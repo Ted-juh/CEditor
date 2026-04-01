@@ -1,0 +1,37 @@
+<script>
+  /**
+   * Status Bar — bottom of the window. Shows context info, selection state, etc.
+   */
+</script>
+
+<div class="status-bar">
+  <span class="status-item">Ready</span>
+  <span class="spacer"></span>
+  <span class="status-item dim">No selection</span>
+  <span class="status-item dim">CEditor v0.1.0</span>
+</div>
+
+<style>
+  .status-bar {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 10px;
+    gap: 12px;
+    background: #007ACC;
+    font-size: 11px;
+    color: #FFF;
+  }
+
+  .status-item {
+    white-space: nowrap;
+  }
+
+  .status-item.dim {
+    opacity: 0.7;
+  }
+
+  .spacer {
+    flex: 1;
+  }
+</style>

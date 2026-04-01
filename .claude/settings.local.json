@@ -1,0 +1,32 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --build . --target CEditor)",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\"\" && cd /d C:\\\\dev\\\\Projects\\\\CEditor\\\\build && ninja CEditor 2>&1\")",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\"\" >nul 2>&1 & cd /d C:\\\\dev\\\\Projects\\\\CEditor\\\\build & ninja CEditor 2>&1\")",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\"\" >nul 2>&1 & C:\\\\dev\\\\Projects\\\\CEditor\\\\build\\\\ninja.exe -C C:\\\\dev\\\\Projects\\\\CEditor\\\\build CEditor > C:\\\\dev\\\\Projects\\\\CEditor\\\\build\\\\build_output.txt 2>&1\")",
+      "Bash(MSVC_VER=\"14.50.35717\")",
+      "Bash(SDK_VER=\"10.0.26100.0\")",
+      "Bash(export INCLUDE=\"C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/$MSVC_VER/include;C:/Program Files \\(x86\\)/Windows Kits/10/Include/$SDK_VER/ucrt;C:/Program Files \\(x86\\)/Windows Kits/10/Include/$SDK_VER/um;C:/Program Files \\(x86\\)/Windows Kits/10/Include/$SDK_VER/shared\")",
+      "Bash(export LIB=\"C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC/$MSVC_VER/lib/x64;C:/Program Files \\(x86\\)/Windows Kits/10/Lib/$SDK_VER/ucrt/x64;C:/Program Files \\(x86\\)/Windows Kits/10/Lib/$SDK_VER/um/x64\")",
+      "Bash(MSVC_VER=\"14.44.35207\")",
+      "Bash(cmake .. -G Ninja -DCMAKE_C_COMPILER=\"C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin/clang.exe\" -DCMAKE_CXX_COMPILER=\"C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/Llvm/x64/bin/clang.exe\")",
+      "Bash(ninja -k 0 CEditor)",
+      "Bash(cmd //c \"C:\\\\Users\\\\Tedjuh\\\\AppData\\\\Local\\\\Temp\\\\build.bat\")",
+      "Bash(grep -r RadioButton /c/dev/Projects/CEditor --include=*.h --include=*.cpp)",
+      "Bash(grep -rn \"RadioButton\\\\|RadioGroup\\\\|createComponent.*Button\" /c/dev/Projects/CEditor/Source/CEditor/CE_Panel --include=*.cpp --include=*.h)",
+      "Bash(grep -rn \"ToggleButton\\\\|DrawableButton\" /c/dev/Projects/CEditor/Source/CEditor/CE_Panel/UI/Components/ButtonComponent --include=*.cpp --include=*.h)",
+      "Bash(cmake --build out/build/x64-Debug --target CEditor)",
+      "Bash(cmake --preset x64-Debug)",
+      "Bash(cmake -B out/build/x64-Debug -G Ninja)",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvarsall.bat\"\" x64 >nul 2>&1 & cmake --build c:\\\\dev\\\\Projects\\\\CEditor\\\\out\\\\build\\\\x64-Debug --target CEditor 2>&1\")",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvarsall.bat\"\" x64 && cmake --build c:\\\\dev\\\\Projects\\\\CEditor\\\\out\\\\build\\\\x64-Debug --target CEditor\")",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvarsall.bat\"\" x64 1>nul 2>nul && echo VCVARS_OK && set INCLUDE\")",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvarsall.bat\"\" x64 >nul 2>nul && cmake --build c:\\\\dev\\\\Projects\\\\CEditor\\\\out\\\\build\\\\x64-Debug --target CEditor > c:\\\\dev\\\\Projects\\\\CEditor\\\\build_out.txt 2>&1\")",
+      "Bash(grep -r buildControlSection_.*Card /c/dev/Projects/CEditor/Source/CEditor/CE_Application/Panels/PropertiesPanel/PropertiesPanel.h)",
+      "Bash(xargs ls:*)",
+      "Bash(grep -r \"buildAnimationCardBody\\\\|buildBackgroundCardBody\\\\|buildTextCardBody\" /c/dev/Projects/CEditor/Source/CEditor/CE_Application/Panels/PropertiesPanel/PropertiesPanel_Section*.cpp)",
+      "Bash(ls -la /c/dev/Projects/CEditor/Source/CEditor/CE_Application/Panels/PropertiesPanel/Cards/Components/*.h)"
+    ]
+  }
+}

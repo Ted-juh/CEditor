@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v \"^\\\\s*//\")",
+      "Bash(find \"c:\\\\dev\\\\Projects\\\\CEditor\\\\Source\\\\CEditor\\\\CE_Panel\\\\UI\\\\Rendering\"\" -type f -name \"*.h\" -o -name \"*.cpp \")",
+      "Bash(cmake --build build --config Debug --target CEditor)",
+      "Bash(cmake --build build --config Debug)",
+      "Bash(ls -la \"c:/dev/Projects/CEditor/Source/CEditor/CE_Application/Panels/PropertiesPanel/Cards/Handlers/TextCardHandler\"*.cpp \"c:/dev/Projects/CEditor/Source/CEditor/CE_Application/Panels/PropertiesPanel/Cards/Handlers/TextCardHandler\"*.h)",
+      "Bash(find c:devProjectsCEditor -path *juce* -name *.h -type f)",
+      "Bash(find c:devProjectsCEditorJUCE -name juce_TextEditor.h -o -name *TextEditor* -type f)",
+      "Bash(xargs grep:*)",
+      "Bash(find /c/dev/Projects/CEditor/Source/CEditor -type f -name *Debug* -o -name *Inspector* -o -name *History*)",
+      "Bash(cmd /c \"call \"\"C:\\\\Program Files\\\\Microsoft Visual Studio\\\\18\\\\Community\\\\VC\\\\Auxiliary\\\\Build\\\\vcvars64.bat\"\" >nul 2>&1 & cd /d C:\\\\dev\\\\Projects\\\\CEditor\\\\build & C:\\\\dev\\\\IDE\\\\Ninja\\\\ninja.exe CEditor\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Read(//c/Program Files/Microsoft Visual Studio/18/Community/VC/Auxiliary/Build/**)",
+      "Bash(1 cd:*)",
+      "Bash(1 BATCH cmd /c C:devProjectsCEditorbuilddo_build.bat)",
+      "Bash(INCLUDE=\"C:/Program Files \\(x86\\)/Windows Kits/10/Include/10.0.26100.0/um;C:/Program Files \\(x86\\)/Windows Kits/10/Include/10.0.26100.0/shared\" cmd /c \"cd /d C:\\\\dev\\\\Projects\\\\CEditor\\\\build && C:\\\\dev\\\\IDE\\\\Ninja\\\\ninja.exe CEditor\")",
+      "Bash(export INCLUDE=\"C:/Program Files \\(x86\\)/Windows Kits/10/Include/10.0.26100.0/um;C:/Program Files \\(x86\\)/Windows Kits/10/Include/10.0.26100.0/shared\")",
+      "Bash(ninja CEditor)"
+    ]
+  }
+}
