@@ -1,8 +1,10 @@
 <script>
-  import { panels, activePanelId } from '../stores/panels.js';
+  import { panels, activePanelId, editorZoom } from '../stores/panels.js';
   import TabBar from './TabBar.svelte';
 
   let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  let zoom = $derived($editorZoom);
+  let scale = $derived(zoom / 100);
 </script>
 
 <div class="editor-wrapper">
@@ -13,12 +15,14 @@
   <div class="canvas-area">
     {#if panel}
       <div class="canvas-viewport">
-        <div
-          class="panel-surface"
-          style="width: {panel.width}px; height: {panel.height}px;"
-        >
-          <!-- Panel components will render here -->
-          <span class="panel-label">{panel.name} — {panel.width} x {panel.height}</span>
+        <div class="zoom-container" style="transform: scale({scale}); transform-origin: center center;">
+          <div
+            class="panel-surface"
+            style="width: {panel.width}px; height: {panel.height}px;"
+          >
+            <!-- Panel components will render here -->
+            <span class="panel-label">{panel.name} — {panel.width} x {panel.height}</span>
+          </div>
         </div>
       </div>
     {:else}
@@ -83,6 +87,14 @@
 
   .canvas-viewport::-webkit-scrollbar-corner {
     background: #5B9BD5;
+  }
+
+  .zoom-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 40px;
   }
 
   .panel-surface {

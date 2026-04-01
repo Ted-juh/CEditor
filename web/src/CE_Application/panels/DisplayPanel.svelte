@@ -3,8 +3,52 @@
    * Display Panel — bottom dock with mini displays/tools.
    * Tabs for: Colors, Gradient, Notepad, Viewer, Tools, Console.
    */
+  import ColorChooser from '../components/ColorChooser.svelte';
+  import ColorSettings from '../components/ColorSettings.svelte';
+  import { activePanel, updatePanel } from '../stores/panels.js';
 
   let activeTab = $state('colors');
+
+  // Color the user picked via the chooser (bands/hex input only)
+  let userPickedColor = $state($activePanel?.bgColour ?? '333333');
+  let userPickedAlpha = $state(1);
+  let stepSize = $state(10);
+
+  // Swatches: 2 rows x 12 columns = 24 slots
+  let swatches = $state(Array(24).fill(null));
+
+  // Called by the ColorChooser when the user interacts with bands/hex
+  // hex is now AARRGGBB format
+  function handleColorChange(hex) {
+    if (hex.length >= 8) {
+      userPickedAlpha = parseInt(hex.slice(0, 2), 16) / 255;
+      userPickedColor = hex.slice(2, 8);
+    } else {
+      userPickedAlpha = 1;
+      userPickedColor = hex.slice(0, 6);
+    }
+    const panel = $activePanel;
+    if (panel) {
+      updatePanel(panel.id, { bgColour: userPickedColor, modified: true });
+    }
+  }
+
+  function handleSwatchClick(index) {
+    if (swatches[index]) {
+      handleColorChange('FF' + swatches[index]);
+    } else {
+      swatches[index] = userPickedColor;
+    }
+  }
+
+  function handleSwatchDblClick(index) {
+    swatches[index] = null;
+  }
+
+  function handleSwatchRightClick(index, e) {
+    e.preventDefault();
+    swatches[index] = userPickedColor;
+  }
 
   const tabs = [
     { id: 'colors',   label: 'Colors' },
@@ -31,7 +75,41 @@
 
   <div class="tab-content">
     {#if activeTab === 'colors'}
-      <div class="placeholder">Color Picker / Swatches</div>
+      <div class="colors-layout">
+        <div class="colors-preview">
+          <ColorChooser
+            color={userPickedColor}
+            alpha={userPickedAlpha}
+            {stepSize}
+            onchange={handleColorChange}
+          />
+        </div>
+        <div class="colors-sidebar">
+          <div class="sidebar-settings">
+            <ColorSettings
+              color={userPickedColor}
+              alpha={userPickedAlpha}
+              bind:stepSize={stepSize}
+              onApplyColor={handleColorChange}
+            />
+          </div>
+          <div class="sidebar-swatches">
+            <div class="swatches-grid">
+              {#each swatches as swatch, i}
+                <button
+                  class="swatch"
+                  class:empty={!swatch}
+                  style={swatch ? `background: #${swatch}` : ''}
+                  onclick={() => handleSwatchClick(i)}
+                  ondblclick={() => handleSwatchDblClick(i)}
+                  oncontextmenu={(e) => handleSwatchRightClick(i, e)}
+                  title={swatch ? `#${swatch} — right-click to replace, double-click to clear` : 'Click to store current color'}
+                ></button>
+              {/each}
+            </div>
+          </div>
+        </div>
+      </div>
     {:else if activeTab === 'gradient'}
       <div class="placeholder">Gradient Editor</div>
     {:else if activeTab === 'notepad'}
@@ -88,6 +166,68 @@
   .tab-content {
     flex: 1;
     overflow: auto;
+  }
+
+  .colors-layout {
+    display: flex;
+    height: 100%;
+  }
+
+  .colors-preview {
+    width: 75%;
+    flex-shrink: 0;
+    border-right: 1px solid #333;
+  }
+
+  .colors-sidebar {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sidebar-settings {
+    flex: 3;
+    overflow: auto;
+  }
+
+  .sidebar-swatches {
+    flex: 1;
+    border-top: 1px solid #333;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+  }
+
+  .swatches-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 2px;
+    width: 100%;
+  }
+
+  .swatch {
+    aspect-ratio: 1;
+    border: 1px solid #333;
+    border-radius: 2px;
+    cursor: pointer;
+    padding: 0;
+    min-width: 0;
+    transition: border-color 0.1s;
+  }
+
+  .swatch:hover {
+    border-color: #5B9BD5;
+  }
+
+  .swatch.empty {
+    background: #333;
+    border-style: dashed;
+  }
+
+  .swatch.empty:hover {
+    border-color: #5B9BD5;
   }
 
   .placeholder {

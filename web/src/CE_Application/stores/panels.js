@@ -28,6 +28,10 @@ export function createPanel(name = null) {
 /** Currently selected component id (null = panel itself is selected) */
 export const selectedComponentId = writable(null);
 
+/** Editor zoom state */
+export const editorZoom = writable(100);
+export const editorZoomIncrement = writable(10);
+
 /** All open panels */
 export const panels = writable([]);
 
