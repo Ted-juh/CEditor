@@ -1,4 +1,5 @@
 #include "ValueTreeBridge.h"
+#include "AppSettings.h"
 
 ValueTreeBridge::ValueTreeBridge()
 {
@@ -102,6 +103,172 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (
             juce::MessageManager::callAsync ([this]()
             {
                 undoManager.redo();
+            });
+        })
+        .withEventListener ("closeApplication", [] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([]()
+            {
+                juce::JUCEApplication::getInstance()->systemRequestedQuit();
+            });
+        })
+        .withEventListener ("savePanelAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto panelId = payloadObj->getProperty ("panelId").toString();
+                auto jsonData = payloadObj->getProperty ("data").toString();
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Save Panel As",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cepanel");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [this, panelId, jsonData] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File())
+                            return;
+
+                        auto file = result.withFileExtension ("cepanel");
+                        file.replaceWithText (jsonData);
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("panelId", panelId);
+                        obj->setProperty ("filePath", file.getFullPathName());
+                        obj->setProperty ("name", file.getFileNameWithoutExtension());
+
+                        browser->emitEventIfBrowserIsVisible ("panelSaved", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("savePanel", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* obj = payload.getDynamicObject();
+                if (obj == nullptr)
+                    return;
+
+                auto panelId = obj->getProperty ("panelId").toString();
+                auto filePath = obj->getProperty ("filePath").toString();
+                auto jsonData = obj->getProperty ("data").toString();
+
+                juce::File file (filePath);
+                file.replaceWithText (jsonData);
+
+                auto* resp = new juce::DynamicObject();
+                resp->setProperty ("panelId", panelId);
+                resp->setProperty ("filePath", filePath);
+
+                browser->emitEventIfBrowserIsVisible ("panelSaved", juce::var (resp));
+            });
+        })
+        .withEventListener ("openPanel", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Open Panel",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cepanel");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File() || ! result.existsAsFile())
+                            return;
+
+                        auto jsonData = result.loadFileAsString();
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", result.getFullPathName());
+                        obj->setProperty ("name", result.getFileNameWithoutExtension());
+                        obj->setProperty ("data", jsonData);
+
+                        browser->emitEventIfBrowserIsVisible ("panelOpened", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("openPanelFile", [this] (const juce::var& payload)
+        {
+            // Open a specific panel file by path (used for restoring session)
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto filePath = payloadObj->getProperty ("filePath").toString();
+                juce::File file (filePath);
+
+                if (! file.existsAsFile())
+                    return;
+
+                auto jsonData = file.loadFileAsString();
+
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("filePath", filePath);
+                obj->setProperty ("name", file.getFileNameWithoutExtension());
+                obj->setProperty ("data", jsonData);
+
+                browser->emitEventIfBrowserIsVisible ("panelOpened", juce::var (obj));
+            });
+        })
+        .withEventListener ("loadOpenPanels", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr || appSettings == nullptr)
+                    return;
+
+                auto paths = appSettings->getOpenPanelPaths();
+                juce::Array<juce::var> arr;
+
+                for (const auto& path : paths)
+                    arr.add (path);
+
+                browser->emitEventIfBrowserIsVisible ("openPanelPaths", arr);
+            });
+        })
+        .withEventListener ("updateOpenPanels", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (appSettings == nullptr)
+                    return;
+
+                juce::StringArray paths;
+
+                if (auto* arr = payload.getArray())
+                {
+                    for (const auto& item : *arr)
+                        paths.add (item.toString());
+                }
+
+                appSettings->setOpenPanelPaths (paths);
             });
         });
 

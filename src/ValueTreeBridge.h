@@ -3,16 +3,23 @@
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
 
+class AppSettings;
+
 /**
  * Bridges a juce::ValueTree to a WebBrowserComponent via native events.
  *
  * C++ -> JS:  emits "fullState" and "propUpdate" events
  * JS -> C++:  receives "setProperty", "undo", "redo" via event listeners
+ *             receives "savePanelAs", "savePanel", "openPanel",
+ *             "loadOpenPanels", "updateOpenPanels" for file operations
  */
 class ValueTreeBridge : public juce::ValueTree::Listener
 {
 public:
     ValueTreeBridge();
+
+    /** Set the AppSettings reference for panel persistence */
+    void setAppSettings (AppSettings* s) { appSettings = s; }
 
     /** Returns WebBrowserComponent::Options with all native functions and event listeners
      *  registered. Chain this into your Options builder before constructing the WebBrowserComponent.
@@ -55,4 +62,7 @@ private:
     juce::UndoManager undoManager;
     juce::WebBrowserComponent* browser = nullptr;
     bool suppressOutgoing = false;
+
+    AppSettings* appSettings = nullptr;
+    std::unique_ptr<juce::FileChooser> fileChooser;
 };

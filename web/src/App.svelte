@@ -7,11 +7,24 @@
   import DisplayPanel from './CE_Application/panels/DisplayPanel.svelte';
   import PropertiesPanel from './CE_Application/panels/PropertiesPanel.svelte';
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
+  import { initPanelBridge } from './CE_Application/stores/panels.js';
+  import { initConsoleBridge } from './CE_Application/stores/console.js';
+
+  initPanelBridge();
+  initConsoleBridge();
 
   let propertiesPanelWidth = $state(280);
   let isResizingProps = $state(false);
-  let displayPanelHeight = $state(180);
+  let displayPanelHeight = $state(480);
   let isResizingDisplay = $state(false);
+  let showDisplayPanel = $state(true);
+  let showPropertiesPanel = $state(true);
+  const tabDefaultHeights = { colors: 480, gradient: 580 };
+
+  function handleDisplayTabChange(tabId) {
+    const target = tabDefaultHeights[tabId];
+    if (target) displayPanelHeight = target;
+  }
 
   function startPropsResize(e) {
     isResizingProps = true;
@@ -40,7 +53,7 @@
 
     function onMouseMove(e) {
       const delta = startY - e.clientY;
-      displayPanelHeight = Math.max(80, Math.min(500, startHeight + delta));
+      displayPanelHeight = Math.max(80, Math.min(900, startHeight + delta));
     }
 
     function onMouseUp() {
@@ -54,13 +67,18 @@
   }
 </script>
 
-<div class="app" style="--props-width: {propertiesPanelWidth}px">
+<div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
   <div class="menubar-area">
     <MenuBar />
   </div>
 
   <div class="icon-panel-area">
-    <IconPanel />
+    <IconPanel
+      {showDisplayPanel}
+      {showPropertiesPanel}
+      onToggleDisplay={() => showDisplayPanel = !showDisplayPanel}
+      onToggleProperties={() => showPropertiesPanel = !showPropertiesPanel}
+    />
   </div>
 
   <div class="center-area">
@@ -74,18 +92,20 @@
       <ZoomBar />
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize}></div>
-    <div class="display-panel-area" style="flex: 0 0 {displayPanelHeight}px;">
-      <DisplayPanel />
+    <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {showDisplayPanel ? 'block' : 'none'}"></div>
+    <div class="display-panel-area" style="flex: 0 0 {displayPanelHeight}px; display: {showDisplayPanel ? 'block' : 'none'}">
+      <DisplayPanel onTabChange={handleDisplayTabChange} />
     </div>
   </div>
 
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
+  {#if showPropertiesPanel}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
 
-  <div class="properties-area">
-    <PropertiesPanel width={propertiesPanelWidth} />
-  </div>
+    <div class="properties-area">
+      <PropertiesPanel width={propertiesPanelWidth} />
+    </div>
+  {/if}
 
   <div class="statusbar-area">
     <StatusBar />
@@ -97,10 +117,10 @@
     width: 100vw;
     height: 100vh;
     display: grid;
-    grid-template-columns: 48px 1fr 8px var(--props-width);
+    grid-template-columns: 48px 1fr var(--resize-width) var(--props-width);
     grid-template-rows: 28px 1fr 24px;
     grid-template-areas:
-      "menu    menu    menu    menu"
+      "icon    menu    menu    menu"
       "icon    center  resize  props"
       "status  status  status  status";
     overflow: hidden;

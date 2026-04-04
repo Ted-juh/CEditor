@@ -13,10 +13,19 @@ set(WEBVIEW2_DIR "${CMAKE_SOURCE_DIR}/thirdparty/webview2/build/native")
 set(WEBVIEW2_INCLUDE "${WEBVIEW2_DIR}/include")
 set(WEBVIEW2_LIB_DIR "${WEBVIEW2_DIR}/x64")
 
+# --- Binary resources (icon etc.) ---
+juce_add_binary_data(CEditorData
+    HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/BinaryData"
+    SOURCES
+        include/MainApplication/logo.png
+)
+
 # --- Standalone GUI app ---
 juce_add_gui_app(CEditor
     PRODUCT_NAME "CEditor"
     COMPANY_NAME "Tedjuh-inc"
+    ICON_BIG   "${CMAKE_SOURCE_DIR}/include/MainApplication/logo.png"
+    ICON_SMALL "${CMAKE_SOURCE_DIR}/include/MainApplication/logo.png"
 )
 
 target_sources(CEditor PRIVATE
@@ -34,7 +43,10 @@ target_compile_definitions(CEditor PRIVATE
     CEDITOR_DEV_MODE=1
 )
 
-target_include_directories(CEditor PRIVATE "${WEBVIEW2_INCLUDE}")
+target_include_directories(CEditor PRIVATE
+    "${WEBVIEW2_INCLUDE}"
+    "${CMAKE_BINARY_DIR}/BinaryData"
+)
 
 target_link_libraries(CEditor PRIVATE
     juce::juce_core
@@ -44,6 +56,8 @@ target_link_libraries(CEditor PRIVATE
     juce::juce_gui_basics
     juce::juce_gui_extra
     "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+    dwmapi
+    CEditorData
 )
 
 # JUCE handles the entry point via START_JUCE_APPLICATION

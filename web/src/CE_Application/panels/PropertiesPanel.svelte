@@ -1,6 +1,5 @@
 <script>
   import {
-    Crosshair,
     Paintbrush,
     Type,
     SquareDashed,
@@ -16,9 +15,16 @@
     SquareStack,
     ChevronDown,
     ChevronRight,
+    Box,
+    Move,
+    MousePointer,
   } from 'lucide-svelte';
   import { panels, activePanelId, selectedComponentId } from '../stores/panels.js';
+  import { selectedControl, hasSection } from '../stores/controls.js';
   import PanelCardContent from './PanelCardContent.svelte';
+  import CoreEditor from '../sections/CoreEditor.svelte';
+  import TransformEditor from '../sections/TransformEditor.svelte';
+  import BackgroundEditor from '../sections/BackgroundEditor.svelte';
 
   let { width = 280 } = $props();
 
@@ -41,8 +47,9 @@
   // Reset tabs when context mode changes
   $effect(() => {
     if (contextMode) {
-      singleTab = 'identity';
-      multiTabs = new Set(['identity']);
+      const defaultTab = contextMode === 'component' ? 'core' : 'identity';
+      singleTab = defaultTab;
+      multiTabs = new Set([defaultTab]);
     }
   });
 
@@ -54,18 +61,28 @@
     { id: 'export',     icon: Monitor,          label: 'Export' },
   ];
 
-  // Component-level tabs
-  const componentTabs = [
-    { id: 'identity',   icon: Crosshair,    label: 'Identity' },
-    { id: 'background', icon: Paintbrush,    label: 'Background' },
-    { id: 'text',       icon: Type,          label: 'Text' },
-    { id: 'border',     icon: SquareDashed,  label: 'Border' },
-    { id: 'icon',       icon: Image,         label: 'Icon' },
-    { id: 'effects',    icon: Sparkles,      label: 'Effects' },
-    { id: 'actions',    icon: Zap,           label: 'Actions' },
-    { id: 'links',      icon: Link,          label: 'Links' },
-    { id: 'specific',   icon: Settings2,     label: 'Type' },
+  // All possible component-level tabs (filtered by which sections exist)
+  const allComponentTabs = [
+    { id: 'core',       icon: Box,           label: 'Core',       section: 'Core' },
+    { id: 'transform',  icon: Move,          label: 'Transform',  section: 'Transform' },
+    { id: 'background', icon: Paintbrush,    label: 'Background', section: 'Background' },
+    { id: 'text',       icon: Type,          label: 'Text',       section: 'Text' },
+    { id: 'border',     icon: SquareDashed,  label: 'Border',     section: 'Border' },
+    { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
+    { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },
+    { id: 'icon',       icon: Image,         label: 'Icon',       section: 'Icon' },
+    { id: 'effects',    icon: Sparkles,      label: 'Effects',    section: 'Shadow' },
+    { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
+    { id: 'links',      icon: Link,          label: 'Links',      section: null },
+    { id: 'specific',   icon: Settings2,     label: 'Type',       section: null },
   ];
+
+  // Only show tabs for sections that exist on the selected component
+  let componentTabs = $derived(
+    $selectedControl
+      ? allComponentTabs.filter(t => !t.section || hasSection($selectedControl, t.section))
+      : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
+  );
 
   let tabs = $derived(contextMode === 'panel' ? panelTabs : componentTabs);
 
@@ -165,7 +182,15 @@
             {#if contextMode === 'panel'}
               <PanelCardContent tabId={tab.id} />
             {:else}
-              <div class="placeholder">Component: {tab.label}</div>
+              {#if tab.id === 'core'}
+                <CoreEditor control={$selectedControl} />
+              {:else if tab.id === 'transform'}
+                <TransformEditor control={$selectedControl} />
+              {:else if tab.id === 'background'}
+                <BackgroundEditor control={$selectedControl} />
+              {:else}
+                <div class="placeholder">Component: {tab.label}</div>
+              {/if}
             {/if}
           </div>
         {/each}
@@ -186,7 +211,23 @@
                   {#if contextMode === 'panel'}
                     <PanelCardContent tabId={tab.id} />
                   {:else}
-                    <div class="placeholder">Component: {tab.label}</div>
+                    {#if tab.id === 'core'}
+                      <CoreEditor control={$selectedControl} />
+                    {:else if tab.id === 'transform'}
+                      <TransformEditor control={$selectedControl} />
+                    {:else if tab.id === 'background'}
+                      <BackgroundEditor control={$selectedControl} />
+                    {:else}
+                      {#if tab.id === 'core'}
+                <CoreEditor control={$selectedControl} />
+              {:else if tab.id === 'transform'}
+                <TransformEditor control={$selectedControl} />
+              {:else if tab.id === 'background'}
+                <BackgroundEditor control={$selectedControl} />
+              {:else}
+                <div class="placeholder">Component: {tab.label}</div>
+              {/if}
+                    {/if}
                   {/if}
                 </div>
               {/if}

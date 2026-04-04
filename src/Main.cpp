@@ -1,5 +1,6 @@
 #include <juce_gui_basics/juce_gui_basics.h>
 #include "MainWindow.h"
+#include "AppSettings.h"
 
 class CEditorApplication : public juce::JUCEApplication
 {
@@ -10,20 +11,26 @@ public:
 
     void initialise (const juce::String&) override
     {
-        mainWindow = std::make_unique<MainWindow> ("CEditor");
+        settings = std::make_unique<AppSettings>();
+        mainWindow = std::make_unique<MainWindow> ("CEditor", *settings);
     }
 
     void shutdown() override
     {
         mainWindow = nullptr;
+        settings = nullptr;
     }
 
     void systemRequestedQuit() override
     {
+        if (mainWindow != nullptr)
+            mainWindow->saveAndClose();
+
         quit();
     }
 
 private:
+    std::unique_ptr<AppSettings> settings;
     std::unique_ptr<MainWindow> mainWindow;
 };
 

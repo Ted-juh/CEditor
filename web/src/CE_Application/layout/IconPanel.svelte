@@ -11,7 +11,16 @@
     LayoutGrid,
     Activity,
     AudioLines,
+    PanelBottom,
+    PanelRight,
   } from 'lucide-svelte';
+
+  let {
+    showDisplayPanel = true,
+    showPropertiesPanel = true,
+    onToggleDisplay = () => {},
+    onToggleProperties = () => {},
+  } = $props();
 
   let activeTool = $state('select');
 
@@ -59,6 +68,29 @@
       </button>
     {/each}
   </div>
+
+  <div class="spacer"></div>
+
+  <div class="separator"></div>
+
+  <div class="panel-toggles">
+    <button
+      class="icon-btn"
+      class:active={showDisplayPanel}
+      title="Toggle Display Panel"
+      onclick={onToggleDisplay}
+    >
+      <PanelBottom size={18} strokeWidth={1.5} />
+    </button>
+    <button
+      class="icon-btn"
+      class:active={showPropertiesPanel}
+      title="Toggle Properties Panel"
+      onclick={onToggleProperties}
+    >
+      <PanelRight size={18} strokeWidth={1.5} />
+    </button>
+  </div>
 </div>
 
 <style>
@@ -69,19 +101,24 @@
     height: 100%;
     background: #252525;
     border-right: 1px solid #1A1A1A;
-    padding: 6px 0;
+    padding: 34px 0 6px 0;
     gap: 2px;
     overflow-y: auto;
   }
 
   .tool-section,
-  .component-section {
+  .component-section,
+  .panel-toggles {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 2px;
     width: 100%;
     padding: 0 4px;
+  }
+
+  .spacer {
+    flex: 1;
   }
 
   .separator {

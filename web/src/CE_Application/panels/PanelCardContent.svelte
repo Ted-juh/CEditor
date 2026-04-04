@@ -1,9 +1,15 @@
 <script>
   import { panels, activePanelId, updatePanel } from '../stores/panels.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import NumberInput from '../sections/NumberInput.svelte';
 
   let { tabId = '' } = $props();
 
   let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+
+  function handleSwatchClick(prop, currentColor) {
+    activateColorTarget({ type: 'panel', prop }, currentColor);
+  }
 
   function handlePropChange(prop, e) {
     if (!panel) return;
@@ -30,13 +36,11 @@
       <div class="prop-row-pair">
         <div class="prop-row half">
           <span class="lbl">Width</span>
-          <input class="val" type="number" value={panel.width}
-                 onchange={(e) => handlePropChange('width', e)} />
+          <NumberInput value={panel.width} step={1} min={1} onchange={(v) => updatePanel(panel.id, { width: v })} />
         </div>
         <div class="prop-row half">
           <span class="lbl">Height</span>
-          <input class="val" type="number" value={panel.height}
-                 onchange={(e) => handlePropChange('height', e)} />
+          <NumberInput value={panel.height} step={1} min={1} onchange={(v) => updatePanel(panel.id, { height: v })} />
         </div>
       </div>
     </div>
@@ -54,7 +58,7 @@
       <div class="prop-row">
         <span class="lbl">Colour</span>
         <div class="color-input">
-          <div class="mini-swatch" style="background:#{panel.bgColour}"></div>
+          <button class="mini-swatch" title="Pick colour" style="background:#{panel.bgColour}" onclick={() => handleSwatchClick('bgColour', panel.bgColour)}></button>
           <input class="val" type="text" value={panel.bgColour}
                  onchange={(e) => handlePropChange('bgColour', e)} />
         </div>
@@ -71,8 +75,11 @@
       </div>
       <div class="prop-row">
         <span class="lbl">Grid Size</span>
-        <input class="val" type="number" value={panel.gridSize}
-               onchange={(e) => handlePropChange('gridSize', e)} />
+        <NumberInput value={panel.gridSize} step={1} min={1} onchange={(v) => updatePanel(panel.id, { gridSize: v })} />
+      </div>
+      <div class="prop-row">
+        <span class="lbl">Thickness</span>
+        <NumberInput value={panel.gridLineWidth ?? 1} step={1} min={1} max={10} onchange={(v) => updatePanel(panel.id, { gridLineWidth: v })} />
       </div>
       <div class="prop-row">
         <span class="lbl">Snap</span>
@@ -80,6 +87,14 @@
                 onclick={() => handleToggle('snapToGrid')}>
           {panel.snapToGrid ? 'On' : 'Off'}
         </button>
+      </div>
+      <div class="prop-row">
+        <span class="lbl">Colour</span>
+        <div class="color-input">
+          <button class="mini-swatch" title="Pick colour" style="background:#{(panel.gridColour ?? '33FFFFFF').slice(-6)}" onclick={() => handleSwatchClick('gridColour', panel.gridColour ?? '33FFFFFF')}></button>
+          <input class="val" type="text" value={panel.gridColour ?? '33FFFFFF'}
+                 onchange={(e) => handlePropChange('gridColour', e)} />
+        </div>
       </div>
     </div>
   {:else if tabId === 'export'}
@@ -165,6 +180,11 @@
     border: 1px solid #555;
     flex-shrink: 0;
     cursor: pointer;
+    padding: 0;
+  }
+
+  .mini-swatch:hover {
+    border-color: #5B9BD5;
   }
 
   .toggle-val {

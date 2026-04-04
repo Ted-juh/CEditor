@@ -1,19 +1,23 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closePanel, activePanelId } from '../stores/panels.js';
+  import { addPanel, closePanel, activePanelId, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
+  import { addControl } from '../stores/controls.js';
+  import { closeApplication } from '../bridge/bridge.js';
 
   const menus = {
     File: [
       { label: 'New Panel',  shortcut: 'Ctrl+N', action: () => addPanel() },
-      { label: 'Open Panel', shortcut: 'Ctrl+O', action: () => {} },
+      { label: 'Open Panel', shortcut: 'Ctrl+O', action: () => openPanelFromFile() },
       { type: 'separator' },
-      { label: 'Save',       shortcut: 'Ctrl+S', action: () => {} },
-      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => {} },
+      { label: 'Save',       shortcut: 'Ctrl+S', action: () => saveActivePanel() },
+      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => saveActivePanelAs() },
       { type: 'separator' },
       { label: 'Close Panel', shortcut: 'Ctrl+W', action: () => {
         const id = get(activePanelId);
         if (id != null) closePanel(id);
       }},
+      { type: 'separator' },
+      { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],
     Edit: [
       { label: 'Undo', shortcut: 'Ctrl+Z', action: () => {} },
@@ -34,14 +38,10 @@
       { label: 'Toggle Snap', action: () => {} },
     ],
     Insert: [
-      { label: 'Button',   action: () => {} },
-      { label: 'Label',    action: () => {} },
-      { label: 'Slider',   action: () => {} },
-      { label: 'ComboBox', action: () => {} },
-      { label: 'Backdrop', action: () => {} },
-      { label: 'Grid',     action: () => {} },
-      { label: 'Envelope', action: () => {} },
-      { label: 'Filter',   action: () => {} },
+      { label: 'Background', action: () => addControl('Background') },
+      { label: 'Label',      action: () => addControl('Label') },
+      { label: 'Button',     action: () => addControl('Button') },
+      { label: 'Container',  action: () => addControl('Container') },
     ],
     Panel: [
       { label: 'Panel Properties...', action: () => {} },
@@ -72,13 +72,11 @@
   }
 
   function handleWindowClick(e) {
-    // Close menu if clicking outside
     if (openMenu && !e.target.closest('.menubar')) {
       openMenu = null;
     }
   }
 
-  // Handle hover to switch between open menus
   function handleMenuHover(name) {
     if (openMenu !== null) {
       openMenu = name;
@@ -89,10 +87,6 @@
 <svelte:window onclick={handleWindowClick} />
 
 <nav class="menubar">
-  <div class="app-icon" title="CEditor">
-    <!-- App icon placeholder -->
-  </div>
-
   {#each menuNames as name}
     <div class="menu-wrapper">
       <button
@@ -135,17 +129,6 @@
     gap: 1px;
     position: relative;
     z-index: 100;
-  }
-
-  .app-icon {
-    width: 48px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    background: #252525;
-    border-right: 1px solid #1A1A1A;
   }
 
   .menu-wrapper {

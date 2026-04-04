@@ -8,10 +8,12 @@
  * In dev mode, loads from Vite dev server (localhost:5173).
  * In production, serves from the ResourceProvider.
  */
+class AppSettings;
+
 class WebViewHost : public juce::Component
 {
 public:
-    WebViewHost();
+    WebViewHost (AppSettings* settings = nullptr);
 
     void resized() override;
 
