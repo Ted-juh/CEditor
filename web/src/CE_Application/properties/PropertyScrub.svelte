@@ -48,6 +48,7 @@
 
 <div class="property-scrub">
   <span class="scrub-label">{label}</span>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="scrub-track"
        bind:this={trackEl}
        onpointerdown={handlePointerDown}
