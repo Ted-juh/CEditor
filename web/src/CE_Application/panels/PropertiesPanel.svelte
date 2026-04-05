@@ -18,8 +18,16 @@
     Box,
     Move,
     MousePointer,
+    Lock,
+    LockOpen,
+    Undo2,
+    Redo2,
+    Save,
+    Grid3x3 as GridIcon,
+    Magnet,
   } from 'lucide-svelte';
-  import { panels, activePanelId, selectedComponentId } from '../stores/panels.js';
+  import { panels, activePanelId, selectedComponentId, updatePanel, saveActivePanel } from '../stores/panels.js';
+  import { propertyHint } from '../stores/propertyHint.js';
   import { selectedControl, hasSection } from '../stores/controls.js';
   import PanelCardContent from './PanelCardContent.svelte';
   import CoreEditor from '../sections/CoreEditor.svelte';
@@ -36,10 +44,10 @@
   let viewMode = $state('single');
 
   // Single mode: one active tab
-  let singleTab = $state('identity');
+  let singleTab = $state('core');
 
   // Multi mode: set of visible tab ids
-  let multiTabs = $state(new Set(['identity']));
+  let multiTabs = $state(new Set(['core']));
 
   // Collapse state per card id
   let collapsedCards = $state({});
@@ -47,7 +55,7 @@
   // Reset tabs when context mode changes
   $effect(() => {
     if (contextMode) {
-      const defaultTab = contextMode === 'component' ? 'core' : 'identity';
+      const defaultTab = 'core';
       singleTab = defaultTab;
       multiTabs = new Set([defaultTab]);
     }
@@ -55,7 +63,7 @@
 
   // Panel-level tabs
   const panelTabs = [
-    { id: 'identity',   icon: LayoutDashboard, label: 'Panel' },
+    { id: 'core',       icon: LayoutDashboard, label: 'Core' },
     { id: 'background', icon: Paintbrush,      label: 'Background' },
     { id: 'grid',       icon: Grid3x3,         label: 'Grid' },
     { id: 'export',     icon: Monitor,          label: 'Export' },
@@ -150,7 +158,7 @@
           title={tab.label}
           onclick={(e) => handleTabClick(tab.id, e)}
         >
-          <tab.icon size={16} strokeWidth={1.5} />
+          <tab.icon size={20} strokeWidth={1.5} />
         </button>
       {/each}
 
@@ -172,37 +180,92 @@
 
     <!-- Card detail area -->
     <div class="card-area">
+      <!-- Toolbar area — aligns with editor tab bar (34px) -->
+      <div class="props-toolbar">
+        <button
+          class="toolbar-btn"
+          disabled
+          title="Undo"
+        >
+          <Undo2 size={18} strokeWidth={1.5} />
+        </button>
+        <button
+          class="toolbar-btn"
+          disabled
+          title="Redo"
+        >
+          <Redo2 size={18} strokeWidth={1.5} />
+        </button>
+        <div class="toolbar-divider"></div>
+        <button
+          class="toolbar-btn"
+          class:active={panel.modified}
+          title="Save panel"
+          onclick={() => saveActivePanel()}
+        >
+          <Save size={18} strokeWidth={1.5} />
+        </button>
+        <button
+          class="toolbar-btn"
+          class:active={panel.locked}
+          title={panel.locked ? 'Unlock panel' : 'Lock panel'}
+          onclick={() => updatePanel(panel.id, { locked: !panel.locked })}
+        >
+          {#if panel.locked}
+            <Lock size={18} strokeWidth={1.5} />
+          {:else}
+            <LockOpen size={18} strokeWidth={1.5} />
+          {/if}
+        </button>
+        <div class="toolbar-divider"></div>
+        <button
+          class="toolbar-btn"
+          class:active={panel.gridEnabled}
+          title={panel.gridEnabled ? 'Hide grid' : 'Show grid'}
+          onclick={() => updatePanel(panel.id, { gridEnabled: !panel.gridEnabled })}
+        >
+          <GridIcon size={18} strokeWidth={1.5} />
+        </button>
+        <button
+          class="toolbar-btn"
+          class:active={panel.snapToGrid}
+          title={panel.snapToGrid ? 'Disable snap' : 'Enable snap'}
+          onclick={() => updatePanel(panel.id, { snapToGrid: !panel.snapToGrid })}
+        >
+          <Magnet size={18} strokeWidth={1.5} />
+        </button>
+      </div>
+
       {#if viewMode === 'single'}
-        {#each visibleTabs as tab (tab.id)}
+        {#key singleTab}
           <div class="card-header">
-            <span class="card-title">{tab.label}</span>
-            <span class="card-context">{contextMode === 'panel' ? 'Panel' : 'Component'}</span>
+            <span class="card-title">{tabs.find(t => t.id === singleTab)?.label ?? ''}</span>
           </div>
           <div class="card-content">
             {#if contextMode === 'panel'}
-              <PanelCardContent tabId={tab.id} />
+              <PanelCardContent tabId={singleTab} />
             {:else}
-              {#if tab.id === 'core'}
+              {#if singleTab === 'core'}
                 <CoreEditor control={$selectedControl} />
-              {:else if tab.id === 'transform'}
+              {:else if singleTab === 'transform'}
                 <TransformEditor control={$selectedControl} />
-              {:else if tab.id === 'background'}
+              {:else if singleTab === 'background'}
                 <BackgroundEditor control={$selectedControl} />
               {:else}
-                <div class="placeholder">Component: {tab.label}</div>
+                <div class="placeholder">Component: {tabs.find(t => t.id === singleTab)?.label ?? ''}</div>
               {/if}
             {/if}
           </div>
-        {/each}
+        {/key}
       {:else}
         <div class="multi-scroll">
           {#each visibleTabs as tab (tab.id)}
             <div class="multi-card">
               <button class="multi-card-header" onclick={() => toggleCollapse(tab.id)}>
                 {#if isCollapsed(tab.id)}
-                  <ChevronRight size={14} strokeWidth={1.5} />
+                  <ChevronRight size={16} strokeWidth={1.5} />
                 {:else}
-                  <ChevronDown size={14} strokeWidth={1.5} />
+                  <ChevronDown size={16} strokeWidth={1.5} />
                 {/if}
                 <span class="multi-card-title">{tab.label}</span>
               </button>
@@ -235,6 +298,12 @@
           {/each}
         </div>
       {/if}
+
+      <!-- Info bar -->
+      <div class="info-bar">
+        <div class="info-header">Info</div>
+        <span class="info-text">{$propertyHint || 'Hover a property for details'}</span>
+      </div>
     </div>
   {:else}
     <div class="empty-panel">
@@ -259,7 +328,7 @@
     flex-shrink: 0;
     background: #222;
     border-right: 1px solid #1A1A1A;
-    padding: 6px 0;
+    padding: 34px 0 6px 0;
     gap: 2px;
   }
 
@@ -305,29 +374,66 @@
     overflow: hidden;
   }
 
+  .props-toolbar {
+    display: flex;
+    align-items: center;
+    height: 34px;
+    flex-shrink: 0;
+    padding: 0 8px;
+    border-bottom: 1px solid #2A2A2A;
+    background: #222;
+  }
+
+  .toolbar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.1s;
+  }
+
+  .toolbar-btn:hover {
+    background: #333;
+    color: #CCC;
+  }
+
+  .toolbar-btn.active {
+    color: #5B9BD5;
+  }
+
+  .toolbar-btn:disabled {
+    color: #444;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .toolbar-divider {
+    width: 1px;
+    height: 16px;
+    background: #333;
+    flex-shrink: 0;
+  }
+
   .card-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #2A2A2A;
+    height: 30px;
     flex-shrink: 0;
+    padding: 0 12px;
   }
 
   .card-title {
     font-size: 12px;
     font-weight: 600;
-    color: #CCC;
+    color: #5B9BD5;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-  }
-
-  .card-context {
-    font-size: 10px;
-    color: #666;
-    background: #2A2A2A;
-    padding: 1px 6px;
-    border-radius: 3px;
   }
 
   .card-content {
@@ -396,5 +502,34 @@
     padding: 20px;
     color: #444;
     font-size: 12px;
+  }
+
+  .info-bar {
+    flex-shrink: 0;
+    height: 80px;
+    padding: 0;
+    border-top: 1px solid #333;
+    background: #222;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .info-header {
+    font-size: 9px;
+    font-weight: 600;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 4px 10px 2px 10px;
+    border-bottom: 1px solid #2A2A2A;
+  }
+
+  .info-text {
+    font-size: 11px;
+    color: #888;
+    line-height: 1.4;
+    padding: 4px 10px;
+    flex: 1;
   }
 </style>

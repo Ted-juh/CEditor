@@ -57,13 +57,8 @@ export function applyColorToTarget(hex) {
     const panelId = get(activePanelId);
     if (panelId == null) return;
 
-    // Panel properties store AARRGGBB for gridColour, RRGGBB for bgColour
-    if (target.prop === 'gridColour') {
-      updatePanel(panelId, { [target.prop]: hex, modified: true });
-    } else {
-      // bgColour uses 6-char RRGGBB
-      updatePanel(panelId, { [target.prop]: hex.slice(2, 8), modified: true });
-    }
+    // All panel colour properties use AARRGGBB
+    updatePanel(panelId, { [target.prop]: hex, modified: true });
   } else if (target.type === 'control') {
     // Control properties use AARRGGBB
     updateControlProperty(target.controlId, target.path, hex);

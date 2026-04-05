@@ -15,23 +15,39 @@
   import ConsolePanel from '../components/ConsolePanel.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
 
   let props = $props();
   let onTabChange = $derived(props.onTabChange);
 
   let activeTab = $state('colors');
 
+  // --- External tab switch requests ---
+  $effect(() => {
+    const req = $displayTabRequest;
+    if (req) {
+      handleTabClick(req.tab);
+      displayTabRequest.set(null);
+    }
+  });
+
   // --- Central color state ---
   let userPickedColor = $state($activePanel?.bgColour ?? '333333');
   let userPickedAlpha = $state(1);
 
   // --- Color target: switch to Colors tab and set color when a swatch activates a target ---
+  // Plain variable (not $state) so it doesn't become a reactive dependency of the effect.
+  let _lastHandledTarget = null;
   $effect(() => {
     const target = $colorTarget;
-    if (target && target._initialColor) {
+    if (target && target._initialColor && target !== _lastHandledTarget) {
+      _lastHandledTarget = target;
       activeTab = 'colors';
       userPickedColor = target._initialColor;
       userPickedAlpha = target._initialAlpha ?? 1;
+    }
+    if (!target) {
+      _lastHandledTarget = null;
     }
   });
   let stepSize = $state(10);

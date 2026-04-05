@@ -123,6 +123,54 @@ export function updateOpenPanels(paths) {
   window.__JUCE__.backend.emitEvent('updateOpenPanels', paths);
 }
 
+/** Request an image file browser dialog. C++ will emit 'imageBrowsed' on success. */
+export function browseImage(requestId) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — browseImage ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('browseImage', { requestId });
+}
+
+/** Listen for 'imageBrowsed' events. Callback receives { requestId, filePath }. */
+export function onImageBrowsed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('imageBrowsed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Request file metadata (size, created, modified). C++ will emit 'fileInfo' with { filePath, size, created, modified }. */
+export function requestFileInfo(filePath) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — requestFileInfo ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('requestFileInfo', { filePath });
+}
+
+/** Listen for 'fileInfo' events. Callback receives { filePath, size, created, modified }. */
+export function onFileInfo(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('fileInfo', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Request a file's contents as base64. C++ will emit 'fileData' with { requestId, data, mimeType }. */
+export function requestFileData(requestId, filePath) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — requestFileData ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('requestFileData', { requestId, filePath });
+}
+
+/** Listen for 'fileData' events. Callback receives { requestId, data, mimeType }. */
+export function onFileData(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('fileData', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Listen for 'panelSaved' events. Callback receives { panelId, filePath, name? }. */
 export function onPanelSaved(callback) {
   if (!isJuceAvailable()) return () => {};

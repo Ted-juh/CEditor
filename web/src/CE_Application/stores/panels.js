@@ -24,11 +24,28 @@ export function createPanel(name = null) {
   return {
     id,
     name: name ?? `Untitled ${id}`,
+    scriptId: `panel_${id}`,
+    author: '',
+    version: '1.0.0',
+    description: '',
+    enabled: true,
+    locked: false,
     filePath: null,
     width: 600,
     height: 400,
-    bgColour: '333333',
-    bgMode: 'solid',
+    resizable: false,
+    minWidth: 0,
+    minHeight: 0,
+    maxWidth: 0,
+    maxHeight: 0,
+    lockAspectRatio: false,
+    // --- Background layers ---
+    bgLayerOrder: ['solid', 'gradient', 'image', 'texture'],
+    bgSolid: true,
+    bgColour: 'FF333333',
+    bgGradientEnabled: false,
+    bgGradientOpacity: 100,
+    bgGradientName: '',
     bgGradient: {
       type: 'linear',
       angle: 90,
@@ -42,10 +59,52 @@ export function createPanel(name = null) {
         { color: '0000FF', position: 100 },
       ],
     },
+    bgImageEnabled: false,
+    bgImage: '',
+    bgImageOpacity: 100,
+    bgImageFit: 'fill',
+    bgImageAlign: 'center',
+    bgImageOffsetX: 0,
+    bgImageOffsetY: 0,
+    bgImageBlend: 'normal',
+    bgImageBlur: 0,
+    bgImageTint: 'FFFFFF',
+    bgImageFlipH: false,
+    bgImageFlipV: false,
+    bgImageRotation: 0,
+    bgImageGrayscale: false,
+    bgImageSaturation: 100,
+    bgImageBrightness: 100,
+    bgImageContrast: 100,
+    bgImageTileScale: 1.0,
+    bgTextureEnabled: false,
+    bgTexture: '',
+    bgTextureOpacity: 100,
+    bgTextureFit: 'tile',
+    bgTextureAlign: 'center',
+    bgTextureOffsetX: 0,
+    bgTextureOffsetY: 0,
+    bgTextureBlend: 'normal',
+    bgTextureBlur: 0,
+    bgTextureTint: 'FFFFFF',
+    bgTextureFlipH: false,
+    bgTextureFlipV: false,
+    bgTextureRotation: 0,
+    bgTextureGrayscale: false,
+    bgTextureSaturation: 100,
+    bgTextureBrightness: 100,
+    bgTextureContrast: 100,
+    bgTextureTileScale: 1.0,
     gridEnabled: true,
     gridSize: 10,
     gridColour: '33FFFFFF',
     gridLineWidth: 1,
+    gridType: 'lines',
+    gridSubdivision: 1,
+    gridSubColour: '55FFFFFF',
+    gridCentered: false,
+    gridOriginX: 0,
+    gridOriginY: 0,
     snapToGrid: true,
     notepad: {
       notes: [{ name: 'Note 1', content: '' }],
@@ -117,7 +176,21 @@ export function setActivePanel(id) {
 /** Update a panel's properties */
 export function updatePanel(id, updates) {
   panels.update(list =>
-    list.map(p => p.id === id ? { ...p, ...updates } : p)
+    list.map(p => {
+      if (p.id !== id) return p;
+
+      // Lock aspect ratio: proportionally adjust the other dimension
+      if (p.lockAspectRatio && p.width > 0 && p.height > 0) {
+        const ratio = p.width / p.height;
+        if ('width' in updates && !('height' in updates)) {
+          updates.height = Math.round(updates.width / ratio);
+        } else if ('height' in updates && !('width' in updates)) {
+          updates.width = Math.round(updates.height * ratio);
+        }
+      }
+
+      return { ...p, ...updates, modified: true };
+    })
   );
 }
 

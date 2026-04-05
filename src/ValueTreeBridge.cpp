@@ -237,6 +237,106 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (
                 browser->emitEventIfBrowserIsVisible ("panelOpened", juce::var (obj));
             });
         })
+        .withEventListener ("requestFileInfo", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto filePath = payloadObj->getProperty ("filePath").toString();
+                juce::File file (filePath);
+
+                if (! file.existsAsFile())
+                    return;
+
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("filePath", filePath);
+                obj->setProperty ("size", (juce::int64) file.getSize());
+                obj->setProperty ("created", file.getCreationTime().toISO8601 (true));
+                obj->setProperty ("modified", file.getLastModificationTime().toISO8601 (true));
+
+                browser->emitEventIfBrowserIsVisible ("fileInfo", juce::var (obj));
+            });
+        })
+        .withEventListener ("requestFileData", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto requestId = payloadObj->getProperty ("requestId").toString();
+                auto filePath = payloadObj->getProperty ("filePath").toString();
+
+                juce::File file (filePath);
+                if (! file.existsAsFile())
+                    return;
+
+                juce::MemoryBlock mb;
+                file.loadFileAsData (mb);
+
+                auto base64 = juce::Base64::toBase64 (mb.getData(), mb.getSize());
+
+                // Determine MIME type from extension
+                auto ext = file.getFileExtension().toLowerCase();
+                juce::String mimeType = "image/png";
+                if (ext == ".jpg" || ext == ".jpeg") mimeType = "image/jpeg";
+                else if (ext == ".gif") mimeType = "image/gif";
+                else if (ext == ".bmp") mimeType = "image/bmp";
+                else if (ext == ".svg") mimeType = "image/svg+xml";
+                else if (ext == ".webp") mimeType = "image/webp";
+
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("requestId", requestId);
+                obj->setProperty ("data", "data:" + mimeType + ";base64," + base64);
+
+                browser->emitEventIfBrowserIsVisible ("fileData", juce::var (obj));
+            });
+        })
+        .withEventListener ("browseImage", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto requestId = payloadObj->getProperty ("requestId").toString();
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Select Image",
+                    juce::File::getSpecialLocation (juce::File::userPicturesDirectory),
+                    "*.png;*.jpg;*.jpeg;*.gif;*.bmp;*.svg;*.webp");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this, requestId] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File() || ! result.existsAsFile())
+                            return;
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("requestId", requestId);
+                        obj->setProperty ("filePath", result.getFullPathName());
+
+                        browser->emitEventIfBrowserIsVisible ("imageBrowsed", juce::var (obj));
+                    });
+            });
+        })
         .withEventListener ("loadOpenPanels", [this] (const juce::var&)
         {
             juce::MessageManager::callAsync ([this]()
