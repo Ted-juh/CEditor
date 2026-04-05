@@ -119,8 +119,43 @@ export function createPanel(name = null) {
   };
 }
 
-/** Currently selected component id (null = panel itself is selected) */
-export const selectedComponentId = writable(null);
+/** Currently selected component ids (Set). Empty = panel is selected. */
+export const selectedComponentIds = writable(new Set());
+
+/** Backward-compatible: first selected id or null */
+export const selectedComponentId = derived(
+  selectedComponentIds,
+  ($ids) => $ids.size > 0 ? [...$ids][0] : null
+);
+
+/** Key object id — the most recently clicked component in a multi-select */
+export const keyObjectId = writable(null);
+
+/** Selection helpers */
+export function selectComponent(id, addToSelection = false) {
+  if (addToSelection) {
+    selectedComponentIds.update(ids => {
+      const next = new Set(ids);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  } else {
+    selectedComponentIds.set(new Set([id]));
+  }
+  keyObjectId.set(id);
+}
+
+export function clearSelection() {
+  selectedComponentIds.set(new Set());
+  keyObjectId.set(null);
+}
+
+export function isSelected(id) {
+  return get(selectedComponentIds).has(id);
+}
+
+/** Active multi-drag delta — applied visually to all selected components during drag */
+export const multiDragDelta = writable({ x: 0, y: 0, active: false });
 
 /** Editor zoom state */
 export const editorZoom = writable(100);

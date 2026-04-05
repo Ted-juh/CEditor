@@ -1,5 +1,5 @@
 import { derived, get } from 'svelte/store';
-import { panels, activePanelId, selectedComponentId, updatePanel } from './panels.js';
+import { panels, activePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId, updatePanel } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 
@@ -30,6 +30,13 @@ export function addControl(type, overrides = {}) {
   const panelId = get(activePanelId);
   if (panelId == null) return null;
 
+  // Stagger position so new controls don't stack at 0,0
+  const panel = get(panels).find(p => p.id === panelId);
+  if (panel && !overrides.Transform) {
+    const offset = panel.controls.length * 20;
+    overrides = { ...overrides, Transform: { x: 20 + offset, y: 20 + offset } };
+  }
+
   const control = createControlFromType(type, overrides);
   const id = control._children.Core.id;
 
@@ -41,7 +48,7 @@ export function addControl(type, overrides = {}) {
   );
 
   // Auto-select the new control
-  selectedComponentId.set(id);
+  selectComponent(id);
   return control;
 }
 
@@ -63,9 +70,17 @@ export function removeControl(id) {
     })
   );
 
-  // Deselect if we removed the selected component
-  if (get(selectedComponentId) === id) {
-    selectedComponentId.set(null);
+  // Remove from selection if it was selected
+  selectedComponentIds.update(ids => {
+    if (!ids.has(id)) return ids;
+    const next = new Set(ids);
+    next.delete(id);
+    return next;
+  });
+
+  // Clear key object if it was the deleted control
+  if (get(keyObjectId) === id) {
+    keyObjectId.set(null);
   }
 }
 
@@ -103,7 +118,7 @@ export function duplicateControl(id) {
     })
   );
 
-  selectedComponentId.set(newId);
+  selectComponent(newId);
   return clone;
 }
 

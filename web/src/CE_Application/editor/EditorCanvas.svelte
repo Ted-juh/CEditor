@@ -1,5 +1,6 @@
 <script>
-  import { panels, activePanelId, editorZoom, selectedComponentId } from '../stores/panels.js';
+  import { panels, activePanelId, editorZoom, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
+  import { getSection } from '../stores/controls.js';
   import { removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
@@ -13,6 +14,7 @@
   let gridEnabled = $derived(panel?.gridEnabled ?? false);
   let gridSize = $derived(panel?.gridSize ?? 10);
   let snapToGrid = $derived(panel?.snapToGrid ?? false);
+  let panelLocked = $derived(panel?.locked ?? false);
 
   // Grid snap origin — same centering math as the visual grid, without the visual fudge
   let gridOrigin = $derived.by(() => {
@@ -288,54 +290,139 @@
     return style;
   });
 
+  // --- Marquee selection ---
+  let isMarquee = $state(false);
+  let marqueeStart = $state({ x: 0, y: 0 });
+  let marqueeEnd = $state({ x: 0, y: 0 });
+  let panelSurfaceEl = $state(null);
+
+  let marqueeRect = $derived.by(() => {
+    const x1 = Math.min(marqueeStart.x, marqueeEnd.x);
+    const y1 = Math.min(marqueeStart.y, marqueeEnd.y);
+    const x2 = Math.max(marqueeStart.x, marqueeEnd.x);
+    const y2 = Math.max(marqueeStart.y, marqueeEnd.y);
+    return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+  });
+
+  function handleSurfaceMouseDown(e) {
+    if (e.button !== 0) return;
+    // Only start marquee on the surface itself, not on controls
+    if (e.target !== panelSurfaceEl && !e.target.classList.contains('grid-overlay') && !e.target.classList.contains('bg-layer')) return;
+
+    e.preventDefault();
+    const rect = panelSurfaceEl.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / scale;
+    const y = (e.clientY - rect.top) / scale;
+
+    isMarquee = true;
+    marqueeStart = { x, y };
+    marqueeEnd = { x, y };
+
+    window.addEventListener('mousemove', handleMarqueeMove);
+    window.addEventListener('mouseup', handleMarqueeEnd);
+  }
+
+  function handleMarqueeMove(e) {
+    if (!isMarquee) return;
+    const rect = panelSurfaceEl.getBoundingClientRect();
+    marqueeEnd = {
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale,
+    };
+  }
+
+  function handleMarqueeEnd() {
+    if (!isMarquee) return;
+    window.removeEventListener('mousemove', handleMarqueeMove);
+    window.removeEventListener('mouseup', handleMarqueeEnd);
+
+    isMarquee = false;
+
+    // Only select if the marquee has a meaningful size (not just a click)
+    if (marqueeRect.w < 3 && marqueeRect.h < 3) {
+      clearSelection();
+      return;
+    }
+
+    // Find all controls that intersect the marquee rect
+    const ids = new Set();
+    if (panel) {
+      for (const ctrl of panel.controls) {
+        const t = getSection(ctrl, 'Transform');
+        const c = getSection(ctrl, 'Core');
+        if (!t || !c) continue;
+        // AABB intersection test (partial overlap counts)
+        if (t.x < marqueeRect.x + marqueeRect.w &&
+            t.x + t.width > marqueeRect.x &&
+            t.y < marqueeRect.y + marqueeRect.h &&
+            t.y + t.height > marqueeRect.y) {
+          ids.add(c.id);
+        }
+      }
+    }
+
+    selectedComponentIds.set(ids);
+
+    // Swallow the click that follows mouseup so handleCanvasClick doesn't clear selection
+    window.addEventListener('click', (ev) => {
+      if (ev.target?.closest?.('.panel-surface, .canvas-viewport')) {
+        ev.stopPropagation(); ev.preventDefault();
+      }
+    }, { once: true, capture: true });
+  }
+
   // Click on empty canvas → deselect
   function handleCanvasClick(e) {
     if (e.target === e.currentTarget || e.target.classList.contains('panel-surface')) {
-      selectedComponentId.set(null);
+      clearSelection();
     }
   }
 
   // Keyboard shortcuts
   function handleKeyDown(e) {
     if (!panel) return;
-    const selected = $selectedComponentId;
-    if (!selected) return;
+    const ids = $selectedComponentIds;
+    if (ids.size === 0) return;
 
-    // Find selected control
-    const ctrl = panel.controls.find(c => c._children?.Core?.id === selected);
-    if (!ctrl) return;
-    const isLocked = ctrl._children?.Core?.locked;
+    // Find all selected controls
+    const selectedCtrls = panel.controls.filter(c => ids.has(c._children?.Core?.id));
+    if (selectedCtrls.length === 0) return;
 
-    // Delete
+    // Delete all selected
     if (e.key === 'Delete' || e.key === 'Backspace') {
       e.preventDefault();
-      removeControl(selected);
+      for (const id of ids) removeControl(id);
       return;
     }
 
-    // Duplicate
+    // Duplicate all selected
     if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
       e.preventDefault();
-      duplicateControl(selected);
+      for (const id of ids) duplicateControl(id);
       return;
     }
 
-    // Arrow nudge (not when locked)
-    if (isLocked) return;
-    const nudge = e.shiftKey ? gridSize : 1;
+    // Arrow nudge (skip if panel locked or any selected is component-locked)
+    if (panelLocked) return;
+    const anyLocked = selectedCtrls.some(c => c._children?.Core?.locked);
+    if (anyLocked) return;
 
-    if (e.key === 'ArrowLeft') {
+    const nudge = e.shiftKey ? gridSize : 1;
+    const arrowDeltas = {
+      ArrowLeft:  { prop: 'Transform.x', dir: -1 },
+      ArrowRight: { prop: 'Transform.x', dir:  1 },
+      ArrowUp:    { prop: 'Transform.y', dir: -1 },
+      ArrowDown:  { prop: 'Transform.y', dir:  1 },
+    };
+
+    const arrow = arrowDeltas[e.key];
+    if (arrow) {
       e.preventDefault();
-      updateControlProperty(selected, 'Transform.x', (ctrl._children.Transform?.x ?? 0) - nudge);
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      updateControlProperty(selected, 'Transform.x', (ctrl._children.Transform?.x ?? 0) + nudge);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      updateControlProperty(selected, 'Transform.y', (ctrl._children.Transform?.y ?? 0) - nudge);
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      updateControlProperty(selected, 'Transform.y', (ctrl._children.Transform?.y ?? 0) + nudge);
+      const axis = arrow.prop === 'Transform.x' ? 'x' : 'y';
+      for (const ctrl of selectedCtrls) {
+        const current = ctrl._children?.Transform?.[axis] ?? 0;
+        updateControlProperty(ctrl._children.Core.id, arrow.prop, current + arrow.dir * nudge);
+      }
     }
   }
 </script>
@@ -355,10 +442,13 @@
           width: {panel.width * scale + 80}px;
           height: {panel.height * scale + 80}px;
         ">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             class="panel-surface"
             style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
+            bind:this={panelSurfaceEl}
             onclick={handleCanvasClick}
+            onmousedown={handleSurfaceMouseDown}
           >
             {#each (panel.bgLayerOrder ?? ['solid', 'gradient', 'image', 'texture']) as layerId}
               {#if layerId === 'solid' && solidStyle}
@@ -382,9 +472,17 @@
                 {gridSize}
                 gridOriginX={gridOrigin.x}
                 gridOriginY={gridOrigin.y}
+                {panelLocked}
                 allControls={panel.controls}
               />
             {/each}
+
+            {#if isMarquee && marqueeRect.w > 1}
+              <div
+                class="marquee"
+                style="left:{marqueeRect.x}px; top:{marqueeRect.y}px; width:{marqueeRect.w}px; height:{marqueeRect.h}px;"
+              ></div>
+            {/if}
 
           </div>
         </div>
@@ -472,6 +570,14 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  .marquee {
+    position: absolute;
+    border: 1px solid #5B9BD5;
+    background: rgba(91, 155, 213, 0.1);
+    pointer-events: none;
+    z-index: 200;
   }
 
   .empty-state {

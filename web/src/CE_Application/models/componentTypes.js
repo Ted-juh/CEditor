@@ -49,19 +49,29 @@ export const COMPONENT_TYPES = {
 
 // --- Internal helpers ---
 
-let nextControlId = 1;
+let nextControlId = Date.now();
 
 /** Deep-clone a plain object. */
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
-/** Shallow-merge overrides into a section clone (one level deep into _children). */
+/** Deep-merge overrides into a section clone, including _children. */
 function applyOverrides(section, overrides) {
   if (!overrides) return section;
   for (const [key, value] of Object.entries(overrides)) {
-    if (key === '_children' || key === '_type') continue;
-    section[key] = value;
+    if (key === '_type') continue;
+    if (key === '_children' && typeof value === 'object' && section._children) {
+      for (const [childName, childOverrides] of Object.entries(value)) {
+        if (section._children[childName]) {
+          applyOverrides(section._children[childName], childOverrides);
+        } else {
+          section._children[childName] = deepClone(childOverrides);
+        }
+      }
+    } else {
+      section[key] = value;
+    }
   }
   return section;
 }

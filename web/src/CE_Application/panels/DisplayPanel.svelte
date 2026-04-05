@@ -13,6 +13,7 @@
   import ViewerEditor from '../components/ViewerEditor.svelte';
   import ViewerSettings from '../components/ViewerSettings.svelte';
   import ConsolePanel from '../components/ConsolePanel.svelte';
+  import AlignmentPanel from '../components/AlignmentPanel.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
@@ -387,7 +388,7 @@
     { id: 'gradient', label: 'Gradient' },
     { id: 'notepad',  label: 'Notepad' },
     { id: 'viewer',   label: 'Viewer' },
-    { id: 'tools',    label: 'Tools' },
+    { id: 'align',    label: 'Align' },
     { id: 'console',  label: 'Console' },
   ];
 </script>
@@ -577,8 +578,8 @@
         <div class="placeholder">Open or create a panel to use the Viewer</div>
       {/if}
     </div>
-    <div class="tab-pane" style:display={activeTab === 'tools' ? 'block' : 'none'}>
-      <div class="placeholder">Tools</div>
+    <div class="tab-pane" style:display={activeTab === 'align' ? 'block' : 'none'}>
+      <AlignmentPanel />
     </div>
     <div class="tab-pane" style:display={activeTab === 'console' ? 'block' : 'none'}>
       <ConsolePanel />

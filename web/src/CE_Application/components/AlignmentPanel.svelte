@@ -1,0 +1,417 @@
+<script>
+  import {
+    AlignHorizontalJustifyStart,
+    AlignHorizontalJustifyCenter,
+    AlignHorizontalJustifyEnd,
+    AlignVerticalJustifyStart,
+    AlignVerticalJustifyCenter,
+    AlignVerticalJustifyEnd,
+    AlignHorizontalDistributeStart,
+    AlignHorizontalDistributeCenter,
+    AlignHorizontalDistributeEnd,
+    AlignVerticalDistributeStart,
+    AlignVerticalDistributeCenter,
+    AlignVerticalDistributeEnd,
+    AlignHorizontalSpaceBetween,
+    AlignVerticalSpaceBetween,
+    Group,
+    Frame,
+    MousePointerClick,
+    BringToFront,
+    SendToBack,
+    MoveUp,
+    MoveDown,
+    StretchHorizontal,
+    StretchVertical,
+    Scaling,
+    Magnet,
+    FlipHorizontal2,
+    FlipVertical2,
+    LayoutGrid,
+    Circle,
+  } from 'lucide-svelte';
+
+  import { selectedComponentIds, keyObjectId } from '../stores/panels.js';
+  import {
+    alignLeft, alignHCenter, alignRight,
+    alignTop, alignVCenter, alignBottom,
+    distributeLeftEdges, distributeHCenters, distributeRightEdges,
+    distributeTopEdges, distributeVCenters, distributeBottomEdges,
+    distributeHSpacing, distributeVSpacing,
+    bringToFront, bringForward, sendBackward, sendToBack,
+    matchWidth, matchHeight, matchBoth,
+    snapSelectionToGrid,
+    flipHorizontal, flipVertical,
+    tidyGrid, arrangeCircular,
+  } from '../stores/alignment.js';
+
+  let alignMode = $state('selection');
+  let regionX = $state(0);
+  let regionY = $state(0);
+  let regionRef = $derived({ x: regionX, y: regionY });
+  let useFixedH = $state(false);
+  let useFixedV = $state(false);
+  let fixedHGap = $state(10);
+  let fixedVGap = $state(10);
+  let gridCols = $state(3);
+  let gridGapX = $state(10);
+  let gridGapY = $state(10);
+  let circleRadius = $state(100);
+  let circleStartAngle = $state(0);
+
+  let selCount = $derived($selectedComponentIds.size);
+  let canAlign = $derived(alignMode === 'region' ? selCount >= 1 : selCount >= 2);
+  let canDistribute = $derived(selCount >= 3);
+  let canFixedSpace = $derived(selCount >= 2);
+  let canOrder = $derived(selCount >= 1);
+  let canMatch = $derived(selCount >= 2);
+  let canFlip = $derived(selCount >= 2);
+  let canGrid = $derived(selCount >= 2);
+  let canCircle = $derived(selCount >= 2);
+  let hasKeyObject = $derived($keyObjectId != null && $selectedComponentIds.has($keyObjectId));
+</script>
+
+<div class="align-panel">
+  <!-- Align To -->
+  <div class="align-section">
+    <div class="section-label">Align To</div>
+    <div class="mode-group">
+      <button class="mode-btn" class:active={alignMode === 'selection'} title="Align to Selection" onclick={() => alignMode = 'selection'}>
+        <Group size={14} strokeWidth={1.5} />
+        <span>Selection</span>
+      </button>
+      <button class="mode-btn" class:active={alignMode === 'region'} title="Align to Region" onclick={() => alignMode = 'region'}>
+        <Frame size={14} strokeWidth={1.5} />
+        <span>Region</span>
+      </button>
+      <button class="mode-btn" class:active={alignMode === 'key-object'} disabled={!hasKeyObject} title="Align to Key Object" onclick={() => alignMode = 'key-object'}>
+        <MousePointerClick size={14} strokeWidth={1.5} />
+        <span>Key Object</span>
+      </button>
+    </div>
+  </div>
+
+  {#if alignMode === 'region'}
+    <div class="section-divider"></div>
+    <div class="align-section">
+      <div class="section-label">Position</div>
+      <div class="region-row">
+        <span class="input-label">X</span>
+        <input class="spacing-input" type="number" bind:value={regionX} onfocus={(e) => e.target.select()} />
+      </div>
+      <div class="region-row">
+        <span class="input-label">Y</span>
+        <input class="spacing-input" type="number" bind:value={regionY} onfocus={(e) => e.target.select()} />
+      </div>
+    </div>
+  {/if}
+
+  <div class="section-divider"></div>
+
+  <!-- Align -->
+  <div class="align-section">
+    <div class="section-label">Align</div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canAlign} title="Align Left Edges" onclick={() => alignLeft(alignMode, regionRef)}>
+        <AlignHorizontalJustifyStart size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canAlign} title="Align Horizontal Centers" onclick={() => alignHCenter(alignMode, regionRef)}>
+        <AlignHorizontalJustifyCenter size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canAlign} title="Align Right Edges" onclick={() => alignRight(alignMode, regionRef)}>
+        <AlignHorizontalJustifyEnd size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canAlign} title="Align Top Edges" onclick={() => alignTop(alignMode, regionRef)}>
+        <AlignVerticalJustifyStart size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canAlign} title="Align Vertical Centers" onclick={() => alignVCenter(alignMode, regionRef)}>
+        <AlignVerticalJustifyCenter size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canAlign} title="Align Bottom Edges" onclick={() => alignBottom(alignMode, regionRef)}>
+        <AlignVerticalJustifyEnd size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Distribute Edges -->
+  <div class="align-section">
+    <div class="section-label">Distribute</div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Left Edges" onclick={distributeLeftEdges}>
+        <AlignHorizontalDistributeStart size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Horizontal Centers" onclick={distributeHCenters}>
+        <AlignHorizontalDistributeCenter size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Right Edges" onclick={distributeRightEdges}>
+        <AlignHorizontalDistributeEnd size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Top Edges" onclick={distributeTopEdges}>
+        <AlignVerticalDistributeStart size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Vertical Centers" onclick={distributeVCenters}>
+        <AlignVerticalDistributeCenter size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canDistribute} title="Distribute Bottom Edges" onclick={distributeBottomEdges}>
+        <AlignVerticalDistributeEnd size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Distribute Spacing -->
+  <div class="align-section">
+    <div class="section-label">Spacing</div>
+    <div class="spacing-row">
+      <button class="action-btn" disabled={useFixedH ? !canFixedSpace : !canDistribute} title={useFixedH ? `H-spacing: ${fixedHGap}px` : 'Equal H-Spacing'} onclick={() => distributeHSpacing(useFixedH ? fixedHGap : null)}>
+        <AlignHorizontalSpaceBetween size={16} strokeWidth={1.5} />
+      </button>
+      <button class="toggle-btn" class:active={useFixedH} onclick={() => useFixedH = !useFixedH}>
+        {useFixedH ? 'Fixed' : 'Auto'}
+      </button>
+      {#if useFixedH}
+        <input class="spacing-input" type="number" bind:value={fixedHGap} min="0" onfocus={(e) => e.target.select()} />
+        <span class="unit">px</span>
+      {/if}
+    </div>
+    <div class="spacing-row">
+      <button class="action-btn" disabled={useFixedV ? !canFixedSpace : !canDistribute} title={useFixedV ? `V-spacing: ${fixedVGap}px` : 'Equal V-Spacing'} onclick={() => distributeVSpacing(useFixedV ? fixedVGap : null)}>
+        <AlignVerticalSpaceBetween size={16} strokeWidth={1.5} />
+      </button>
+      <button class="toggle-btn" class:active={useFixedV} onclick={() => useFixedV = !useFixedV}>
+        {useFixedV ? 'Fixed' : 'Auto'}
+      </button>
+      {#if useFixedV}
+        <input class="spacing-input" type="number" bind:value={fixedVGap} min="0" onfocus={(e) => e.target.select()} />
+        <span class="unit">px</span>
+      {/if}
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Z-Order -->
+  <div class="align-section">
+    <div class="section-label">Order</div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canOrder} title="Bring to Front" onclick={bringToFront}>
+        <BringToFront size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canOrder} title="Bring Forward" onclick={bringForward}>
+        <MoveUp size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canOrder} title="Send to Back" onclick={sendToBack}>
+        <SendToBack size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canOrder} title="Send Backward" onclick={sendBackward}>
+        <MoveDown size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Match Size -->
+  <div class="align-section">
+    <div class="section-label">Size</div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={!canMatch} title="Match Width" onclick={matchWidth}>
+        <StretchHorizontal size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canMatch} title="Match Height" onclick={matchHeight}>
+        <StretchVertical size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canMatch} title="Match Both" onclick={matchBoth}>
+        <Scaling size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+    <div class="btn-row">
+      <button class="action-btn" disabled={selCount < 1} title="Snap to Grid" onclick={snapSelectionToGrid}>
+        <Magnet size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canFlip} title="Flip Horizontal" onclick={flipHorizontal}>
+        <FlipHorizontal2 size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={!canFlip} title="Flip Vertical" onclick={flipVertical}>
+        <FlipVertical2 size={16} strokeWidth={1.5} />
+      </button>
+    </div>
+  </div>
+
+  <div class="section-divider"></div>
+
+  <!-- Layout: Grid + Circle -->
+  <div class="align-section">
+    <div class="section-label">Layout</div>
+    <div class="layout-row">
+      <button class="action-btn" disabled={!canGrid} title="Arrange in Grid" onclick={() => tidyGrid(gridCols, gridGapX, gridGapY)}>
+        <LayoutGrid size={16} strokeWidth={1.5} />
+      </button>
+      <span class="input-label">Cols</span>
+      <input class="spacing-input sm" type="number" bind:value={gridCols} min="1" onfocus={(e) => e.target.select()} />
+      <span class="input-label">Gap</span>
+      <input class="spacing-input sm" type="number" bind:value={gridGapX} min="0" onfocus={(e) => e.target.select()} />
+      <span class="unit">x</span>
+      <input class="spacing-input sm" type="number" bind:value={gridGapY} min="0" onfocus={(e) => e.target.select()} />
+    </div>
+    <div class="layout-row">
+      <button class="action-btn" disabled={!canCircle} title="Arrange in Circle" onclick={() => arrangeCircular(circleRadius, circleStartAngle)}>
+        <Circle size={16} strokeWidth={1.5} />
+      </button>
+      <span class="input-label">R</span>
+      <input class="spacing-input sm" type="number" bind:value={circleRadius} min="1" onfocus={(e) => e.target.select()} />
+      <span class="input-label">Angle</span>
+      <input class="spacing-input sm" type="number" bind:value={circleStartAngle} onfocus={(e) => e.target.select()} />
+      <span class="unit">&deg;</span>
+    </div>
+  </div>
+</div>
+
+<style>
+  .align-panel {
+    display: flex;
+    flex-direction: row;
+    gap: 0;
+    padding: 8px 0;
+    height: 100%;
+    overflow-x: auto;
+  }
+
+  .align-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 0 12px;
+    flex-shrink: 0;
+  }
+
+  .section-divider {
+    width: 1px;
+    background: #333;
+    flex-shrink: 0;
+  }
+
+  .section-label {
+    font-size: 9px;
+    color: #5B9BD5;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .mode-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: #252525;
+    border: none;
+    color: #888;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    border-radius: 3px;
+    transition: all 0.1s;
+  }
+
+  .region-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .mode-btn:hover { background: #333; color: #CCC; }
+  .mode-btn.active { background: #094771; color: #FFF; }
+  .mode-btn:disabled { opacity: 0.3; cursor: default; pointer-events: none; }
+
+  .btn-row {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+  }
+
+  .action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 26px;
+    background: #252525;
+    border: none;
+    color: #AAA;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.1s;
+  }
+
+  .action-btn:hover { background: #333; color: #FFF; }
+  .action-btn:active { background: #094771; color: #FFF; }
+  .action-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+
+  .spacing-row, .layout-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .toggle-btn {
+    padding: 3px 8px;
+    background: #252525;
+    border: none;
+    color: #888;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: inherit;
+    border-radius: 3px;
+    transition: all 0.1s;
+  }
+
+  .toggle-btn:hover { background: #333; color: #CCC; }
+  .toggle-btn.active { background: #094771; color: #FFF; }
+
+  .spacing-input {
+    width: 50px;
+    height: 22px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #CCC;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 0 4px;
+    text-align: center;
+  }
+
+  .spacing-input.sm {
+    width: 38px;
+  }
+
+  .spacing-input:focus {
+    outline: none;
+    border-color: #5B9BD5;
+  }
+
+  .unit {
+    font-size: 10px;
+    color: #555;
+  }
+
+  .input-label {
+    font-size: 9px;
+    color: #666;
+  }
+</style>

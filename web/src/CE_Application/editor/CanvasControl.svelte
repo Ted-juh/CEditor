@@ -1,7 +1,8 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
-  import { selectedComponentId } from '../stores/panels.js';
+  import { selectedComponentIds, selectComponent, multiDragDelta, keyObjectId } from '../stores/panels.js';
   import { updateControlProperty, getSection } from '../stores/controls.js';
+  import { get } from 'svelte/store';
 
   let {
     control,
@@ -10,6 +11,7 @@
     gridSize = 10,
     gridOriginX = 0,
     gridOriginY = 0,
+    panelLocked = false,
     allControls = [],
     onDragStart = null,
     onDragEnd = null,
@@ -19,9 +21,11 @@
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
   let background = $derived(getSection(control, 'Background'));
-  let isSelected = $derived(core?.id != null && $selectedComponentId === core.id);
+  let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
+  let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);
   let isVisible = $derived(core?.visible !== false);
+  let isEditorLocked = $derived(panelLocked || isLocked);
 
   // --- Drag state (internal $state per feedback) ---
   let isDragging = $state(false);
@@ -40,8 +44,12 @@
   let transientW = $state(null);
   let transientH = $state(null);
 
-  let displayX = $derived(transientX ?? transform?.x ?? 0);
-  let displayY = $derived(transientY ?? transform?.y ?? 0);
+  // During multi-drag, non-dragged selected components offset by the shared delta
+  let multiDragOffsetX = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.x : 0);
+  let multiDragOffsetY = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.y : 0);
+
+  let displayX = $derived((transientX ?? transform?.x ?? 0) + multiDragOffsetX);
+  let displayY = $derived((transientY ?? transform?.y ?? 0) + multiDragOffsetY);
   let displayW = $derived(transientW ?? transform?.width ?? 100);
   let displayH = $derived(transientH ?? transform?.height ?? 40);
 
@@ -146,9 +154,25 @@
     if (e.button !== 0) return;
     e.stopPropagation();
 
-    selectedComponentId.set(core?.id ?? null);
+    const multiKey = e.ctrlKey || e.metaKey;
+    if (multiKey) {
+      // Ctrl+click: toggle this component in/out of selection
+      selectComponent(core?.id, true);
+    } else if (!isSelected) {
+      // Normal click on unselected: replace selection with just this one
+      selectComponent(core?.id, false);
+    }
+    // Normal click on already-selected: keep current selection (enables multi-drag)
 
-    if (isLocked || isResizing) return;
+    if (isEditorLocked || isResizing) {
+      // Swallow the click only if it lands on the canvas (prevents deselect)
+      window.addEventListener('click', (ev) => {
+        if (ev.target?.closest?.('.panel-surface, .canvas-viewport')) {
+          ev.stopPropagation(); ev.preventDefault();
+        }
+      }, { once: true, capture: true });
+      return;
+    }
 
     // Start drag
     isDragging = true;
@@ -181,6 +205,12 @@
     transientX = Math.round(align.x);
     transientY = Math.round(align.y);
     snapGuides = align.guides;
+
+    // Broadcast delta for other selected components to follow
+    const ids = get(selectedComponentIds);
+    if (ids.size > 1) {
+      multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
+    }
   }
 
   function handleDragEnd() {
@@ -188,21 +218,50 @@
     window.removeEventListener('mousemove', handleDragMove);
     window.removeEventListener('mouseup', handleDragEnd);
 
-    if (core?.id && (transientX !== dragStartPos.x || transientY !== dragStartPos.y)) {
-      updateControlProperty(core.id, 'Transform.x', transientX);
-      updateControlProperty(core.id, 'Transform.y', transientY);
+    const dx = transientX - dragStartPos.x;
+    const dy = transientY - dragStartPos.y;
+
+    if (dx !== 0 || dy !== 0) {
+      const ids = get(selectedComponentIds);
+      if (ids.size > 1 && ids.has(core?.id)) {
+        // Multi-drag: apply delta to all selected components
+        for (const other of allControls) {
+          const otherId = getSection(other, 'Core')?.id;
+          if (!otherId || otherId === core.id || !ids.has(otherId)) continue;
+          const ot = getSection(other, 'Transform');
+          if (ot) {
+            updateControlProperty(otherId, 'Transform.x', ot.x + dx);
+            updateControlProperty(otherId, 'Transform.y', ot.y + dy);
+          }
+        }
+      }
+      // Always update the dragged component itself
+      if (core?.id) {
+        updateControlProperty(core.id, 'Transform.x', transientX);
+        updateControlProperty(core.id, 'Transform.y', transientY);
+      }
     }
+
+    // Clear multi-drag delta
+    multiDragDelta.set({ x: 0, y: 0, active: false });
 
     isDragging = false;
     transientX = null;
     transientY = null;
     snapGuides = [];
     onDragEnd?.();
+    // Swallow the click only if it lands on the canvas (prevents deselect),
+    // but let clicks on menus/toolbar pass through
+    window.addEventListener('click', (ev) => {
+      if (ev.target?.closest?.('.panel-surface, .canvas-viewport')) {
+        ev.stopPropagation(); ev.preventDefault();
+      }
+    }, { once: true, capture: true });
   }
 
   // --- Resize ---
   function handleResizeStart(handle, e) {
-    if (isLocked) return;
+    if (isEditorLocked) return;
     e.stopPropagation();
     e.preventDefault();
 
@@ -293,6 +352,13 @@
     transientW = null;
     transientH = null;
     snapGuides = [];
+    // Swallow the click only if it lands on the canvas (prevents deselect),
+    // but let clicks on menus/toolbar pass through
+    window.addEventListener('click', (ev) => {
+      if (ev.target?.closest?.('.panel-surface, .canvas-viewport')) {
+        ev.stopPropagation(); ev.preventDefault();
+      }
+    }, { once: true, capture: true });
   }
 
   // Resize handle definitions: [id, cursor, css-position]
@@ -308,8 +374,8 @@
   ];
 
   function handleStyle(id) {
-    const s = 6;   // handle size in px
-    const o = -3;  // offset (half of size)
+    const s = 8;   // handle visual size in px
+    const o = -4;  // offset (half of size)
     const positions = {
       tl: `top:${o}px;left:${o}px;`,
       t:  `top:${o}px;left:calc(50% - ${s/2}px);`,
@@ -328,8 +394,9 @@
 <div
   class="canvas-control"
   class:selected={isSelected}
+  class:key-object={isKeyObject}
   class:hidden-component={!isVisible}
-  class:locked={isLocked}
+  class:locked={isEditorLocked}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{transform?.opacity ?? 1}; {transform?.rotation ? `transform:rotate(${transform.rotation}deg);` : ''}"
   onmousedown={handleMouseDown}
 >
@@ -339,7 +406,7 @@
 
   <span class="control-label">{core?.name ?? ''}</span>
 
-  {#if isSelected && !isLocked}
+  {#if isSelected && !isEditorLocked}
     {#each handles as h (h.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -380,6 +447,10 @@
     outline-offset: -1px;
   }
 
+  .canvas-control.selected.key-object {
+    outline-color: #E5A029;
+  }
+
   .canvas-control.hidden-component {
     opacity: 0.25 !important;
     outline: 1px dashed #666;
@@ -406,13 +477,28 @@
     position: absolute;
     background: #5B9BD5;
     border: 1px solid #FFF;
-    border-radius: 1px;
+    border-radius: 2px;
     z-index: 10;
+  }
+
+  .resize-handle::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
   }
 
   .resize-handle:hover {
     background: #FFF;
     border-color: #5B9BD5;
+  }
+
+  .key-object .resize-handle {
+    background: #E5A029;
+  }
+
+  .key-object .resize-handle:hover {
+    background: #FFF;
+    border-color: #E5A029;
   }
 
   .snap-guide {
