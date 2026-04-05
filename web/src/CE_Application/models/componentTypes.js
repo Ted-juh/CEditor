@@ -37,6 +37,14 @@ export const COMPONENT_TYPES = {
       Grid: { enabled: true, snap: true, size: 10 },
     },
   },
+
+  TestBox: {
+    sections: ['Background'],
+    defaultOverrides: {
+      Transform: { width: 80, height: 80 },
+      Background: { _children: { Fill: { colour: 'FF5B9BD5' } } },
+    },
+  },
 };
 
 // --- Internal helpers ---

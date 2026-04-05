@@ -14,6 +14,22 @@
   let gridSize = $derived(panel?.gridSize ?? 10);
   let snapToGrid = $derived(panel?.snapToGrid ?? false);
 
+  // Grid snap origin — same centering math as the visual grid, without the visual fudge
+  let gridOrigin = $derived.by(() => {
+    if (!panel) return { x: 0, y: 0 };
+    let ox = panel.gridOriginX ?? 0;
+    let oy = panel.gridOriginY ?? 0;
+    if (panel.gridCentered && gridSize > 0) {
+      const sub = panel.gridSubdivision ?? 1;
+      const tileSize = sub > 1 ? gridSize * sub : gridSize;
+      const rw = Math.round(panel.width / tileSize);
+      const rh = Math.round(panel.height / tileSize);
+      ox = -((rw * tileSize) - panel.width) / 2;
+      oy = -((rh * tileSize) - panel.height) / 2;
+    }
+    return { x: ox, y: oy };
+  });
+
   let gridColour = $derived(panel?.gridColour ?? '33FFFFFF');
   let gridLineWidth = $derived(panel?.gridLineWidth ?? 1);
 
@@ -335,10 +351,13 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="canvas-viewport" onclick={handleCanvasClick}>
-        <div class="zoom-container" style="transform: scale({scale}); transform-origin: center center;">
+        <div class="zoom-container" style="
+          width: {panel.width * scale + 80}px;
+          height: {panel.height * scale + 80}px;
+        ">
           <div
             class="panel-surface"
-            style="width: {panel.width}px; height: {panel.height}px;"
+            style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
             onclick={handleCanvasClick}
           >
             {#each (panel.bgLayerOrder ?? ['solid', 'gradient', 'image', 'texture']) as layerId}
@@ -361,6 +380,8 @@
                 {scale}
                 {snapToGrid}
                 {gridSize}
+                gridOriginX={gridOrigin.x}
+                gridOriginY={gridOrigin.y}
                 allControls={panel.controls}
               />
             {/each}
@@ -403,9 +424,6 @@
     width: 100%;
     height: 100%;
     overflow: auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .canvas-viewport::-webkit-scrollbar {
@@ -428,11 +446,9 @@
   }
 
   .zoom-container {
-    display: flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
     padding: 40px;
+    margin: auto;
   }
 
   .panel-surface {

@@ -8,6 +8,8 @@
     scale = 1,
     snapToGrid = false,
     gridSize = 10,
+    gridOriginX = 0,
+    gridOriginY = 0,
     allControls = [],
     onDragStart = null,
     onDragEnd = null,
@@ -46,26 +48,48 @@
   const MIN_SIZE = 10;
   const SNAP_THRESHOLD = 5;
 
-  // --- Snap to grid helper ---
-  function snapValue(val) {
+  // --- Snap to grid helper (accounts for grid origin offset) ---
+  function snapToGridX(val) {
     if (!snapToGrid || gridSize <= 0) return val;
-    return Math.round(val / gridSize) * gridSize;
+    return Math.round((val - gridOriginX) / gridSize) * gridSize + gridOriginX;
   }
 
-  // --- Snap guides: find alignment with other controls ---
+  function snapToGridY(val) {
+    if (!snapToGrid || gridSize <= 0) return val;
+    return Math.round((val - gridOriginY) / gridSize) * gridSize + gridOriginY;
+  }
+
+  // --- Snap guides: find alignment with other controls and return snapped position ---
   let snapGuides = $state([]);
 
-  function findSnapGuides(x, y, w, h) {
-    if (!allControls || allControls.length === 0) return [];
-    const guides = [];
-    const edges = {
-      left: x,
-      centerX: x + w / 2,
-      right: x + w,
-      top: y,
-      centerY: y + h / 2,
-      bottom: y + h,
-    };
+  /**
+   * Find alignment snap guides against other controls.
+   * Returns { x, y, guides[] } — snapped position + visual guide lines.
+   * Each edge of our rect is compared to each edge of every other control on the same axis.
+   * The closest match within SNAP_THRESHOLD wins per axis.
+   */
+  function findAlignmentSnap(x, y, w, h) {
+    const result = { x, y, guides: [] };
+    if (!allControls || allControls.length === 0) return result;
+
+    // Our edges by axis
+    const myXEdges = [
+      { offset: 0,     val: x },         // left
+      { offset: w / 2, val: x + w / 2 }, // centerX
+      { offset: w,     val: x + w },     // right
+    ];
+    const myYEdges = [
+      { offset: 0,     val: y },         // top
+      { offset: h / 2, val: y + h / 2 }, // centerY
+      { offset: h,     val: y + h },     // bottom
+    ];
+
+    let bestDx = SNAP_THRESHOLD;
+    let bestDy = SNAP_THRESHOLD;
+    let bestSnapX = null;
+    let bestSnapY = null;
+    let xGuidePos = null;
+    let yGuidePos = null;
 
     for (const other of allControls) {
       const otherCore = getSection(other, 'Core');
@@ -77,39 +101,44 @@
       const ow = otherTransform.width;
       const oh = otherTransform.height;
 
-      const otherEdges = {
-        left: ox,
-        centerX: ox + ow / 2,
-        right: ox + ow,
-        top: oy,
-        centerY: oy + oh / 2,
-        bottom: oy + oh,
-      };
+      const otherXEdges = [ox, ox + ow / 2, ox + ow];
+      const otherYEdges = [oy, oy + oh / 2, oy + oh];
 
-      // Vertical guides (x-axis alignment)
-      for (const [, val] of Object.entries(edges)) {
-        if (val === edges.top || val === edges.centerY || val === edges.bottom) continue;
-        for (const [, oval] of Object.entries(otherEdges)) {
-          if (oval === otherEdges.top || oval === otherEdges.centerY || oval === otherEdges.bottom) continue;
-          if (Math.abs(val - oval) < SNAP_THRESHOLD) {
-            guides.push({ type: 'vertical', pos: oval });
+      // X-axis alignment (produces vertical guide lines)
+      for (const myEdge of myXEdges) {
+        for (const oval of otherXEdges) {
+          const dist = Math.abs(myEdge.val - oval);
+          if (dist < bestDx) {
+            bestDx = dist;
+            bestSnapX = oval - myEdge.offset; // shift our x so this edge aligns
+            xGuidePos = oval;
           }
         }
       }
 
-      // Horizontal guides (y-axis alignment)
-      for (const [, val] of Object.entries(edges)) {
-        if (val === edges.left || val === edges.centerX || val === edges.right) continue;
-        for (const [, oval] of Object.entries(otherEdges)) {
-          if (oval === otherEdges.left || oval === otherEdges.centerX || oval === otherEdges.right) continue;
-          if (Math.abs(val - oval) < SNAP_THRESHOLD) {
-            guides.push({ type: 'horizontal', pos: oval });
+      // Y-axis alignment (produces horizontal guide lines)
+      for (const myEdge of myYEdges) {
+        for (const oval of otherYEdges) {
+          const dist = Math.abs(myEdge.val - oval);
+          if (dist < bestDy) {
+            bestDy = dist;
+            bestSnapY = oval - myEdge.offset; // shift our y so this edge aligns
+            yGuidePos = oval;
           }
         }
       }
     }
 
-    return guides;
+    if (bestSnapX !== null) {
+      result.x = bestSnapX;
+      result.guides.push({ type: 'vertical', pos: xGuidePos });
+    }
+    if (bestSnapY !== null) {
+      result.y = bestSnapY;
+      result.guides.push({ type: 'horizontal', pos: yGuidePos });
+    }
+
+    return result;
   }
 
   // --- Click to select ---
@@ -141,15 +170,17 @@
     let newX = dragStartPos.x + dx;
     let newY = dragStartPos.y + dy;
 
+    // Grid snap first
     if (snapToGrid && gridSize > 0) {
-      newX = snapValue(newX);
-      newY = snapValue(newY);
+      newX = snapToGridX(newX);
+      newY = snapToGridY(newY);
     }
 
-    transientX = Math.round(newX);
-    transientY = Math.round(newY);
-
-    snapGuides = findSnapGuides(transientX, transientY, displayW, displayH);
+    // Alignment snap overrides grid when within threshold
+    const align = findAlignmentSnap(newX, newY, displayW, displayH);
+    transientX = Math.round(align.x);
+    transientY = Math.round(align.y);
+    snapGuides = align.guides;
   }
 
   function handleDragEnd() {
@@ -226,20 +257,21 @@
     if (w < MIN_SIZE) { w = MIN_SIZE; if (handle.includes('l')) x = resizeStartRect.x + resizeStartRect.w - MIN_SIZE; }
     if (h < MIN_SIZE) { h = MIN_SIZE; if (handle.includes('t')) y = resizeStartRect.y + resizeStartRect.h - MIN_SIZE; }
 
-    // Snap
+    // Grid snap
     if (snapToGrid && gridSize > 0) {
-      x = snapValue(x);
-      y = snapValue(y);
-      w = snapValue(w) || gridSize;
-      h = snapValue(h) || gridSize;
+      x = snapToGridX(x);
+      y = snapToGridY(y);
+      w = Math.round(w / gridSize) * gridSize || gridSize;
+      h = Math.round(h / gridSize) * gridSize || gridSize;
     }
 
-    transientX = Math.round(x);
-    transientY = Math.round(y);
+    // Alignment snap overrides grid when within threshold
+    const align = findAlignmentSnap(x, y, w, h);
+    transientX = Math.round(align.x);
+    transientY = Math.round(align.y);
     transientW = Math.round(w);
     transientH = Math.round(h);
-
-    snapGuides = findSnapGuides(transientX, transientY, transientW, transientH);
+    snapGuides = align.guides;
   }
 
   function handleResizeEnd() {

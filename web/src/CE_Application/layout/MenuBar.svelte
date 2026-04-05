@@ -42,6 +42,8 @@
       { label: 'Label',      action: () => addControl('Label') },
       { label: 'Button',     action: () => addControl('Button') },
       { label: 'Container',  action: () => addControl('Container') },
+      { type: 'separator' },
+      { label: 'TestBox',    action: () => addControl('TestBox') },
     ],
     Panel: [
       { label: 'Panel Properties...', action: () => {} },
