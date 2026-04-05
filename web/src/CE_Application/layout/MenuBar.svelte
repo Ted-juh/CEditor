@@ -3,6 +3,7 @@
   import { addPanel, closePanel, activePanelId, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
+  import { undo, redo } from '../stores/history.js';
 
   const menus = {
     File: [
@@ -20,8 +21,8 @@
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],
     Edit: [
-      { label: 'Undo', shortcut: 'Ctrl+Z', action: () => {} },
-      { label: 'Redo', shortcut: 'Ctrl+Y', action: () => {} },
+      { label: 'Undo', shortcut: 'Ctrl+Z', action: () => undo() },
+      { label: 'Redo', shortcut: 'Ctrl+Y', action: () => redo() },
       { type: 'separator' },
       { label: 'Cut',   shortcut: 'Ctrl+X', action: () => {} },
       { label: 'Copy',  shortcut: 'Ctrl+C', action: () => {} },

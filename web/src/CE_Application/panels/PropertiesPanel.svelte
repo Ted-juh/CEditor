@@ -30,6 +30,7 @@
   } from 'lucide-svelte';
   import { panels, activePanelId, selectedComponentId, updatePanel, saveActivePanel } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
+  import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
   import { selectedControl, hasSection } from '../stores/controls.js';
   import PanelCardContent from './PanelCardContent.svelte';
   import CoreEditor from '../sections/CoreEditor.svelte';
@@ -226,10 +227,10 @@
   {#if panel}
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <div class="props-toolbar">
-      <button class="toolbar-btn" disabled title="Undo">
+      <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title="Undo" onclick={undo}>
         <Undo2 size={18} strokeWidth={1.5} />
       </button>
-      <button class="toolbar-btn" disabled title="Redo">
+      <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title="Redo" onclick={redo}>
         <Redo2 size={18} strokeWidth={1.5} />
       </button>
       <div class="toolbar-divider"></div>

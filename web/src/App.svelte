@@ -9,9 +9,21 @@
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import { initPanelBridge } from './CE_Application/stores/panels.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
+  import { initHistory, undo, redo } from './CE_Application/stores/history.js';
 
   initPanelBridge();
   initConsoleBridge();
+  initHistory();
+
+  function handleGlobalKeyDown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      undo();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      redo();
+    }
+  }
 
   let propertiesPanelWidth = $state(280);
   let isResizingProps = $state(false);
@@ -66,6 +78,8 @@
     window.addEventListener('mouseup', onMouseUp);
   }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeyDown} />
 
 <div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
   <div class="menubar-area">
