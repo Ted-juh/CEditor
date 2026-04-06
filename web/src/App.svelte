@@ -6,16 +6,29 @@
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import DisplayPanel from './CE_Application/panels/DisplayPanel.svelte';
   import PropertiesPanel from './CE_Application/panels/PropertiesPanel.svelte';
+  import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
+  import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
   import { initPanelBridge } from './CE_Application/stores/panels.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
+  import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
 
   initPanelBridge();
   initConsoleBridge();
   initHistory();
 
   function handleGlobalKeyDown(e) {
+    if (e.key === 'F1') {
+      e.preventDefault();
+      showShortcuts = !showShortcuts;
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+      e.preventDefault();
+      requestZoomToSelection();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
       e.preventDefault();
       undo();
@@ -27,6 +40,10 @@
 
   let propertiesPanelWidth = $state(280);
   let isResizingProps = $state(false);
+  let treePanelWidth = $state(200);
+  let isResizingTree = $state(false);
+  let showTreePanel = $state(true);
+  let showShortcuts = $state(false);
   let displayPanelHeight = $state(480);
   let isResizingDisplay = $state(false);
   let showDisplayPanel = $state(true);
@@ -58,6 +75,26 @@
     window.addEventListener('mouseup', onMouseUp);
   }
 
+  function startTreeResize(e) {
+    isResizingTree = true;
+    const startX = e.clientX;
+    const startWidth = treePanelWidth;
+
+    function onMouseMove(e) {
+      const delta = startX - e.clientX;
+      treePanelWidth = Math.max(120, Math.min(400, startWidth + delta));
+    }
+
+    function onMouseUp() {
+      isResizingTree = false;
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    }
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }
+
   function startDisplayResize(e) {
     isResizingDisplay = true;
     const startY = e.clientY;
@@ -79,7 +116,7 @@
   }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeyDown} />
+<svelte:window onkeydown={handleGlobalKeyDown} oncontextmenu={(e) => e.preventDefault()} />
 
 <div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
   <div class="menubar-area">
@@ -90,20 +127,33 @@
     <IconPanel
       {showDisplayPanel}
       {showPropertiesPanel}
+      {showTreePanel}
       onToggleDisplay={() => showDisplayPanel = !showDisplayPanel}
       onToggleProperties={() => showPropertiesPanel = !showPropertiesPanel}
+      onToggleTree={() => showTreePanel = !showTreePanel}
     />
   </div>
 
   <div class="center-area">
-    <div class="editor-canvas-area">
-      <EditorCanvas />
-    </div>
-    <div class="common-bar-area">
-      <CommonPropertyBar />
-    </div>
-    <div class="zoom-bar-area">
-      <ZoomBar />
+    <div class="editor-top-row">
+      <div class="editor-canvas-col">
+        <div class="editor-canvas-area">
+          <EditorCanvas />
+        </div>
+        <div class="common-bar-area">
+          <CommonPropertyBar />
+        </div>
+        <div class="zoom-bar-area">
+          <ZoomBar />
+        </div>
+      </div>
+      {#if showTreePanel}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="tree-resize-handle" class:active={isResizingTree} onmousedown={startTreeResize}></div>
+        <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
+          <ComponentTree />
+        </div>
+      {/if}
     </div>
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {showDisplayPanel ? 'block' : 'none'}"></div>
@@ -126,6 +176,8 @@
   </div>
 </div>
 
+<ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+
 <style>
   .app {
     width: 100vw;
@@ -147,6 +199,36 @@
   .center-area     { grid-area: center; display: flex; flex-direction: column; overflow: hidden; }
   .properties-area { grid-area: props; overflow: hidden; }
   .statusbar-area  { grid-area: status; }
+
+  .editor-top-row {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .editor-canvas-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .tree-area {
+    overflow: hidden;
+  }
+
+  .tree-resize-handle {
+    flex: 0 0 8px;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.15s;
+  }
+  .tree-resize-handle:hover,
+  .tree-resize-handle.active {
+    background: #5B9BD5;
+  }
 
   .resize-handle {
     grid-area: resize;

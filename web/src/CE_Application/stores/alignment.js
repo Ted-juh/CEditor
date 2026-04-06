@@ -2,6 +2,7 @@ import { get } from 'svelte/store';
 import { panels, activePanelId, activePanel, selectedComponentIds, keyObjectId } from './panels.js';
 import { getSection, updateControlProperty } from './controls.js';
 import { updatePanel } from './panels.js';
+import { guides } from './guides.js';
 
 // --- Helpers ---
 
@@ -27,6 +28,48 @@ function getReferenceBounds(mode, transforms, regionRef = null) {
     const kid = get(keyObjectId);
     const key = transforms.find(t => t.id === kid);
     if (key) return { x: key.x, y: key.y, width: key.width, height: key.height };
+  }
+  if (mode === 'guides') {
+    // Build a reference rect from guide lines.
+    // For each axis, find the two nearest guides that bracket the selection center.
+    // If only one guide exists on an axis, use it as a zero-width line.
+    const g = get(guides);
+    const selMinX = Math.min(...transforms.map(t => t.x));
+    const selMinY = Math.min(...transforms.map(t => t.y));
+    const selMaxX = Math.max(...transforms.map(t => t.x + t.width));
+    const selMaxY = Math.max(...transforms.map(t => t.y + t.height));
+    const selCX = (selMinX + selMaxX) / 2;
+    const selCY = (selMinY + selMaxY) / 2;
+
+    const vg = [...(g.vertical ?? [])].sort((a, b) => a - b);
+    const hg = [...(g.horizontal ?? [])].sort((a, b) => a - b);
+
+    // Find nearest vertical guide to selection center-X
+    let refX = selMinX, refW = selMaxX - selMinX;
+    if (vg.length >= 2) {
+      // Find pair that brackets center, or closest two
+      const left = vg.filter(v => v <= selCX);
+      const right = vg.filter(v => v >= selCX);
+      const l = left.length > 0 ? left[left.length - 1] : vg[0];
+      const r = right.length > 0 ? right[0] : vg[vg.length - 1];
+      refX = l; refW = r - l;
+    } else if (vg.length === 1) {
+      refX = vg[0]; refW = 0;
+    }
+
+    // Find nearest horizontal guide to selection center-Y
+    let refY = selMinY, refH = selMaxY - selMinY;
+    if (hg.length >= 2) {
+      const top = hg.filter(v => v <= selCY);
+      const bot = hg.filter(v => v >= selCY);
+      const t = top.length > 0 ? top[top.length - 1] : hg[0];
+      const b = bot.length > 0 ? bot[0] : hg[hg.length - 1];
+      refY = t; refH = b - t;
+    } else if (hg.length === 1) {
+      refY = hg[0]; refH = 0;
+    }
+
+    return { x: refX, y: refY, width: refW, height: refH };
   }
   // 'selection' or fallback
   const minX = Math.min(...transforms.map(t => t.x));
@@ -178,10 +221,18 @@ export function distributeBottomEdges() {
 // --- Distribute Spacing (2) ---
 // fixedGap: null = auto (even spacing from outermost), number = exact pixel gap
 
-export function distributeHSpacing(fixedGap = null) {
+export function distributeHSpacing(fixedGap = null, alignOpposite = false) {
   const transforms = getSelectedTransforms();
   if (transforms.length < 2) return;
   const sorted = [...transforms].sort((a, b) => a.x - b.x);
+
+  // Align all to topmost Y when option is enabled
+  if (alignOpposite) {
+    const topY = Math.min(...sorted.map(t => t.y));
+    for (const t of sorted) {
+      updateControlProperty(t.id, 'Transform.y', topY);
+    }
+  }
 
   if (fixedGap != null) {
     // Fixed gap: place each component fixedGap pixels after the previous
@@ -205,10 +256,18 @@ export function distributeHSpacing(fixedGap = null) {
   }
 }
 
-export function distributeVSpacing(fixedGap = null) {
+export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
   const transforms = getSelectedTransforms();
   if (transforms.length < 2) return;
   const sorted = [...transforms].sort((a, b) => a.y - b.y);
+
+  // Align all to leftmost X when option is enabled
+  if (alignOpposite) {
+    const leftX = Math.min(...sorted.map(t => t.x));
+    for (const t of sorted) {
+      updateControlProperty(t.id, 'Transform.x', leftX);
+    }
+  }
 
   if (fixedGap != null) {
     // Fixed gap: place each component fixedGap pixels after the previous
@@ -349,6 +408,42 @@ export function snapSelectionToGrid() {
     const snappedY = Math.round((t.y - oy) / gridSize) * gridSize + oy;
     updateControlProperty(t.id, 'Transform.x', snappedX);
     updateControlProperty(t.id, 'Transform.y', snappedY);
+  }
+}
+
+// --- Snap to Guides ---
+
+export function snapSelectionToGuides() {
+  const g = get(guides);
+  const vg = [...(g.vertical ?? [])].sort((a, b) => a - b);
+  const hg = [...(g.horizontal ?? [])].sort((a, b) => a - b);
+  if (vg.length === 0 && hg.length === 0) return;
+
+  const transforms = getSelectedTransforms();
+  for (const t of transforms) {
+    // Snap X to nearest vertical guide
+    if (vg.length > 0) {
+      let bestDist = Infinity, bestX = t.x;
+      // Check left edge, center, right edge
+      for (const edge of [t.x, t.x + t.width / 2, t.x + t.width]) {
+        for (const gx of vg) {
+          const d = Math.abs(edge - gx);
+          if (d < bestDist) { bestDist = d; bestX = gx - (edge - t.x); }
+        }
+      }
+      updateControlProperty(t.id, 'Transform.x', Math.round(bestX));
+    }
+    // Snap Y to nearest horizontal guide
+    if (hg.length > 0) {
+      let bestDist = Infinity, bestY = t.y;
+      for (const edge of [t.y, t.y + t.height / 2, t.y + t.height]) {
+        for (const gy of hg) {
+          const d = Math.abs(edge - gy);
+          if (d < bestDist) { bestDist = d; bestY = gy - (edge - t.y); }
+        }
+      }
+      updateControlProperty(t.id, 'Transform.y', Math.round(bestY));
+    }
   }
 }
 

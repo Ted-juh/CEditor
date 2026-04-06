@@ -1,5 +1,6 @@
 <script>
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { selectedComponentIds } from '../stores/panels.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
 
   let { control = null } = $props();
@@ -7,6 +8,15 @@
   let core = $derived(getSection(control, 'Core'));
   let background = $derived(getSection(control, 'Background'));
   let fill = $derived(background?._children?.Fill);
+
+  function set(path, value) {
+    if (!core?.id) return;
+    if ($selectedComponentIds.size > 1) {
+      updateSelectedProperty(path, value);
+    } else {
+      updateControlProperty(core.id, path, value);
+    }
+  }
 
   function handleSwatchClick() {
     if (!core?.id || !fill?.colour) return;
@@ -17,16 +27,13 @@
   }
 
   function setMode(e) {
-    if (!core?.id) return;
-    updateControlProperty(core.id, 'Background.mode', e.target.value);
+    set('Background.mode', e.target.value);
   }
 
   function setColour(e) {
-    if (!core?.id) return;
     let val = e.target.value.replace(/^#/, '').toUpperCase();
-    // Ensure AARRGGBB format (prepend FF if 6-char)
     if (val.length === 6) val = 'FF' + val;
-    updateControlProperty(core.id, 'Background.Fill.colour', val);
+    set('Background.Fill.colour', val);
   }
 
   function selectAll(e) {

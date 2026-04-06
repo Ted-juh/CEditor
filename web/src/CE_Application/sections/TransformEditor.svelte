@@ -1,5 +1,6 @@
 <script>
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { selectedComponentIds } from '../stores/panels.js';
   import NumberInput from './NumberInput.svelte';
 
   let { control = null } = $props();
@@ -9,7 +10,11 @@
 
   function set(prop, value) {
     if (!core?.id) return;
-    updateControlProperty(core.id, `Transform.${prop}`, value);
+    if ($selectedComponentIds.size > 1) {
+      updateSelectedProperty(`Transform.${prop}`, value);
+    } else {
+      updateControlProperty(core.id, `Transform.${prop}`, value);
+    }
   }
 </script>
 
@@ -45,6 +50,32 @@
         <NumberInput value={transform.rotation} step={1} onchange={(v) => set('rotation', v)} />
       </div>
     </div>
+    <div class="prop-row-pair">
+      <div class="prop-row half">
+        <span class="lbl">MinW</span>
+        <NumberInput value={transform.minWidth ?? 0} step={1} min={0} onchange={(v) => set('minWidth', v)} />
+      </div>
+      <div class="prop-row half">
+        <span class="lbl">MinH</span>
+        <NumberInput value={transform.minHeight ?? 0} step={1} min={0} onchange={(v) => set('minHeight', v)} />
+      </div>
+    </div>
+    <div class="prop-row-pair">
+      <div class="prop-row half">
+        <span class="lbl">MaxW</span>
+        <NumberInput value={transform.maxWidth ?? 0} step={1} min={0} onchange={(v) => set('maxWidth', v)} />
+      </div>
+      <div class="prop-row half">
+        <span class="lbl">MaxH</span>
+        <NumberInput value={transform.maxHeight ?? 0} step={1} min={0} onchange={(v) => set('maxHeight', v)} />
+      </div>
+    </div>
+    <div class="prop-row">
+      <span class="lbl">Aspect Lock</span>
+      <button class="toggle-val" class:on={transform.aspectLock} onclick={() => set('aspectLock', !transform.aspectLock)}>
+        {transform.aspectLock ? 'On' : 'Off'}
+      </button>
+    </div>
   </div>
 {/if}
 
@@ -55,4 +86,10 @@
   .prop-row:hover { background: #2A2A2A; }
   .prop-row.half { flex: 1; }
   .lbl { color: #888; font-size: 11px; min-width: 20px; flex-shrink: 0; }
+  .toggle-val {
+    background: #252525; border: none; color: #888; font-size: 11px;
+    padding: 2px 8px; border-radius: 3px; cursor: pointer; font-family: inherit;
+  }
+  .toggle-val:hover { background: #333; color: #CCC; }
+  .toggle-val.on { background: #094771; color: #5B9BD5; }
 </style>

@@ -1,6 +1,7 @@
 <script>
-  import { Maximize } from 'lucide-svelte';
+  import { Maximize, Ruler, Columns3, MoveHorizontal } from 'lucide-svelte';
   import { editorZoom, editorZoomIncrement, panels, activePanelId } from '../stores/panels.js';
+  import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
 
   let isEditing = $state(false);
   let editValue = $state('100');
@@ -102,6 +103,18 @@
     <button class="zoom-btn icon" onclick={fitToWindow} title="Fit to window">
       <Maximize size={12} strokeWidth={1.5} />
     </button>
+
+    <div class="divider"></div>
+
+    <button class="zoom-btn icon" class:toggle-on={$showRulers} onclick={() => showRulers.update(v => !v)} title="Toggle Rulers">
+      <Ruler size={12} strokeWidth={1.5} />
+    </button>
+    <button class="zoom-btn icon" class:toggle-on={$showGuides} onclick={() => showGuides.update(v => !v)} title="Toggle Guide Lines">
+      <Columns3 size={12} strokeWidth={1.5} />
+    </button>
+    <button class="zoom-btn icon" class:toggle-on={$showDistances} onclick={() => showDistances.update(v => !v)} title="Toggle Distance Labels">
+      <MoveHorizontal size={12} strokeWidth={1.5} />
+    </button>
   </div>
 </div>
 
@@ -146,6 +159,7 @@
   }
 
   .zoom-btn:hover { background: #444; color: #FFF; }
+  .zoom-btn.toggle-on { background: #094771; color: #5B9BD5; border-color: #5B9BD5; }
 
   .zoom-btn.icon { width: auto; padding: 0 4px; }
 

@@ -1,5 +1,6 @@
 <script>
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import { selectedComponentIds } from '../stores/panels.js';
   import NumberInput from './NumberInput.svelte';
 
   let { control = null } = $props();
@@ -8,7 +9,11 @@
 
   function set(prop, value) {
     if (!core?.id) return;
-    updateControlProperty(core.id, `Core.${prop}`, value);
+    if ($selectedComponentIds.size > 1) {
+      updateSelectedProperty(`Core.${prop}`, value);
+    } else {
+      updateControlProperty(core.id, `Core.${prop}`, value);
+    }
   }
 
   function handleInput(prop, e) {

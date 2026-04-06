@@ -4,6 +4,9 @@
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
+  import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
+  import { editorZoom, editorZoomIncrement, activePanel, updatePanel } from '../stores/panels.js';
+  import { requestZoomToSelection } from '../stores/editorCommands.js';
 
   const menus = {
     File: [
@@ -24,19 +27,28 @@
       { label: 'Undo', shortcut: 'Ctrl+Z', action: () => undo() },
       { label: 'Redo', shortcut: 'Ctrl+Y', action: () => redo() },
       { type: 'separator' },
-      { label: 'Cut',   shortcut: 'Ctrl+X', action: () => {} },
-      { label: 'Copy',  shortcut: 'Ctrl+C', action: () => {} },
-      { label: 'Paste', shortcut: 'Ctrl+V', action: () => {} },
+      { label: 'Cut',   shortcut: 'Ctrl+X', action: () => cutSelection() },
+      { label: 'Copy',  shortcut: 'Ctrl+C', action: () => copySelection() },
+      { label: 'Paste', shortcut: 'Ctrl+V', action: () => pasteSelection() },
       { type: 'separator' },
-      { label: 'Select All', shortcut: 'Ctrl+A', action: () => {} },
+      { label: 'Select All', shortcut: 'Ctrl+A', action: () => selectAll() },
     ],
     View: [
-      { label: 'Zoom In',  shortcut: 'Ctrl++', action: () => {} },
-      { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => {} },
-      { label: 'Fit to Window', shortcut: 'Ctrl+0', action: () => {} },
+      { label: 'Zoom In',  shortcut: 'Ctrl++', action: () => editorZoom.update(z => Math.min(400, z + get(editorZoomIncrement))) },
+      { label: 'Zoom Out', shortcut: 'Ctrl+-', action: () => editorZoom.update(z => Math.max(10, z - get(editorZoomIncrement))) },
+      { label: 'Reset Zoom', action: () => editorZoom.set(100) },
+      { label: 'Fit to Window', shortcut: 'Ctrl+0', action: () => {
+        const p = get(activePanel);
+        if (!p) return;
+        const vp = document.querySelector('.canvas-viewport');
+        if (!vp) return;
+        const fitScale = Math.min((vp.clientWidth - 80) / p.width, (vp.clientHeight - 80) / p.height);
+        editorZoom.set(Math.max(10, Math.min(400, Math.round(fitScale * 100))));
+      }},
+      { label: 'Zoom to Selection', shortcut: 'Ctrl+Shift+P', action: () => requestZoomToSelection() },
       { type: 'separator' },
-      { label: 'Toggle Grid', action: () => {} },
-      { label: 'Toggle Snap', action: () => {} },
+      { label: 'Toggle Grid', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { gridEnabled: !p.gridEnabled }); } },
+      { label: 'Toggle Snap', action: () => { const p = get(activePanel); if (p) updatePanel(p.id, { snapToGrid: !p.snapToGrid }); } },
     ],
     Insert: [
       { label: 'Background', action: () => addControl('Background') },
@@ -57,7 +69,9 @@
       { label: 'Build Settings...', action: () => {} },
     ],
     Help: [
-      { label: 'Documentation', action: () => {} },
+      { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }));
+      }},
       { label: 'About CEditor', action: () => {} },
     ],
   };

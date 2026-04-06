@@ -11,14 +11,54 @@ export { getSection, hasSection };
  * null when no component is selected (panel mode).
  */
 export const selectedControl = derived(
-  [panels, activePanelId, selectedComponentId],
-  ([$panels, $activePanelId, $selectedComponentId]) => {
-    if ($selectedComponentId == null) return null;
+  [panels, activePanelId, selectedComponentId, selectedComponentIds, keyObjectId],
+  ([$panels, $activePanelId, $selectedComponentId, $ids, $keyId]) => {
+    // In multi-select, show the key object (orange); in single-select, show the one selected
+    const targetId = $ids.size > 1 && $keyId ? $keyId : $selectedComponentId;
+    if (targetId == null) return null;
     const panel = $panels.find(p => p.id === $activePanelId);
     if (!panel) return null;
-    return panel.controls.find(c => c._children?.Core?.id === $selectedComponentId) ?? null;
+    return panel.controls.find(c => c._children?.Core?.id === targetId) ?? null;
   }
 );
+
+/**
+ * All currently selected control objects (derived).
+ */
+export const selectedControls = derived(
+  [panels, activePanelId, selectedComponentIds],
+  ([$panels, $activePanelId, $ids]) => {
+    if ($ids.size === 0) return [];
+    const panel = $panels.find(p => p.id === $activePanelId);
+    if (!panel) return [];
+    return panel.controls.filter(c => $ids.has(c._children?.Core?.id));
+  }
+);
+
+/**
+ * Update a property on ALL selected controls at once.
+ * Single panels.update call for efficiency.
+ */
+export function updateSelectedProperty(path, value) {
+  const panelId = get(activePanelId);
+  const ids = get(selectedComponentIds);
+  if (panelId == null || ids.size === 0) return;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      const newControls = p.controls.map(c => {
+        if (!ids.has(c._children?.Core?.id)) return c;
+        const clone = JSON.parse(JSON.stringify(c));
+        setNestedValue(clone, path, value);
+        return clone;
+      });
+
+      return { ...p, controls: newControls, modified: true };
+    })
+  );
+}
 
 /**
  * Add a new control to the active panel.
@@ -89,37 +129,54 @@ export function removeControl(id) {
  * @param {string} id - Core.id of the control to duplicate
  * @returns {object|null} The duplicated control, or null
  */
-export function duplicateControl(id) {
+/**
+ * Duplicate one or more controls in the active panel.
+ * Accepts a single id or an array/Set of ids.
+ * @param {string|string[]|Set<string>} ids - Core.id(s) of the control(s) to duplicate
+ * @returns {object[]|null} The duplicated controls, or null
+ */
+export function duplicateControl(ids) {
   const panelId = get(activePanelId);
   if (panelId == null) return null;
+
+  // Normalise to array
+  const idList = typeof ids === 'string' ? [ids] : [...ids];
 
   const panel = get(panels).find(p => p.id === panelId);
   if (!panel) return null;
 
-  const source = panel.controls.find(c => c._children?.Core?.id === id);
-  if (!source) return null;
+  const clones = [];
+  for (const id of idList) {
+    const source = panel.controls.find(c => c._children?.Core?.id === id);
+    if (!source) continue;
 
-  // Deep clone and assign new id/name
-  const clone = JSON.parse(JSON.stringify(source));
-  const newId = `ctrl_${Date.now()}`;
-  clone._children.Core.id = newId;
-  clone._children.Core.name = `${clone._children.Core.name}_copy`;
+    const clone = JSON.parse(JSON.stringify(source));
+    const newId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    clone._children.Core.id = newId;
+    clone._children.Core.name = `${clone._children.Core.name}_copy`;
 
-  // Offset position so it doesn't stack exactly on top
-  if (clone._children.Transform) {
-    clone._children.Transform.x += 20;
-    clone._children.Transform.y += 20;
+    if (clone._children.Transform) {
+      clone._children.Transform.x += 20;
+      clone._children.Transform.y += 20;
+    }
+
+    clones.push(clone);
   }
+
+  if (clones.length === 0) return null;
 
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      return { ...p, controls: [...p.controls, clone], modified: true };
+      return { ...p, controls: [...p.controls, ...clones], modified: true };
     })
   );
 
-  selectComponent(newId);
-  return clone;
+  // Select all duplicated controls
+  const newIds = new Set(clones.map(c => c._children.Core.id));
+  selectedComponentIds.set(newIds);
+
+  return clones;
 }
 
 /**

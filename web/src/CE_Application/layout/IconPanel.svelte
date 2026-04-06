@@ -13,13 +13,16 @@
     AudioLines,
     PanelBottom,
     PanelRight,
+    PanelLeftClose,
   } from 'lucide-svelte';
 
   let {
     showDisplayPanel = true,
     showPropertiesPanel = true,
+    showTreePanel = true,
     onToggleDisplay = () => {},
     onToggleProperties = () => {},
+    onToggleTree = () => {},
   } = $props();
 
   let activeTool = $state('select');
@@ -81,6 +84,14 @@
       onclick={onToggleDisplay}
     >
       <PanelBottom size={18} strokeWidth={1.5} />
+    </button>
+    <button
+      class="icon-btn"
+      class:active={showTreePanel}
+      title="Toggle Component Tree"
+      onclick={onToggleTree}
+    >
+      <PanelLeftClose size={18} strokeWidth={1.5} />
     </button>
     <button
       class="icon-btn"

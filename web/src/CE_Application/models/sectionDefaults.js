@@ -31,6 +31,11 @@ export const SECTION_DEFAULTS = {
     y: 0,
     width: 100,
     height: 40,
+    minWidth: 0,
+    minHeight: 0,
+    maxWidth: 0,    // 0 = no limit
+    maxHeight: 0,   // 0 = no limit
+    aspectLock: false,
     opacity: 1.0,
     rotation: 0,
   },

@@ -29,6 +29,7 @@
     FlipVertical2,
     LayoutGrid,
     Circle,
+    Ruler,
   } from 'lucide-svelte';
 
   import { selectedComponentIds, keyObjectId } from '../stores/panels.js';
@@ -40,10 +41,11 @@
     distributeHSpacing, distributeVSpacing,
     bringToFront, bringForward, sendBackward, sendToBack,
     matchWidth, matchHeight, matchBoth,
-    snapSelectionToGrid,
+    snapSelectionToGrid, snapSelectionToGuides,
     flipHorizontal, flipVertical,
     tidyGrid, arrangeCircular,
   } from '../stores/alignment.js';
+  import { guides } from '../stores/guides.js';
 
   let alignMode = $state('selection');
   let regionX = $state(0);
@@ -53,6 +55,7 @@
   let useFixedV = $state(false);
   let fixedHGap = $state(10);
   let fixedVGap = $state(10);
+  let spacingAlign = $state(false);
   let gridCols = $state(3);
   let gridGapX = $state(10);
   let gridGapY = $state(10);
@@ -60,7 +63,7 @@
   let circleStartAngle = $state(0);
 
   let selCount = $derived($selectedComponentIds.size);
-  let canAlign = $derived(alignMode === 'region' ? selCount >= 1 : selCount >= 2);
+  let canAlign = $derived(alignMode === 'region' || alignMode === 'guides' ? selCount >= 1 : selCount >= 2);
   let canDistribute = $derived(selCount >= 3);
   let canFixedSpace = $derived(selCount >= 2);
   let canOrder = $derived(selCount >= 1);
@@ -87,6 +90,10 @@
       <button class="mode-btn" class:active={alignMode === 'key-object'} disabled={!hasKeyObject} title="Align to Key Object" onclick={() => alignMode = 'key-object'}>
         <MousePointerClick size={14} strokeWidth={1.5} />
         <span>Key Object</span>
+      </button>
+      <button class="mode-btn" class:active={alignMode === 'guides'} disabled={$guides.vertical.length === 0 && $guides.horizontal.length === 0} title="Align to Guide Lines" onclick={() => alignMode = 'guides'}>
+        <Ruler size={14} strokeWidth={1.5} />
+        <span>Guides</span>
       </button>
     </div>
   </div>
@@ -170,7 +177,7 @@
   <div class="align-section">
     <div class="section-label">Spacing</div>
     <div class="spacing-row">
-      <button class="action-btn" disabled={useFixedH ? !canFixedSpace : !canDistribute} title={useFixedH ? `H-spacing: ${fixedHGap}px` : 'Equal H-Spacing'} onclick={() => distributeHSpacing(useFixedH ? fixedHGap : null)}>
+      <button class="action-btn" disabled={useFixedH ? !canFixedSpace : !canDistribute} title={useFixedH ? `H-spacing: ${fixedHGap}px` : 'Equal H-Spacing'} onclick={() => distributeHSpacing(useFixedH ? fixedHGap : null, spacingAlign)}>
         <AlignHorizontalSpaceBetween size={16} strokeWidth={1.5} />
       </button>
       <button class="toggle-btn" class:active={useFixedH} onclick={() => useFixedH = !useFixedH}>
@@ -182,7 +189,7 @@
       {/if}
     </div>
     <div class="spacing-row">
-      <button class="action-btn" disabled={useFixedV ? !canFixedSpace : !canDistribute} title={useFixedV ? `V-spacing: ${fixedVGap}px` : 'Equal V-Spacing'} onclick={() => distributeVSpacing(useFixedV ? fixedVGap : null)}>
+      <button class="action-btn" disabled={useFixedV ? !canFixedSpace : !canDistribute} title={useFixedV ? `V-spacing: ${fixedVGap}px` : 'Equal V-Spacing'} onclick={() => distributeVSpacing(useFixedV ? fixedVGap : null, spacingAlign)}>
         <AlignVerticalSpaceBetween size={16} strokeWidth={1.5} />
       </button>
       <button class="toggle-btn" class:active={useFixedV} onclick={() => useFixedV = !useFixedV}>
@@ -192,6 +199,11 @@
         <input class="spacing-input" type="number" bind:value={fixedVGap} min="0" onfocus={(e) => e.target.select()} />
         <span class="unit">px</span>
       {/if}
+    </div>
+    <div class="spacing-row">
+      <button class="toggle-btn" class:active={spacingAlign} onclick={() => spacingAlign = !spacingAlign} title="Also align on the opposite axis">
+        {spacingAlign ? 'Align' : 'Free'}
+      </button>
     </div>
   </div>
 
@@ -237,6 +249,9 @@
     <div class="btn-row">
       <button class="action-btn" disabled={selCount < 1} title="Snap to Grid" onclick={snapSelectionToGrid}>
         <Magnet size={16} strokeWidth={1.5} />
+      </button>
+      <button class="action-btn" disabled={selCount < 1 || ($guides.vertical.length === 0 && $guides.horizontal.length === 0)} title="Snap to Guides" onclick={snapSelectionToGuides}>
+        <Ruler size={16} strokeWidth={1.5} />
       </button>
       <button class="action-btn" disabled={!canFlip} title="Flip Horizontal" onclick={flipHorizontal}>
         <FlipHorizontal2 size={16} strokeWidth={1.5} />
