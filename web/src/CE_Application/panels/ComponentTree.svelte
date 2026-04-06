@@ -129,6 +129,7 @@
         {@const isSelected = $selectedComponentIds.has(id)}
         {@const isKey = $keyObjectId === id && $selectedComponentIds.size > 1}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div
           class="tree-item"
           class:selected={isSelected}
