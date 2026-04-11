@@ -8,6 +8,10 @@
    */
   import { onMount } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, interpolateColor, squareRampToDataURL } from '../utils/gradientCSS.js';
+  import {
+    computeAxisGeometry, stopThumbPoint,
+    projectOntoAxis as projectPointOntoAxis,
+  } from '../utils/gradientAxisGeometry.js';
 
   let props = $props();
   let gradient = $derived(props.gradient);
@@ -87,86 +91,42 @@
   let needsShapeContainer = $derived(shape !== 'rectangle');
 
   // --- Axis geometry ---
-  // Radial: axis from gradient center → center+radius (one direction, horizontal)
-  // Linear: axis through 50,50 (or gradient center for conical) from edge to edge
+  // All the axis math lives in gradientAxisGeometry.js. This one derivation
+  // recomputes every field whenever the gradient, shape, or live drag
+  // state changes.
+  let axis = $derived(computeAxisGeometry(gradient, shape, {
+    centerX: internalCenterX, centerY: internalCenterY,
+    radiusX: internalRadiusX, radiusY: internalRadiusY,
+  }));
 
-  let isRadialAxis = $derived(['radial', 'radialRamp'].includes(gradient.type));
-  let hasCenterControl = $derived(['radial', 'radialRamp', 'conical'].includes(gradient.type));
-  let hasRadiusControl = $derived(['radial', 'radialRamp'].includes(gradient.type));
-
-  let axisAngle = $derived((() => {
-    switch (gradient.type) {
-      case 'radial':
-      case 'radialRamp':
-        return 90; // horizontal
-      case 'conical':
-        return gradient.angle ?? 0;
-      default:
-        return (gradient.angle ?? 90);
-    }
-  })());
-
-  // CSS angle to radians (0°=up, 90°=right, clockwise)
-  let axisRad = $derived((axisAngle - 90) * Math.PI / 180);
-
-  // Axis center follows gradient center for types with center control
-  let axisCenterX = $derived(hasCenterControl ? internalCenterX : 50);
-  let axisCenterY = $derived(hasCenterControl ? internalCenterY : 50);
-
-  // Half-length for linear axis types (ray-cast to edges)
-  let linearHalfLen = $derived((() => {
-    if (shape !== 'rectangle') return 48;
-    const cx = axisCenterX, cy = axisCenterY;
-    const dx = Math.cos(axisRad), dy = Math.sin(axisRad);
-    let tMin = Infinity;
-    if (Math.abs(dx) > 0.001) tMin = Math.min(tMin, Math.abs((dx > 0 ? 100 - cx : cx) / dx));
-    if (Math.abs(dy) > 0.001) tMin = Math.min(tMin, Math.abs((dy > 0 ? 100 - cy : cy) / dy));
-    return Math.min(tMin * 0.95, 50);
-  })());
-
-  // Axis start (stop 0%) and end (stop 100%) points in container %
-  let axisStart = $derived((() => {
-    if (isRadialAxis) {
-      // 0% = at center
-      return { x: axisCenterX, y: axisCenterY };
-    }
-    const dx = Math.cos(axisRad), dy = Math.sin(axisRad);
-    return { x: axisCenterX - dx * linearHalfLen, y: axisCenterY - dy * linearHalfLen };
-  })());
-
-  let axisEnd = $derived((() => {
-    if (isRadialAxis) {
-      // 100% = at center + radius (horizontal)
-      return { x: axisCenterX + internalRadiusX, y: axisCenterY };
-    }
-    const dx = Math.cos(axisRad), dy = Math.sin(axisRad);
-    return { x: axisCenterX + dx * linearHalfLen, y: axisCenterY + dy * linearHalfLen };
-  })());
+  // Destructured accessors — keep the existing template names stable so
+  // the SVG references below don't all need rewriting.
+  let hasCenterControl = $derived(axis.hasCenterControl);
+  let hasRadiusControl = $derived(axis.hasRadiusControl);
+  let axisCenterX      = $derived(axis.axisCenterX);
+  let axisCenterY      = $derived(axis.axisCenterY);
+  let axisStart        = $derived(axis.axisStart);
+  let axisEnd          = $derived(axis.axisEnd);
+  let showPerpAxis     = $derived(axis.showPerpAxis);
+  let perpAxisEnd      = $derived(axis.perpAxisEnd);
 
   let axisContainerEl = $state(null);
 
-  // Project mouse onto axis line, returning 0-100 stop position
+  // Project the mouse event onto the axis line (stop position 0-100).
+  // Thin wrapper over the pure point-projection util — captures the
+  // container ref + current axis start/end so call sites stay terse.
   function projectOntoAxis(e) {
     const el = axisContainerEl;
     if (!el) return 50;
     const rect = el.getBoundingClientRect();
     const mx = ((e.clientX - rect.left) / rect.width) * 100;
     const my = ((e.clientY - rect.top) / rect.height) * 100;
-
-    const ax = axisEnd.x - axisStart.x;
-    const ay = axisEnd.y - axisStart.y;
-    const len2 = ax * ax + ay * ay;
-    if (len2 < 0.001) return 0;
-
-    const t = ((mx - axisStart.x) * ax + (my - axisStart.y) * ay) / len2;
-    return Math.max(0, Math.min(100, Math.round(t * 100)));
+    return projectPointOntoAxis(mx, my, axisStart, axisEnd);
   }
 
-  // Position a stop thumb between axisStart (0%) and axisEnd (100%)
+  // CSS string for a stop thumb at its fraction of the axis.
   function getThumbStyle(stop) {
-    const t = stop.position / 100;
-    const x = axisStart.x + (axisEnd.x - axisStart.x) * t;
-    const y = axisStart.y + (axisEnd.y - axisStart.y) * t;
+    const { x, y } = stopThumbPoint(axisStart, axisEnd, stop.position);
     return `left: ${x}%; top: ${y}%; background: #${stop.color}`;
   }
 
@@ -177,12 +137,6 @@
   });
 
   // Perpendicular axis for Y radius (radial in rectangle mode)
-  let showPerpAxis = $derived(hasRadiusControl && (shape === 'rectangle' || shape === 'ellipse'));
-  let perpAxisEnd = $derived(
-    hasRadiusControl
-      ? { x: axisCenterX, y: axisCenterY + internalRadiusY }
-      : { x: axisCenterX, y: axisCenterY }
-  );
   let perpLineStyle = $derived({
     x1: axisCenterX, y1: axisCenterY,
     x2: perpAxisEnd.x, y2: perpAxisEnd.y,

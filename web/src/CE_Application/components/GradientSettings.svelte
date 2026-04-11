@@ -5,6 +5,7 @@
    */
   import { X, Plus, Circle, Square, RectangleHorizontal, Triangle } from 'lucide-svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { addStopInLargestGap, updateStopAt, deleteStopAt } from '../utils/gradientStops.js';
 
   let props = $props();
   let gradient = $derived(props.gradient);
@@ -26,44 +27,20 @@
   }
 
   function updateStop(index, changes) {
-    const newStops = gradient.stops.map((s, i) =>
-      i === index ? { ...s, ...changes } : s
-    );
-    onchange({ ...gradient, stops: newStops });
+    onchange({ ...gradient, stops: updateStopAt(gradient.stops, index, changes) });
   }
 
   function deleteStop(index) {
-    if (gradient.stops.length <= 2) return;
-    const newStops = gradient.stops.filter((_, i) => i !== index);
-    onchange({ ...gradient, stops: newStops });
-    if (onSelectStop) onSelectStop(Math.min(index, newStops.length - 1));
+    const result = deleteStopAt(gradient.stops, index);
+    if (!result) return;
+    onchange({ ...gradient, stops: result.stops });
+    onSelectStop?.(result.newIndex);
   }
 
   function addStop() {
-    // Find the largest gap and add a stop in the middle
-    const sorted = [...gradient.stops].sort((a, b) => a.position - b.position);
-    let maxGap = 0, gapStart = 0, gapEnd = 100;
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const gap = sorted[i + 1].position - sorted[i].position;
-      if (gap > maxGap) {
-        maxGap = gap;
-        gapStart = sorted[i].position;
-        gapEnd = sorted[i + 1].position;
-      }
-    }
-    const position = Math.round((gapStart + gapEnd) / 2);
-    // Interpolate color
-    const startColor = sorted.find(s => s.position === gapStart)?.color || '888888';
-    const endColor = sorted.find(s => s.position === gapEnd)?.color || '888888';
-    // Simple midpoint blend
-    const blend = (a, b) => Math.round((parseInt(a, 16) + parseInt(b, 16)) / 2).toString(16).padStart(2, '0');
-    const color = blend(startColor.slice(0,2), endColor.slice(0,2))
-                + blend(startColor.slice(2,4), endColor.slice(2,4))
-                + blend(startColor.slice(4,6), endColor.slice(4,6));
-
-    const newStops = [...gradient.stops, { color: color.toUpperCase(), position }];
-    onchange({ ...gradient, stops: newStops });
-    if (onSelectStop) onSelectStop(newStops.length - 1);
+    const result = addStopInLargestGap(gradient.stops);
+    onchange({ ...gradient, stops: result.stops });
+    onSelectStop?.(result.newIndex);
   }
 
   // Contextual controls based on gradient type

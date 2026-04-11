@@ -213,7 +213,7 @@ export function updateControlProperty(controlId, path, value) {
 /**
  * Add a section to a control.
  * @param {string} controlId - Core.id
- * @param {string} sectionName - Section type (e.g., 'Border', 'Grid')
+ * @param {string} sectionName - Section type (e.g., 'Effects', 'Grid')
  */
 export function addSection(controlId, sectionName) {
   const defaults = SECTION_DEFAULTS[sectionName];
@@ -277,12 +277,14 @@ export function removeSection(controlId, sectionName) {
 
 /**
  * Set a nested value in a control by dot-notation path.
- * First segment navigates _children, subsequent segments navigate deeper _children.
- * The last segment is the property name.
+ * First segment navigates _children (section lookup).
+ * Subsequent segments try _children first (tree nodes), then plain properties
+ * (handles plain objects like per-side border and array indices).
  *
- * "Transform.x" → clone._children.Transform.x = value
- * "Background.Fill.colour" → clone._children.Background._children.Fill.colour = value
- * "Core.name" → clone._children.Core.name = value
+ * "Transform.x"                    → _children.Transform.x = value
+ * "Background.Fill.colour"         → _children.Background._children.Fill.colour = value
+ * "Background.Border.top.style"    → _children.Background._children.Border.top.style = value
+ * "Effects.Shadows.items.0.blur"   → _children.Effects._children.Shadows.items[0].blur = value
  */
 function setNestedValue(control, path, value) {
   const parts = path.split('.');
@@ -292,10 +294,14 @@ function setNestedValue(control, path, value) {
   let current = control._children?.[parts[0]];
   if (!current) return;
 
-  // Navigate through _children for intermediate parts
+  // Navigate intermediate parts
   for (let i = 1; i < parts.length - 1; i++) {
-    if (current._children && current._children[parts[i]]) {
-      current = current._children[parts[i]];
+    const key = parts[i];
+    // Try _children first (tree nodes), then plain property (objects/arrays)
+    if (current._children && current._children[key] !== undefined) {
+      current = current._children[key];
+    } else if (current[key] !== undefined) {
+      current = current[key];
     } else {
       return; // path doesn't exist
     }

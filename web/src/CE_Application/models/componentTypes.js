@@ -20,18 +20,18 @@ export const COMPONENT_TYPES = {
   },
 
   Button: {
-    sections: ['Background', 'Text', 'Border', 'Mouse', 'States', 'Scripts'],
+    sections: ['Background', 'Text', 'Mouse', 'States', 'Scripts'],
     defaultOverrides: {
       Transform: { width: 120, height: 40 },
       Text: { content: 'Click Me' },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
-      Border: { enabled: true },
+      Background: { _children: { Border: { enabled: true } } },
     },
     defaultStates: ['Hover', 'Pressed', 'Disabled', 'Focused'],
   },
 
   Container: {
-    sections: ['Background', 'Border', 'Grid', 'Children'],
+    sections: ['Background', 'Grid', 'Children'],
     defaultOverrides: {
       Transform: { width: 300, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },

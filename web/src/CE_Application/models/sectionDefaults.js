@@ -40,15 +40,77 @@ export const SECTION_DEFAULTS = {
     rotation: 0,
   },
 
-  /** Background — visual fill (solid colour, gradient, or image). */
+  /** Background — the complete visual shell: fill + border + corners. */
   Background: {
     _type: 'Background',
-    mode: 'solid',
+    mode: 'solid',              // solid / gradient / image / none
     _children: {
       Fill: {
         _type: 'Fill',
         mode: 'solid',
         colour: 'FF3A3A3A',
+      },
+      Border: {
+        _type: 'Border',
+        enabled: true,
+        linked: true,           // all sides same vs independent
+        // --- uniform (when linked: true) ---
+        style: 'solid',         // solid / dashed / dotted / double / groove / ridge / inset / outset / none
+        thickness: 2,
+        dotRadius: 2,           // dot size (radius) when style is 'dotted'; thickness becomes gap between dots
+        colour: 'FFFFFFFF',
+        // --- fill modes (per-side, multi-selectable) ---
+        fillSolid: true,        // solid colour fill active
+        fillGradient: false,    // gradient fill active
+        fillImage: false,       // image fill active
+        fillOverlay: false,     // overlay fill active
+        imageSrc: '',           // data URL for image fill
+        overlaySrc: '',         // data URL for overlay fill
+        gradient: null,         // gradient data { type, angle, stops, ... }
+        // --- double line (when style is 'double') ---
+        doubleGap: 2,                 // gap between the two lines
+        // --- per-side (when linked: false) ---
+        top:    { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
+        right:  { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
+        bottom: { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
+        left:   { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
+      },
+      Corners: {
+        _type: 'Corners',
+        linked: true,           // all corners same vs independent
+        // --- uniform (when linked: true) ---
+        borderEnabled: true,    // border draws around corners
+        radius: 0,
+        style: 'rounded',      // rounded / chamfer / notch / straight
+        direction: 'outward',   // outward / inward
+        borderStyle: 'solid',   // solid / dashed / dotted / double / groove / ridge / inset / outset  (line style, same as sides)
+        thickness: 2,           // border thickness at corners (gap between dots when dotted)
+        dotRadius: 2,           // dot size (radius) when borderStyle is 'dotted'
+        doubleGap: 2,           // gap between the two lines (when borderStyle is 'double')
+        doubleAnchor: 'center', // center / outer / inner
+        doubleDirection: 'outward', // inward / outward
+        colour: 'FFFFFFFF',     // border colour at corners
+        // --- fill modes (per-corner, multi-selectable) ---
+        fillSolid: true,
+        fillGradient: false,
+        fillImage: false,
+        fillOverlay: false,
+        imageSrc: '',
+        overlaySrc: '',
+        gradient: null,
+        cornerGradientMode: 'radial',  // 'radial' | 'tangential' | 'inherit'
+        cornerGradientFlip: false,     // reverse direction for radial / tangential
+        cornerGradientInheritSide: 'A', // 'A' or 'B' — for top-left: A=top, B=left
+        // --- per-corner (when linked: false) ---
+        topLeft:     { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        topRight:    { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        bottomLeft:  { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        bottomRight: { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        // sideA/sideB mapping:
+        //   TL: sideA = top edge,    sideB = left edge
+        //   TR: sideA = top edge,    sideB = right edge
+        //   BL: sideA = bottom edge, sideB = left edge
+        //   BR: sideA = bottom edge, sideB = right edge
       },
     },
   },
@@ -64,17 +126,7 @@ export const SECTION_DEFAULTS = {
     },
   },
 
-  /** Border — outline + corners. */
-  Border: {
-    _type: 'Border',
-    enabled: false,
-    style: 'solid',
-    thickness: 1,
-    _children: {
-      Fill: { _type: 'Fill', colour: 'FF888888' },
-      Corners: { _type: 'Corners', radius: 0 },
-    },
-  },
+  // Border is now part of Background._children.Border (not a standalone section).
 
   /** Grid — visual grid, cell data, snap. Foundation for arpeggiators, drum pads, etc. */
   Grid: {
@@ -121,17 +173,44 @@ export const SECTION_DEFAULTS = {
     },
   },
 
-  /** Shadow — drop or inner shadow. */
-  Shadow: {
-    _type: 'Shadow',
-    enabled: false,
-    type: 'drop',
-    offsetX: 0,
-    offsetY: 2,
-    blur: 4,
-    spread: 0,
+  /** Effects — shadows, bevel/emboss, CSS filters, blend mode. */
+  Effects: {
+    _type: 'Effects',
     _children: {
-      Fill: { _type: 'Fill', colour: '66000000' },
+      Shadows: {
+        _type: 'Shadows',
+        items: [
+          { enabled: false, type: 'drop', offsetX: 0, offsetY: 2, blur: 4, spread: 0, colour: '66000000' },
+        ],
+      },
+      Bevel: {
+        _type: 'Bevel',
+        enabled: false,
+        style: 'outer-bevel',    // outer-bevel / inner-bevel / emboss / pillow-emboss
+        depth: 100,
+        size: 5,
+        softness: 0,
+        angle: 135,
+        highlightColour: 'FFFFFF',
+        highlightOpacity: 75,
+        shadowColour: '000000',
+        shadowOpacity: 75,
+      },
+      Filters: {
+        _type: 'Filters',
+        blur: 0,
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        hueRotate: 0,
+        grayscale: 0,
+        sepia: 0,
+        invert: 0,
+      },
+      Blend: {
+        _type: 'Blend',
+        mode: 'normal',
+      },
     },
   },
 

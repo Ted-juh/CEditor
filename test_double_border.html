@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Double Border Math Test</title>
+<style>
+  body { background: #333; display: flex; gap: 40px; flex-wrap: wrap; padding: 40px; font-family: monospace; color: #fff; }
+  .test { position: relative; }
+  .label { font-size: 11px; margin-bottom: 4px; }
+  svg { overflow: visible; }
+</style>
+</head>
+<body>
+
+<script>
+/**
+ * Build a complete closed SVG path at `inset` from the component edge.
+ * Positive inset = inside, negative = outside.
+ * Corner radii are adjusted: inner gets smaller, outer gets bigger.
+ */
+function buildPath(inset, W, H, cornerRadii) {
+  const i = inset;
+  const availW = W - 2 * i;
+  const availH = H - 2 * i;
+
+  // Adjust each corner radius by inset
+  let [tlR, trR, brR, blR] = cornerRadii.map(r => Math.max(0, r - i));
+
+  // CSS-style clamping: scale down if adjacent corners overlap
+  const topSum = tlR + trR;
+  const rightSum = trR + brR;
+  const bottomSum = brR + blR;
+  const leftSum = blR + tlR;
+  const maxRatio = Math.max(
+    topSum > 0 ? topSum / availW : 0,
+    rightSum > 0 ? rightSum / availH : 0,
+    bottomSum > 0 ? bottomSum / availW : 0,
+    leftSum > 0 ? leftSum / availH : 0,
+  );
+  if (maxRatio > 1) {
+    tlR /= maxRatio; trR /= maxRatio; brR /= maxRatio; blR /= maxRatio;
+  }
+
+  const p = [];
+  p.push(`M ${i + tlR} ${i}`);
+  // Top → TR
+  p.push(`L ${W - i - trR} ${i}`);
+  if (trR > 0) p.push(`A ${trR} ${trR} 0 0 1 ${W - i} ${i + trR}`);
+  // Right → BR
+  p.push(`L ${W - i} ${H - i - brR}`);
+  if (brR > 0) p.push(`A ${brR} ${brR} 0 0 1 ${W - i - brR} ${H - i}`);
+  // Bottom → BL
+  p.push(`L ${i + blR} ${H - i}`);
+  if (blR > 0) p.push(`A ${blR} ${blR} 0 0 1 ${i} ${H - i - blR}`);
+  // Left → TL
+  p.push(`L ${i} ${i + tlR}`);
+  if (tlR > 0) p.push(`A ${tlR} ${tlR} 0 0 1 ${i + tlR} ${i}`);
+  p.push('Z');
+  return p.join(' ');
+}
+
+function createTest(label, W, H, radii, lt, gap, anchor) {
+  // Calculate insets based on anchor mode
+  let outerInset, innerInset;
+  if (anchor === 'center') {
+    outerInset = -(gap / 2) - (lt / 2);
+    innerInset =  (gap / 2) + (lt / 2);
+  } else if (anchor === 'outer') {
+    innerInset = -(lt / 2);
+    outerInset = -(lt / 2) - gap - lt;
+  } else { // inner
+    outerInset = lt / 2;
+    innerInset = lt / 2 + gap + lt;
+  }
+
+  const div = document.createElement('div');
+  div.className = 'test';
+  div.innerHTML = `
+    <div class="label">${label}<br>lt=${lt} gap=${gap} anchor=${anchor}<br>outer=${outerInset.toFixed(1)} inner=${innerInset.toFixed(1)}</div>
+    <svg width="${W + 40}" height="${H + 40}" viewBox="${-20} ${-20} ${W+40} ${H+40}">
+      <rect x="0" y="0" width="${W}" height="${H}" fill="#444" stroke="#666" stroke-width="0.5" stroke-dasharray="2"/>
+      <path d="${buildPath(outerInset, W, H, radii)}" fill="none" stroke="#ef4444" stroke-width="${lt}"/>
+      <path d="${buildPath(innerInset, W, H, radii)}" fill="none" stroke="#3b82f6" stroke-width="${lt}"/>
+    </svg>`;
+  document.body.appendChild(div);
+}
+
+// Test cases
+// 1. Simple rect, no corners, center anchor
+createTest('No corners, center', 200, 100, [0,0,0,0], 3, 6, 'center');
+
+// 2. Uniform corners, center anchor
+createTest('r=20 all, center', 200, 100, [20,20,20,20], 3, 6, 'center');
+
+// 3. Mixed corners (like the screenshot — large top, small bottom)
+createTest('r=50/50/0/0, center', 200, 100, [50,50,0,0], 3, 6, 'center');
+
+// 4. Very large corners
+createTest('r=50 all, center', 200, 100, [50,50,50,50], 3, 6, 'center');
+
+// 5. Anchor: inner (both lines inside)
+createTest('r=20, inner', 200, 100, [20,20,20,20], 3, 6, 'inner');
+
+// 6. Anchor: outer (both lines outside)
+createTest('r=20, outer', 200, 100, [20,20,20,20], 3, 6, 'outer');
+
+// 7. Mixed corners, thick lines
+createTest('r=60/0/60/0, thick', 200, 100, [60,0,60,0], 5, 8, 'center');
+
+// 8. Pill shape
+createTest('Pill r=50', 200, 100, [50,50,50,50], 4, 6, 'center');
+</script>
+
+</body>
+</html>

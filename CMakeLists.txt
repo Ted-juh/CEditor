@@ -61,3 +61,6 @@ target_link_libraries(CEditor PRIVATE
 )
 
 # JUCE handles the entry point via START_JUCE_APPLICATION
+# Run this from the web/ directory:
+# cd web && npm run dev
+# That starts the Vite dev server with hot reload. It'll show the localhost URL (usually http://localhost:5173) in the terminal output.

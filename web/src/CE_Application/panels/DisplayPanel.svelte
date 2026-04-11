@@ -5,18 +5,19 @@
    */
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
-  import GradientEditor from '../components/GradientEditor.svelte';
-  import GradientSettings from '../components/GradientSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
-  import NotepadEditor from '../components/NotepadEditor.svelte';
-  import NotepadSettings from '../components/NotepadSettings.svelte';
-  import ViewerEditor from '../components/ViewerEditor.svelte';
-  import ViewerSettings from '../components/ViewerSettings.svelte';
   import ConsolePanel from '../components/ConsolePanel.svelte';
   import AlignmentPanel from '../components/AlignmentPanel.svelte';
+  import SwatchGrid from '../components/SwatchGrid.svelte';
+  import ViewerTab from './ViewerTab.svelte';
+  import NotepadTab from './NotepadTab.svelte';
+  import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
+  import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { deepClone } from '../utils/deepClone.js';
+  import { syncExternalTarget } from '../utils/targetSync.js';
 
   let props = $props();
   let onTabChange = $derived(props.onTabChange);
@@ -38,28 +39,18 @@
 
   // --- Color target: switch to Colors tab and set color when a swatch activates a target ---
   // Plain variable (not $state) so it doesn't become a reactive dependency of the effect.
-  let _lastHandledTarget = null;
+  const colorTargetGuard = { current: null };
   $effect(() => {
-    const target = $colorTarget;
-    if (target && target._initialColor && target !== _lastHandledTarget) {
-      _lastHandledTarget = target;
+    syncExternalTarget($colorTarget, colorTargetGuard, (t) => !!t._initialColor, (t) => {
       activeTab = 'colors';
-      userPickedColor = target._initialColor;
-      userPickedAlpha = target._initialAlpha ?? 1;
-    }
-    if (!target) {
-      _lastHandledTarget = null;
-    }
+      userPickedColor = t._initialColor;
+      userPickedAlpha = t._initialAlpha ?? 1;
+    });
   });
   let stepSize = $state(10);
 
-  // --- Shared swatches (used by both Colors and Gradient tabs) ---
+  // --- Shared swatches (used by Colors / Gradient / Notepad tabs) ---
   let swatches = $state(Array(24).fill(null));
-
-  // --- Gradient state ---
-  let gradientSelectedStop = $state(0);
-  let gradientShape = $state('rectangle');
-  let gradientSwatches = $state(Array(24).fill(null));
 
   const defaultGradient = {
     type: 'linear', angle: 90, centerX: 50, centerY: 50,
@@ -69,19 +60,17 @@
 
   // THE gradient. This is the single source of truth for the UI.
   // Synced FROM store on panel switch. Written TO store on every change.
-  let currentGradient = $state(JSON.parse(JSON.stringify(defaultGradient)));
+  // Lives here rather than inside GradientTab because the Colors-tab stop
+  // editing flow (liveGradient mini-preview) also reads it.
+  let currentGradient = $state(deepClone(defaultGradient));
 
-  // --- Notepad state ---
-  let notepadNotes = $state([{ name: 'Note 1', content: '' }]);
-  let notepadActiveIndex = $state(0);
-  let notepadEditorRef = $state(null);
+  // Bumped whenever the active panel changes — child tabs watch this as
+  // their reset signal so they can re-sync from the new active panel.
+  let panelResetKey = $state(0);
 
-  // --- Viewer state ---
-  let viewerImages = $state([]);
-  let viewerActiveIndex = $state(0);
-  let viewerEditorRef = $state(null);
-  let viewerStatus = $state('');
-  let viewerHoverColor = $state(null);
+  // Ref to the notepad tab so the cross-tab "back from color pick" flow
+  // can call `applyTextColor(hex, range)` on it.
+  let notepadTabRef = $state(null);
 
   // Sync from store when active panel changes (panel switch)
   let lastPanelId = $state(null);
@@ -89,35 +78,28 @@
     const panel = $activePanel;
     if (panel && panel.id !== lastPanelId) {
       lastPanelId = panel.id;
-      currentGradient = panel.bgGradient ? JSON.parse(JSON.stringify(panel.bgGradient)) : JSON.parse(JSON.stringify(defaultGradient));
-      // Sync notepad
-      const np = panel.notepad;
-      if (np) {
-        notepadNotes = JSON.parse(JSON.stringify(np.notes));
-        notepadActiveIndex = np.activeNoteIndex ?? 0;
-      } else {
-        notepadNotes = [{ name: 'Note 1', content: '' }];
-        notepadActiveIndex = 0;
-      }
-      // Sync viewer
-      const vw = panel.viewer;
-      if (vw) {
-        viewerImages = JSON.parse(JSON.stringify(vw.images));
-        viewerActiveIndex = vw.activeImageIndex ?? 0;
-      } else {
-        viewerImages = [];
-        viewerActiveIndex = 0;
-      }
+      currentGradient = panel.bgGradient ? deepClone(panel.bgGradient) : deepClone(defaultGradient);
+      panelResetKey++;
     }
+  });
+
+  // --- Gradient target: sync from external control gradient ---
+  const gradTargetGuard = { current: null };
+  $effect(() => {
+    syncExternalTarget($gradientTarget, gradTargetGuard, (t) => !!t._initialGradient, (t) => {
+      currentGradient = deepClone(t._initialGradient);
+      activeTab = 'gradient';
+      onTabChange?.('gradient');
+    });
   });
 
   // Stop color editing mode
   let editingGradientStop = $state(null);
 
-  // Notepad color picking mode
+  // Notepad color picking mode (cross-tab flow: pick color on Colors tab,
+  // then apply as text foreColor in the notepad editor).
   let pickingNotepadColor = $state(false);
   let savedNotepadSelection = $state(null);
-  let notepadTextColor = $state('DDDDDD');
 
   // Live gradient for the mini-preview during stop color editing
   let liveGradient = $derived((() => {
@@ -129,6 +111,9 @@
   })());
 
   // --- Color change handler ---
+  // Routes a new color to the right destination based on current editing
+  // mode. Gradient-stop and notepad-pick modes defer the write (their
+  // "back" buttons commit); target and default modes write immediately.
   function handleColorChange(hex) {
     if (hex.length >= 8) {
       userPickedAlpha = parseInt(hex.slice(0, 2), 16) / 255;
@@ -138,61 +123,35 @@
       userPickedColor = hex.slice(0, 6);
     }
 
-    // If editing a gradient stop, update the stop color instead of panel bgColour
-    if (editingGradientStop !== null) {
-      // Don't write to store on every change — liveGradient handles the preview.
-      // The store is committed on "back to gradient".
-    } else if (pickingNotepadColor) {
-      // Preview only — color is applied on "back to notepad".
-    } else if ($colorTarget) {
-      // External color target (swatch binding) — route to target
-      applyColorToTarget(hex);
-    } else {
-      const panel = $activePanel;
-      if (panel) {
-        updatePanel(panel.id, { bgColour: userPickedColor, modified: true });
-      }
-    }
-  }
+    // Deferred modes — preview only, commit happens on "back to X"
+    if (editingGradientStop !== null || pickingNotepadColor) return;
 
-  // --- Notepad change handler ---
-  function handleNotepadChange(updatedNotes) {
-    notepadNotes = updatedNotes;
-    const panel = $activePanel;
-    if (panel) {
-      updatePanel(panel.id, {
-        notepad: { notes: JSON.parse(JSON.stringify(updatedNotes)), activeNoteIndex: notepadActiveIndex },
-        modified: true,
-      });
-    }
-  }
+    // External color target (swatch binding) — route to target
+    if ($colorTarget) { applyColorToTarget(hex); return; }
 
-  // --- Viewer change handler ---
-  function handleViewerChange(updatedImages) {
-    viewerImages = updatedImages;
+    // Default — write to panel bgColour
     const panel = $activePanel;
-    if (panel) {
-      updatePanel(panel.id, {
-        viewer: { images: JSON.parse(JSON.stringify(updatedImages)), activeImageIndex: viewerActiveIndex },
-        modified: true,
-      });
-    }
+    if (panel) updatePanel(panel.id, { bgColour: userPickedColor, modified: true });
   }
 
   // --- Viewer eyedropper: save picked color to first empty swatch ---
+  // Called from ViewerTab's eyedropper. Returns a status message for the
+  // child to display, since the swatch array lives here.
   function handleViewerColorPicked(hex) {
     const emptyIdx = swatches.findIndex(s => s === null);
     if (emptyIdx !== -1) {
       swatches[emptyIdx] = hex;
-      viewerStatus = `#${hex} saved to swatch ${emptyIdx + 1}`;
-    } else {
-      viewerStatus = `#${hex} — no empty swatch (double-click one to clear)`;
+      return `#${hex} saved to swatch ${emptyIdx + 1}`;
     }
+    return `#${hex} — no empty swatch (double-click one to clear)`;
   }
 
   // --- Gradient change handler ---
   function handleGradientChange(newGradient) {
     currentGradient = newGradient;
+    // Route to gradient target if active (e.g. border gradient)
+    if ($gradientTarget && applyGradientToTarget(newGradient)) return;
+    // Default: write to panel bgGradient
     const panel = $activePanel;
     if (panel) {
       updatePanel(panel.id, { bgGradient: newGradient, modified: true });
@@ -216,7 +175,9 @@
       i === editingGradientStop ? { ...s, color: userPickedColor } : s
     );
     currentGradient = { ...currentGradient, stops: newStops };
-    // Persist to store
+    // Route to gradient target if active
+    if ($gradientTarget && applyGradientToTarget(currentGradient)) return;
+    // Default: persist to panel store
     const panel = $activePanel;
     if (panel) {
       updatePanel(panel.id, { bgGradient: currentGradient, modified: true });
@@ -251,62 +212,60 @@
   // --- Back from color picking to notepad ---
   function handleBackToNotepad() {
     const pickedColor = userPickedColor;
-    notepadTextColor = pickedColor;
     const range = savedNotepadSelection;
     savedNotepadSelection = null;
 
     // Restore color chooser to panel bgColour
-    const panel = $activePanel;
-    if (panel) {
-      userPickedColor = panel.bgColour;
-      userPickedAlpha = 1;
-    }
+    resetUserColor();
     pickingNotepadColor = false;
     activeTab = 'notepad';
-    if (onTabChange) onTabChange('notepad');
+    onTabChange?.('notepad');
 
-    // Apply foreColor after the tab is visible
-    requestAnimationFrame(() => {
-      const el = notepadEditorRef?.getEditorElement?.();
-      if (el && range) {
-        el.focus();
-        const sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(range);
-        document.execCommand('foreColor', false, '#' + pickedColor);
-      }
-    });
+    // Apply foreColor after the tab is visible — NotepadTab handles the
+    // focus, selection restore, and execCommand internally.
+    notepadTabRef?.applyTextColor(pickedColor, range);
   }
 
-  // --- Tab change: clear editing mode if leaving colors ---
+  // --- Tab change: commit/discard any in-flight editing mode ---
+  // Each "mode" (editing a gradient stop, picking notepad color, an active
+  // color/gradient target) is active only while its home tab is visible.
+  // Leaving that tab must either commit or clear the mode and restore the
+  // chooser/gradient to the panel defaults.
+  function resetUserColor() {
+    const p = $activePanel;
+    if (p) { userPickedColor = p.bgColour; userPickedAlpha = 1; }
+  }
+
+  function resetGradientFromPanel() {
+    const p = $activePanel;
+    if (p) {
+      currentGradient = p.bgGradient
+        ? deepClone(p.bgGradient)
+        : deepClone(defaultGradient);
+    }
+  }
+
   function handleTabClick(tabId) {
-    if (editingGradientStop !== null && tabId !== 'colors') {
-      commitStopColor();
-      editingGradientStop = null;
-      const panel = $activePanel;
-      if (panel) {
-        userPickedColor = panel.bgColour;
-        userPickedAlpha = 1;
+    if (tabId !== 'colors') {
+      if (editingGradientStop !== null) {
+        commitStopColor();
+        editingGradientStop = null;
+        resetUserColor();
+      }
+      if (pickingNotepadColor) {
+        // Leaving colors without going back — discard the pick
+        savedNotepadSelection = null;
+        pickingNotepadColor = false;
+        resetUserColor();
+      }
+      if ($colorTarget) {
+        clearColorTarget();
+        resetUserColor();
       }
     }
-    if (pickingNotepadColor && tabId !== 'colors') {
-      // Leaving colors without going back — discard
-      savedNotepadSelection = null;
-      pickingNotepadColor = false;
-      const panel = $activePanel;
-      if (panel) {
-        userPickedColor = panel.bgColour;
-        userPickedAlpha = 1;
-      }
-    }
-    // Clear color target when leaving colors tab
-    if ($colorTarget && tabId !== 'colors') {
-      clearColorTarget();
-      const panel = $activePanel;
-      if (panel) {
-        userPickedColor = panel.bgColour;
-        userPickedAlpha = 1;
-      }
+    if (tabId !== 'gradient' && $gradientTarget) {
+      clearGradientTarget();
+      resetGradientFromPanel();
     }
     activeTab = tabId;
     if (onTabChange) onTabChange(tabId);
@@ -330,62 +289,10 @@
     swatches[index] = userPickedColor;
   }
 
-  // --- Gradient swatch handler (assigns color to selected stop) ---
-  function handleGradientSwatchClick(index) {
-    const grad = currentGradient;
-    const panel = $activePanel;
-    if (swatches[index]) {
-      if (panel) {
-        const newStops = grad.stops.map((s, i) =>
-          i === gradientSelectedStop ? { ...s, color: swatches[index] } : s
-        );
-        updatePanel(panel.id, { bgGradient: { ...grad, stops: newStops }, modified: true });
-      }
-    } else {
-      if (grad.stops[gradientSelectedStop]) {
-        swatches[index] = grad.stops[gradientSelectedStop].color;
-      }
-    }
-  }
-
-  // --- Notepad swatch handler (apply color as text foreColor, or store) ---
-  function handleNotepadSwatchClick(index) {
-    if (swatches[index]) {
-      notepadTextColor = swatches[index];
-      const el = notepadEditorRef?.getEditorElement?.();
-      if (el) {
-        el.focus();
-        document.execCommand('foreColor', false, '#' + swatches[index]);
-      }
-    } else {
-      swatches[index] = notepadTextColor;
-    }
-  }
-
-  // --- Gradient preset swatch handlers (store/load entire gradients) ---
-  function handleGradientPresetClick(index) {
-    if (gradientSwatches[index]) {
-      // Load: apply stored gradient
-      currentGradient = JSON.parse(JSON.stringify(gradientSwatches[index]));
-      handleGradientChange(currentGradient);
-    } else {
-      // Store: save current gradient
-      gradientSwatches[index] = JSON.parse(JSON.stringify(currentGradient));
-    }
-  }
-
-  function handleGradientPresetDblClick(index) {
-    gradientSwatches[index] = null;
-  }
-
-  function handleGradientPresetRightClick(index, e) {
-    e.preventDefault();
-    gradientSwatches[index] = JSON.parse(JSON.stringify(currentGradient));
-  }
-
   const tabs = [
     { id: 'colors',   label: 'Colors' },
     { id: 'gradient', label: 'Gradient' },
+    { id: 'effects',  label: 'Effects' },
     { id: 'notepad',  label: 'Notepad' },
     { id: 'viewer',   label: 'Viewer' },
     { id: 'align',    label: 'Align' },
@@ -444,139 +351,43 @@
               onApplyColor={handleColorChange}
             />
           </div>
-          <div class="sidebar-swatches">
-            <div class="swatches-label">Colors</div>
-            <div class="swatches-grid">
-              {#each swatches as swatch, i}
-                <button
-                  class="swatch"
-                  class:empty={!swatch}
-                  style={swatch ? `background: #${swatch}` : ''}
-                  onclick={() => handleSwatchClick(i)}
-                  ondblclick={() => handleSwatchDblClick(i)}
-                  oncontextmenu={(e) => handleSwatchRightClick(i, e)}
-                  title={swatch ? `#${swatch} — right-click to replace, double-click to clear` : 'Click to store current color'}
-                ></button>
-              {/each}
-            </div>
-          </div>
+          <SwatchGrid
+            {swatches}
+            onclick={handleSwatchClick}
+            ondblclick={handleSwatchDblClick}
+            oncontextmenu={handleSwatchRightClick}
+          />
         </div>
       </div>
     </div>
 
     <div class="tab-pane" style:display={activeTab === 'gradient' ? 'block' : 'none'}>
-      <div class="gradient-layout">
-        <div class="gradient-preview">
-          <GradientEditor
-            gradient={currentGradient}
-            selectedStop={gradientSelectedStop}
-            shape={gradientShape}
-            onchange={handleGradientChange}
-            onSelectStop={(i) => gradientSelectedStop = i}
-          />
-        </div>
-        <div class="gradient-sidebar">
-          <div class="sidebar-settings">
-            <GradientSettings
-              gradient={currentGradient}
-              selectedStop={gradientSelectedStop}
-              shape={gradientShape}
-              onchange={handleGradientChange}
-              onSelectStop={(i) => gradientSelectedStop = i}
-              onEditStopColor={handleEditStopColor}
-              onShapeChange={(s) => gradientShape = s}
-              gradientSwatches={gradientSwatches}
-              onGradientPresetClick={handleGradientPresetClick}
-              onGradientPresetDblClick={handleGradientPresetDblClick}
-              onGradientPresetRightClick={handleGradientPresetRightClick}
-            />
-          </div>
-          <div class="sidebar-swatches">
-            <div class="swatches-label">Colors</div>
-            <div class="swatches-grid">
-              {#each swatches as swatch, i}
-                <button
-                  class="swatch"
-                  class:empty={!swatch}
-                  style={swatch ? `background: #${swatch}` : ''}
-                  onclick={() => handleGradientSwatchClick(i)}
-                  ondblclick={() => handleSwatchDblClick(i)}
-                  oncontextmenu={(e) => handleSwatchRightClick(i, e)}
-                  title={swatch ? `#${swatch} — click to assign to selected stop` : 'Click to store stop color'}
-                ></button>
-              {/each}
-            </div>
-          </div>
-        </div>
-      </div>
+      <GradientTab
+        gradient={currentGradient}
+        {swatches}
+        onchange={handleGradientChange}
+        oneditstopcolor={handleEditStopColor}
+        onswatchdblclick={handleSwatchDblClick}
+        onswatchrightclick={handleSwatchRightClick}
+      />
     </div>
 
     <div class="tab-pane" style:display={activeTab === 'notepad' ? 'block' : 'none'}>
-      {#if $activePanel}
-        <div class="notepad-layout">
-          <div class="notepad-editor-area">
-            <NotepadEditor
-              bind:notes={notepadNotes}
-              bind:activeNoteIndex={notepadActiveIndex}
-              onchange={handleNotepadChange}
-              bind:this={notepadEditorRef}
-            />
-          </div>
-          <div class="notepad-sidebar">
-            <div class="sidebar-settings">
-              <NotepadSettings
-                getEditorElement={() => notepadEditorRef?.getEditorElement?.()}
-                onPickColor={handlePickNotepadColor}
-              />
-            </div>
-            <div class="sidebar-swatches">
-              <div class="swatches-label">Colors</div>
-              <div class="swatches-grid">
-                {#each swatches as swatch, i}
-                  <button
-                    class="swatch"
-                    class:empty={!swatch}
-                    style={swatch ? `background: #${swatch}` : ''}
-                    onclick={() => handleNotepadSwatchClick(i)}
-                    ondblclick={() => handleSwatchDblClick(i)}
-                    oncontextmenu={(e) => handleSwatchRightClick(i, e)}
-                    title={swatch ? `#${swatch} — click to apply as text color` : 'Click to store current color'}
-                  ></button>
-                {/each}
-              </div>
-            </div>
-          </div>
-        </div>
-      {:else}
-        <div class="placeholder">Open or create a panel to use the Notepad</div>
-      {/if}
+      <NotepadTab
+        {swatches}
+        resetKey={panelResetKey}
+        bind:this={notepadTabRef}
+        onswatchstore={(i, color) => swatches[i] = color}
+        onswatchdblclick={handleSwatchDblClick}
+        onswatchrightclick={handleSwatchRightClick}
+        onpickcolor={handlePickNotepadColor}
+      />
     </div>
     <div class="tab-pane" style:display={activeTab === 'viewer' ? 'block' : 'none'}>
-      {#if $activePanel}
-        <div class="viewer-layout">
-          <div class="viewer-canvas-area">
-            <ViewerEditor
-              bind:images={viewerImages}
-              bind:activeImageIndex={viewerActiveIndex}
-              onchange={handleViewerChange}
-              onColorPicked={handleViewerColorPicked}
-              onColorHover={(hex) => viewerHoverColor = hex}
-              bind:this={viewerEditorRef}
-            />
-          </div>
-          <div class="viewer-sidebar">
-            <div class="sidebar-settings">
-              <ViewerSettings
-                getViewerRef={() => viewerEditorRef}
-                statusMessage={viewerStatus}
-                hoverColor={viewerHoverColor}
-              />
-            </div>
-          </div>
-        </div>
-      {:else}
-        <div class="placeholder">Open or create a panel to use the Viewer</div>
-      {/if}
+      <ViewerTab resetKey={panelResetKey} oncolorpicked={handleViewerColorPicked} />
+    </div>
+    <div class="tab-pane" style:display={activeTab === 'effects' ? 'block' : 'none'}>
+      <div class="placeholder">Effects editor — full editing coming soon. Use Properties Panel for quick toggles.</div>
     </div>
     <div class="tab-pane" style:display={activeTab === 'align' ? 'block' : 'none'}>
       <AlignmentPanel />
@@ -667,63 +478,6 @@
     flex-direction: column;
   }
 
-  /* Gradient layout (mirrors colors layout) */
-  .gradient-layout {
-    display: flex;
-    height: 100%;
-  }
-
-  .gradient-preview {
-    width: 75%;
-    flex-shrink: 0;
-    border-right: 1px solid #333;
-  }
-
-  .gradient-sidebar {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Notepad layout */
-  .notepad-layout {
-    display: flex;
-    height: 100%;
-  }
-
-  .notepad-editor-area {
-    width: 75%;
-    flex-shrink: 0;
-    border-right: 1px solid #333;
-  }
-
-  .notepad-sidebar {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  /* Viewer layout */
-  .viewer-layout {
-    display: flex;
-    height: 100%;
-  }
-
-  .viewer-canvas-area {
-    width: 80%;
-    flex-shrink: 0;
-    border-right: 1px solid #333;
-  }
-
-  .viewer-sidebar {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
   /* Notepad color picker mini-panel (shown in Colors tab) */
   .notepad-color-mini {
     width: 25%;
@@ -771,54 +525,6 @@
   .sidebar-settings {
     flex: 3;
     overflow: auto;
-  }
-
-  .sidebar-swatches {
-    flex: 1;
-    border-top: 1px solid #333;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 2px;
-  }
-
-  .swatches-label {
-    font-size: 9px;
-    color: #666;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .swatches-grid {
-    display: grid;
-    grid-template-columns: repeat(12, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 2px;
-    width: 100%;
-  }
-
-  .swatch {
-    aspect-ratio: 1;
-    border: 1px solid #333;
-    border-radius: 2px;
-    cursor: pointer;
-    padding: 0;
-    min-width: 0;
-    transition: border-color 0.1s;
-  }
-
-  .swatch:hover {
-    border-color: #5B9BD5;
-  }
-
-  .swatch.empty {
-    background: #333;
-    border-style: dashed;
-  }
-
-  .swatch.empty:hover {
-    border-color: #5B9BD5;
   }
 
   .placeholder {

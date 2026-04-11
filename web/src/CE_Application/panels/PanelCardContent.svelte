@@ -7,10 +7,11 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
-  import AlignmentPicker from '../properties/AlignmentPicker.svelte';
-  import PropertyScrub from '../properties/PropertyScrub.svelte';
+  import LayerEffectsSection from './LayerEffectsSection.svelte';
   import { PaintBucket, Blend, Image, BrickWall, ChevronUp, ChevronDown } from 'lucide-svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { formatFileSize, formatDate } from '../utils/formatting.js';
+  import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
 
@@ -41,19 +42,6 @@
       lastInfoPath = null;
     }
   });
-
-  function formatFileSize(bytes) {
-    if (bytes == null) return '—';
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-  }
-
-  function formatDate(iso) {
-    if (!iso) return '—';
-    const d = new Date(iso);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
 
   function handleSwatchClick(prop, currentColor) {
     activateColorTarget({ type: 'panel', prop }, currentColor);
@@ -136,24 +124,14 @@
   }
 
   // --- Script ID validation ---
-  // Stoplight: 'red' = error (blocks save), 'yellow' = warning (suggestion), 'green' = valid
+  // Stoplight: 'red' = error (blocks save), 'yellow' = warning, 'green' = valid
   let idEditing = $state(false);
   let idDraft = $state('');
-  let idLevel = $state('green');   // 'red' | 'yellow' | 'green'
+  let idLevel = $state('green');
   let idMessage = $state('');
 
-  function validateScriptId(value) {
-    if (!value) return { level: 'red', msg: 'ID cannot be empty' };
-    if (!/^[a-zA-Z_]/.test(value)) return { level: 'red', msg: 'Must start with a letter or underscore' };
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(value)) return { level: 'red', msg: 'Only letters, numbers and underscores allowed' };
-    const duplicate = $panels.find(p => p.id !== panel.id && p.scriptId === value);
-    if (duplicate) return { level: 'red', msg: `ID "${value}" is already used by "${duplicate.name}"` };
-    if (/^[A-Z]/.test(value)) return { level: 'yellow', msg: 'Convention: start with lowercase (camelCase or snake_case)' };
-    return { level: 'green', msg: 'Valid identifier' };
-  }
-
   function applyValidation(value) {
-    const result = validateScriptId(value);
+    const result = validateScriptId(value, $panels, panel.id);
     idLevel = result.level;
     idMessage = result.msg;
   }
@@ -392,237 +370,32 @@
 
       {/if}
       {#if layerId === 'image' && panel.bgImageEnabled === true}
-        <PropertySection title="Image" collapsed={imageCollapsed} ontoggle={(v) => setCollapsed('bg-image', v)}>
-          <div class="bg-file-row">
-            <button class="bg-browse-btn" title="Browse..." onclick={handleBrowseImage}>...</button>
-            <input class="val"
-                   type="text"
-                   value={panel.bgImage ?? ''}
-                   placeholder="No image selected"
-                   onfocus={(e) => e.target.select()}
-                   onchange={(e) => updatePanel(panel.id, { bgImage: e.target.value })} />
-          </div>
-        </PropertySection>
-        {#if !imageCollapsed}
-        <PropertySection title="Geometry">
-          <div class="bg-props-layout">
-            <div class="bg-props-left">
-              <span class="bg-props-label">Align</span>
-              <AlignmentPicker value={panel.bgImageAlign ?? 'center'}
-                               onchange={(v) => updatePanel(panel.id, { bgImageAlign: v })} />
-            </div>
-            <div class="bg-props-right">
-              <PropertyCell label="Fit" span={1} hint="How the image fills the panel area">
-                <select class="val" value={panel.bgImageFit ?? 'fill'}
-                        onchange={(e) => updatePanel(panel.id, { bgImageFit: e.target.value })}>
-                  <option value="fill">Fill</option>
-                  <option value="fit">Fit</option>
-                  <option value="stretch">Stretch</option>
-                  <option value="tile">Tile</option>
-                  <option value="original">Original</option>
-                </select>
-              </PropertyCell>
-              <PropertyCell label="Offset X" span={1} hint="Horizontal offset from anchor in pixels">
-                <NumberInput value={panel.bgImageOffsetX ?? 0} step={1}
-                             onchange={(v) => updatePanel(panel.id, { bgImageOffsetX: v })} />
-              </PropertyCell>
-              <PropertyCell label="Offset Y" span={1} hint="Vertical offset from anchor in pixels">
-                <NumberInput value={panel.bgImageOffsetY ?? 0} step={1}
-                             onchange={(v) => updatePanel(panel.id, { bgImageOffsetY: v })} />
-              </PropertyCell>
-            </div>
-          </div>
-          <PropertyCell label="Flip H" span={1} hint="Flip image horizontally">
-            <PropertyToggle value={panel.bgImageFlipH ?? false}
-                            onchange={() => updatePanel(panel.id, { bgImageFlipH: !panel.bgImageFlipH })} />
-          </PropertyCell>
-          <PropertyCell label="Flip V" span={1} hint="Flip image vertically">
-            <PropertyToggle value={panel.bgImageFlipV ?? false}
-                            onchange={() => updatePanel(panel.id, { bgImageFlipV: !panel.bgImageFlipV })} />
-          </PropertyCell>
-          <PropertyCell label="Angle" span={2} hint="Rotate the image in degrees">
-            <NumberInput value={panel.bgImageRotation ?? 0} step={1} min={-360} max={360}
-                         onchange={(v) => updatePanel(panel.id, { bgImageRotation: v })} />
-          </PropertyCell>
-          {#if (panel.bgImageFit ?? 'fill') === 'tile'}
-            <PropertyCell label="Scale" span={4} hint="Tile size multiplier">
-              <NumberInput value={panel.bgImageTileScale ?? 1.0} step={0.1} min={0.1}
-                           onchange={(v) => updatePanel(panel.id, { bgImageTileScale: v })} />
-            </PropertyCell>
-          {/if}
-        </PropertySection>
-        <PropertySection title="Color Effects">
-          <PropertyCell label="Blend" span={1} hint="Blend mode for compositing">
-            <select class="val" value={panel.bgImageBlend ?? 'normal'}
-                    onchange={(e) => updatePanel(panel.id, { bgImageBlend: e.target.value })}>
-              <option value="normal">Normal</option>
-              <option value="multiply">Multiply</option>
-              <option value="screen">Screen</option>
-              <option value="overlay">Overlay</option>
-              <option value="darken">Darken</option>
-              <option value="lighten">Lighten</option>
-              <option value="color-dodge">Dodge</option>
-              <option value="color-burn">Burn</option>
-              <option value="soft-light">Soft Light</option>
-              <option value="hard-light">Hard Light</option>
-              <option value="difference">Difference</option>
-              <option value="exclusion">Exclusion</option>
-              <option value="hue">Hue</option>
-              <option value="saturation">Saturation</option>
-              <option value="color">Color</option>
-              <option value="luminosity">Luminosity</option>
-            </select>
-          </PropertyCell>
-          <PropertyCell label="Opacity" span={1} hint="Image layer opacity (0–100%)">
-            <NumberInput value={panel.bgImageOpacity ?? 100} step={1} min={0} max={100}
-                         onchange={(v) => updatePanel(panel.id, { bgImageOpacity: v })} />
-          </PropertyCell>
-          <PropertyCell label="Blur" span={1} hint="Blur amount in pixels">
-            <NumberInput value={panel.bgImageBlur ?? 0} step={1} min={0}
-                         onchange={(v) => updatePanel(panel.id, { bgImageBlur: v })} />
-          </PropertyCell>
-          <PropertyCell label="Tint" span={1} hint="Colour tint applied over the image">
-            <PropertyColor value={String(panel.bgImageTint ?? 'FFFFFF')}
-                           onchange={(v) => updatePanel(panel.id, { bgImageTint: v })}
-                           onswatchclick={() => handleSwatchClick('bgImageTint', panel.bgImageTint ?? 'FFFFFF')} />
-          </PropertyCell>
-          <div class="bg-effects-layout">
-            <div class="bg-scrub-group">
-              <PropertyScrub label="Sat" value={panel.bgImageSaturation ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgImageSaturation: v })} />
-              <PropertyScrub label="Bri" value={panel.bgImageBrightness ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgImageBrightness: v })} />
-              <PropertyScrub label="Con" value={panel.bgImageContrast ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgImageContrast: v })} />
-            </div>
-            <div class="bg-grayscale-col">
-              <span class="bg-props-label">Gray</span>
-              <button class="bg-grayscale-btn" class:active={panel.bgImageGrayscale ?? false}
-                      title="Toggle grayscale"
-                      onclick={() => updatePanel(panel.id, { bgImageGrayscale: !panel.bgImageGrayscale })}>
-                B/W
-              </button>
-            </div>
-          </div>
-        </PropertySection>
-        {/if}
-
+        <LayerEffectsSection
+          {panel}
+          prefix="Image"
+          label="Image"
+          defaultFit="fill"
+          placeholder="No image selected"
+          collapsed={imageCollapsed}
+          onupdate={(patch) => updatePanel(panel.id, patch)}
+          onbrowse={handleBrowseImage}
+          oncollapsetoggle={(v) => setCollapsed('bg-image', v)}
+          onswatchclick={handleSwatchClick}
+        />
       {/if}
       {#if layerId === 'texture' && panel.bgTextureEnabled === true}
-        <PropertySection title="Texture" collapsed={textureCollapsed} ontoggle={(v) => setCollapsed('bg-texture', v)}>
-          <div class="bg-file-row">
-            <button class="bg-browse-btn" title="Browse..." onclick={handleBrowseTexture}>...</button>
-            <input class="val"
-                   type="text"
-                   value={panel.bgTexture ?? ''}
-                   placeholder="No texture selected"
-                   onfocus={(e) => e.target.select()}
-                   onchange={(e) => updatePanel(panel.id, { bgTexture: e.target.value })} />
-          </div>
-        </PropertySection>
-        {#if !textureCollapsed}
-        <PropertySection title="Geometry">
-          <div class="bg-props-layout">
-            <div class="bg-props-left">
-              <span class="bg-props-label">Align</span>
-              <AlignmentPicker value={panel.bgTextureAlign ?? 'center'}
-                               onchange={(v) => updatePanel(panel.id, { bgTextureAlign: v })} />
-            </div>
-            <div class="bg-props-right">
-              <PropertyCell label="Fit" span={1} hint="How the texture fills the panel area">
-                <select class="val" value={panel.bgTextureFit ?? 'tile'}
-                        onchange={(e) => updatePanel(panel.id, { bgTextureFit: e.target.value })}>
-                  <option value="fill">Fill</option>
-                  <option value="fit">Fit</option>
-                  <option value="stretch">Stretch</option>
-                  <option value="tile">Tile</option>
-                  <option value="original">Original</option>
-                </select>
-              </PropertyCell>
-              <PropertyCell label="Offset X" span={1} hint="Horizontal offset from anchor in pixels">
-                <NumberInput value={panel.bgTextureOffsetX ?? 0} step={1}
-                             onchange={(v) => updatePanel(panel.id, { bgTextureOffsetX: v })} />
-              </PropertyCell>
-              <PropertyCell label="Offset Y" span={1} hint="Vertical offset from anchor in pixels">
-                <NumberInput value={panel.bgTextureOffsetY ?? 0} step={1}
-                             onchange={(v) => updatePanel(panel.id, { bgTextureOffsetY: v })} />
-              </PropertyCell>
-            </div>
-          </div>
-          <PropertyCell label="Flip H" span={1} hint="Flip texture horizontally">
-            <PropertyToggle value={panel.bgTextureFlipH ?? false}
-                            onchange={() => updatePanel(panel.id, { bgTextureFlipH: !panel.bgTextureFlipH })} />
-          </PropertyCell>
-          <PropertyCell label="Flip V" span={1} hint="Flip texture vertically">
-            <PropertyToggle value={panel.bgTextureFlipV ?? false}
-                            onchange={() => updatePanel(panel.id, { bgTextureFlipV: !panel.bgTextureFlipV })} />
-          </PropertyCell>
-          <PropertyCell label="Angle" span={2} hint="Rotate the texture in degrees">
-            <NumberInput value={panel.bgTextureRotation ?? 0} step={1} min={-360} max={360}
-                         onchange={(v) => updatePanel(panel.id, { bgTextureRotation: v })} />
-          </PropertyCell>
-          {#if (panel.bgTextureFit ?? 'tile') === 'tile'}
-            <PropertyCell label="Scale" span={4} hint="Tile size multiplier">
-              <NumberInput value={panel.bgTextureTileScale ?? 1.0} step={0.1} min={0.1}
-                           onchange={(v) => updatePanel(panel.id, { bgTextureTileScale: v })} />
-            </PropertyCell>
-          {/if}
-        </PropertySection>
-        <PropertySection title="Color Effects">
-          <PropertyCell label="Blend" span={1} hint="Blend mode for compositing">
-            <select class="val" value={panel.bgTextureBlend ?? 'normal'}
-                    onchange={(e) => updatePanel(panel.id, { bgTextureBlend: e.target.value })}>
-              <option value="normal">Normal</option>
-              <option value="multiply">Multiply</option>
-              <option value="screen">Screen</option>
-              <option value="overlay">Overlay</option>
-              <option value="darken">Darken</option>
-              <option value="lighten">Lighten</option>
-              <option value="color-dodge">Dodge</option>
-              <option value="color-burn">Burn</option>
-              <option value="soft-light">Soft Light</option>
-              <option value="hard-light">Hard Light</option>
-              <option value="difference">Difference</option>
-              <option value="exclusion">Exclusion</option>
-              <option value="hue">Hue</option>
-              <option value="saturation">Saturation</option>
-              <option value="color">Color</option>
-              <option value="luminosity">Luminosity</option>
-            </select>
-          </PropertyCell>
-          <PropertyCell label="Opacity" span={1} hint="Texture layer opacity (0–100%)">
-            <NumberInput value={panel.bgTextureOpacity ?? 100} step={1} min={0} max={100}
-                         onchange={(v) => updatePanel(panel.id, { bgTextureOpacity: v })} />
-          </PropertyCell>
-          <PropertyCell label="Blur" span={1} hint="Blur amount in pixels">
-            <NumberInput value={panel.bgTextureBlur ?? 0} step={1} min={0}
-                         onchange={(v) => updatePanel(panel.id, { bgTextureBlur: v })} />
-          </PropertyCell>
-          <PropertyCell label="Tint" span={1} hint="Colour tint applied over the texture">
-            <PropertyColor value={String(panel.bgTextureTint ?? 'FFFFFF')}
-                           onchange={(v) => updatePanel(panel.id, { bgTextureTint: v })}
-                           onswatchclick={() => handleSwatchClick('bgTextureTint', panel.bgTextureTint ?? 'FFFFFF')} />
-          </PropertyCell>
-          <div class="bg-effects-layout">
-            <div class="bg-scrub-group">
-              <PropertyScrub label="Sat" value={panel.bgTextureSaturation ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgTextureSaturation: v })} />
-              <PropertyScrub label="Bri" value={panel.bgTextureBrightness ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgTextureBrightness: v })} />
-              <PropertyScrub label="Con" value={panel.bgTextureContrast ?? 100} min={0} max={200}
-                             onchange={(v) => updatePanel(panel.id, { bgTextureContrast: v })} />
-            </div>
-            <div class="bg-grayscale-col">
-              <span class="bg-props-label">Gray</span>
-              <button class="bg-grayscale-btn" class:active={panel.bgTextureGrayscale ?? false}
-                      title="Toggle grayscale"
-                      onclick={() => updatePanel(panel.id, { bgTextureGrayscale: !panel.bgTextureGrayscale })}>
-                B/W
-              </button>
-            </div>
-          </div>
-        </PropertySection>
-        {/if}
+        <LayerEffectsSection
+          {panel}
+          prefix="Texture"
+          label="Texture"
+          defaultFit="tile"
+          placeholder="No texture selected"
+          collapsed={textureCollapsed}
+          onupdate={(patch) => updatePanel(panel.id, patch)}
+          onbrowse={handleBrowseTexture}
+          oncollapsetoggle={(v) => setCollapsed('bg-texture', v)}
+          onswatchclick={handleSwatchClick}
+        />
       {/if}
     {/each}
 
@@ -884,54 +657,6 @@
     pointer-events: none;
   }
 
-  .bg-effects-layout {
-    grid-column: span 4;
-    display: flex;
-    gap: 4px;
-  }
-
-  .bg-effects-layout .bg-scrub-group {
-    flex: 3;
-  }
-
-  .bg-grayscale-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .bg-grayscale-btn {
-    flex: 1;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    border-radius: 3px;
-    color: #666;
-    font-size: 10px;
-    font-family: inherit;
-    cursor: pointer;
-    font-weight: 600;
-  }
-
-  .bg-grayscale-btn:hover {
-    border-color: #555;
-    color: #AAA;
-  }
-
-  .bg-grayscale-btn.active {
-    border-color: #5B9BD5;
-    color: #5B9BD5;
-    background: #0D2A3E;
-  }
-
-  .bg-scrub-group {
-    grid-column: span 4;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    padding: 2px 0;
-  }
-
   .bg-swatch {
     width: 100%;
     height: 26px;
@@ -943,63 +668,6 @@
 
   .bg-swatch:hover {
     border-color: #5B9BD5;
-  }
-
-  .bg-file-row {
-    grid-column: span 4;
-    display: flex;
-    gap: 4px;
-    align-items: center;
-  }
-
-  .bg-props-layout {
-    grid-column: span 4;
-    display: flex;
-    gap: 4px;
-  }
-
-  .bg-props-left {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    width: 50%;
-    flex-shrink: 0;
-  }
-
-  .bg-props-label {
-    font-size: 9px;
-    color: #5B9BD5;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    line-height: 1;
-    padding-left: 2px;
-    user-select: none;
-  }
-
-  .bg-props-right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
-
-  .bg-browse-btn {
-    width: 36px;
-    flex-shrink: 0;
-    height: 26px;
-    background: #252525;
-    border: 1px solid #333;
-    color: #888;
-    font-size: 11px;
-    border-radius: 3px;
-    cursor: pointer;
-    font-family: inherit;
-  }
-
-  .bg-browse-btn:hover {
-    border-color: #5B9BD5;
-    color: #DDD;
   }
 
   .placeholder {

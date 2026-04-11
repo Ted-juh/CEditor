@@ -1,6 +1,29 @@
 <script>
-  import { Trash2, ArrowDownToLine, Filter } from 'lucide-svelte';
+  import { Trash2, ArrowDownToLine, Filter, Copy, Check } from 'lucide-svelte';
   import { consoleEntries, clearConsole } from '../stores/console.js';
+
+  let copied = $state(false);
+
+  async function copyAll() {
+    const text = filtered.map(e =>
+      `${e.timestamp} [${e.source.toUpperCase()}] ${e.level.toUpperCase().padEnd(5)} ${e.message}`
+    ).join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+      setTimeout(() => copied = false, 1500);
+    } catch (err) {
+      // Fallback: select text in a temp textarea
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      copied = true;
+      setTimeout(() => copied = false, 1500);
+    }
+  }
 
   let containerEl = $state(null);
   let autoScroll = $state(true);
@@ -69,6 +92,9 @@
   <div class="console-toolbar">
     <button class="tool-btn" onclick={clearConsole} title="Clear console">
       <Trash2 size={12} />
+    </button>
+    <button class="tool-btn" onclick={copyAll} title="Copy all visible entries to clipboard">
+      {#if copied}<Check size={12} />{:else}<Copy size={12} />{/if}
     </button>
     <div class="toolbar-separator"></div>
     <select class="level-filter" bind:value={filterLevel}>

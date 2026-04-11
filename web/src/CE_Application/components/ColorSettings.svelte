@@ -4,6 +4,9 @@
    * Quick actions, Opacity presets, and Bit Depth for the Colors tab sidebar.
    */
   import { Copy, Check, Sun, Moon, Droplets, Thermometer, RotateCcw } from 'lucide-svelte';
+  import { hexToRgb, rgbToHex, rgbToHsl, alphaToHex, quantizeColor } from '../utils/colorMath.js';
+  import { computeHarmony } from '../utils/colorHarmony.js';
+  import { invertColor, grayscaleColor, shiftLightness, shiftSaturation } from '../utils/colorActions.js';
 
   let { color = 'FF0000', alpha = 1, onApplyColor, stepSize = $bindable(10) } = $props();
 
@@ -12,51 +15,8 @@
   let bitDepth = $state('24');
   let copied = $state(false);
 
-  // --- Color parsing ---
-
-  function hexToRgb(hex) {
-    hex = hex.replace(/^#/, '');
-    return [
-      parseInt(hex.slice(0, 2), 16),
-      parseInt(hex.slice(2, 4), 16),
-      parseInt(hex.slice(4, 6), 16),
-    ];
-  }
-
-  function rgbToHsl(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
-        case g: h = ((b - r) / d + 2) * 60; break;
-        case b: h = ((r - g) / d + 4) * 60; break;
-      }
-    }
-    return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
-  }
-
-  function hslToRgb(h, s, l) {
-    s /= 100; l /= 100;
-    const k = n => (n + h / 30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-  }
-
-  function rgbToHex(r, g, b) {
-    const toHex = v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0').toUpperCase();
-    return toHex(r) + toHex(g) + toHex(b);
-  }
-
   function applyColor(hex6, a = alpha) {
-    if (onApplyColor) {
-      const alphaHex = Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase();
-      onApplyColor(alphaHex + hex6);
-    }
+    onApplyColor?.(alphaToHex(a) + hex6);
   }
 
   // --- Derived color values ---
@@ -64,7 +24,8 @@
   let rgb = $derived(hexToRgb(color));
   let rawHsl = $derived(rgbToHsl(rgb[0], rgb[1], rgb[2]));
 
-  // Preserve hue & saturation when color is achromatic (black/white/grey)
+  // Preserve hue & saturation when color is achromatic (black/white/grey) so
+  // sliders don't jump back to 0° whenever the user hits grey.
   let savedHue = $state(0);
   let savedSat = $state(0);
   $effect(() => {
@@ -75,7 +36,9 @@
       savedSat = s;
     }
   });
-  let hsl = $derived([savedHue, savedSat, rawHsl[2]]);
+  // Round for display; harmony + quick actions all pass through hslToRgb
+  // which rounds its own output anyway.
+  let hsl = $derived([Math.round(savedHue), Math.round(savedSat), Math.round(rawHsl[2])]);
 
   let alphaInt = $derived(Math.round(alpha * 255));
   let alphaPct = $derived(alpha.toFixed(2));
@@ -86,7 +49,7 @@
     const [r, g, b] = rgb;
     const [h, s, l] = hsl;
     switch (format) {
-      case 'hex':  return `#${alphaInt.toString(16).padStart(2, '0').toUpperCase()}${color}`;
+      case 'hex':  return `#${alphaToHex(alpha)}${color}`;
       case 'rgb':  return `rgb(${r}, ${g}, ${b})`;
       case 'argb': return `argb(${alphaInt}, ${r}, ${g}, ${b})`;
       case 'rgba': return `rgba(${r}, ${g}, ${b}, ${alphaPct})`;
@@ -102,104 +65,27 @@
       copied = true;
       setTimeout(() => copied = false, 1200);
     } catch {
-      // Fallback
+      // Fallback: no-op
     }
   }
 
   // --- Harmony colors ---
-
-  function hueShift(h, deg) {
-    return ((h + deg) % 360 + 360) % 360;
-  }
-
-  function harmonyHslToHex(h, s, l) {
-    const [r, g, b] = hslToRgb(h, s, l);
-    return rgbToHex(r, g, b);
-  }
-
-  let harmonyColors = $derived((() => {
-    const [h, s, l] = hsl;
-    switch (harmonyType) {
-      case 'complementary':
-        return [harmonyHslToHex(hueShift(h, 180), s, l)];
-      case 'analogous':
-        return [harmonyHslToHex(hueShift(h, -30), s, l), harmonyHslToHex(hueShift(h, 30), s, l)];
-      case 'triadic':
-        return [harmonyHslToHex(hueShift(h, 120), s, l), harmonyHslToHex(hueShift(h, 240), s, l)];
-      case 'split':
-        return [harmonyHslToHex(hueShift(h, 150), s, l), harmonyHslToHex(hueShift(h, 210), s, l)];
-      case 'tetradic':
-        return [harmonyHslToHex(hueShift(h, 90), s, l), harmonyHslToHex(hueShift(h, 180), s, l), harmonyHslToHex(hueShift(h, 270), s, l)];
-      default:
-        return [];
-    }
-  })());
-
-  // --- Tint/Shade variations ---
-  // 5 tints (lighter) and 5 shades (darker) of current color
+  let harmonyColors = $derived(computeHarmony(hsl[0], hsl[1], hsl[2], harmonyType));
 
   // --- Quick actions ---
-
-  function actionInvert() {
-    const [r, g, b] = rgb;
-    applyColor(rgbToHex(255 - r, 255 - g, 255 - b));
-  }
-
-  function actionGrayscale() {
-    const [r, g, b] = rgb;
-    const gray = Math.round(0.299 * r + 0.587 * g + 0.114 * b);
-    applyColor(rgbToHex(gray, gray, gray));
-  }
-
-  function actionLighten() {
-    const [h, s, l] = hsl;
-    const newL = Math.min(100, l + 10);
-    const [r, g, b] = hslToRgb(h, s, newL);
-    applyColor(rgbToHex(r, g, b));
-  }
-
-  function actionDarken() {
-    const [h, s, l] = hsl;
-    const newL = Math.max(0, l - 10);
-    const [r, g, b] = hslToRgb(h, s, newL);
-    applyColor(rgbToHex(r, g, b));
-  }
-
-  function actionDesaturate() {
-    const [h, s, l] = hsl;
-    const newS = Math.max(0, s - 15);
-    const [r, g, b] = hslToRgb(h, newS, l);
-    applyColor(rgbToHex(r, g, b));
-  }
-
-  function actionSaturate() {
-    const [h, s, l] = hsl;
-    const newS = Math.min(100, s + 15);
-    const [r, g, b] = hslToRgb(h, newS, l);
-    applyColor(rgbToHex(r, g, b));
-  }
+  function actionInvert()     { applyColor(invertColor(color)); }
+  function actionGrayscale()  { applyColor(grayscaleColor(color)); }
+  function actionLighten()    { applyColor(shiftLightness(hsl[0], hsl[1], hsl[2],  10)); }
+  function actionDarken()     { applyColor(shiftLightness(hsl[0], hsl[1], hsl[2], -10)); }
+  function actionSaturate()   { applyColor(shiftSaturation(hsl[0], hsl[1], hsl[2],  15)); }
+  function actionDesaturate() { applyColor(shiftSaturation(hsl[0], hsl[1], hsl[2], -15)); }
 
   // --- Opacity presets ---
-
   function setOpacity(value) {
     applyColor(color, value);
   }
 
   // --- Bit Depth ---
-
-  function quantize(value, bits) {
-    const levels = (1 << bits) - 1;
-    return Math.round(value / 255 * levels) * 255 / levels;
-  }
-
-  function quantizeColor(r, g, b, depth) {
-    switch (depth) {
-      case '8':  return [quantize(r, 3), quantize(g, 3), quantize(b, 2)];
-      case '16': return [quantize(r, 5), quantize(g, 6), quantize(b, 5)];
-      default:   return [r, g, b];
-    }
-  }
-
   let quantized = $derived(quantizeColor(rgb[0], rgb[1], rgb[2], bitDepth));
   let quantizedHex = $derived(rgbToHex(quantized[0], quantized[1], quantized[2]));
   let isQuantized = $derived(bitDepth === '8' || bitDepth === '16');

@@ -11,6 +11,9 @@
    *   onchange(AARRGGBB) — called when user interacts with bands or hex input
    */
 
+  import { hexToRgb, rgbToHex, rgbToHsl, hslToRgb, alphaToHex } from '../utils/colorMath.js';
+  import { hueBand, saturationBand, lightnessBand, alphaBand } from '../utils/bandGradients.js';
+
   let { color = '333333', alpha: propAlpha = 1, stepSize = 10, onchange } = $props();
 
   // --- Internal HSL state (for smooth dragging) ---
@@ -24,46 +27,6 @@
 
   // Flag: when true, the next prop change is our own echo — skip it
   let ignoreNextPropChange = false;
-
-  // --- Color conversion utilities ---
-
-  function hslToRgb(h, s, l) {
-    s /= 100; l /= 100;
-    const k = n => (n + h / 30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
-    return [Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255)];
-  }
-
-  function rgbToHsl(r, g, b) {
-    r /= 255; g /= 255; b /= 255;
-    const max = Math.max(r, g, b), min = Math.min(r, g, b);
-    let h = 0, s = 0, l = (max + min) / 2;
-    if (max !== min) {
-      const d = max - min;
-      s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-      switch (max) {
-        case r: h = ((g - b) / d + (g < b ? 6 : 0)) * 60; break;
-        case g: h = ((b - r) / d + 2) * 60; break;
-        case b: h = ((r - g) / d + 4) * 60; break;
-      }
-    }
-    return [h, s * 100, l * 100];
-  }
-
-  function hexToRgb(hex) {
-    hex = hex.replace(/^#/, '');
-    return [
-      parseInt(hex.slice(0, 2), 16),
-      parseInt(hex.slice(2, 4), 16),
-      parseInt(hex.slice(4, 6), 16),
-    ];
-  }
-
-  function rgbToHex(r, g, b) {
-    const toHex = v => v.toString(16).padStart(2, '0').toUpperCase();
-    return toHex(r) + toHex(g) + toHex(b);
-  }
 
   // --- Sync internal state from external color prop ---
   function syncFromHex(hex6) {
@@ -97,31 +60,15 @@
   // --- Derived values ---
   let currentRgb = $derived(hslToRgb(hue, saturation, lightness));
   let currentHex6 = $derived(rgbToHex(currentRgb[0], currentRgb[1], currentRgb[2]));
-  let currentAlphaHex = $derived(Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase());
-  let currentFullHex = $derived(currentAlphaHex + currentHex6);
+  let currentFullHex = $derived(alphaToHex(alpha) + currentHex6);
   let displayHex = $derived('#' + currentFullHex);
   let colorWithAlpha = $derived(`hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha})`);
 
   // --- Gradient strings for each band ---
-  let hueGradient = $derived((() => {
-    const stops = [];
-    for (let i = 0; i <= 360; i += 30) {
-      stops.push(`hsl(${i}, ${saturation}%, ${lightness}%)`);
-    }
-    return `linear-gradient(to right, ${stops.join(', ')})`;
-  })());
-
-  let satGradient = $derived(
-    `linear-gradient(to right, hsl(${hue}, 100%, ${lightness}%), hsl(${hue}, 0%, ${lightness}%))`
-  );
-
-  let lightGradient = $derived(
-    `linear-gradient(to right, hsl(${hue}, ${saturation}%, 0%), hsl(${hue}, ${saturation}%, 50%), hsl(${hue}, ${saturation}%, 100%))`
-  );
-
-  let alphaGradient = $derived(
-    `linear-gradient(to right, hsla(${hue}, ${saturation}%, ${lightness}%, 1), hsla(${hue}, ${saturation}%, ${lightness}%, 0))`
-  );
+  let hueGradient   = $derived(hueBand(saturation, lightness));
+  let satGradient   = $derived(saturationBand(hue, lightness));
+  let lightGradient = $derived(lightnessBand(hue, saturation));
+  let alphaGradient = $derived(alphaBand(hue, saturation, lightness));
 
   // --- Thumb positions (0-1) ---
   let huePos = $derived(hue / 360);
