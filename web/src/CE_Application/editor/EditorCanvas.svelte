@@ -23,8 +23,21 @@
   let scale = $derived(zoom / 100);
 
   // --- Ruler scroll/size tracking ---
-  let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0 });
-  $effect(() => trackViewportMetrics(metrics, () => viewportEl));
+  let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0, contentLeft: 40, contentTop: 40 });
+  $effect(() => trackViewportMetrics(metrics, () => viewportEl, () => panelSurfaceEl));
+
+  // Re-measure panel-surface offset when zoom or panel size changes — the
+  // panel surface uses a CSS transform so its layout box doesn't resize, so
+  // the ResizeObserver above won't fire on zoom. We trigger it manually.
+  $effect(() => {
+    scale;
+    panel?.width;
+    panel?.height;
+    if (panelSurfaceEl) {
+      metrics.contentLeft = panelSurfaceEl.offsetLeft;
+      metrics.contentTop  = panelSurfaceEl.offsetTop;
+    }
+  });
 
   let gridEnabled = $derived(panel?.gridEnabled ?? false);
   let gridSize = $derived(panel?.gridSize ?? 10);
@@ -154,28 +167,30 @@
       <div class="canvas-viewport" class:with-rulers={$showRulers} bind:this={viewportEl}
            onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
            onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
-        <div class="zoom-container" style="width: {panel.width * scale + 80}px; height: {panel.height * scale + 80}px;">
-          <PanelSurface
-            {panel}
-            {scale}
-            {snapToGrid}
-            {gridSize}
-            {gridOrigin}
-            {panelLocked}
-            {bgLayers}
-            {gridStyle}
-            {marquee}
-            {marqueeRect}
-            bind:surfaceRef={panelSurfaceEl}
-            onclick={handleCanvasClick}
-            onmousedown={marqueeCtrl.handleMouseDown}
-            oncontextmenu={handleContextMenu}
-          />
+        <div class="canvas-stage">
+          <div class="zoom-container" style="width: {panel.width * scale + 80}px; height: {panel.height * scale + 80}px;">
+            <PanelSurface
+              {panel}
+              {scale}
+              {snapToGrid}
+              {gridSize}
+              {gridOrigin}
+              {panelLocked}
+              {bgLayers}
+              {gridStyle}
+              {marquee}
+              {marqueeRect}
+              bind:surfaceRef={panelSurfaceEl}
+              onclick={handleCanvasClick}
+              onmousedown={marqueeCtrl.handleMouseDown}
+              oncontextmenu={handleContextMenu}
+            />
+          </div>
         </div>
       </div>
       {#if $showRulers}
-        <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
-        <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
+        <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
+        <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
         <div class="ruler-corner"></div>
       {/if}
       <CanvasContextMenu bind:target={ctxMenu} {panel} />
@@ -260,10 +275,17 @@
     background: #5B9BD5;
   }
 
+  .canvas-stage {
+    min-width: 100%;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .zoom-container {
     flex-shrink: 0;
     padding: 40px;
-    margin: auto;
   }
 
   .empty-state {

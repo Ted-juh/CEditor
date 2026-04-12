@@ -68,6 +68,13 @@
     }
   }
 
+  function handleTabKeyDown(e, index) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      switchTab(index);
+    }
+  }
+
   // Keyboard shortcuts for formatting
   function handleKeyDown(e) {
     if (e.ctrlKey || e.metaKey) {
@@ -102,20 +109,23 @@
 <div class="notepad-editor">
   <div class="note-tabs">
     {#each notes as note, i}
-      <button
-        class="note-tab"
-        class:active={i === activeNoteIndex}
-        onclick={() => switchTab(i)}
-        ondblclick={() => handleTabDblClick(i)}
-        title="Double-click to rename"
-      >
-        <span class="note-tab-label">{note.name}</span>
+      <div class="note-tab-wrap" class:active={i === activeNoteIndex}>
+        <button
+          class="note-tab"
+          class:active={i === activeNoteIndex}
+          onclick={() => switchTab(i)}
+          ondblclick={() => handleTabDblClick(i)}
+          onkeydown={(e) => handleTabKeyDown(e, i)}
+          title="Double-click to rename"
+        >
+          <span class="note-tab-label">{note.name}</span>
+        </button>
         {#if notes.length > 1}
           <button class="note-tab-close" onclick={(e) => closeNote(i, e)} title="Close note">
             <X size={10} />
           </button>
         {/if}
-      </button>
+      </div>
     {/each}
     <button class="note-tab-add" onclick={addNote} title="Add note">
       <Plus size={12} />
@@ -125,6 +135,9 @@
   <div
     class="editor-area"
     contenteditable="true"
+    role="textbox"
+    aria-multiline="true"
+    tabindex="0"
     bind:this={editorEl}
     oninput={handleInput}
     onkeydown={handleKeyDown}
@@ -174,15 +187,28 @@
     flex-shrink: 0;
   }
 
+  .note-tab-wrap {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background: #252525;
+    border-top: 2px solid transparent;
+    flex-shrink: 0;
+  }
+
+  .note-tab-wrap.active {
+    background: #2D2D2D;
+    border-top-color: #5B9BD5;
+  }
+
   .note-tab:hover {
     color: #CCC;
-    background: #2A2A2A;
+    background: transparent;
   }
 
   .note-tab.active {
     color: #DDD;
-    background: #2D2D2D;
-    border-top-color: #5B9BD5;
+    background: transparent;
   }
 
   .note-tab-label {

@@ -196,9 +196,20 @@ export function computeSelectionBounds(panel, ids) {
 }
 
 /**
+ * Compute the panel-surface offset within the viewport's scroll content for
+ * a given panel size and zoom. Mirrors the flex centering in EditorCanvas:
+ * the panel is centered when smaller than the viewport, otherwise sits at
+ * the 40px padding edge.
+ */
+function contentOffsets(panel, viewportEl, scale) {
+  const left = Math.max(40, (viewportEl.clientWidth - panel.width * scale) / 2);
+  const top  = Math.max(40, (viewportEl.clientHeight - panel.height * scale) / 2);
+  return { left, top };
+}
+
+/**
  * Compute { zoom, scrollLeft, scrollTop } to zoom-and-center the given
  * selection bounds inside the viewport. Returns null if inputs are invalid.
- * The 40px offset matches the zoom-container padding in EditorCanvas.
  */
 export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
   if (!panel || !viewportEl) return null;
@@ -211,12 +222,13 @@ export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
   const availH = viewportEl.clientHeight - padding * 2;
   const zoom = clampZoom(Math.round(Math.min(availW / selW, availH / selH) * 100));
   const newScale = zoom / 100;
+  const { left, top } = contentOffsets(panel, viewportEl, newScale);
   const cx = (b.minX + b.maxX) / 2;
   const cy = (b.minY + b.maxY) / 2;
   return {
     zoom,
-    scrollLeft: cx * newScale + 40 - viewportEl.clientWidth / 2,
-    scrollTop:  cy * newScale + 40 - viewportEl.clientHeight / 2,
+    scrollLeft: cx * newScale + left - viewportEl.clientWidth / 2,
+    scrollTop:  cy * newScale + top  - viewportEl.clientHeight / 2,
   };
 }
 
@@ -224,18 +236,27 @@ export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
  * Compute the result of a ctrl+wheel zoom that keeps the cursor position
  * stable. Returns { zoom, scrollLeft, scrollTop } or null if no change.
  */
-export function computeWheelZoom(viewportEl, e, currentZoom, step = 10) {
-  if (!viewportEl) return null;
+export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10) {
+  if (!viewportEl || !panel) return null;
   const rect = viewportEl.getBoundingClientRect();
-  const mx = e.clientX - rect.left + viewportEl.scrollLeft;
-  const my = e.clientY - rect.top + viewportEl.scrollTop;
+  const oldScale = currentZoom / 100;
+  const oldOff = contentOffsets(panel, viewportEl, oldScale);
+
+  const cursorVpX = e.clientX - rect.left;
+  const cursorVpY = e.clientY - rect.top;
+  // Cursor in panel coordinates
+  const panelX = (cursorVpX + viewportEl.scrollLeft - oldOff.left) / oldScale;
+  const panelY = (cursorVpY + viewportEl.scrollTop  - oldOff.top)  / oldScale;
+
   const delta = e.deltaY < 0 ? step : -step;
   const newZoom = clampZoom(currentZoom + delta);
   if (newZoom === currentZoom) return null;
-  const ratio = newZoom / currentZoom;
+  const newScale = newZoom / 100;
+  const newOff = contentOffsets(panel, viewportEl, newScale);
+
   return {
     zoom: newZoom,
-    scrollLeft: mx * ratio - (e.clientX - rect.left),
-    scrollTop:  my * ratio - (e.clientY - rect.top),
+    scrollLeft: panelX * newScale + newOff.left - cursorVpX,
+    scrollTop:  panelY * newScale + newOff.top  - cursorVpY,
   };
 }

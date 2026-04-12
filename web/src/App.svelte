@@ -38,12 +38,24 @@
     }
   }
 
+  function readStoredBool(key, defaultValue) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored !== null) return JSON.parse(stored);
+    } catch { /* ignore */ }
+    return defaultValue;
+  }
+
   let propertiesPanelWidth = $state(280);
   let isResizingProps = $state(false);
   let treePanelWidth = $state(200);
   let isResizingTree = $state(false);
-  let showTreePanel = $state(true);
+  let showTreePanel = $state(readStoredBool('ce.showTreePanel', true));
   let showShortcuts = $state(false);
+
+  $effect(() => {
+    try { localStorage.setItem('ce.showTreePanel', JSON.stringify(showTreePanel)); } catch { /* ignore */ }
+  });
   let displayPanelHeight = $state(480);
   let isResizingDisplay = $state(false);
   let showDisplayPanel = $state(true);

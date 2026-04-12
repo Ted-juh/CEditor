@@ -46,7 +46,7 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     const panel = getPanel();
     if (!el || !panel || (!e.ctrlKey && !e.metaKey)) return;
     e.preventDefault();
-    apply(computeWheelZoom(el, e, getZoom()));
+    apply(computeWheelZoom(el, e, getZoom(), panel));
   }
 
   function fitToWindow() {

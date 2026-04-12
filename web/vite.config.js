@@ -15,5 +15,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          svelte: ['svelte'],
+          icons: ['lucide-svelte'],
+        },
+      },
+    },
   },
 });

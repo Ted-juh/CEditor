@@ -1,0 +1,28 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 24,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "native",
+      "displayName": "Native (Ninja Multi-Config)",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/native"
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "native-debug",
+      "configurePreset": "native",
+      "configuration": "Debug"
+    },
+    {
+      "name": "native-release",
+      "configurePreset": "native",
+      "configuration": "Release"
+    }
+  ]
+}

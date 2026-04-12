@@ -11,16 +11,25 @@
       closePanel(id);
     }
   }
+
+  function handleTabKeyDown(e, id) {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setActivePanel(id);
+    }
+  }
 </script>
 
 <div class="tab-bar">
   <div class="tabs">
     {#each panelList as panel (panel.id)}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
         class="tab"
         class:active={panel.id === activeId}
+        role="button"
+        tabindex="0"
         onclick={() => setActivePanel(panel.id)}
+        onkeydown={(e) => handleTabKeyDown(e, panel.id)}
         onmousedown={(e) => handleMiddleClick(e, panel.id)}
       >
         <span class="tab-name">

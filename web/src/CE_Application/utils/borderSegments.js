@@ -85,17 +85,29 @@ function getCornerStrokes(border, corners, pos) {
 }
 
 // Distance from the corner anchor where the side path must START.
-// - rounded outward / chamfer / notch / straight: side inset by R
-// - rounded inward: arc stroke extends perpendicular to its vertical tangent,
-//   covering a band of width tt. Side must start one half-thickness further
-//   out to reach the far edge of that band, i.e. r + tt/2.
+// - rounded outward / chamfer / notch / straight: side inset by R. The
+//   outward arc has horizontal tangent where it meets the top side, so the
+//   stroke flows continuously from arc into side; aligning at the centerline
+//   endpoint (R + tt/2 with the 1-px overlap → R) is enough.
+// - rounded inward: the arc has a *vertical* tangent at its top endpoint,
+//   so the arc's butt cap is a horizontal segment at y = tt/2 spanning
+//   x ∈ [R, R + tt]. The arc band itself only exists at y ≥ tt/2 — there is
+//   nothing covering y ∈ [0, tt/2] for x ∈ [R, R + tt]. The side stroke must
+//   reach all the way down to x = R to fill that L-corner. Solving
+//   `sideStart = tlG + t - tlOv = r` with t = tt/2 and tlOv = 1 gives
+//   tlG = r - tt/2 + 1; using r - tt/2 instead gives a 1-pixel overlap into
+//   the bite area, matching the overlap convention used by the other corner
+//   shapes.
 // - corner off: max(R, 2*thickness) — prevents sides from running into the
 //   space a missing corner would have filled.
-function sideInset(on, cn, r, tt) {
+//
+// Reserved for a future "inward inset" mode (the original behavior): the
+// formula `r + tt / 2` shifts the side's start to the OUTER edge of the arc
+// band, leaving the arc's curved cap visible as a small angular notch
+// between the side and the curve. Useful as a stylistic option later — wire
+// it up via a corner `mode` field when the UI exposes it.
+function sideInset(on, _cn, r, tt) {
   if (!on) return Math.max(r, tt * 2);
-  const shape = cn?.style || 'rounded';
-  const dir = cn?.direction || 'outward';
-  if (shape === 'rounded' && dir === 'inward') return r + tt / 2;
   return r;
 }
 

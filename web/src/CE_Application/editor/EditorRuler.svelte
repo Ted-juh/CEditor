@@ -8,6 +8,7 @@
     orientation = 'horizontal',
     length = 0,
     scrollOffset = 0,
+    contentOffset = 40,
     scale = 1,
     onGuideCreate = null,
   } = $props();
@@ -23,7 +24,7 @@
 
   // Convert panel coord → ruler screen pixel
   function panelToRuler(pc) {
-    return pc * scale - scrollOffset + 40;
+    return pc * scale - scrollOffset + contentOffset;
   }
 
   // Pick a tick interval so on-screen spacing is ~50-100px
@@ -68,8 +69,8 @@
     const subInterval = interval / subDiv;
 
     // Range of panel coords visible
-    const panelStart = (scrollOffset - 40) / scale;
-    const panelEnd = (scrollOffset + (isHorizontal ? w : h) - 40) / scale;
+    const panelStart = (scrollOffset - contentOffset) / scale;
+    const panelEnd = (scrollOffset + (isHorizontal ? w : h) - contentOffset) / scale;
 
     const firstSub = Math.floor(panelStart / subInterval) * subInterval;
 
@@ -79,7 +80,7 @@
     ctx.textAlign = isHorizontal ? 'center' : 'left';
 
     for (let pc = firstSub; pc <= panelEnd; pc += subInterval) {
-      const screenPos = pc * scale - scrollOffset + 40;
+      const screenPos = pc * scale - scrollOffset + contentOffset;
       const isMajor = Math.abs(pc - Math.round(pc / interval) * interval) < 0.01;
       const tickLen = isMajor ? 10 : 5;
 
@@ -129,19 +130,17 @@
 
       const rect = canvasEl.getBoundingClientRect();
 
+      const surface = canvasEl.closest('.canvas-area')?.querySelector('.panel-surface');
+      if (!surface) return;
+      const sRect = surface.getBoundingClientRect();
+
       if (isHorizontal) {
         if (ev.clientY <= rect.bottom) return;
-        const viewport = canvasEl.closest('.canvas-area')?.querySelector('.canvas-viewport');
-        if (!viewport) return;
-        const vpRect = viewport.getBoundingClientRect();
-        const panelY = (ev.clientY - vpRect.top + viewport.scrollTop - 40) / scale;
+        const panelY = (ev.clientY - sRect.top) / scale;
         onGuideCreate?.('horizontal', panelY);
       } else {
         if (ev.clientX <= rect.right) return;
-        const viewport = canvasEl.closest('.canvas-area')?.querySelector('.canvas-viewport');
-        if (!viewport) return;
-        const vpRect = viewport.getBoundingClientRect();
-        const panelX = (ev.clientX - vpRect.left + viewport.scrollLeft - 40) / scale;
+        const panelX = (ev.clientX - sRect.left) / scale;
         onGuideCreate?.('vertical', panelX);
       }
     };
