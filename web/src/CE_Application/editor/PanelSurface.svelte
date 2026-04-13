@@ -11,6 +11,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { showGuides } from '../stores/editorView.js';
+  import { sortControlsForRender } from '../utils/controlOrder.js';
 
   let {
     panel,
@@ -31,6 +32,7 @@
 
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
+  let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -57,7 +59,7 @@
     <GuideLines {scale} panelWidth={panel.width} panelHeight={panel.height} />
   {/if}
 
-  {#each panel.controls as control (control._children?.Core?.id)}
+  {#each orderedControls as control (control._children?.Core?.id)}
     <CanvasControl
       {control}
       {scale}
@@ -66,7 +68,7 @@
       gridOriginX={gridOrigin.x}
       gridOriginY={gridOrigin.y}
       {panelLocked}
-      allControls={panel.controls}
+      allControls={orderedControls}
       panelWidth={panel.width}
       panelHeight={panel.height}
     />

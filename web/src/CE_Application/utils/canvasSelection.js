@@ -1,3 +1,5 @@
+import { sortControlsForHitTest } from './controlOrder.js';
+
 /**
  * Return a Set of control IDs whose Transform AABB intersects the given rect
  * (partial overlap counts). `rect` is { x, y, w, h } in panel coordinates.
@@ -23,7 +25,7 @@ export function findControlsInRect(controls, rect, getSection) {
  * behavior — do not reverse without verifying hit-test semantics.
  */
 export function findControlAtPoint(controls, x, y) {
-  return controls.find(c => {
+  return sortControlsForHitTest(controls).find(c => {
     const t = c._children?.Transform;
     if (!t) return false;
     return x >= t.x && x <= t.x + t.width && y >= t.y && y <= t.y + t.height;

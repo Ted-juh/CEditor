@@ -4,10 +4,11 @@
   import { updateControlProperty } from '../stores/controls.js';
   import { updatePanel } from '../stores/panels.js';
   import { getSection } from '../models/componentTypes.js';
+  import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
 
   let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
   // Controls in reverse order (top of list = front/highest z)
-  let controls = $derived(panel ? [...panel.controls].reverse() : []);
+  let controls = $derived(panel ? [...sortControlsForRender(panel.controls)].reverse() : []);
 
   // --- Rename ---
   let renamingId = $state(null);
@@ -82,24 +83,53 @@
       return;
     }
 
-    // Work with the original (non-reversed) array
-    const arr = [...panel.controls];
-    const srcIdx = arr.findIndex(c => c._children?.Core?.id === dragSourceId);
-    const item = arr[srcIdx];
-    arr.splice(srcIdx, 1);
+    const source = panel.controls.find(c => getControlId(c) === dragSourceId);
+    const target = panel.controls.find(c => getControlId(c) === dragOverId);
 
-    // Find target in the modified array
-    let tgtIdx = arr.findIndex(c => c._children?.Core?.id === dragOverId);
-
-    // Since the tree is reversed (top = last in array = front),
-    // "above" in the tree = higher z-index = after in array
-    // "below" in the tree = lower z-index = before in array
-    if (dragOverPos === 'above') {
-      tgtIdx += 1;
+    if (!source || !target || getControlLayer(source) !== getControlLayer(target)) {
+      dragOverId = null;
+      dragOverPos = null;
+      dragSourceId = null;
+      return;
     }
 
-    arr.splice(tgtIdx, 0, item);
-    updatePanel(panel.id, { controls: arr });
+    const layer = getControlLayer(source);
+    const displayLayer = controls.filter(c => getControlLayer(c) === layer);
+    const item = displayLayer.find(c => getControlId(c) === dragSourceId);
+
+    if (!item) {
+      dragOverId = null;
+      dragOverPos = null;
+      dragSourceId = null;
+      return;
+    }
+
+    const reorderedDisplayLayer = displayLayer.filter(c => getControlId(c) !== dragSourceId);
+    let targetIndex = reorderedDisplayLayer.findIndex(c => getControlId(c) === dragOverId);
+    if (targetIndex < 0) {
+      dragOverId = null;
+      dragOverPos = null;
+      dragSourceId = null;
+      return;
+    }
+
+    if (dragOverPos === 'below') targetIndex += 1;
+    reorderedDisplayLayer.splice(targetIndex, 0, item);
+
+    const zIndexById = new Map(
+      [...reorderedDisplayLayer].reverse().map((control, index) => [getControlId(control), index])
+    );
+
+    const updatedControls = panel.controls.map(control => {
+      const id = getControlId(control);
+      if (getControlLayer(control) !== layer || id == null || !zIndexById.has(id)) return control;
+
+      const clone = JSON.parse(JSON.stringify(control));
+      clone._children.Core.zIndex = zIndexById.get(id);
+      return clone;
+    });
+
+    updatePanel(panel.id, { controls: updatedControls });
 
     dragOverId = null;
     dragOverPos = null;

@@ -3,6 +3,7 @@ import { panels, activePanelId, activePanel, selectedComponentIds, keyObjectId }
 import { getSection, updateControlProperty } from './controls.js';
 import { updatePanel } from './panels.js';
 import { guides } from './guides.js';
+import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
 
 // --- Helpers ---
 
@@ -292,14 +293,50 @@ export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
 }
 
 // --- Z-Order (4) ---
-// Operates on array position in panel.controls (render order)
+// Operates within each Core.layer using Core.zIndex as the ordering key.
 
 function reorderControls(reorderFn) {
   const panel = get(activePanel);
   if (!panel) return;
   const ids = get(selectedComponentIds);
   if (ids.size === 0) return;
-  const newControls = reorderFn([...panel.controls], ids);
+
+  const zIndexById = new Map();
+  const layers = new Map();
+
+  for (const control of sortControlsForRender(panel.controls)) {
+    const layer = getControlLayer(control);
+    if (!layers.has(layer)) layers.set(layer, []);
+    layers.get(layer).push(control);
+  }
+
+  for (const layerControls of layers.values()) {
+    const selectedInLayer = new Set(
+      layerControls
+        .map(control => getControlId(control))
+        .filter(id => id != null && ids.has(id))
+    );
+
+    if (selectedInLayer.size === 0) continue;
+
+    const reorderedLayer = reorderFn([...layerControls], selectedInLayer);
+    reorderedLayer.forEach((control, index) => {
+      const id = getControlId(control);
+      if (id != null) zIndexById.set(id, index);
+    });
+  }
+
+  if (zIndexById.size === 0) return;
+
+  const newControls = panel.controls.map(control => {
+    const id = getControlId(control);
+    if (id == null || !zIndexById.has(id)) return control;
+
+    const clone = JSON.parse(JSON.stringify(control));
+    clone._children.Core.zIndex = zIndexById.get(id);
+    return clone;
+  });
+
   updatePanel(panel.id, { controls: newControls });
 }
 
