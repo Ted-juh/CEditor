@@ -19,6 +19,7 @@
     swatches = [],              // shared color swatches (parent-owned)
     onchange = null,            // (newGradient) => void
     oneditstopcolor = null,     // (stopIndex) => void — triggers cross-tab flow
+    onshapechange = null,       // (shape) => void — sync shape to parent
     onswatchdblclick = null,
     onswatchrightclick = null,
   } = $props();
@@ -82,7 +83,10 @@
         onchange={(g) => onchange?.(g)}
         onSelectStop={(i) => selectedStop = i}
         onEditStopColor={(i) => oneditstopcolor?.(i)}
-        onShapeChange={(s) => shape = s}
+        onShapeChange={(s) => {
+          shape = s;
+          onshapechange?.(s);
+        }}
         gradientSwatches={gradientPresets}
         onGradientPresetClick={handlePresetClick}
         onGradientPresetDblClick={handlePresetDblClick}

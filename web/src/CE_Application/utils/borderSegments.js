@@ -108,6 +108,21 @@ function getCornerStrokes(border, corners, pos) {
 // it up via a corner `mode` field when the UI exposes it.
 function sideInset(on, _cn, r, tt) {
   if (!on) return Math.max(r, tt * 2);
+  // Chamfer diagonal runs edge-to-edge (see cornerPaths.js). For the side
+  // centerline to intersect that diagonal cleanly on the inside edge, the
+  // side start must be shifted inward by half thickness.
+  //
+  // sideStart = sideInset + tt/2 - overlap  -> should land at x=r (or y=r)
+  // => sideInset = r - tt/2 + overlap.
+  const cornerStyle = _cn?.style || 'rounded';
+  if (cornerStyle === 'chamfer') {
+    return Math.max(0, r - tt / 2 + 1);
+  }
+  // Notch corners should anchor like straight corners; using the chamfer
+  // inset here pulls the side too far into the corner and breaks the join.
+  if (cornerStyle === 'notch') {
+    return r;
+  }
   return r;
 }
 
@@ -122,11 +137,31 @@ function buildCornerGeom(W, H, tlR, trR, brR, blR) {
   };
 }
 
+function reverseAxis(axis) {
+  return axis ? { x1: axis.x2, y1: axis.y2, x2: axis.x1, y2: axis.y1 } : null;
+}
+
 // Per-corner gradient geometry — computed once per corner regardless of how
-// many stroke layers are drawn. Returns { cornerShape, arcCx, arcCy,
-// isInward, gradAxis }. Unused fields stay undefined.
+// many stroke layers are drawn.
+// Returns:
+//   {
+//     cornerShape, isInward, arcCx, arcCy,
+//     radialAxis, tangentialAxis
+//   }
+// For rounded corners, radial uses arcCx/arcCy and tangentialAxis is used for
+// tangential mode. For non-rounded corners, both modes use linear axes.
 function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
+  const e = R + t;
+
   if (cnStyle === 'rounded') {
+    let tangentialAxis;
+    switch (pos) {
+      case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
+      case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
+      case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
+      case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
+    }
+
     if (cnDir === 'inward') {
       // Inward: radial centered at the inset point near the anchor.
       let arcCx, arcCy;
@@ -136,7 +171,13 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
         case 'br': arcCx = W - t; arcCy = H - t; break;
         case 'bl': arcCx = t;     arcCy = H - t; break;
       }
-      return { cornerShape: 'rounded', isInward: true, arcCx, arcCy, gradAxis: null };
+      return {
+        cornerShape: 'rounded',
+        isInward: true,
+        arcCx, arcCy,
+        radialAxis: null,
+        tangentialAxis,
+      };
     }
     // Outward: radial centered at the arc circle center.
     let arcCx, arcCy;
@@ -146,47 +187,169 @@ function computeCornerGradientGeom(pos, cnStyle, cnDir, R, t, W, H) {
       case 'br': arcCx = W - R - t; arcCy = H - R - t; break;
       case 'bl': arcCx = R + t;     arcCy = H - R - t; break;
     }
-    return { cornerShape: 'rounded', isInward: false, arcCx, arcCy, gradAxis: null };
+    return {
+      cornerShape: 'rounded',
+      isInward: false,
+      arcCx, arcCy,
+      radialAxis: null,
+      tangentialAxis,
+    };
   }
 
   if (cnStyle === 'chamfer') {
-    // Linear gradient perpendicular to the 45° chamfer line, through its midpoint.
-    const mid = t + R / 2;
-    let gradAxis;
+    // Tangential: along the chamfer edge.
+    let tangentialAxis;
     switch (pos) {
-      case 'tl': gradAxis = { x1: mid + t / 2,     y1: mid + t / 2, x2: mid - t / 2, y2: mid - t / 2 }; break;
-      case 'tr': gradAxis = { x1: W - mid - t / 2, y1: mid + t / 2, x2: W - mid + t / 2, y2: mid - t / 2 }; break;
-      case 'br': gradAxis = { x1: W - mid - t / 2, y1: H - mid - t / 2, x2: W - mid + t / 2, y2: H - mid + t / 2 }; break;
-      case 'bl': gradAxis = { x1: mid + t / 2,     y1: H - mid - t / 2, x2: mid - t / 2, y2: H - mid + t / 2 }; break;
+      case 'tl': tangentialAxis = { x1: 0,     y1: e,     x2: e,     y2: 0 };     break;
+      case 'tr': tangentialAxis = { x1: W - e, y1: 0,     x2: W,     y2: e };     break;
+      case 'br': tangentialAxis = { x1: W,     y1: H - e, x2: W - e, y2: H };     break;
+      case 'bl': tangentialAxis = { x1: e,     y1: H,     x2: 0,     y2: H - e }; break;
     }
-    return { cornerShape: 'linear', isInward: false, arcCx: undefined, arcCy: undefined, gradAxis };
+
+    // Radial mode for linear corners: axis across thickness.
+    const mid = e / 2;
+    let radialAxis;
+    switch (pos) {
+      case 'tl': radialAxis = { x1: mid + t / 2,     y1: mid + t / 2,     x2: mid - t / 2,     y2: mid - t / 2 };     break;
+      case 'tr': radialAxis = { x1: W - mid - t / 2, y1: mid + t / 2,     x2: W - mid + t / 2, y2: mid - t / 2 };     break;
+      case 'br': radialAxis = { x1: W - mid - t / 2, y1: H - mid - t / 2, x2: W - mid + t / 2, y2: H - mid + t / 2 }; break;
+      case 'bl': radialAxis = { x1: mid + t / 2,     y1: H - mid - t / 2, x2: mid - t / 2,     y2: H - mid + t / 2 }; break;
+    }
+
+    if (cnDir === 'inward') radialAxis = reverseAxis(radialAxis);
+
+    return {
+      cornerShape: 'linear',
+      isInward: cnDir === 'inward',
+      arcCx: undefined,
+      arcCy: undefined,
+      radialAxis,
+      tangentialAxis,
+    };
   }
 
   if (cnStyle === 'straight') {
-    // Gradient from the L-shape's inner corner (toward body) to its outer corner (anchor).
-    let gradAxis;
+    // Tangential: along corner endpoints (edge-to-edge flow).
+    let tangentialAxis;
     switch (pos) {
-      case 'tl': gradAxis = { x1: R + t,     y1: R + t,     x2: 0, y2: 0 }; break;
-      case 'tr': gradAxis = { x1: W - R - t, y1: R + t,     x2: W, y2: 0 }; break;
-      case 'br': gradAxis = { x1: W - R - t, y1: H - R - t, x2: W, y2: H }; break;
-      case 'bl': gradAxis = { x1: R + t,     y1: H - R - t, x2: 0, y2: H }; break;
+      case 'tl': tangentialAxis = { x1: t,     y1: e,     x2: e,     y2: t };     break;
+      case 'tr': tangentialAxis = { x1: W - e, y1: t,     x2: W - t, y2: e };     break;
+      case 'br': tangentialAxis = { x1: W - t, y1: H - e, x2: W - e, y2: H - t }; break;
+      case 'bl': tangentialAxis = { x1: e,     y1: H - t, x2: t,     y2: H - e }; break;
     }
-    return { cornerShape: 'linear', isInward: false, arcCx: undefined, arcCy: undefined, gradAxis };
+
+    // Radial: inner corner toward outer anchor (continuous with side thickness gradients).
+    let radialAxis;
+    switch (pos) {
+      case 'tl': radialAxis = { x1: e,     y1: e,     x2: 0, y2: 0 }; break;
+      case 'tr': radialAxis = { x1: W - e, y1: e,     x2: W, y2: 0 }; break;
+      case 'br': radialAxis = { x1: W - e, y1: H - e, x2: W, y2: H }; break;
+      case 'bl': radialAxis = { x1: e,     y1: H - e, x2: 0, y2: H }; break;
+    }
+
+    if (cnDir === 'inward') radialAxis = reverseAxis(radialAxis);
+
+    return {
+      cornerShape: 'linear',
+      isInward: cnDir === 'inward',
+      arcCx: undefined,
+      arcCy: undefined,
+      radialAxis,
+      tangentialAxis,
+    };
   }
 
   if (cnStyle === 'notch') {
-    // Gradient from L-elbow to the cut-in region.
-    let gradAxis;
+    // Tangential: along notch endpoints (edge-to-edge flow).
+    let tangentialAxis;
     switch (pos) {
-      case 'tl': gradAxis = { x1: 0, y1: 0, x2: R + t,     y2: R + t };     break;
-      case 'tr': gradAxis = { x1: W, y1: 0, x2: W - R - t, y2: R + t };     break;
-      case 'br': gradAxis = { x1: W, y1: H, x2: W - R - t, y2: H - R - t }; break;
-      case 'bl': gradAxis = { x1: 0, y1: H, x2: R + t,     y2: H - R - t }; break;
+      case 'tl': tangentialAxis = { x1: 0,     y1: e,     x2: e,     y2: 0 };     break;
+      case 'tr': tangentialAxis = { x1: W - e, y1: 0,     x2: W,     y2: e };     break;
+      case 'br': tangentialAxis = { x1: W,     y1: H - e, x2: W - e, y2: H };     break;
+      case 'bl': tangentialAxis = { x1: e,     y1: H,     x2: 0,     y2: H - e }; break;
     }
-    return { cornerShape: 'linear', isInward: false, arcCx: undefined, arcCy: undefined, gradAxis };
+
+    // Radial: notch elbow toward outer anchor.
+    let radialAxis;
+    switch (pos) {
+      case 'tl': radialAxis = { x1: e,     y1: e,     x2: 0, y2: 0 }; break;
+      case 'tr': radialAxis = { x1: W - e, y1: e,     x2: W, y2: 0 }; break;
+      case 'br': radialAxis = { x1: W - e, y1: H - e, x2: W, y2: H }; break;
+      case 'bl': radialAxis = { x1: e,     y1: H - e, x2: 0, y2: H }; break;
+    }
+
+    if (cnDir === 'inward') radialAxis = reverseAxis(radialAxis);
+
+    return {
+      cornerShape: 'linear',
+      isInward: cnDir === 'inward',
+      arcCx: undefined,
+      arcCy: undefined,
+      radialAxis,
+      tangentialAxis,
+    };
   }
 
-  return { cornerShape: 'rounded', isInward: false, arcCx: undefined, arcCy: undefined, gradAxis: null };
+  return {
+    cornerShape: 'rounded',
+    isInward: false,
+    arcCx: undefined,
+    arcCy: undefined,
+    radialAxis: null,
+    tangentialAxis: null,
+  };
+}
+
+function cornerLineJoin(style) {
+  return style === 'rounded' ? 'round' : 'miter';
+}
+
+function acrossAxisForSide(side, x, y, t) {
+  switch (side) {
+    case 'top':    return { x1: x,     y1: y + t, x2: x,     y2: y - t };
+    case 'right':  return { x1: x - t, y1: y,     x2: x + t, y2: y };
+    case 'bottom': return { x1: x,     y1: y - t, x2: x,     y2: y + t };
+    case 'left':   return { x1: x + t, y1: y,     x2: x - t, y2: y };
+  }
+  return null;
+}
+
+// For straight/notch corners, split into leg pieces so each leg can carry a
+// local across-thickness gradient (horizontal + vertical) instead of forcing
+// one gradient axis across an L-shape path.
+function buildLinearCornerPieces(style, pos, i, e, t, W, H) {
+  const h = (x1, y, x2, sideKey) => ({
+    d: `M ${x1} ${y} L ${x2} ${y}`,
+    tangentialAxis: { x1, y1: y, x2, y2: y },
+    radialAxis: acrossAxisForSide(sideKey, (x1 + x2) / 2, y, t),
+    sideKey,
+  });
+  const v = (x, y1, y2, sideKey) => ({
+    d: `M ${x} ${y1} L ${x} ${y2}`,
+    tangentialAxis: { x1: x, y1, x2: x, y2 },
+    radialAxis: acrossAxisForSide(sideKey, x, (y1 + y2) / 2, t),
+    sideKey,
+  });
+
+  if (style === 'straight') {
+    switch (pos) {
+      case 'tl': return [v(i, e, i, 'left'), h(i, i, e, 'top')];
+      case 'tr': return [h(W - e, i, W - i, 'top'), v(W - i, i, e, 'right')];
+      case 'br': return [v(W - i, H - e, H - i, 'right'), h(W - i, H - i, W - e, 'bottom')];
+      case 'bl': return [h(e, H - i, i, 'bottom'), v(i, H - i, H - e, 'left')];
+    }
+  }
+
+  if (style === 'notch') {
+    switch (pos) {
+      case 'tl': return [h(0, e, e, 'top'), v(e, e, 0, 'left')];
+      case 'tr': return [v(W - e, 0, e, 'right'), h(W - e, e, W, 'top')];
+      case 'br': return [h(W, H - e, W - e, 'bottom'), v(W - e, H - e, H, 'right')];
+      case 'bl': return [v(e, H, H - e, 'left'), h(e, H - e, 0, 'bottom')];
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -222,7 +385,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const trG = sideInset(trOn, tr, trR, tt);
     for (const l of ll) {
       const y = t + l.offset;
-      result.push({ kind: 'side', key: 'top', d: `M ${tlG + t - tlOv} ${y} L ${W - trG - t + trOv} ${y}`, thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap });
+      const x1 = tlG + t - tlOv;
+      const x2 = W - trG - t + trOv;
+      result.push({
+        kind: 'side',
+        key: 'top',
+        d: `M ${x1} ${y} L ${x2} ${y}`,
+        thick: l.thick,
+        colour: l.colour,
+        dasharray: l.dasharray,
+        linecap: l.linecap,
+        flowAxis: { x1, y1: y, x2, y2: y },
+      });
     }
   }
   if (isSideOn(border, 'right')) {
@@ -232,7 +406,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const brG = sideInset(brOn, br, brR, tt);
     for (const l of ll) {
       const x = W - t - l.offset;
-      result.push({ kind: 'side', key: 'right', d: `M ${x} ${trG + t - trOv} L ${x} ${H - brG - t + brOv}`, thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap });
+      const y1 = trG + t - trOv;
+      const y2 = H - brG - t + brOv;
+      result.push({
+        kind: 'side',
+        key: 'right',
+        d: `M ${x} ${y1} L ${x} ${y2}`,
+        thick: l.thick,
+        colour: l.colour,
+        dasharray: l.dasharray,
+        linecap: l.linecap,
+        flowAxis: { x1: x, y1, x2: x, y2 },
+      });
     }
   }
   if (isSideOn(border, 'bottom')) {
@@ -242,7 +427,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const blG = sideInset(blOn, bl, blR, tt);
     for (const l of ll) {
       const y = H - t - l.offset;
-      result.push({ kind: 'side', key: 'bottom', d: `M ${W - brG - t + brOv} ${y} L ${blG + t - blOv} ${y}`, thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap });
+      const x1 = W - brG - t + brOv;
+      const x2 = blG + t - blOv;
+      result.push({
+        kind: 'side',
+        key: 'bottom',
+        d: `M ${x1} ${y} L ${x2} ${y}`,
+        thick: l.thick,
+        colour: l.colour,
+        dasharray: l.dasharray,
+        linecap: l.linecap,
+        flowAxis: { x1, y1: y, x2, y2: y },
+      });
     }
   }
   if (isSideOn(border, 'left')) {
@@ -252,7 +448,18 @@ export function buildBorderSegments(W, H, border, corners) {
     const tlG = sideInset(tlOn, tl, tlR, tt);
     for (const l of ll) {
       const x = t + l.offset;
-      result.push({ kind: 'side', key: 'left', d: `M ${x} ${H - blG - t + blOv} L ${x} ${tlG + t - tlOv}`, thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap });
+      const y1 = H - blG - t + blOv;
+      const y2 = tlG + t - tlOv;
+      result.push({
+        kind: 'side',
+        key: 'left',
+        d: `M ${x} ${y1} L ${x} ${y2}`,
+        thick: l.thick,
+        colour: l.colour,
+        dasharray: l.dasharray,
+        linecap: l.linecap,
+        flowAxis: { x1: x, y1, x2: x, y2 },
+      });
     }
   }
 
@@ -278,14 +485,38 @@ export function buildBorderSegments(W, H, border, corners) {
     for (const l of ll) {
       const inset = t + l.offset;
       const d = buildCornerPath(cn, pos, R, inset, t, W, H);
-      result.push({
-        kind: 'corner', key, pos, d,
-        thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
-        cornerShape: grad.cornerShape,
-        radialIsInward: grad.isInward,
-        gradAxis: grad.gradAxis,
-        geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
-      });
+      const e = R + t;
+      const pieces = buildLinearCornerPieces(cnStyle, pos, inset, e, t, W, H);
+      if (pieces?.length) {
+        pieces.forEach((piece, partIdx) => {
+          const radialAxis = cnDir === 'inward' ? reverseAxis(piece.radialAxis) : piece.radialAxis;
+          result.push({
+            kind: 'corner', key, pos, d: piece.d,
+            thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
+            linejoin: cornerLineJoin(cnStyle),
+            cornerStyle: cnStyle,
+            cornerShape: grad.cornerShape,
+            radialIsInward: grad.isInward,
+            radialAxis,
+            tangentialAxis: piece.tangentialAxis,
+            cornerPart: partIdx,
+            cornerPartSide: piece.sideKey,
+            geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+          });
+        });
+      } else {
+        result.push({
+          kind: 'corner', key, pos, d,
+          thick: l.thick, colour: l.colour, dasharray: l.dasharray, linecap: l.linecap,
+          linejoin: cornerLineJoin(cnStyle),
+          cornerStyle: cnStyle,
+          cornerShape: grad.cornerShape,
+          radialIsInward: grad.isInward,
+          radialAxis: grad.radialAxis,
+          tangentialAxis: grad.tangentialAxis,
+          geom: { ...cornerGeom[pos], R, thickness: tt, arcCx: grad.arcCx, arcCy: grad.arcCy },
+        });
+      }
     }
   }
 

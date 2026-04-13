@@ -43,12 +43,65 @@ export const SECTION_DEFAULTS = {
   /** Background — the complete visual shell: fill + border + corners. */
   Background: {
     _type: 'Background',
-    mode: 'solid',              // solid / gradient / image / none
+    mode: 'solid',              // legacy primary layer / fallback
     _children: {
       Fill: {
         _type: 'Fill',
-        mode: 'solid',
+        mode: 'solid',          // legacy primary layer / fallback
+        layerOrder: ['solid', 'gradient', 'image', 'overlay'],
         colour: 'FF3A3A3A',
+        solidEnabled: true,
+        solidBlend: 'normal',
+        solidClipMode: 'shape',
+        solidMuted: false,
+        gradientEnabled: false,
+        gradientOpacity: 100,
+        gradientName: '',
+        gradientBlend: 'normal',
+        gradientClipMode: 'shape',
+        gradientMuted: false,
+        gradient: null,
+        imageEnabled: false,
+        imageMuted: false,
+        imageSrc: '',
+        imageOpacity: 100,
+        imageFit: 'fill',
+        imageAlign: 'center',
+        imageOffsetX: 0,
+        imageOffsetY: 0,
+        imageBlend: 'normal',
+        imageBlur: 0,
+        imageTint: 'FFFFFF',
+        imageFlipH: false,
+        imageFlipV: false,
+        imageRotation: 0,
+        imageGrayscale: false,
+        imageSaturation: 100,
+        imageBrightness: 100,
+        imageContrast: 100,
+        imageTileScale: 1.0,
+        imageClipMode: 'shape',
+        overlayEnabled: false,
+        overlayMuted: false,
+        overlaySrc: '',
+        overlayOpacity: 100,
+        overlayFit: 'tile',
+        overlayAlign: 'center',
+        overlayOffsetX: 0,
+        overlayOffsetY: 0,
+        overlayBlend: 'normal',
+        overlayBlur: 0,
+        overlayTint: 'FFFFFF',
+        overlayFlipH: false,
+        overlayFlipV: false,
+        overlayRotation: 0,
+        overlayGrayscale: false,
+        overlaySaturation: 100,
+        overlayBrightness: 100,
+        overlayContrast: 100,
+        overlayTileScale: 1.0,
+        overlayClipMode: 'shape',
+        soloLayer: '',
       },
       Border: {
         _type: 'Border',
@@ -67,13 +120,14 @@ export const SECTION_DEFAULTS = {
         imageSrc: '',           // data URL for image fill
         overlaySrc: '',         // data URL for overlay fill
         gradient: null,         // gradient data { type, angle, stops, ... }
+        gradientFlow: 'across', // across / follow
         // --- double line (when style is 'double') ---
         doubleGap: 2,                 // gap between the two lines
         // --- per-side (when linked: false) ---
-        top:    { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
-        right:  { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
-        bottom: { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
-        left:   { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null },
+        top:    { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across' },
+        right:  { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across' },
+        bottom: { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across' },
+        left:   { style: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across' },
       },
       Corners: {
         _type: 'Corners',
@@ -98,14 +152,15 @@ export const SECTION_DEFAULTS = {
         imageSrc: '',
         overlaySrc: '',
         gradient: null,
+        gradientFlow: 'across',       // across / follow
         cornerGradientMode: 'radial',  // 'radial' | 'tangential' | 'inherit'
         cornerGradientFlip: false,     // reverse direction for radial / tangential
         cornerGradientInheritSide: 'A', // 'A' or 'B' — for top-left: A=top, B=left
         // --- per-corner (when linked: false) ---
-        topLeft:     { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
-        topRight:    { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
-        bottomLeft:  { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
-        bottomRight: { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        topLeft:     { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        topRight:    { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        bottomLeft:  { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
+        bottomRight: { radius: 0, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 2, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: 'FFFFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
         // sideA/sideB mapping:
         //   TL: sideA = top edge,    sideB = left edge
         //   TR: sideA = top edge,    sideB = right edge

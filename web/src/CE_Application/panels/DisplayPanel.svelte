@@ -63,6 +63,7 @@
   // Lives here rather than inside GradientTab because the Colors-tab stop
   // editing flow (liveGradient mini-preview) also reads it.
   let currentGradient = $state(deepClone(defaultGradient));
+  let gradientShape = $state('rectangle');
 
   // Bumped whenever the active panel changes — child tabs watch this as
   // their reset signal so they can re-sync from the new active panel.
@@ -364,9 +365,11 @@
     <div class="tab-pane" style:display={activeTab === 'gradient' ? 'block' : 'none'}>
       <GradientTab
         gradient={currentGradient}
+        shape={gradientShape}
         {swatches}
         onchange={handleGradientChange}
         oneditstopcolor={handleEditStopColor}
+        onshapechange={(shape) => gradientShape = shape}
         onswatchdblclick={handleSwatchDblClick}
         onswatchrightclick={handleSwatchRightClick}
       />

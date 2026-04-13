@@ -3,6 +3,7 @@
 
   let {
     mode = 'radial',         // 'radial' | 'tangential' | 'inherit'
+    shapeStyle = 'rounded',  // rounded | straight | notch | chamfer
     flip = false,
     inheritSide = 'A',       // 'A' | 'B'
     inheritLabelA = 'A',
@@ -12,28 +13,42 @@
     oninheritchange = null,
   } = $props();
 
-  // Flip control is meaningful for radial and tangential; irrelevant for inherit.
-  let showFlip = $derived(mode === 'tangential' || mode === 'radial');
+  let isRounded = $derived(shapeStyle === 'rounded');
+  // Flip is only kept for rounded modes where directional sweep matters.
+  let showFlip = $derived(isRounded && (mode === 'tangential' || mode === 'radial'));
 </script>
 
 <div class="edit-row">
   <span class="edit-label">G.Mode</span>
   <div class="cgm-picker">
-    <button class="cgm-btn" class:active={mode === 'radial'}
-      title="Radial — gradient flows along the curve (sweeps the arc)"
-      onclick={() => onmodechange?.('radial')}>
-      <svg viewBox="0 0 14 14" fill="none"><path d="M11 2 Q11 11 2 11" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="2" r="0.9" fill="currentColor"/><circle cx="2" cy="11" r="0.9" fill="currentColor"/></svg>
-    </button>
-    <button class="cgm-btn" class:active={mode === 'tangential'}
-      title="Tangential — straight linear gradient between arc endpoints"
-      onclick={() => onmodechange?.('tangential')}>
-      <svg viewBox="0 0 14 14" fill="none"><path d="M11 3 Q3 3 3 11" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M3 11 L1 9 M3 11 L5 9" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
-    </button>
-    <button class="cgm-btn" class:active={mode === 'inherit'}
-      title="Inherit — corner uses an adjacent side gradient"
-      onclick={() => onmodechange?.('inherit')}>
-      <Link size={11} strokeWidth={1.5} />
-    </button>
+    {#if isRounded}
+      <button class="cgm-btn" class:active={mode === 'radial'}
+        title="Radial — gradient flows along the curve (sweeps the arc)"
+        onclick={() => onmodechange?.('radial')}>
+        <svg viewBox="0 0 14 14" fill="none"><path d="M11 2 Q11 11 2 11" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="11" cy="2" r="0.9" fill="currentColor"/><circle cx="2" cy="11" r="0.9" fill="currentColor"/></svg>
+      </button>
+      <button class="cgm-btn" class:active={mode === 'tangential'}
+        title="Tangential — straight linear gradient between arc endpoints"
+        onclick={() => onmodechange?.('tangential')}>
+        <svg viewBox="0 0 14 14" fill="none"><path d="M11 3 Q3 3 3 11" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M3 11 L1 9 M3 11 L5 9" stroke="currentColor" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>
+      </button>
+      <button class="cgm-btn" class:active={mode === 'inherit'}
+        title="Inherit — corner uses an adjacent side gradient"
+        onclick={() => onmodechange?.('inherit')}>
+        <Link size={11} strokeWidth={1.5} />
+      </button>
+    {:else}
+      <button class="cgm-btn text-btn" class:active={mode === 'tangential'}
+        title="Follow edge direction"
+        onclick={() => onmodechange?.('tangential')}>
+        Follow
+      </button>
+      <button class="cgm-btn text-btn" class:active={mode === 'radial'}
+        title="Across border thickness"
+        onclick={() => onmodechange?.('radial')}>
+        Across
+      </button>
+    {/if}
   </div>
 </div>
 
@@ -48,7 +63,7 @@
   </div>
 {/if}
 
-{#if mode === 'inherit'}
+{#if isRounded && mode === 'inherit'}
   <div class="edit-row">
     <span class="edit-label">From</span>
     <div class="cgm-picker">
@@ -104,6 +119,7 @@
   .cgm-btn:hover { border-color: #5B9BD5; color: #CCC; }
   .cgm-btn.active { background: #094771; border-color: #0B6EB5; color: #DDD; }
   .cgm-btn svg { width: 12px; height: 12px; }
+  .text-btn { font-size: 9px; }
 
   .flip-btn {
     flex: 1;

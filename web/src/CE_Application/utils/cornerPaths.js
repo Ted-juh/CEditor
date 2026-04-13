@@ -82,22 +82,25 @@ export function buildCornerPath(cn, pos, R, inset, tBase, W, H) {
   }
 
   if (style === 'chamfer') {
-    // Short horizontal/vertical legs extend to the box edge before and after
-    // the diagonal, so the butt caps are axis-aligned and flush with the side
-    // strokes — same approach as the inward-arc line legs.
+    // Chamfer should connect at the same edge anchor distance (`e`) as the
+    // adjacent side runs. Using inset-based inner legs makes the diagonal end
+    // too early (around mid-side). A direct edge-to-edge diagonal keeps the
+    // chamfer reaching fully to the side joins.
     switch (pos) {
-      case 'tl': return `M 0 ${e} L ${i} ${e} L ${e} ${i} L ${e} 0`;
-      case 'tr': return `M ${W - e} 0 L ${W - e} ${i} L ${W - i} ${e} L ${W} ${e}`;
-      case 'br': return `M ${W} ${H - e} L ${W - i} ${H - e} L ${W - e} ${H - i} L ${W - e} ${H}`;
-      case 'bl': return `M ${e} ${H} L ${e} ${H - i} L ${i} ${H - e} L 0 ${H - e}`;
+      case 'tl': return `M 0 ${e} L ${e} 0`;
+      case 'tr': return `M ${W - e} 0 L ${W} ${e}`;
+      case 'br': return `M ${W} ${H - e} L ${W - e} ${H}`;
+      case 'bl': return `M ${e} ${H} L 0 ${H - e}`;
     }
   }
   if (style === 'notch') {
+    // Notch uses edge-anchored endpoints (like chamfer) so each leg reaches
+    // fully to the side band instead of stopping at the side centerline.
     switch (pos) {
-      case 'tl': return `M ${i} ${e} L ${e} ${e} L ${e} ${i}`;
-      case 'tr': return `M ${W - e} ${i} L ${W - e} ${e} L ${W - i} ${e}`;
-      case 'br': return `M ${W - i} ${H - e} L ${W - e} ${H - e} L ${W - e} ${H - i}`;
-      case 'bl': return `M ${e} ${H - i} L ${e} ${H - e} L ${i} ${H - e}`;
+      case 'tl': return `M 0 ${e} L ${e} ${e} L ${e} 0`;
+      case 'tr': return `M ${W - e} 0 L ${W - e} ${e} L ${W} ${e}`;
+      case 'br': return `M ${W} ${H - e} L ${W - e} ${H - e} L ${W - e} ${H}`;
+      case 'bl': return `M ${e} ${H} L ${e} ${H - e} L 0 ${H - e}`;
     }
   }
   // straight
@@ -125,6 +128,27 @@ export function buildFillClipPath(cornersByPos, W, H) {
   const brP = fillCornerSegment(br, 'br', W, H);
   d.push(`L ${brP.start}`); d.push(brP.path);
   const blP = fillCornerSegment(bl, 'bl', W, H);
+  d.push(`L ${blP.start}`); d.push(blP.path);
+  d.push('Z');
+  return `clip-path: path('${d.join(' ')}');`;
+}
+
+export function buildInsetFillClipPath(cornersByPos, W, H, insets) {
+  const left = Math.max(0, insets?.left ?? 0);
+  const top = Math.max(0, insets?.top ?? 0);
+  const right = Math.max(0, insets?.right ?? 0);
+  const bottom = Math.max(0, insets?.bottom ?? 0);
+  if (W <= left + right || H <= top + bottom) return 'clip-path: inset(50%);';
+
+  const { tl, tr, br, bl } = cornersByPos;
+  const d = [];
+  const tlP = insetFillCornerSegment(tl, 'tl', W, H, { left, top, right, bottom });
+  d.push(`M ${tlP.start}`); d.push(tlP.path);
+  const trP = insetFillCornerSegment(tr, 'tr', W, H, { left, top, right, bottom });
+  d.push(`L ${trP.start}`); d.push(trP.path);
+  const brP = insetFillCornerSegment(br, 'br', W, H, { left, top, right, bottom });
+  d.push(`L ${brP.start}`); d.push(brP.path);
+  const blP = insetFillCornerSegment(bl, 'bl', W, H, { left, top, right, bottom });
   d.push(`L ${blP.start}`); d.push(blP.path);
   d.push('Z');
   return `clip-path: path('${d.join(' ')}');`;
@@ -183,5 +207,76 @@ function fillCornerSegment(c, pos, W, H) {
     case 'tr': return { start: `${W} 0`, path: '' };
     case 'br': return { start: `${W} ${H}`, path: '' };
     case 'bl': return { start: `0 ${H}`, path: '' };
+  }
+}
+
+function insetFillCornerSegment(c, pos, W, H, insets) {
+  const left = insets.left;
+  const top = insets.top;
+  const right = insets.right;
+  const bottom = insets.bottom;
+  const baseR = c.radius || 0;
+  const style = c.style || 'rounded';
+  const dir = c.direction || 'outward';
+
+  const insetX = pos === 'tl' || pos === 'bl' ? left : right;
+  const insetY = pos === 'tl' || pos === 'tr' ? top : bottom;
+  const r = Math.max(0, baseR - Math.max(insetX, insetY));
+
+  const x0 = left;
+  const y0 = top;
+  const x1 = W - right;
+  const y1 = H - bottom;
+
+  if (r === 0 || style === 'straight') {
+    switch (pos) {
+      case 'tl': return { start: `${x0} ${y0}`, path: '' };
+      case 'tr': return { start: `${x1} ${y0}`, path: '' };
+      case 'br': return { start: `${x1} ${y1}`, path: '' };
+      case 'bl': return { start: `${x0} ${y1}`, path: '' };
+    }
+  }
+
+  if (style === 'rounded' && dir === 'inward') {
+    switch (pos) {
+      case 'tl': return { start: `${x0} ${y0 + r}`, path: `A ${r} ${r} 0 0 0 ${x0 + r} ${y0}` };
+      case 'tr': return { start: `${x1 - r} ${y0}`, path: `A ${r} ${r} 0 0 0 ${x1} ${y0 + r}` };
+      case 'br': return { start: `${x1} ${y1 - r}`, path: `A ${r} ${r} 0 0 0 ${x1 - r} ${y1}` };
+      case 'bl': return { start: `${x0 + r} ${y1}`, path: `A ${r} ${r} 0 0 0 ${x0} ${y1 - r}` };
+    }
+  }
+
+  if (style === 'rounded') {
+    switch (pos) {
+      case 'tl': return { start: `${x0} ${y0 + r}`, path: `A ${r} ${r} 0 0 1 ${x0 + r} ${y0}` };
+      case 'tr': return { start: `${x1 - r} ${y0}`, path: `A ${r} ${r} 0 0 1 ${x1} ${y0 + r}` };
+      case 'br': return { start: `${x1} ${y1 - r}`, path: `A ${r} ${r} 0 0 1 ${x1 - r} ${y1}` };
+      case 'bl': return { start: `${x0 + r} ${y1}`, path: `A ${r} ${r} 0 0 1 ${x0} ${y1 - r}` };
+    }
+  }
+
+  if (style === 'chamfer') {
+    switch (pos) {
+      case 'tl': return { start: `${x0} ${y0 + r}`, path: `L ${x0 + r} ${y0}` };
+      case 'tr': return { start: `${x1 - r} ${y0}`, path: `L ${x1} ${y0 + r}` };
+      case 'br': return { start: `${x1} ${y1 - r}`, path: `L ${x1 - r} ${y1}` };
+      case 'bl': return { start: `${x0 + r} ${y1}`, path: `L ${x0} ${y1 - r}` };
+    }
+  }
+
+  if (style === 'notch') {
+    switch (pos) {
+      case 'tl': return { start: `${x0} ${y0 + r}`, path: `L ${x0 + r} ${y0 + r} L ${x0 + r} ${y0}` };
+      case 'tr': return { start: `${x1 - r} ${y0}`, path: `L ${x1 - r} ${y0 + r} L ${x1} ${y0 + r}` };
+      case 'br': return { start: `${x1} ${y1 - r}`, path: `L ${x1 - r} ${y1 - r} L ${x1 - r} ${y1}` };
+      case 'bl': return { start: `${x0 + r} ${y1}`, path: `L ${x0 + r} ${y1 - r} L ${x0} ${y1 - r}` };
+    }
+  }
+
+  switch (pos) {
+    case 'tl': return { start: `${x0} ${y0}`, path: '' };
+    case 'tr': return { start: `${x1} ${y0}`, path: '' };
+    case 'br': return { start: `${x1} ${y1}`, path: '' };
+    case 'bl': return { start: `${x0} ${y1}`, path: '' };
   }
 }

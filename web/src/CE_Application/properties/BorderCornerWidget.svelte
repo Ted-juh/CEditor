@@ -311,6 +311,15 @@
     set(ctxPath('cornerGradientInheritSide'), side);
   }
 
+  function gradientFlowValue() {
+    return ctx?.data?.gradientFlow ?? 'across';
+  }
+
+  function setGradientFlow(mode) {
+    if (!ctx) return;
+    setSelectedProp('gradientFlow', mode);
+  }
+
   // Get human label for the side a corner inherits from
   function inheritSideLabel(pos, side) {
     const useA = side !== 'B';
@@ -410,9 +419,28 @@
       </div>
     </div>
 
-    {#if ctx.kind === 'corner' && isFillActive('gradient')}
+    {#if isFillActive('gradient')}
+      <div class="edit-row">
+        <span class="edit-label">G.Flow</span>
+        <div class="flow-picker">
+          <button class="flow-btn" class:active={gradientFlowValue() === 'across'}
+            title="Gradient runs across border thickness (classic behavior)"
+            onclick={() => setGradientFlow('across')}>
+            Across
+          </button>
+          <button class="flow-btn" class:active={gradientFlowValue() === 'follow'}
+            title="Gradient follows the border loop around the component"
+            onclick={() => setGradientFlow('follow')}>
+            Follow
+          </button>
+        </div>
+      </div>
+    {/if}
+
+    {#if ctx.kind === 'corner' && isFillActive('gradient') && (d?.style ?? 'rounded') === 'rounded'}
       <CornerGradientModePicker
         mode={d?.cornerGradientMode ?? 'radial'}
+        shapeStyle={d?.style ?? 'rounded'}
         flip={!!d?.cornerGradientFlip}
         inheritSide={d?.cornerGradientInheritSide ?? 'A'}
         inheritLabelA={inheritSideLabel(selected, 'A')}
@@ -615,4 +643,26 @@
     letter-spacing: 0.3px;
     padding-left: 2px;
   }
+
+  .flow-picker {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .flow-btn {
+    flex: 1;
+    height: 18px;
+    border-radius: 3px;
+    border: 1px solid #444;
+    background: #1A1A1A;
+    color: #888;
+    font-size: 9px;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0 6px;
+  }
+  .flow-btn:hover { border-color: #5B9BD5; color: #CCC; }
+  .flow-btn.active { background: #094771; border-color: #0B6EB5; color: #DDD; }
 </style>

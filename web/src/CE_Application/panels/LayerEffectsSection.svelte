@@ -23,10 +23,19 @@
     defaultFit = 'fill',    // 'fill' for Image, 'tile' for Texture
     placeholder = 'No file selected',
     collapsed = true,
+    showClipping = false,
+    soloActive = false,
+    muteActive = false,
+    canPaste = false,
     onupdate = null,        // (patch) => void — partial panel update
     onbrowse = null,        // () => void
     oncollapsetoggle = null,
     onswatchclick = null,   // (prop, value) => void
+    onsolo = null,
+    onmute = null,
+    onreset = null,
+    oncopy = null,
+    onpaste = null,
   } = $props();
 
   // Typed field accessors — one place, one source of truth
@@ -39,6 +48,7 @@
   function toggle(name) { set(name, !get(name, false)); }
 
   let fit = $derived(get('Fit', defaultFit));
+  let clipMode = $derived(get('ClipMode', 'shape'));
 </script>
 
 <PropertySection title={label} {collapsed} ontoggle={(v) => oncollapsetoggle?.(v)}>
@@ -54,6 +64,14 @@
 </PropertySection>
 
 {#if !collapsed}
+  <div class="layer-tools-row">
+    <button class="layer-tool-btn" class:active={soloActive} title="Solo layer" onclick={() => onsolo?.()}>S</button>
+    <button class="layer-tool-btn" class:active={muteActive} title="Mute layer" onclick={() => onmute?.()}>M</button>
+    <button class="layer-tool-btn" title="Reset layer" onclick={() => onreset?.()}>R</button>
+    <button class="layer-tool-btn" title="Copy layer settings" onclick={() => oncopy?.()}>C</button>
+    <button class="layer-tool-btn" disabled={!canPaste} title="Paste layer settings" onclick={() => onpaste?.()}>P</button>
+  </div>
+
   <PropertySection title="Geometry">
     <div class="bg-props-layout">
       <div class="bg-props-left">
@@ -130,6 +148,18 @@
       </div>
     </div>
   </PropertySection>
+
+  {#if showClipping}
+    <PropertySection title="Clipping">
+      <PropertyCell label="Mode" span={4} hint="How this layer is clipped inside the component background">
+        <select class="val" value={clipMode} onchange={(e) => set('ClipMode', e.target.value)}>
+          <option value="none">None</option>
+          <option value="shape">Shape</option>
+          <option value="border-inner">Border Inner</option>
+        </select>
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 {/if}
 
 <style>
@@ -199,6 +229,41 @@
     line-height: 1;
     padding-left: 2px;
     user-select: none;
+  }
+
+  .layer-tools-row {
+    display: flex;
+    gap: 4px;
+    padding: 2px 0 4px 0;
+  }
+
+  .layer-tool-btn {
+    width: 24px;
+    height: 22px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #777;
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .layer-tool-btn:hover {
+    border-color: #5B9BD5;
+    color: #DDD;
+  }
+
+  .layer-tool-btn.active {
+    border-color: #5B9BD5;
+    color: #5B9BD5;
+    background: #0D2A3E;
+  }
+
+  .layer-tool-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
   }
 
   .bg-effects-layout {
