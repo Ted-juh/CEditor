@@ -24,7 +24,7 @@
 
   // --- Ruler scroll/size tracking ---
   let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0, contentLeft: 40, contentTop: 40 });
-  $effect(() => trackViewportMetrics(metrics, () => viewportEl, () => panelSurfaceEl));
+  $effect(() => trackViewportMetrics(metrics, () => viewportEl, () => zoomContainerEl));
 
   // Re-measure panel-surface offset when zoom or panel size changes — the
   // panel surface uses a CSS transform so its layout box doesn't resize, so
@@ -33,9 +33,11 @@
     scale;
     panel?.width;
     panel?.height;
-    if (panelSurfaceEl) {
-      metrics.contentLeft = panelSurfaceEl.offsetLeft;
-      metrics.contentTop  = panelSurfaceEl.offsetTop;
+    metrics.width;
+    metrics.height;
+    if (zoomContainerEl) {
+      metrics.contentLeft = zoomContainerEl.offsetLeft;
+      metrics.contentTop  = zoomContainerEl.offsetTop;
     }
   });
 
@@ -70,7 +72,13 @@
 
   // --- DOM refs ---
   let viewportEl = $state(null);
+  let zoomContainerEl = $state(null);
   let panelSurfaceEl = $state(null);
+
+  let scaledPanelWidth = $derived(panel ? panel.width * scale : 0);
+  let scaledPanelHeight = $derived(panel ? panel.height * scale : 0);
+  let stageMarginLeft = $derived(Math.max(40, (metrics.width - scaledPanelWidth) / 2));
+  let stageMarginTop = $derived(Math.max(40, (metrics.height - scaledPanelHeight) / 2));
 
   // --- Pan (space+drag, middle mouse, right mouse) ---
   // `pan` state is mutated by the controller; reactivity lives here.
@@ -168,7 +176,11 @@
            onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
            onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
         <div class="canvas-stage">
-          <div class="zoom-container" style="width: {panel.width * scale + 80}px; height: {panel.height * scale + 80}px;">
+          <div
+            class="zoom-container"
+            bind:this={zoomContainerEl}
+            style="width: {scaledPanelWidth}px; height: {scaledPanelHeight}px; margin-left: {stageMarginLeft}px; margin-top: {stageMarginTop}px;"
+          >
             <PanelSurface
               {panel}
               {scale}
@@ -278,14 +290,11 @@
   .canvas-stage {
     min-width: 100%;
     min-height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
   }
 
   .zoom-container {
-    flex-shrink: 0;
-    padding: 40px;
+    position: relative;
   }
 
   .empty-state {

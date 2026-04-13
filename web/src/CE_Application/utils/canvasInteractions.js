@@ -233,8 +233,10 @@ export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
 }
 
 /**
- * Compute the result of a ctrl+wheel zoom that keeps the cursor position
- * stable. Returns { zoom, scrollLeft, scrollTop } or null if no change.
+ * Compute the result of a wheel zoom that targets the hovered panel point.
+ * The hovered point becomes the viewport center after zooming so scrolling
+ * the wheel naturally "dives into" the thing under the mouse.
+ * Returns { zoom, scrollLeft, scrollTop } or null if no change.
  */
 export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10) {
   if (!viewportEl || !panel) return null;
@@ -256,7 +258,7 @@ export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10) {
 
   return {
     zoom: newZoom,
-    scrollLeft: panelX * newScale + newOff.left - cursorVpX,
-    scrollTop:  panelY * newScale + newOff.top  - cursorVpY,
+    scrollLeft: panelX * newScale + newOff.left - viewportEl.clientWidth / 2,
+    scrollTop:  panelY * newScale + newOff.top  - viewportEl.clientHeight / 2,
   };
 }

@@ -15,6 +15,10 @@
  *
  * Returned handlers use the math utilities from canvasInteractions.js so
  * this stays a thin orchestration layer.
+ *
+ * The wheel handler always zooms around the current mouse position. The
+ * underlying math keeps the point under the cursor visually stable while the
+ * viewport scale changes.
  */
 import {
   computeFitZoom,
@@ -23,6 +27,8 @@ import {
 } from './canvasInteractions.js';
 
 export function createZoomController({ getViewport, getPanel, getSelection, editorZoom, getZoom }) {
+  let pendingScrollFrame = null;
+
   // Apply a compute-result back to viewport + store.
   // `scrollDeferred` schedules scroll writes in requestAnimationFrame so the
   // zoom change takes effect before the scroll position is adjusted — needed
@@ -32,21 +38,33 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     editorZoom.set(result.zoom);
     const el = getViewport();
     if (!el) return;
+    if (pendingScrollFrame !== null) {
+      cancelAnimationFrame(pendingScrollFrame);
+      pendingScrollFrame = null;
+    }
     const write = () => {
       if (!el) return;
       el.scrollLeft = result.scrollLeft;
       el.scrollTop  = result.scrollTop;
     };
-    if (scrollDeferred) requestAnimationFrame(write);
-    else write();
+    if (scrollDeferred) {
+      pendingScrollFrame = requestAnimationFrame(() => {
+        pendingScrollFrame = null;
+        write();
+      });
+    } else {
+      write();
+    }
   }
 
   function handleWheel(e) {
     const el = getViewport();
     const panel = getPanel();
-    if (!el || !panel || (!e.ctrlKey && !e.metaKey)) return;
+    if (!el || !panel) return;
     e.preventDefault();
-    apply(computeWheelZoom(el, e, getZoom(), panel));
+    // Defer the scroll write so the new zoomed layout exists before we
+    // recenter the hovered point in the viewport.
+    apply(computeWheelZoom(el, e, getZoom(), panel), /* scrollDeferred */ true);
   }
 
   function fitToWindow() {
