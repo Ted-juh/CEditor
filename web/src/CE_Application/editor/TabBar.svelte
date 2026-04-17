@@ -1,45 +1,57 @@
 <script>
   import { X, Plus } from 'lucide-svelte';
-  import { panels, activePanelId, addPanel, closePanel, setActivePanel } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, addPanel, closePanel, setActiveEditorTab, closeSettingsTab } from '../stores/panels.js';
 
-  let panelList = $derived($panels);
-  let activeId = $derived($activePanelId);
+  let tabList = $derived($editorTabs);
+  let activeTab = $derived($activeEditorTab);
 
-  function handleMiddleClick(e, id) {
+  function handleMiddleClick(e, tab) {
     if (e.button === 1) {
       e.preventDefault();
-      closePanel(id);
+      closeTab(tab);
     }
   }
 
-  function handleTabKeyDown(e, id) {
+  function handleTabKeyDown(e, tab) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      setActivePanel(id);
+      setActiveEditorTab(tab);
+    }
+  }
+
+  function isActive(tab) {
+    return activeTab?.type === tab.tabType && activeTab?.id === tab.id;
+  }
+
+  function closeTab(tab) {
+    if (tab.tabType === 'settings') {
+      closeSettingsTab();
+    } else {
+      closePanel(tab.id);
     }
   }
 </script>
 
 <div class="tab-bar">
   <div class="tabs">
-    {#each panelList as panel (panel.id)}
+    {#each tabList as tab (`${tab.tabType}:${tab.id}`)}
       <div
         class="tab"
-        class:active={panel.id === activeId}
+        class:active={isActive(tab)}
         role="button"
         tabindex="0"
-        onclick={() => setActivePanel(panel.id)}
-        onkeydown={(e) => handleTabKeyDown(e, panel.id)}
-        onmousedown={(e) => handleMiddleClick(e, panel.id)}
+        onclick={() => setActiveEditorTab(tab)}
+        onkeydown={(e) => handleTabKeyDown(e, tab)}
+        onmousedown={(e) => handleMiddleClick(e, tab)}
       >
         <span class="tab-name">
-          {panel.name}
-          {#if panel.modified}<span class="modified-dot">●</span>{/if}
+          {tab.name}
+          {#if tab.modified}<span class="modified-dot">●</span>{/if}
         </span>
         <button
           class="tab-close"
           title="Close"
-          onclick={(e) => { e.stopPropagation(); closePanel(panel.id); }}
+          onclick={(e) => { e.stopPropagation(); closeTab(tab); }}
         >
           <X size={12} strokeWidth={1.5} />
         </button>

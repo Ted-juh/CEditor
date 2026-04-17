@@ -3,17 +3,44 @@
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2,
     LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer,
   } from 'lucide-svelte';
-  import { panels, activePanelId, selectedComponentId } from '../stores/panels.js';
+  import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
-  import { selectedControl, hasSection } from '../stores/controls.js';
+  import { selectedControl, hasSection, addSection } from '../stores/controls.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import TabIconBar from './TabIconBar.svelte';
   import TabContentArea from './TabContentArea.svelte';
   import { createTabViewState } from '../utils/tabViewState.js';
+  import { COMPONENT_TYPES } from '../models/componentTypes.js';
+  import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
 
-  let { width = 280 } = $props();
+  const MIN_PROPERTIES_PANEL_WIDTH = 600;
+  const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
 
-  let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  function readStoredUiState() {
+    const stored = readStoredJson(UI_STATE_STORAGE_KEY, {});
+    return {
+      viewMode: stored?.viewMode === 'multi' ? 'multi' : 'single',
+      pinPanelProps: stored?.pinPanelProps === true,
+      singleTab: String(stored?.singleTab ?? 'core'),
+      multiTabs: new Set(Array.isArray(stored?.multiTabs) && stored.multiTabs.length > 0 ? stored.multiTabs : ['core']),
+      pinnedPanelTab: String(stored?.pinnedPanelTab ?? 'core'),
+      pinnedPanelMultiTabs: new Set(
+        Array.isArray(stored?.pinnedPanelMultiTabs) && stored.pinnedPanelMultiTabs.length > 0
+          ? stored.pinnedPanelMultiTabs
+          : ['core']
+      ),
+      collapsedCards: stored?.collapsedCards && typeof stored.collapsedCards === 'object'
+        ? stored.collapsedCards
+        : {},
+    };
+  }
+
+  const storedUiState = readStoredUiState();
+
+  let { width = MIN_PROPERTIES_PANEL_WIDTH } = $props();
+  let clampedWidth = $derived(Math.max(width, MIN_PROPERTIES_PANEL_WIDTH));
+
+  let panel = $derived($activePanel);
   let selectedComponent = $derived($selectedComponentId);
   let contextMode = $derived(selectedComponent != null ? 'component' : 'panel');
 
@@ -23,18 +50,18 @@
   let ownerName = $derived(contextMode === 'panel' ? panelName : componentName);
 
   // View mode: 'single' or 'multi'
-  let viewMode = $state('single');
+  let viewMode = $state(storedUiState.viewMode);
 
   // Pin panel properties — show panel props at top even when a component is selected
-  let pinPanelProps = $state(false);
+  let pinPanelProps = $state(storedUiState.pinPanelProps);
 
   // Main tab state (component tabs, or panel tabs when contextMode === 'panel')
-  let singleTab = $state('core');
-  let multiTabs = $state(new Set(['core']));
+  let singleTab = $state(storedUiState.singleTab);
+  let multiTabs = $state(storedUiState.multiTabs);
 
   // Pinned-panel tab state (only used when showPinnedPanel is true)
-  let pinnedPanelTab = $state('core');
-  let pinnedPanelMultiTabs = $state(new Set(['core']));
+  let pinnedPanelTab = $state(storedUiState.pinnedPanelTab);
+  let pinnedPanelMultiTabs = $state(storedUiState.pinnedPanelMultiTabs);
 
   // Controllers — closures bind to the state vars above. handleClick/isActive
   // are used by both the main tab bar and the pinned panel tab bar.
@@ -50,15 +77,7 @@
   });
 
   // Collapse state per card id
-  let collapsedCards = $state({});
-
-  // Reset component tabs when context mode changes
-  $effect(() => {
-    if (contextMode) {
-      singleTab = 'core';
-      multiTabs = new Set(['core']);
-    }
-  });
+  let collapsedCards = $state(storedUiState.collapsedCards);
 
   // Whether to show the pinned panel section at top
   let showPinnedPanel = $derived(pinPanelProps && contextMode === 'component');
@@ -94,6 +113,23 @@
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
 
+  // Upgrade older controls in-place when their type template gains new sections.
+  $effect(() => {
+    const control = $selectedControl;
+    const controlId = control?._children?.Core?.id;
+    const controlType = control?._children?.Core?.controlType;
+    if (!controlId || !controlType) return;
+
+    const template = COMPONENT_TYPES[controlType];
+    if (!template?.sections?.length) return;
+
+    for (const sectionName of template.sections) {
+      if (!hasSection(control, sectionName)) {
+        addSection(controlId, sectionName);
+      }
+    }
+  });
+
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
   let tabs = $derived(contextMode === 'panel' ? panelTabs : componentTabs);
@@ -116,6 +152,62 @@
       : panelTabs.filter(t => pinnedPanelMultiTabs.has(t.id))
   );
 
+  function ensureValidMainTabs() {
+    const validIds = new Set(tabs.map((tab) => tab.id));
+    if (validIds.size === 0) return;
+
+    if (!validIds.has(singleTab)) {
+      singleTab = tabs[0]?.id ?? 'core';
+    }
+
+    const filteredMultiTabs = [...multiTabs].filter((id) => validIds.has(id));
+    const nextMultiTabs = filteredMultiTabs.length > 0 ? filteredMultiTabs : [singleTab];
+    const currentMultiTabs = [...multiTabs];
+    if (
+      nextMultiTabs.length !== currentMultiTabs.length
+      || nextMultiTabs.some((id, index) => id !== currentMultiTabs[index])
+    ) {
+      multiTabs = new Set(nextMultiTabs);
+    }
+  }
+
+  function ensureValidPinnedTabs() {
+    const validIds = new Set(panelTabs.map((tab) => tab.id));
+    if (!validIds.has(pinnedPanelTab)) {
+      pinnedPanelTab = panelTabs[0]?.id ?? 'core';
+    }
+
+    const filtered = [...pinnedPanelMultiTabs].filter((id) => validIds.has(id));
+    const nextPinnedTabs = filtered.length > 0 ? filtered : [pinnedPanelTab];
+    const currentPinnedTabs = [...pinnedPanelMultiTabs];
+    if (
+      nextPinnedTabs.length !== currentPinnedTabs.length
+      || nextPinnedTabs.some((id, index) => id !== currentPinnedTabs[index])
+    ) {
+      pinnedPanelMultiTabs = new Set(nextPinnedTabs);
+    }
+  }
+
+  $effect(() => {
+    ensureValidMainTabs();
+  });
+
+  $effect(() => {
+    ensureValidPinnedTabs();
+  });
+
+  $effect(() => {
+    writeStoredJson(UI_STATE_STORAGE_KEY, {
+      viewMode,
+      pinPanelProps,
+      singleTab,
+      multiTabs: [...multiTabs],
+      pinnedPanelTab,
+      pinnedPanelMultiTabs: [...pinnedPanelMultiTabs],
+      collapsedCards,
+    });
+  });
+
   function toggleViewMode() {
     if (viewMode === 'single') {
       viewMode = 'multi';
@@ -131,7 +223,7 @@
   }
 </script>
 
-<div class="properties-panel" style="width: {width}px;">
+<div class="properties-panel" style="width: {clampedWidth}px;">
   {#if panel}
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <PropertiesToolbar
@@ -245,6 +337,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
+    min-width: 600px;
     background: #1E1E1E;
     border-left: 1px solid #1A1A1A;
   }
@@ -267,10 +360,10 @@
 
   .content-scroll {
     flex: 1;
-    overflow-y: auto;
     display: flex;
     flex-direction: column;
     min-height: 0;
+    overflow: hidden;
   }
 
   /* --- Split view: two halves stacked vertically --- */

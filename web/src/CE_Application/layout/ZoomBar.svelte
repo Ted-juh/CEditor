@@ -1,6 +1,6 @@
 <script>
   import { Maximize, Ruler, Columns3, MoveHorizontal } from 'lucide-svelte';
-  import { editorZoom, editorZoomIncrement, panels, activePanelId } from '../stores/panels.js';
+  import { editorZoom, editorZoomIncrement, activePanel } from '../stores/panels.js';
   import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
 
   let isEditing = $state(false);
@@ -8,7 +8,7 @@
 
   let zoom = $derived($editorZoom);
   let increment = $derived($editorZoomIncrement);
-  let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  let panel = $derived($activePanel);
 
   function zoomIn() {
     editorZoom.update(z => Math.min(400, z + $editorZoomIncrement));

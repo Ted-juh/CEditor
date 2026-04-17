@@ -10,6 +10,14 @@ import {
   onPanelOpened,
   onOpenPanelPaths,
 } from '../bridge/bridge.js';
+import {
+  reopenLastSession,
+  autosaveEnabled,
+  autosaveIntervalSeconds,
+  restoreUnsavedWork,
+  defaultSnapToGrid,
+  defaultGridSize,
+} from './runtimePreferences.js';
 
 /**
  * Panel data model.
@@ -17,6 +25,10 @@ import {
  */
 
 let nextId = 1;
+const UNSAVED_PANELS_KEY = 'ce.unsavedPanels';
+const UNSAVED_ACTIVE_TAB_KEY = 'ce.unsavedActiveEditorTab';
+let autosaveTimer = null;
+let sessionRestoreInitialized = false;
 
 /** Create a new panel object with defaults */
 export function createPanel(name = null) {
@@ -96,7 +108,7 @@ export function createPanel(name = null) {
     bgTextureContrast: 100,
     bgTextureTileScale: 1.0,
     gridEnabled: true,
-    gridSize: 10,
+    gridSize: get(defaultGridSize),
     gridColour: '33FFFFFF',
     gridLineWidth: 1,
     gridType: 'lines',
@@ -105,7 +117,7 @@ export function createPanel(name = null) {
     gridCentered: false,
     gridOriginX: 0,
     gridOriginY: 0,
-    snapToGrid: true,
+    snapToGrid: get(defaultSnapToGrid),
     notepad: {
       notes: [{ name: 'Note 1', content: '' }],
       activeNoteIndex: 0,
@@ -117,6 +129,127 @@ export function createPanel(name = null) {
     modified: false,
     controls: [],
   };
+}
+
+function canUseLocalStorage() {
+  return typeof localStorage !== 'undefined';
+}
+
+function readStoredJson(key, fallback) {
+  if (!canUseLocalStorage()) return fallback;
+
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredJson(key, value) {
+  if (!canUseLocalStorage()) return;
+
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch { /* ignore */ }
+}
+
+function clearUnsavedSessionSnapshot() {
+  if (!canUseLocalStorage()) return;
+
+  try {
+    localStorage.removeItem(UNSAVED_PANELS_KEY);
+    localStorage.removeItem(UNSAVED_ACTIVE_TAB_KEY);
+  } catch { /* ignore */ }
+}
+
+function buildUnsavedSessionSnapshot() {
+  return get(panels)
+    .filter((panel) => !panel.filePath || panel.modified)
+    .map((panel) => ({ ...panel }));
+}
+
+function persistUnsavedSessionSnapshot() {
+  if (!get(autosaveEnabled) || !get(restoreUnsavedWork)) {
+    clearUnsavedSessionSnapshot();
+    return;
+  }
+
+  const snapshot = buildUnsavedSessionSnapshot();
+  if (snapshot.length === 0) {
+    clearUnsavedSessionSnapshot();
+    return;
+  }
+
+  writeStoredJson(UNSAVED_PANELS_KEY, snapshot);
+  writeStoredJson(UNSAVED_ACTIVE_TAB_KEY, get(activeEditorTab));
+}
+
+export function flushUnsavedSessionSnapshot() {
+  if (autosaveTimer != null) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+
+  persistUnsavedSessionSnapshot();
+}
+
+function scheduleUnsavedSessionAutosave() {
+  if (autosaveTimer != null) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+  }
+
+  if (!sessionRestoreInitialized || !get(autosaveEnabled) || !get(restoreUnsavedWork)) {
+    if (!get(restoreUnsavedWork)) clearUnsavedSessionSnapshot();
+    return;
+  }
+
+  autosaveTimer = setTimeout(() => {
+    persistUnsavedSessionSnapshot();
+    autosaveTimer = null;
+  }, Math.max(5, get(autosaveIntervalSeconds)) * 1000);
+}
+
+function restoreUnsavedSessionFromSnapshot() {
+  if (!get(restoreUnsavedWork)) {
+    clearUnsavedSessionSnapshot();
+    return;
+  }
+
+  const snapshot = readStoredJson(UNSAVED_PANELS_KEY, []);
+  if (!Array.isArray(snapshot) || snapshot.length === 0) return;
+
+  const idMap = new Map();
+  const restoredPanels = snapshot
+    .filter((panel) => panel && typeof panel === 'object')
+    .map((panelData) => {
+      const restored = {
+        ...createPanel(),
+        ...panelData,
+        modified: panelData.modified !== false,
+      };
+
+      idMap.set(panelData.id, restored.id);
+      return restored;
+    });
+
+  if (restoredPanels.length === 0) return;
+
+  panels.update((list) => [
+    ...list,
+    ...restoredPanels.filter((candidate) =>
+      !candidate.filePath || !list.some((panel) => panel.filePath && panel.filePath === candidate.filePath)
+    ),
+  ]);
+
+  const savedActiveTab = readStoredJson(UNSAVED_ACTIVE_TAB_KEY, null);
+  const restoredActiveId = idMap.get(savedActiveTab?.id) ?? restoredPanels[restoredPanels.length - 1]?.id ?? null;
+
+  if (restoredActiveId != null) {
+    activePanelId.set(restoredActiveId);
+    activeEditorTab.set({ type: 'panel', id: restoredActiveId });
+  }
 }
 
 /** Currently selected component ids (Set). Empty = panel is selected. */
@@ -167,10 +300,43 @@ export const panels = writable([]);
 /** ID of the active (visible) panel */
 export const activePanelId = writable(null);
 
+/** Whether the global Settings editor tab is open */
+export const settingsTabOpen = writable(false);
+
+/** Active editor tab descriptor: { type: 'panel'|'settings', id } */
+export const activeEditorTab = writable({ type: 'panel', id: null });
+
+/** All editor tabs shown in the top tab bar */
+export const editorTabs = derived(
+  [panels, settingsTabOpen],
+  ([$panels, $settingsTabOpen]) => {
+    const tabs = $panels.map(panel => ({
+      id: panel.id,
+      tabType: 'panel',
+      name: panel.name,
+      modified: panel.modified,
+    }));
+
+    if ($settingsTabOpen) {
+      tabs.push({
+        id: 'settings',
+        tabType: 'settings',
+        name: 'Settings',
+        modified: false,
+      });
+    }
+
+    return tabs;
+  }
+);
+
 /** The active panel object (derived) */
 export const activePanel = derived(
-  [panels, activePanelId],
-  ([$panels, $activePanelId]) => $panels.find(p => p.id === $activePanelId) ?? null
+  [panels, activePanelId, activeEditorTab],
+  ([$panels, $activePanelId, $activeEditorTab]) =>
+    $activeEditorTab?.type === 'panel'
+      ? ($panels.find(p => p.id === $activePanelId) ?? null)
+      : null
 );
 
 /** Add a new panel and make it active */
@@ -178,7 +344,27 @@ export function addPanel(panel = null) {
   const p = panel ?? createPanel();
   panels.update(list => [...list, p]);
   activePanelId.set(p.id);
+  activeEditorTab.set({ type: 'panel', id: p.id });
   return p;
+}
+
+/** Open the global Settings editor tab and activate it */
+export function openSettingsTab() {
+  settingsTabOpen.set(true);
+  activeEditorTab.set({ type: 'settings', id: 'settings' });
+  clearSelection();
+}
+
+/** Close the global Settings editor tab */
+export function closeSettingsTab() {
+  settingsTabOpen.set(false);
+
+  const panelId = get(activePanelId);
+  if (panelId != null) {
+    activeEditorTab.set({ type: 'panel', id: panelId });
+  } else {
+    activeEditorTab.set({ type: 'panel', id: null });
+  }
 }
 
 /** Close a panel by id */
@@ -186,6 +372,7 @@ export function closePanel(id) {
   panels.update(list => {
     const idx = list.findIndex(p => p.id === id);
     const newList = list.filter(p => p.id !== id);
+    const wasActivePanelTab = get(activeEditorTab)?.type === 'panel' && get(activeEditorTab)?.id === id;
 
     // If we closed the active tab, activate an adjacent one
     activePanelId.update(activeId => {
@@ -196,16 +383,62 @@ export function closePanel(id) {
       return newList[newIdx].id;
     });
 
+    if (wasActivePanelTab) {
+      const nextPanelId = newList.length > 0
+        ? newList[Math.min(idx, newList.length - 1)].id
+        : null;
+
+      if (nextPanelId != null) {
+        activeEditorTab.set({ type: 'panel', id: nextPanelId });
+      } else if (get(settingsTabOpen)) {
+        activeEditorTab.set({ type: 'settings', id: 'settings' });
+      } else {
+        activeEditorTab.set({ type: 'panel', id: null });
+      }
+    }
+
     return newList;
   });
 
   // Update persisted open panel paths
   persistOpenPanelPaths();
+  flushUnsavedSessionSnapshot();
 }
 
 /** Switch to a panel by id */
 export function setActivePanel(id) {
   activePanelId.set(id);
+  activeEditorTab.set({ type: 'panel', id });
+}
+
+/** Switch to any editor tab by descriptor */
+export function setActiveEditorTab(tab) {
+  if (!tab) return;
+
+  if (tab.tabType === 'settings' || tab.type === 'settings' || tab.id === 'settings') {
+    openSettingsTab();
+    return;
+  }
+
+  const panelId = tab.id ?? null;
+  if (panelId != null) {
+    setActivePanel(panelId);
+  }
+}
+
+/** Close whichever editor tab is currently active */
+export function closeActiveEditorTab() {
+  const tab = get(activeEditorTab);
+  if (!tab) return;
+
+  if (tab.type === 'settings') {
+    closeSettingsTab();
+    return;
+  }
+
+  if (tab.type === 'panel' && tab.id != null) {
+    closePanel(tab.id);
+  }
 }
 
 /** Update a panel's properties */
@@ -285,6 +518,23 @@ function persistOpenPanelPaths() {
   bridgeUpdateOpenPanels(paths);
 }
 
+panels.subscribe(() => {
+  scheduleUnsavedSessionAutosave();
+});
+
+autosaveEnabled.subscribe(() => {
+  scheduleUnsavedSessionAutosave();
+});
+
+autosaveIntervalSeconds.subscribe(() => {
+  scheduleUnsavedSessionAutosave();
+});
+
+restoreUnsavedWork.subscribe((enabled) => {
+  if (!enabled) clearUnsavedSessionSnapshot();
+  scheduleUnsavedSessionAutosave();
+});
+
 // --- Bridge event listeners ---
 
 /** Initialize bridge listeners. Call once at app startup. */
@@ -301,6 +551,7 @@ export function initPanelBridge() {
 
     // Persist open panel paths now that this panel has a file
     persistOpenPanelPaths();
+    flushUnsavedSessionSnapshot();
   });
 
   // Panel opened from file — create panel and make it active
@@ -315,6 +566,7 @@ export function initPanelBridge() {
     const panel = deserializePanel(payload.data, payload.filePath, payload.name);
     addPanel(panel);
     persistOpenPanelPaths();
+    flushUnsavedSessionSnapshot();
   });
 
   // Session restore — receive list of paths, open each one
@@ -326,6 +578,17 @@ export function initPanelBridge() {
     }
   });
 
-  // Request stored open panel paths from C++
-  bridgeLoadOpenPanels();
+}
+
+export function restoreSessionFromPreferences() {
+  if (sessionRestoreInitialized) return;
+  sessionRestoreInitialized = true;
+
+  restoreUnsavedSessionFromSnapshot();
+
+  if (get(reopenLastSession)) {
+    bridgeLoadOpenPanels();
+  } else {
+    scheduleUnsavedSessionAutosave();
+  }
 }

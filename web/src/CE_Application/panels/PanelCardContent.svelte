@@ -1,5 +1,5 @@
 <script>
-  import { panels, activePanelId, updatePanel } from '../stores/panels.js';
+  import { panels, activePanel, updatePanel } from '../stores/panels.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
   import NumberInput from '../sections/NumberInput.svelte';
@@ -17,7 +17,7 @@
 
   let { tabId = '' } = $props();
 
-  let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  let panel = $derived($activePanel);
 
   // Collapse state from persistent store
   let imageCollapsed = $derived($sectionCollapse['bg-image'] ?? true);
@@ -398,7 +398,6 @@
         />
       {/if}
     {/each}
-
   {:else if tabId === 'grid'}
     <PropertySection title="Grid">
       <PropertyCell label="Show" span={2} hint="Show or hide the grid overlay">
@@ -456,7 +455,6 @@
                      onchange={(v) => updatePanel(panel.id, { gridOriginY: v })} />
       </PropertyCell>
     </PropertySection>
-
   {:else if tabId === 'export'}
     <PropertySection title="Export">
       <div class="placeholder">No export settings configured</div>

@@ -52,6 +52,26 @@ private:
     // Convert a ValueTree to a JSON-compatible juce::var (recursive)
     static juce::var treeToVar (const juce::ValueTree& t);
 
+    static bool decodeDataUrlToMemoryBlock (const juce::String& dataUrl, juce::MemoryBlock& out);
+    static juce::String renderFontPreviewDataUrl (const juce::String& fontDataUrl,
+                                                  const juce::String& familyName,
+                                                  const juce::String& styleName,
+                                                  const juce::String& text,
+                                                  int width,
+                                                  int height,
+                                                  float fontHeight,
+                                                  const juce::String& colourHex,
+                                                  const juce::String& justification,
+                                                  int paddingLeft,
+                                                  int paddingRight,
+                                                  int paddingTop,
+                                                  int paddingBottom,
+                                                  int offsetX,
+                                                  int offsetY,
+                                                  float letterSpacing,
+                                                  bool italic,
+                                                  bool underline);
+
     // Set a property via dot-notation path (e.g., "Text.Fill.colour")
     void setPropertyFromPath (const juce::String& path, const juce::var& value);
 

@@ -4,6 +4,7 @@
     step = 1,
     min = undefined,
     max = undefined,
+    disabled = false,
     onchange = null,
   } = $props();
 
@@ -19,14 +20,17 @@
   }
 
   function decrement() {
+    if (disabled) return;
     fire((value ?? 0) - step);
   }
 
   function increment() {
+    if (disabled) return;
     fire((value ?? 0) + step);
   }
 
   function handleInput(e) {
+    if (disabled) return;
     const v = Number(e.target.value);
     if (!isNaN(v)) fire(v);
   }
@@ -36,8 +40,8 @@
   }
 </script>
 
-<div class="num-input">
-  <button class="num-btn" title="Decrease" onclick={decrement}>&minus;</button>
+<div class="num-input" class:disabled>
+  <button class="num-btn" title="Decrease" onclick={decrement} {disabled}>&minus;</button>
   <input
     class="num-field"
     type="number"
@@ -45,10 +49,11 @@
     {step}
     {min}
     {max}
+    {disabled}
     onfocus={selectAll}
     onchange={handleInput}
   />
-  <button class="num-btn" title="Increase" onclick={increment}>+</button>
+  <button class="num-btn" title="Increase" onclick={increment} {disabled}>+</button>
 </div>
 
 <style>
@@ -65,6 +70,10 @@
 
   .num-input:focus-within {
     border-color: #5B9BD5;
+  }
+
+  .num-input.disabled {
+    opacity: 0.5;
   }
 
   .num-btn {
@@ -94,6 +103,12 @@
     color: #FFF;
   }
 
+  .num-btn:disabled {
+    cursor: default;
+    color: #666;
+    background: #1F1F1F;
+  }
+
   .num-field {
     flex: 1;
     min-width: 0;
@@ -106,6 +121,10 @@
     text-align: center;
     outline: none;
     -moz-appearance: textfield;
+  }
+
+  .num-field:disabled {
+    cursor: default;
   }
 
   .num-field::-webkit-inner-spin-button,

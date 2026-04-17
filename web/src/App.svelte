@@ -9,16 +9,27 @@
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
-  import { initPanelBridge } from './CE_Application/stores/panels.js';
+  import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot } from './CE_Application/stores/panels.js';
+  import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
 
-  initPanelBridge();
-  initConsoleBridge();
-  initHistory();
+  const isCutoutDebug = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('debug') === 'cutout';
+
+  if (!isCutoutDebug) {
+    initPanelBridge();
+    initAppSettingsBridge();
+    initConsoleBridge();
+    initHistory();
+  }
 
   function handleGlobalKeyDown(e) {
+    if (isCutoutDebug) return;
+
     if (e.key === 'F1') {
       e.preventDefault();
       showShortcuts = !showShortcuts;
@@ -27,6 +38,11 @@
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
       e.preventDefault();
       requestZoomToSelection();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+      e.preventDefault();
+      openSettingsTab();
       return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
@@ -38,28 +54,48 @@
     }
   }
 
-  function readStoredBool(key, defaultValue) {
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored !== null) return JSON.parse(stored);
-    } catch { /* ignore */ }
-    return defaultValue;
-  }
+  const MIN_PROPERTIES_PANEL_WIDTH = 600;
+  const UI_STORAGE_KEYS = {
+    propertiesPanelWidth: 'ce.ui.propertiesPanelWidth',
+    treePanelWidth: 'ce.ui.treePanelWidth',
+    showTreePanel: 'ce.ui.showTreePanel',
+    displayPanelHeight: 'ce.ui.displayPanelHeight',
+    showDisplayPanel: 'ce.ui.showDisplayPanel',
+    showPropertiesPanel: 'ce.ui.showPropertiesPanel',
+  };
 
-  let propertiesPanelWidth = $state(280);
+  let propertiesPanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.propertiesPanelWidth, MIN_PROPERTIES_PANEL_WIDTH));
   let isResizingProps = $state(false);
-  let treePanelWidth = $state(200);
+  let treePanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.treePanelWidth, 200));
   let isResizingTree = $state(false);
-  let showTreePanel = $state(readStoredBool('ce.showTreePanel', true));
+  let showTreePanel = $state(readStoredBool(UI_STORAGE_KEYS.showTreePanel, true));
   let showShortcuts = $state(false);
+  let isSettingsTab = $derived($activeEditorTab?.type === 'settings');
 
   $effect(() => {
-    try { localStorage.setItem('ce.showTreePanel', JSON.stringify(showTreePanel)); } catch { /* ignore */ }
+    writeStoredJson(UI_STORAGE_KEYS.showTreePanel, showTreePanel);
   });
-  let displayPanelHeight = $state(480);
+  $effect(() => {
+    writeStoredJson(UI_STORAGE_KEYS.propertiesPanelWidth, propertiesPanelWidth);
+  });
+  $effect(() => {
+    writeStoredJson(UI_STORAGE_KEYS.treePanelWidth, treePanelWidth);
+  });
+  let displayPanelHeight = $state(readStoredNumber(UI_STORAGE_KEYS.displayPanelHeight, 480));
   let isResizingDisplay = $state(false);
-  let showDisplayPanel = $state(true);
-  let showPropertiesPanel = $state(true);
+  let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, true));
+  let showPropertiesPanel = $state(readStoredBool(UI_STORAGE_KEYS.showPropertiesPanel, true));
+
+  $effect(() => {
+    writeStoredJson(UI_STORAGE_KEYS.displayPanelHeight, displayPanelHeight);
+  });
+  $effect(() => {
+    writeStoredJson(UI_STORAGE_KEYS.showDisplayPanel, showDisplayPanel);
+  });
+  $effect(() => {
+    writeStoredJson(UI_STORAGE_KEYS.showPropertiesPanel, showPropertiesPanel);
+  });
+
   const tabDefaultHeights = { colors: 480, gradient: 580 };
 
   function handleDisplayTabChange(tabId) {
@@ -74,7 +110,8 @@
 
     function onMouseMove(e) {
       const delta = startX - e.clientX;
-      propertiesPanelWidth = Math.max(220, Math.min(500, startWidth + delta));
+      const maxWidth = Math.max(MIN_PROPERTIES_PANEL_WIDTH, window.innerWidth - 120);
+      propertiesPanelWidth = Math.max(MIN_PROPERTIES_PANEL_WIDTH, Math.min(maxWidth, startWidth + delta));
     }
 
     function onMouseUp() {
@@ -126,69 +163,79 @@
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
   }
+
+  function handleBeforeUnload() {
+    flushUnsavedSessionSnapshot();
+  }
 </script>
 
-<svelte:window onkeydown={handleGlobalKeyDown} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onkeydown={handleGlobalKeyDown} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
 
-<div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
-  <div class="menubar-area">
-    <MenuBar />
-  </div>
+{#if isCutoutDebug}
+  <CutoutDebugPage />
+{:else}
+  <div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
+    <div class="menubar-area">
+      <MenuBar />
+    </div>
 
-  <div class="icon-panel-area">
-    <IconPanel
-      {showDisplayPanel}
-      {showPropertiesPanel}
-      {showTreePanel}
-      onToggleDisplay={() => showDisplayPanel = !showDisplayPanel}
-      onToggleProperties={() => showPropertiesPanel = !showPropertiesPanel}
-      onToggleTree={() => showTreePanel = !showTreePanel}
-    />
-  </div>
+    <div class="icon-panel-area">
+      <IconPanel
+        {showDisplayPanel}
+        {showPropertiesPanel}
+        {showTreePanel}
+        onToggleDisplay={() => showDisplayPanel = !showDisplayPanel}
+        onToggleProperties={() => showPropertiesPanel = !showPropertiesPanel}
+        onToggleTree={() => showTreePanel = !showTreePanel}
+      />
+    </div>
 
-  <div class="center-area">
-    <div class="editor-top-row">
-      <div class="editor-canvas-col">
-        <div class="editor-canvas-area">
-          <EditorCanvas />
+    <div class="center-area">
+      <div class="editor-top-row">
+        <div class="editor-canvas-col">
+          <div class="editor-canvas-area">
+            <EditorCanvas />
+          </div>
+          {#if !isSettingsTab}
+            <div class="common-bar-area">
+              <CommonPropertyBar />
+            </div>
+            <div class="zoom-bar-area">
+              <ZoomBar />
+            </div>
+          {/if}
         </div>
-        <div class="common-bar-area">
-          <CommonPropertyBar />
-        </div>
-        <div class="zoom-bar-area">
-          <ZoomBar />
-        </div>
+        {#if showTreePanel}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div class="tree-resize-handle" class:active={isResizingTree} onmousedown={startTreeResize}></div>
+          <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
+            <ComponentTree />
+          </div>
+        {/if}
       </div>
-      {#if showTreePanel}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="tree-resize-handle" class:active={isResizingTree} onmousedown={startTreeResize}></div>
-        <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
-          <ComponentTree />
-        </div>
-      {/if}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {showDisplayPanel ? 'block' : 'none'}"></div>
+      <div class="display-panel-area" style="flex: 0 0 {displayPanelHeight}px; display: {showDisplayPanel ? 'block' : 'none'}">
+        <DisplayPanel onTabChange={handleDisplayTabChange} />
+      </div>
     </div>
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {showDisplayPanel ? 'block' : 'none'}"></div>
-    <div class="display-panel-area" style="flex: 0 0 {displayPanelHeight}px; display: {showDisplayPanel ? 'block' : 'none'}">
-      <DisplayPanel onTabChange={handleDisplayTabChange} />
+
+    {#if showPropertiesPanel}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
+
+      <div class="properties-area">
+        <PropertiesPanel width={propertiesPanelWidth} />
+      </div>
+    {/if}
+
+    <div class="statusbar-area">
+      <StatusBar />
     </div>
   </div>
 
-  {#if showPropertiesPanel}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
-
-    <div class="properties-area">
-      <PropertiesPanel width={propertiesPanelWidth} />
-    </div>
-  {/if}
-
-  <div class="statusbar-area">
-    <StatusBar />
-  </div>
-</div>
-
-<ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+  <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+{/if}
 
 <style>
   .app {

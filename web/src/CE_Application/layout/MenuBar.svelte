@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closePanel, activePanelId, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
+  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, activePanelId, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
@@ -17,9 +17,15 @@
       { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => saveActivePanelAs() },
       { type: 'separator' },
       { label: 'Close Panel', shortcut: 'Ctrl+W', action: () => {
+        const tab = get(activeEditorTab);
+        if (tab?.type === 'settings') {
+          closeActiveEditorTab();
+          return;
+        }
         const id = get(activePanelId);
         if (id != null) closePanel(id);
       }},
+      { label: 'Settings...', shortcut: 'Ctrl+,', action: () => openSettingsTab() },
       { type: 'separator' },
       { label: 'Close Program', shortcut: 'Alt+F4', action: () => closeApplication() },
     ],

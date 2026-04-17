@@ -1,12 +1,12 @@
 <script>
   import { Eye, EyeOff, Lock, LockOpen } from 'lucide-svelte';
-  import { panels, activePanelId, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { updatePanel } from '../stores/panels.js';
   import { getSection } from '../models/componentTypes.js';
   import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
 
-  let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  let panel = $derived($activePanel);
   // Controls in reverse order (top of list = front/highest z)
   let controls = $derived(panel ? [...sortControlsForRender(panel.controls)].reverse() : []);
 

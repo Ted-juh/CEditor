@@ -1,5 +1,5 @@
 <script>
-  import { panels, activePanelId, editorZoom, editorZoomIncrement, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
+  import { panels, activePanelId, activeEditorTab, editorZoom, editorZoomIncrement, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
   import { getSection, removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -14,11 +14,13 @@
   import PanelSurface from './PanelSurface.svelte';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
   import EditorRuler from './EditorRuler.svelte';
+  import SettingsView from './SettingsView.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
 
-  let panel = $derived($panels.find(p => p.id === $activePanelId) ?? null);
+  let activeTab = $derived($activeEditorTab);
+  let panel = $derived(activeTab?.type === 'panel' ? ($panels.find(p => p.id === $activePanelId) ?? null) : null);
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
 
@@ -169,7 +171,9 @@
   </div>
 
   <div class="canvas-area">
-    {#if panel}
+    {#if activeTab?.type === 'settings'}
+      <SettingsView />
+    {:else if panel}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div class="canvas-viewport" class:with-rulers={$showRulers} bind:this={viewportEl}

@@ -1,16 +1,17 @@
 <script>
   import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, RemoveFormatting, Pipette } from 'lucide-svelte';
+  import { availableFonts } from '../stores/appSettings.js';
 
   let { getEditorElement, onPickColor } = $props();
 
   let fontFamily = $state('Consolas');
   let fontSize = $state(12);
-
-  const fonts = [
-    'Arial', 'Verdana', 'Helvetica', 'Tahoma', 'Georgia',
-    'Times New Roman', 'Courier New', 'Consolas', 'Lucida Console',
-    'Segoe UI', 'Trebuchet MS', 'Impact',
-  ];
+  let selectedFontOption = $derived(
+    $availableFonts.find(option => option.value === fontFamily)
+    ?? $availableFonts.find(option => option.family === fontFamily)
+    ?? null
+  );
+  let selectedFontPreviewFamily = $derived(selectedFontOption?.cssFamily ?? fontFamily);
 
   const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
 
@@ -61,9 +62,9 @@
   <!-- Font Family -->
   <div class="section">
     <div class="section-label">Font</div>
-    <select class="combo" bind:value={fontFamily} onchange={applyFont}>
-      {#each fonts as f}
-        <option value={f} style="font-family: '{f}'">{f}</option>
+    <select class="combo" style={`font-family:'${selectedFontPreviewFamily}'`} bind:value={fontFamily} onchange={applyFont}>
+      {#each $availableFonts as f}
+        <option value={f.value} style={`font-family:'${f.cssFamily ?? f.value}'`}>{f.label}</option>
       {/each}
     </select>
   </div>

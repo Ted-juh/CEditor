@@ -61,6 +61,52 @@ public:
         propertiesFile->save();
     }
 
+    /** Get persisted app-level UI settings as a JSON-like var object */
+    juce::var getAppSettingsData() const
+    {
+        auto stored = propertiesFile->getValue ("appSettings", "");
+
+        if (stored.isNotEmpty())
+        {
+            auto parsed = juce::JSON::parse (stored);
+            if (parsed.isObject())
+            {
+                if (auto* obj = parsed.getDynamicObject())
+                {
+                    auto general = obj->getProperty ("general");
+                    if (! general.isObject())
+                    {
+                        auto* generalObj = new juce::DynamicObject();
+                        obj->setProperty ("general", juce::var (generalObj));
+                    }
+
+                    auto fonts = obj->getProperty ("fonts");
+                    if (! fonts.isArray())
+                        obj->setProperty ("fonts", juce::var (juce::Array<juce::var>()));
+
+                    auto icons = obj->getProperty ("icons");
+                    if (! icons.isArray())
+                        obj->setProperty ("icons", juce::var (juce::Array<juce::var>()));
+                }
+
+                return parsed;
+            }
+        }
+
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("general", juce::var (new juce::DynamicObject()));
+        obj->setProperty ("fonts", juce::var (juce::Array<juce::var>()));
+        obj->setProperty ("icons", juce::var (juce::Array<juce::var>()));
+        return juce::var (obj);
+    }
+
+    /** Persist app-level UI settings */
+    void setAppSettingsData (const juce::var& data)
+    {
+        propertiesFile->setValue ("appSettings", juce::JSON::toString (data));
+        propertiesFile->save();
+    }
+
 private:
     std::unique_ptr<juce::PropertiesFile> propertiesFile;
 };

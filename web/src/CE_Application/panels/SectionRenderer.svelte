@@ -14,6 +14,8 @@
   import TransformEditor from '../sections/TransformEditor.svelte';
   import BackgroundEditor from '../sections/BackgroundEditor.svelte';
   import BorderEditor from '../sections/BorderEditor.svelte';
+  import TextEditor from '../sections/TextEditor.svelte';
+  import IconEditor from '../sections/IconEditor.svelte';
   import EffectsEditor from '../sections/EffectsEditor.svelte';
 
   let { contextMode = 'panel', tabId = '', control = null, fallbackLabel = '' } = $props();
@@ -29,6 +31,10 @@
   <BackgroundEditor {control} />
 {:else if tabId === 'border'}
   <BorderEditor {control} />
+{:else if tabId === 'text'}
+  <TextEditor {control} />
+{:else if tabId === 'icon'}
+  <IconEditor {control} />
 {:else if tabId === 'effects'}
   <EffectsEditor {control} />
 {:else}

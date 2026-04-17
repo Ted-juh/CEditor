@@ -7,6 +7,7 @@
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
   import ConsolePanel from '../components/ConsolePanel.svelte';
+  import DebugPanel from '../components/DebugPanel.svelte';
   import AlignmentPanel from '../components/AlignmentPanel.svelte';
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import ViewerTab from './ViewerTab.svelte';
@@ -17,12 +18,19 @@
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
 
   let props = $props();
   let onTabChange = $derived(props.onTabChange);
 
-  let activeTab = $state('colors');
+  const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
+
+  let activeTab = $state(readStoredJson(DISPLAY_TAB_STORAGE_KEY, 'colors'));
+
+  $effect(() => {
+    writeStoredJson(DISPLAY_TAB_STORAGE_KEY, activeTab);
+  });
 
   // --- External tab switch requests ---
   $effect(() => {
@@ -396,7 +404,15 @@
       <AlignmentPanel />
     </div>
     <div class="tab-pane" style:display={activeTab === 'console' ? 'block' : 'none'}>
-      <ConsolePanel />
+      <div class="console-split">
+        <div class="debug-side">
+          <DebugPanel />
+        </div>
+        <div class="console-divider"></div>
+        <div class="console-side">
+          <ConsolePanel />
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -537,5 +553,29 @@
     height: 100%;
     color: #444;
     font-size: 12px;
+  }
+
+  .console-split {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .debug-side {
+    width: 36%;
+    min-width: 240px;
+    max-width: 520px;
+    flex-shrink: 0;
+  }
+
+  .console-divider {
+    width: 1px;
+    background: #333;
+    flex-shrink: 0;
+  }
+
+  .console-side {
+    flex: 1;
+    min-width: 0;
   }
 </style>

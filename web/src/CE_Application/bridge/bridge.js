@@ -123,6 +123,27 @@ export function updateOpenPanels(paths) {
   window.__JUCE__.backend.emitEvent('updateOpenPanels', paths);
 }
 
+/** Request persisted app settings. C++ emits 'appSettingsLoaded'. */
+export function loadAppSettings() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('loadAppSettings', {});
+}
+
+/** Persist app settings payload. */
+export function updateAppSettings(settings) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('updateAppSettings', settings);
+}
+
+/** Request a font import dialog. C++ emits 'fontsImported' on success. */
+export function importFonts() {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — importFonts ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('importFonts', {});
+}
+
 /** Request an image file browser dialog. C++ will emit 'imageBrowsed' on success. */
 export function browseImage(requestId) {
   if (!isJuceAvailable()) {
@@ -171,6 +192,26 @@ export function onFileData(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+/** Request a native-rendered text preview for a custom font. */
+export function renderFontPreview(requestId, payload) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — renderFontPreview ignored');
+    return;
+  }
+
+  window.__JUCE__.backend.emitEvent('renderFontPreview', {
+    requestId,
+    ...payload,
+  });
+}
+
+/** Listen for native text preview results. Callback receives { requestId, data?, error? }. */
+export function onFontPreviewRendered(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('fontPreviewRendered', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Listen for 'panelSaved' events. Callback receives { panelId, filePath, name? }. */
 export function onPanelSaved(callback) {
   if (!isJuceAvailable()) return () => {};
@@ -189,5 +230,19 @@ export function onPanelOpened(callback) {
 export function onOpenPanelPaths(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('openPanelPaths', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Listen for 'appSettingsLoaded' events. */
+export function onAppSettingsLoaded(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('appSettingsLoaded', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Listen for 'fontsImported' events. Callback receives imported font metadata array. */
+export function onFontsImported(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('fontsImported', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }

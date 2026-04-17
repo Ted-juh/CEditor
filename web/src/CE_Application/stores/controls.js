@@ -2,6 +2,8 @@ import { derived, get } from 'svelte/store';
 import { panels, activePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId, updatePanel } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
+import { insertOffset, duplicateOffset } from './runtimePreferences.js';
+import { deepClone } from '../utils/deepClone.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -73,8 +75,9 @@ export function addControl(type, overrides = {}) {
   // Stagger position so new controls don't stack at 0,0
   const panel = get(panels).find(p => p.id === panelId);
   if (panel && !overrides.Transform) {
-    const offset = panel.controls.length * 20;
-    overrides = { ...overrides, Transform: { x: 20 + offset, y: 20 + offset } };
+    const baseOffset = get(insertOffset);
+    const offset = panel.controls.length * baseOffset;
+    overrides = { ...overrides, Transform: { x: baseOffset + offset, y: baseOffset + offset } };
   }
 
   const control = createControlFromType(type, overrides);
@@ -156,8 +159,9 @@ export function duplicateControl(ids) {
     clone._children.Core.name = `${clone._children.Core.name}_copy`;
 
     if (clone._children.Transform) {
-      clone._children.Transform.x += 20;
-      clone._children.Transform.y += 20;
+      const offset = get(duplicateOffset);
+      clone._children.Transform.x += offset;
+      clone._children.Transform.y += offset;
     }
 
     clones.push(clone);
@@ -208,6 +212,61 @@ export function updateControlProperty(controlId, path, value) {
       return { ...p, controls: newControls, modified: true };
     })
   );
+}
+
+export function applyControlPatch(controlId, patch) {
+  const panelId = get(activePanelId);
+  if (panelId == null || !patch || Object.keys(patch).length === 0) return;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      const newControls = p.controls.map(c => {
+        if (c._children?.Core?.id !== controlId) return c;
+
+        const clone = JSON.parse(JSON.stringify(c));
+        for (const [path, value] of Object.entries(patch)) {
+          setNestedValue(clone, path, deepClone(value));
+        }
+        return clone;
+      });
+
+      return { ...p, controls: newControls, modified: true };
+    })
+  );
+}
+
+export function applySelectedPatch(patch) {
+  const panelId = get(activePanelId);
+  const ids = get(selectedComponentIds);
+  if (panelId == null || ids.size === 0 || !patch || Object.keys(patch).length === 0) return;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      const newControls = p.controls.map(c => {
+        if (!ids.has(c._children?.Core?.id)) return c;
+
+        const clone = JSON.parse(JSON.stringify(c));
+        for (const [path, value] of Object.entries(patch)) {
+          setNestedValue(clone, path, deepClone(value));
+        }
+        return clone;
+      });
+
+      return { ...p, controls: newControls, modified: true };
+    })
+  );
+}
+
+export function applyPatchObject(control, patch) {
+  if (!control || !patch || Object.keys(patch).length === 0) return control;
+  for (const [path, value] of Object.entries(patch)) {
+    setNestedValue(control, path, deepClone(value));
+  }
+  return control;
 }
 
 /**
@@ -290,6 +349,12 @@ function setNestedValue(control, path, value) {
   const parts = path.split('.');
   if (parts.length === 0) return;
 
+  if (parts.length === 1) {
+    if (!control._children) return;
+    control._children[parts[0]] = value;
+    return;
+  }
+
   // First part is always a section name in _children
   let current = control._children?.[parts[0]];
   if (!current) return;
@@ -300,6 +365,16 @@ function setNestedValue(control, path, value) {
     // Try _children first (tree nodes), then plain property (objects/arrays)
     if (current._children && current._children[key] !== undefined) {
       current = current._children[key];
+    } else if (current._children && current._children[key] === undefined) {
+      const defaultChild = getDefaultChildTemplate(current._type, key);
+      if (defaultChild !== undefined) {
+        current._children[key] = JSON.parse(JSON.stringify(defaultChild));
+        current = current._children[key];
+      } else if (current[key] !== undefined) {
+        current = current[key];
+      } else {
+        return; // path doesn't exist
+      }
     } else if (current[key] !== undefined) {
       current = current[key];
     } else {
@@ -309,5 +384,19 @@ function setNestedValue(control, path, value) {
 
   // Set the final property
   const propName = parts[parts.length - 1];
-  current[propName] = value;
+  const treeValue = value != null && typeof value === 'object' && !Array.isArray(value)
+    && (value._type !== undefined || value._children !== undefined);
+  const defaultChild = current?._children ? getDefaultChildTemplate(current._type, propName) : undefined;
+
+  if (current?._children && (current._children[propName] !== undefined || treeValue || defaultChild !== undefined)) {
+    current._children[propName] = value;
+  } else {
+    current[propName] = value;
+  }
+}
+
+function getDefaultChildTemplate(typeName, childName) {
+  if (!typeName || !childName) return undefined;
+  const sectionDefaults = SECTION_DEFAULTS[typeName];
+  return sectionDefaults?._children?.[childName];
 }

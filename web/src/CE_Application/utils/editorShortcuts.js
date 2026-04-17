@@ -1,3 +1,6 @@
+import { get } from 'svelte/store';
+import { keyboardNudgeSmall, keyboardNudgeLarge } from '../stores/runtimePreferences.js';
+
 /**
  * Editor canvas keyboard shortcuts.
  * Pure function so the handler can be unit tested and kept out of the component.
@@ -72,7 +75,10 @@ export function handleEditorShortcut(e, ctx) {
   const arrowAxis = { ArrowLeft: 'x', ArrowRight: 'x', ArrowUp: 'y', ArrowDown: 'y' }[e.key];
   if (!arrowAxis) return;
   const arrowDir = (e.key === 'ArrowLeft' || e.key === 'ArrowUp') ? -1 : 1;
-  const nudge = (e.shiftKey ? gridSize : 1) * arrowDir;
+  const baseNudge = e.shiftKey
+    ? Math.max(gridSize, get(keyboardNudgeLarge))
+    : get(keyboardNudgeSmall);
+  const nudge = baseNudge * arrowDir;
 
   e.preventDefault();
   for (const c of selectedCtrls) {

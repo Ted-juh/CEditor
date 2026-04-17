@@ -26,12 +26,14 @@
    */
   import { ChevronDown, ChevronRight } from 'lucide-svelte';
   import SectionRenderer from './SectionRenderer.svelte';
+  import FooterRenderer from './FooterRenderer.svelte';
 
   let {
     viewMode,
     tabs = [],
     visibleTabs = [],
     singleTabId,
+    footerTabId = singleTabId,
     contextMode,
     control = null,
     ownerName = '',
@@ -42,50 +44,85 @@
 
   const cardId = (id) => collapsePrefix + id;
   const isCollapsed = (id) => collapsedCards[cardId(id)] === true;
+  const hasFooter = (mode, id) => {
+    if (mode === 'panel') return id === 'background' || id === 'grid';
+    return id === 'background' || id === 'border' || id === 'text' || id === 'icon' || id === 'effects';
+  };
 </script>
 
 {#if viewMode === 'single'}
   {#key singleTabId}
-    <div class="card-header">
-      <span class="card-title">{tabs.find(t => t.id === singleTabId)?.label ?? ''}</span>
-      <span class="owner-label">{ownerName}</span>
-    </div>
-    <div class="card-content">
-      <SectionRenderer
-        {contextMode}
-        tabId={singleTabId}
-        {control}
-        fallbackLabel={tabs.find(t => t.id === singleTabId)?.label ?? ''}
-      />
-    </div>
-  {/key}
-{:else}
-  {#each visibleTabs as tab, i (tab.id)}
-    <div class="multi-card">
-      <button class="multi-card-header" onclick={() => ontogglecollapse?.(cardId(tab.id))}>
-        {#if isCollapsed(tab.id)}
-          <ChevronRight size={16} strokeWidth={1.5} />
-        {:else}
-          <ChevronDown size={16} strokeWidth={1.5} />
-        {/if}
-        <span class="multi-card-title">{tab.label}</span>
-        {#if i === 0}<span class="owner-label">{ownerName}</span>{/if}
-      </button>
-      {#if !isCollapsed(tab.id)}
-        <div class="multi-card-content">
+    <div class="tab-content-shell">
+      <div class="tab-sections-scroll">
+        <div class="card-header">
+          <span class="card-title">{tabs.find(t => t.id === singleTabId)?.label ?? ''}</span>
+          <span class="owner-label">{ownerName}</span>
+        </div>
+        <div class="card-content">
           <SectionRenderer
             {contextMode}
-            tabId={tab.id}
+            tabId={singleTabId}
             {control}
-            fallbackLabel={tab.label}
+            fallbackLabel={tabs.find(t => t.id === singleTabId)?.label ?? ''}
           />
+        </div>
+      </div>
+      {#if hasFooter(contextMode, singleTabId)}
+        <div class="card-footer">
+          <FooterRenderer {contextMode} tabId={singleTabId} {control} />
         </div>
       {/if}
     </div>
-  {/each}
+  {/key}
+{:else}
+  <div class="tab-content-shell">
+    <div class="tab-sections-scroll">
+      {#each visibleTabs as tab, i (tab.id)}
+        <div class="multi-card">
+          <button class="multi-card-header" onclick={() => ontogglecollapse?.(cardId(tab.id))}>
+            {#if isCollapsed(tab.id)}
+              <ChevronRight size={16} strokeWidth={1.5} />
+            {:else}
+              <ChevronDown size={16} strokeWidth={1.5} />
+            {/if}
+            <span class="multi-card-title">{tab.label}</span>
+            {#if i === 0}<span class="owner-label">{ownerName}</span>{/if}
+          </button>
+          {#if !isCollapsed(tab.id)}
+            <div class="multi-card-content">
+              <SectionRenderer
+                {contextMode}
+                tabId={tab.id}
+                {control}
+                fallbackLabel={tab.label}
+              />
+            </div>
+          {/if}
+        </div>
+      {/each}
+    </div>
+    {#if hasFooter(contextMode, footerTabId)}
+      <div class="card-footer">
+        <FooterRenderer {contextMode} tabId={footerTabId} {control} />
+      </div>
+    {/if}
+  </div>
 {/if}
 
 <style>
+  .tab-content-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .tab-sections-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
   .card-header {
     display: flex;
     align-items: center;
@@ -115,8 +152,13 @@
   }
 
   .card-content {
-    flex: 1;
-    overflow-y: auto;
+    padding: 8px;
+  }
+
+  .card-footer {
+    flex-shrink: 0;
+    border-top: 1px solid #2A2A2A;
+    background: #1F1F1F;
     padding: 8px;
   }
 
