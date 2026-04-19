@@ -9,6 +9,8 @@ import {
   onPanelSaved,
   onPanelOpened,
   onOpenPanelPaths,
+  requestFileData,
+  onFileData,
 } from '../bridge/bridge.js';
 import {
   reopenLastSession,
@@ -18,6 +20,7 @@ import {
   defaultSnapToGrid,
   defaultGridSize,
 } from './runtimePreferences.js';
+import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 
 /**
  * Panel data model.
@@ -29,6 +32,135 @@ const UNSAVED_PANELS_KEY = 'ce.unsavedPanels';
 const UNSAVED_ACTIVE_TAB_KEY = 'ce.unsavedActiveEditorTab';
 let autosaveTimer = null;
 let sessionRestoreInitialized = false;
+const storedValueCache = new Map();
+const pendingOpenPanelFileTimers = new Map();
+const pendingOpenPanelFiles = new Set();
+let pendingManualOpenTimer = null;
+let panelDataRequestCounter = 0;
+const pendingPanelDataRequests = new Map();
+let panelDataListenerRegistered = false;
+
+function formatBytes(bytes) {
+  const value = Number(bytes);
+  if (!Number.isFinite(value) || value <= 0) return '0 B';
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(2)} MB`;
+  if (value >= 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${Math.round(value)} B`;
+}
+
+function panelPerfLabel(name, filePath) {
+  return String(name ?? filePath ?? 'panel').trim() || 'panel';
+}
+
+function estimateDataUrlBytes(dataUrl) {
+  const value = String(dataUrl ?? '');
+  const commaIndex = value.indexOf(',');
+  if (commaIndex < 0) return value.length;
+
+  const base64 = value.slice(commaIndex + 1);
+  const padding = base64.endsWith('==') ? 2 : (base64.endsWith('=') ? 1 : 0);
+  return Math.max(0, Math.floor((base64.length * 3) / 4) - padding);
+}
+
+function dataUrlToText(dataUrl) {
+  const value = String(dataUrl ?? '');
+  const commaIndex = value.indexOf(',');
+  if (commaIndex < 0) {
+    throw new Error('Invalid panel data URL');
+  }
+
+  const header = value.slice(0, commaIndex);
+  const body = value.slice(commaIndex + 1);
+
+  if (!/;base64/i.test(header)) {
+    return decodeURIComponent(body);
+  }
+
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+
+  return new TextDecoder().decode(bytes);
+}
+
+function finishPendingPanelTimers(filePath, label, payloadSizeBytes, extra = '') {
+  const detail = `label="${label}" bytes=${formatBytes(payloadSizeBytes)}${extra ? ` ${extra}` : ''}`;
+  pendingManualOpenTimer?.(detail);
+  pendingManualOpenTimer = null;
+
+  const queuedTimer = pendingOpenPanelFileTimers.get(filePath);
+  queuedTimer?.(detail);
+  pendingOpenPanelFileTimers.delete(filePath);
+}
+
+function ensurePanelDataListener() {
+  if (panelDataListenerRegistered) return;
+  panelDataListenerRegistered = true;
+
+  onFileData((payload) => {
+    const pending = pendingPanelDataRequests.get(payload?.requestId);
+    if (!pending) return;
+
+    pendingPanelDataRequests.delete(payload.requestId);
+
+    try {
+      const decodedText = dataUrlToText(payload?.data);
+      const byteSize = Number(payload?.byteSize) || estimateDataUrlBytes(payload?.data);
+      pending.stopTimer?.(
+        `bytes=${formatBytes(byteSize)} read=${Number(payload?.readMs || 0).toFixed(1)}ms encode=${Number(payload?.encodeMs || 0).toFixed(1)}ms`
+      );
+      pending.resolve({
+        data: decodedText,
+        byteSize,
+        readMs: Number(payload?.readMs),
+        encodeMs: Number(payload?.encodeMs),
+      });
+    } catch (error) {
+      pending.stopTimer?.('decode failed');
+      pending.reject(error);
+    }
+  });
+}
+
+function requestDeferredPanelData(filePath, label) {
+  ensurePanelDataListener();
+
+  return new Promise((resolve, reject) => {
+    const requestId = `panel_${++panelDataRequestCounter}`;
+    logPerfDebug(`panel data request ${label}`, filePath);
+    pendingPanelDataRequests.set(requestId, {
+      resolve,
+      reject,
+      stopTimer: createPerfDebugTimer(`panel data load ${label}`),
+    });
+    requestFileData(requestId, filePath);
+  });
+}
+
+function schedulePanelOpenHousekeeping(label) {
+  setTimeout(() => {
+    const stopTimer = createPerfDebugTimer(`panel post-open housekeeping ${label}`);
+    persistOpenPanelPaths();
+    flushUnsavedSessionSnapshot();
+    stopTimer();
+  }, 0);
+}
+
+function uniquePanelPaths(paths) {
+  const unique = [];
+  const seen = new Set();
+
+  for (const rawPath of paths ?? []) {
+    const path = String(rawPath ?? '').trim();
+    if (!path || seen.has(path)) continue;
+    seen.add(path);
+    unique.push(path);
+  }
+
+  return unique;
+}
 
 /** Create a new panel object with defaults */
 export function createPanel(name = null) {
@@ -140,6 +272,7 @@ function readStoredJson(key, fallback) {
 
   try {
     const raw = localStorage.getItem(key);
+    if (raw != null) storedValueCache.set(key, raw);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -150,7 +283,10 @@ function writeStoredJson(key, value) {
   if (!canUseLocalStorage()) return;
 
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    const raw = JSON.stringify(value);
+    if (storedValueCache.get(key) === raw) return;
+    localStorage.setItem(key, raw);
+    storedValueCache.set(key, raw);
   } catch { /* ignore */ }
 }
 
@@ -158,6 +294,8 @@ function clearUnsavedSessionSnapshot() {
   if (!canUseLocalStorage()) return;
 
   try {
+    storedValueCache.delete(UNSAVED_PANELS_KEY);
+    storedValueCache.delete(UNSAVED_ACTIVE_TAB_KEY);
     localStorage.removeItem(UNSAVED_PANELS_KEY);
     localStorage.removeItem(UNSAVED_ACTIVE_TAB_KEY);
   } catch { /* ignore */ }
@@ -266,6 +404,8 @@ export const keyObjectId = writable(null);
 
 /** Selection helpers */
 export function selectComponent(id, addToSelection = false) {
+  if (id == null) return;
+
   if (addToSelection) {
     selectedComponentIds.update(ids => {
       const next = new Set(ids);
@@ -306,6 +446,13 @@ export const settingsTabOpen = writable(false);
 /** Active editor tab descriptor: { type: 'panel'|'settings', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
+/** Active panel id with fallback resolution when selection state lags behind open panels. */
+export const resolvedActivePanelId = derived(
+  [panels, activePanelId, activeEditorTab],
+  ([$panels, $activePanelId, $activeEditorTab]) =>
+    resolvePanelSelection($panels, $activePanelId, $activeEditorTab)?.id ?? null
+);
+
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
   [panels, settingsTabOpen],
@@ -330,13 +477,23 @@ export const editorTabs = derived(
   }
 );
 
+function resolvePanelSelection(list, activeId, tab) {
+  if (!Array.isArray(list) || list.length === 0) return null;
+  if (tab?.type === 'settings') return null;
+
+  const panelFromTab = tab?.type === 'panel'
+    ? list.find((panel) => panel.id === tab.id) ?? null
+    : null;
+  const panelFromActiveId = list.find((panel) => panel.id === activeId) ?? null;
+
+  return panelFromTab ?? panelFromActiveId ?? list[list.length - 1] ?? null;
+}
+
 /** The active panel object (derived) */
 export const activePanel = derived(
   [panels, activePanelId, activeEditorTab],
   ([$panels, $activePanelId, $activeEditorTab]) =>
-    $activeEditorTab?.type === 'panel'
-      ? ($panels.find(p => p.id === $activePanelId) ?? null)
-      : null
+    resolvePanelSelection($panels, $activePanelId, $activeEditorTab)
 );
 
 /** Add a new panel and make it active */
@@ -438,6 +595,12 @@ export function closeActiveEditorTab() {
 
   if (tab.type === 'panel' && tab.id != null) {
     closePanel(tab.id);
+    return;
+  }
+
+  const resolvedPanelId = get(resolvedActivePanelId);
+  if (resolvedPanelId != null) {
+    closePanel(resolvedPanelId);
   }
 }
 
@@ -508,18 +671,46 @@ export function saveActivePanelAs() {
 
 /** Open a panel from a file dialog. */
 export function openPanelFromFile() {
+  pendingManualOpenTimer?.('cancelled-or-superseded');
+  pendingManualOpenTimer = createPerfDebugTimer('panel manual open roundtrip');
+  logPerfDebug('panel open requested from UI');
   bridgeOpenPanel();
 }
 
 /** Persist the list of saved (filePath != null) open panel paths to C++ settings. */
 function persistOpenPanelPaths() {
   const list = get(panels);
-  const paths = list.filter(p => p.filePath).map(p => p.filePath);
+  const paths = uniquePanelPaths(list.filter(p => p.filePath).map(p => p.filePath));
   bridgeUpdateOpenPanels(paths);
+}
+
+function syncPanelSelection() {
+  const tab = get(activeEditorTab);
+  if (tab?.type === 'settings') return;
+
+  const list = get(panels);
+  const activeId = get(activePanelId);
+
+  if (list.length === 0) {
+    if (activeId !== null) activePanelId.set(null);
+    if (tab?.type !== 'panel' || tab?.id !== null) {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
+    return;
+  }
+
+  const resolvedPanel = resolvePanelSelection(list, activeId, tab);
+
+  if (!resolvedPanel) return;
+  if (activeId !== resolvedPanel.id) activePanelId.set(resolvedPanel.id);
+  if (tab?.type !== 'panel' || tab?.id !== resolvedPanel.id) {
+    activeEditorTab.set({ type: 'panel', id: resolvedPanel.id });
+  }
 }
 
 panels.subscribe(() => {
   scheduleUnsavedSessionAutosave();
+  syncPanelSelection();
 });
 
 autosaveEnabled.subscribe(() => {
@@ -535,12 +726,22 @@ restoreUnsavedWork.subscribe((enabled) => {
   scheduleUnsavedSessionAutosave();
 });
 
+activePanelId.subscribe(() => {
+  syncPanelSelection();
+});
+
+activeEditorTab.subscribe((tab) => {
+  if (tab?.type === 'settings') return;
+  syncPanelSelection();
+});
+
 // --- Bridge event listeners ---
 
 /** Initialize bridge listeners. Call once at app startup. */
 export function initPanelBridge() {
   // Panel saved successfully — update filePath, name, clear modified flag
   onPanelSaved((payload) => {
+    const label = panelPerfLabel(payload?.name, payload?.filePath);
     const panelId = parseInt(payload.panelId, 10);
     const updates = { filePath: payload.filePath, modified: false };
     if (payload.name) updates.name = payload.name;
@@ -550,21 +751,79 @@ export function initPanelBridge() {
     );
 
     // Persist open panel paths now that this panel has a file
-    persistOpenPanelPaths();
-    flushUnsavedSessionSnapshot();
+    schedulePanelOpenHousekeeping(label);
   });
 
   // Panel opened from file — create panel and make it active
-  onPanelOpened((payload) => {
+  onPanelOpened(async (payload) => {
+    const label = panelPerfLabel(payload?.name, payload?.filePath);
+    let payloadSizeBytes = Number(payload?.byteSize) || String(payload?.data ?? '').length;
+    const filePath = String(payload?.filePath ?? '').trim();
+
     // Check if this file is already open
-    const existing = get(panels).find(p => p.filePath === payload.filePath);
+    const existing = get(panels).find(p => p.filePath === filePath);
     if (existing) {
-      activePanelId.set(existing.id);
+      finishPendingPanelTimers(filePath, label, payloadSizeBytes);
+      logPerfDebug(`panel reuse ${label}`, `id=${existing.id}`);
+      setActivePanel(existing.id);
       return;
     }
 
-    const panel = deserializePanel(payload.data, payload.filePath, payload.name);
+    if (filePath && pendingOpenPanelFiles.has(filePath)) {
+      finishPendingPanelTimers(filePath, label, payloadSizeBytes, 'duplicate-request-ignored');
+      return;
+    }
+
+    if (filePath) pendingOpenPanelFiles.add(filePath);
+
+    let panelData = String(payload?.data ?? '');
+    let nativeReadMs = Number(payload?.readMs);
+
+    if (!panelData && filePath) {
+      try {
+        const deferred = await requestDeferredPanelData(filePath, label);
+        panelData = deferred.data;
+        payloadSizeBytes = Number(deferred?.byteSize) || payloadSizeBytes;
+        nativeReadMs = Number.isFinite(deferred?.readMs) ? deferred.readMs : nativeReadMs;
+      } catch (error) {
+        if (filePath) pendingOpenPanelFiles.delete(filePath);
+        finishPendingPanelTimers(filePath, label, payloadSizeBytes, 'failed');
+        console.error('[panels] Failed to load deferred panel data:', error);
+        return;
+      }
+    }
+
+    const existingAfterLoad = get(panels).find((panel) => panel.filePath === filePath);
+    if (existingAfterLoad) {
+      if (filePath) pendingOpenPanelFiles.delete(filePath);
+      finishPendingPanelTimers(filePath, label, payloadSizeBytes, 'reused-after-load');
+      setActivePanel(existingAfterLoad.id);
+      return;
+    }
+
+    finishPendingPanelTimers(filePath, label, payloadSizeBytes);
+
+    const openTimer = createPerfDebugTimer(`panel open ${label}`);
+    const deserializeTimer = createPerfDebugTimer(`panel deserialize ${label}`);
+    const panel = deserializePanel(panelData, filePath, payload.name);
+    const controlCount = Array.isArray(panel?.controls) ? panel.controls.length : 0;
+    deserializeTimer(
+      `controls=${controlCount} bytes=${formatBytes(payloadSizeBytes)}${Number.isFinite(nativeReadMs) ? ` nativeRead=${nativeReadMs.toFixed(1)}ms` : ''}`
+    );
+
+    const activateTimer = createPerfDebugTimer(`panel activate ${label}`);
     addPanel(panel);
+    activateTimer(`controls=${controlCount}`);
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        openTimer(
+          `controls=${controlCount} bytes=${formatBytes(payloadSizeBytes)}${Number.isFinite(nativeReadMs) ? ` nativeRead=${nativeReadMs.toFixed(1)}ms` : ''}`
+        );
+      });
+    });
+
+    if (filePath) pendingOpenPanelFiles.delete(filePath);
     persistOpenPanelPaths();
     flushUnsavedSessionSnapshot();
   });
@@ -572,7 +831,10 @@ export function initPanelBridge() {
   // Session restore — receive list of paths, open each one
   onOpenPanelPaths((paths) => {
     if (Array.isArray(paths)) {
-      for (const path of paths) {
+      const uniquePaths = uniquePanelPaths(paths);
+      logPerfDebug('restore open-panel paths received', `count=${paths.length} unique=${uniquePaths.length}`);
+      for (const path of uniquePaths) {
+        pendingOpenPanelFileTimers.set(path, createPerfDebugTimer(`panel file bridge ${panelPerfLabel('', path)}`));
         bridgeOpenPanelFile(path);
       }
     }
@@ -584,9 +846,12 @@ export function restoreSessionFromPreferences() {
   if (sessionRestoreInitialized) return;
   sessionRestoreInitialized = true;
 
+  const unsavedRestoreTimer = createPerfDebugTimer('restore unsaved session snapshot');
   restoreUnsavedSessionFromSnapshot();
+  unsavedRestoreTimer(`panels=${get(panels).length}`);
 
   if (get(reopenLastSession)) {
+    logPerfDebug('restore saved panel paths requested');
     bridgeLoadOpenPanels();
   } else {
     scheduleUnsavedSessionAutosave();

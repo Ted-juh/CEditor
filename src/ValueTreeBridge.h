@@ -71,6 +71,8 @@ private:
                                                   float letterSpacing,
                                                   bool italic,
                                                   bool underline);
+    void emitDebugLog (const juce::String& level, const juce::String& message) const;
+    void emitPerfDebug (const juce::String& message) const;
 
     // Set a property via dot-notation path (e.g., "Text.Fill.colour")
     void setPropertyFromPath (const juce::String& path, const juce::var& value);
@@ -82,6 +84,7 @@ private:
     juce::UndoManager undoManager;
     juce::WebBrowserComponent* browser = nullptr;
     bool suppressOutgoing = false;
+    bool perfDebugEnabled = false;
 
     AppSettings* appSettings = nullptr;
     std::unique_ptr<juce::FileChooser> fileChooser;

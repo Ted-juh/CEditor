@@ -135,6 +135,12 @@ export function updateAppSettings(settings) {
   window.__JUCE__.backend.emitEvent('updateAppSettings', settings);
 }
 
+/** Enable or disable native perf debug logging. */
+export function setPerfDebugEnabled(enabled) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('setPerfDebugEnabled', enabled === true);
+}
+
 /** Request a font import dialog. C++ emits 'fontsImported' on success. */
 export function importFonts() {
   if (!isJuceAvailable()) {
@@ -176,7 +182,7 @@ export function onFileInfo(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
-/** Request a file's contents as base64. C++ will emit 'fileData' with { requestId, data, mimeType }. */
+/** Request a file's contents as a data URL. C++ will emit 'fileData' with { requestId, data, mimeType }. */
 export function requestFileData(requestId, filePath) {
   if (!isJuceAvailable()) {
     console.warn('[bridge] No JUCE backend — requestFileData ignored');
@@ -219,7 +225,7 @@ export function onPanelSaved(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
-/** Listen for 'panelOpened' events. Callback receives { filePath, name, data }. */
+/** Listen for 'panelOpened' events. Callback receives metadata and may include data inline. */
 export function onPanelOpened(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('panelOpened', callback);

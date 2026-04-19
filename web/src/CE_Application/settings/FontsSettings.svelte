@@ -1,6 +1,6 @@
 <script>
   import { Download, Globe, Power, PowerOff, Trash2 } from 'lucide-svelte';
-  import { storedFonts, fontRuntimeStatus, importLocalFontFiles, addGoogleFont, toggleFontEnabled, removeStoredFont } from '../stores/appSettings.js';
+  import { storedFonts, fontRuntimeStatus, importLocalFontFiles, addGoogleFont, toggleFontEnabled, removeStoredFont, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
 
   let googleFamily = $state('');
@@ -15,6 +15,12 @@
   function libraryPreviewKey(font) {
     return `library:${font.id}:${font.fontStyle || 'normal'}:${font.staticWeight || 400}`;
   }
+
+  $effect(() => {
+    for (const font of $storedFonts) {
+      ensureStoredFontLoaded(font, { allowFeatureBackfill: true, delayMs: 0 });
+    }
+  });
 
   $effect(() => {
     for (const font of $storedFonts) {

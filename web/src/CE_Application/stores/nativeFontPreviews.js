@@ -1,5 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { isJuceAvailable, renderFontPreview, onFontPreviewRendered } from '../bridge/bridge.js';
+import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 
 export const nativeFontPreviews = writable({});
 
@@ -12,7 +13,8 @@ function initListeners() {
   listenersInitialized = true;
 
   onFontPreviewRendered((payload) => {
-    const cacheKey = pendingRequests.get(payload?.requestId);
+    const pending = pendingRequests.get(payload?.requestId);
+    const cacheKey = pending?.cacheKey;
     if (!cacheKey) return;
 
     pendingRequests.delete(payload.requestId);
@@ -23,6 +25,7 @@ function initListeners() {
         error: String(payload?.error ?? ''),
       },
     }));
+    pending?.stopTimer?.(payload?.error ? `error=${payload.error}` : '');
   });
 }
 
@@ -36,6 +39,10 @@ export function requestNativeFontPreview(cacheKey, payload) {
   initListeners();
 
   const requestId = `font_preview_${++requestCounter}`;
-  pendingRequests.set(requestId, cacheKey);
+  logPerfDebug(`native font preview request ${requestId}`, cacheKey);
+  pendingRequests.set(requestId, {
+    cacheKey,
+    stopTimer: createPerfDebugTimer(`native font preview ${requestId}`),
+  });
   renderFontPreview(requestId, payload);
 }

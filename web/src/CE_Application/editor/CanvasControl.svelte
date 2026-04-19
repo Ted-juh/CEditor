@@ -1,8 +1,9 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
+  import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import { selectedComponentIds, selectComponent, multiDragDelta, keyObjectId } from '../stores/panels.js';
   import { updateControlProperty, getSection } from '../stores/controls.js';
-  import { storedFonts, storedIcons, fontRuntimeStatus } from '../stores/appSettings.js';
+  import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { showDistances } from '../stores/editorView.js';
@@ -11,6 +12,8 @@
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { measurePerfDebug } from '../utils/perfDebug.js';
   import {
     computeResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
@@ -20,6 +23,8 @@
   let {
     control,
     scale = 1,
+    previewSessionOverride = null,
+    editorInteractionEnabled = true,
     snapToGrid = false,
     gridSize = 10,
     gridOriginX = 0,
@@ -35,15 +40,46 @@
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
-  let background = $derived(getSection(control, 'Background'));
-  let text = $derived(getSection(control, 'Text'));
-  let icon = $derived(getSection(control, 'Icon'));
-  let effects = $derived(getSection(control, 'Effects'));
+  let previewSession = $derived(previewSessionOverride ?? null);
+  let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
+  let interactiveRenderingEnabled = $derived(previewSessionOverride !== null || editorInteractionEnabled === false);
+  let resolvedInteractive = $derived(interactiveRenderingEnabled ? resolveInteractiveControl(control, appliedPreviewSession) : null);
+  let renderControl = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control);
+  let interactionRuntime = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null);
+  let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
+  let background = $derived(getSection(renderControl, 'Background'));
+  let text = $derived(getSection(renderControl, 'Text'));
+  let icon = $derived(getSection(renderControl, 'Icon'));
+  let effects = $derived(getSection(renderControl, 'Effects'));
+  let renderParts = $derived(getSection(renderControl, 'Parts'));
+  let renderPartEntries = $derived.by(() =>
+    Object.entries(renderParts?._children ?? {})
+      .filter(([, part]) => part?.visible !== false)
+      .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0))
+  );
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
   let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);
   let isVisible = $derived(core?.visible !== false);
   let isEditorLocked = $derived(panelLocked || isLocked);
+  let renderOpacity = $derived(renderTransform?.opacity ?? transform?.opacity ?? 1);
+  let renderScale = $derived(renderTransform?.scale ?? transform?.scale ?? 1);
+  let interactionDebugEnabled = $derived(interactiveRenderingEnabled && previewSession?.autoDebug === true);
+  let interactionDebugSummary = $derived.by(() => {
+    if (!interactionDebugEnabled) return '';
+
+    const segments = [];
+    if (interactionRuntime?.activeStates?.length) {
+      segments.push(interactionRuntime.activeStates.join(' + '));
+    }
+
+    const family = interactionRuntime?.signals?.family;
+    if (family === 'range' || family === 'select') {
+      segments.push(`value:${String(interactionRuntime?.signals?.valueRaw ?? '-')}`);
+    }
+
+    return segments.join(' | ');
+  });
 
   // --- Drag state (internal $state per feedback) ---
   let isDragging = $state(false);
@@ -351,8 +387,26 @@
     }, { once: true, capture: true });
   }
 
-  // Current rotation for display (transient during rotate drag, otherwise from transform)
-  let displayRotation = $derived(transientRotation ?? transform?.rotation ?? 0);
+  // Current rotation for display (transient during rotate drag, otherwise from the resolved transform)
+  let displayRotation = $derived(transientRotation ?? renderTransform?.rotation ?? transform?.rotation ?? 0);
+  let rootTransitionCSS = $derived.by(() => {
+    const rules = [];
+    const transformTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('transform');
+    const opacityTransition = interactionRuntime?.transitions?.rootTransitions?.get?.('opacity');
+
+    if (transformTransition) rules.push(`transform ${transformTransition}`);
+    if (opacityTransition) rules.push(`opacity ${opacityTransition}`);
+
+    return rules.length ? `transition:${rules.join(', ')};` : '';
+  });
+  let canvasTransformCSS = $derived.by(() => {
+    const transforms = [];
+    if (Math.abs(displayRotation) > 0.001) transforms.push(`rotate(${displayRotation}deg)`);
+    if (Math.abs(renderScale - 1) > 0.001) transforms.push(`scale(${renderScale})`);
+    return transforms.length
+      ? `transform:${transforms.join(' ')}; transform-origin:center center;`
+      : '';
+  });
 
   // Resize handle definitions: [id, cursor, css-position]
   const handles = [
@@ -2260,7 +2314,14 @@
       if (width <= 0 || geometry.thickness <= 0) continue;
 
       ctx.fillStyle = geometry.colour;
-      const segments = buildLineSegmentsFromMask(geometry, fontSectionForCanvas, pixelWidth, pixelHeight, dpr);
+      const segments = measurePerfDebug(
+        `text line mask ${core?.id ?? 'control'}`,
+        () => buildLineSegmentsFromMask(geometry, fontSectionForCanvas, pixelWidth, pixelHeight, dpr),
+        {
+          minDurationMs: 3,
+          detail: `kind=${kind} width=${Math.round(width)} gap=${numberOr(geometry.gap, 0)}`,
+        }
+      );
       for (const segment of segments) {
         ctx.fillRect(segment.left, geometry.top, segment.width, geometry.thickness);
       }
@@ -2421,6 +2482,9 @@
       : ''
   ));
   let needsVisualTextFill = $derived(textFillMode !== 'solid');
+  // WebView2 intermittently drops masked foreignObject fills for custom-flow SVG text.
+  // Fall back to direct glyph fill there so labels still render and the editor stays interactive.
+  let useTextFillForeignObject = $derived(needsVisualTextFill && !usesCustomTextFlow);
   let textReflectionEnabled = $derived(
     textEffects?.reflectionEnabled === true || (textEffects?.reflectionEnabled == null && textEffects?.copyEnabled === true)
   );
@@ -2530,6 +2594,10 @@
     return matchingFamilyFonts.find((font) => (font.fontStyle === 'italic') === wantsItalic)
       ?? matchingFamilyFonts[0];
   });
+  $effect(() => {
+    if (!resolvedStoredFont) return;
+    ensureStoredFontLoaded(resolvedStoredFont, { delayMs: 0 });
+  });
   let resolvedFontFamily = $derived(resolvedStoredFont?.cssFamily ?? textFont?.family ?? 'Arial');
   let controlContentElement = $state(null);
   let textGlyphElement = $state(null);
@@ -2540,8 +2608,8 @@
   let fontSectionForCanvas = $derived(textFont ?? null);
   let textFillForCanvas = $derived(textFill ?? null);
   let sourceTextLines = $derived(renderedTextContent.split(/\r\n|\r|\n/));
-  let blockTextLayoutState = $derived.by(() => (
-    buildBlockTextLayoutState(renderedTextContent, {
+  let blockTextLayoutState = $derived.by(() => {
+    const runLayout = () => buildBlockTextLayoutState(renderedTextContent, {
       fontSection: textFont,
       family: resolvedFontFamily,
       maxWidth: textParagraphMeasureWidth,
@@ -2555,50 +2623,30 @@
       maxLines: textMaxLines,
       fitMode: textFitMode,
       lineHeightMultiplier: textLineHeightMultiplier,
-    })
-  ));
+    });
+
+    if (!text || renderedTextContent.length === 0) {
+      return runLayout();
+    }
+
+    return measurePerfDebug(
+      `text block layout ${core?.id ?? 'control'}`,
+      runLayout,
+      {
+        minDurationMs: 4,
+        detail: `chars=${renderedTextContent.length} wrap=${textWrapMode} fit=${textFitMode}`,
+      }
+    );
+  });
   let blockTextLayout = $derived(blockTextLayoutState.layout);
   let blockTextFitScale = $derived(usesCustomTextFlow ? 1 : blockTextLayoutState.fitScale);
   let displayedBlockTextContent = $derived(blockTextLayout.renderedContent);
   let blockTextLineEntries = $derived(usesCustomTextFlow ? [] : blockTextLayout.lineEntries);
   let textBlockInlineExtent = $derived.by(() => Math.max(0, blockTextLayout.lineBoxWidth || textParagraphMeasureWidth));
   let svgTextLines = $derived(usesCustomTextFlow ? sourceTextLines : blockTextLayout.lines);
-  let customTextLayout = $derived.by(() => (
-    usesCustomTextFlow
-      ? buildCustomTextFlowLayout(sourceTextLines, {
-        mode: textFlowMode,
-        angle: textFlowAngle,
-        stepX: textFlowStepX,
-        stepY: textFlowStepY,
-        radius: textFlowRadius,
-        sweep: textFlowSweep,
-        wordSpacing: textWordSpacing,
-        distribution: textFlowDistribution,
-        facing: textFlowFacing,
-        side: textFlowSide,
-        reverse: textFlowReverse,
-        startOffset: textFlowStartOffset,
-        fixedAdvance: textFlowFixedAdvance,
-        amplitude: textFlowAmplitude,
-        frequency: textFlowFrequency,
-        turns: textFlowTurns,
-        perimeterInset: textFlowPerimeterInset,
-        stairUnit: textFlowStairUnit,
-        boxWidth: textContentWidth,
-        boxHeight: textContentHeight,
-        polylinePoints: textPosition?.flowPolylinePoints,
-        freehandPoints: textPosition?.flowFreehandPoints,
-        bezierPoints: {
-          start: { x: textPosition?.flowPathStartX, y: textPosition?.flowPathStartY },
-          c1: { x: textPosition?.flowPathC1X, y: textPosition?.flowPathC1Y },
-          c2: { x: textPosition?.flowPathC2X, y: textPosition?.flowPathC2Y },
-          end: { x: textPosition?.flowPathEndX, y: textPosition?.flowPathEndY },
-        },
-        lineHeight: Math.max(1, numberOr(textFont?.size, 12) * textLineHeightMultiplier),
-        fontSection: textFont,
-        family: resolvedFontFamily,
-      })
-      : {
+  let customTextLayout = $derived.by(() => {
+    if (!usesCustomTextFlow) {
+      return {
         glyphs: [],
         lineEntries: [],
         lineHeight: Math.max(1, numberOr(textFont?.size, 12)),
@@ -2612,8 +2660,56 @@
           centerX: 0,
           centerY: 0,
         },
+      };
+    }
+
+    const runLayout = () => buildCustomTextFlowLayout(sourceTextLines, {
+      mode: textFlowMode,
+      angle: textFlowAngle,
+      stepX: textFlowStepX,
+      stepY: textFlowStepY,
+      radius: textFlowRadius,
+      sweep: textFlowSweep,
+      wordSpacing: textWordSpacing,
+      distribution: textFlowDistribution,
+      facing: textFlowFacing,
+      side: textFlowSide,
+      reverse: textFlowReverse,
+      startOffset: textFlowStartOffset,
+      fixedAdvance: textFlowFixedAdvance,
+      amplitude: textFlowAmplitude,
+      frequency: textFlowFrequency,
+      turns: textFlowTurns,
+      perimeterInset: textFlowPerimeterInset,
+      stairUnit: textFlowStairUnit,
+      boxWidth: textContentWidth,
+      boxHeight: textContentHeight,
+      polylinePoints: textPosition?.flowPolylinePoints,
+      freehandPoints: textPosition?.flowFreehandPoints,
+      bezierPoints: {
+        start: { x: textPosition?.flowPathStartX, y: textPosition?.flowPathStartY },
+        c1: { x: textPosition?.flowPathC1X, y: textPosition?.flowPathC1Y },
+        c2: { x: textPosition?.flowPathC2X, y: textPosition?.flowPathC2Y },
+        end: { x: textPosition?.flowPathEndX, y: textPosition?.flowPathEndY },
+      },
+      lineHeight: Math.max(1, numberOr(textFont?.size, 12) * textLineHeightMultiplier),
+      fontSection: textFont,
+      family: resolvedFontFamily,
+    });
+
+    if (!text || renderedTextContent.length === 0) {
+      return runLayout();
+    }
+
+    return measurePerfDebug(
+      `text custom flow ${core?.id ?? 'control'}`,
+      runLayout,
+      {
+        minDurationMs: 4,
+        detail: `mode=${textFlowMode} chars=${renderedTextContent.length}`,
       }
-  ));
+    );
+  });
   let textGlyphSize = $derived.by(() => (
     usesCustomTextFlow
       ? {
@@ -3120,6 +3216,7 @@
     renderedTextContent;
     displayedBlockTextContent;
     usesCustomTextFlow;
+    showBlockLineDecorations;
     textFont?.family;
     textFont?.size;
     textFont?.weightValue;
@@ -3154,6 +3251,13 @@
         width: textGlyphElement.offsetWidth ?? 0,
         height: textGlyphElement.offsetHeight ?? 0,
       };
+
+      if (!showBlockLineDecorations) {
+        if (domGlyphCharacterRects.length > 0) {
+          domGlyphCharacterRects = [];
+        }
+        return;
+      }
 
       const range = document.createRange();
       const nextRects = [];
@@ -3191,7 +3295,9 @@
     const frame = requestAnimationFrame(syncMetrics);
     const observer = new ResizeObserver(() => syncMetrics());
     observer.observe(textGlyphElement);
-    observer.observe(controlContentElement);
+    if (showBlockLineDecorations) {
+      observer.observe(controlContentElement);
+    }
 
     return () => {
       cancelAnimationFrame(frame);
@@ -3286,16 +3392,33 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="canvas-control"
-  class:selected={isSelected && !panelLocked}
-  class:key-object={isKeyObject && !panelLocked}
+  class:selected={editorInteractionEnabled && isSelected && !panelLocked}
+  class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
-  class:locked={isEditorLocked}
-  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{transform?.opacity ?? 1}; {displayRotation ? `transform:rotate(${displayRotation}deg); transform-origin:center center;` : ''} {shadowCSS} {blendCSS}"
-  onmousedown={handleMouseDown}
+  class:locked={editorInteractionEnabled && isEditorLocked}
+  class:preview-surface={!editorInteractionEnabled}
+  style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS}"
+  onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
 >
   <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
     {#if background}
       <BackgroundRenderer {background} width={displayW} height={displayH} />
+    {/if}
+
+    {#if renderPartEntries.length}
+      {#each renderPartEntries as [partName, part] (partName)}
+        <InteractivePartRenderer
+          {part}
+          parentWidth={displayW}
+          parentHeight={displayH}
+          transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
+          debug={interactionDebugEnabled}
+        />
+      {/each}
+    {/if}
+
+    {#if interactionDebugEnabled && interactionDebugSummary}
+      <div class="interaction-debug-badge">{interactionDebugSummary}</div>
     {/if}
 
     {#if hasIcon}
@@ -3565,7 +3688,7 @@
 
     {#if hasText && usesCustomTextFlow}
       <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || needsVisualTextFill || textReflectionFadeEnabled}
+        {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || useTextFillForeignObject || textReflectionFadeEnabled}
           <defs>
             {#if textReflectionFadeEnabled}
               <linearGradient
@@ -3592,7 +3715,7 @@
                 <rect x="0" y="0" width={displayW} height={displayH} fill={`url(#${textReflectionFadeGradientId('custom')})`}></rect>
               </mask>
             {/if}
-            {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || needsVisualTextFill}
+            {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || useTextFillForeignObject}
               <mask id={textShapeMaskId('custom')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
                 <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
                 <g transform={textSvgMirrorTransform}>
@@ -3833,9 +3956,9 @@
             </g>
           {:else if layer.key === 'fill'}
             <g style={textVisualEffectStyle}>
-              {#if needsVisualTextFill && !textKnockout}
-                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('custom')})`}>
-                  <div xmlns="http://www.w3.org/1999/xhtml" style={textFillLayerStyle}></div>
+              {#if useTextFillForeignObject && !textKnockout}
+                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('custom')})`} style="pointer-events:none;">
+                  <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
                 </foreignObject>
               {:else if !textKnockout}
                 <g transform={textSvgMirrorTransform}>
@@ -4308,8 +4431,8 @@
           {:else if layer.key === 'fill'}
             <g style={textVisualEffectStyle}>
               {#if needsVisualTextFill && !textKnockout}
-                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('block')})`}>
-                  <div xmlns="http://www.w3.org/1999/xhtml" style={textFillLayerStyle}></div>
+                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('block')})`} style="pointer-events:none;">
+                  <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
                 </foreignObject>
               {:else if !textKnockout}
                 <g transform={textSvgBlockTransform}>
@@ -4501,7 +4624,7 @@
     {/if}
   </div>
 
-  {#if isSelected && !isEditorLocked}
+  {#if editorInteractionEnabled && isSelected && !isEditorLocked}
     {#each handles as h (h.id)}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div
@@ -4554,6 +4677,25 @@
     inset: 0;
     overflow: hidden;
     pointer-events: none;
+  }
+
+  .interaction-debug-badge {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    max-width: calc(100% - 8px);
+    padding: 3px 7px;
+    border-radius: 999px;
+    background: rgba(18, 18, 18, 0.9);
+    border: 1px solid rgba(91, 155, 213, 0.45);
+    color: #D7ECFF;
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    z-index: 12;
   }
 
   .text-content {
@@ -4632,6 +4774,10 @@
 
   .canvas-control:hover:not(.locked) {
     outline: 1px solid rgba(91, 155, 213, 0.4);
+  }
+
+  .canvas-control.preview-surface:hover:not(.locked) {
+    outline: none;
   }
 
   .canvas-control.selected {

@@ -1,14 +1,15 @@
 <script>
   import {
-    Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2,
+    Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play,
     LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer,
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
-  import { selectedControl, hasSection, addSection } from '../stores/controls.js';
+  import { selectedControl, hasSection } from '../stores/controls.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import TabIconBar from './TabIconBar.svelte';
   import TabContentArea from './TabContentArea.svelte';
+  import StateEditScopeBar from './StateEditScopeBar.svelte';
   import { createTabViewState } from '../utils/tabViewState.js';
   import { COMPONENT_TYPES } from '../models/componentTypes.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
@@ -40,12 +41,10 @@
   let { width = MIN_PROPERTIES_PANEL_WIDTH } = $props();
   let clampedWidth = $derived(Math.max(width, MIN_PROPERTIES_PANEL_WIDTH));
 
-  let panel = $derived($activePanel);
-  let selectedComponent = $derived($selectedComponentId);
-  let contextMode = $derived(selectedComponent != null ? 'component' : 'panel');
+  let contextMode = $derived($selectedComponentId != null ? 'component' : 'panel');
 
   // Owner names for header overlays
-  let panelName = $derived(panel?.name ?? 'Panel');
+  let panelName = $derived($activePanel?.name ?? 'Panel');
   let componentName = $derived($selectedControl?._children?.Core?.name ?? 'Component');
   let ownerName = $derived(contextMode === 'panel' ? panelName : componentName);
 
@@ -101,9 +100,11 @@
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },
     { id: 'icon',       icon: Image,         label: 'Icon',       section: 'Icon' },
     { id: 'effects',    icon: Sparkles,      label: 'Effects',    section: 'Effects' },
+    { id: 'behavior',   icon: Settings2,     label: 'Behavior',   section: 'Behavior' },
+    { id: 'states',     icon: Workflow,      label: 'States',     section: 'States' },
+    { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
+    { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
-    { id: 'links',      icon: Link,          label: 'Links',      section: null },
-    { id: 'specific',   icon: Settings2,     label: 'Type',       section: null },
   ];
 
   // Only show tabs for sections that exist on the selected component
@@ -112,23 +113,6 @@
       ? allComponentTabs.filter(t => !t.section || hasSection($selectedControl, t.section))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
-
-  // Upgrade older controls in-place when their type template gains new sections.
-  $effect(() => {
-    const control = $selectedControl;
-    const controlId = control?._children?.Core?.id;
-    const controlType = control?._children?.Core?.controlType;
-    if (!controlId || !controlType) return;
-
-    const template = COMPONENT_TYPES[controlType];
-    if (!template?.sections?.length) return;
-
-    for (const sectionName of template.sections) {
-      if (!hasSection(control, sectionName)) {
-        addSection(controlId, sectionName);
-      }
-    }
-  });
 
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
@@ -145,6 +129,8 @@
       ? componentTabs.filter(t => t.id === singleTab)
       : componentTabs.filter(t => multiTabs.has(t.id))
   );
+  let visibleComponentTabIds = $derived(visibleComponentTabs.map((tab) => tab.id));
+  let visibleTabIds = $derived(visibleTabs.map((tab) => tab.id));
 
   let visiblePinnedPanelTabs = $derived(
     viewMode === 'single'
@@ -224,10 +210,10 @@
 </script>
 
 <div class="properties-panel" style="width: {clampedWidth}px;">
-  {#if panel}
+  {#if $activePanel}
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <PropertiesToolbar
-      {panel}
+      panel={$activePanel}
       {pinPanelProps}
       {viewMode}
       ontogglepin={() => pinPanelProps = !pinPanelProps}
@@ -270,6 +256,7 @@
             onclick={main.handleClick}
           />
           <div class="split-content-area">
+            <StateEditScopeBar control={$selectedControl} visibleTabIds={visibleComponentTabIds} />
             <TabContentArea
               {viewMode}
               tabs={componentTabs}
@@ -296,6 +283,9 @@
 
         <div class="card-area">
           <div class="content-scroll">
+            {#if contextMode === 'component'}
+              <StateEditScopeBar control={$selectedControl} visibleTabIds={visibleTabIds} />
+            {/if}
             <TabContentArea
               {viewMode}
               {tabs}

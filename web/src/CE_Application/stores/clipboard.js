@@ -1,5 +1,5 @@
 import { get } from 'svelte/store';
-import { panels, activePanelId, selectedComponentIds, selectComponent, clearSelection } from './panels.js';
+import { panels, resolvedActivePanelId, selectedComponentIds, selectComponent, clearSelection } from './panels.js';
 import { removeControl } from './controls.js';
 
 /**
@@ -15,7 +15,7 @@ export function copySelection() {
   const ids = get(selectedComponentIds);
   if (ids.size === 0) return;
 
-  const panel = get(panels).find(p => p.id === get(activePanelId));
+  const panel = get(panels).find(p => p.id === get(resolvedActivePanelId));
   if (!panel) return;
 
   buffer = panel.controls
@@ -40,7 +40,7 @@ export function cutSelection() {
 export function pasteSelection(position = null) {
   if (buffer.length === 0) return;
 
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
   const newIds = [];
@@ -107,7 +107,7 @@ export function hasClipboardContent() {
  * Select all controls in the active panel.
  */
 export function selectAll() {
-  const panel = get(panels).find(p => p.id === get(activePanelId));
+  const panel = get(panels).find(p => p.id === get(resolvedActivePanelId));
   if (!panel) return;
 
   const ids = new Set();

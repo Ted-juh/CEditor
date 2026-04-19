@@ -2,13 +2,14 @@
   import { Bold, Italic, Underline, Strikethrough, ArrowRight, ArrowLeft, FlipHorizontal, PaintBucket, Blend, Image as ImageIcon, Layers } from 'lucide-svelte';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { availableFonts, WEIGHT_OPTIONS } from '../stores/appSettings.js';
+  import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activateGradientTarget } from '../stores/gradientTarget.js';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import { stateEditScope } from '../stores/stateEditScope.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { deepClone } from '../utils/deepClone.js';
@@ -34,6 +35,10 @@
   let effectiveWeightValue = $derived(font?.weightValue ?? (font?.weight === 'Bold' ? 700 : 400));
   let boldActive = $derived(weightedFontSelected ? effectiveWeightValue >= 700 : font?.weight === 'Bold');
   let selectedFontPreviewFamily = $derived(selectedFontOption?.cssFamily ?? font?.family ?? 'Arial');
+  $effect(() => {
+    if (!selectedFontOption) return;
+    ensureStoredFontLoaded(selectedFontOption, { allowFeatureBackfill: true, delayMs: 0 });
+  });
   let displayedVerticalOffset = $derived(-(position?.offsetY ?? 0));
   let displayedWeightValue = $derived(String(normalizeWeightValue(effectiveWeightValue)));
   let lineColourFallback = $derived(String(textFill?.colour ?? 'FFFFFFFF'));
@@ -49,6 +54,10 @@
     Array.isArray(selectedFontOption?.supportedFeatures) ? selectedFontOption.supportedFeatures : []
   );
   let selectedFontFeatureSupportKnown = $derived(selectedFontOption?.featureSupportKnown === true);
+  let editScope = $derived($stateEditScope);
+  let fontEditorRenderKey = $derived(
+    `${core?.id ?? 'global'}:${editScope?.mode ?? 'base'}:${editScope?.stateName ?? ''}:${font?.family ?? 'Arial'}:${font?.weightValue ?? font?.weight ?? 400}:${font?.style ?? 'Normal'}`
+  );
   let textReadingOrientationValue = $derived.by(() => {
     const value = String(position?.readingOrientation ?? 'ltr');
     return value === 'rtl' || value === 'mirrored' ? value : 'ltr';
@@ -750,80 +759,82 @@
       </PropertyCell>
     </PropertySection>
 
-    <PropertySection
-      title="Font Settings"
-      collapsed={fontSectionCollapsed}
-      ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
-    >
-      <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
-        <select
-          class="text-select"
-          style={`font-family:'${selectedFontPreviewFamily}'`}
-          value={font?.family ?? 'Arial'}
-          onchange={setFontFamily}
-        >
-          {#each $availableFonts as option}
-            <option value={option.value} style={`font-family:'${option.cssFamily ?? option.value}'`}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-
-      <PropertyCell label="Size" span={2} hint="Font size in pixels">
-        <NumberInput
-          value={font?.size ?? 12}
-          min={1}
-          step={1}
-          onchange={(value) => set('Text.Font.size', value)}
-        />
-      </PropertyCell>
-
-      <PropertyCell
-        label="Weight"
-        span={2}
-        disabled={!weightedFontSelected}
-        hint={weightedFontSelected
-          ? 'Choose a font weight for weight-capable fonts'
-          : 'This font does not expose variable weight options'}
+    {#key fontEditorRenderKey}
+      <PropertySection
+        title="Font Settings"
+        collapsed={fontSectionCollapsed}
+        ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
       >
-        <select
-          class="text-select"
-          value={displayedWeightValue}
-          onchange={setFontWeight}
+        <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
+          <select
+            class="text-select"
+            style={`font-family:'${selectedFontPreviewFamily}'`}
+            value={font?.family ?? 'Arial'}
+            onchange={setFontFamily}
+          >
+            {#each $availableFonts as option}
+              <option value={option.value} style={`font-family:'${option.cssFamily ?? option.value}'`}>{option.label}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+
+        <PropertyCell label="Size" span={2} hint="Font size in pixels">
+          <NumberInput
+            value={font?.size ?? 12}
+            min={1}
+            step={1}
+            onchange={(value) => set('Text.Font.size', value)}
+          />
+        </PropertyCell>
+
+        <PropertyCell
+          label="Weight"
+          span={2}
           disabled={!weightedFontSelected}
+          hint={weightedFontSelected
+            ? 'Choose a font weight for weight-capable fonts'
+            : 'This font does not expose variable weight options'}
         >
-          {#each WEIGHT_OPTIONS as option}
-            <option value={String(option.value)}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
+          <select
+            class="text-select"
+            value={displayedWeightValue}
+            onchange={setFontWeight}
+            disabled={!weightedFontSelected}
+          >
+            {#each WEIGHT_OPTIONS as option}
+              <option value={String(option.value)}>{option.label}</option>
+            {/each}
+          </select>
+        </PropertyCell>
 
-      <PropertyCell label="Typeface" span={2} hint="Quick typeface styling toggles">
-        <div class="style-row">
-          <button class="style-btn" class:active={boldActive} title="Bold" onclick={toggleBold}>
-            <Bold size={14} strokeWidth={1.8} />
-          </button>
-          <button class="style-btn" class:active={font?.style === 'Italic'} title="Italic" onclick={toggleItalic}>
-            <Italic size={14} strokeWidth={1.8} />
-          </button>
-        </div>
-      </PropertyCell>
+        <PropertyCell label="Typeface" span={2} hint="Quick typeface styling toggles">
+          <div class="style-row">
+            <button class="style-btn" class:active={boldActive} title="Bold" onclick={toggleBold}>
+              <Bold size={14} strokeWidth={1.8} />
+            </button>
+            <button class="style-btn" class:active={font?.style === 'Italic'} title="Italic" onclick={toggleItalic}>
+              <Italic size={14} strokeWidth={1.8} />
+            </button>
+          </div>
+        </PropertyCell>
 
-      <PropertyCell label="Word Spacing" span={2} hint="Adjust spacing added to each whitespace character in pixels.">
-        <NumberInput
-          value={font?.wordSpacing ?? 0}
-          step={0.5}
-          onchange={(value) => set('Text.Font.wordSpacing', value)}
-        />
-      </PropertyCell>
+        <PropertyCell label="Word Spacing" span={2} hint="Adjust spacing added to each whitespace character in pixels.">
+          <NumberInput
+            value={font?.wordSpacing ?? 0}
+            step={0.5}
+            onchange={(value) => set('Text.Font.wordSpacing', value)}
+          />
+        </PropertyCell>
 
-      <PropertyCell label="Letter Spacing" span={2} hint="Adjust spacing between characters in pixels">
-        <NumberInput
-          value={font?.letterSpacing ?? 0}
-          step={0.5}
-          onchange={(value) => set('Text.Font.letterSpacing', value)}
-        />
-      </PropertyCell>
-    </PropertySection>
+        <PropertyCell label="Letter Spacing" span={2} hint="Adjust spacing between characters in pixels">
+          <NumberInput
+            value={font?.letterSpacing ?? 0}
+            step={0.5}
+            onchange={(value) => set('Text.Font.letterSpacing', value)}
+          />
+        </PropertyCell>
+      </PropertySection>
+    {/key}
 
     <PropertySection
       title="Typography"

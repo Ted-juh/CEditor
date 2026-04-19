@@ -1,5 +1,4 @@
 <script>
-  import { X, Plus } from 'lucide-svelte';
   import { editorTabs, activeEditorTab, addPanel, closePanel, setActiveEditorTab, closeSettingsTab } from '../stores/panels.js';
 
   let tabList = $derived($editorTabs);
@@ -53,14 +52,14 @@
           title="Close"
           onclick={(e) => { e.stopPropagation(); closeTab(tab); }}
         >
-          <X size={12} strokeWidth={1.5} />
+          ×
         </button>
       </div>
     {/each}
   </div>
 
   <button class="new-tab-btn" title="New Panel" onclick={() => addPanel()}>
-    <Plus size={14} strokeWidth={1.5} />
+    +
   </button>
 </div>
 
@@ -140,6 +139,8 @@
     height: 18px;
     padding: 0;
     flex-shrink: 0;
+    font-size: 14px;
+    line-height: 1;
   }
 
   .tab-close:hover {
@@ -160,6 +161,8 @@
     height: 28px;
     flex-shrink: 0;
     margin-bottom: 1px;
+    font-size: 18px;
+    line-height: 1;
   }
 
   .new-tab-btn:hover {

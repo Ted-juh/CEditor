@@ -1,6 +1,6 @@
 <script>
   import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, RemoveFormatting, Pipette } from 'lucide-svelte';
-  import { availableFonts } from '../stores/appSettings.js';
+  import { availableFonts, ensureStoredFontLoaded } from '../stores/appSettings.js';
 
   let { getEditorElement, onPickColor } = $props();
 
@@ -12,6 +12,10 @@
     ?? null
   );
   let selectedFontPreviewFamily = $derived(selectedFontOption?.cssFamily ?? fontFamily);
+  $effect(() => {
+    if (!selectedFontOption) return;
+    ensureStoredFontLoaded(selectedFontOption, { delayMs: 0 });
+  });
 
   const fontSizes = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48];
 

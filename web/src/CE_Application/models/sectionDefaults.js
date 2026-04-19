@@ -38,6 +38,7 @@ export const SECTION_DEFAULTS = {
     aspectLock: false,
     opacity: 1.0,
     rotation: 0,
+    scale: 1,
   },
 
   /** Background — the complete visual shell: fill + border + corners. */
@@ -486,9 +487,60 @@ export const SECTION_DEFAULTS = {
     padding: 0,
   },
 
+  /** Behavior — interaction family, role, and value model. */
+  Behavior: {
+    _type: 'Behavior',
+    family: 'trigger',
+    role: 'button',
+    valueType: 'none',
+    defaultValue: null,
+    selectionMode: 'none',
+    enumValues: [],
+    wrapEnum: false,
+    groupId: '',
+    allowMixed: false,
+    uncheckOnClick: false,
+    pressMode: 'pressRelease',
+    toggleOn: 'release',
+    orientation: 'horizontal',
+    direction: 'ltr',
+    min: 0,
+    max: 1,
+    step: 1,
+    keyboardEnabled: true,
+    focusable: true,
+    activationKeys: ['Enter', 'Space'],
+    arrowKeyAdjust: false,
+    pageKeyAdjust: false,
+    homeEndAdjust: false,
+    dragEnabled: false,
+    wheelEnabled: false,
+    snapToStep: true,
+    emitClick: true,
+    emitValueChange: false,
+    emitStateChange: true,
+  },
+
+  /** Parts — named internal sub-elements for advanced controls. */
+  Parts: {
+    _type: 'Parts',
+    _children: {},
+  },
+
+  /** Bindings — value-driven mappings into root or part properties. */
+  Bindings: {
+    _type: 'Bindings',
+    enabled: true,
+    debug: false,
+    _children: {},
+  },
+
   /** States — contains named state override children. Starts empty. */
   States: {
     _type: 'States',
+    enabled: true,
+    debug: false,
+      priority: ['hover', 'pressed', 'focused', 'checked', 'mixed', 'dragging', 'disabled'],
     _children: {},
   },
 
@@ -500,6 +552,8 @@ export const SECTION_DEFAULTS = {
   /** Animations — named animation definitions. Starts empty. */
   Animations: {
     _type: 'Animations',
+    enabled: true,
+    debug: false,
     _children: {},
   },
 };

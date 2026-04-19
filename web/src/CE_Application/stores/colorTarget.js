@@ -1,5 +1,5 @@
 import { writable, get } from 'svelte/store';
-import { panels, activePanelId, updatePanel } from './panels.js';
+import { resolvedActivePanelId, updatePanel } from './panels.js';
 import { updateControlProperty } from './controls.js';
 
 /**
@@ -54,7 +54,7 @@ export function applyColorToTarget(hex) {
   if (!target) return;
 
   if (target.type === 'panel') {
-    const panelId = get(activePanelId);
+    const panelId = get(resolvedActivePanelId);
     if (panelId == null) return;
 
     // All panel colour properties use AARRGGBB

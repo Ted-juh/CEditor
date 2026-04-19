@@ -1,5 +1,5 @@
 import { writable, derived, get } from 'svelte/store';
-import { activePanelId } from './panels.js';
+import { resolvedActivePanelId } from './panels.js';
 
 // Map of panelId → { horizontal: number[], vertical: number[] }
 const allGuides = writable({});
@@ -18,12 +18,12 @@ export function deleteSelectedGuide() {
   return true;
 }
 
-export const guides = derived([allGuides, activePanelId], ([$all, $id]) => {
+export const guides = derived([allGuides, resolvedActivePanelId], ([$all, $id]) => {
   return $all[$id] ?? { horizontal: [], vertical: [] };
 });
 
 export function addGuide(orientation, position) {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
   allGuides.update(g => {
     const pg = { ...(g[panelId] ?? { horizontal: [], vertical: [] }) };
@@ -33,7 +33,7 @@ export function addGuide(orientation, position) {
 }
 
 export function removeGuide(orientation, index) {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
   allGuides.update(g => {
     const pg = { ...(g[panelId] ?? { horizontal: [], vertical: [] }) };
@@ -43,13 +43,13 @@ export function removeGuide(orientation, index) {
 }
 
 export function clearGuides() {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
   allGuides.update(g => ({ ...g, [panelId]: { horizontal: [], vertical: [] } }));
 }
 
 export function updateGuide(orientation, index, newPosition) {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
   allGuides.update(g => {
     const pg = { ...(g[panelId] ?? { horizontal: [], vertical: [] }) };

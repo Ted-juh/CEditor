@@ -8,37 +8,87 @@
    *   tabId       — current tab id
    *   control     — $selectedControl (only used when contextMode is 'component')
    *   fallbackLabel — human label for the placeholder
-   */
-  import PanelCardContent from './PanelCardContent.svelte';
-  import CoreEditor from '../sections/CoreEditor.svelte';
-  import TransformEditor from '../sections/TransformEditor.svelte';
-  import BackgroundEditor from '../sections/BackgroundEditor.svelte';
-  import BorderEditor from '../sections/BorderEditor.svelte';
-  import TextEditor from '../sections/TextEditor.svelte';
-  import IconEditor from '../sections/IconEditor.svelte';
-  import EffectsEditor from '../sections/EffectsEditor.svelte';
+  */
+  import { stateEditScope } from '../stores/stateEditScope.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+  import {
+    ensureSectionEditorComponent,
+    getSectionEditorComponent,
+    hasSectionEditor,
+  } from './sectionEditorLoaders.js';
 
   let { contextMode = 'panel', tabId = '', control = null, fallbackLabel = '' } = $props();
+
+  const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects']);
+
+  let scope = $derived($stateEditScope);
+  let editorControl = $derived.by(() => {
+    if (contextMode !== 'component' || !control) return control;
+    if (!STATE_SCOPABLE_TABS.has(tabId)) return control;
+    if (scope?.mode !== 'state' || !scope?.stateName) return control;
+    return resolveStateScopedControl(control, scope.stateName);
+  });
+  let textEditorRenderKey = $derived(
+    `${control?._children?.Core?.id ?? 'none'}:${scope?.mode ?? 'base'}:${scope?.stateName ?? ''}:${editorControl?._children?.Text?.content ?? ''}:${editorControl?._children?.Text?._children?.Font?.family ?? 'Arial'}`
+  );
+  let editorProps = $derived.by(() => {
+    if (contextMode === 'panel') {
+      return { tabId };
+    }
+
+    if (tabId === 'core') return { control };
+    if (tabId === 'behavior') return { control };
+    if (tabId === 'states') return { control };
+    if (tabId === 'bindings') return { control };
+    if (tabId === 'animations') return { control };
+    return { control: editorControl };
+  });
+  let editorInstanceKey = $derived(
+    tabId === 'text'
+      ? textEditorRenderKey
+      : `${contextMode}:${tabId}:${control?._children?.Core?.id ?? 'none'}`
+  );
+  let hasDedicatedEditor = $derived(hasSectionEditor(contextMode, tabId));
+  let EditorComponent = $state(null);
+
+  $effect(() => {
+    let cancelled = false;
+
+    if (!hasDedicatedEditor) {
+      EditorComponent = null;
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existing = getSectionEditorComponent(contextMode, tabId);
+    if (existing) {
+      EditorComponent = existing;
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    EditorComponent = null;
+    ensureSectionEditorComponent(contextMode, tabId).then((component) => {
+      if (cancelled) return;
+      EditorComponent = component;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  });
 </script>
 
-{#if contextMode === 'panel'}
-  <PanelCardContent {tabId} />
-{:else if tabId === 'core'}
-  <CoreEditor {control} />
-{:else if tabId === 'transform'}
-  <TransformEditor {control} />
-{:else if tabId === 'background'}
-  <BackgroundEditor {control} />
-{:else if tabId === 'border'}
-  <BorderEditor {control} />
-{:else if tabId === 'text'}
-  <TextEditor {control} />
-{:else if tabId === 'icon'}
-  <IconEditor {control} />
-{:else if tabId === 'effects'}
-  <EffectsEditor {control} />
-{:else}
+{#if !hasDedicatedEditor}
   <div class="placeholder">Component: {fallbackLabel}</div>
+{:else if EditorComponent}
+  {#key editorInstanceKey}
+    <EditorComponent {...editorProps} />
+  {/key}
+{:else}
+  <div class="placeholder">Loading {fallbackLabel || tabId}…</div>
 {/if}
 
 <style>

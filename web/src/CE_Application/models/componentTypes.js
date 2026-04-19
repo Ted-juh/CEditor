@@ -1,4 +1,5 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
+import { createDefaultInteractiveSections } from './interactionDefaults.js';
 
 /**
  * Component type registry.
@@ -20,14 +21,34 @@ export const COMPONENT_TYPES = {
   },
 
   Button: {
-    sections: ['Background', 'Text', 'Mouse', 'States', 'Scripts'],
+    sections: ['Background', 'Text', 'Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
     defaultOverrides: {
       Transform: { width: 120, height: 40 },
       Text: { content: 'Click Me' },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
       Background: { _children: { Border: { enabled: true } } },
+      ...createDefaultInteractiveSections('Button'),
     },
-    defaultStates: ['Hover', 'Pressed', 'Disabled', 'Focused'],
+  },
+
+  ToggleButton: {
+    sections: ['Background', 'Text', 'Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
+    defaultOverrides: {
+      Transform: { width: 132, height: 40 },
+      Text: { content: 'Toggle' },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0 },
+      Background: { _children: { Border: { enabled: true } } },
+      ...createDefaultInteractiveSections('ToggleButton'),
+    },
+  },
+
+  Slider: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
+    defaultOverrides: {
+      Transform: { width: 220, height: 48 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Slider'),
+    },
   },
 
   Container: {
@@ -118,14 +139,6 @@ export function createControl(type, overrides = {}) {
     applyOverrides(section, template.defaultOverrides?.[sectionName]);
     applyOverrides(section, overrides[sectionName]);
     children[sectionName] = section;
-  }
-
-  // 4. Default states (if the type defines them and States section was included)
-  if (template.defaultStates && children.States) {
-    if (!children.States._children) children.States._children = {};
-    for (const stateName of template.defaultStates) {
-      children.States._children[stateName] = { _type: stateName };
-    }
   }
 
   return {

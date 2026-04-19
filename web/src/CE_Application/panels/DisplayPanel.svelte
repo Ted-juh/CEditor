@@ -6,12 +6,7 @@
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
-  import ConsolePanel from '../components/ConsolePanel.svelte';
-  import DebugPanel from '../components/DebugPanel.svelte';
-  import AlignmentPanel from '../components/AlignmentPanel.svelte';
   import SwatchGrid from '../components/SwatchGrid.svelte';
-  import ViewerTab from './ViewerTab.svelte';
-  import NotepadTab from './NotepadTab.svelte';
   import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
   import { colorTarget, applyColorToTarget, clearColorTarget } from '../stores/colorTarget.js';
@@ -25,11 +20,112 @@
   let onTabChange = $derived(props.onTabChange);
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
+  const DEFAULT_DISPLAY_TAB = 'colors';
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'preview', 'console']);
+  const LAZY_TAB_LOADERS = {
+    notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
+    viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
+    align: () => import('../components/AlignmentPanel.svelte').then((module) => ({ default: module.default })),
+    preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
+    console: async () => {
+      const [debugModule, consoleModule] = await Promise.all([
+        import('../components/DebugPanel.svelte'),
+        import('../components/ConsolePanel.svelte'),
+      ]);
+      return {
+        debug: debugModule.default,
+        console: consoleModule.default,
+      };
+    },
+  };
+  const lazyTabCache = new Map();
+  const lazyTabPromises = new Map();
 
-  let activeTab = $state(readStoredJson(DISPLAY_TAB_STORAGE_KEY, 'colors'));
+  function sanitizeStoredDisplayTab(value) {
+    const normalized = String(value ?? DEFAULT_DISPLAY_TAB);
+    if (!DISPLAY_TAB_IDS.has(normalized)) return DEFAULT_DISPLAY_TAB;
+    // Preview is intentionally not restored on startup because it mounts
+    // a live interactive surface and should only run on demand.
+    if (normalized === 'preview') return DEFAULT_DISPLAY_TAB;
+    return normalized;
+  }
+
+  let activeTab = $state(sanitizeStoredDisplayTab(readStoredJson(DISPLAY_TAB_STORAGE_KEY, DEFAULT_DISPLAY_TAB)));
+  let activeTabComponent = $state(null);
+  let activeTabError = $state('');
+  $effect(() => {
+    writeStoredJson(
+      DISPLAY_TAB_STORAGE_KEY,
+      activeTab === 'preview' ? DEFAULT_DISPLAY_TAB : activeTab
+    );
+  });
+
+  function getLazyTabComponent(tabId) {
+    return lazyTabCache.get(tabId) ?? null;
+  }
+
+  function ensureLazyTabComponent(tabId) {
+    if (!LAZY_TAB_LOADERS[tabId]) {
+      return Promise.resolve(null);
+    }
+
+    if (lazyTabCache.has(tabId)) {
+      return Promise.resolve(lazyTabCache.get(tabId));
+    }
+
+    if (!lazyTabPromises.has(tabId)) {
+      lazyTabPromises.set(
+        tabId,
+        LAZY_TAB_LOADERS[tabId]()
+          .then((componentSet) => {
+            lazyTabCache.set(tabId, componentSet);
+            return componentSet;
+          })
+          .finally(() => {
+            lazyTabPromises.delete(tabId);
+          })
+      );
+    }
+
+    return lazyTabPromises.get(tabId);
+  }
 
   $effect(() => {
-    writeStoredJson(DISPLAY_TAB_STORAGE_KEY, activeTab);
+    let cancelled = false;
+
+    if (!LAZY_TAB_LOADERS[activeTab]) {
+      activeTabComponent = null;
+      activeTabError = '';
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existing = getLazyTabComponent(activeTab);
+    if (existing) {
+      activeTabComponent = existing;
+      activeTabError = '';
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    activeTabComponent = null;
+    activeTabError = '';
+
+    ensureLazyTabComponent(activeTab)
+      .then((componentSet) => {
+        if (cancelled) return;
+        activeTabComponent = componentSet;
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        activeTabError = error?.message ?? 'load failed';
+      });
+
+    return () => {
+      cancelled = true;
+    };
   });
 
   // --- External tab switch requests ---
@@ -305,6 +401,7 @@
     { id: 'notepad',  label: 'Notepad' },
     { id: 'viewer',   label: 'Viewer' },
     { id: 'align',    label: 'Align' },
+    { id: 'preview',  label: 'Preview' },
     { id: 'console',  label: 'Console' },
   ];
 </script>
@@ -323,97 +420,121 @@
   </div>
 
   <div class="tab-content">
-    <div class="tab-pane" style:display={activeTab === 'colors' ? 'block' : 'none'}>
-      <div class="colors-layout">
-        <div class="colors-preview" class:split={editingGradientStop !== null || pickingNotepadColor}>
-          <ColorChooser
-            color={userPickedColor}
-            alpha={userPickedAlpha}
-            {stepSize}
-            onchange={handleColorChange}
-          />
-        </div>
-        {#if editingGradientStop !== null && currentGradient}
-          <div class="gradient-mini">
-            <GradientMiniPreview
-              gradient={liveGradient}
-              shape={gradientShape}
-              onBack={handleBackToGradient}
-            />
-          </div>
-        {/if}
-        {#if pickingNotepadColor}
-          <div class="notepad-color-mini">
-            <div class="notepad-color-preview" style="background: #{userPickedColor}"></div>
-            <div class="notepad-color-hex">#{userPickedColor}</div>
-            <button class="notepad-color-back" onclick={handleBackToNotepad}>
-              Back to Notepad
-            </button>
-          </div>
-        {/if}
-        <div class="colors-sidebar">
-          <div class="sidebar-settings">
-            <ColorSettings
+    {#if activeTab === 'colors'}
+      <div class="tab-pane">
+        <div class="colors-layout">
+          <div class="colors-preview" class:split={editingGradientStop !== null || pickingNotepadColor}>
+            <ColorChooser
               color={userPickedColor}
               alpha={userPickedAlpha}
-              bind:stepSize={stepSize}
-              onApplyColor={handleColorChange}
+              {stepSize}
+              onchange={handleColorChange}
             />
           </div>
-          <SwatchGrid
-            {swatches}
-            onclick={handleSwatchClick}
-            ondblclick={handleSwatchDblClick}
-            oncontextmenu={handleSwatchRightClick}
-          />
+          {#if editingGradientStop !== null && currentGradient}
+            <div class="gradient-mini">
+              <GradientMiniPreview
+                gradient={liveGradient}
+                shape={gradientShape}
+                onBack={handleBackToGradient}
+              />
+            </div>
+          {/if}
+          {#if pickingNotepadColor}
+            <div class="notepad-color-mini">
+              <div class="notepad-color-preview" style="background: #{userPickedColor}"></div>
+              <div class="notepad-color-hex">#{userPickedColor}</div>
+              <button class="notepad-color-back" onclick={handleBackToNotepad}>
+                Back to Notepad
+              </button>
+            </div>
+          {/if}
+          <div class="colors-sidebar">
+            <div class="sidebar-settings">
+              <ColorSettings
+                color={userPickedColor}
+                alpha={userPickedAlpha}
+                bind:stepSize={stepSize}
+                onApplyColor={handleColorChange}
+              />
+            </div>
+            <SwatchGrid
+              {swatches}
+              onclick={handleSwatchClick}
+              ondblclick={handleSwatchDblClick}
+              oncontextmenu={handleSwatchRightClick}
+            />
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="tab-pane" style:display={activeTab === 'gradient' ? 'block' : 'none'}>
-      <GradientTab
-        gradient={currentGradient}
-        shape={gradientShape}
-        {swatches}
-        onchange={handleGradientChange}
-        oneditstopcolor={handleEditStopColor}
-        onshapechange={(shape) => gradientShape = shape}
-        onswatchdblclick={handleSwatchDblClick}
-        onswatchrightclick={handleSwatchRightClick}
-      />
-    </div>
-
-    <div class="tab-pane" style:display={activeTab === 'notepad' ? 'block' : 'none'}>
-      <NotepadTab
-        {swatches}
-        resetKey={panelResetKey}
-        bind:this={notepadTabRef}
-        onswatchstore={(i, color) => swatches[i] = color}
-        onswatchdblclick={handleSwatchDblClick}
-        onswatchrightclick={handleSwatchRightClick}
-        onpickcolor={handlePickNotepadColor}
-      />
-    </div>
-    <div class="tab-pane" style:display={activeTab === 'viewer' ? 'block' : 'none'}>
-      <ViewerTab resetKey={panelResetKey} oncolorpicked={handleViewerColorPicked} />
-    </div>
-    <div class="tab-pane" style:display={activeTab === 'effects' ? 'block' : 'none'}>
+    {:else if activeTab === 'gradient'}
+      <div class="tab-pane">
+        <GradientTab
+          gradient={currentGradient}
+          shape={gradientShape}
+          {swatches}
+          onchange={handleGradientChange}
+          oneditstopcolor={handleEditStopColor}
+          onshapechange={(shape) => gradientShape = shape}
+          onswatchdblclick={handleSwatchDblClick}
+          onswatchrightclick={handleSwatchRightClick}
+        />
+      </div>
+    {:else if activeTab === 'notepad' && activeTabComponent?.default}
+      {@const NotepadTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <NotepadTab
+          {swatches}
+          resetKey={panelResetKey}
+          bind:this={notepadTabRef}
+          onswatchstore={(i, color) => swatches[i] = color}
+          onswatchdblclick={handleSwatchDblClick}
+          onswatchrightclick={handleSwatchRightClick}
+          onpickcolor={handlePickNotepadColor}
+        />
+      </div>
+    {:else if activeTab === 'viewer' && activeTabComponent?.default}
+      {@const ViewerTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <ViewerTab resetKey={panelResetKey} oncolorpicked={handleViewerColorPicked} />
+      </div>
+    {:else if activeTab === 'effects'}
+      <div class="tab-pane">
       <div class="placeholder">Effects editor — full editing coming soon. Use Properties Panel for quick toggles.</div>
-    </div>
-    <div class="tab-pane" style:display={activeTab === 'align' ? 'block' : 'none'}>
-      <AlignmentPanel />
-    </div>
-    <div class="tab-pane" style:display={activeTab === 'console' ? 'block' : 'none'}>
-      <div class="console-split">
-        <div class="debug-side">
-          <DebugPanel />
-        </div>
-        <div class="console-divider"></div>
-        <div class="console-side">
-          <ConsolePanel />
+      </div>
+    {:else if activeTab === 'align' && activeTabComponent?.default}
+      {@const AlignmentPanel = activeTabComponent.default}
+      <div class="tab-pane">
+        <AlignmentPanel />
+      </div>
+    {:else if activeTab === 'preview' && activeTabComponent?.default}
+      {@const PreviewTabComponent = activeTabComponent.default}
+      <div class="tab-pane">
+        <PreviewTabComponent />
+      </div>
+    {:else if activeTab === 'console' && activeTabComponent?.debug && activeTabComponent?.console}
+      {@const DebugPanel = activeTabComponent.debug}
+      {@const ConsolePanel = activeTabComponent.console}
+      <div class="tab-pane">
+        <div class="console-split">
+          <div class="debug-side">
+            <DebugPanel />
+          </div>
+          <div class="console-divider"></div>
+          <div class="console-side">
+            <ConsolePanel />
+          </div>
         </div>
       </div>
-    </div>
+    {:else if activeTabError}
+      <div class="tab-pane">
+        <div class="placeholder">Failed To Load: {activeTabError}</div>
+      </div>
+    {:else}
+      <div class="tab-pane">
+        <div class="placeholder">Loading {tabs.find((tab) => tab.id === activeTab)?.label ?? 'tab'}…</div>
+      </div>
+    {/if}
   </div>
 </div>
 

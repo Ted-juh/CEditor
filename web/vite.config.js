@@ -19,7 +19,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           svelte: ['svelte'],
-          icons: ['lucide-svelte'],
         },
       },
     },

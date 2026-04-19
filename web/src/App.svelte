@@ -2,13 +2,13 @@
   import MenuBar from './CE_Application/layout/MenuBar.svelte';
   import IconPanel from './CE_Application/layout/IconPanel.svelte';
   import EditorCanvas from './CE_Application/editor/EditorCanvas.svelte';
+  import PropertiesPanel from './CE_Application/panels/PropertiesPanel.svelte';
+  import DisplayPanel from './CE_Application/panels/DisplayPanel.svelte';
+  import StatusBar from './CE_Application/layout/StatusBar.svelte';
+  import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
+  import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
   import CommonPropertyBar from './CE_Application/layout/CommonPropertyBar.svelte';
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
-  import DisplayPanel from './CE_Application/panels/DisplayPanel.svelte';
-  import PropertiesPanel from './CE_Application/panels/PropertiesPanel.svelte';
-  import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
-  import StatusBar from './CE_Application/layout/StatusBar.svelte';
-  import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot } from './CE_Application/stores/panels.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
@@ -16,15 +16,39 @@
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
+  import { syncPerfDebugToNative, logPerfDebug } from './CE_Application/utils/perfDebug.js';
 
   const isCutoutDebug = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('debug') === 'cutout';
 
   if (!isCutoutDebug) {
     initPanelBridge();
-    initAppSettingsBridge();
     initConsoleBridge();
+    syncPerfDebugToNative();
+    initAppSettingsBridge();
     initHistory();
+  }
+
+  if (typeof window !== 'undefined' && !isCutoutDebug && !window.__ceditorGlobalErrorHooksInstalled) {
+    window.__ceditorGlobalErrorHooksInstalled = true;
+
+    window.addEventListener('error', (event) => {
+      const error = event?.error;
+      logPerfDebug(
+        'window error',
+        `message="${String(error?.message ?? event?.message ?? 'unknown')}" source=${String(event?.filename ?? '')}:${Number(event?.lineno ?? 0)}:${Number(event?.colno ?? 0)}`
+      );
+      console.error('[app] Unhandled window error', error ?? event);
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event?.reason;
+      logPerfDebug(
+        'window rejection',
+        `message="${String(reason?.message ?? reason ?? 'unknown')}"`
+      );
+      console.error('[app] Unhandled promise rejection', reason);
+    });
   }
 
   function handleGlobalKeyDown(e) {
@@ -95,7 +119,6 @@
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.showPropertiesPanel, showPropertiesPanel);
   });
-
   const tabDefaultHeights = { colors: 480, gradient: 580 };
 
   function handleDisplayTabChange(tabId) {
@@ -167,6 +190,7 @@
   function handleBeforeUnload() {
     flushUnsavedSessionSnapshot();
   }
+
 </script>
 
 <svelte:window onkeydown={handleGlobalKeyDown} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
@@ -184,9 +208,15 @@
         {showDisplayPanel}
         {showPropertiesPanel}
         {showTreePanel}
-        onToggleDisplay={() => showDisplayPanel = !showDisplayPanel}
-        onToggleProperties={() => showPropertiesPanel = !showPropertiesPanel}
-        onToggleTree={() => showTreePanel = !showTreePanel}
+        onToggleDisplay={() => {
+          showDisplayPanel = !showDisplayPanel;
+        }}
+        onToggleProperties={() => {
+          showPropertiesPanel = !showPropertiesPanel;
+        }}
+        onToggleTree={() => {
+          showTreePanel = !showTreePanel;
+        }}
       />
     </div>
 
@@ -234,7 +264,9 @@
     </div>
   </div>
 
-  <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+  {#if showShortcuts}
+    <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
+  {/if}
 {/if}
 
 <style>

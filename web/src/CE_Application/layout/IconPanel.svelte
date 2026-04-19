@@ -37,11 +37,11 @@
     { id: 'button',   icon: RectangleHorizontal, label: 'Button' },
     { id: 'label',    icon: Type,                label: 'Label' },
     { id: 'slider',   icon: SlidersHorizontal,   label: 'Slider' },
-    { id: 'combobox', icon: ChevronDown,          label: 'ComboBox' },
-    { id: 'backdrop', icon: Square,               label: 'Backdrop' },
-    { id: 'grid',     icon: LayoutGrid,           label: 'Grid' },
-    { id: 'envelope', icon: Activity,             label: 'Envelope' },
-    { id: 'filter',   icon: AudioLines,           label: 'Filter' },
+    { id: 'combobox', icon: ChevronDown,         label: 'ComboBox' },
+    { id: 'backdrop', icon: Square,              label: 'Backdrop' },
+    { id: 'grid',     icon: LayoutGrid,          label: 'Grid' },
+    { id: 'envelope', icon: Activity,            label: 'Envelope' },
+    { id: 'filter',   icon: AudioLines,          label: 'Filter' },
   ];
 </script>
 

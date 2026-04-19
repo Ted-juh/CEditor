@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { panels, activePanelId } from './panels.js';
+import { panels, resolvedActivePanelId } from './panels.js';
 
 /** Reactive stores for UI binding */
 export const undoAvailable = writable(false);
@@ -29,7 +29,7 @@ function getHistory(panelId) {
 }
 
 function updateAvailability() {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) {
     undoAvailable.set(false);
     redoAvailable.set(false);
@@ -68,7 +68,7 @@ export function pushSnapshot() {
   clearTimeout(debounceTimer);
   debounceTimer = null;
 
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
   const panel = get(panels).find(p => p.id === panelId);
@@ -115,7 +115,7 @@ export function undo() {
     pushSnapshot();
   }
 
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
   const history = getHistory(panelId);
@@ -137,7 +137,7 @@ export function undo() {
  * Redo the last undone action on the active panel.
  */
 export function redo() {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
   const history = getHistory(panelId);
@@ -159,13 +159,13 @@ export function redo() {
  * Check if undo/redo is available for the active panel.
  */
 export function canUndo() {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return false;
   return getHistory(panelId).undoStack.length > 0;
 }
 
 export function canRedo() {
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId == null) return false;
   return getHistory(panelId).redoStack.length > 0;
 }
@@ -177,14 +177,14 @@ export function canRedo() {
  */
 export function initHistory() {
   // Capture initial state of active panel
-  const panelId = get(activePanelId);
+  const panelId = get(resolvedActivePanelId);
   if (panelId != null) {
     const panel = get(panels).find(p => p.id === panelId);
     if (panel) lastSnapshotJson = snapshotPanel(panel);
   }
 
   // Watch for active panel changes to reset lastSnapshotJson
-  activePanelId.subscribe(id => {
+  resolvedActivePanelId.subscribe(id => {
     if (id == null) { lastSnapshotJson = null; return; }
     const panel = get(panels).find(p => p.id === id);
     if (panel) lastSnapshotJson = snapshotPanel(panel);

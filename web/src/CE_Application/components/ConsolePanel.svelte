@@ -1,8 +1,10 @@
 <script>
   import { Trash2, ArrowDownToLine, Filter, Copy, Check } from 'lucide-svelte';
   import { consoleEntries, clearConsole } from '../stores/console.js';
+  import { isPerfDebugEnabled, setPerfDebugEnabled } from '../utils/perfDebug.js';
 
   let copied = $state(false);
+  let perfLoggingEnabled = $state(isPerfDebugEnabled());
 
   async function copyAll() {
     const text = filtered.map(e =>
@@ -69,6 +71,18 @@
     if (containerEl) containerEl.scrollTop = containerEl.scrollHeight;
   }
 
+  function togglePerfLogging() {
+    const nextEnabled = setPerfDebugEnabled(!perfLoggingEnabled);
+    perfLoggingEnabled = nextEnabled;
+
+    if (nextEnabled) {
+      filterText = 'perf';
+      console.info('[perf] Logging enabled from Console panel. Load or reload a panel to capture timings.');
+    } else {
+      console.info('Perf logging disabled from Console panel.');
+    }
+  }
+
   function selectAll(e) {
     e.target.select();
   }
@@ -97,6 +111,14 @@
       {#if copied}<Check size={12} />{:else}<Copy size={12} />{/if}
     </button>
     <div class="toolbar-separator"></div>
+    <button
+      class="perf-btn"
+      class:active={perfLoggingEnabled}
+      onclick={togglePerfLogging}
+      title={perfLoggingEnabled ? 'Disable perf logging' : 'Enable perf logging'}
+    >
+      PERF
+    </button>
     <select class="level-filter" bind:value={filterLevel}>
       {#each levels as lvl}
         <option value={lvl}>{lvl === 'all' ? 'All Levels' : lvl.charAt(0).toUpperCase() + lvl.slice(1)}</option>
@@ -113,6 +135,9 @@
       />
     </div>
     <div class="toolbar-spacer"></div>
+    {#if perfLoggingEnabled}
+      <span class="perf-hint">Load a panel to capture timings</span>
+    {/if}
     <span class="entry-count">{filtered.length}</span>
     <button class="tool-btn" class:active={autoScroll} onclick={scrollToBottom} title="Scroll to bottom">
       <ArrowDownToLine size={12} />
@@ -178,6 +203,33 @@
     color: #5B9BD5;
   }
 
+  .perf-btn {
+    min-width: 40px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 3px;
+    border: 1px solid #3A3A3A;
+    background: #1A1A1A;
+    color: #999;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .perf-btn:hover {
+    background: #2A2A2A;
+    color: #FFF;
+    border-color: #5A5A5A;
+  }
+
+  .perf-btn.active {
+    background: rgba(91, 155, 213, 0.18);
+    border-color: rgba(91, 155, 213, 0.8);
+    color: #BFE0FF;
+  }
+
   .toolbar-separator {
     width: 1px;
     height: 14px;
@@ -225,6 +277,12 @@
 
   .toolbar-spacer {
     flex: 1;
+  }
+
+  .perf-hint {
+    font-size: 9px;
+    color: #6FA8DC;
+    white-space: nowrap;
   }
 
   .entry-count {

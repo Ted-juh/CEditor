@@ -162,7 +162,6 @@
   .zoom-btn.toggle-on { background: #094771; color: #5B9BD5; border-color: #5B9BD5; }
 
   .zoom-btn.icon { width: auto; padding: 0 4px; }
-
   .zoom-value {
     color: #888;
     font-size: 10px;

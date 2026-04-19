@@ -6,9 +6,8 @@
   import { getSection } from '../models/componentTypes.js';
   import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
 
-  let panel = $derived($activePanel);
   // Controls in reverse order (top of list = front/highest z)
-  let controls = $derived(panel ? [...sortControlsForRender(panel.controls)].reverse() : []);
+  let controls = $derived($activePanel ? [...sortControlsForRender($activePanel.controls)].reverse() : []);
 
   // --- Rename ---
   let renamingId = $state(null);
@@ -78,13 +77,13 @@
 
   function handleDrop(e) {
     e.preventDefault();
-    if (!panel || !dragSourceId || !dragOverId || dragSourceId === dragOverId) {
+    if (!$activePanel || !dragSourceId || !dragOverId || dragSourceId === dragOverId) {
       dragOverId = null; dragOverPos = null; dragSourceId = null;
       return;
     }
 
-    const source = panel.controls.find(c => getControlId(c) === dragSourceId);
-    const target = panel.controls.find(c => getControlId(c) === dragOverId);
+    const source = $activePanel.controls.find(c => getControlId(c) === dragSourceId);
+    const target = $activePanel.controls.find(c => getControlId(c) === dragOverId);
 
     if (!source || !target || getControlLayer(source) !== getControlLayer(target)) {
       dragOverId = null;
@@ -120,7 +119,7 @@
       [...reorderedDisplayLayer].reverse().map((control, index) => [getControlId(control), index])
     );
 
-    const updatedControls = panel.controls.map(control => {
+    const updatedControls = $activePanel.controls.map(control => {
       const id = getControlId(control);
       if (getControlLayer(control) !== layer || id == null || !zIndexById.has(id)) return control;
 
@@ -129,7 +128,7 @@
       return clone;
     });
 
-    updatePanel(panel.id, { controls: updatedControls });
+    updatePanel($activePanel.id, { controls: updatedControls });
 
     dragOverId = null;
     dragOverPos = null;

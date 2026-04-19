@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, activePanelId, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
+  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
@@ -22,8 +22,8 @@
           closeActiveEditorTab();
           return;
         }
-        const id = get(activePanelId);
-        if (id != null) closePanel(id);
+        const panel = get(activePanel);
+        if (panel?.id != null) closePanel(panel.id);
       }},
       { label: 'Settings...', shortcut: 'Ctrl+,', action: () => openSettingsTab() },
       { type: 'separator' },
@@ -60,6 +60,8 @@
       { label: 'Background', action: () => addControl('Background') },
       { label: 'Label',      action: () => addControl('Label') },
       { label: 'Button',     action: () => addControl('Button') },
+      { label: 'Toggle Button', action: () => addControl('ToggleButton') },
+      { label: 'Slider',     action: () => addControl('Slider') },
       { label: 'Container',  action: () => addControl('Container') },
       { type: 'separator' },
       { label: 'TestBox',    action: () => addControl('TestBox') },
