@@ -18,45 +18,12 @@
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
-  import { logPerfDebug } from '../utils/perfDebug.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
 
-  function describeEditorTab(tab) {
-    return `${tab?.type ?? 'none'}:${tab?.id ?? 'null'}`;
-  }
-
-  function describePanel(panelValue) {
-    return panelValue ? `${panelValue.id}:${panelValue.name ?? 'unnamed'}` : 'null:none';
-  }
-
-  function handlePanelSurfaceError(error, tab, panelValue) {
-    const message = String(error?.message ?? error ?? 'unknown');
-    logPerfDebug(
-      'editor panel surface error',
-      `tab=${describeEditorTab(tab)} panel=${describePanel(panelValue)} message="${message}"`
-    );
-    console.error('[editor] Panel surface render failure', {
-      tab,
-      panel: panelValue,
-      error,
-    });
-  }
-
   function bindViewport(node) {
     viewportEl = node;
-    logPerfDebug(
-      'editor viewport mount',
-      `panel=${describePanel($activePanel)} size=${node.clientWidth}x${node.clientHeight}`
-    );
-
-    requestAnimationFrame(() => {
-      if (viewportEl !== node) return;
-      node.scrollLeft = 0;
-      node.scrollTop = 0;
-      logPerfDebug('editor viewport reset', `panel=${describePanel($activePanel)}`);
-    });
 
     return {
       destroy() {
@@ -67,10 +34,6 @@
 
   function bindZoomContainer(node) {
     zoomContainerEl = node;
-    logPerfDebug(
-      'editor zoom-container mount',
-      `panel=${describePanel($activePanel)} size=${node.offsetWidth}x${node.offsetHeight}`
-    );
 
     return {
       destroy() {
@@ -78,13 +41,6 @@
       },
     };
   }
-
-  $effect(() => {
-    logPerfDebug(
-      'editor canvas state',
-      `tab=${describeEditorTab($activeEditorTab)} panel=${describePanel($activePanel)} zoom=${zoom}`
-    );
-  });
 
   // --- Ruler scroll/size tracking ---
   let metrics = $state({ scrollLeft: 0, scrollTop: 0, width: 0, height: 0, contentLeft: 40, contentTop: 40 });
@@ -154,7 +110,6 @@
       if (!viewportEl || $activePanel?.id !== panelId) return;
       viewportEl.scrollLeft = 0;
       viewportEl.scrollTop = 0;
-      logPerfDebug('editor viewport reset', `panel=${describePanel($activePanel)}`);
     });
   });
 
@@ -383,43 +338,6 @@
     position: relative;
     outline: 1px solid rgba(91, 155, 213, 0.35);
     outline-offset: 2px;
-  }
-
-  .panel-render-error {
-    position: relative;
-    border: 1px solid #8F2D2D;
-    border-radius: 2px;
-    background: linear-gradient(180deg, #2C1616 0%, #1F1111 100%);
-    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-  }
-
-  .panel-render-error-card {
-    max-width: min(520px, calc(100% - 48px));
-    padding: 16px 18px;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 10px;
-    background: rgba(0,0,0,0.22);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    text-align: center;
-  }
-
-  .panel-render-error-title {
-    color: #F2D7D7;
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  .panel-render-error-message {
-    color: #D5B1B1;
-    font-size: 12px;
-    line-height: 1.35;
-    word-break: break-word;
   }
 
   .empty-state {

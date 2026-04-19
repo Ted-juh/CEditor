@@ -16,7 +16,7 @@
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
-  import { syncPerfDebugToNative, logPerfDebug } from './CE_Application/utils/perfDebug.js';
+  import { syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
 
   const isCutoutDebug = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('debug') === 'cutout';
@@ -27,28 +27,6 @@
     syncPerfDebugToNative();
     initAppSettingsBridge();
     initHistory();
-  }
-
-  if (typeof window !== 'undefined' && !isCutoutDebug && !window.__ceditorGlobalErrorHooksInstalled) {
-    window.__ceditorGlobalErrorHooksInstalled = true;
-
-    window.addEventListener('error', (event) => {
-      const error = event?.error;
-      logPerfDebug(
-        'window error',
-        `message="${String(error?.message ?? event?.message ?? 'unknown')}" source=${String(event?.filename ?? '')}:${Number(event?.lineno ?? 0)}:${Number(event?.colno ?? 0)}`
-      );
-      console.error('[app] Unhandled window error', error ?? event);
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-      const reason = event?.reason;
-      logPerfDebug(
-        'window rejection',
-        `message="${String(reason?.message ?? reason ?? 'unknown')}"`
-      );
-      console.error('[app] Unhandled promise rejection', reason);
-    });
   }
 
   function handleGlobalKeyDown(e) {
