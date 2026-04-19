@@ -22,6 +22,7 @@
     panelLocked = false,
     bgLayers = {},       // { solid, gradient, image, texture } — CSS strings or null
     gridStyle = '',
+    scopedEditingControl = null,
     marquee,             // { isActive, start, end }
     marqueeRect,         // { x, y, w, h }
     onmousedown = null,
@@ -33,6 +34,7 @@
   // Default layer order if the panel doesn't specify one.
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
   let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  let scopedEditingControlId = $derived(scopedEditingControl?._children?.Core?.id ?? null);
 
   function bindSurface(node) {
     surfaceRef = node;
@@ -71,7 +73,9 @@
 
   {#each orderedControls as control (control._children?.Core?.id)}
     <CanvasControl
-      {control}
+      control={scopedEditingControlId != null && scopedEditingControlId === control._children?.Core?.id
+        ? scopedEditingControl
+        : control}
       {scale}
       {snapToGrid}
       {gridSize}

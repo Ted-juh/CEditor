@@ -3,16 +3,17 @@
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play,
     LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer,
   } from 'lucide-svelte';
-  import { activePanel, selectedComponentId } from '../stores/panels.js';
+  import { activePanel, selectedComponentId, selectedComponentIds } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
-  import { selectedControl, hasSection } from '../stores/controls.js';
+  import { selectedControl, hasSection, getSection } from '../stores/controls.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import TabIconBar from './TabIconBar.svelte';
   import TabContentArea from './TabContentArea.svelte';
-  import StateEditScopeBar from './StateEditScopeBar.svelte';
   import { createTabViewState } from '../utils/tabViewState.js';
-  import { COMPONENT_TYPES } from '../models/componentTypes.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
+  import { stateEditScope, setStateEditScopeBase, setStateEditScopeState } from '../stores/stateEditScope.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+  import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
   const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
@@ -113,6 +114,39 @@
       ? allComponentTabs.filter(t => !t.section || hasSection($selectedControl, t.section))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
+  let selectedControlId = $derived($selectedControl?._children?.Core?.id ?? '');
+  let selectedStates = $derived(getSection($selectedControl, 'States'));
+  let stateTargetOptions = $derived(buildStateTargetOptions(selectedStates));
+  let activeScope = $derived($stateEditScope);
+  let stateRailExpanded = $state(false);
+  let activeStateTarget = $derived(
+    activeScope?.mode === 'state' && activeScope?.stateName
+      ? activeScope.stateName
+      : BASE_STATE_TARGET
+  );
+  let activeStateTargetOption = $derived(findStateTargetOption(stateTargetOptions, activeStateTarget));
+  let stateTargetBadge = $derived(
+    activeStateTargetOption?.id === BASE_STATE_TARGET
+      ? ''
+      : (activeStateTargetOption?.fullLabel ?? '')
+  );
+  let stateTargetTooltip = $derived(
+    activeStateTargetOption?.id === BASE_STATE_TARGET
+      ? ''
+      : `Editing ${activeStateTargetOption?.fullLabel ?? activeStateTarget}`
+  );
+  let hasStateTargets = $derived(stateTargetOptions.length > 1);
+  let showStateRail = $derived(
+    hasStateTargets
+      && $selectedComponentIds.size <= 1
+      && (stateRailExpanded || activeStateTarget !== BASE_STATE_TARGET)
+  );
+  let scopedComponentControl = $derived.by(() => {
+    if (!$selectedControl) return null;
+    if (activeStateTarget === BASE_STATE_TARGET) return $selectedControl;
+    return resolveStateScopedControl($selectedControl, activeStateTarget);
+  });
+  let lastScopedControlId = $state('');
 
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
@@ -129,8 +163,6 @@
       ? componentTabs.filter(t => t.id === singleTab)
       : componentTabs.filter(t => multiTabs.has(t.id))
   );
-  let visibleComponentTabIds = $derived(visibleComponentTabs.map((tab) => tab.id));
-  let visibleTabIds = $derived(visibleTabs.map((tab) => tab.id));
 
   let visiblePinnedPanelTabs = $derived(
     viewMode === 'single'
@@ -194,6 +226,20 @@
     });
   });
 
+  $effect(() => {
+    if (selectedControlId !== lastScopedControlId) {
+      lastScopedControlId = selectedControlId;
+      stateRailExpanded = false;
+      setStateEditScopeBase();
+    }
+  });
+
+  $effect(() => {
+    if (activeStateTarget === BASE_STATE_TARGET) return;
+    if (stateTargetOptions.some((option) => option.id === activeStateTarget)) return;
+    setStateEditScopeBase();
+  });
+
   function toggleViewMode() {
     if (viewMode === 'single') {
       viewMode = 'multi';
@@ -206,6 +252,27 @@
 
   function toggleCollapse(id) {
     collapsedCards = { ...collapsedCards, [id]: !collapsedCards[id] };
+  }
+
+  function handleStateTargetClick(targetId) {
+    if (!targetId || targetId === BASE_STATE_TARGET) {
+      setStateEditScopeBase();
+      return;
+    }
+
+    setStateEditScopeState(targetId);
+  }
+
+  function handleComponentTabClick(id, event) {
+    if (id === 'states' && hasStateTargets && $selectedComponentIds.size <= 1) {
+      const closeExpandedRail = viewMode === 'single'
+        && singleTab === 'states'
+        && stateRailExpanded
+        && activeStateTarget === BASE_STATE_TARGET;
+      stateRailExpanded = !closeExpandedRail;
+    }
+
+    main.handleClick(id, event);
   }
 </script>
 
@@ -253,10 +320,13 @@
           <TabIconBar
             tabs={componentTabs}
             isActive={main.isActive}
-            onclick={main.handleClick}
+            onclick={handleComponentTabClick}
+            showStateRail={showStateRail}
+            stateTargets={stateTargetOptions}
+            activeStateTarget={activeStateTarget}
+            onstatetargetclick={handleStateTargetClick}
           />
           <div class="split-content-area">
-            <StateEditScopeBar control={$selectedControl} visibleTabIds={visibleComponentTabIds} />
             <TabContentArea
               {viewMode}
               tabs={componentTabs}
@@ -264,6 +334,10 @@
               singleTabId={singleTab}
               contextMode="component"
               control={$selectedControl}
+              scopedControl={scopedComponentControl}
+              stateTargetKey={activeStateTarget}
+              stateTargetBadge={stateTargetBadge}
+              stateTargetTooltip={stateTargetTooltip}
               ownerName={componentName}
               {collapsedCards}
               ontogglecollapse={toggleCollapse}
@@ -278,14 +352,15 @@
         <TabIconBar
           {tabs}
           isActive={main.isActive}
-          onclick={main.handleClick}
+          onclick={contextMode === 'component' ? handleComponentTabClick : main.handleClick}
+          showStateRail={contextMode === 'component' && showStateRail}
+          stateTargets={contextMode === 'component' ? stateTargetOptions : []}
+          activeStateTarget={contextMode === 'component' ? activeStateTarget : ''}
+          onstatetargetclick={contextMode === 'component' ? handleStateTargetClick : null}
         />
 
         <div class="card-area">
           <div class="content-scroll">
-            {#if contextMode === 'component'}
-              <StateEditScopeBar control={$selectedControl} visibleTabIds={visibleTabIds} />
-            {/if}
             <TabContentArea
               {viewMode}
               {tabs}
@@ -293,6 +368,10 @@
               singleTabId={singleTab}
               {contextMode}
               control={$selectedControl}
+              scopedControl={contextMode === 'component' ? scopedComponentControl : null}
+              stateTargetKey={contextMode === 'component' ? activeStateTarget : 'base'}
+              stateTargetBadge={contextMode === 'component' ? stateTargetBadge : ''}
+              stateTargetTooltip={contextMode === 'component' ? stateTargetTooltip : ''}
               {ownerName}
               {collapsedCards}
               ontogglecollapse={toggleCollapse}

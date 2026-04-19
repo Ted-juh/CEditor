@@ -27,6 +27,7 @@
   import { ChevronDown, ChevronRight } from 'lucide-svelte';
   import SectionRenderer from './SectionRenderer.svelte';
   import FooterRenderer from './FooterRenderer.svelte';
+  import { isStateScopableTabId } from '../utils/stateTargets.js';
 
   let {
     viewMode,
@@ -40,6 +41,10 @@
     collapsedCards = {},
     collapsePrefix = '',
     ontogglecollapse = null,
+    scopedControl = null,
+    stateTargetKey = 'base',
+    stateTargetBadge = '',
+    stateTargetTooltip = '',
   } = $props();
 
   const cardId = (id) => collapsePrefix + id;
@@ -48,6 +53,8 @@
     if (mode === 'panel') return id === 'background' || id === 'grid';
     return id === 'background' || id === 'border' || id === 'text' || id === 'icon' || id === 'effects';
   };
+  const shouldShowStateBadge = (mode, id) =>
+    mode === 'component' && !!stateTargetBadge && isStateScopableTabId(id);
 </script>
 
 {#if viewMode === 'single'}
@@ -56,6 +63,9 @@
       <div class="tab-sections-scroll">
         <div class="card-header">
           <span class="card-title">{tabs.find(t => t.id === singleTabId)?.label ?? ''}</span>
+          {#if shouldShowStateBadge(contextMode, singleTabId)}
+            <span class="state-badge" title={stateTargetTooltip}>Editing {stateTargetBadge}</span>
+          {/if}
           <span class="owner-label">{ownerName}</span>
         </div>
         <div class="card-content">
@@ -63,6 +73,8 @@
             {contextMode}
             tabId={singleTabId}
             {control}
+            {scopedControl}
+            {stateTargetKey}
             fallbackLabel={tabs.find(t => t.id === singleTabId)?.label ?? ''}
           />
         </div>
@@ -86,6 +98,9 @@
               <ChevronDown size={16} strokeWidth={1.5} />
             {/if}
             <span class="multi-card-title">{tab.label}</span>
+            {#if shouldShowStateBadge(contextMode, tab.id)}
+              <span class="state-badge compact" title={stateTargetTooltip}>{stateTargetBadge}</span>
+            {/if}
             {#if i === 0}<span class="owner-label">{ownerName}</span>{/if}
           </button>
           {#if !isCollapsed(tab.id)}
@@ -94,6 +109,8 @@
                 {contextMode}
                 tabId={tab.id}
                 {control}
+                {scopedControl}
+                {stateTargetKey}
                 fallbackLabel={tab.label}
               />
             </div>
@@ -149,6 +166,24 @@
     text-overflow: ellipsis;
     max-width: 120px;
     text-align: right;
+  }
+
+  .state-badge {
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #15364A;
+    border: 1px solid #2E617F;
+    color: #CDE7F6;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .state-badge.compact {
+    margin-left: 0;
   }
 
   .card-content {

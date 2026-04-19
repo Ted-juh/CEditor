@@ -24,6 +24,7 @@
     control,
     scale = 1,
     previewSessionOverride = null,
+    renderIdNamespace = '',
     editorInteractionEnabled = true,
     snapToGrid = false,
     gridSize = 10,
@@ -46,6 +47,11 @@
   let resolvedInteractive = $derived(interactiveRenderingEnabled ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control);
   let interactionRuntime = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null);
+  let svgIdSeed = $derived.by(() => {
+    const baseId = safeSvgId(core?.id);
+    const namespace = safeSvgId(renderIdNamespace);
+    return namespace ? `${namespace}-${baseId}` : baseId;
+  });
   let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
   let background = $derived(getSection(renderControl, 'Background'));
   let text = $derived(getSection(renderControl, 'Text'));
@@ -584,19 +590,19 @@
   }
 
   function textShapeMaskId(kind = 'block') {
-    return `text-shape-mask-${safeSvgId(core?.id)}-${kind}`;
+    return `text-shape-mask-${svgIdSeed}-${kind}`;
   }
 
   function textOutlineMaskId(kind = 'block') {
-    return `text-outline-mask-${safeSvgId(core?.id)}-${kind}`;
+    return `text-outline-mask-${svgIdSeed}-${kind}`;
   }
 
   function textReflectionFadeGradientId(kind = 'block') {
-    return `text-reflection-fade-gradient-${safeSvgId(core?.id)}-${kind}`;
+    return `text-reflection-fade-gradient-${svgIdSeed}-${kind}`;
   }
 
   function textReflectionFadeMaskId(kind = 'block') {
-    return `text-reflection-fade-mask-${safeSvgId(core?.id)}-${kind}`;
+    return `text-reflection-fade-mask-${svgIdSeed}-${kind}`;
   }
 
   function textAlignFor(justification) {
@@ -975,11 +981,11 @@
   }
 
   function lineMaskId(kind, layer) {
-    return `text-line-mask-${safeSvgId(core?.id)}-${kind}-${layer}`;
+    return `text-line-mask-${svgIdSeed}-${kind}-${layer}`;
   }
 
   function customFlowMaskId(kind, layer) {
-    return `text-flow-mask-${safeSvgId(core?.id)}-${kind}-${layer}`;
+    return `text-flow-mask-${svgIdSeed}-${kind}-${layer}`;
   }
 
   function lineCanvasFont(fontSection, familyName = resolvedFontFamily) {

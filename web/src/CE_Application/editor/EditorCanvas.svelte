@@ -18,6 +18,7 @@
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
+  import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -74,6 +75,13 @@
 
   // Dynamic grid CSS — rendered on the panel surface
   let gridStyle = $derived(buildGridStyle($activePanel, { gridEnabled, gridSize, gridColour, gridLineWidth }));
+  let activeStateScope = $derived($stateEditScope);
+  let scopedEditingControl = $derived(activeStateScope.mode === 'state' ? $selectedScopedEditingControl : null);
+  let editorStateBadge = $derived(
+    scopedEditingControl && activeStateScope.mode === 'state' && activeStateScope.stateName
+      ? `Canvas shows ${activeStateScope.stateName}`
+      : ''
+  );
 
   // Trigger file loading when paths change
   $effect(() => {
@@ -226,6 +234,7 @@
                 {panelLocked}
                 {bgLayers}
                 {gridStyle}
+                {scopedEditingControl}
                 {marquee}
                 {marqueeRect}
                 bind:surfaceRef={panelSurfaceEl}
@@ -233,6 +242,9 @@
                 onmousedown={marqueeCtrl.handleMouseDown}
                 oncontextmenu={handleContextMenu}
               />
+              {#if editorStateBadge}
+                <div class="editor-state-badge">{editorStateBadge}</div>
+              {/if}
             </div>
           </div>
         </div>
@@ -338,6 +350,22 @@
     position: relative;
     outline: 1px solid rgba(91, 155, 213, 0.35);
     outline-offset: 2px;
+  }
+
+  .editor-state-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(18, 18, 18, 0.9);
+    border: 1px solid rgba(91, 155, 213, 0.45);
+    color: #D7ECFF;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    pointer-events: none;
+    z-index: 8;
   }
 
   .empty-state {

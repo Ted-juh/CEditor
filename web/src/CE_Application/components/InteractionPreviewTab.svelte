@@ -1,7 +1,6 @@
 <script>
   import { selectedControl } from '../stores/controls.js';
   import { getDefaultInteractionPreviewSession, dumpSelectedInteractionDebug } from '../stores/interactionPreview.js';
-  import { stateEditScope } from '../stores/stateEditScope.js';
   import InteractiveTestSurface from './InteractiveTestSurface.svelte';
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
 
@@ -22,23 +21,9 @@
     return next;
   }
 
-  function createScopeDrivenSession(control, scope) {
-    const next = createPreviewSession(control);
-    if (!control || scope?.mode !== 'state' || !scope?.stateName) return next;
-
-    const state = control?._children?.States?._children?.[scope.stateName];
-    const when = state?.when ?? {};
-    const flags = ['hover', 'pressed', 'focused', 'dragging', 'disabled', 'checked', 'mixed'];
-    for (const flag of flags) {
-      next[flag] = when?.[flag] === true;
-    }
-    return next;
-  }
-
   let control = $derived($selectedControl);
   let controlId = $derived(control?._children?.Core?.id ?? '');
   let behavior = $derived(control?._children?.Behavior ?? null);
-  let editScope = $derived($stateEditScope);
   let hasInteractiveModel = $derived(
     !!behavior
     || Object.keys(control?._children?.Parts?._children ?? {}).length > 0
@@ -53,27 +38,13 @@
   $effect(() => {
     if (!controlId) {
       lastControlId = '';
-      session = createScopeDrivenSession(control, editScope);
+      session = createPreviewSession(control);
       return;
     }
 
     if (controlId !== lastControlId) {
       lastControlId = controlId;
-      session = createScopeDrivenSession(control, editScope);
-    }
-  });
-
-  $effect(() => {
-    controlId;
-    editScope?.mode;
-    editScope?.stateName;
-
-    if (!control) return;
-    if (editScope?.mode !== 'state' || !editScope?.stateName) return;
-
-    session = {
-      ...session,
-      ...createScopeDrivenSession(control, editScope),
+      session = createPreviewSession(control);
     }
   });
 

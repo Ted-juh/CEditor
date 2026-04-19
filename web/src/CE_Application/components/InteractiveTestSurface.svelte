@@ -35,6 +35,9 @@
 
   let behavior = $derived(control?._children?.Behavior ?? null);
   let transform = $derived(control?._children?.Transform ?? null);
+  let previewRenderIdNamespace = $derived(
+    `interaction-preview-${control?._children?.Core?.id ?? 'control'}`
+  );
   let previewControl = $derived.by(() => {
     if (!control) return null;
     const clone = deepClone(control);
@@ -339,6 +342,7 @@
           <CanvasControl
             control={previewControl}
             scale={1}
+            renderIdNamespace={previewRenderIdNamespace}
             panelLocked={false}
             allControls={[previewControl]}
             editorInteractionEnabled={false}

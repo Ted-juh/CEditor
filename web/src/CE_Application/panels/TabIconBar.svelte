@@ -14,6 +14,10 @@
     isActive = () => false,
     onclick = null,
     titlePrefix = '',
+    showStateRail = false,
+    stateTargets = [],
+    activeStateTarget = '',
+    onstatetargetclick = null,
   } = $props();
 </script>
 
@@ -27,6 +31,21 @@
     >
       <tab.icon size={20} strokeWidth={1.5} />
     </button>
+    {#if tab.id === 'states' && showStateRail && stateTargets.length > 0}
+      <div class="state-rail" aria-label="State editing targets">
+        {#each stateTargets as target (target.id)}
+          <button
+            class="state-target"
+            class:active={activeStateTarget === target.id}
+            class:has-overrides={target.hasOverrides}
+            title={target.tooltip}
+            onclick={() => onstatetargetclick?.(target.id)}
+          >
+            <span>{target.shortLabel}</span>
+          </button>
+        {/each}
+      </div>
+    {/if}
   {/each}
   <div class="tab-spacer"></div>
 </div>
@@ -70,5 +89,58 @@
 
   .tab-spacer {
     flex: 1;
+  }
+
+  .state-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 2px 0 6px;
+    align-items: center;
+  }
+
+  .state-target {
+    position: relative;
+    width: 24px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #171717;
+    border: 1px solid #353535;
+    border-radius: 4px;
+    color: #999;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+    font-family: inherit;
+    padding: 0;
+  }
+
+  .state-target:hover {
+    border-color: #5B9BD5;
+    color: #F5F5F5;
+  }
+
+  .state-target.active {
+    background: #0C4366;
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
+
+  .state-target.has-overrides::after {
+    content: '';
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #F5B83D;
+  }
+
+  .state-target.active.has-overrides::after {
+    background: #FFF;
   }
 </style>
