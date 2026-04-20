@@ -9,6 +9,8 @@
     snapGuides = [],
     distanceLabels = [],
     isKeyObject = false,
+    overlayOffsetX = 0,
+    overlayOffsetY = 0,
   } = $props();
 </script>
 
@@ -39,16 +41,30 @@
       class="snap-guide"
       class:vertical={guide.type === 'vertical'}
       class:horizontal={guide.type === 'horizontal'}
-      style="{guide.type === 'vertical' ? `left:${guide.pos}px;` : `top:${guide.pos}px;`}"
+      style="{guide.type === 'vertical'
+        ? `left:${guide.pos - overlayOffsetX}px;`
+        : `top:${guide.pos - overlayOffsetY}px;`}"
     ></div>
   {/each}
   {#each distanceLabels as label}
     {#if label.axis === 'h'}
-      <div class="dist-line dist-h" style="left:{label.x}px; top:{label.y}px; width:{label.length}px;"></div>
-      <div class="dist-label" style="left:{label.side === 'left' ? label.x + label.length - 20 : label.x + 20}px; top:{label.y}px;">{label.dist}</div>
+      <div
+        class="dist-line dist-h"
+        style="left:{label.x - overlayOffsetX}px; top:{label.y - overlayOffsetY}px; width:{label.length}px;"
+      ></div>
+      <div
+        class="dist-label"
+        style="left:{(label.side === 'left' ? label.x + label.length - 20 : label.x + 20) - overlayOffsetX}px; top:{label.y - overlayOffsetY}px;"
+      >{label.dist}</div>
     {:else}
-      <div class="dist-line dist-v" style="left:{label.x}px; top:{label.y}px; height:{label.length}px;"></div>
-      <div class="dist-label" style="left:{label.x}px; top:{label.side === 'top' ? label.y + label.length - 20 : label.y + 20}px;">{label.dist}</div>
+      <div
+        class="dist-line dist-v"
+        style="left:{label.x - overlayOffsetX}px; top:{label.y - overlayOffsetY}px; height:{label.length}px;"
+      ></div>
+      <div
+        class="dist-label"
+        style="left:{label.x - overlayOffsetX}px; top:{(label.side === 'top' ? label.y + label.length - 20 : label.y + 20) - overlayOffsetY}px;"
+      >{label.dist}</div>
     {/if}
   {/each}
 {/if}

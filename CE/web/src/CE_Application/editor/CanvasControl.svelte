@@ -4656,6 +4656,8 @@
     {snapGuides}
     {distanceLabels}
     {isKeyObject}
+    overlayOffsetX={displayX}
+    overlayOffsetY={displayY}
   />
 </div>
 
