@@ -14,13 +14,13 @@ The editor UI runs entirely in Svelte. JUCE handles the non-visual backend: MIDI
 ## Project Structure
 
 ```
-src/                         C++ backend (JUCE)
+CE/src/                      C++ backend (JUCE)
   Main.cpp                   Application entry point
   MainWindow.h               Window hosting the WebView
   WebViewHost.h/.cpp         WebBrowserComponent wrapper
   ValueTreeBridge.h/.cpp     C++ <-> JS bridge over ValueTree
 
-web/src/                     Svelte frontend
+CE/web/src/                  Svelte frontend
   CE_Application/            Editor application (layout, panels, menus, tools)
   CE_ComponentDesigner/      Custom component builder (future)
   CE_Panel/                  Runtime components (Button, Slider, Label, etc.)
@@ -35,7 +35,7 @@ web/src/                     Svelte frontend
 - **CMake** (3.24+) — [cmake.org](https://cmake.org/)
 - **Visual Studio 2022+** (Windows) with the "Desktop development with C++" workload
 - **JUCE 8.0.7** — included in the repo under `JUCE/`
-- **WebView2 SDK** — included in the repo under `thirdparty/webview2/`
+- **WebView2 SDK** — included in the repo under `CE/thirdparty/webview2/`
 
 ### Clone and Setup
 
@@ -45,9 +45,9 @@ git clone https://github.com/Ted-juh/CEditor.git
 cd CEditor
 
 # 2. Install the Svelte/Vite frontend dependencies
-cd web
+cd CE/web
 npm install
-cd ..
+cd ../..
 ```
 
 ### Running in Development
@@ -56,7 +56,7 @@ You need two things running side by side: the Vite dev server (serves the Svelte
 
 **Terminal 1 — Start the Svelte dev server:**
 ```bash
-cd web
+cd CE/web
 npm run dev
 ```
 This starts Vite on `http://localhost:5173`. Keep this running.
@@ -80,27 +80,29 @@ The JUCE application opens a window that loads the Svelte UI from the Vite dev s
 
 | What you're editing | What to do |
 |---|---|
-| Svelte UI (`web/src/`) | Just save the file — Vite hot reloads instantly |
+| Svelte UI (`CE/web/src/`) | Just save the file — Vite hot reloads instantly |
 | CSS / styling | Same — instant hot reload |
-| C++ backend (`src/`) | Rebuild with `powershell -ExecutionPolicy Bypass -File ./scripts/build-native.ps1 -Configuration Debug`, then restart the app |
+| C++ backend (`CE/src/`) | Rebuild with `powershell -ExecutionPolicy Bypass -File ./scripts/build-native.ps1 -Configuration Debug`, then restart the app |
 | CMakeLists.txt | Re-run `cmake --preset native`, then rebuild |
-| package.json (new npm dependency) | Run `cd web && npm install`, then restart Vite |
+| package.json (new npm dependency) | Run `cd CE/web && npm install`, then restart Vite |
 
 ### Project Folder Overview
 
 ```
 CEditor/
   JUCE/                      JUCE 8.0.7 (pre-installed, do not modify)
-  thirdparty/
-    webview2/                WebView2 SDK (pre-installed)
-  src/                       C++ backend source
-  web/                       Svelte frontend
-    src/
-      CE_Application/        Editor app (layout, menus, panels, tools, bridge)
-      CE_ComponentDesigner/  Custom component builder (future)
-      CE_Panel/              Runtime components (Button, Slider, Label, etc.)
-    package.json             Node dependencies
-    vite.config.js           Vite configuration
+  CE/
+    thirdparty/
+      webview2/              WebView2 SDK (pre-installed)
+    src/                     C++ backend source
+    include/                 Native app assets
+    web/                     Svelte frontend
+      src/
+        CE_Application/      Editor app (layout, menus, panels, tools, bridge)
+        CE_ComponentDesigner/ Custom component builder (future)
+        CE_Panel/            Runtime components (Button, Slider, Label, etc.)
+      package.json           Node dependencies
+      vite.config.js         Vite configuration
   CMakeLists.txt             CMake build configuration
   build/                     Build output (gitignored)
   scripts/build-native.ps1   Windows-native build helper (loads vcvars + builds preset)
@@ -108,13 +110,13 @@ CEditor/
 
 ### Troubleshooting
 
-- **Vite not found / npm errors** — Make sure Node.js is installed and `npm install` was run in the `web/` directory.
+- **Vite not found / npm errors** — Make sure Node.js is installed and `npm install` was run in the `CE/web/` directory.
 - **CMake can't find JUCE** — The JUCE install is expected at `JUCE/lib/cmake/JUCE-8.0.7/`. Don't move or rename it.
 - **`windows.h` missing during native build** — Build from a VS developer environment or use `scripts/build-native.ps1` (it initializes `vcvars64.bat` automatically).
 - **Debug/Release confusion** — Use presets: `native-debug` and `native-release` build to `build/native`, so configuration is explicit.
-- **WebView2.h not found** — The WebView2 SDK should be at `thirdparty/webview2/build/native/include/`. If missing, re-extract the NuGet package.
+- **WebView2.h not found** — The WebView2 SDK should be at `CE/thirdparty/webview2/build/native/include/`. If missing, re-extract the NuGet package.
 - **App shows blank white window** — Make sure the Vite dev server is running on port 5173 before launching the app.
-- **Port 5173 in use** — Another Vite instance may be running. Kill it or check `web/vite.config.js` for the port setting.
+- **Port 5173 in use** — Another Vite instance may be running. Kill it or check `CE/web/vite.config.js` for the port setting.
 
 ## Contributing
 

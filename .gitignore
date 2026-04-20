@@ -1,5 +1,9 @@
 /build/
-/web/dist/
+/CE/web/dist/
+/CE/web/vite*.log
+/CE/web/node_modules/.vite/
+/CE/web/node_modules/.vite-temp/
+/CE/web/node_modules/.package-lock.json
 /Ctrlr/
 /JUCE/
 /Docs/
