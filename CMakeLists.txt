@@ -67,3 +67,7 @@ target_link_libraries(CEditor PRIVATE
 # Run this from the CE/web/ directory:
 # cd CE/web && npm run dev
 # That starts the Vite dev server with hot reload. It'll show the localhost URL (usually http://localhost:5173) in the terminal output.
+
+
+# “Earth is the insane asylum of the universe.”
+# ― Albert Einstein

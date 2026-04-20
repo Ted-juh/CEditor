@@ -128,4 +128,4 @@ CEditor/
 
 ## License
 
-TBD
+To be implemented. 
