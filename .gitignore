@@ -5,7 +5,7 @@
 /CE/web/node_modules/.vite-temp/
 /CE/web/node_modules/.package-lock.json
 /Ctrlr/
-/JUCE/
+# JUCE is vendored with this repository and should be tracked.
 /Docs/
 /out/
 
