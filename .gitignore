@@ -9,7 +9,7 @@
 /Docs/
 /out/
 
-*.claude
+/.claude/
 *.cache
 *.exe
 *.obj
@@ -22,7 +22,7 @@
 .DS_Store
 .windsurfrules
 MoveAllFiles.bat
-Claude.md
+/Claude.md
 
 Source/CPanel_Build/Builds/VisualStudio2022/RunnerTemplate.sln
 Source/CPanel_Build/Builds/VisualStudio2022/RunnerTemplate.vcxproj
