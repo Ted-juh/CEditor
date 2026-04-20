@@ -234,31 +234,34 @@ export function computeZoomToSelection(panel, viewportEl, ids, padding = 60) {
 
 /**
  * Compute the result of a wheel zoom that targets the hovered panel point.
- * The hovered point becomes the viewport center after zooming so scrolling
- * the wheel naturally "dives into" the thing under the mouse.
+ * The hovered panel point stays under the cursor after zooming, even when the
+ * panel re-centers because it becomes smaller than the viewport.
  * Returns { zoom, scrollLeft, scrollTop } or null if no change.
  */
-export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10) {
+export function computeWheelZoom(viewportEl, e, currentZoom, panel, step = 10, baseView = null) {
   if (!viewportEl || !panel) return null;
   const rect = viewportEl.getBoundingClientRect();
-  const oldScale = currentZoom / 100;
+  const effectiveZoom = baseView?.zoom ?? currentZoom;
+  const effectiveScrollLeft = baseView?.scrollLeft ?? viewportEl.scrollLeft;
+  const effectiveScrollTop = baseView?.scrollTop ?? viewportEl.scrollTop;
+  const oldScale = effectiveZoom / 100;
   const oldOff = contentOffsets(panel, viewportEl, oldScale);
 
   const cursorVpX = e.clientX - rect.left;
   const cursorVpY = e.clientY - rect.top;
   // Cursor in panel coordinates
-  const panelX = (cursorVpX + viewportEl.scrollLeft - oldOff.left) / oldScale;
-  const panelY = (cursorVpY + viewportEl.scrollTop  - oldOff.top)  / oldScale;
+  const panelX = (cursorVpX + effectiveScrollLeft - oldOff.left) / oldScale;
+  const panelY = (cursorVpY + effectiveScrollTop - oldOff.top) / oldScale;
 
   const delta = e.deltaY < 0 ? step : -step;
-  const newZoom = clampZoom(currentZoom + delta);
-  if (newZoom === currentZoom) return null;
+  const newZoom = clampZoom(effectiveZoom + delta);
+  if (newZoom === effectiveZoom) return null;
   const newScale = newZoom / 100;
   const newOff = contentOffsets(panel, viewportEl, newScale);
 
   return {
     zoom: newZoom,
-    scrollLeft: panelX * newScale + newOff.left - viewportEl.clientWidth / 2,
-    scrollTop:  panelY * newScale + newOff.top  - viewportEl.clientHeight / 2,
+    scrollLeft: panelX * newScale + newOff.left - cursorVpX,
+    scrollTop: panelY * newScale + newOff.top - cursorVpY,
   };
 }

@@ -28,6 +28,16 @@ import {
 
 export function createZoomController({ getViewport, getPanel, getSelection, editorZoom, getZoom }) {
   let pendingScrollFrame = null;
+  let pendingDeferredResult = null;
+
+  function flushDeferredScroll() {
+    const el = getViewport();
+    const latest = pendingDeferredResult;
+    pendingDeferredResult = null;
+    if (!el || !latest) return;
+    el.scrollLeft = latest.scrollLeft;
+    el.scrollTop = latest.scrollTop;
+  }
 
   // Apply a compute-result back to viewport + store.
   // `scrollDeferred` schedules scroll writes in requestAnimationFrame so the
@@ -38,22 +48,22 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     editorZoom.set(result.zoom);
     const el = getViewport();
     if (!el) return;
-    if (pendingScrollFrame !== null) {
-      cancelAnimationFrame(pendingScrollFrame);
-      pendingScrollFrame = null;
-    }
-    const write = () => {
-      if (!el) return;
-      el.scrollLeft = result.scrollLeft;
-      el.scrollTop  = result.scrollTop;
-    };
     if (scrollDeferred) {
-      pendingScrollFrame = requestAnimationFrame(() => {
-        pendingScrollFrame = null;
-        write();
-      });
+      pendingDeferredResult = result;
+      if (pendingScrollFrame === null) {
+        pendingScrollFrame = requestAnimationFrame(() => {
+          pendingScrollFrame = null;
+          flushDeferredScroll();
+        });
+      }
     } else {
-      write();
+      if (pendingScrollFrame !== null) {
+        cancelAnimationFrame(pendingScrollFrame);
+        pendingScrollFrame = null;
+      }
+      pendingDeferredResult = null;
+      el.scrollLeft = result.scrollLeft;
+      el.scrollTop = result.scrollTop;
     }
   }
 
@@ -62,9 +72,13 @@ export function createZoomController({ getViewport, getPanel, getSelection, edit
     const panel = getPanel();
     if (!el || !panel) return;
     e.preventDefault();
-    // Defer the scroll write so the new zoomed layout exists before we
-    // recenter the hovered point in the viewport.
-    apply(computeWheelZoom(el, e, getZoom(), panel), /* scrollDeferred */ true);
+    // Defer the scroll write so the new zoomed layout exists before we adjust
+    // the viewport, but compose repeated wheel events against the latest
+    // pending view so the cursor anchor stays stable during rapid scrolling.
+    apply(
+      computeWheelZoom(el, e, getZoom(), panel, 10, pendingDeferredResult),
+      /* scrollDeferred */ true,
+    );
   }
 
   function fitToWindow() {
