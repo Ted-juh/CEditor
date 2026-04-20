@@ -29,121 +29,27 @@ import {
   keyboardNudgeLarge,
 } from './runtimePreferences.js';
 import { restoreSessionFromPreferences } from './panels.js';
+import {
+  buildFontFaceSource,
+  createDefaultSettings,
+  createFontId,
+  getBuiltinFonts,
+  normalizeFamilyName,
+  normalizeFontEntry,
+  normalizeGeneralSettings,
+  normalizeSettings,
+  normalizeSupportedFeatures,
+  sanitizeSettingsForPersistence,
+  shouldCompactPersistedSettings,
+} from './appSettingsSchema.js';
+import {
+  buildLocalFontEntryFromFile,
+  buildLocalIconEntryFromFile,
+  isSupportedFontFileName,
+  isSupportedIconFileName,
+} from './appSettingsImportBuilders.js';
 
-const BUILTIN_FONTS = [
-  'Arial',
-  'Verdana',
-  'Helvetica',
-  'Tahoma',
-  'Georgia',
-  'Times New Roman',
-  'Courier New',
-  'Consolas',
-  'Segoe UI',
-  'Trebuchet MS',
-  'Impact',
-];
-
-export const WEIGHT_OPTIONS = [
-  { value: 100, label: '100 Thin' },
-  { value: 200, label: '200 Extra Light' },
-  { value: 300, label: '300 Light' },
-  { value: 400, label: '400 Regular' },
-  { value: 500, label: '500 Medium' },
-  { value: 600, label: '600 Semi Bold' },
-  { value: 700, label: '700 Bold' },
-  { value: 800, label: '800 Extra Bold' },
-  { value: 900, label: '900 Black' },
-];
-
-function createDefaultSettings() {
-  return { general: { ...DEFAULT_GENERAL_SETTINGS }, fonts: [], icons: [] };
-}
-
-function createFontId(prefix = 'font') {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createIconId(prefix = 'icon') {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function createCssFamily(id) {
-  return `ce_font_${String(id ?? '').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-}
-
-function normalizeFamilyName(value) {
-  return String(value ?? '').replace(/\s+/g, ' ').trim();
-}
-
-function normalizeCachedFace(face) {
-  return {
-    dataUrl: String(face?.dataUrl ?? ''),
-    format: String(face?.format ?? ''),
-    style: String(face?.style ?? 'normal'),
-    weight: String(face?.weight ?? '400'),
-    unicodeRange: String(face?.unicodeRange ?? ''),
-  };
-}
-
-function normalizeSupportedFeatures(features) {
-  return Array.isArray(features)
-    ? features
-      .map((feature) => String(feature ?? '').slice(0, 4))
-      .filter((feature) => feature.length === 4)
-    : [];
-}
-
-function stripExtension(name) {
-  return String(name ?? '').replace(/\.[^.]+$/, '');
-}
-
-function getExtension(name) {
-  const lower = String(name ?? '').toLowerCase();
-  const index = lower.lastIndexOf('.');
-  return index >= 0 ? lower.slice(index) : '';
-}
-
-function isSupportedFontFileName(name) {
-  return ['.ttf', '.otf', '.woff', '.woff2'].includes(getExtension(name));
-}
-
-function isSupportedIconFileName(name) {
-  return ['.svg', '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'].includes(getExtension(name));
-}
-
-function inferFontMimeTypeFromFileName(name) {
-  const extension = getExtension(name);
-  if (extension === '.woff2') return 'font/woff2';
-  if (extension === '.woff') return 'font/woff';
-  if (extension === '.otf') return 'font/otf';
-  return 'font/ttf';
-}
-
-function inferIconMimeTypeFromFileName(name) {
-  const extension = getExtension(name);
-  if (extension === '.svg') return 'image/svg+xml';
-  if (extension === '.png') return 'image/png';
-  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg';
-  if (extension === '.gif') return 'image/gif';
-  if (extension === '.bmp') return 'image/bmp';
-  if (extension === '.webp') return 'image/webp';
-  return 'image/png';
-}
-
-function cssFormatFromMimeType(mimeType) {
-  const lower = String(mimeType ?? '').toLowerCase();
-  if (lower.includes('woff2')) return 'woff2';
-  if (lower.includes('woff')) return 'woff';
-  if (lower.includes('otf') || lower.includes('opentype')) return 'opentype';
-  if (lower.includes('ttf') || lower.includes('truetype')) return 'truetype';
-  return '';
-}
-
-function buildFontFaceSource(dataUrl, mimeType = '') {
-  const format = cssFormatFromMimeType(mimeType);
-  return format ? `url(${dataUrl}) format('${format}')` : `url(${dataUrl})`;
-}
+export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
 function dataUrlToArrayBuffer(dataUrl) {
   const value = String(dataUrl ?? '');
@@ -178,159 +84,6 @@ function dataUrlToObjectUrl(dataUrl, mimeType = '') {
   return objectUrl;
 }
 
-function normalizeFontEntry(entry) {
-  const id = String(entry?.id ?? createFontId(entry?.sourceType === 'google' ? 'gfont' : 'font'));
-  const family = normalizeFamilyName(entry?.family ?? entry?.fileName ?? '');
-  const filePath = String(entry?.filePath ?? '');
-  const supportsWeight = entry?.supportsWeight === true
-    || (entry?.sourceType === 'google' && entry?.supportsWeight == null);
-  const cachedFaces = Array.isArray(entry?.cachedFaces)
-    ? entry.cachedFaces.map(normalizeCachedFace).filter((face) => face.dataUrl)
-    : [];
-
-  return {
-    id,
-    family,
-    cssFamily: String(entry?.cssFamily ?? createCssFamily(id)),
-    enabled: entry?.enabled !== false,
-    sourceType: entry?.sourceType === 'google' ? 'google' : 'local',
-    filePath,
-    fileName: String(entry?.fileName ?? ''),
-    googleFamily: String(entry?.googleFamily ?? family),
-    supportsWeight,
-    axes: Array.isArray(entry?.axes)
-      ? entry.axes
-        .map((axis) => ({
-          tag: String(axis?.tag ?? '').slice(0, 4),
-          min: Number.isFinite(Number(axis?.min)) ? Number(axis.min) : 0,
-          default: Number.isFinite(Number(axis?.default)) ? Number(axis.default) : 0,
-          max: Number.isFinite(Number(axis?.max)) ? Number(axis.max) : 0,
-        }))
-        .filter((axis) => axis.tag.length === 4)
-      : [],
-    weightAxis: entry?.weightAxis ?? null,
-    staticWeight: entry?.staticWeight ?? null,
-    parseSupported: entry?.parseSupported !== false,
-    supportedFeatures: normalizeSupportedFeatures(entry?.supportedFeatures),
-    featureSupportKnown: entry?.featureSupportKnown === true,
-    featureSupportScanned: entry?.featureSupportScanned === true || entry?.featureSupportKnown === true,
-    cachedFaces,
-    // File-backed fonts can be reloaded from disk; keeping the full data URL
-    // inline makes the persisted settings balloon and hurts startup.
-    localDataUrl: filePath ? '' : String(entry?.localDataUrl ?? ''),
-    fileFormat: String(entry?.fileFormat ?? ''),
-    fontStyle: String(entry?.fontStyle ?? 'normal'),
-    styleName: String(entry?.styleName ?? ''),
-  };
-}
-
-function normalizeIconEntry(entry) {
-  const id = String(entry?.id ?? createIconId('icon'));
-  const fileName = String(entry?.fileName ?? '');
-  const name = normalizeFamilyName(entry?.name ?? stripExtension(fileName));
-  const mimeType = String(entry?.mimeType ?? inferIconMimeTypeFromFileName(fileName));
-
-  return {
-    id,
-    name,
-    enabled: entry?.enabled !== false,
-    sourceType: entry?.sourceType === 'builtin' ? 'builtin' : 'local',
-    fileName,
-    filePath: String(entry?.filePath ?? ''),
-    mimeType,
-    dataUrl: String(entry?.dataUrl ?? ''),
-    isVector: entry?.isVector === true || mimeType.includes('svg'),
-    width: Number.isFinite(Number(entry?.width)) ? Number(entry.width) : 0,
-    height: Number.isFinite(Number(entry?.height)) ? Number(entry.height) : 0,
-  };
-}
-
-function clampInteger(value, fallback, min, max) {
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed)) return fallback;
-  return Math.max(min, Math.min(max, parsed));
-}
-
-function normalizeGeneralSettings(general) {
-  return {
-    reopenLastSession: general?.reopenLastSession !== false,
-    autosaveEnabled: general?.autosaveEnabled !== false,
-    autosaveIntervalSeconds: clampInteger(
-      general?.autosaveIntervalSeconds,
-      DEFAULT_GENERAL_SETTINGS.autosaveIntervalSeconds,
-      5,
-      600
-    ),
-    restoreUnsavedWork: general?.restoreUnsavedWork !== false,
-    defaultSnapToGrid: general?.defaultSnapToGrid !== false,
-    defaultGridSize: clampInteger(
-      general?.defaultGridSize,
-      DEFAULT_GENERAL_SETTINGS.defaultGridSize,
-      1,
-      400
-    ),
-    showRulers: general?.showRulers !== false,
-    showGuides: general?.showGuides !== false,
-    showDistances: general?.showDistances !== false,
-    insertOffset: clampInteger(general?.insertOffset, DEFAULT_GENERAL_SETTINGS.insertOffset, 0, 400),
-    duplicateOffset: clampInteger(general?.duplicateOffset, DEFAULT_GENERAL_SETTINGS.duplicateOffset, 0, 400),
-    keyboardNudgeSmall: clampInteger(
-      general?.keyboardNudgeSmall,
-      DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall,
-      1,
-      200
-    ),
-    keyboardNudgeLarge: clampInteger(
-      general?.keyboardNudgeLarge,
-      DEFAULT_GENERAL_SETTINGS.keyboardNudgeLarge,
-      1,
-      400
-    ),
-  };
-}
-
-function normalizeSettings(data) {
-  const general = normalizeGeneralSettings(data?.general);
-  const fonts = Array.isArray(data?.fonts)
-    ? data.fonts.map(normalizeFontEntry).filter((font) => font.family)
-    : [];
-  const icons = Array.isArray(data?.icons)
-    ? data.icons.map(normalizeIconEntry).filter((icon) => icon.name && icon.dataUrl)
-    : [];
-  return { general, fonts, icons };
-}
-
-function sanitizeSettingsForPersistence(settings) {
-  return {
-    ...(settings ?? createDefaultSettings()),
-    fonts: Array.isArray(settings?.fonts)
-      ? settings.fonts.map((font) => {
-        const nextFont = { ...font };
-        if (nextFont.filePath) {
-          nextFont.localDataUrl = '';
-        }
-
-        // Cached Google faces make the settings file enormous. We keep the
-        // metadata and family, then let the browser stylesheet path reload
-        // them when needed instead of persisting a giant offline blob.
-        if (nextFont.sourceType === 'google') {
-          nextFont.cachedFaces = [];
-        }
-
-        return nextFont;
-      })
-      : [],
-    icons: Array.isArray(settings?.icons) ? settings.icons : [],
-  };
-}
-
-function shouldCompactPersistedSettings(settings) {
-  return Array.isArray(settings?.fonts) && settings.fonts.some((font) =>
-    (font?.filePath && font?.localDataUrl)
-    || (font?.sourceType === 'google' && Array.isArray(font.cachedFaces) && font.cachedFaces.length > 0)
-  );
-}
-
 export const appSettings = writable(createDefaultSettings());
 export const fontRuntimeStatus = writable({});
 
@@ -349,7 +102,7 @@ export const availableFonts = derived(appSettings, ($settings) => {
     importedFontCounts.set(countKey, (importedFontCounts.get(countKey) ?? 0) + 1);
   }
 
-  for (const family of BUILTIN_FONTS) {
+  for (const family of getBuiltinFonts()) {
     const key = family.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
@@ -833,77 +586,6 @@ async function loadLocalFontFace(entry, dataUrl) {
     setFontStatus(entry.id, 'failed', error?.message ?? 'load failed');
     throw error;
   }
-}
-
-function readBrowserFileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(reader.error ?? new Error(`Failed to read ${file?.name ?? 'file'}`));
-    reader.readAsDataURL(file);
-  });
-}
-
-function loadImageDimensions(dataUrl) {
-  return new Promise((resolve) => {
-    if (typeof Image === 'undefined' || !dataUrl) {
-      resolve({ width: 0, height: 0 });
-      return;
-    }
-
-    const image = new Image();
-    image.onload = () => resolve({
-      width: Number.isFinite(image.naturalWidth) ? image.naturalWidth : 0,
-      height: Number.isFinite(image.naturalHeight) ? image.naturalHeight : 0,
-    });
-    image.onerror = () => resolve({ width: 0, height: 0 });
-    image.src = dataUrl;
-  });
-}
-
-async function buildLocalFontEntryFromFile(file) {
-  const localDataUrl = await readBrowserFileAsDataUrl(file);
-  const fallbackFamily = normalizeFamilyName(String(file?.name ?? '').replace(/\.[^.]+$/, ''));
-  const metadata = await parseFontMetadataFromDataUrl(localDataUrl, fallbackFamily);
-
-  return normalizeFontEntry({
-    id: createFontId('font'),
-    family: metadata.family || fallbackFamily,
-    sourceType: 'local',
-    enabled: true,
-    fileName: String(file?.name ?? ''),
-    supportsWeight: metadata.supportsWeight === true,
-    axes: metadata.axes ?? [],
-    weightAxis: metadata.weightAxis ?? null,
-    staticWeight: metadata.staticWeight ?? null,
-    parseSupported: metadata.parseSupported !== false,
-    supportedFeatures: metadata.supportedFeatures ?? [],
-    featureSupportKnown: metadata.featureSupportKnown === true,
-    featureSupportScanned: true,
-    localDataUrl,
-    fileFormat: inferFontMimeTypeFromFileName(file?.name),
-    fontStyle: metadata.fontStyle || 'normal',
-    styleName: metadata.styleName || '',
-  });
-}
-
-async function buildLocalIconEntryFromFile(file) {
-  const dataUrl = await readBrowserFileAsDataUrl(file);
-  const mimeType = String(file?.type || inferIconMimeTypeFromFileName(file?.name));
-  const dimensions = await loadImageDimensions(dataUrl);
-
-  return normalizeIconEntry({
-    id: createIconId('icon'),
-    name: stripExtension(String(file?.name ?? 'Icon')),
-    sourceType: 'local',
-    enabled: true,
-    fileName: String(file?.name ?? ''),
-    mimeType,
-    dataUrl,
-    isVector: mimeType.includes('svg'),
-    width: dimensions.width,
-    height: dimensions.height,
-  });
 }
 
 function updateStoredFont(id, updater) {

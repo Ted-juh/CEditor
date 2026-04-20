@@ -1,5 +1,5 @@
 <script>
-  import { Bold, Italic, Underline, Strikethrough, ArrowRight, ArrowLeft, FlipHorizontal, PaintBucket, Blend, Image as ImageIcon, Layers } from 'lucide-svelte';
+  import { Bold, Italic, Underline, Strikethrough } from 'lucide-svelte';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -15,6 +15,17 @@
   import { deepClone } from '../utils/deepClone.js';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import NumberInput from './NumberInput.svelte';
+  import TextLineDecorationControls from './TextLineDecorationControls.svelte';
+  import {
+    DEFAULT_TEXT_FILL_GRADIENT,
+    FLOW_MODE_OPTIONS,
+    TEXT_FILL_LAYER_ICONS,
+    TEXT_FILL_LAYER_LABELS,
+    TEXT_FILL_LAYER_ORDER,
+    TEXT_POSITION_OPTIONS,
+    TEXT_READING_OPTIONS,
+    TYPOGRAPHY_FEATURE_OPTIONS,
+  } from './textEditorOptions.js';
 
   let { control = null } = $props();
 
@@ -67,62 +78,6 @@
     return ['rotate', 'line', 'stair', 'arc', 'circle', 'vertical', 'wave', 'zigzag', 'spiral', 'perimeter', 'polyline', 'bezier', 'freehand'].includes(value) ? value : 'rotate';
   });
   let textFlowAngleValue = $derived(resolveFlowAngle(position));
-  const DEFAULT_TEXT_FILL_GRADIENT = {
-    type: 'linear',
-    angle: 90,
-    centerX: 50,
-    centerY: 50,
-    radiusX: 50,
-    radiusY: 50,
-    edge: 0,
-    stops: [
-      { color: 'FFFFFFFF'.slice(2), position: 0 },
-      { color: 'FF3A3A3A'.slice(2), position: 100 },
-    ],
-  };
-  const TEXT_POSITION_OPTIONS = [
-    { value: 'topLeft', label: 'Top Left' },
-    { value: 'top', label: 'Top' },
-    { value: 'topRight', label: 'Top Right' },
-    { value: 'left', label: 'Left' },
-    { value: 'centred', label: 'Center' },
-    { value: 'right', label: 'Right' },
-    { value: 'bottomLeft', label: 'Bottom Left' },
-    { value: 'bottom', label: 'Bottom' },
-    { value: 'bottomRight', label: 'Bottom Right' },
-  ];
-  const FLOW_MODE_OPTIONS = [
-    { value: 'rotate', label: 'Rotate' },
-    { value: 'line', label: 'Line' },
-    { value: 'stair', label: 'Stair' },
-    { value: 'arc', label: 'Arc' },
-    { value: 'circle', label: 'Circle' },
-    { value: 'vertical', label: 'Vertical' },
-    { value: 'wave', label: 'Wave' },
-    { value: 'zigzag', label: 'Zigzag' },
-    { value: 'spiral', label: 'Spiral' },
-    { value: 'perimeter', label: 'Perimeter' },
-    { value: 'polyline', label: 'Polyline' },
-    { value: 'bezier', label: 'Bezier' },
-    { value: 'freehand', label: 'Freehand' },
-  ];
-  const TEXT_READING_OPTIONS = [
-    { value: 'ltr', label: 'L->R', icon: ArrowRight, span: 1 },
-    { value: 'rtl', label: 'R<-L', icon: ArrowLeft, span: 1 },
-    { value: 'mirrored', label: 'Mirrored', icon: FlipHorizontal, span: 2 },
-  ];
-  const TEXT_FILL_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
-  const TEXT_FILL_LAYER_LABELS = { solid: 'Solid', gradient: 'Gradient', image: 'Image', texture: 'Texture' };
-  const TEXT_FILL_LAYER_ICONS = { solid: PaintBucket, gradient: Blend, image: ImageIcon, texture: Layers };
-  const TYPOGRAPHY_FEATURE_OPTIONS = [
-    { key: 'ligatures', label: 'Ligatures', tags: ['liga', 'clig'] },
-    { key: 'stylisticAlternates', label: 'Alternates', tags: ['salt'] },
-    { key: 'oldstyleFigures', label: 'Oldstyle', tags: ['onum'] },
-    { key: 'tabularFigures', label: 'Tabular', tags: ['tnum'] },
-    { key: 'fractions', label: 'Fractions', tags: ['frac'] },
-    { key: 'slashedZero', label: 'Slash 0', tags: ['zero'] },
-  ];
-
   function sectionKey(name) {
     return `component-text:${core?.id ?? 'global'}:${name}`;
   }
@@ -1897,192 +1852,90 @@
       </PropertyCell>
 
       {#if font?.underline === true}
-        <PropertyCell label="Underline" span={4} hint="Underline controls.">
-          <div class="effect-divider"></div>
-        </PropertyCell>
-        <PropertyCell label="Underline Y" span={1} hint="0 = shared text/line centre. Positive moves up, negative moves down.">
-          <NumberInput
-            value={displayedLineY('underline')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineY('underline', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Underline Thickness" span={1} hint="Line thickness in pixels">
-          <NumberInput
-            value={lineProp('underlineThickness', 1)}
-            min={1}
-            step={0.5}
-            onchange={(value) => setLineNumber('underlineThickness', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Underline Color" span={2} hint="AARRGGBB line colour">
-          <PropertyColor
-            value={String(lineProp('underlineColour', lineColourFallback))}
-            onchange={(value) => setLineColor('underlineColour', value)}
-            onswatchclick={() => handleLineColorSwatch('underlineColour')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Underline Left" span={1} hint="Relative to the shared text/line centre. Negative moves left, positive moves right.">
-          <NumberInput
-            value={displayedLineLeft('underlineInsetLeft')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineLeft('underlineInsetLeft', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Width" span={2} hint="Snap left/right to the component border, or fit the underline to the word width.">
-          <div class="mini-action-row">
-            <button class="mini-action-btn" onclick={() => fitLineToLeftBorder('underline')}>&lt;--F</button>
-            <button class="mini-action-btn" onclick={() => fitLineToWordWidth('underline')}>Fit</button>
-            <button class="mini-action-btn" onclick={() => fitLineToRightBorder('underline')}>F--&gt;</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Underline Right" span={1} hint="Relative to the shared text/line centre. Positive moves right, negative moves left.">
-          <NumberInput
-            value={displayedLineRight('underlineInsetRight')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineRight('underlineInsetRight', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Layer" span={2} hint="Choose whether the underline is drawn behind or in front of the text.">
-          <div class="style-row">
-            <button class="style-btn" class:active={lineLayerValue('underline') === 'back'} onclick={() => setLineLayer('underline', 'back')}>Back</button>
-            <button class="style-btn" class:active={lineLayerValue('underline') === 'front'} onclick={() => setLineLayer('underline', 'front')}>Front</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Gap" span={2} hint="Clearance around letters when the underline overlaps the text.">
-          <NumberInput
-            value={lineProp('underlineGap', 0)}
-            min={0}
-            step={0.5}
-            onchange={(value) => setLineNumber('underlineGap', value)}
-          />
-        </PropertyCell>
+        <TextLineDecorationControls
+          title="Underline"
+          yLabel="Underline Y"
+          thicknessLabel="Underline Thickness"
+          colorLabel="Underline Color"
+          leftLabel="Underline Left"
+          rightLabel="Underline Right"
+          colorValue={String(lineProp('underlineColour', lineColourFallback))}
+          displayedY={displayedLineY('underline')}
+          thickness={lineProp('underlineThickness', 1)}
+          displayedLeft={displayedLineLeft('underlineInsetLeft')}
+          displayedRight={displayedLineRight('underlineInsetRight')}
+          gap={lineProp('underlineGap', 0)}
+          layerValue={lineLayerValue('underline')}
+          onChangeY={(value) => setDisplayedLineY('underline', value)}
+          onChangeThickness={(value) => setLineNumber('underlineThickness', value)}
+          onChangeColor={(value) => setLineColor('underlineColour', value)}
+          onColorSwatch={() => handleLineColorSwatch('underlineColour')}
+          onChangeLeft={(value) => setDisplayedLineLeft('underlineInsetLeft', value)}
+          onFitLeft={() => fitLineToLeftBorder('underline')}
+          onFitWord={() => fitLineToWordWidth('underline')}
+          onFitRight={() => fitLineToRightBorder('underline')}
+          onChangeRight={(value) => setDisplayedLineRight('underlineInsetRight', value)}
+          onSetLayer={(value) => setLineLayer('underline', value)}
+          onChangeGap={(value) => setLineNumber('underlineGap', value)}
+        />
       {/if}
 
       {#if font?.strikethrough === true}
-        <PropertyCell label="Strikethrough" span={4} hint="Strikethrough controls.">
-          <div class="effect-divider"></div>
-        </PropertyCell>
-        <PropertyCell label="Strike Y" span={1} hint="0 = shared text/line centre. Positive moves up, negative moves down.">
-          <NumberInput
-            value={displayedLineY('strikethrough')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineY('strikethrough', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Strike Thickness" span={1} hint="Line thickness in pixels">
-          <NumberInput
-            value={lineProp('strikethroughThickness', 1)}
-            min={1}
-            step={0.5}
-            onchange={(value) => setLineNumber('strikethroughThickness', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Strike Color" span={2} hint="AARRGGBB line colour">
-          <PropertyColor
-            value={String(lineProp('strikethroughColour', lineColourFallback))}
-            onchange={(value) => setLineColor('strikethroughColour', value)}
-            onswatchclick={() => handleLineColorSwatch('strikethroughColour')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Strike Left" span={1} hint="Relative to the shared text/line centre. Negative moves left, positive moves right.">
-          <NumberInput
-            value={displayedLineLeft('strikethroughInsetLeft')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineLeft('strikethroughInsetLeft', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Width" span={2} hint="Snap left/right to the component border, or fit the strikethrough to the word width.">
-          <div class="mini-action-row">
-            <button class="mini-action-btn" onclick={() => fitLineToLeftBorder('strikethrough')}>&lt;--F</button>
-            <button class="mini-action-btn" onclick={() => fitLineToWordWidth('strikethrough')}>Fit</button>
-            <button class="mini-action-btn" onclick={() => fitLineToRightBorder('strikethrough')}>F--&gt;</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Strike Right" span={1} hint="Relative to the shared text/line centre. Positive moves right, negative moves left.">
-          <NumberInput
-            value={displayedLineRight('strikethroughInsetRight')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineRight('strikethroughInsetRight', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Layer" span={2} hint="Choose whether the strikethrough is drawn behind or in front of the text.">
-          <div class="style-row">
-            <button class="style-btn" class:active={lineLayerValue('strikethrough') === 'back'} onclick={() => setLineLayer('strikethrough', 'back')}>Back</button>
-            <button class="style-btn" class:active={lineLayerValue('strikethrough') === 'front'} onclick={() => setLineLayer('strikethrough', 'front')}>Front</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Gap" span={2} hint="Clearance around letters when the strikethrough overlaps the text.">
-          <NumberInput
-            value={lineProp('strikethroughGap', 0)}
-            min={0}
-            step={0.5}
-            onchange={(value) => setLineNumber('strikethroughGap', value)}
-          />
-        </PropertyCell>
+        <TextLineDecorationControls
+          title="Strikethrough"
+          yLabel="Strike Y"
+          thicknessLabel="Strike Thickness"
+          colorLabel="Strike Color"
+          leftLabel="Strike Left"
+          rightLabel="Strike Right"
+          colorValue={String(lineProp('strikethroughColour', lineColourFallback))}
+          displayedY={displayedLineY('strikethrough')}
+          thickness={lineProp('strikethroughThickness', 1)}
+          displayedLeft={displayedLineLeft('strikethroughInsetLeft')}
+          displayedRight={displayedLineRight('strikethroughInsetRight')}
+          gap={lineProp('strikethroughGap', 0)}
+          layerValue={lineLayerValue('strikethrough')}
+          onChangeY={(value) => setDisplayedLineY('strikethrough', value)}
+          onChangeThickness={(value) => setLineNumber('strikethroughThickness', value)}
+          onChangeColor={(value) => setLineColor('strikethroughColour', value)}
+          onColorSwatch={() => handleLineColorSwatch('strikethroughColour')}
+          onChangeLeft={(value) => setDisplayedLineLeft('strikethroughInsetLeft', value)}
+          onFitLeft={() => fitLineToLeftBorder('strikethrough')}
+          onFitWord={() => fitLineToWordWidth('strikethrough')}
+          onFitRight={() => fitLineToRightBorder('strikethrough')}
+          onChangeRight={(value) => setDisplayedLineRight('strikethroughInsetRight', value)}
+          onSetLayer={(value) => setLineLayer('strikethrough', value)}
+          onChangeGap={(value) => setLineNumber('strikethroughGap', value)}
+        />
       {/if}
 
       {#if font?.overline === true}
-        <PropertyCell label="Overline" span={4} hint="Overline controls.">
-          <div class="effect-divider"></div>
-        </PropertyCell>
-        <PropertyCell label="Overline Y" span={1} hint="0 = shared text/line centre. Positive moves up, negative moves down.">
-          <NumberInput
-            value={displayedLineY('overline')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineY('overline', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Overline Thickness" span={1} hint="Line thickness in pixels">
-          <NumberInput
-            value={lineProp('overlineThickness', 1)}
-            min={1}
-            step={0.5}
-            onchange={(value) => setLineNumber('overlineThickness', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Overline Color" span={2} hint="AARRGGBB line colour">
-          <PropertyColor
-            value={String(lineProp('overlineColour', lineColourFallback))}
-            onchange={(value) => setLineColor('overlineColour', value)}
-            onswatchclick={() => handleLineColorSwatch('overlineColour')}
-          />
-        </PropertyCell>
-        <PropertyCell label="Overline Left" span={1} hint="Relative to the shared text/line centre. Negative moves left, positive moves right.">
-          <NumberInput
-            value={displayedLineLeft('overlineInsetLeft')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineLeft('overlineInsetLeft', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Width" span={2} hint="Snap left/right to the component border, or fit the overline to the word width.">
-          <div class="mini-action-row">
-            <button class="mini-action-btn" onclick={() => fitLineToLeftBorder('overline')}>&lt;--F</button>
-            <button class="mini-action-btn" onclick={() => fitLineToWordWidth('overline')}>Fit</button>
-            <button class="mini-action-btn" onclick={() => fitLineToRightBorder('overline')}>F--&gt;</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Overline Right" span={1} hint="Relative to the shared text/line centre. Positive moves right, negative moves left.">
-          <NumberInput
-            value={displayedLineRight('overlineInsetRight')}
-            step={0.5}
-            onchange={(value) => setDisplayedLineRight('overlineInsetRight', value)}
-          />
-        </PropertyCell>
-        <PropertyCell label="Layer" span={2} hint="Choose whether the overline is drawn behind or in front of the text.">
-          <div class="style-row">
-            <button class="style-btn" class:active={lineLayerValue('overline') === 'back'} onclick={() => setLineLayer('overline', 'back')}>Back</button>
-            <button class="style-btn" class:active={lineLayerValue('overline') === 'front'} onclick={() => setLineLayer('overline', 'front')}>Front</button>
-          </div>
-        </PropertyCell>
-        <PropertyCell label="Gap" span={2} hint="Clearance around letters when the overline overlaps the text.">
-          <NumberInput
-            value={lineProp('overlineGap', 0)}
-            min={0}
-            step={0.5}
-            onchange={(value) => setLineNumber('overlineGap', value)}
-          />
-        </PropertyCell>
+        <TextLineDecorationControls
+          title="Overline"
+          yLabel="Overline Y"
+          thicknessLabel="Overline Thickness"
+          colorLabel="Overline Color"
+          leftLabel="Overline Left"
+          rightLabel="Overline Right"
+          colorValue={String(lineProp('overlineColour', lineColourFallback))}
+          displayedY={displayedLineY('overline')}
+          thickness={lineProp('overlineThickness', 1)}
+          displayedLeft={displayedLineLeft('overlineInsetLeft')}
+          displayedRight={displayedLineRight('overlineInsetRight')}
+          gap={lineProp('overlineGap', 0)}
+          layerValue={lineLayerValue('overline')}
+          onChangeY={(value) => setDisplayedLineY('overline', value)}
+          onChangeThickness={(value) => setLineNumber('overlineThickness', value)}
+          onChangeColor={(value) => setLineColor('overlineColour', value)}
+          onColorSwatch={() => handleLineColorSwatch('overlineColour')}
+          onChangeLeft={(value) => setDisplayedLineLeft('overlineInsetLeft', value)}
+          onFitLeft={() => fitLineToLeftBorder('overline')}
+          onFitWord={() => fitLineToWordWidth('overline')}
+          onFitRight={() => fitLineToRightBorder('overline')}
+          onChangeRight={(value) => setDisplayedLineRight('overlineInsetRight', value)}
+          onSetLayer={(value) => setLineLayer('overline', value)}
+          onChangeGap={(value) => setLineNumber('overlineGap', value)}
+        />
       {/if}
     </PropertySection>
   </div>
@@ -2325,37 +2178,6 @@
   .style-btn.active {
     background: #094771;
     border-color: #0B6EB5;
-    color: #FFF;
-  }
-
-  .mini-action-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 3px;
-    width: 100%;
-  }
-
-  .mini-action-btn {
-    height: 22px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #AAA;
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 0 6px;
-    font: inherit;
-    font-size: 9px;
-    line-height: 1;
-    white-space: nowrap;
-    width: 100%;
-    min-width: 0;
-  }
-
-  .mini-action-btn:hover {
-    border-color: #5B9BD5;
     color: #FFF;
   }
 

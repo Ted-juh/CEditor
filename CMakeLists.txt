@@ -32,6 +32,8 @@ target_sources(CEditor PRIVATE
     src/Main.cpp
     src/WebViewHost.cpp
     src/ValueTreeBridge.cpp
+    src/ValueTreeBridgeHandlers.cpp
+    src/ValueTreeBridgeState.cpp
 )
 
 target_compile_definitions(CEditor PRIVATE

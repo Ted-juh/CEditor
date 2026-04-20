@@ -17,22 +17,26 @@ import {
   autosaveEnabled,
   autosaveIntervalSeconds,
   restoreUnsavedWork,
-  defaultSnapToGrid,
-  defaultGridSize,
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
+import { applyPanelUpdates } from './panelDocumentHelpers.js';
+import { createPanel, deserializePanel, serializePanel, uniquePanelPaths } from './panelModel.js';
+import {
+  clearUnsavedSessionSnapshot,
+  persistUnsavedSessionSnapshot as persistSessionSnapshot,
+  readUnsavedActiveEditorTab,
+  readUnsavedSessionSnapshot,
+} from './panelSessionPersistence.js';
+
+export { createPanel };
 
 /**
  * Panel data model.
  * Each panel has: id, name, width, height, modified, filePath, controls (empty for now).
  */
 
-let nextId = 1;
-const UNSAVED_PANELS_KEY = 'ce.unsavedPanels';
-const UNSAVED_ACTIVE_TAB_KEY = 'ce.unsavedActiveEditorTab';
 let autosaveTimer = null;
 let sessionRestoreInitialized = false;
-const storedValueCache = new Map();
 const pendingOpenPanelFileTimers = new Map();
 const pendingOpenPanelFiles = new Set();
 let pendingManualOpenTimer = null;
@@ -148,179 +152,13 @@ function schedulePanelOpenHousekeeping(label) {
   }, 0);
 }
 
-function uniquePanelPaths(paths) {
-  const unique = [];
-  const seen = new Set();
-
-  for (const rawPath of paths ?? []) {
-    const path = String(rawPath ?? '').trim();
-    if (!path || seen.has(path)) continue;
-    seen.add(path);
-    unique.push(path);
-  }
-
-  return unique;
-}
-
-/** Create a new panel object with defaults */
-export function createPanel(name = null) {
-  const id = nextId++;
-  return {
-    id,
-    name: name ?? `Untitled ${id}`,
-    scriptId: `panel_${id}`,
-    author: '',
-    version: '1.0.0',
-    description: '',
-    enabled: true,
-    locked: false,
-    filePath: null,
-    width: 600,
-    height: 400,
-    resizable: false,
-    minWidth: 0,
-    minHeight: 0,
-    maxWidth: 0,
-    maxHeight: 0,
-    lockAspectRatio: false,
-    // --- Background layers ---
-    bgLayerOrder: ['solid', 'gradient', 'image', 'texture'],
-    bgSolid: true,
-    bgColour: 'FF333333',
-    bgGradientEnabled: false,
-    bgGradientOpacity: 100,
-    bgGradientName: '',
-    bgGradient: {
-      type: 'linear',
-      angle: 90,
-      centerX: 50,
-      centerY: 50,
-      radiusX: 50,
-      radiusY: 50,
-      edge: 0,
-      stops: [
-        { color: 'FF0000', position: 0 },
-        { color: '0000FF', position: 100 },
-      ],
-    },
-    bgImageEnabled: false,
-    bgImage: '',
-    bgImageOpacity: 100,
-    bgImageFit: 'fill',
-    bgImageAlign: 'center',
-    bgImageOffsetX: 0,
-    bgImageOffsetY: 0,
-    bgImageBlend: 'normal',
-    bgImageBlur: 0,
-    bgImageTint: 'FFFFFF',
-    bgImageFlipH: false,
-    bgImageFlipV: false,
-    bgImageRotation: 0,
-    bgImageGrayscale: false,
-    bgImageSaturation: 100,
-    bgImageBrightness: 100,
-    bgImageContrast: 100,
-    bgImageTileScale: 1.0,
-    bgTextureEnabled: false,
-    bgTexture: '',
-    bgTextureOpacity: 100,
-    bgTextureFit: 'tile',
-    bgTextureAlign: 'center',
-    bgTextureOffsetX: 0,
-    bgTextureOffsetY: 0,
-    bgTextureBlend: 'normal',
-    bgTextureBlur: 0,
-    bgTextureTint: 'FFFFFF',
-    bgTextureFlipH: false,
-    bgTextureFlipV: false,
-    bgTextureRotation: 0,
-    bgTextureGrayscale: false,
-    bgTextureSaturation: 100,
-    bgTextureBrightness: 100,
-    bgTextureContrast: 100,
-    bgTextureTileScale: 1.0,
-    gridEnabled: true,
-    gridSize: get(defaultGridSize),
-    gridColour: '33FFFFFF',
-    gridLineWidth: 1,
-    gridType: 'lines',
-    gridSubdivision: 1,
-    gridSubColour: '55FFFFFF',
-    gridCentered: false,
-    gridOriginX: 0,
-    gridOriginY: 0,
-    snapToGrid: get(defaultSnapToGrid),
-    notepad: {
-      notes: [{ name: 'Note 1', content: '' }],
-      activeNoteIndex: 0,
-    },
-    viewer: {
-      images: [],
-      activeImageIndex: 0,
-    },
-    modified: false,
-    controls: [],
-  };
-}
-
-function canUseLocalStorage() {
-  return typeof localStorage !== 'undefined';
-}
-
-function readStoredJson(key, fallback) {
-  if (!canUseLocalStorage()) return fallback;
-
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw != null) storedValueCache.set(key, raw);
-    return raw ? JSON.parse(raw) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeStoredJson(key, value) {
-  if (!canUseLocalStorage()) return;
-
-  try {
-    const raw = JSON.stringify(value);
-    if (storedValueCache.get(key) === raw) return;
-    localStorage.setItem(key, raw);
-    storedValueCache.set(key, raw);
-  } catch { /* ignore */ }
-}
-
-function clearUnsavedSessionSnapshot() {
-  if (!canUseLocalStorage()) return;
-
-  try {
-    storedValueCache.delete(UNSAVED_PANELS_KEY);
-    storedValueCache.delete(UNSAVED_ACTIVE_TAB_KEY);
-    localStorage.removeItem(UNSAVED_PANELS_KEY);
-    localStorage.removeItem(UNSAVED_ACTIVE_TAB_KEY);
-  } catch { /* ignore */ }
-}
-
-function buildUnsavedSessionSnapshot() {
-  return get(panels)
-    .filter((panel) => !panel.filePath || panel.modified)
-    .map((panel) => ({ ...panel }));
-}
-
 function persistUnsavedSessionSnapshot() {
-  if (!get(autosaveEnabled) || !get(restoreUnsavedWork)) {
-    clearUnsavedSessionSnapshot();
-    return;
-  }
-
-  const snapshot = buildUnsavedSessionSnapshot();
-  if (snapshot.length === 0) {
-    clearUnsavedSessionSnapshot();
-    return;
-  }
-
-  writeStoredJson(UNSAVED_PANELS_KEY, snapshot);
-  writeStoredJson(UNSAVED_ACTIVE_TAB_KEY, get(activeEditorTab));
+  persistSessionSnapshot({
+    panelList: get(panels),
+    activeEditorTab: get(activeEditorTab),
+    autosaveEnabled: get(autosaveEnabled),
+    restoreUnsavedWork: get(restoreUnsavedWork),
+  });
 }
 
 export function flushUnsavedSessionSnapshot() {
@@ -355,7 +193,7 @@ function restoreUnsavedSessionFromSnapshot() {
     return;
   }
 
-  const snapshot = readStoredJson(UNSAVED_PANELS_KEY, []);
+  const snapshot = readUnsavedSessionSnapshot();
   if (!Array.isArray(snapshot) || snapshot.length === 0) return;
 
   const idMap = new Map();
@@ -381,7 +219,7 @@ function restoreUnsavedSessionFromSnapshot() {
     ),
   ]);
 
-  const savedActiveTab = readStoredJson(UNSAVED_ACTIVE_TAB_KEY, null);
+  const savedActiveTab = readUnsavedActiveEditorTab();
   const restoredActiveId = idMap.get(savedActiveTab?.id) ?? restoredPanels[restoredPanels.length - 1]?.id ?? null;
 
   if (restoredActiveId != null) {
@@ -606,45 +444,9 @@ export function closeActiveEditorTab() {
 
 /** Update a panel's properties */
 export function updatePanel(id, updates) {
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== id) return p;
-
-      // Lock aspect ratio: proportionally adjust the other dimension
-      if (p.lockAspectRatio && p.width > 0 && p.height > 0) {
-        const ratio = p.width / p.height;
-        if ('width' in updates && !('height' in updates)) {
-          updates.height = Math.round(updates.width / ratio);
-        } else if ('height' in updates && !('width' in updates)) {
-          updates.width = Math.round(updates.height * ratio);
-        }
-      }
-
-      return { ...p, ...updates, modified: true };
-    })
+  panels.update((list) =>
+    list.map((panel) => (panel.id === id ? applyPanelUpdates(panel, updates) : panel))
   );
-}
-
-// --- Serialization ---
-
-/** Serialize a panel to JSON (strip runtime-only fields) */
-function serializePanel(panel) {
-  const { id, modified, ...data } = panel;
-  return JSON.stringify(data, null, 2);
-}
-
-/** Deserialize JSON into a panel object */
-function deserializePanel(json, filePath, name) {
-  const data = JSON.parse(json);
-  const id = nextId++;
-  return {
-    ...createPanel(),
-    ...data,
-    id,
-    filePath,
-    name: name || data.name || `Untitled ${id}`,
-    modified: false,
-  };
 }
 
 // --- Save / Open actions ---

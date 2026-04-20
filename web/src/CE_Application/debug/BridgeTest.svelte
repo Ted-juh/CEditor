@@ -1,5 +1,5 @@
 <script>
-  import { controlTree, bridgeConnected, getNestedValue, updateProperty } from '../bridge/valueTree.js';
+  import { controlTree, bridgeConnected, getNestedValue, updateProperty } from '../bridge/valueTreeDebug.js';
   import { undo, redo } from '../bridge/bridge.js';
   import CeButton from '../../CE_Panel/components/CeButton.svelte';
 

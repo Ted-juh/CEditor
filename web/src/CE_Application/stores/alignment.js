@@ -1,6 +1,6 @@
 import { get } from 'svelte/store';
-import { panels, activePanelId, activePanel, selectedComponentIds, keyObjectId } from './panels.js';
-import { getSection, updateControlProperty } from './controls.js';
+import { panels, activePanel, selectedComponentIds, keyObjectId } from './panels.js';
+import { applyControlPatchesById, getSection } from './controls.js';
 import { updatePanel } from './panels.js';
 import { guides } from './guides.js';
 import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
@@ -80,6 +80,20 @@ function getReferenceBounds(mode, transforms, regionRef = null) {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+function commitTransformUpdates(transforms, buildPatch) {
+  const patches = new Map();
+
+  transforms.forEach((transform, index) => {
+    const patch = buildPatch(transform, index);
+    if (!patch || Object.keys(patch).length === 0) return;
+    patches.set(transform.id, patch);
+  });
+
+  if (patches.size > 0) {
+    applyControlPatchesById(patches);
+  }
+}
+
 // --- Align (6) ---
 // regionRef: { x, y } — only used when mode === 'region'
 
@@ -87,9 +101,7 @@ export function alignLeft(mode, regionRef = null) {
   const transforms = getSelectedTransforms();
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.x', ref.x);
-  }
+  commitTransformUpdates(transforms, () => ({ 'Transform.x': ref.x }));
 }
 
 export function alignHCenter(mode, regionRef = null) {
@@ -97,9 +109,9 @@ export function alignHCenter(mode, regionRef = null) {
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
   const center = ref.x + ref.width / 2;
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.x', Math.round(center - t.width / 2));
-  }
+  commitTransformUpdates(transforms, (transform) => ({
+    'Transform.x': Math.round(center - transform.width / 2),
+  }));
 }
 
 export function alignRight(mode, regionRef = null) {
@@ -107,18 +119,14 @@ export function alignRight(mode, regionRef = null) {
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
   const right = ref.x + ref.width;
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.x', right - t.width);
-  }
+  commitTransformUpdates(transforms, (transform) => ({ 'Transform.x': right - transform.width }));
 }
 
 export function alignTop(mode, regionRef = null) {
   const transforms = getSelectedTransforms();
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.y', ref.y);
-  }
+  commitTransformUpdates(transforms, () => ({ 'Transform.y': ref.y }));
 }
 
 export function alignVCenter(mode, regionRef = null) {
@@ -126,9 +134,9 @@ export function alignVCenter(mode, regionRef = null) {
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
   const center = ref.y + ref.height / 2;
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.y', Math.round(center - t.height / 2));
-  }
+  commitTransformUpdates(transforms, (transform) => ({
+    'Transform.y': Math.round(center - transform.height / 2),
+  }));
 }
 
 export function alignBottom(mode, regionRef = null) {
@@ -136,9 +144,7 @@ export function alignBottom(mode, regionRef = null) {
   if (transforms.length === 0) return;
   const ref = getReferenceBounds(mode, transforms, regionRef);
   const bottom = ref.y + ref.height;
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.y', bottom - t.height);
-  }
+  commitTransformUpdates(transforms, (transform) => ({ 'Transform.y': bottom - transform.height }));
 }
 
 // --- Distribute Edges (6) ---
@@ -150,9 +156,10 @@ export function distributeLeftEdges() {
   const first = sorted[0].x;
   const last = sorted[sorted.length - 1].x;
   const step = (last - first) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    updateControlProperty(sorted[i].id, 'Transform.x', Math.round(first + step * i));
-  }
+  commitTransformUpdates(
+    sorted.slice(1, -1),
+    (_, index) => ({ 'Transform.x': Math.round(first + step * (index + 1)) })
+  );
 }
 
 export function distributeHCenters() {
@@ -162,10 +169,10 @@ export function distributeHCenters() {
   const firstCenter = sorted[0].x + sorted[0].width / 2;
   const lastCenter = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width / 2;
   const step = (lastCenter - firstCenter) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    const target = firstCenter + step * i;
-    updateControlProperty(sorted[i].id, 'Transform.x', Math.round(target - sorted[i].width / 2));
-  }
+  commitTransformUpdates(sorted.slice(1, -1), (transform, index) => {
+    const target = firstCenter + step * (index + 1);
+    return { 'Transform.x': Math.round(target - transform.width / 2) };
+  });
 }
 
 export function distributeRightEdges() {
@@ -175,10 +182,10 @@ export function distributeRightEdges() {
   const firstRight = sorted[0].x + sorted[0].width;
   const lastRight = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width;
   const step = (lastRight - firstRight) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    const target = firstRight + step * i;
-    updateControlProperty(sorted[i].id, 'Transform.x', Math.round(target - sorted[i].width));
-  }
+  commitTransformUpdates(sorted.slice(1, -1), (transform, index) => {
+    const target = firstRight + step * (index + 1);
+    return { 'Transform.x': Math.round(target - transform.width) };
+  });
 }
 
 export function distributeTopEdges() {
@@ -188,9 +195,10 @@ export function distributeTopEdges() {
   const first = sorted[0].y;
   const last = sorted[sorted.length - 1].y;
   const step = (last - first) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    updateControlProperty(sorted[i].id, 'Transform.y', Math.round(first + step * i));
-  }
+  commitTransformUpdates(
+    sorted.slice(1, -1),
+    (_, index) => ({ 'Transform.y': Math.round(first + step * (index + 1)) })
+  );
 }
 
 export function distributeVCenters() {
@@ -200,10 +208,10 @@ export function distributeVCenters() {
   const firstCenter = sorted[0].y + sorted[0].height / 2;
   const lastCenter = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height / 2;
   const step = (lastCenter - firstCenter) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    const target = firstCenter + step * i;
-    updateControlProperty(sorted[i].id, 'Transform.y', Math.round(target - sorted[i].height / 2));
-  }
+  commitTransformUpdates(sorted.slice(1, -1), (transform, index) => {
+    const target = firstCenter + step * (index + 1);
+    return { 'Transform.y': Math.round(target - transform.height / 2) };
+  });
 }
 
 export function distributeBottomEdges() {
@@ -213,10 +221,10 @@ export function distributeBottomEdges() {
   const firstBottom = sorted[0].y + sorted[0].height;
   const lastBottom = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height;
   const step = (lastBottom - firstBottom) / (sorted.length - 1);
-  for (let i = 1; i < sorted.length - 1; i++) {
-    const target = firstBottom + step * i;
-    updateControlProperty(sorted[i].id, 'Transform.y', Math.round(target - sorted[i].height));
-  }
+  commitTransformUpdates(sorted.slice(1, -1), (transform, index) => {
+    const target = firstBottom + step * (index + 1);
+    return { 'Transform.y': Math.round(target - transform.height) };
+  });
 }
 
 // --- Distribute Spacing (2) ---
@@ -230,18 +238,18 @@ export function distributeHSpacing(fixedGap = null, alignOpposite = false) {
   // Align all to topmost Y when option is enabled
   if (alignOpposite) {
     const topY = Math.min(...sorted.map(t => t.y));
-    for (const t of sorted) {
-      updateControlProperty(t.id, 'Transform.y', topY);
-    }
+    commitTransformUpdates(sorted, () => ({ 'Transform.y': topY }));
   }
 
   if (fixedGap != null) {
     // Fixed gap: place each component fixedGap pixels after the previous
     let currentX = sorted[0].x + sorted[0].width + fixedGap;
+    const patches = new Map();
     for (let i = 1; i < sorted.length; i++) {
-      updateControlProperty(sorted[i].id, 'Transform.x', Math.round(currentX));
+      patches.set(sorted[i].id, { 'Transform.x': Math.round(currentX) });
       currentX += sorted[i].width + fixedGap;
     }
+    applyControlPatchesById(patches);
   } else {
     // Auto: even spacing between outermost
     if (sorted.length < 3) return;
@@ -250,10 +258,12 @@ export function distributeHSpacing(fixedGap = null, alignOpposite = false) {
     const spanEnd = sorted[sorted.length - 1].x + sorted[sorted.length - 1].width;
     const gap = ((spanEnd - spanStart) - totalWidth) / (sorted.length - 1);
     let currentX = sorted[0].x + sorted[0].width + gap;
+    const patches = new Map();
     for (let i = 1; i < sorted.length - 1; i++) {
-      updateControlProperty(sorted[i].id, 'Transform.x', Math.round(currentX));
+      patches.set(sorted[i].id, { 'Transform.x': Math.round(currentX) });
       currentX += sorted[i].width + gap;
     }
+    applyControlPatchesById(patches);
   }
 }
 
@@ -265,18 +275,18 @@ export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
   // Align all to leftmost X when option is enabled
   if (alignOpposite) {
     const leftX = Math.min(...sorted.map(t => t.x));
-    for (const t of sorted) {
-      updateControlProperty(t.id, 'Transform.x', leftX);
-    }
+    commitTransformUpdates(sorted, () => ({ 'Transform.x': leftX }));
   }
 
   if (fixedGap != null) {
     // Fixed gap: place each component fixedGap pixels after the previous
     let currentY = sorted[0].y + sorted[0].height + fixedGap;
+    const patches = new Map();
     for (let i = 1; i < sorted.length; i++) {
-      updateControlProperty(sorted[i].id, 'Transform.y', Math.round(currentY));
+      patches.set(sorted[i].id, { 'Transform.y': Math.round(currentY) });
       currentY += sorted[i].height + fixedGap;
     }
+    applyControlPatchesById(patches);
   } else {
     // Auto: even spacing between outermost
     if (sorted.length < 3) return;
@@ -285,10 +295,12 @@ export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
     const spanEnd = sorted[sorted.length - 1].y + sorted[sorted.length - 1].height;
     const gap = ((spanEnd - spanStart) - totalHeight) / (sorted.length - 1);
     let currentY = sorted[0].y + sorted[0].height + gap;
+    const patches = new Map();
     for (let i = 1; i < sorted.length - 1; i++) {
-      updateControlProperty(sorted[i].id, 'Transform.y', Math.round(currentY));
+      patches.set(sorted[i].id, { 'Transform.y': Math.round(currentY) });
       currentY += sorted[i].height + gap;
     }
+    applyControlPatchesById(patches);
   }
 }
 
@@ -396,28 +408,24 @@ export function matchWidth() {
   const transforms = getSelectedTransforms();
   if (transforms.length < 2) return;
   const ref = getReferenceSize(transforms);
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.width', ref.width);
-  }
+  commitTransformUpdates(transforms, () => ({ 'Transform.width': ref.width }));
 }
 
 export function matchHeight() {
   const transforms = getSelectedTransforms();
   if (transforms.length < 2) return;
   const ref = getReferenceSize(transforms);
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.height', ref.height);
-  }
+  commitTransformUpdates(transforms, () => ({ 'Transform.height': ref.height }));
 }
 
 export function matchBoth() {
   const transforms = getSelectedTransforms();
   if (transforms.length < 2) return;
   const ref = getReferenceSize(transforms);
-  for (const t of transforms) {
-    updateControlProperty(t.id, 'Transform.width', ref.width);
-    updateControlProperty(t.id, 'Transform.height', ref.height);
-  }
+  commitTransformUpdates(transforms, () => ({
+    'Transform.width': ref.width,
+    'Transform.height': ref.height,
+  }));
 }
 
 // --- Snap to Grid ---

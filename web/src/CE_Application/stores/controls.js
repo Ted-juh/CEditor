@@ -1,13 +1,15 @@
 import { derived, get } from 'svelte/store';
-import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId, updatePanel } from './panels.js';
+import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
-import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
+import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
+import { mutatePanelControlsByIdsInList, mutatePanelControlsInList } from './panelDocumentHelpers.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
+export { applyPatchObject } from './controlTreeUtils.js';
 
 /**
  * The currently selected control object (derived).
@@ -57,22 +59,6 @@ function deepEqual(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
-function valueAtPath(control, path) {
-  if (!control || !path) return undefined;
-  const parts = String(path).split('.');
-  let current = control;
-  for (const part of parts) {
-    if (current?._children?.[part] !== undefined) {
-      current = current._children[part];
-    } else if (current?.[part] !== undefined) {
-      current = current[part];
-    } else {
-      return undefined;
-    }
-  }
-  return current;
-}
-
 function ensureStatePatchMap(control, stateName) {
   const states = control?._children?.States;
   const state = states?._children?.[stateName];
@@ -115,18 +101,10 @@ export function updateSelectedProperty(path, value) {
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-
-      const newControls = p.controls.map(c => {
-        if (!ids.has(c._children?.Core?.id)) return c;
-        const clone = JSON.parse(JSON.stringify(c));
-        applyResolvedValue(clone, path, value);
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
+  panels.update((list) =>
+    mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+      applyResolvedValue(draft, path, value);
+      return true;
     })
   );
 }
@@ -263,47 +241,35 @@ export function duplicateControl(ids) {
  * @param {*} value - The new value
  */
 export function updateControlProperty(controlId, path, value) {
+  applyControlPatchesById(new Map([[controlId, { [path]: value }]]));
+}
+
+export function applyControlPatchesById(patchesByControlId) {
   const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return;
+  if (panelId == null || !patchesByControlId || patchesByControlId.size === 0) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
+  panels.update((list) =>
+    mutatePanelControlsInList(
+      list,
+      panelId,
+      (control) => patchesByControlId.has(control?._children?.Core?.id),
+      (draft) => {
+        const patch = patchesByControlId.get(draft?._children?.Core?.id);
+        if (!patch || Object.keys(patch).length === 0) return false;
 
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
+        for (const [path, value] of Object.entries(patch)) {
+          applyResolvedValue(draft, path, value);
+        }
 
-        const clone = JSON.parse(JSON.stringify(c));
-        applyResolvedValue(clone, path, value);
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
-    })
+        return true;
+      }
+    )
   );
 }
 
 export function applyControlPatch(controlId, patch) {
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null || !patch || Object.keys(patch).length === 0) return;
-
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
-
-        const clone = JSON.parse(JSON.stringify(c));
-        for (const [path, value] of Object.entries(patch)) {
-          applyResolvedValue(clone, path, deepClone(value));
-        }
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
-    })
-  );
+  if (!patch || Object.keys(patch).length === 0) return;
+  applyControlPatchesById(new Map([[controlId, patch]]));
 }
 
 export function applySelectedPatch(patch) {
@@ -311,51 +277,31 @@ export function applySelectedPatch(patch) {
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0 || !patch || Object.keys(patch).length === 0) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
+  panels.update((list) =>
+    mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+      for (const [path, value] of Object.entries(patch)) {
+        applyResolvedValue(draft, path, value);
+      }
 
-      const newControls = p.controls.map(c => {
-        if (!ids.has(c._children?.Core?.id)) return c;
-
-        const clone = JSON.parse(JSON.stringify(c));
-        for (const [path, value] of Object.entries(patch)) {
-          applyResolvedValue(clone, path, deepClone(value));
-        }
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
+      return true;
     })
   );
-}
-
-export function applyPatchObject(control, patch) {
-  if (!control || !patch || Object.keys(patch).length === 0) return control;
-  for (const [path, value] of Object.entries(patch)) {
-    setNestedValue(control, path, deepClone(value));
-  }
-  return control;
 }
 
 export function removeControlNode(controlId, path) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null || !path) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
-
-        const clone = JSON.parse(JSON.stringify(c));
-        deleteNestedValue(clone, path);
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
-    })
+  panels.update((list) =>
+    mutatePanelControlsInList(
+      list,
+      panelId,
+      (control) => control?._children?.Core?.id === controlId,
+      (draft) => {
+        deleteNestedValue(draft, path);
+        return true;
+      }
+    )
   );
 }
 
@@ -374,21 +320,17 @@ export function addSection(controlId, sectionName) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
-        if (c._children[sectionName]) return c; // already has it
-
-        const clone = JSON.parse(JSON.stringify(c));
-        clone._children[sectionName] = JSON.parse(JSON.stringify(defaults));
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
-    })
+  panels.update((list) =>
+    mutatePanelControlsInList(
+      list,
+      panelId,
+      (control) => control?._children?.Core?.id === controlId,
+      (draft, original) => {
+        if (original._children[sectionName]) return false;
+        draft._children[sectionName] = deepClone(defaults);
+        return true;
+      }
+    )
   );
 }
 
@@ -414,27 +356,22 @@ export function addSections(controlId, sectionNames = []) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
+  panels.update((list) =>
+    mutatePanelControlsInList(
+      list,
+      panelId,
+      (control) => control?._children?.Core?.id === controlId,
+      (draft, original) => {
+        const missingEntries = entries.filter(([sectionName]) => !original._children?.[sectionName]);
+        if (!missingEntries.length) return false;
 
-      let changed = false;
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
-
-        const missingEntries = entries.filter(([sectionName]) => !c._children?.[sectionName]);
-        if (!missingEntries.length) return c;
-
-        const clone = JSON.parse(JSON.stringify(c));
-        for (const [sectionName, defaults] of missingEntries) {
-          clone._children[sectionName] = JSON.parse(JSON.stringify(defaults));
+        for (const [sectionName, sectionDefaults] of missingEntries) {
+          draft._children[sectionName] = deepClone(sectionDefaults);
         }
-        changed = true;
-        return clone;
-      });
 
-      return changed ? { ...p, controls: newControls, modified: true } : p;
-    })
+        return true;
+      }
+    )
   );
 }
 
@@ -451,120 +388,15 @@ export function removeSection(controlId, sectionName) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-
-      const newControls = p.controls.map(c => {
-        if (c._children?.Core?.id !== controlId) return c;
-
-        const clone = JSON.parse(JSON.stringify(c));
-        delete clone._children[sectionName];
-        return clone;
-      });
-
-      return { ...p, controls: newControls, modified: true };
-    })
-  );
-}
-
-// --- Internal helpers ---
-
-/**
- * Set a nested value in a control by dot-notation path.
- * First segment navigates _children (section lookup).
- * Subsequent segments try _children first (tree nodes), then plain properties
- * (handles plain objects like per-side border and array indices).
- *
- * "Transform.x"                    → _children.Transform.x = value
- * "Background.Fill.colour"         → _children.Background._children.Fill.colour = value
- * "Background.Border.top.style"    → _children.Background._children.Border.top.style = value
- * "Effects.Shadows.items.0.blur"   → _children.Effects._children.Shadows.items[0].blur = value
- */
-function setNestedValue(control, path, value) {
-  const parts = path.split('.');
-  if (parts.length === 0) return;
-
-  if (parts.length === 1) {
-    if (!control._children) return;
-    control._children[parts[0]] = value;
-    return;
-  }
-
-  // First part is always a section name in _children
-  let current = control._children?.[parts[0]];
-  if (!current) return;
-
-  // Navigate intermediate parts
-  for (let i = 1; i < parts.length - 1; i++) {
-    const key = parts[i];
-    // Try _children first (tree nodes), then plain property (objects/arrays)
-    if (current._children && current._children[key] !== undefined) {
-      current = current._children[key];
-    } else if (current._children && current._children[key] === undefined) {
-      const defaultChild = getDefaultChildTemplate(current._type, key);
-      if (defaultChild !== undefined) {
-        current._children[key] = JSON.parse(JSON.stringify(defaultChild));
-        current = current._children[key];
-      } else if (current[key] !== undefined) {
-        current = current[key];
-      } else {
-        return; // path doesn't exist
+  panels.update((list) =>
+    mutatePanelControlsInList(
+      list,
+      panelId,
+      (control) => control?._children?.Core?.id === controlId,
+      (draft) => {
+        delete draft._children[sectionName];
+        return true;
       }
-    } else if (current[key] !== undefined) {
-      current = current[key];
-    } else {
-      return; // path doesn't exist
-    }
-  }
-
-  // Set the final property
-  const propName = parts[parts.length - 1];
-  const treeValue = value != null && typeof value === 'object' && !Array.isArray(value)
-    && (value._type !== undefined || value._children !== undefined);
-  const defaultChild = current?._children ? getDefaultChildTemplate(current._type, propName) : undefined;
-
-  if (current?._children && (current._children[propName] !== undefined || treeValue || defaultChild !== undefined)) {
-    current._children[propName] = value;
-  } else {
-    current[propName] = value;
-  }
-}
-
-function getDefaultChildTemplate(typeName, childName) {
-  if (!typeName || !childName) return undefined;
-  const sectionDefaults = SECTION_DEFAULTS[typeName];
-  return sectionDefaults?._children?.[childName];
-}
-
-function deleteNestedValue(control, path) {
-  const parts = path.split('.');
-  if (parts.length === 0) return;
-
-  if (parts.length === 1) {
-    if (!control._children) return;
-    delete control._children[parts[0]];
-    return;
-  }
-
-  let current = control._children?.[parts[0]];
-  if (!current) return;
-
-  for (let i = 1; i < parts.length - 1; i += 1) {
-    const key = parts[i];
-    if (current?._children?.[key] !== undefined) {
-      current = current._children[key];
-    } else if (current?.[key] !== undefined) {
-      current = current[key];
-    } else {
-      return;
-    }
-  }
-
-  const finalKey = parts[parts.length - 1];
-  if (current?._children?.[finalKey] !== undefined) {
-    delete current._children[finalKey];
-  } else if (current && current[finalKey] !== undefined) {
-    delete current[finalKey];
-  }
+    )
+  );
 }
