@@ -128,6 +128,14 @@
       </div>
       <input type="checkbox" checked={general.showDistances} onchange={(event) => setBool('showDistances', event)} />
     </label>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Preview Selection Ring</strong>
+        <span>Show the yellow dashed inspect ring around the active control while Preview mode is on.</span>
+      </div>
+      <input type="checkbox" checked={general.showPreviewSelectionRing} onchange={(event) => setBool('showPreviewSelectionRing', event)} />
+    </label>
   </section>
 
   <section class="settings-card">

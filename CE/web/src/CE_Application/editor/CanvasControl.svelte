@@ -37,6 +37,23 @@
     panelHeight = 0,
     onDragStart = null,
     onDragEnd = null,
+    previewRole = '',
+    previewTabIndex = undefined,
+    previewAriaLabel = '',
+    previewAriaDisabled = undefined,
+    previewAriaChecked = undefined,
+    previewAriaValueNow = undefined,
+    previewAriaValueMin = undefined,
+    previewAriaValueMax = undefined,
+    previewKeyboardFocus = false,
+    previewHighlighted = false,
+    onpreviewpointerenter = null,
+    onpreviewpointerleave = null,
+    onpreviewpointerdown = null,
+    onpreviewfocus = null,
+    onpreviewblur = null,
+    onpreviewkeydown = null,
+    onpreviewkeyup = null,
   } = $props();
 
   // --- Derived data from sections ---
@@ -87,6 +104,20 @@
 
     return segments.join(' | ');
   });
+  let previewInteractive = $derived(
+    editorInteractionEnabled === false
+    && (
+      !!previewRole
+      || previewTabIndex !== undefined
+      || onpreviewpointerenter != null
+      || onpreviewpointerleave != null
+      || onpreviewpointerdown != null
+      || onpreviewfocus != null
+      || onpreviewblur != null
+      || onpreviewkeydown != null
+      || onpreviewkeyup != null
+    )
+  );
 
   // --- Drag state (internal $state per feedback) ---
   let isDragging = $state(false);
@@ -3412,6 +3443,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
+<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
   class="canvas-control"
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
@@ -3419,8 +3451,27 @@
   class:hidden-component={!isVisible}
   class:locked={editorInteractionEnabled && isEditorLocked}
   class:preview-surface={!editorInteractionEnabled}
+  class:preview-interactive={previewInteractive}
+  class:preview-disabled={previewInteractive && previewAriaDisabled === true}
+  class:preview-keyboard-focus={previewInteractive && previewKeyboardFocus}
+  class:preview-highlighted={previewInteractive && previewHighlighted}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
+  onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
+  onpointerleave={previewInteractive ? onpreviewpointerleave : undefined}
+  onpointerdown={previewInteractive ? onpreviewpointerdown : undefined}
+  onfocus={previewInteractive ? onpreviewfocus : undefined}
+  onblur={previewInteractive ? onpreviewblur : undefined}
+  onkeydown={previewInteractive ? onpreviewkeydown : undefined}
+  onkeyup={previewInteractive ? onpreviewkeyup : undefined}
+  role={previewInteractive ? (previewRole || 'button') : undefined}
+  tabindex={previewInteractive ? previewTabIndex : undefined}
+  aria-label={previewInteractive ? previewAriaLabel : undefined}
+  aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
+  aria-checked={previewInteractive ? previewAriaChecked : undefined}
+  aria-valuenow={previewInteractive ? previewAriaValueNow : undefined}
+  aria-valuemin={previewInteractive ? previewAriaValueMin : undefined}
+  aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
 >
   <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
     {#if background}
@@ -4774,6 +4825,32 @@
 
   .canvas-control.preview-surface:hover:not(.locked) {
     outline: none;
+  }
+
+  .canvas-control.preview-interactive {
+    cursor: pointer;
+    outline: none;
+  }
+
+  .canvas-control.preview-disabled {
+    cursor: not-allowed;
+  }
+
+  .canvas-control.preview-keyboard-focus::after,
+  .canvas-control.preview-highlighted::before {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 12px;
+    pointer-events: none;
+  }
+
+  .canvas-control.preview-keyboard-focus::after {
+    border: 1px solid rgba(91, 155, 213, 0.6);
+  }
+
+  .canvas-control.preview-highlighted::before {
+    border: 1px dashed rgba(255, 196, 84, 0.7);
   }
 
   .canvas-control.selected {

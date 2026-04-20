@@ -1,5 +1,5 @@
 <script>
-  import { activePanel, activeEditorTab, editorZoom, editorZoomIncrement, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
+  import { activePanel, activeEditorTab, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
   import { getSection, removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -12,6 +12,7 @@
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import TabBar from './TabBar.svelte';
   import PanelSurface from './PanelSurface.svelte';
+  import PanelPreviewSurface from './PanelPreviewSurface.svelte';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
@@ -19,6 +20,7 @@
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
+  import { previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -108,6 +110,41 @@
   let scaledPanelHeight = $derived($activePanel ? $activePanel.height * scale : 0);
   let stageMarginLeft = $derived(Math.max(40, (metrics.width - scaledPanelWidth) / 2));
   let stageMarginTop = $derived(Math.max(40, (metrics.height - scaledPanelHeight) / 2));
+  let previewBadge = $derived(
+    $previewModeEnabled
+      ? ($previewInspection?.control?._children?.Core?.name
+        ? `Preview · ${$previewInspection.control._children.Core.name}`
+        : 'Preview')
+      : ''
+  );
+
+  $effect(() => {
+    if (!$previewModeEnabled) return;
+
+    pan.spaceHeld = false;
+    pan.isPanning = false;
+
+    const controls = $activePanel?.controls ?? [];
+    syncPanelPreviewSessions(controls);
+
+    const availableIds = new Set(
+      controls
+        .map((control) => control?._children?.Core?.id)
+        .filter(Boolean)
+    );
+
+    if (availableIds.size === 0) {
+      setPreviewInspectedControlId('');
+      return;
+    }
+
+    if ($previewInspectedControlId && availableIds.has($previewInspectedControlId)) return;
+
+    const fallbackId = $selectedComponentId && availableIds.has($selectedComponentId)
+      ? $selectedComponentId
+      : (controls[0]?._children?.Core?.id ?? '');
+    setPreviewInspectedControlId(fallbackId);
+  });
 
   $effect(() => {
     const panelId = $activePanel?.id ?? null;
@@ -161,7 +198,43 @@
     if (sig > lastZoomSignal) { lastZoomSignal = sig; zoomCtrl.zoomToSelection(); }
   });
 
+  function handlePreviewShortcut(e) {
+    if (e.defaultPrevented) return;
+
+    const mod = e.ctrlKey || e.metaKey;
+    const lowerKey = String(e.key ?? '').toLowerCase();
+    if ((mod && ['a', 'c', 'x', 'v', 'd'].includes(lowerKey)) || e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault();
+      return;
+    }
+
+    if (mod && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      editorZoom.update((value) => Math.min(400, value + $editorZoomIncrement));
+      return;
+    }
+    if (mod && e.key === '-') {
+      e.preventDefault();
+      editorZoom.update((value) => Math.max(10, value - $editorZoomIncrement));
+      return;
+    }
+    if (mod && e.key === '0') {
+      e.preventDefault();
+      zoomCtrl.fitToWindow();
+      return;
+    }
+    if (mod && e.shiftKey && (e.key === 'P' || e.key === 'p')) {
+      e.preventDefault();
+      zoomCtrl.zoomToSelection();
+    }
+  }
+
   function handleEditorKeyDown(e) {
+    if ($previewModeEnabled) {
+      handlePreviewShortcut(e);
+      return;
+    }
+
     panCtrl.handleKeyDown(e);
     handleEditorShortcut(e, {
       panel: $activePanel, panelLocked, gridSize,
@@ -174,8 +247,14 @@
     });
   }
 
+  function handleEditorKeyUp(e) {
+    if ($previewModeEnabled) return;
+    panCtrl.handleKeyUp(e);
+  }
+
   // Click on empty canvas → deselect (but not after panning)
   function handleCanvasClick(e) {
+    if ($previewModeEnabled) return;
     if (pan.spaceHeld) return;
     if (e.target === e.currentTarget || e.target.classList.contains('panel-surface')) {
       clearSelection();
@@ -191,6 +270,7 @@
   function handleContextMenu(e) { e.preventDefault(); }
 
   function showContextMenuAt(screenX, screenY) {
+    if ($previewModeEnabled) { ctxMenu = null; return; }
     if (!$activePanel || !panelSurfaceEl) { ctxMenu = null; return; }
     const rect = panelSurfaceEl.getBoundingClientRect();
     const panelX = (screenX - rect.left) / scale;
@@ -204,7 +284,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="editor-wrapper" onkeydown={handleEditorKeyDown} onkeyup={panCtrl.handleKeyUp} tabindex="-1" class:panning={pan.isPanning || pan.spaceHeld}>
+<div class="editor-wrapper" onkeydown={handleEditorKeyDown} onkeyup={handleEditorKeyUp} tabindex="-1" class:panning={pan.isPanning || pan.spaceHeld}>
   <div class="tab-bar-area">
     <TabBar />
   </div>
@@ -225,24 +305,36 @@
               use:bindZoomContainer
               style="width: {scaledPanelWidth}px; height: {scaledPanelHeight}px; margin-left: {stageMarginLeft}px; margin-top: {stageMarginTop}px;"
             >
-              <PanelSurface
-                panel={$activePanel}
-                {scale}
-                {snapToGrid}
-                {gridSize}
-                {gridOrigin}
-                {panelLocked}
-                {bgLayers}
-                {gridStyle}
-                {scopedEditingControl}
-                {marquee}
-                {marqueeRect}
-                bind:surfaceRef={panelSurfaceEl}
-                onclick={handleCanvasClick}
-                onmousedown={marqueeCtrl.handleMouseDown}
-                oncontextmenu={handleContextMenu}
-              />
-              {#if editorStateBadge}
+              {#if $previewModeEnabled}
+                <PanelPreviewSurface
+                  panel={$activePanel}
+                  {scale}
+                  {bgLayers}
+                  {gridStyle}
+                  bind:surfaceRef={panelSurfaceEl}
+                />
+              {:else}
+                <PanelSurface
+                  panel={$activePanel}
+                  {scale}
+                  {snapToGrid}
+                  {gridSize}
+                  {gridOrigin}
+                  {panelLocked}
+                  {bgLayers}
+                  {gridStyle}
+                  {scopedEditingControl}
+                  {marquee}
+                  {marqueeRect}
+                  bind:surfaceRef={panelSurfaceEl}
+                  onclick={handleCanvasClick}
+                  onmousedown={marqueeCtrl.handleMouseDown}
+                  oncontextmenu={handleContextMenu}
+                />
+              {/if}
+              {#if $previewModeEnabled}
+                <div class="editor-state-badge preview-active">{previewBadge}</div>
+              {:else if editorStateBadge}
                 <div class="editor-state-badge">{editorStateBadge}</div>
               {/if}
             </div>
@@ -253,7 +345,9 @@
           <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
           <div class="ruler-corner"></div>
         {/if}
-        <CanvasContextMenu bind:target={ctxMenu} panel={$activePanel} />
+        {#if !$previewModeEnabled}
+          <CanvasContextMenu bind:target={ctxMenu} panel={$activePanel} />
+        {/if}
       {:else}
         <div class="empty-state">
           <span class="empty-text">No panel open</span>
@@ -366,6 +460,11 @@
     letter-spacing: 0.01em;
     pointer-events: none;
     z-index: 8;
+  }
+
+  .editor-state-badge.preview-active {
+    border-color: rgba(255, 196, 84, 0.45);
+    color: #FFE4A7;
   }
 
   .empty-state {

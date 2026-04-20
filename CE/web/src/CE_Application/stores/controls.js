@@ -4,8 +4,9 @@ import { createControl as createControlFromType, getSection, hasSection } from '
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
+import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
-import { mutatePanelControlsByIdsInList, mutatePanelControlsInList } from './panelDocumentHelpers.js';
+import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -92,6 +93,22 @@ function applyResolvedValue(control, path, value) {
   return true;
 }
 
+function isBehaviorPath(path) {
+  return String(path ?? '').startsWith('Behavior.');
+}
+
+function shouldNormalizeExclusiveSelection(paths = []) {
+  return Array.from(paths).some((path) => isBehaviorPath(path));
+}
+
+function normalizeExclusiveSelectionInList(list, panelId, preferredControlIds = []) {
+  return updatePanelInList(list, panelId, (panel) => {
+    const nextControls = normalizeExclusiveSelectDefaults(panel?.controls ?? [], preferredControlIds);
+    if (nextControls === panel?.controls) return panel;
+    return { ...panel, controls: nextControls, modified: true };
+  });
+}
+
 /**
  * Update a property on ALL selected controls at once.
  * Single panels.update call for efficiency.
@@ -101,12 +118,20 @@ export function updateSelectedProperty(path, value) {
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0) return;
 
-  panels.update((list) =>
-    mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+  const preferredControlIds = isBehaviorPath(path) ? [...ids] : [];
+
+  panels.update((list) => {
+    let nextList = mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
       applyResolvedValue(draft, path, value);
       return true;
-    })
-  );
+    });
+
+    if (isBehaviorPath(path)) {
+      nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
+    }
+
+    return nextList;
+  });
 }
 
 /**
@@ -211,6 +236,10 @@ export function duplicateControl(ids) {
       clone._children.Transform.y += offset;
     }
 
+    if (isExclusiveSelectBehavior(clone?._children?.Behavior) && clone._children.Behavior.defaultValue === true) {
+      clone._children.Behavior.defaultValue = false;
+    }
+
     clones.push(clone);
   }
 
@@ -248,8 +277,13 @@ export function applyControlPatchesById(patchesByControlId) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null || !patchesByControlId || patchesByControlId.size === 0) return;
 
-  panels.update((list) =>
-    mutatePanelControlsInList(
+  const preferredControlIds = [...patchesByControlId.keys()];
+  const shouldNormalize = shouldNormalizeExclusiveSelection(
+    preferredControlIds.flatMap((controlId) => Object.keys(patchesByControlId.get(controlId) ?? {}))
+  );
+
+  panels.update((list) => {
+    let nextList = mutatePanelControlsInList(
       list,
       panelId,
       (control) => patchesByControlId.has(control?._children?.Core?.id),
@@ -263,8 +297,14 @@ export function applyControlPatchesById(patchesByControlId) {
 
         return true;
       }
-    )
-  );
+    );
+
+    if (shouldNormalize) {
+      nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
+    }
+
+    return nextList;
+  });
 }
 
 export function applyControlPatch(controlId, patch) {
@@ -277,15 +317,24 @@ export function applySelectedPatch(patch) {
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0 || !patch || Object.keys(patch).length === 0) return;
 
-  panels.update((list) =>
-    mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+  const preferredControlIds = [...ids];
+  const shouldNormalize = shouldNormalizeExclusiveSelection(Object.keys(patch));
+
+  panels.update((list) => {
+    let nextList = mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
       for (const [path, value] of Object.entries(patch)) {
         applyResolvedValue(draft, path, value);
       }
 
       return true;
-    })
-  );
+    });
+
+    if (shouldNormalize) {
+      nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
+    }
+
+    return nextList;
+  });
 }
 
 export function removeControlNode(controlId, path) {

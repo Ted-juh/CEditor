@@ -6,7 +6,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import { BASE_STATE_TARGET, buildStateTargetOptions, summarizeStateOverrides } from '../utils/stateTargets.js';
+  import { BASE_STATE_TARGET, buildStateTargetOptions, resolveSelectedStateName, summarizeStateOverrides } from '../utils/stateTargets.js';
 
   let { control = null } = $props();
 
@@ -23,7 +23,7 @@
   let core = $derived(getSection(control, 'Core'));
   let states = $derived(getSection(control, 'States'));
   let multiEdit = $derived($selectedComponentIds.size > 1);
-  let stateTargetOptions = $derived(buildStateTargetOptions(states, { includeBase: false }));
+  let stateTargetOptions = $derived(buildStateTargetOptions(states));
   let selectedStateName = $state('');
   let newStateName = $state('');
   let componentPatchDraft = $state('{}');
@@ -36,7 +36,11 @@
       ? activeScope.stateName
       : BASE_STATE_TARGET
   );
-  let selectedState = $derived(states?._children?.[selectedStateName] ?? null);
+  let selectedState = $derived(
+    selectedStateName && selectedStateName !== BASE_STATE_TARGET
+      ? (states?._children?.[selectedStateName] ?? null)
+      : null
+  );
   let overrideSummary = $derived(summarizeStateOverrides(selectedState));
   let activeTargetLabel = $derived(
     activeStateTarget === BASE_STATE_TARGET
@@ -45,16 +49,13 @@
   );
 
   $effect(() => {
-    if (!stateTargetOptions.length) {
-      selectedStateName = '';
-      return;
-    }
-
-    if (!selectedStateName || !stateTargetOptions.some((option) => option.id === selectedStateName)) {
-      const preferred = activeStateTarget !== BASE_STATE_TARGET
-        ? stateTargetOptions.find((option) => option.id === activeStateTarget)
-        : null;
-      selectedStateName = preferred?.id ?? stateTargetOptions[0].id;
+    const nextSelectedStateName = resolveSelectedStateName(
+      stateTargetOptions,
+      selectedStateName,
+      activeStateTarget,
+    );
+    if (nextSelectedStateName !== selectedStateName) {
+      selectedStateName = nextSelectedStateName;
     }
   });
 
@@ -154,20 +155,31 @@
       text: JSON.stringify(selectedState, null, 2),
     });
   }
+
+  function selectState(stateName) {
+    if (!stateName) return;
+    if (stateName === BASE_STATE_TARGET) {
+      selectedStateName = BASE_STATE_TARGET;
+      setStateEditScopeBase();
+      return;
+    }
+    selectedStateName = stateName;
+    setStateEditScopeState(stateName);
+  }
 </script>
 
 {#if multiEdit}
   <div class="placeholder">State editing is single-selection only.</div>
 {:else if states}
   <PropertySection title="State Studio">
-    <PropertyCell label="States" span={4} hint="Choose the state you want to inspect or manage here.">
+    <PropertyCell label="States" span={4} hint="Choose Base or a state you want to inspect and manage here.">
       <div class="state-strip">
         {#each stateTargetOptions as option}
           <button
             class="state-chip"
             class:selected={selectedStateName === option.id}
             class:active-target={activeStateTarget === option.id}
-            onclick={() => selectedStateName = option.id}
+            onclick={() => selectState(option.id)}
             title={option.tooltip}
           >
             <span>{option.fullLabel}</span>
@@ -186,7 +198,18 @@
     </PropertyCell>
   </PropertySection>
 
-  {#if selectedState}
+  {#if selectedStateName === BASE_STATE_TARGET}
+    <PropertySection title="Base Target">
+      <PropertyCell label="Mode" span={4} hint="Base is the unmodified control. Select a state chip to inspect that state directly.">
+        <div class="target-banner">
+          <div class="target-copy">
+            <strong>Base</strong>
+            <span>Visual tabs are currently editing the base control.</span>
+          </div>
+        </div>
+      </PropertyCell>
+    </PropertySection>
+  {:else if selectedState}
     <PropertySection title="Selected State">
       <PropertyCell label="Target" span={4} hint="Choose whether visual tabs should currently edit Base or this state.">
         <div class="target-banner">

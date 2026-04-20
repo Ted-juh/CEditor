@@ -6,7 +6,9 @@
   import { activePanel, selectedComponentId, selectedComponentIds } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { selectedControl, hasSection, getSection } from '../stores/controls.js';
+  import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
+  import PreviewInspector from './PreviewInspector.svelte';
   import TabIconBar from './TabIconBar.svelte';
   import TabContentArea from './TabContentArea.svelte';
   import { createTabViewState } from '../utils/tabViewState.js';
@@ -17,6 +19,7 @@
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
   const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
+  const PREVIEW_INFO_TEXT = 'Preview is active. Click, hover, or focus controls on the canvas to inspect live runtime values here.';
 
   function readStoredUiState() {
     const stored = readStoredJson(UI_STATE_STORAGE_KEY, {});
@@ -283,11 +286,22 @@
       panel={$activePanel}
       {pinPanelProps}
       {viewMode}
+      previewMode={$previewModeEnabled}
       ontogglepin={() => pinPanelProps = !pinPanelProps}
       ontoggleview={toggleViewMode}
+      ontogglepreview={togglePreviewMode}
     />
 
-    {#if showPinnedPanel}
+    {#if $previewModeEnabled}
+      <div class="preview-wrapper">
+        <PreviewInspector />
+      </div>
+
+      <div class="info-bar">
+        <div class="info-header">Info</div>
+        <span class="info-text">{PREVIEW_INFO_TEXT}</span>
+      </div>
+    {:else if showPinnedPanel}
       <!-- === SPLIT VIEW: icons + content paired per section === -->
       <div class="split-wrapper">
         <!-- Panel half: icons + content -->
@@ -462,6 +476,12 @@
     height: 2px;
     background: #094771;
     flex-shrink: 0;
+  }
+
+  .preview-wrapper {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* --- Misc --- */

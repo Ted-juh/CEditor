@@ -13,12 +13,14 @@ test('normalizeGeneralSettings clamps numeric runtime preferences', () => {
     defaultGridSize: -5,
     insertOffset: 999,
     keyboardNudgeSmall: 0,
+    showPreviewSelectionRing: false,
   });
 
   assert.equal(normalized.autosaveIntervalSeconds, 600);
   assert.equal(normalized.defaultGridSize, 1);
   assert.equal(normalized.insertOffset, 400);
   assert.equal(normalized.keyboardNudgeSmall, 1);
+  assert.equal(normalized.showPreviewSelectionRing, false);
 });
 
 test('normalizeSettings filters invalid assets', () => {

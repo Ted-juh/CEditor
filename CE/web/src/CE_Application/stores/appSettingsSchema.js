@@ -211,6 +211,7 @@ export function normalizeGeneralSettings(general) {
     showRulers: general?.showRulers !== false,
     showGuides: general?.showGuides !== false,
     showDistances: general?.showDistances !== false,
+    showPreviewSelectionRing: general?.showPreviewSelectionRing !== false,
     insertOffset: clampInteger(general?.insertOffset, DEFAULT_GENERAL_SETTINGS.insertOffset, 0, 400),
     duplicateOffset: clampInteger(general?.duplicateOffset, DEFAULT_GENERAL_SETTINGS.duplicateOffset, 0, 400),
     keyboardNudgeSmall: clampInteger(

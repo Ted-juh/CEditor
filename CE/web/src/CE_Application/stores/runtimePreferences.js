@@ -10,6 +10,7 @@ export const DEFAULT_GENERAL_SETTINGS = {
   showRulers: true,
   showGuides: true,
   showDistances: true,
+  showPreviewSelectionRing: true,
   insertOffset: 20,
   duplicateOffset: 20,
   keyboardNudgeSmall: 1,
@@ -25,6 +26,7 @@ export const defaultGridSize = writable(DEFAULT_GENERAL_SETTINGS.defaultGridSize
 export const showRulers = writable(DEFAULT_GENERAL_SETTINGS.showRulers);
 export const showGuides = writable(DEFAULT_GENERAL_SETTINGS.showGuides);
 export const showDistances = writable(DEFAULT_GENERAL_SETTINGS.showDistances);
+export const showPreviewSelectionRing = writable(DEFAULT_GENERAL_SETTINGS.showPreviewSelectionRing);
 export const insertOffset = writable(DEFAULT_GENERAL_SETTINGS.insertOffset);
 export const duplicateOffset = writable(DEFAULT_GENERAL_SETTINGS.duplicateOffset);
 export const keyboardNudgeSmall = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall);
@@ -40,6 +42,7 @@ export function applyGeneralSettingsToRuntime(settings) {
   showRulers.set(settings.showRulers);
   showGuides.set(settings.showGuides);
   showDistances.set(settings.showDistances);
+  showPreviewSelectionRing.set(settings.showPreviewSelectionRing);
   insertOffset.set(settings.insertOffset);
   duplicateOffset.set(settings.duplicateOffset);
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);

@@ -1,7 +1,10 @@
 <script>
   import { selectedControl } from '../stores/controls.js';
+  import { activePanel } from '../stores/panels.js';
   import { getDefaultInteractionPreviewSession, dumpSelectedInteractionDebug } from '../stores/interactionPreview.js';
+  import InteractiveSelectGroupSurface from './InteractiveSelectGroupSurface.svelte';
   import InteractiveTestSurface from './InteractiveTestSurface.svelte';
+  import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
 
   function numberOr(value, fallback = 0) {
@@ -21,9 +24,57 @@
     return next;
   }
 
+  function createPreviewSessions(controls, preferredControlId = '') {
+    const normalizedControls = normalizeExclusiveSelectDefaults(
+      Array.isArray(controls) ? controls : [],
+      preferredControlId ? [preferredControlId] : []
+    );
+
+    return normalizedControls.reduce((sessions, control) => {
+      const nextControlId = control?._children?.Core?.id;
+      if (!nextControlId) return sessions;
+      sessions[nextControlId] = createPreviewSession(control);
+      return sessions;
+    }, {});
+  }
+
   let control = $derived($selectedControl);
   let controlId = $derived(control?._children?.Core?.id ?? '');
   let behavior = $derived(control?._children?.Behavior ?? null);
+  let panelControls = $derived($activePanel?.controls ?? []);
+  let groupPreviewControls = $derived.by(() =>
+    controlId ? findExclusiveSelectGroupControls(panelControls, controlId) : []
+  );
+  let showGroupPreview = $derived(groupPreviewControls.length > 1);
+  let previewControls = $derived(showGroupPreview ? groupPreviewControls : (control ? [control] : []));
+  let previewControlMap = $derived.by(() => {
+    const map = new Map();
+    for (const previewControl of previewControls) {
+      const nextControlId = previewControl?._children?.Core?.id;
+      if (!nextControlId) continue;
+      map.set(nextControlId, previewControl);
+    }
+    return map;
+  });
+  let previewSignature = $derived.by(() =>
+    previewControls.map((previewControl) => {
+      const previewBehavior = previewControl?._children?.Behavior ?? null;
+      const previewControlId = previewControl?._children?.Core?.id ?? '';
+      return [
+        previewControlId,
+        previewBehavior?.defaultValue === true ? '1' : '0',
+        String(previewBehavior?.family ?? ''),
+        String(previewBehavior?.role ?? ''),
+        String(previewBehavior?.valueType ?? ''),
+        String(previewBehavior?.groupId ?? ''),
+      ].join(':');
+    }).join('|')
+  );
+  let previewSubtitle = $derived.by(() => {
+    const baseLabel = control?._children?.Core?.name ?? controlId;
+    if (!showGroupPreview) return baseLabel;
+    return `${baseLabel} - ${groupPreviewControls.length}-item group`;
+  });
   let hasInteractiveModel = $derived(
     !!behavior
     || Object.keys(control?._children?.Parts?._children ?? {}).length > 0
@@ -32,22 +83,24 @@
     || Object.keys(control?._children?.Animations?._children ?? {}).length > 0
   );
 
-  let session = $state(getDefaultInteractionPreviewSession());
-  let lastControlId = $state('');
+  let sessionsById = $state({});
+  let lastSessionSeed = $state('');
 
   $effect(() => {
     if (!controlId) {
-      lastControlId = '';
-      session = createPreviewSession(control);
+      lastSessionSeed = '';
+      sessionsById = {};
       return;
     }
 
-    if (controlId !== lastControlId) {
-      lastControlId = controlId;
-      session = createPreviewSession(control);
+    const nextSeed = `${controlId}|${previewSignature}`;
+    if (nextSeed !== lastSessionSeed) {
+      lastSessionSeed = nextSeed;
+      sessionsById = createPreviewSessions(previewControls, controlId);
     }
   });
 
+  let session = $derived(sessionsById?.[controlId] ?? createPreviewSession(control));
   let previewOverrides = $derived(session?.enabled === false ? {} : session);
   let resolved = $derived(control ? resolveInteractiveControl(control, previewOverrides) : null);
   let runtime = $derived(resolved ? serializeInteractionRuntime(resolved.runtime) : null);
@@ -55,20 +108,83 @@
   let showMixed = $derived(behavior?.allowMixed === true);
   let showRangeValue = $derived(behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float');
 
-  function patchSession(patch = {}) {
-    session = {
-      ...createPreviewSession(control),
-      ...session,
-      ...patch,
+  function patchControlSession(targetControlId, patch = {}) {
+    const targetControl = previewControlMap.get(targetControlId) ?? null;
+    if (!targetControl) return;
+
+    sessionsById = {
+      ...sessionsById,
+      [targetControlId]: {
+        ...createPreviewSession(targetControl),
+        ...(sessionsById?.[targetControlId] ?? {}),
+        ...patch,
+      },
     };
   }
 
+  function patchSession(patch = {}) {
+    if (!controlId) return;
+    patchControlSession(controlId, patch);
+  }
+
+  function setExclusivePreviewSelection(targetControlId, nextChecked = true) {
+    const targetControl = previewControlMap.get(targetControlId) ?? null;
+    if (!targetControl) return;
+
+    const targetBehavior = targetControl?._children?.Behavior ?? null;
+    if (!isExclusiveSelectBehavior(targetBehavior)) {
+      patchControlSession(targetControlId, {
+        checked: nextChecked,
+        mixed: false,
+        valueOverrideEnabled: false,
+      });
+      return;
+    }
+
+    if (!nextChecked && targetBehavior?.uncheckOnClick !== true) {
+      return;
+    }
+
+    const nextSessions = { ...sessionsById };
+
+    if (nextChecked) {
+      for (const groupedControl of groupPreviewControls) {
+        const groupedControlId = groupedControl?._children?.Core?.id;
+        if (!groupedControlId) continue;
+
+        nextSessions[groupedControlId] = {
+          ...createPreviewSession(groupedControl),
+          ...(sessionsById?.[groupedControlId] ?? {}),
+          checked: groupedControlId === targetControlId,
+          mixed: false,
+          valueOverrideEnabled: false,
+        };
+      }
+    } else {
+      nextSessions[targetControlId] = {
+        ...createPreviewSession(targetControl),
+        ...(sessionsById?.[targetControlId] ?? {}),
+        checked: false,
+        mixed: false,
+        valueOverrideEnabled: false,
+      };
+    }
+
+    sessionsById = nextSessions;
+  }
+
   function resetSession() {
-    session = createPreviewSession(control);
+    sessionsById = createPreviewSessions(previewControls, controlId);
   }
 
   function handleToggle(key, event) {
-    patchSession({ [key]: event.currentTarget.checked });
+    const nextValue = event.currentTarget.checked;
+    if (key === 'checked' && showGroupPreview && isExclusiveSelectBehavior(behavior)) {
+      setExclusivePreviewSelection(controlId, nextValue);
+      return;
+    }
+
+    patchSession({ [key]: nextValue });
   }
 
   function handleValueChange(event) {
@@ -76,6 +192,14 @@
       valueOverrideEnabled: true,
       valueOverride: Number(event.currentTarget.value),
     });
+  }
+
+  function handleGroupCommit(targetControlId) {
+    const targetSession = sessionsById?.[targetControlId];
+    const isChecked = targetSession?.checked === true;
+    const targetBehavior = previewControlMap.get(targetControlId)?._children?.Behavior ?? null;
+    const nextChecked = isChecked && targetBehavior?.uncheckOnClick === true ? false : true;
+    setExclusivePreviewSelection(targetControlId, nextChecked);
   }
 
   function dumpResolvedPayload() {
@@ -103,7 +227,7 @@
     <div class="preview-toolbar">
       <div class="preview-title-group">
         <div class="preview-title">Interaction Preview</div>
-        <div class="preview-subtitle">{control?._children?.Core?.name ?? controlId}</div>
+        <div class="preview-subtitle">{previewSubtitle}</div>
       </div>
       <div class="toolbar-spacer"></div>
       <button class="toolbar-btn" onclick={resetSession}>
@@ -116,7 +240,17 @@
 
     <div class="preview-layout">
       <section class="preview-stage-card">
-        <InteractiveTestSurface {control} {session} onpatchsession={patchSession} />
+        {#if showGroupPreview}
+          <InteractiveSelectGroupSurface
+            controls={groupPreviewControls}
+            {sessionsById}
+            selectedControlId={controlId}
+            onpatchcontrolsession={patchControlSession}
+            oncommitselect={handleGroupCommit}
+          />
+        {:else}
+          <InteractiveTestSurface {control} {session} onpatchsession={patchSession} />
+        {/if}
       </section>
 
       <div class="preview-sidebar">

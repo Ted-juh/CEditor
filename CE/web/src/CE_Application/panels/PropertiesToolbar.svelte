@@ -8,7 +8,7 @@
    */
   import {
     Undo2, Redo2, Save, Lock, LockOpen,
-    Grid3x3 as GridIcon, Magnet, Pin, PinOff, Layers, SquareStack,
+    Grid3x3 as GridIcon, Magnet, Pin, PinOff, Layers, SquareStack, Play, Square,
   } from 'lucide-svelte';
   import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
   import { updatePanel, saveActivePanel } from '../stores/panels.js';
@@ -17,8 +17,10 @@
     panel,
     pinPanelProps = false,
     viewMode = 'single',
+    previewMode = false,
     ontogglepin = null,
     ontoggleview = null,
+    ontogglepreview = null,
   } = $props();
 </script>
 
@@ -43,6 +45,15 @@
       <Lock size={18} strokeWidth={1.5} />
     {:else}
       <LockOpen size={18} strokeWidth={1.5} />
+    {/if}
+  </button>
+  <button class="toolbar-btn" class:active={previewMode}
+    title={previewMode ? 'Exit Preview' : 'Enter Preview'}
+    onclick={() => ontogglepreview?.()}>
+    {#if previewMode}
+      <Square size={16} strokeWidth={1.5} />
+    {:else}
+      <Play size={16} strokeWidth={1.5} />
     {/if}
   </button>
 

@@ -143,3 +143,21 @@ export function findStateTargetOption(options = [], targetId = BASE_STATE_TARGET
     ?? options.find((option) => option.id === BASE_STATE_TARGET)
     ?? null;
 }
+
+export function resolveSelectedStateName(
+  options = [],
+  selectedStateName = '',
+  activeStateTarget = BASE_STATE_TARGET,
+) {
+  if (!Array.isArray(options) || options.length === 0) return '';
+
+  if (options.some((option) => option.id === activeStateTarget)) {
+    return activeStateTarget;
+  }
+
+  if (options.some((option) => option.id === selectedStateName)) {
+    return selectedStateName;
+  }
+
+  return options[0]?.id ?? '';
+}
