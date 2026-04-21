@@ -56,6 +56,28 @@
       />
     </PropertyCell>
 
+    <PropertyCell label="Tint" span={1} hint="Primary tint applied to the imported icon.">
+      <input class="icon-select" type="text" value={icon?.tint ?? 'FFFFFFFF'} onchange={(event) => set('Icon.tint', event.target.value)} />
+    </PropertyCell>
+
+    <PropertyCell label="Opacity" span={1} hint="Opacity applied to the icon image.">
+      <NumberInput
+        value={icon?.opacity ?? 1}
+        min={0}
+        max={1}
+        step={0.05}
+        onchange={(value) => set('Icon.opacity', value)}
+      />
+    </PropertyCell>
+
+    <PropertyCell label="Rotate" span={1} hint="Rotation applied to the icon layer.">
+      <NumberInput
+        value={icon?.rotation ?? 0}
+        step={1}
+        onchange={(value) => set('Icon.rotation', value)}
+      />
+    </PropertyCell>
+
     <PropertyCell label="Preview" span={4} hint="Imported icons are managed globally in File -> Settings -> Icons">
       <div class="preview-card">
         {#if selectedIcon?.dataUrl}

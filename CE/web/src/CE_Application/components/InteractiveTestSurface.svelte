@@ -19,8 +19,15 @@
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
 
+  function getValueRows(control) {
+    const rows = control?._children?.Value?.rows;
+    return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
+  }
+
   let {
     control = null,
+    resolvedControl = null,
+    resolvedRuntime = null,
     session = null,
     onpatchsession = null,
   } = $props();
@@ -58,8 +65,9 @@
     `interaction-preview-${control?._children?.Core?.id ?? 'control'}`
   );
   let previewControl = $derived.by(() => {
-    if (!control) return null;
-    const clone = deepClone(control);
+    const sourceControl = resolvedControl ?? control;
+    if (!sourceControl) return null;
+    const clone = deepClone(sourceControl);
     if (clone?._children?.Transform) {
       clone._children.Transform.x = 0;
       clone._children.Transform.y = 0;
@@ -126,10 +134,27 @@
   }
 
   function commitSelectAction() {
+    const buttonType = String(behavior?.buttonType ?? '');
     const role = String(behavior?.role ?? '');
     const valueType = String(behavior?.valueType ?? '');
+    const valueRows = getValueRows(control);
     if (role === 'radio') {
       patchSession({ checked: true, mixed: false, valueOverrideEnabled: false });
+      return;
+    }
+    if (buttonType === 'cyclic' && valueRows.length) {
+      const currentValue = session?.valueOverrideEnabled === true
+        ? session?.valueOverride
+        : (behavior?.defaultValue ?? valueRows[0]?.internalValue ?? valueRows[0]?.id);
+      const currentIndex = Math.max(0, valueRows.findIndex((row) => String(row?.internalValue ?? row?.id) === String(currentValue ?? '')));
+      const nextIndex = currentIndex >= valueRows.length - 1
+        ? (behavior?.wrapBehavior === false ? currentIndex : 0)
+        : currentIndex + 1;
+      const nextRow = valueRows[nextIndex] ?? valueRows[0];
+      patchSession({
+        valueOverrideEnabled: true,
+        valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+      });
       return;
     }
     if (valueType === 'enum') {
@@ -545,6 +570,8 @@
         >
           <CanvasControl
             control={previewControl}
+            resolvedControlOverride={previewControl}
+            interactionRuntimeOverride={resolvedRuntime}
             scale={1}
             renderIdNamespace={previewRenderIdNamespace}
             panelLocked={false}

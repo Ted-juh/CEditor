@@ -319,9 +319,9 @@ function rangeParts() {
   };
 }
 
-const BUTTON_PRIORITY = ['hover', 'pressed', 'focused', 'checked', 'mixed', 'disabled'];
-const SLIDER_PRIORITY = ['hover', 'pressed', 'focused', 'dragging', 'disabled'];
-const RANGE_PRIORITY = ['hover', 'pressed', 'focused', 'dragging', 'disabled'];
+const BUTTON_PRIORITY = ['hover', 'focused', 'checked', 'mixed', 'pressed', 'disabled'];
+const SLIDER_PRIORITY = ['hover', 'focused', 'dragging', 'pressed', 'disabled'];
+const RANGE_PRIORITY = ['hover', 'focused', 'dragging', 'pressed', 'disabled'];
 
 export function createBehaviorDefaults(type) {
   if (type === 'ToggleButton') {

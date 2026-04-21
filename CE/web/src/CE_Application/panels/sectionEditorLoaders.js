@@ -20,10 +20,12 @@ const EAGER_COMPONENT_EDITORS = {
 
 const LAZY_COMPONENT_LOADERS = {
   text: () => import('../sections/TextEditor.svelte'),
+  contentlayout: () => import('../sections/ContentLayoutEditor.svelte'),
   icon: () => import('../sections/IconEditor.svelte'),
   effects: () => import('../sections/EffectsEditor.svelte'),
   behavior: () => import('../sections/BehaviorEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),
+  value: () => import('../sections/ValueEditor.svelte'),
   bindings: () => import('../sections/BindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
 };

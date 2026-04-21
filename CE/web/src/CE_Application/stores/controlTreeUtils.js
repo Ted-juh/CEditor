@@ -1,6 +1,26 @@
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from '../utils/deepClone.js';
 
+function isArrayIndexSegment(value) {
+  return /^\d+$/.test(String(value ?? ''));
+}
+
+function readChildValue(current, part) {
+  if (Array.isArray(current) && isArrayIndexSegment(part)) {
+    return current[Number(part)];
+  }
+
+  if (current?._children?.[part] !== undefined) {
+    return current._children[part];
+  }
+
+  if (current?.[part] !== undefined) {
+    return current[part];
+  }
+
+  return undefined;
+}
+
 export function valueAtPath(control, path) {
   if (!control || !path) return undefined;
 
@@ -8,13 +28,12 @@ export function valueAtPath(control, path) {
   let current = control;
 
   for (const part of parts) {
-    if (current?._children?.[part] !== undefined) {
-      current = current._children[part];
-    } else if (current?.[part] !== undefined) {
-      current = current[part];
-    } else {
+    const next = readChildValue(current, part);
+    if (next === undefined) {
       return undefined;
     }
+
+    current = next;
   }
 
   return current;
@@ -42,6 +61,13 @@ export function setNestedValue(control, path, value) {
   for (let index = 1; index < parts.length - 1; index += 1) {
     const key = parts[index];
 
+    if (Array.isArray(current) && isArrayIndexSegment(key)) {
+      const nextIndex = Number(key);
+      if (current[nextIndex] === undefined) return;
+      current = current[nextIndex];
+      continue;
+    }
+
     if (current._children && current._children[key] !== undefined) {
       current = current._children[key];
       continue;
@@ -65,6 +91,11 @@ export function setNestedValue(control, path, value) {
   }
 
   const propName = parts[parts.length - 1];
+  if (Array.isArray(current) && isArrayIndexSegment(propName)) {
+    current[Number(propName)] = value;
+    return;
+  }
+
   const treeValue = value != null
     && typeof value === 'object'
     && !Array.isArray(value)
@@ -93,7 +124,9 @@ export function deleteNestedValue(control, path) {
 
   for (let index = 1; index < parts.length - 1; index += 1) {
     const key = parts[index];
-    if (current?._children?.[key] !== undefined) {
+    if (Array.isArray(current) && isArrayIndexSegment(key)) {
+      current = current[Number(key)];
+    } else if (current?._children?.[key] !== undefined) {
       current = current._children[key];
     } else if (current?.[key] !== undefined) {
       current = current[key];
@@ -103,7 +136,9 @@ export function deleteNestedValue(control, path) {
   }
 
   const finalKey = parts[parts.length - 1];
-  if (current?._children?.[finalKey] !== undefined) {
+  if (Array.isArray(current) && isArrayIndexSegment(finalKey)) {
+    delete current[Number(finalKey)];
+  } else if (current?._children?.[finalKey] !== undefined) {
     delete current._children[finalKey];
   } else if (current && current[finalKey] !== undefined) {
     delete current[finalKey];

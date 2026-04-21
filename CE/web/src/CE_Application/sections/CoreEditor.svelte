@@ -43,6 +43,21 @@
       <span class="val readonly">{core.controlType}</span>
     </div>
     <div class="prop-row">
+      <span class="lbl">Tooltip</span>
+      <input class="val" type="text" value={core.tooltip ?? ''}
+             onfocus={selectAll} onchange={(e) => handleInput('tooltip', e)} />
+    </div>
+    <div class="prop-row">
+      <span class="lbl">A11y</span>
+      <input class="val" type="text" value={core.screenReaderText ?? ''}
+             onfocus={selectAll} onchange={(e) => handleInput('screenReaderText', e)} />
+    </div>
+    <div class="prop-row">
+      <span class="lbl">Preset</span>
+      <input class="val" type="text" value={core.stylePreset ?? ''}
+             onfocus={selectAll} onchange={(e) => handleInput('stylePreset', e)} />
+    </div>
+    <div class="prop-row">
       <span class="lbl">Visible</span>
       <button class="toggle-val" class:on={core.visible}
               onclick={() => handleToggle('visible')}>

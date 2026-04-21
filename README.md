@@ -64,7 +64,7 @@ This starts Vite on `http://localhost:5173`. Keep this running.
 **Terminal 2 — Build and run the C++ backend:**
 ```bash
 # Recommended (handles VS developer environment + deterministic config)
-powershell -ExecutionPolicy Bypass -File ./scripts/build-native.ps1 -Configuration Debug
+powershell -ExecutionPolicy Bypass -File ./tools/scripts/build-native.ps1 -Configuration Debug
 
 # Alternative preset-based flow
 cmake --preset native
@@ -82,7 +82,7 @@ The JUCE application opens a window that loads the Svelte UI from the Vite dev s
 |---|---|
 | Svelte UI (`CE/web/src/`) | Just save the file — Vite hot reloads instantly |
 | CSS / styling | Same — instant hot reload |
-| C++ backend (`CE/src/`) | Rebuild with `powershell -ExecutionPolicy Bypass -File ./scripts/build-native.ps1 -Configuration Debug`, then restart the app |
+| C++ backend (`CE/src/`) | Rebuild with `powershell -ExecutionPolicy Bypass -File ./tools/scripts/build-native.ps1 -Configuration Debug`, then restart the app |
 | CMakeLists.txt | Re-run `cmake --preset native`, then rebuild |
 | package.json (new npm dependency) | Run `cd CE/web && npm install`, then restart Vite |
 
@@ -105,14 +105,18 @@ CEditor/
       vite.config.js         Vite configuration
   CMakeLists.txt             CMake build configuration
   build/                     Build output (gitignored)
-  scripts/build-native.ps1   Windows-native build helper (loads vcvars + builds preset)
+  tools/
+    docs/                    Project docs and packaging notes
+    installer/               Inno Setup script and installer assets
+    scripts/                 Windows build/packaging helpers
+      build-native.ps1       Windows-native build helper (loads vcvars + builds preset)
 ```
 
 ### Troubleshooting
 
 - **Vite not found / npm errors** — Make sure Node.js is installed and `npm install` was run in the `CE/web/` directory.
 - **CMake can't find JUCE** — The JUCE install is expected at `JUCE/lib/cmake/JUCE-8.0.7/`. Don't move or rename it.
-- **`windows.h` missing during native build** — Build from a VS developer environment or use `scripts/build-native.ps1` (it initializes `vcvars64.bat` automatically).
+- **`windows.h` missing during native build** — Build from a VS developer environment or use `tools/scripts/build-native.ps1` (it initializes `vcvars64.bat` automatically).
 - **Debug/Release confusion** — Use presets: `native-debug` and `native-release` build to `build/native`, so configuration is explicit.
 - **WebView2.h not found** — The WebView2 SDK should be at `CE/thirdparty/webview2/build/native/include/`. If missing, re-extract the NuGet package.
 - **App shows blank white window** — Make sure the Vite dev server is running on port 5173 before launching the app.

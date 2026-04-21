@@ -6,9 +6,37 @@ function getNodeChild(node, key) {
   return node?._children?.[key];
 }
 
+function getValueRows(control) {
+  const rows = getNodeChild(control, 'Value')?.rows;
+  return Array.isArray(rows) ? rows : [];
+}
+
+function findDefaultRow(rows = []) {
+  return rows.find((row) => row?.selectedByDefault === true && row?.enabled !== false)
+    ?? rows.find((row) => row?.enabled !== false)
+    ?? null;
+}
+
+function findRowByInternalValue(rows = [], value) {
+  return rows.find((row) => String(row?.internalValue ?? row?.id ?? '') === String(value ?? ''))
+    ?? null;
+}
+
 function normalizeKey(value) {
   return String(value ?? '').trim().toLowerCase();
 }
+
+const KNOWN_STATE_PRECEDENCE = {
+  hover: 10,
+  focused: 20,
+  checked: 30,
+  mixed: 40,
+  dragging: 50,
+  pressed: 60,
+  pending: 70,
+  executed: 80,
+  disabled: 90,
+};
 
 function isNumeric(value) {
   return typeof value === 'number' && Number.isFinite(value);
@@ -283,6 +311,9 @@ export function serializeInteractionRuntime(runtime = {}) {
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
+  const valueRows = getValueRows(control);
+  const defaultRow = findDefaultRow(valueRows);
+  const buttonType = String(behavior?.buttonType ?? '');
   const valueType = String(behavior?.valueType ?? 'none');
   const defaultValue = behavior?.defaultValue;
   const enumValues = normalizeEnumValues(behavior?.enumValues ?? []);
@@ -293,6 +324,60 @@ export function resolveInteractionContext(control, previewSession = {}) {
 
   if (valueType === 'bool' && previewSession?.valueOverrideEnabled !== true) {
     valueRaw = previewSession?.checked === true;
+  }
+
+  if (buttonType === 'toggle') {
+    const checked = previewSession?.checked === true || behavior?.defaultValue === true;
+    const toggleRow = checked
+      ? (valueRows[1] ?? valueRows.find((row) => row?.internalValue === true) ?? null)
+      : (valueRows[0] ?? valueRows.find((row) => row?.internalValue === false) ?? null);
+    valueRaw = checked;
+    return {
+      family: String(behavior?.family ?? 'select'),
+      role: String(behavior?.role ?? core?.controlType ?? 'toggle'),
+      valueType,
+      valueRaw,
+      valueDisplay: String(toggleRow?.displayText ?? (checked ? 'On' : 'Off')),
+      valueEnum: '',
+      valueNormalized: checked ? 1 : 0,
+      hover: previewSession?.hover === true,
+      pressed: previewSession?.pressed === true,
+      focused: previewSession?.focused === true,
+      dragging: previewSession?.dragging === true,
+      disabled: previewSession?.disabled === true || core?.enabled === false,
+      checked,
+      mixed: previewSession?.mixed === true,
+      pending: previewSession?.pending === true,
+      executed: previewSession?.executed === true,
+      animationsEnabled: previewSession?.animationsEnabled !== false,
+    };
+  }
+
+  if (buttonType === 'radio' || buttonType === 'cyclic') {
+    const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
+      ?? findDefaultRow(valueRows);
+    valueRaw = resolvedRow?.internalValue ?? resolvedRow?.id ?? defaultValue ?? '';
+    const rowIndex = Math.max(0, valueRows.findIndex((row) => row?.id === resolvedRow?.id));
+    const normalizedRow = valueRows.length > 1 ? rowIndex / (valueRows.length - 1) : (resolvedRow ? 1 : 0);
+    return {
+      family: String(behavior?.family ?? 'select'),
+      role: String(behavior?.role ?? core?.controlType ?? 'button'),
+      valueType,
+      valueRaw,
+      valueDisplay: String(resolvedRow?.displayText ?? valueRaw ?? ''),
+      valueEnum: String(valueRaw ?? ''),
+      valueNormalized: clamp(normalizedRow, 0, 1),
+      hover: previewSession?.hover === true,
+      pressed: previewSession?.pressed === true,
+      focused: previewSession?.focused === true,
+      dragging: previewSession?.dragging === true,
+      disabled: previewSession?.disabled === true || core?.enabled === false,
+      checked: buttonType === 'radio' ? resolvedRow != null : previewSession?.checked === true,
+      mixed: previewSession?.mixed === true,
+      pending: previewSession?.pending === true,
+      executed: previewSession?.executed === true,
+      animationsEnabled: previewSession?.animationsEnabled !== false,
+    };
   }
 
   if (valueType === 'enum') {
@@ -326,6 +411,8 @@ export function resolveInteractionContext(control, previewSession = {}) {
     disabled: previewSession?.disabled === true || core?.enabled === false,
     checked: previewSession?.checked === true || valueRaw === true,
     mixed: previewSession?.mixed === true,
+    pending: previewSession?.pending === true,
+    executed: previewSession?.executed === true,
     animationsEnabled: previewSession?.animationsEnabled !== false,
   };
 }
@@ -373,10 +460,14 @@ export function resolveInteractiveControl(control, previewSession = {}) {
     : Object.entries(resolvedStates?._children ?? {})
       .filter(([, state]) => evaluateState(state, signals))
       .sort((left, right) => {
-        const leftIndex = priority.indexOf(normalizeKey(left[0] ?? left[1]?.name));
-        const rightIndex = priority.indexOf(normalizeKey(right[0] ?? right[1]?.name));
-        const safeLeft = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
-        const safeRight = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+        const leftKey = normalizeKey(left[0] ?? left[1]?.name);
+        const rightKey = normalizeKey(right[0] ?? right[1]?.name);
+        const leftKnown = KNOWN_STATE_PRECEDENCE[leftKey];
+        const rightKnown = KNOWN_STATE_PRECEDENCE[rightKey];
+        const leftIndex = priority.indexOf(leftKey);
+        const rightIndex = priority.indexOf(rightKey);
+        const safeLeft = leftKnown ?? (leftIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + leftIndex);
+        const safeRight = rightKnown ?? (rightIndex === -1 ? Number.MAX_SAFE_INTEGER : 200 + rightIndex);
         return safeLeft - safeRight;
       });
 

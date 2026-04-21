@@ -9,6 +9,11 @@
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
   import { adjustRangeValue, getCurrentRangeValue, getRangeMax, getRangeMin, snapRangeValue } from '../utils/rangeBehavior.js';
 
+  function getValueRows(control) {
+    const rows = control?._children?.Value?.rows;
+    return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
+  }
+
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
@@ -72,11 +77,6 @@
       ].join(':');
     }).join('|')
   );
-  let previewSubtitle = $derived.by(() => {
-    const baseLabel = control?._children?.Core?.name ?? controlId;
-    if (!showGroupPreview) return baseLabel;
-    return `${baseLabel} - ${groupPreviewControls.length}-item group`;
-  });
   let hasInteractiveModel = $derived(
     !!behavior
     || Object.keys(control?._children?.Parts?._children ?? {}).length > 0
@@ -106,15 +106,29 @@
   let previewOverrides = $derived(session?.enabled === false ? {} : session);
   let resolved = $derived(control ? resolveInteractiveControl(control, previewOverrides) : null);
   let runtime = $derived(resolved ? serializeInteractionRuntime(resolved.runtime) : null);
+  let buttonType = $derived(String(behavior?.buttonType ?? ''));
   let showChecked = $derived(behavior?.family === 'select' && behavior?.valueType === 'bool');
   let showMixed = $derived(behavior?.allowMixed === true && behavior?.valueType === 'bool');
   let showRangeValue = $derived(behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float');
-  let showEnumValue = $derived(behavior?.valueType === 'enum');
+  let showEnumValue = $derived(behavior?.valueType === 'enum' || buttonType === 'cyclic' || buttonType === 'radio');
   let enumValues = $derived(normalizeEnumValues(behavior?.enumValues ?? []));
+  let valueRows = $derived(getValueRows(control));
+  let previewValueOptions = $derived.by(() =>
+    valueRows.length
+      ? valueRows.map((row) => ({ value: String(row?.internalValue ?? row?.id ?? ''), label: row?.displayText ?? String(row?.internalValue ?? row?.id ?? '') }))
+      : enumValues.map((option) => ({ value: option, label: option }))
+  );
+  let defaultPreviewValue = $derived.by(() => {
+    if (valueRows.length) {
+      const defaultRow = valueRows.find((row) => row?.selectedByDefault === true) ?? valueRows[0] ?? null;
+      return String(defaultRow?.internalValue ?? defaultRow?.id ?? '');
+    }
+    return resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? '');
+  });
   let enumPreviewValue = $derived(
     session?.valueOverrideEnabled === true
-      ? String(session?.valueOverride ?? resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? ''))
-      : resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? '')
+      ? String(session?.valueOverride ?? defaultPreviewValue)
+      : defaultPreviewValue
   );
 
   function patchControlSession(targetControlId, patch = {}) {
@@ -251,20 +265,6 @@
   </div>
 {:else}
   <div class="preview-tab">
-    <div class="preview-toolbar">
-      <div class="preview-title-group">
-        <div class="preview-title">Interaction Preview</div>
-        <div class="preview-subtitle">{previewSubtitle}</div>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <button class="toolbar-btn" onclick={resetSession}>
-        Reset
-      </button>
-      <button class="toolbar-btn primary" onclick={dumpResolvedPayload}>
-        Debug
-      </button>
-    </div>
-
     <div class="preview-layout">
       <section class="preview-stage-card">
         {#if showGroupPreview}
@@ -276,7 +276,13 @@
             oncommitselect={handleGroupCommit}
           />
         {:else}
-          <InteractiveTestSurface {control} {session} onpatchsession={patchSession} />
+          <InteractiveTestSurface
+            {control}
+            resolvedControl={resolved?.control ?? control}
+            resolvedRuntime={resolved?.runtime ?? null}
+            {session}
+            onpatchsession={patchSession}
+          />
         {/if}
       </section>
 
@@ -361,10 +367,10 @@
               <span>Override Value</span>
               <input type="checkbox" checked={session.valueOverrideEnabled === true} onchange={(event) => handleToggle('valueOverrideEnabled', event)} />
             </label>
-            {#if enumValues.length}
+            {#if previewValueOptions.length}
               <select class="select-input" value={enumPreviewValue} onchange={handleEnumValueChange}>
-                {#each enumValues as option}
-                  <option value={option}>{option}</option>
+                {#each previewValueOptions as option}
+                  <option value={option.value}>{option.label}</option>
                 {/each}
               </select>
             {:else}
@@ -409,6 +415,18 @@
         </section>
       </div>
     </div>
+
+    <div class="preview-footer">
+      <div class="footer-spacer"></div>
+      <div class="footer-actions">
+        <button class="toolbar-btn" onclick={resetSession}>
+          Reset
+        </button>
+        <button class="toolbar-btn primary" onclick={dumpResolvedPayload}>
+          Debug
+        </button>
+      </div>
+    </div>
   </div>
 {/if}
 
@@ -431,38 +449,6 @@
     min-height: 0;
     background: #171717;
     color: #D7D7D7;
-  }
-
-  .preview-toolbar {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 10px;
-    border-bottom: 1px solid #303030;
-    background: #1D1D1D;
-  }
-
-  .preview-title-group {
-    min-width: 0;
-  }
-
-  .preview-title {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.45px;
-  }
-
-  .preview-subtitle {
-    color: #7C7C7C;
-    font-size: 10px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .toolbar-spacer {
-    flex: 1;
   }
 
   .toolbar-btn {
@@ -497,6 +483,24 @@
     grid-template-columns: minmax(360px, 1.4fr) minmax(280px, 0.9fr);
     gap: 10px;
     padding: 10px;
+  }
+
+  .preview-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px 10px;
+    flex-shrink: 0;
+  }
+
+  .footer-spacer {
+    flex: 1;
+  }
+
+  .footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 
   .preview-stage-card,

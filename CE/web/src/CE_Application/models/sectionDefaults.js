@@ -16,6 +16,9 @@ export const SECTION_DEFAULTS = {
     // id is generated at creation time by createControl()
     name: '',
     controlType: '',
+    tooltip: '',
+    screenReaderText: '',
+    stylePreset: '',
     visible: true,
     enabled: true,
     locked: false,
@@ -433,9 +436,47 @@ export const SECTION_DEFAULTS = {
     name: '',
     size: 16,
     fit: 'contain',
+    tint: 'FFFFFFFF',
+    opacity: 1,
+    rotation: 0,
+    flipH: false,
+    flipV: false,
     _children: {
       Fill: { _type: 'Fill', mode: 'solid', colour: 'FFFFFFFF' },
+      Effects: {
+        _type: 'IconEffects',
+        shadowEnabled: false,
+        shadowOffsetX: 0,
+        shadowOffsetY: 2,
+        shadowBlur: 4,
+        shadowColour: '66000000',
+        glowEnabled: false,
+        glowSize: 4,
+        glowColour: '66FFFFFF',
+        blurEnabled: false,
+        blurAmount: 0,
+      },
     },
+  },
+
+  /** Content Layout — shared text/icon arrangement. */
+  ContentLayout: {
+    _type: 'ContentLayout',
+    mode: 'text_only',
+    horizontalAlign: 'center',
+    verticalAlign: 'center',
+    gap: 8,
+    paddingLeft: 8,
+    paddingRight: 8,
+    paddingTop: 6,
+    paddingBottom: 6,
+    textOffsetX: 0,
+    textOffsetY: 0,
+    iconOffsetX: 0,
+    iconOffsetY: 0,
+    textAboveIcon: true,
+    textZIndex: 2,
+    iconZIndex: 1,
   },
 
   /** Effects — shadows, bevel/emboss, CSS filters, blend mode. */
@@ -490,10 +531,26 @@ export const SECTION_DEFAULTS = {
   /** Behavior — interaction family, role, and value model. */
   Behavior: {
     _type: 'Behavior',
+    buttonType: 'momentary',
+    subtype: 'action',
     family: 'trigger',
     role: 'button',
     valueType: 'none',
     defaultValue: null,
+    fireOn: 'onRelease',
+    activeWhileHeld: false,
+    repeatEnabled: false,
+    repeatDelay: 300,
+    repeatInterval: 120,
+    allowUncheck: true,
+    allowDeselect: false,
+    visualStyle: 'radio',
+    wrapBehavior: true,
+    holdDuration: 1200,
+    requiredClicks: 2,
+    clickWindow: 350,
+    disableAfterUse: true,
+    lockoutDuration: 0,
     selectionMode: 'none',
     enumValues: [],
     wrapEnum: false,
@@ -521,6 +578,13 @@ export const SECTION_DEFAULTS = {
     emitStateChange: true,
   },
 
+  /** Value — user-facing display/internal/send mapping rows. */
+  Value: {
+    _type: 'Value',
+    showMapping: false,
+    rows: [],
+  },
+
   /** Parts — named internal sub-elements for advanced controls. */
   Parts: {
     _type: 'Parts',
@@ -540,7 +604,7 @@ export const SECTION_DEFAULTS = {
     _type: 'States',
     enabled: true,
     debug: false,
-      priority: ['hover', 'pressed', 'focused', 'checked', 'mixed', 'dragging', 'disabled'],
+      priority: ['hover', 'focused', 'checked', 'mixed', 'dragging', 'pressed', 'disabled'],
     _children: {},
   },
 

@@ -25,6 +25,8 @@
     control,
     scale = 1,
     previewSessionOverride = null,
+    resolvedControlOverride = null,
+    interactionRuntimeOverride = null,
     renderIdNamespace = '',
     editorInteractionEnabled = true,
     snapToGrid = false,
@@ -69,9 +71,16 @@
   let previewSession = $derived(previewSessionOverride ?? null);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
   let interactiveRenderingEnabled = $derived(previewSessionOverride !== null || editorInteractionEnabled === false);
-  let resolvedInteractive = $derived(interactiveRenderingEnabled ? resolveInteractiveControl(control, appliedPreviewSession) : null);
-  let renderControl = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control);
-  let interactionRuntime = $derived(interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null);
+  let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
+  let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
+  let renderControl = $derived(
+    resolvedControlOverride
+      ?? (interactiveRenderingEnabled ? (resolvedInteractive?.control ?? control) : control)
+  );
+  let interactionRuntime = $derived(
+    interactionRuntimeOverride
+      ?? (interactiveRenderingEnabled ? (resolvedInteractive?.runtime ?? null) : null)
+  );
   let svgIdSeed = $derived.by(() => {
     const baseId = safeSvgId(core?.id);
     const namespace = safeSvgId(renderIdNamespace);
@@ -82,6 +91,13 @@
   let text = $derived(getSection(renderControl, 'Text'));
   let icon = $derived(getSection(renderControl, 'Icon'));
   let effects = $derived(getSection(renderControl, 'Effects'));
+  let contentLayout = $derived(getSection(renderControl, 'ContentLayout'));
+  let behavior = $derived(getSection(renderControl, 'Behavior'));
+  let valueSection = $derived(getSection(renderControl, 'Value'));
+  let statesSection = $derived(getSection(renderControl, 'States'));
+  let buttonType = $derived(String(behavior?.buttonType ?? '').trim().toLowerCase());
+  let valueRows = $derived(getEnabledValueRows(valueSection));
+  let isRadioGroupControl = $derived(buttonType === 'radio');
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   let renderPartEntries = $derived.by(() =>
     Object.entries(renderParts?._children ?? {})
@@ -510,6 +526,11 @@
       return parseHexColor(fallback, null);
     }
     return { r: 255, g: 255, b: 255, a: 1 };
+  }
+
+  function getEnabledValueRows(valueSection) {
+    const rows = valueSection?.rows;
+    return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
   }
 
   function rgbaColor({ r, g, b, a }) {
@@ -2394,10 +2415,42 @@
   let textMultiline = $derived(text?._children?.Multiline ?? null);
   let textEffects = $derived(text?._children?.Effects ?? null);
   let textPosition = $derived(text?._children?.Position ?? null);
-  let effectiveTextPaddingLeft = $derived(textPosition?.paddingLeft ?? 4);
-  let effectiveTextPaddingRight = $derived(textPosition?.paddingRight ?? 4);
-  let effectiveTextPaddingTop = $derived(0);
-  let effectiveTextPaddingBottom = $derived(0);
+  let contentLayoutMode = $derived(String(contentLayout?.mode ?? 'text_only'));
+  let layoutPaddingLeft = $derived(numberOr(contentLayout?.paddingLeft, textPosition?.paddingLeft ?? 4));
+  let layoutPaddingRight = $derived(numberOr(contentLayout?.paddingRight, textPosition?.paddingRight ?? 4));
+  let layoutPaddingTop = $derived(numberOr(contentLayout?.paddingTop, 0));
+  let layoutPaddingBottom = $derived(numberOr(contentLayout?.paddingBottom, 0));
+  let layoutGap = $derived(Math.max(0, numberOr(contentLayout?.gap, 8)));
+  let effectiveTextOffsetX = $derived(numberOr(textPosition?.offsetX, 0) + numberOr(contentLayout?.textOffsetX, 0));
+  let effectiveTextOffsetY = $derived(numberOr(textPosition?.offsetY, 0) + numberOr(contentLayout?.textOffsetY, 0));
+  let effectiveTextPaddingLeft = $derived(
+    layoutPaddingLeft + (
+      contentLayoutMode === 'icon_left_text_right' && icon?.source !== 'none'
+        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
+        : 0
+    )
+  );
+  let effectiveTextPaddingRight = $derived(
+    layoutPaddingRight + (
+      contentLayoutMode === 'text_left_icon_right' && icon?.source !== 'none'
+        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
+        : 0
+    )
+  );
+  let effectiveTextPaddingTop = $derived(
+    layoutPaddingTop + (
+      contentLayoutMode === 'icon_above_text_below' && icon?.source !== 'none'
+        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
+        : 0
+    )
+  );
+  let effectiveTextPaddingBottom = $derived(
+    layoutPaddingBottom + (
+      contentLayoutMode === 'text_above_icon_below' && icon?.source !== 'none'
+        ? Math.max(4, Number(icon?.size ?? 16)) + layoutGap
+        : 0
+    )
+  );
   let textReadingOrientation = $derived(normalizeTextReadingOrientation(textPosition?.readingOrientation));
   let textIsMirrored = $derived(textReadingOrientation === 'mirrored');
   let textCaseMode = $derived(normalizeTextCaseMode(textFont?.caseMode));
@@ -2468,7 +2521,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!!text && renderedTextContent.length > 0);
+  let hasText = $derived(!isRadioGroupControl && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -2861,6 +2914,7 @@
     if (!hasText) return '';
     return [
       `padding:${effectiveTextPaddingTop}px ${effectiveTextPaddingRight}px ${effectiveTextPaddingBottom}px ${effectiveTextPaddingLeft}px`,
+      `z-index:${numberOr(contentLayout?.textZIndex, 2)}`,
     ].join('; ');
   });
   let textLayoutBounds = $derived.by(() => {
@@ -2947,8 +3001,8 @@
     const glyphHeight = textPlacement?.height ?? textLayoutBounds.height;
 
     return {
-      x: baseLeft + (glyphWidth / 2) + numberOr(textPosition?.offsetX, 0),
-      y: baseTop + (glyphHeight / 2) + numberOr(textPosition?.offsetY, 0) - textScriptBaselineShift,
+      x: baseLeft + (glyphWidth / 2) + effectiveTextOffsetX,
+      y: baseTop + (glyphHeight / 2) + effectiveTextOffsetY - textScriptBaselineShift,
     };
   });
   let svgTextAnchor = $derived(svgTextAnchorFor(textPosition?.justification ?? 'centred'));
@@ -3271,7 +3325,7 @@
   let showBlockTextVisual = $derived((!usesCustomTextFlow) && (showBlockLineDecorations || hasTextEffects || needsVisualTextFill));
   let nativePreviewStyle = $derived.by(() => {
     if (!hasText || usesCustomTextFlow) return '';
-    return `transform:translate(${textPosition?.offsetX ?? 0}px, ${textPosition?.offsetY ?? 0}px)`;
+    return `transform:translate(${effectiveTextOffsetX}px, ${effectiveTextOffsetY}px)`;
   });
   $effect(() => {
     renderedTextContent;
@@ -3293,8 +3347,8 @@
     textMaxLines;
     textFitMode;
     textLineHeightMultiplier;
-    textPosition?.offsetX;
-    textPosition?.offsetY;
+    effectiveTextOffsetX;
+    effectiveTextOffsetY;
     textMeasureMaxWidth;
     displayW;
     displayH;
@@ -3438,14 +3492,156 @@
 
     return $storedIcons.find((entry) => entry.name === iconName && entry.enabled) ?? null;
   });
-  let hasIcon = $derived(!!resolvedStoredIcon?.dataUrl && icon?.source !== 'none');
-  let iconStyle = $derived.by(() => {
-    const size = Math.max(4, Number(icon?.size ?? 16));
-    const fit = icon?.fit === 'cover' ? 'cover' : 'contain';
+  let selectedStateNode = $derived(statesSection?._children?.Selected ?? null);
+  let radioGroupSelectionMode = $derived(String(behavior?.selectionMode ?? 'single').trim().toLowerCase() === 'multi' ? 'multi' : 'single');
+  let radioGroupSelectedKeys = $derived.by(() => {
+    if (!isRadioGroupControl) return new Set();
+
+    const selected = new Set();
+    const runtimeValue = interactionRuntime?.signals?.valueRaw;
+    if (Array.isArray(runtimeValue)) {
+      for (const entry of runtimeValue) {
+        selected.add(String(entry));
+      }
+    } else if (runtimeValue !== undefined && runtimeValue !== null && runtimeValue !== '') {
+      selected.add(String(runtimeValue));
+    }
+
+    if (selected.size === 0) {
+      for (const row of valueRows) {
+        if (row?.selectedByDefault === true) {
+          selected.add(String(row?.internalValue ?? row?.id ?? ''));
+          if (radioGroupSelectionMode !== 'multi') break;
+        }
+      }
+    }
+
+    if (selected.size === 0) {
+      const defaultValue = behavior?.defaultValue;
+      if (Array.isArray(defaultValue)) {
+        for (const entry of defaultValue) {
+          selected.add(String(entry));
+        }
+      } else if (defaultValue !== undefined && defaultValue !== null && defaultValue !== '') {
+        selected.add(String(defaultValue));
+      }
+    }
+
+    if (selected.size === 0 && valueRows[0]) {
+      selected.add(String(valueRows[0]?.internalValue ?? valueRows[0]?.id ?? ''));
+    }
+
+    if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
+      return new Set([selected.values().next().value]);
+    }
+
+    return selected;
+  });
+  let radioGroupItems = $derived.by(() => {
+    if (!isRadioGroupControl) return [];
+
+    return valueRows.map((row, index) => {
+      const internalKey = String(row?.internalValue ?? row?.id ?? `item_${index + 1}`);
+      const overrides = row?.visualOverrides ?? {};
+      const selected = radioGroupSelectedKeys.has(internalKey);
+      const baseFill = overrides.backgroundColour ?? background?._children?.Fill?.colour ?? 'FF3A3A3A';
+      const selectedFill = overrides.selectedBackgroundColour
+        ?? selectedStateNode?.patches?.component?.['Background.Fill.colour']
+        ?? 'FF2D6F9C';
+      const baseTextColour = overrides.textColour ?? text?._children?.Fill?.colour ?? 'FFFFFFFF';
+      const selectedTextColour = overrides.selectedTextColour
+        ?? selectedStateNode?.patches?.component?.['Text.Fill.colour']
+        ?? baseTextColour;
+      const borderColour = overrides.borderColour ?? background?._children?.Border?.colour ?? '66FFFFFF';
+      const selectedBorderColour = overrides.selectedBorderColour
+        ?? selectedStateNode?.patches?.component?.['Background.Border.colour']
+        ?? borderColour;
+
+      return {
+        id: row?.id ?? `row_${index + 1}`,
+        label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
+        selected,
+        style: [
+          `background:${cssColor(selected ? selectedFill : baseFill)}`,
+          `border-color:${cssColor(selected ? selectedBorderColour : borderColour)}`,
+          `color:${cssColor(selected ? selectedTextColour : baseTextColour)}`,
+        ].join('; '),
+      };
+    });
+  });
+  let radioGroupStyle = $derived.by(() => {
+    if (!isRadioGroupControl) return '';
     return [
-      `width:${size}px`,
-      `height:${size}px`,
+      `padding:${layoutPaddingTop}px ${layoutPaddingRight}px ${layoutPaddingBottom}px ${layoutPaddingLeft}px`,
+      `gap:${layoutGap}px`,
+    ].join('; ');
+  });
+  let hasIcon = $derived(!isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
+  let iconEffects = $derived(icon?._children?.Effects ?? null);
+  let iconSizeValue = $derived(Math.max(4, Number(icon?.size ?? 16)));
+  let iconContainerStyle = $derived.by(() => {
+    if (!hasIcon) return '';
+
+    const horizontalAlign = String(contentLayout?.horizontalAlign ?? 'center');
+    const verticalAlign = String(contentLayout?.verticalAlign ?? 'center');
+    const contentLeft = layoutPaddingLeft;
+    const contentRight = Math.max(contentLeft, displayW - layoutPaddingRight);
+    const contentTop = layoutPaddingTop;
+    const contentBottom = Math.max(contentTop, displayH - layoutPaddingBottom);
+
+    const alignAxis = (min, max, size, align, startValue, endValue) => {
+      if (align === startValue) return min + (size / 2);
+      if (align === endValue) return max - (size / 2);
+      return (min + max) / 2;
+    };
+
+    let centerX = alignAxis(contentLeft, contentRight, iconSizeValue, horizontalAlign, 'left', 'right');
+    let centerY = alignAxis(contentTop, contentBottom, iconSizeValue, verticalAlign, 'top', 'bottom');
+
+    if (contentLayoutMode === 'icon_left_text_right') {
+      centerX = contentLeft + (iconSizeValue / 2);
+    } else if (contentLayoutMode === 'text_left_icon_right') {
+      centerX = contentRight - (iconSizeValue / 2);
+    } else if (contentLayoutMode === 'icon_above_text_below') {
+      centerY = contentTop + (iconSizeValue / 2);
+    } else if (contentLayoutMode === 'text_above_icon_below') {
+      centerY = contentBottom - (iconSizeValue / 2);
+    }
+
+    centerX += numberOr(contentLayout?.iconOffsetX, 0);
+    centerY += numberOr(contentLayout?.iconOffsetY, 0);
+
+    return [
+      `left:${centerX - (iconSizeValue / 2)}px`,
+      `top:${centerY - (iconSizeValue / 2)}px`,
+      `width:${iconSizeValue}px`,
+      `height:${iconSizeValue}px`,
+      `z-index:${numberOr(contentLayout?.iconZIndex, 1)}`,
+    ].join('; ');
+  });
+  let iconStyle = $derived.by(() => {
+    const fit = icon?.fit === 'cover' ? 'cover' : 'contain';
+    const transforms = [];
+    if (icon?.flipH === true) transforms.push('scaleX(-1)');
+    if (icon?.flipV === true) transforms.push('scaleY(-1)');
+    if (Math.abs(numberOr(icon?.rotation, 0)) > 0.001) transforms.push(`rotate(${numberOr(icon?.rotation, 0)}deg)`);
+    const filters = [];
+    if (iconEffects?.shadowEnabled === true) {
+      filters.push(`drop-shadow(${numberOr(iconEffects?.shadowOffsetX, 0)}px ${numberOr(iconEffects?.shadowOffsetY, 2)}px ${Math.max(0, numberOr(iconEffects?.shadowBlur, 4))}px ${cssColor(iconEffects?.shadowColour ?? '66000000')})`);
+    }
+    if (iconEffects?.glowEnabled === true) {
+      filters.push(`drop-shadow(0 0 ${Math.max(0, numberOr(iconEffects?.glowSize, 4))}px ${cssColor(iconEffects?.glowColour ?? '66FFFFFF')})`);
+    }
+    if (iconEffects?.blurEnabled === true && numberOr(iconEffects?.blurAmount, 0) > 0) {
+      filters.push(`blur(${numberOr(iconEffects?.blurAmount, 0)}px)`);
+    }
+    return [
+      'width:100%',
+      'height:100%',
       `object-fit:${fit}`,
+      `opacity:${Math.max(0, Math.min(1, numberOr(icon?.opacity, 1)))}`,
+      transforms.length ? `transform:${transforms.join(' ')}` : '',
+      filters.length ? `filter:${filters.join(' ')}` : '',
     ].join('; ');
   });
 </script>
@@ -3509,8 +3705,29 @@
       <div class="interaction-debug-badge">{interactionDebugSummary}</div>
     {/if}
 
+    {#if isRadioGroupControl && radioGroupItems.length}
+      <div class="radio-group-content" style={radioGroupStyle}>
+        {#each radioGroupItems as item (item.id)}
+          <div
+            class="radio-group-item"
+            class:selected={item.selected}
+            class:segmented={String(behavior?.visualStyle ?? 'radio') === 'segmented'}
+            class:tab={String(behavior?.visualStyle ?? 'radio') === 'tab'}
+            style={item.style}
+          >
+            {#if String(behavior?.visualStyle ?? 'radio') === 'radio'}
+              <span class="radio-dot-shell">
+                <span class="radio-dot"></span>
+              </span>
+            {/if}
+            <span class="radio-group-label">{item.label}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     {#if hasIcon}
-      <div class="icon-content">
+      <div class="icon-content" style={iconContainerStyle}>
         <img class="icon-image" style={iconStyle} src={resolvedStoredIcon.dataUrl} alt="" />
       </div>
     {/if}
@@ -4774,12 +4991,79 @@
     min-width: 0;
   }
 
-  .icon-content {
+  .radio-group-content {
     position: absolute;
     inset: 0;
     display: flex;
+    flex-wrap: wrap;
+    align-content: stretch;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .radio-group-item {
+    min-width: 0;
+    flex: 1 1 96px;
+    min-height: 28px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    box-sizing: border-box;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1px;
+    overflow: hidden;
+  }
+
+  .radio-group-item.segmented,
+  .radio-group-item.tab {
+    border-radius: 9px;
+  }
+
+  .radio-group-item.tab {
+    align-self: stretch;
+    min-height: 32px;
+  }
+
+  .radio-dot-shell {
+    width: 12px;
+    height: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .radio-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: currentColor;
+    transform: scale(0);
+    transition: transform 0.14s ease;
+  }
+
+  .radio-group-item.selected .radio-dot {
+    transform: scale(1);
+  }
+
+  .radio-group-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .icon-content {
+    position: absolute;
+    box-sizing: border-box;
     pointer-events: none;
   }
 

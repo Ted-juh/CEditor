@@ -353,7 +353,7 @@ function(_juce_add_plugin_wrapper_target format path out_path)
     _juce_add_plugin_definitions("${target_name}" INTERFACE ${format})
     _juce_add_standard_defs("${target_name}")
 
-    target_compile_features("${target_name}" INTERFACE cxx_std_17)
+    _juce_apply_compile_standard("${target_name}" INTERFACE 17)
     add_library("juce::${target_name}" ALIAS "${target_name}")
 
     if(format STREQUAL "AUv3")
@@ -599,9 +599,9 @@ function(juce_add_module module_path)
     _juce_get_metadata("${metadata_dict}" minimumCppStandard module_cpp_standard)
 
     if(module_cpp_standard)
-        target_compile_features(${module_name} INTERFACE cxx_std_${module_cpp_standard})
+        _juce_apply_compile_standard(${module_name} INTERFACE ${module_cpp_standard})
     else()
-        target_compile_features(${module_name} INTERFACE cxx_std_11)
+        _juce_apply_compile_standard(${module_name} INTERFACE 11)
     endif()
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

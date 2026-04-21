@@ -3,6 +3,16 @@
    * Common Property Bar — quick-access properties for the selected component.
    * Shows the most frequently edited properties inline.
    */
+  import { selectedControl, getSection } from '../stores/controls.js';
+  import DisplayToolbar from '../components/DisplayToolbar.svelte';
+
+  let control = $derived($selectedControl);
+  let selectedStates = $derived(getSection(control, 'States'));
+  let behavior = $derived(getSection(control, 'Behavior'));
+  let showStateToolbar = $derived(
+    String(behavior?.buttonType ?? '').trim().length > 0
+    && Object.keys(selectedStates?._children ?? {}).length > 0
+  );
 </script>
 
 <div class="common-bar">
@@ -34,12 +44,14 @@
     <button class="toggle-btn" title="Align right">≡</button>
   </div>
 
-  <div class="spacer"></div>
+  {#if showStateToolbar}
+    <div class="divider"></div>
+    <div class="toolbar-slot">
+      <DisplayToolbar />
+    </div>
+  {/if}
 
-  <div class="prop-group">
-    <span class="prop-label-sm">Opacity</span>
-    <span class="prop-value">100%</span>
-  </div>
+  <div class="spacer"></div>
 </div>
 
 <style>
@@ -70,11 +82,6 @@
   .prop-label {
     color: #BBB;
     font-size: 11px;
-  }
-
-  .prop-label-sm {
-    color: #777;
-    font-size: 10px;
   }
 
   .prop-value {
@@ -128,4 +135,10 @@
   }
 
   .spacer { flex: 1; }
+
+  .toolbar-slot {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+  }
 </style>

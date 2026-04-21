@@ -4,13 +4,13 @@ const KNOWN_STATE_META = {
   hover: { shortLabel: 'H', order: 10, title: 'Hover' },
   pressed: { shortLabel: 'P', order: 20, title: 'Pressed' },
   focused: { shortLabel: 'F', order: 30, title: 'Focused' },
-  dragging: { shortLabel: 'G', order: 35, title: 'Dragging' },
-  checked: { shortLabel: 'C', order: 40, title: 'Checked' },
-  mixed: { shortLabel: 'M', order: 50, title: 'Mixed' },
-  disabled: { shortLabel: 'D', order: 90, title: 'Disabled' },
+  disabled: { shortLabel: 'D', order: 40, title: 'Disabled' },
+  dragging: { shortLabel: 'G', order: 50, title: 'Dragging' },
+  checked: { shortLabel: 'C', order: 60, title: 'Checked' },
+  mixed: { shortLabel: 'M', order: 70, title: 'Mixed' },
 };
 
-export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects']);
+export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects', 'contentlayout']);
 export { BASE_STATE_TARGET };
 
 export function isStateScopableTabId(tabId = '') {
@@ -104,9 +104,11 @@ export function buildStateTargetOptions(statesSection, { includeBase = true } = 
       const normalized = normalizeStateKey(stateName || state?.name);
       const known = KNOWN_STATE_META[normalized];
       const preferredOrder = priority.indexOf(normalized);
-      const order = preferredOrder === -1
-        ? (known?.order ?? 500) + (index / 100)
-        : preferredOrder;
+      const order = known
+        ? known.order
+        : preferredOrder === -1
+          ? 500 + (index / 100)
+          : 200 + preferredOrder;
       const fullLabel = String(state?.name ?? stateName ?? 'State');
       const shortLabel = makeUniqueShortLabel(known?.shortLabel, fullLabel, usedLabels);
 

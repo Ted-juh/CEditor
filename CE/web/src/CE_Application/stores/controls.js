@@ -41,7 +41,7 @@ export const selectedControls = derived(
   }
 );
 
-const STATE_SCOPABLE_PREFIXES = ['Background.', 'Text.', 'Icon.', 'Effects.'];
+const STATE_SCOPABLE_PREFIXES = ['Background.', 'Text.', 'Icon.', 'Effects.', 'ContentLayout.'];
 const STATE_SCOPABLE_EXACT = new Set(['Transform.scale', 'Transform.rotation', 'Transform.opacity']);
 
 function isStateScopablePath(path) {

@@ -18,6 +18,9 @@ public:
     void resized() override;
 
 private:
+    void showStatusMessage (const juce::String& title, const juce::String& message);
+
     ValueTreeBridge bridge;
     std::unique_ptr<juce::WebBrowserComponent> webView;
+    std::unique_ptr<juce::Label> statusLabel;
 };

@@ -3,7 +3,7 @@
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play,
     LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer,
   } from 'lucide-svelte';
-  import { activePanel, selectedComponentId, selectedComponentIds } from '../stores/panels.js';
+  import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { selectedControl, hasSection, getSection } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
@@ -13,7 +13,8 @@
   import TabContentArea from './TabContentArea.svelte';
   import { createTabViewState } from '../utils/tabViewState.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
-  import { stateEditScope, setStateEditScopeBase, setStateEditScopeState } from '../stores/stateEditScope.js';
+  import { stateEditScope, setStateEditScopeBase } from '../stores/stateEditScope.js';
+  import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
 
@@ -100,12 +101,14 @@
     { id: 'background', icon: Paintbrush,    label: 'Background', section: 'Background' },
     { id: 'border',     icon: Frame,         label: 'Border',     section: 'Background' },
     { id: 'text',       icon: Type,          label: 'Text',       section: 'Text' },
+    { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },
     { id: 'icon',       icon: Image,         label: 'Icon',       section: 'Icon' },
     { id: 'effects',    icon: Sparkles,      label: 'Effects',    section: 'Effects' },
     { id: 'behavior',   icon: Settings2,     label: 'Behavior',   section: 'Behavior' },
     { id: 'states',     icon: Workflow,      label: 'States',     section: 'States' },
+    { id: 'value',      icon: Link,          label: 'Value',      section: 'Value' },
     { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
@@ -121,7 +124,6 @@
   let selectedStates = $derived(getSection($selectedControl, 'States'));
   let stateTargetOptions = $derived(buildStateTargetOptions(selectedStates));
   let activeScope = $derived($stateEditScope);
-  let stateRailExpanded = $state(false);
   let activeStateTarget = $derived(
     activeScope?.mode === 'state' && activeScope?.stateName
       ? activeScope.stateName
@@ -137,12 +139,6 @@
     activeStateTargetOption?.id === BASE_STATE_TARGET
       ? ''
       : `Editing ${activeStateTargetOption?.fullLabel ?? activeStateTarget}`
-  );
-  let hasStateTargets = $derived(stateTargetOptions.length > 1);
-  let showStateRail = $derived(
-    hasStateTargets
-      && $selectedComponentIds.size <= 1
-      && (stateRailExpanded || activeStateTarget !== BASE_STATE_TARGET)
   );
   let scopedComponentControl = $derived.by(() => {
     if (!$selectedControl) return null;
@@ -232,7 +228,6 @@
   $effect(() => {
     if (selectedControlId !== lastScopedControlId) {
       lastScopedControlId = selectedControlId;
-      stateRailExpanded = false;
       setStateEditScopeBase();
     }
   });
@@ -241,6 +236,20 @@
     if (activeStateTarget === BASE_STATE_TARGET) return;
     if (stateTargetOptions.some((option) => option.id === activeStateTarget)) return;
     setStateEditScopeBase();
+  });
+
+  $effect(() => {
+    if (contextMode !== 'component') {
+      activeComponentPropertiesTab.set('');
+      return;
+    }
+
+    if (viewMode !== 'single') {
+      activeComponentPropertiesTab.set('');
+      return;
+    }
+
+    activeComponentPropertiesTab.set(String(singleTab ?? ''));
   });
 
   function toggleViewMode() {
@@ -257,24 +266,7 @@
     collapsedCards = { ...collapsedCards, [id]: !collapsedCards[id] };
   }
 
-  function handleStateTargetClick(targetId) {
-    if (!targetId || targetId === BASE_STATE_TARGET) {
-      setStateEditScopeBase();
-      return;
-    }
-
-    setStateEditScopeState(targetId);
-  }
-
   function handleComponentTabClick(id, event) {
-    if (id === 'states' && hasStateTargets && $selectedComponentIds.size <= 1) {
-      const closeExpandedRail = viewMode === 'single'
-        && singleTab === 'states'
-        && stateRailExpanded
-        && activeStateTarget === BASE_STATE_TARGET;
-      stateRailExpanded = !closeExpandedRail;
-    }
-
     main.handleClick(id, event);
   }
 </script>
@@ -335,10 +327,6 @@
             tabs={componentTabs}
             isActive={main.isActive}
             onclick={handleComponentTabClick}
-            showStateRail={showStateRail}
-            stateTargets={stateTargetOptions}
-            activeStateTarget={activeStateTarget}
-            onstatetargetclick={handleStateTargetClick}
           />
           <div class="split-content-area">
             <TabContentArea
@@ -367,10 +355,6 @@
           {tabs}
           isActive={main.isActive}
           onclick={contextMode === 'component' ? handleComponentTabClick : main.handleClick}
-          showStateRail={contextMode === 'component' && showStateRail}
-          stateTargets={contextMode === 'component' ? stateTargetOptions : []}
-          activeStateTarget={contextMode === 'component' ? activeStateTarget : ''}
-          onstatetargetclick={contextMode === 'component' ? handleStateTargetClick : null}
         />
 
         <div class="card-area">

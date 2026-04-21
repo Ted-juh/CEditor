@@ -32,7 +32,9 @@
     Ruler,
   } from 'lucide-svelte';
 
+  import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds, keyObjectId } from '../stores/panels.js';
+  import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
   import {
     alignLeft, alignHCenter, alignRight,
     alignTop, alignVCenter, alignBottom,
@@ -47,6 +49,10 @@
   } from '../stores/alignment.js';
   import { guides } from '../stores/guides.js';
 
+  let control = $derived($selectedControl);
+  let activePropertiesTab = $derived(String($activeComponentPropertiesTab ?? ''));
+  let contentLayout = $derived(getSection(control, 'ContentLayout'));
+  let showContentLayoutQuickTools = $derived(activePropertiesTab === 'contentlayout' && !!contentLayout);
   let alignMode = $state('selection');
   let regionX = $state(0);
   let regionY = $state(0);
@@ -72,9 +78,61 @@
   let canGrid = $derived(selCount >= 2);
   let canCircle = $derived(selCount >= 2);
   let hasKeyObject = $derived($keyObjectId != null && $selectedComponentIds.has($keyObjectId));
+
+  function setLayout(path, value) {
+    const controlId = control?._children?.Core?.id;
+    if (!controlId) return;
+
+    if ($selectedComponentIds.size > 1) {
+      updateSelectedProperty(`ContentLayout.${path}`, value);
+    } else {
+      updateControlProperty(controlId, `ContentLayout.${path}`, value);
+    }
+  }
 </script>
 
 <div class="align-panel">
+  {#if showContentLayoutQuickTools}
+    <div class="align-section quick-layout">
+      <div class="section-label">Button Layout</div>
+      <div class="btn-row">
+        <button class="action-btn" class:active={contentLayout?.horizontalAlign === 'left'} title="Align content left" onclick={() => setLayout('horizontalAlign', 'left')}>
+          <AlignHorizontalJustifyStart size={16} strokeWidth={1.5} />
+        </button>
+        <button class="action-btn" class:active={contentLayout?.horizontalAlign === 'center'} title="Center content horizontally" onclick={() => setLayout('horizontalAlign', 'center')}>
+          <AlignHorizontalJustifyCenter size={16} strokeWidth={1.5} />
+        </button>
+        <button class="action-btn" class:active={contentLayout?.horizontalAlign === 'right'} title="Align content right" onclick={() => setLayout('horizontalAlign', 'right')}>
+          <AlignHorizontalJustifyEnd size={16} strokeWidth={1.5} />
+        </button>
+      </div>
+      <div class="btn-row">
+        <button class="action-btn" class:active={contentLayout?.verticalAlign === 'top'} title="Align content top" onclick={() => setLayout('verticalAlign', 'top')}>
+          <AlignVerticalJustifyStart size={16} strokeWidth={1.5} />
+        </button>
+        <button class="action-btn" class:active={contentLayout?.verticalAlign === 'center'} title="Center content vertically" onclick={() => setLayout('verticalAlign', 'center')}>
+          <AlignVerticalJustifyCenter size={16} strokeWidth={1.5} />
+        </button>
+        <button class="action-btn" class:active={contentLayout?.verticalAlign === 'bottom'} title="Align content bottom" onclick={() => setLayout('verticalAlign', 'bottom')}>
+          <AlignVerticalJustifyEnd size={16} strokeWidth={1.5} />
+        </button>
+      </div>
+      <div class="layout-row">
+        <span class="input-label">Gap</span>
+        <input class="spacing-input sm" type="number" value={contentLayout?.gap ?? 8} oninput={(e) => setLayout('gap', Number(e.currentTarget.value ?? 0))} />
+        <span class="unit">px</span>
+      </div>
+      <div class="layout-row">
+        <span class="input-label">Pad</span>
+        <input class="spacing-input sm" type="number" value={contentLayout?.paddingLeft ?? 8} title="Padding left" oninput={(e) => setLayout('paddingLeft', Number(e.currentTarget.value ?? 0))} />
+        <input class="spacing-input sm" type="number" value={contentLayout?.paddingRight ?? 8} title="Padding right" oninput={(e) => setLayout('paddingRight', Number(e.currentTarget.value ?? 0))} />
+        <input class="spacing-input sm" type="number" value={contentLayout?.paddingTop ?? 6} title="Padding top" oninput={(e) => setLayout('paddingTop', Number(e.currentTarget.value ?? 0))} />
+        <input class="spacing-input sm" type="number" value={contentLayout?.paddingBottom ?? 6} title="Padding bottom" oninput={(e) => setLayout('paddingBottom', Number(e.currentTarget.value ?? 0))} />
+      </div>
+    </div>
+    <div class="section-divider"></div>
+  {/if}
+
   <!-- Align To -->
   <div class="align-section">
     <div class="section-label">Align To</div>
@@ -375,6 +433,7 @@
 
   .action-btn:hover { background: #333; color: #FFF; }
   .action-btn:active { background: #094771; color: #FFF; }
+  .action-btn.active { background: #094771; color: #FFF; border: 1px solid #0B6EB5; }
   .action-btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
 
   .spacing-row, .layout-row {
@@ -428,5 +487,9 @@
   .input-label {
     font-size: 9px;
     color: #666;
+  }
+
+  .quick-layout .layout-row {
+    min-height: 26px;
   }
 </style>

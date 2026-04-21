@@ -44,6 +44,24 @@ endmacro()
 
 ####################################################################################
 
+function(_juce_apply_compile_standard target visibility standard)
+  if(MSVC AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.50)
+    get_target_property(_juce_target_type "${target}" TYPE)
+
+    if(_juce_target_type STREQUAL "INTERFACE_LIBRARY" OR "${visibility}" STREQUAL "INTERFACE")
+      return()
+    endif()
+
+    set_target_properties("${target}" PROPERTIES
+      CXX_STANDARD ${standard}
+      CXX_STANDARD_REQUIRED YES
+      CXX_EXTENSIONS NO)
+    return()
+  endif()
+
+  target_compile_features("${target}" ${visibility} cxx_std_${standard})
+endfunction()
+
 include("${CMAKE_CURRENT_LIST_DIR}/LV2_HELPER.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/VST3_HELPER.cmake")
 

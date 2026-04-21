@@ -351,32 +351,38 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
-    border-radius: 999px;
-    border: 1px solid #363636;
-    background: #1B1B1B;
+    min-height: 24px;
+    padding: 0 10px;
+    border-radius: 4px;
+    border: 1px solid #3B3B3B;
+    background: linear-gradient(180deg, #2B2B2B 0%, #232323 100%);
     color: #D5D5D5;
     font-size: 11px;
     cursor: pointer;
     font-family: inherit;
+    font-weight: 600;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
   }
 
   .state-chip:hover {
-    border-color: #5B9BD5;
+    border-color: #4C4C4C;
+    background: linear-gradient(180deg, #343434 0%, #2A2A2A 100%);
+    color: #F0F0F0;
   }
 
   .state-chip.selected {
-    border-color: #5B9BD5;
-    background: #1D2A31;
+    border-color: #0B6EB5;
+    background: linear-gradient(180deg, #0B4F7F 0%, #09466E 100%);
+    color: #FFF;
   }
 
   .state-chip.active-target {
-    box-shadow: inset 0 0 0 1px #7CB2D4;
+    box-shadow: inset 0 0 0 1px rgba(158, 212, 255, 0.85);
   }
 
   .chip-dot {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     background: #F5B83D;
   }

@@ -4,6 +4,7 @@ project(CEditor VERSION 0.1.0)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
+option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
 # JUCE 8.0.7 from local install
 list(APPEND CMAKE_PREFIX_PATH "${CMAKE_SOURCE_DIR}/JUCE/lib/cmake/JUCE-8.0.7")
@@ -40,10 +41,10 @@ target_sources(CEditor PRIVATE
 target_compile_definitions(CEditor PRIVATE
     JUCE_WEB_BROWSER=1
     JUCE_USE_WIN_WEBVIEW2=1
-    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=0
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
     # Dev mode: load from Vite dev server (http://localhost:5173)
-    # Set to 0 for production builds that serve from ResourceProvider
-    CEDITOR_DEV_MODE=1
+    # Set to 0 for production builds that serve files from the installed bundle
+    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
 )
 
 target_include_directories(CEditor PRIVATE
@@ -62,6 +63,18 @@ target_link_libraries(CEditor PRIVATE
     dwmapi
     CEditorData
 )
+
+install(TARGETS CEditor
+    RUNTIME DESTINATION "."
+)
+
+if (EXISTS "${CE_ROOT}/web/dist")
+    install(DIRECTORY "${CE_ROOT}/web/dist/"
+        DESTINATION "web/dist"
+    )
+else()
+    message(WARNING "CE/web/dist was not found. Run `npm run build` in CE/web before `cmake --install`.")
+endif()
 
 # JUCE handles the entry point via START_JUCE_APPLICATION
 # Run this from the CE/web/ directory:

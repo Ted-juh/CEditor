@@ -330,6 +330,7 @@
     flex: 0 0 32px;
     border-top: 1px solid #333;
   }
+
   .zoom-bar-area {
     flex: 0 0 24px;
     border-top: 1px solid #2A2A2A;

@@ -13,6 +13,7 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -77,6 +78,12 @@
   function sessionFor(control) {
     const controlId = getControlId(control);
     return $panelPreviewSessions?.[controlId] ?? createInteractionPreviewSession(control);
+  }
+
+  function resolvedPreviewFor(control) {
+    const session = sessionFor(control);
+    const previewOverrides = session?.enabled === false ? {} : session;
+    return resolveInteractiveControl(control, previewOverrides);
   }
 
   function isDisabled(control) {
@@ -585,8 +592,11 @@
   {/if}
 
   {#each orderedControls as control (control._children?.Core?.id)}
+    {@const resolvedPreview = resolvedPreviewFor(control)}
     <CanvasControl
       {control}
+      resolvedControlOverride={resolvedPreview?.control ?? control}
+      interactionRuntimeOverride={resolvedPreview?.runtime ?? null}
       {scale}
       panelLocked={false}
       allControls={orderedControls}
