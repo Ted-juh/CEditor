@@ -61,6 +61,7 @@
       { label: 'Label',      action: () => addControl('Label') },
       { label: 'Button',     action: () => addControl('Button') },
       { label: 'Toggle Button', action: () => addControl('ToggleButton') },
+      { label: 'Range',      action: () => addControl('Range') },
       { label: 'Slider',     action: () => addControl('Slider') },
       { label: 'Container',  action: () => addControl('Container') },
       { type: 'separator' },

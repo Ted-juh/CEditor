@@ -45,15 +45,22 @@
     previewAriaValueNow = undefined,
     previewAriaValueMin = undefined,
     previewAriaValueMax = undefined,
+    previewAriaValueText = undefined,
+    previewValueField = null,
     previewKeyboardFocus = false,
     previewHighlighted = false,
     onpreviewpointerenter = null,
     onpreviewpointerleave = null,
     onpreviewpointerdown = null,
+    onpreviewwheel = null,
     onpreviewfocus = null,
     onpreviewblur = null,
     onpreviewkeydown = null,
     onpreviewkeyup = null,
+    onpreviewvaluefieldinput = null,
+    onpreviewvaluefieldkeydown = null,
+    onpreviewvaluefieldfocus = null,
+    onpreviewvaluefieldblur = null,
   } = $props();
 
   // --- Derived data from sections ---
@@ -112,6 +119,7 @@
       || onpreviewpointerenter != null
       || onpreviewpointerleave != null
       || onpreviewpointerdown != null
+      || onpreviewwheel != null
       || onpreviewfocus != null
       || onpreviewblur != null
       || onpreviewkeydown != null
@@ -3460,6 +3468,7 @@
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
   onpointerleave={previewInteractive ? onpreviewpointerleave : undefined}
   onpointerdown={previewInteractive ? onpreviewpointerdown : undefined}
+  onwheel={previewInteractive ? onpreviewwheel : undefined}
   onfocus={previewInteractive ? onpreviewfocus : undefined}
   onblur={previewInteractive ? onpreviewblur : undefined}
   onkeydown={previewInteractive ? onpreviewkeydown : undefined}
@@ -3472,6 +3481,7 @@
   aria-valuenow={previewInteractive ? previewAriaValueNow : undefined}
   aria-valuemin={previewInteractive ? previewAriaValueMin : undefined}
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
+  aria-valuetext={previewInteractive ? previewAriaValueText : undefined}
 >
   <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
     {#if background}
@@ -3486,6 +3496,11 @@
           parentHeight={displayH}
           transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
           debug={interactionDebugEnabled}
+          editableInput={previewInteractive && previewValueField && part?.role === 'valueField' ? previewValueField : null}
+          oneditableinput={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldinput : null}
+          oneditablekeydown={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldkeydown : null}
+          oneditablefocus={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldfocus : null}
+          oneditableblur={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldblur : null}
         />
       {/each}
     {/if}

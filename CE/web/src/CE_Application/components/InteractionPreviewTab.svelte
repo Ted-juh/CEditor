@@ -5,7 +5,9 @@
   import InteractiveSelectGroupSurface from './InteractiveSelectGroupSurface.svelte';
   import InteractiveTestSurface from './InteractiveTestSurface.svelte';
   import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
+  import { normalizeEnumValues, resolveEnumDefaultValue } from '../utils/enumBehavior.js';
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
+  import { adjustRangeValue, getCurrentRangeValue, getRangeMax, getRangeMin, snapRangeValue } from '../utils/rangeBehavior.js';
 
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
@@ -104,9 +106,16 @@
   let previewOverrides = $derived(session?.enabled === false ? {} : session);
   let resolved = $derived(control ? resolveInteractiveControl(control, previewOverrides) : null);
   let runtime = $derived(resolved ? serializeInteractionRuntime(resolved.runtime) : null);
-  let showChecked = $derived(behavior?.family === 'select');
-  let showMixed = $derived(behavior?.allowMixed === true);
+  let showChecked = $derived(behavior?.family === 'select' && behavior?.valueType === 'bool');
+  let showMixed = $derived(behavior?.allowMixed === true && behavior?.valueType === 'bool');
   let showRangeValue = $derived(behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float');
+  let showEnumValue = $derived(behavior?.valueType === 'enum');
+  let enumValues = $derived(normalizeEnumValues(behavior?.enumValues ?? []));
+  let enumPreviewValue = $derived(
+    session?.valueOverrideEnabled === true
+      ? String(session?.valueOverride ?? resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? ''))
+      : resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? '')
+  );
 
   function patchControlSession(targetControlId, patch = {}) {
     const targetControl = previewControlMap.get(targetControlId) ?? null;
@@ -190,7 +199,25 @@
   function handleValueChange(event) {
     patchSession({
       valueOverrideEnabled: true,
-      valueOverride: Number(event.currentTarget.value),
+      valueOverride: snapRangeValue(behavior, Number(event.currentTarget.value)),
+      valueInputActive: false,
+      valueInputBuffer: '',
+    });
+  }
+
+  function handleRangeStep(direction) {
+    patchSession({
+      valueOverrideEnabled: true,
+      valueOverride: adjustRangeValue(behavior, getCurrentRangeValue(behavior, session), direction),
+      valueInputActive: false,
+      valueInputBuffer: '',
+    });
+  }
+
+  function handleEnumValueChange(event) {
+    patchSession({
+      valueOverrideEnabled: true,
+      valueOverride: String(event.currentTarget.value ?? ''),
     });
   }
 
@@ -216,7 +243,7 @@
 
 {#if !control}
   <div class="preview-empty">
-    Select a button, toggle, slider, or another interactive control to test it here.
+    Select a button, range, toggle, or another interactive control to test it here.
   </div>
 {:else if !hasInteractiveModel}
   <div class="preview-empty">
@@ -313,24 +340,38 @@
               <span>Override Value</span>
               <input type="checkbox" checked={session.valueOverrideEnabled === true} onchange={(event) => handleToggle('valueOverrideEnabled', event)} />
             </label>
-            <input
-              class="range-input"
-              type="range"
-              min={numberOr(behavior?.min, 0)}
-              max={numberOr(behavior?.max, 1)}
-              step={numberOr(behavior?.step, 0.01)}
-              value={session.valueOverrideEnabled === true ? numberOr(session.valueOverride, numberOr(behavior?.defaultValue, 0)) : numberOr(behavior?.defaultValue, 0)}
-              oninput={handleValueChange}
-            />
-            <input
+            <div class="range-stepper">
+              <button type="button" class="step-btn" onclick={() => handleRangeStep(-1)}>-</button>
+              <input
               class="number-input"
               type="number"
-              min={numberOr(behavior?.min, 0)}
-              max={numberOr(behavior?.max, 1)}
+              min={getRangeMin(behavior)}
+              max={getRangeMax(behavior)}
               step={numberOr(behavior?.step, 0.01)}
-              value={session.valueOverrideEnabled === true ? numberOr(session.valueOverride, numberOr(behavior?.defaultValue, 0)) : numberOr(behavior?.defaultValue, 0)}
+              value={getCurrentRangeValue(behavior, session)}
               oninput={handleValueChange}
             />
+              <button type="button" class="step-btn" onclick={() => handleRangeStep(1)}>+</button>
+            </div>
+            <div class="value-readout">
+              Range preview supports step buttons, direct number entry, arrow keys, wheel, and scrub-dragging on the live stage.
+            </div>
+          {:else if showEnumValue}
+            <label class="toggle-row">
+              <span>Override Value</span>
+              <input type="checkbox" checked={session.valueOverrideEnabled === true} onchange={(event) => handleToggle('valueOverrideEnabled', event)} />
+            </label>
+            {#if enumValues.length}
+              <select class="select-input" value={enumPreviewValue} onchange={handleEnumValueChange}>
+                {#each enumValues as option}
+                  <option value={option}>{option}</option>
+                {/each}
+              </select>
+            {:else}
+              <div class="value-readout">
+                Add enum values in Behavior to preview and override the enum state.
+              </div>
+            {/if}
           {:else}
             <div class="value-readout">
               Use the live stage to hover, press, and click this control.
@@ -511,9 +552,32 @@
     accent-color: #5B9BD5;
   }
 
-  .range-input,
   .number-input {
     width: 100%;
+  }
+
+  .range-stepper {
+    display: grid;
+    grid-template-columns: 36px 1fr 36px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .step-btn {
+    border: 1px solid #3B3B3B;
+    background: #252525;
+    color: #E5E5E5;
+    border-radius: 4px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+  }
+
+  .step-btn:hover {
+    border-color: #5B9BD5;
+    background: #2C2C2C;
   }
 
   .number-input {
@@ -524,6 +588,18 @@
     padding: 6px 8px;
     font-size: 11px;
     font-family: inherit;
+    box-sizing: border-box;
+  }
+
+  .select-input {
+    border: 1px solid #3B3B3B;
+    background: #131313;
+    color: #E5E5E5;
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 11px;
+    font-family: inherit;
+    width: 100%;
     box-sizing: border-box;
   }
 

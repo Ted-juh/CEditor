@@ -36,6 +36,7 @@
   const components = [
     { id: 'button',   icon: RectangleHorizontal, label: 'Button' },
     { id: 'label',    icon: Type,                label: 'Label' },
+    { id: 'range',    icon: SlidersHorizontal,   label: 'Range' },
     { id: 'slider',   icon: SlidersHorizontal,   label: 'Slider' },
     { id: 'combobox', icon: ChevronDown,         label: 'ComboBox' },
     { id: 'backdrop', icon: Square,              label: 'Backdrop' },

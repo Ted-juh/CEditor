@@ -2,6 +2,22 @@
   import { onDestroy } from 'svelte';
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { deepClone } from '../utils/deepClone.js';
+  import { getNextEnumValue } from '../utils/enumBehavior.js';
+  import {
+    adjustRangeValue,
+    getCurrentRangeValue,
+    getRangeMax,
+    getRangeMin,
+    isRangeBehavior,
+    isRangeTextInputKey,
+    isSliderRangeBehavior,
+    normalizedRangePointerValue,
+    parseRangeInputValue,
+    resolveRangeDisplayValue,
+    resolveRangeZone,
+    scrubRangeValue,
+    snapRangeValue,
+  } from '../utils/rangeBehavior.js';
 
   let {
     control = null,
@@ -17,6 +33,9 @@
   let hitboxElement = $state(null);
   let pointerActive = $state(false);
   let draggingRange = $state(false);
+  let pointerDownPoint = $state({ x: 0, y: 0 });
+  let pointerDownZone = $state('');
+  let pointerStartValue = $state(0);
   let keyboardFocusActive = $state(false);
   let lastInputMode = $state('pointer');
 
@@ -64,9 +83,20 @@
   let isDisabled = $derived(session?.enabled === false || session?.disabled === true);
   let helperLabel = $derived.by(() => {
     if (!behavior) return 'Hover and click to test the selected control.';
-    if (behavior.family === 'range') return 'Drag across the control to test value changes.';
+    if (behavior.family === 'range') {
+      return isSliderRangeBehavior(behavior)
+        ? 'Drag across the control to test slider travel.'
+        : 'Click the step buttons, type a value, or scrub-drag to test range behavior.';
+    }
     if (behavior.family === 'select') return 'Hover, press, and click to test selection behavior.';
     return 'Hover and press to test the configured states.';
+  });
+  let previewRole = $derived.by(() => {
+    if (!behavior) return 'button';
+    if (behavior.family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    if (behavior.role === 'radio' || behavior.role === 'segmented') return 'radio';
+    if (behavior.role === 'toggle' || behavior.role === 'checkbox') return 'checkbox';
+    return 'button';
   });
 
   function removeWindowListeners() {
@@ -77,7 +107,7 @@
   onDestroy(removeWindowListeners);
 
   function isRangeControl() {
-    return String(behavior?.family ?? '') === 'range';
+    return isRangeBehavior(behavior);
   }
 
   function isPointInsideHitbox(clientX, clientY) {
@@ -92,10 +122,7 @@
   }
 
   function currentRangeValue() {
-    if (session?.valueOverrideEnabled === true) {
-      return numberOr(session?.valueOverride, numberOr(behavior?.defaultValue, numberOr(behavior?.min, 0)));
-    }
-    return numberOr(behavior?.defaultValue, numberOr(behavior?.min, 0));
+    return getCurrentRangeValue(behavior, session);
   }
 
   function commitSelectAction() {
@@ -109,11 +136,10 @@
       const values = Array.isArray(behavior?.enumValues) ? behavior.enumValues : [];
       if (!values.length) return;
       const currentValue = session?.valueOverrideEnabled === true ? session?.valueOverride : behavior?.defaultValue;
-      const currentIndex = Math.max(0, values.findIndex((value) => value === currentValue));
-      const nextIndex = (currentIndex + 1) % values.length;
+      const nextValue = getNextEnumValue(values, currentValue, behavior?.wrapEnum === true);
       patchSession({
         valueOverrideEnabled: true,
-        valueOverride: values[nextIndex],
+        valueOverride: nextValue,
       });
       return;
     }
@@ -125,81 +151,222 @@
     });
   }
 
-  function snapRangeValue(rawValue) {
-    const min = numberOr(behavior?.min, 0);
-    const max = numberOr(behavior?.max, 1);
-    let next = clamp(rawValue, min, max);
-    const step = numberOr(behavior?.step, 0);
-    if (step > 0) {
-      next = min + Math.round((next - min) / step) * step;
-    }
-    if (String(behavior?.valueType ?? '') === 'int') {
-      next = Math.round(next);
-    }
-    return clamp(next, min, max);
+  function clearRangeInput() {
+    patchSession({
+      valueInputActive: false,
+      valueInputBuffer: '',
+    });
   }
 
-  function normalizedFromPointerEvent(event) {
-    const rect = hitboxElement?.getBoundingClientRect?.();
-    if (!rect) return 0;
-
-    const localX = clamp((event.clientX - rect.left) / Math.max(1, rect.width), 0, 1);
-    const localY = clamp((event.clientY - rect.top) / Math.max(1, rect.height), 0, 1);
-    const orientation = String(behavior?.orientation ?? 'horizontal');
-    const direction = String(behavior?.direction ?? (orientation === 'vertical' ? 'btt' : 'ltr'));
-
-    if (orientation === 'vertical') {
-      if (direction === 'ttb') return localY;
-      return 1 - localY;
-    }
-
-    if (direction === 'rtl') return 1 - localX;
-    return localX;
+  function beginRangeFieldEdit() {
+    patchSession({
+      focused: true,
+      hover: true,
+      valueInputActive: true,
+      valueInputBuffer: resolveRangeDisplayValue(behavior, session),
+    });
   }
 
-  function updateRangeFromPointer(event) {
-    if (!isRangeControl()) return;
-    const min = numberOr(behavior?.min, 0);
-    const max = numberOr(behavior?.max, 1);
-    const normalized = normalizedFromPointerEvent(event);
-    const nextValue = snapRangeValue(min + ((max - min) * normalized));
+  function commitRangeFieldInput() {
+    const rawValue = session?.valueInputActive === true
+      ? String(session?.valueInputBuffer ?? '')
+      : resolveRangeDisplayValue(behavior, session);
+    const parsed = parseRangeInputValue(behavior, rawValue);
+
+    patchSession({
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...(parsed === null ? {} : {
+        valueOverrideEnabled: true,
+        valueOverride: parsed,
+      }),
+    });
+  }
+
+  function handleRangeFieldInput(event) {
+    event.stopPropagation();
+    const rawValue = String(event?.currentTarget?.value ?? '');
+    const parsed = parseRangeInputValue(behavior, rawValue);
+    patchSession({
+      valueInputActive: true,
+      valueInputBuffer: rawValue,
+      ...(parsed === null ? {} : {
+        valueOverrideEnabled: true,
+        valueOverride: parsed,
+      }),
+    });
+  }
+
+  function handleRangeFieldKeyDown(event) {
+    event.stopPropagation();
+
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      adjustRangeFromKey(event.key);
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitRangeFieldInput();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      clearRangeInput();
+    }
+  }
+
+  function handleRangeFieldFocus(event) {
+    event.stopPropagation();
+    beginRangeFieldEdit();
+  }
+
+  function handleRangeFieldBlur(event) {
+    event.stopPropagation();
+    commitRangeFieldInput();
+    patchSession({
+      focused: false,
+      pressed: false,
+      dragging: false,
+    });
+  }
+
+  function setRangeValue(nextValue, extraPatch = {}) {
     patchSession({
       valueOverrideEnabled: true,
-      valueOverride: nextValue,
+      valueOverride: snapRangeValue(behavior, nextValue),
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...extraPatch,
     });
+  }
+
+  function updateSliderRangeFromPointer(event) {
+    if (!isRangeControl()) return;
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return;
+
+    const min = getRangeMin(behavior);
+    const max = getRangeMax(behavior);
+    const normalized = normalizedRangePointerValue(behavior, rect, event.clientX, event.clientY);
+    setRangeValue(min + ((max - min) * normalized));
+  }
+
+  function updateScrubRangeFromPointer(event) {
+    if (!isRangeControl()) return;
+    setRangeValue(
+      scrubRangeValue(behavior, pointerStartValue, pointerDownPoint, { x: event.clientX, y: event.clientY }),
+      { dragging: true }
+    );
+  }
+
+  function maybeStartRangeDrag(event) {
+    if (!isRangeControl() || draggingRange || isSliderRangeBehavior(behavior) || behavior?.dragEnabled !== true) return false;
+
+    const dx = Math.abs(event.clientX - pointerDownPoint.x);
+    const dy = Math.abs(event.clientY - pointerDownPoint.y);
+    if (Math.max(dx, dy) < 5) return false;
+
+    draggingRange = true;
+    patchSession({ dragging: true });
+    return true;
+  }
+
+  function handleRangePointerClick(event) {
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return;
+
+    const zone = resolveRangeZone(behavior, rect, event.clientX, event.clientY);
+    if (zone !== pointerDownZone) return;
+
+    if (zone === 'decrement') {
+      setRangeValue(adjustRangeValue(behavior, currentRangeValue(), -1));
+    } else if (zone === 'increment') {
+      setRangeValue(adjustRangeValue(behavior, currentRangeValue(), 1));
+    }
   }
 
   function adjustRangeFromKey(key) {
     if (!isRangeControl()) return;
 
-    const min = numberOr(behavior?.min, 0);
-    const max = numberOr(behavior?.max, 1);
-    const fallbackStep = String(behavior?.valueType ?? '') === 'int' ? 1 : 0.01;
-    const step = Math.max(numberOr(behavior?.step, fallbackStep), fallbackStep);
     let nextValue = currentRangeValue();
 
     switch (key) {
       case 'Home':
-        nextValue = min;
+        nextValue = getRangeMin(behavior);
         break;
       case 'End':
-        nextValue = max;
+        nextValue = getRangeMax(behavior);
         break;
       case 'ArrowLeft':
       case 'ArrowDown':
-        nextValue -= step;
+        nextValue = adjustRangeValue(behavior, nextValue, -1);
         break;
       case 'ArrowRight':
       case 'ArrowUp':
-        nextValue += step;
+        nextValue = adjustRangeValue(behavior, nextValue, 1);
         break;
       default:
         return;
     }
 
+    setRangeValue(nextValue);
+  }
+
+  function handleRangeTextInput(key) {
+    const currentBuffer = session?.valueInputActive === true ? String(session?.valueInputBuffer ?? '') : '';
+
+    if (key === 'Escape') {
+      clearRangeInput();
+      return true;
+    }
+
+    if (key === 'Enter') {
+      const parsed = parseRangeInputValue(behavior, currentBuffer);
+      patchSession({
+        valueInputActive: false,
+        valueInputBuffer: '',
+        ...(parsed === null ? {} : {
+          valueOverrideEnabled: true,
+          valueOverride: parsed,
+        }),
+      });
+      return true;
+    }
+
+    let nextBuffer = currentBuffer;
+    if (key === 'Backspace') {
+      nextBuffer = currentBuffer.slice(0, -1);
+    } else if (key === 'Delete') {
+      nextBuffer = '';
+    } else if (isRangeTextInputKey(key)) {
+      nextBuffer = `${currentBuffer}${key}`;
+    } else {
+      return false;
+    }
+
+    const parsed = parseRangeInputValue(behavior, nextBuffer);
     patchSession({
-      valueOverrideEnabled: true,
-      valueOverride: snapRangeValue(nextValue),
+      valueInputActive: true,
+      valueInputBuffer: nextBuffer,
+      ...(parsed === null ? {} : {
+        valueOverrideEnabled: true,
+        valueOverride: parsed,
+      }),
+    });
+    return true;
+  }
+
+  function handleWheel(event) {
+    if (!isRangeControl() || behavior?.wheelEnabled !== true || isDisabled) return;
+
+    event.preventDefault();
+    const direction = event.deltaY < 0 ? 1 : -1;
+    setRangeValue(adjustRangeValue(behavior, currentRangeValue(), direction), {
+      hover: true,
+      focused: true,
     });
   }
 
@@ -223,22 +390,41 @@
     lastInputMode = 'pointer';
     keyboardFocusActive = false;
     pointerActive = true;
-    draggingRange = isRangeControl();
+    pointerDownPoint = { x: event.clientX, y: event.clientY };
+    pointerStartValue = currentRangeValue();
+    draggingRange = isRangeControl() && isSliderRangeBehavior(behavior);
+    pointerDownZone = isRangeControl()
+      ? resolveRangeZone(behavior, hitboxElement?.getBoundingClientRect?.(), event.clientX, event.clientY)
+      : '';
     patchSession({
       hover: true,
       pressed: true,
       dragging: draggingRange,
     });
     if (draggingRange) {
-      updateRangeFromPointer(event);
+      updateSliderRangeFromPointer(event);
     }
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
   }
 
   function handleWindowPointerMove(event) {
-    if (!pointerActive || !draggingRange || isDisabled) return;
-    updateRangeFromPointer(event);
+    if (!pointerActive || isDisabled || !isRangeControl()) return;
+
+    if (isSliderRangeBehavior(behavior)) {
+      if (!draggingRange) return;
+      updateSliderRangeFromPointer(event);
+      return;
+    }
+
+    if (maybeStartRangeDrag(event)) {
+      updateScrubRangeFromPointer(event);
+      return;
+    }
+
+    if (draggingRange) {
+      updateScrubRangeFromPointer(event);
+    }
   }
 
   function handleWindowPointerUp(event) {
@@ -246,7 +432,9 @@
     const inside = isPointInsideHitbox(event.clientX, event.clientY);
 
     if (!draggingRange && inside && !isDisabled) {
-      if (String(behavior?.family ?? 'trigger') === 'select') {
+      if (isRangeControl() && !isSliderRangeBehavior(behavior)) {
+        handleRangePointerClick(event);
+      } else if (String(behavior?.family ?? 'trigger') === 'select') {
         commitSelectAction();
       }
     }
@@ -259,6 +447,7 @@
 
     pointerActive = false;
     draggingRange = false;
+    pointerDownZone = '';
     removeWindowListeners();
   }
 
@@ -271,7 +460,7 @@
 
   function handleBlur() {
     keyboardFocusActive = false;
-    patchSession({ focused: false, pressed: false, dragging: false });
+    patchSession({ focused: false, pressed: false, dragging: false, valueInputActive: false });
     pointerActive = false;
     draggingRange = false;
     removeWindowListeners();
@@ -281,6 +470,15 @@
     if (isDisabled) return;
     lastInputMode = 'keyboard';
     keyboardFocusActive = true;
+
+    if (!event.ctrlKey && !event.metaKey && !event.altKey && isRangeControl()) {
+      if (handleRangeTextInput(event.key)) {
+        event.preventDefault();
+        hitboxElement?.focus?.();
+        patchSession({ focused: true, hover: true });
+        return;
+      }
+    }
 
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
@@ -322,18 +520,24 @@
         class="preview-scene"
         style="left:{sceneLeft}px; top:{sceneTop}px; width:{controlWidth}px; height:{controlHeight}px; transform:scale({fitScale}); transform-origin:top left;"
       >
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
         <div
           bind:this={hitboxElement}
           class="test-hitbox"
           class:disabled={session?.disabled === true}
           class:keyboard-focus={keyboardFocusActive}
-          role="button"
+          role={previewRole}
           aria-label="Interactive preview surface"
           aria-disabled={session?.disabled === true}
+          aria-valuenow={isRangeControl() ? currentRangeValue() : undefined}
+          aria-valuemin={isRangeControl() ? getRangeMin(behavior) : undefined}
+          aria-valuemax={isRangeControl() ? getRangeMax(behavior) : undefined}
+          aria-valuetext={isRangeControl() ? resolveRangeDisplayValue(behavior, session) : undefined}
           tabindex={isDisabled ? undefined : 0}
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}
           onpointerdown={handlePointerDown}
+          onwheel={handleWheel}
           onfocus={handleFocus}
           onblur={handleBlur}
           onkeydown={handleKeyDown}
@@ -347,6 +551,17 @@
             allControls={[previewControl]}
             editorInteractionEnabled={false}
             previewSessionOverride={previewSession}
+            previewValueField={previewRole === 'spinbutton' ? {
+              value: resolveRangeDisplayValue(behavior, session),
+              disabled: isDisabled,
+              inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
+              ariaLabel: `${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Range'} value`,
+              tabIndex: -1,
+            } : null}
+            onpreviewvaluefieldinput={handleRangeFieldInput}
+            onpreviewvaluefieldkeydown={handleRangeFieldKeyDown}
+            onpreviewvaluefieldfocus={handleRangeFieldFocus}
+            onpreviewvaluefieldblur={handleRangeFieldBlur}
           />
         </div>
       </div>

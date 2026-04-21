@@ -222,8 +222,106 @@ function sliderParts() {
   };
 }
 
+function rangeParts() {
+  const buttonBackground = rootBackgroundClone();
+  buttonBackground._children.Fill.colour = 'FF343434';
+  buttonBackground._children.Border.enabled = true;
+  buttonBackground._children.Border.thickness = 1;
+  buttonBackground._children.Border.colour = '664C4C4C';
+  buttonBackground._children.Corners.radius = 8;
+
+  const fieldBackground = rootBackgroundClone();
+  fieldBackground._children.Fill.colour = 'FF151515';
+  fieldBackground._children.Border.enabled = true;
+  fieldBackground._children.Border.thickness = 1;
+  fieldBackground._children.Border.colour = '665B5B5B';
+  fieldBackground._children.Corners.radius = 8;
+
+  const buttonText = (content) => {
+    const text = rootTextClone(content);
+    text._children.Font.size = 15;
+    text._children.Font.weightValue = 700;
+    text._children.Font.weight = 'Bold';
+    text._children.Position.justification = 'centred';
+    return text;
+  };
+
+  const valueText = rootTextClone('0');
+  valueText._children.Font.size = 12;
+  valueText._children.Font.weightValue = 600;
+  valueText._children.Font.weight = 'SemiBold';
+  valueText._children.Position.justification = 'centred';
+
+  return {
+    _type: 'Parts',
+    _children: {
+      decrement: createPartNode('decrement', {
+        role: 'decrement',
+        zIndex: 0,
+        layout: {
+          x: 0,
+          y: 50,
+          width: 24,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'left',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: deepClone(buttonBackground),
+          Text: buttonText('-'),
+        },
+      }),
+      valueField: createPartNode('valueField', {
+        role: 'valueField',
+        zIndex: 1,
+        layout: {
+          x: 50,
+          y: 50,
+          width: 48,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'center',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: fieldBackground,
+          Text: valueText,
+        },
+      }),
+      increment: createPartNode('increment', {
+        role: 'increment',
+        zIndex: 2,
+        layout: {
+          x: 100,
+          y: 50,
+          width: 24,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'right',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: deepClone(buttonBackground),
+          Text: buttonText('+'),
+        },
+      }),
+    },
+  };
+}
+
 const BUTTON_PRIORITY = ['hover', 'pressed', 'focused', 'checked', 'mixed', 'disabled'];
 const SLIDER_PRIORITY = ['hover', 'pressed', 'focused', 'dragging', 'disabled'];
+const RANGE_PRIORITY = ['hover', 'pressed', 'focused', 'dragging', 'disabled'];
 
 export function createBehaviorDefaults(type) {
   if (type === 'ToggleButton') {
@@ -281,6 +379,41 @@ export function createBehaviorDefaults(type) {
       min: 0,
       max: 1,
       step: 0.01,
+      keyboardEnabled: true,
+      focusable: true,
+      activationKeys: ['Enter', 'Space'],
+      arrowKeyAdjust: true,
+      pageKeyAdjust: true,
+      homeEndAdjust: true,
+      dragEnabled: true,
+      wheelEnabled: true,
+      snapToStep: true,
+      emitClick: true,
+      emitValueChange: true,
+      emitStateChange: true,
+    };
+  }
+
+  if (type === 'Range') {
+    return {
+      _type: 'Behavior',
+      family: 'range',
+      role: 'spinbox',
+      valueType: 'int',
+      defaultValue: 0,
+      selectionMode: 'none',
+      enumValues: [],
+      wrapEnum: false,
+      groupId: '',
+      allowMixed: false,
+      uncheckOnClick: false,
+      pressMode: 'pressRelease',
+      toggleOn: 'release',
+      orientation: 'horizontal',
+      direction: 'ltr',
+      min: 0,
+      max: 100,
+      step: 1,
       keyboardEnabled: true,
       focusable: true,
       activationKeys: ['Enter', 'Space'],
@@ -440,6 +573,74 @@ export function createStatesDefaults(type) {
     };
   }
 
+  if (type === 'Range') {
+    return {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: RANGE_PRIORITY,
+      _children: {
+        Hover: createStateNode('Hover', {
+          description: 'Lift the step buttons and value field while hovering.',
+          when: { hover: true },
+          parts: {
+            decrement: {
+              'Background.Fill.colour': 'FF3D3D3D',
+            },
+            increment: {
+              'Background.Fill.colour': 'FF3D3D3D',
+            },
+            valueField: {
+              'Background.Fill.colour': 'FF1B1B1B',
+            },
+          },
+        }),
+        Pressed: createStateNode('Pressed', {
+          description: 'Tighten the control while pressing.',
+          when: { pressed: true },
+          component: {
+            'Transform.scale': 0.99,
+          },
+          parts: {
+            decrement: {
+              'Background.Fill.colour': 'FF282828',
+            },
+            increment: {
+              'Background.Fill.colour': 'FF282828',
+            },
+          },
+        }),
+        Dragging: createStateNode('Dragging', {
+          description: 'Highlight the value field while scrubbing.',
+          when: { dragging: true },
+          parts: {
+            valueField: {
+              'Background.Fill.colour': 'FF203141',
+              'Background.Border.colour': 'FF5B9BD5',
+            },
+          },
+        }),
+        Focused: createStateNode('Focused', {
+          description: 'Accent the editable value field while focused.',
+          when: { focused: true },
+          parts: {
+            valueField: {
+              'Background.Border.colour': 'FF89C2FF',
+            },
+          },
+        }),
+        Disabled: createStateNode('Disabled', {
+          group: 'system',
+          description: 'Dim the range control when disabled.',
+          when: { disabled: true },
+          component: {
+            'Transform.opacity': 0.55,
+          },
+        }),
+      },
+    };
+  }
+
   return {
     _type: 'States',
     enabled: true,
@@ -507,6 +708,22 @@ export function createBindingsDefaults(type) {
     };
   }
 
+  if (type === 'Range') {
+    return {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        valueText: createBindingNode('valueText', {
+          source: 'value.display',
+          mapMode: 'direct',
+          target: 'Parts.valueField.Text.content',
+          outputUnit: 'unitless',
+        }),
+      },
+    };
+  }
+
   return {
     _type: 'Bindings',
     enabled: true,
@@ -548,6 +765,28 @@ export function createAnimationsDefaults(type) {
     };
   }
 
+  if (type === 'Range') {
+    return {
+      _type: 'Animations',
+      enabled: true,
+      debug: false,
+      _children: {
+        pressIn: createAnimationNode('pressIn', {
+          trigger: {
+            type: 'stateChange',
+            from: ['*'],
+            to: ['pressed'],
+          },
+          targets: [
+            { path: 'Transform.scale', properties: ['transform'] },
+          ],
+          duration: 90,
+          easing: 'outQuad',
+        }),
+      },
+    };
+  }
+
   return {
     _type: 'Animations',
     enabled: true,
@@ -582,6 +821,10 @@ export function createAnimationsDefaults(type) {
 }
 
 export function createPartsDefaults(type) {
+  if (type === 'Range') {
+    return rangeParts();
+  }
+
   if (type === 'Slider') {
     return sliderParts();
   }

@@ -1,4 +1,6 @@
 import { deepClone } from './deepClone.js';
+import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
+import { getCurrentRangeValue, getRangeMax, getRangeMin, resolveRangeDisplayValue, snapRangeValue } from './rangeBehavior.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -87,6 +89,8 @@ function evaluateBindingSource(binding, signals) {
       return signals.valueRaw;
     case 'value.normalized':
       return signals.valueNormalized;
+    case 'value.display':
+      return signals.valueDisplay;
     case 'value.bool':
       return signals.checked;
     case 'value.enum':
@@ -109,6 +113,10 @@ function evaluateBindingSource(binding, signals) {
 }
 
 function resolveBindingValue(binding, sourceValue) {
+  if (binding?.mapMode === 'direct') {
+    return sourceValue;
+  }
+
   if (binding?.mapMode === 'boolean') {
     const boolValue = !!sourceValue;
     let resolved = boolValue ? binding.trueValue : binding.falseValue;
@@ -275,27 +283,41 @@ export function serializeInteractionRuntime(runtime = {}) {
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
+  const valueType = String(behavior?.valueType ?? 'none');
   const defaultValue = behavior?.defaultValue;
+  const enumValues = normalizeEnumValues(behavior?.enumValues ?? []);
 
   let valueRaw = previewSession?.valueOverrideEnabled
     ? previewSession?.valueOverride
     : defaultValue;
 
-  if (behavior?.valueType === 'bool' && previewSession?.valueOverrideEnabled !== true) {
+  if (valueType === 'bool' && previewSession?.valueOverrideEnabled !== true) {
     valueRaw = previewSession?.checked === true;
   }
 
-  const min = numberOr(behavior?.min, 0);
-  const max = numberOr(behavior?.max, 1);
+  if (valueType === 'enum') {
+    valueRaw = resolveEnumDefaultValue(enumValues, valueRaw);
+  } else if (String(behavior?.family ?? '') === 'range') {
+    valueRaw = getCurrentRangeValue(behavior, previewSession);
+  }
+
+  const min = getRangeMin(behavior);
+  const max = getRangeMax(behavior);
   const normalizedSource = isNumeric(valueRaw) ? valueRaw : (valueRaw === true ? max : min);
-  const valueNormalized = clamp(normalizeRange(normalizedSource, min, max), 0, 1);
+  const valueNormalized = valueType === 'enum'
+    ? clamp(getEnumNormalizedValue(enumValues, valueRaw), 0, 1)
+    : clamp(normalizeRange(snapRangeValue(behavior, normalizedSource), min, max), 0, 1);
+  const valueDisplay = String(behavior?.family === 'range'
+    ? resolveRangeDisplayValue(behavior, previewSession)
+    : (valueType === 'enum' ? String(valueRaw ?? '') : String(valueRaw ?? '')));
 
   return {
     family: String(behavior?.family ?? 'trigger'),
     role: String(behavior?.role ?? core?.controlType ?? 'custom'),
-    valueType: String(behavior?.valueType ?? 'none'),
+    valueType,
     valueRaw,
-    valueEnum: typeof valueRaw === 'string' ? valueRaw : '',
+    valueDisplay,
+    valueEnum: valueType === 'enum' ? String(valueRaw ?? '') : '',
     valueNormalized,
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,

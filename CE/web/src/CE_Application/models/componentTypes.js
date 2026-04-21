@@ -42,6 +42,15 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Range: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
+    defaultOverrides: {
+      Transform: { width: 180, height: 40 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Range'),
+    },
+  },
+
   Slider: {
     sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
     defaultOverrides: {

@@ -1,10 +1,17 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
+  import {
+    applyControlPatch,
+    applySelectedPatch,
+    getSection,
+    updateControlProperty,
+    updateSelectedProperty,
+  } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import { normalizeEnumValues, resolveEnumDefaultValue } from '../utils/enumBehavior.js';
 
   let { control = null } = $props();
 
@@ -15,7 +22,7 @@
   const ROLE_OPTIONS = {
     trigger: ['button', 'custom'],
     select: ['toggle', 'checkbox', 'radio', 'segmented', 'custom'],
-    range: ['slider', 'switch', 'knob', 'custom'],
+    range: ['spinbox', 'stepper', 'scrubber', 'slider', 'knob', 'custom'],
   };
   const VALUE_TYPE_OPTIONS = ['none', 'bool', 'int', 'float', 'enum'];
   const SELECTION_OPTIONS = ['none', 'single', 'multi', 'cycle'];
@@ -33,6 +40,22 @@
     }
   }
 
+  function applyBehaviorPatch(patch = {}) {
+    if (!core?.id) return;
+    const entries = Object.entries(patch);
+    if (!entries.length) return;
+
+    const behaviorPatch = Object.fromEntries(
+      entries.map(([key, value]) => [`Behavior.${key}`, value])
+    );
+
+    if ($selectedComponentIds.size > 1) {
+      applySelectedPatch(behaviorPatch);
+    } else {
+      applyControlPatch(core.id, behaviorPatch);
+    }
+  }
+
   function handleInput(prop, event) {
     set(prop, event?.target?.value ?? '');
   }
@@ -41,11 +64,57 @@
     set(prop, !(behavior?.[prop] === true));
   }
 
+  function nextEnumLabel() {
+    const used = new Set(enumValues);
+    let index = enumValues.length + 1;
+    let candidate = `Option ${index}`;
+    while (used.has(candidate)) {
+      index += 1;
+      candidate = `Option ${index}`;
+    }
+    return candidate;
+  }
+
+  function updateEnumValues(nextValues = []) {
+    const normalizedValues = normalizeEnumValues(nextValues);
+    const patch = {
+      enumValues: normalizedValues,
+    };
+
+    if (valueType === 'enum') {
+      patch.defaultValue = resolveEnumDefaultValue(normalizedValues, behavior?.defaultValue ?? '');
+    }
+
+    applyBehaviorPatch(patch);
+  }
+
+  function updateEnumValueAt(index, value) {
+    const nextValues = [...enumValues];
+    nextValues[index] = value;
+    updateEnumValues(nextValues);
+  }
+
+  function addEnumValue() {
+    updateEnumValues([...enumValues, nextEnumLabel()]);
+  }
+
+  function removeEnumValueAt(index) {
+    const nextValues = [...enumValues];
+    nextValues.splice(index, 1);
+    updateEnumValues(nextValues);
+  }
+
   let family = $derived(String(behavior?.family ?? 'trigger'));
+  let role = $derived(String(behavior?.role ?? 'button'));
   let roleOptions = $derived(ROLE_OPTIONS[family] ?? ['custom']);
   let isSelectFamily = $derived(family === 'select');
   let isRangeFamily = $derived(family === 'range');
   let valueType = $derived(String(behavior?.valueType ?? 'none'));
+  let isEnumValue = $derived(valueType === 'enum');
+  let isBoolValue = $derived(valueType === 'bool');
+  let isExclusiveSelectRole = $derived(role === 'radio' || role === 'segmented');
+  let enumValues = $derived(normalizeEnumValues(behavior?.enumValues ?? []));
+  let enumDefaultValue = $derived(resolveEnumDefaultValue(enumValues, behavior?.defaultValue ?? ''));
 </script>
 
 {#if behavior}
@@ -72,8 +141,18 @@
       </select>
     </PropertyCell>
     <PropertyCell label="Default" span={2} hint="Default runtime value used by previews and new instances.">
-      {#if valueType === 'bool'}
+      {#if isBoolValue}
         <PropertyToggle value={behavior.defaultValue === true} onchange={() => set('defaultValue', !(behavior.defaultValue === true))} />
+      {:else if isEnumValue}
+        {#if enumValues.length}
+          <select class="val" value={enumDefaultValue} onchange={(e) => handleInput('defaultValue', e)}>
+            {#each enumValues as option}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        {:else}
+          <input class="val" type="text" value="" placeholder="Add enum values below" disabled />
+        {/if}
       {:else if valueType === 'int' || valueType === 'float'}
         <NumberInput
           value={behavior.defaultValue ?? 0}
@@ -95,24 +174,59 @@
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Group" span={2} hint="Group id for exclusive items such as radio buttons or segmented controls.">
-        <input class="val" type="text" value={behavior.groupId ?? ''} onchange={(e) => handleInput('groupId', e)} />
-      </PropertyCell>
-      <PropertyCell label="Mixed" span={2} hint="Allow an intermediate mixed state when the role supports it.">
-        <PropertyToggle value={behavior.allowMixed === true} onchange={() => handleToggle('allowMixed')} />
-      </PropertyCell>
-      <PropertyCell label="Uncheck" span={2} hint="Allow clicking an active item to turn it off.">
-        <PropertyToggle value={behavior.uncheckOnClick === true} onchange={() => handleToggle('uncheckOnClick')} />
-      </PropertyCell>
-      <PropertyCell label="Toggle On" span={2} hint="Choose whether the value flips on mouse press or release.">
-        <select class="val" value={behavior.toggleOn ?? 'release'} onchange={(e) => handleInput('toggleOn', e)}>
-          {#each TOGGLE_ON_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Wrap Enum" span={2} hint="When using enum values, wrap from the last item back to the first.">
-        <PropertyToggle value={behavior.wrapEnum === true} onchange={() => handleToggle('wrapEnum')} />
+      {#if isExclusiveSelectRole && isBoolValue}
+        <PropertyCell label="Group" span={2} hint="Group id for exclusive items such as radio buttons or segmented controls.">
+          <input class="val" type="text" value={behavior.groupId ?? ''} onchange={(e) => handleInput('groupId', e)} />
+        </PropertyCell>
+      {/if}
+      {#if isBoolValue}
+        <PropertyCell label="Mixed" span={2} hint="Allow an intermediate mixed state when the role supports it.">
+          <PropertyToggle value={behavior.allowMixed === true} onchange={() => handleToggle('allowMixed')} />
+        </PropertyCell>
+        <PropertyCell label="Uncheck" span={2} hint="Allow clicking an active item to turn it off.">
+          <PropertyToggle value={behavior.uncheckOnClick === true} onchange={() => handleToggle('uncheckOnClick')} />
+        </PropertyCell>
+        <PropertyCell label="Toggle On" span={2} hint="Choose whether the value flips on mouse press or release.">
+          <select class="val" value={behavior.toggleOn ?? 'release'} onchange={(e) => handleInput('toggleOn', e)}>
+            {#each TOGGLE_ON_OPTIONS as option}
+              <option value={option}>{option}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+      {/if}
+      {#if isEnumValue}
+        <PropertyCell label="Wrap Enum" span={2} hint="When using enum values, wrap from the last item back to the first.">
+          <PropertyToggle value={behavior.wrapEnum === true} onchange={() => handleToggle('wrapEnum')} />
+        </PropertyCell>
+      {/if}
+    </PropertySection>
+  {/if}
+
+  {#if isEnumValue}
+    <PropertySection title="Enum">
+      <PropertyCell label="Values" span={2} hint="Ordered values used by enum bindings, preview overrides, and click cycling.">
+        <div class="enum-editor">
+          {#if enumValues.length}
+            {#each enumValues as enumValue, index (`${index}:${enumValue}`)}
+              <div class="enum-row">
+                <input
+                  class="val enum-input"
+                  type="text"
+                  value={enumValue}
+                  onchange={(e) => updateEnumValueAt(index, e?.target?.value ?? '')}
+                />
+                <button type="button" class="enum-btn danger" onclick={() => removeEnumValueAt(index)}>
+                  Remove
+                </button>
+              </div>
+            {/each}
+          {:else}
+            <div class="enum-empty">No enum values yet. Add values to define the cycle order.</div>
+          {/if}
+          <button type="button" class="enum-btn" onclick={addEnumValue}>
+            Add Value
+          </button>
+        </div>
       </PropertyCell>
     </PropertySection>
   {/if}
@@ -192,5 +306,48 @@
 
   .val:focus {
     border-color: #5B9BD5;
+  }
+
+  .enum-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .enum-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+
+  .enum-input {
+    flex: 1;
+  }
+
+  .enum-btn {
+    background: #252525;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    color: #DDD;
+    cursor: pointer;
+    font-size: 11px;
+    min-width: 74px;
+    padding: 5px 8px;
+  }
+
+  .enum-btn:hover {
+    border-color: #5B9BD5;
+  }
+
+  .enum-btn.danger:hover {
+    border-color: #C96A6A;
+  }
+
+  .enum-empty {
+    border: 1px dashed #3A3A3A;
+    border-radius: 4px;
+    color: #8A8A8A;
+    font-size: 11px;
+    padding: 8px;
   }
 </style>

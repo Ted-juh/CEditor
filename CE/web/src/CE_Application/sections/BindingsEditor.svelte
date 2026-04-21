@@ -96,6 +96,7 @@
   const SOURCE_OPTIONS = [
     'value.raw',
     'value.normalized',
+    'value.display',
     'value.bool',
     'value.enum',
     'state.hover',
@@ -105,7 +106,7 @@
     'state.disabled',
     'state.checked',
   ];
-  const MAP_MODE_OPTIONS = ['range', 'boolean', 'enum'];
+  const MAP_MODE_OPTIONS = ['range', 'boolean', 'enum', 'direct'];
   const UNIT_OPTIONS = ['percent', 'px', 'deg', 'unitless'];
 </script>
 
@@ -198,7 +199,7 @@
           <NumberInput value={selectedBinding.trueValue ?? 100} step={0.01} onchange={(value) => setBindingProp('trueValue', value)} />
         </PropertyCell>
       </PropertySection>
-    {:else}
+    {:else if selectedBinding.mapMode === 'enum'}
       <PropertySection title="Enum Map">
         <PropertyCell label="Map" span={4} hint="JSON object mapping enum names to output values.">
           <textarea class="val code" rows="10" bind:value={enumMapDraft} onblur={commitEnumMap}></textarea>
@@ -210,6 +211,12 @@
           </div>
         </PropertyCell>
       </PropertySection>
+    {:else}
+      <PropertySection title="Direct Map">
+        <PropertyCell label="Pass-Through" span={4} hint="Write the source value directly to the target property without remapping.">
+          <div class="placeholder-inline">This mode is useful for string targets such as `Parts.valueField.Text.content`.</div>
+        </PropertyCell>
+      </PropertySection>
     {/if}
   {/if}
 {/if}
@@ -218,6 +225,11 @@
   .placeholder {
     padding: 16px;
     color: #666;
+    font-size: 11px;
+  }
+
+  .placeholder-inline {
+    color: #888;
     font-size: 11px;
   }
 

@@ -8,6 +8,11 @@
     parentHeight = 0,
     transitionBucket = null,
     debug = false,
+    editableInput = null,
+    oneditableinput = null,
+    oneditablekeydown = null,
+    oneditablefocus = null,
+    oneditableblur = null,
   } = $props();
 
   function numberOr(value, fallback = 0) {
@@ -49,6 +54,10 @@
   let layout = $derived(part?._children?.Layout ?? null);
   let background = $derived(part?._children?.Background ?? null);
   let effects = $derived(part?._children?.Effects ?? null);
+  let text = $derived(part?._children?.Text ?? null);
+  let textFill = $derived(text?._children?.Fill ?? null);
+  let textFont = $derived(text?._children?.Font ?? null);
+  let textPosition = $derived(text?._children?.Position ?? null);
 
   let frame = $derived.by(() => {
     if (!layout) {
@@ -101,7 +110,7 @@
       `height:${frame.height}px`,
       `opacity:${numberOr(part?.opacity, 1)}`,
       `z-index:${numberOr(part?.zIndex, 0)}`,
-      `overflow:${part?.clipChildren === true ? 'hidden' : 'visible'}`,
+      `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
       transforms.length ? `transform:${transforms.join(' ')}; transform-origin:center center` : '',
       buildTransitionStyle(transitionBucket),
       shadowCSS,
@@ -109,12 +118,96 @@
       filterCSS,
     ].filter(Boolean).join('; ');
   });
+
+  function justifyContentFor(value) {
+    switch (String(value ?? 'centred').toLowerCase()) {
+      case 'left':
+      case 'near':
+        return 'flex-start';
+      case 'right':
+      case 'far':
+        return 'flex-end';
+      default:
+        return 'center';
+    }
+  }
+
+  let textStyle = $derived.by(() => {
+    if (!text) return '';
+
+    return [
+      `color:#${String(textFill?.colour ?? 'FFFFFFFF').slice(-6)}`,
+      `font-family:${textFont?.family ?? 'Arial'}`,
+      `font-size:${numberOr(textFont?.size, 12)}px`,
+      `font-weight:${numberOr(textFont?.weightValue, 400)}`,
+      `font-style:${String(textFont?.style ?? 'Normal').toLowerCase() === 'italic' ? 'italic' : 'normal'}`,
+      `justify-content:${justifyContentFor(textPosition?.justification)}`,
+      'align-items:center',
+      'display:flex',
+      'height:100%',
+      'line-height:1',
+      'padding:0 8px',
+      'text-align:center',
+      'white-space:nowrap',
+      'width:100%',
+      'box-sizing:border-box',
+      'overflow:hidden',
+      'text-overflow:ellipsis',
+      'pointer-events:none',
+      `text-transform:${String(textFont?.caseMode ?? 'normal').toLowerCase() === 'uppercase' ? 'uppercase' : (String(textFont?.caseMode ?? 'normal').toLowerCase() === 'lowercase' ? 'lowercase' : 'none')}`,
+    ].join('; ');
+  });
+
+  let inputStyle = $derived.by(() => {
+    if (!editableInput) return '';
+
+    return [
+      'position:absolute',
+      'inset:0',
+      'width:100%',
+      'height:100%',
+      'border:none',
+      'outline:none',
+      'background:transparent',
+      'box-sizing:border-box',
+      'padding:0 8px',
+      `color:#${String(textFill?.colour ?? 'FFFFFFFF').slice(-6)}`,
+      `font-family:${textFont?.family ?? 'Arial'}`,
+      `font-size:${numberOr(textFont?.size, 12)}px`,
+      `font-weight:${numberOr(textFont?.weightValue, 400)}`,
+      `font-style:${String(textFont?.style ?? 'Normal').toLowerCase() === 'italic' ? 'italic' : 'normal'}`,
+      `text-align:${justifyContentFor(textPosition?.justification) === 'flex-start' ? 'left' : (justifyContentFor(textPosition?.justification) === 'flex-end' ? 'right' : 'center')}`,
+      'line-height:1',
+      'pointer-events:auto',
+    ].join('; ');
+  });
 </script>
 
 {#if part?.visible !== false}
   <div class="interactive-part" class:debug={debug} style={partStyle}>
     {#if background}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} />
+    {/if}
+
+    {#if text && !editableInput}
+      <div class="interactive-part-text" style={textStyle}>
+        {text?.content ?? ''}
+      </div>
+    {:else if editableInput}
+      <input
+        class="interactive-part-input"
+        type="text"
+        inputmode={editableInput.inputMode ?? 'decimal'}
+        value={editableInput.value ?? ''}
+        disabled={editableInput.disabled === true}
+        aria-label={editableInput.ariaLabel ?? 'Value'}
+        tabindex={editableInput.tabIndex ?? -1}
+        style={inputStyle}
+        oninput={oneditableinput}
+        onkeydown={oneditablekeydown}
+        onfocus={oneditablefocus}
+        onblur={oneditableblur}
+      />
     {/if}
 
     {#if debug}

@@ -3,6 +3,7 @@ import { selectedControl } from './controls.js';
 import { panels, resolvedActivePanelId, selectedComponentId } from './panels.js';
 import { setDebugDock } from './debugDock.js';
 import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
+import { getNextEnumValue } from '../utils/enumBehavior.js';
 import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../utils/selectGroupUtils.js';
 
 const DEFAULT_SESSION = {
@@ -16,6 +17,8 @@ const DEFAULT_SESSION = {
   mixed: false,
   valueOverrideEnabled: false,
   valueOverride: 0,
+  valueInputActive: false,
+  valueInputBuffer: '',
   animationsEnabled: true,
   autoDebug: false,
 };
@@ -256,12 +259,11 @@ export function commitPanelPreviewSelectAction(controlId) {
     const currentValue = currentSession?.valueOverrideEnabled === true
       ? currentSession?.valueOverride
       : behavior?.defaultValue;
-    const currentIndex = Math.max(0, values.findIndex((value) => value === currentValue));
-    const nextIndex = (currentIndex + 1) % values.length;
+    const nextValue = getNextEnumValue(values, currentValue, behavior?.wrapEnum === true);
 
     updatePanelPreviewSession(controlId, {
       valueOverrideEnabled: true,
-      valueOverride: values[nextIndex],
+      valueOverride: nextValue,
     });
     return;
   }
