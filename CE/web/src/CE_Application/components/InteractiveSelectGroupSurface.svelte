@@ -47,6 +47,8 @@
       focused: false,
       dragging: false,
       disabled: false,
+      pending: false,
+      executed: false,
       checked: behavior?.defaultValue === true,
       mixed: false,
       valueOverrideEnabled: false,

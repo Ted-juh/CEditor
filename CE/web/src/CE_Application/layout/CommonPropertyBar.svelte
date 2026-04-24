@@ -9,10 +9,13 @@
   let control = $derived($selectedControl);
   let selectedStates = $derived(getSection(control, 'States'));
   let behavior = $derived(getSection(control, 'Behavior'));
+  let valueSection = $derived(getSection(control, 'Value'));
+  let buttonType = $derived(String(behavior?.buttonType ?? '').trim().toLowerCase());
   let showStateToolbar = $derived(
     String(behavior?.buttonType ?? '').trim().length > 0
     && Object.keys(selectedStates?._children ?? {}).length > 0
   );
+  let showSegmentToolbar = $derived(buttonType === 'radio' && Array.isArray(valueSection?.rows) && valueSection.rows.length > 0);
 </script>
 
 <div class="common-bar">
@@ -44,7 +47,7 @@
     <button class="toggle-btn" title="Align right">≡</button>
   </div>
 
-  {#if showStateToolbar}
+  {#if showStateToolbar || showSegmentToolbar}
     <div class="divider"></div>
     <div class="toolbar-slot">
       <DisplayToolbar />

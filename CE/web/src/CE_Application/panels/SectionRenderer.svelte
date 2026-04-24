@@ -27,6 +27,7 @@
 
   let editorControl = $derived.by(() => {
     if (contextMode !== 'component' || !control) return control;
+    if (tabId === 'segments') return control;
     if (!isStateScopableTabId(tabId)) return control;
     return scopedControl ?? control;
   });
@@ -43,12 +44,13 @@
     if (tabId === 'states') return { control };
     if (tabId === 'bindings') return { control };
     if (tabId === 'animations') return { control };
+    if (tabId === 'segments') return { control, stateTargetKey };
     return { control: editorControl };
   });
   let editorInstanceKey = $derived(
     tabId === 'text'
       ? textEditorRenderKey
-      : `${contextMode}:${tabId}:${control?._children?.Core?.id ?? 'none'}`
+      : `${contextMode}:${tabId}:${control?._children?.Core?.id ?? 'none'}:${tabId === 'segments' ? stateTargetKey : ''}`
   );
   let hasDedicatedEditor = $derived(hasSectionEditor(contextMode, tabId));
   let EditorComponent = $state(null);

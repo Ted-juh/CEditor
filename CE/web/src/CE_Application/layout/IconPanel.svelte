@@ -1,20 +1,22 @@
 <script>
   import {
-    MousePointer2,
-    Move,
-    ZoomIn,
+    BadgeCheck,
+    CircleDot,
+    Container,
     RectangleHorizontal,
-    Type,
+    RefreshCw,
     SlidersHorizontal,
-    ChevronDown,
+    SlidersVertical,
     Square,
-    LayoutGrid,
-    Activity,
-    AudioLines,
+    TimerReset,
+    ToggleLeft,
+    Type,
     PanelBottom,
     PanelRight,
     PanelLeftClose,
   } from 'lucide-svelte';
+  import { addControl } from '../stores/controls.js';
+  import { activePanel } from '../stores/panels.js';
 
   let {
     showDisplayPanel = true,
@@ -25,53 +27,53 @@
     onToggleTree = () => {},
   } = $props();
 
-  let activeTool = $state('select');
+  let hasActivePanel = $derived(!!$activePanel);
 
-  const tools = [
-    { id: 'select', icon: MousePointer2, label: 'Select' },
-    { id: 'move',   icon: Move,          label: 'Move' },
-    { id: 'zoom',   icon: ZoomIn,        label: 'Zoom' },
+  const insertGroups = [
+    [
+      { type: 'Background',      icon: Square,             label: 'Insert Background' },
+      { type: 'Label',           icon: Type,               label: 'Insert Label' },
+      { type: 'Container',       icon: Container,          label: 'Insert Container' },
+    ],
+    [
+      { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
+      { type: 'ToggleButton',    icon: ToggleLeft,          label: 'Insert Toggle Button' },
+      { type: 'RadioButtonGroup', icon: CircleDot,          label: 'Insert Radio Button Group' },
+      { type: 'CyclicButton',    icon: RefreshCw,           label: 'Insert Cyclic Button' },
+      { type: 'TimedButton',     icon: TimerReset,          label: 'Insert Timed Button' },
+      { type: 'OneShotButton',   icon: BadgeCheck,          label: 'Insert One-Shot Button' },
+    ],
+    [
+      { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
+      { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
+    ],
   ];
 
-  const components = [
-    { id: 'button',   icon: RectangleHorizontal, label: 'Button' },
-    { id: 'label',    icon: Type,                label: 'Label' },
-    { id: 'range',    icon: SlidersHorizontal,   label: 'Range' },
-    { id: 'slider',   icon: SlidersHorizontal,   label: 'Slider' },
-    { id: 'combobox', icon: ChevronDown,         label: 'ComboBox' },
-    { id: 'backdrop', icon: Square,              label: 'Backdrop' },
-    { id: 'grid',     icon: LayoutGrid,          label: 'Grid' },
-    { id: 'envelope', icon: Activity,            label: 'Envelope' },
-    { id: 'filter',   icon: AudioLines,          label: 'Filter' },
-  ];
+  function handleInsert(type) {
+    if (!hasActivePanel) return;
+    addControl(type);
+  }
 </script>
 
 <div class="icon-panel">
-  <div class="tool-section">
-    {#each tools as tool}
-      <button
-        class="icon-btn"
-        class:active={activeTool === tool.id}
-        title={tool.label}
-        onclick={() => activeTool = tool.id}
-      >
-        <tool.icon size={18} strokeWidth={1.5} />
-      </button>
-    {/each}
-  </div>
+  {#each insertGroups as group, groupIndex}
+    <div class="insert-section">
+      {#each group as component}
+        <button
+          class="icon-btn"
+          title={hasActivePanel ? component.label : `${component.label} (open a panel first)`}
+          onclick={() => handleInsert(component.type)}
+          disabled={!hasActivePanel}
+        >
+          <component.icon size={18} strokeWidth={1.5} />
+        </button>
+      {/each}
+    </div>
 
-  <div class="separator"></div>
-
-  <div class="component-section">
-    {#each components as comp}
-      <button
-        class="icon-btn"
-        title={comp.label}
-      >
-        <comp.icon size={18} strokeWidth={1.5} />
-      </button>
-    {/each}
-  </div>
+    {#if groupIndex < insertGroups.length - 1}
+      <div class="separator"></div>
+    {/if}
+  {/each}
 
   <div class="spacer"></div>
 
@@ -118,8 +120,7 @@
     overflow-y: auto;
   }
 
-  .tool-section,
-  .component-section,
+  .insert-section,
   .panel-toggles {
     display: flex;
     flex-direction: column;
@@ -154,7 +155,7 @@
     transition: all 0.1s;
   }
 
-  .icon-btn:hover {
+  .icon-btn:hover:not(:disabled) {
     background: #3A3A3A;
     color: #DDD;
   }
@@ -162,5 +163,10 @@
   .icon-btn.active {
     background: #094771;
     color: #FFF;
+  }
+
+  .icon-btn:disabled {
+    color: #4E4E4E;
+    cursor: not-allowed;
   }
 </style>

@@ -76,6 +76,7 @@
       control={scopedEditingControlId != null && scopedEditingControlId === control._children?.Core?.id
         ? scopedEditingControl
         : control}
+      sourceControl={control}
       {scale}
       {snapToGrid}
       {gridSize}

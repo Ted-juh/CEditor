@@ -115,6 +115,12 @@
           <PropertyCell label="Dragging" span={1} hint="Control is actively dragging">
             <div class="readout bool">{boolLabel(runtime?.signals?.dragging === true)}</div>
           </PropertyCell>
+          <PropertyCell label="Pending" span={1} hint="Timed controls are waiting for hold or multi-click completion">
+            <div class="readout bool">{boolLabel(runtime?.signals?.pending === true)}</div>
+          </PropertyCell>
+          <PropertyCell label="Executed" span={1} hint="Trigger-style controls have just completed their action">
+            <div class="readout bool">{boolLabel(runtime?.signals?.executed === true)}</div>
+          </PropertyCell>
           <PropertyCell label="Checked" span={2} hint="Logical checked state for select controls">
             <div class="readout bool">{boolLabel(runtime?.signals?.checked === true)}</div>
           </PropertyCell>

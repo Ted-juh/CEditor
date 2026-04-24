@@ -13,7 +13,12 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import {
+    createTimedButtonPreviewController,
+    isTimedButtonBehavior,
+  } from '../utils/timedButtonPreview.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -51,6 +56,10 @@
   let pointerStartValue = $state(0);
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
+
+  const timedButtonPreview = createTimedButtonPreviewController({
+    patchSession: (controlId, patch) => patchControlSession(controlId, patch),
+  });
 
   function bindSurface(node) {
     surfaceRef = node;
@@ -99,6 +108,31 @@
 
   function currentRangeValue(control) {
     return getCurrentRangeValue(getBehavior(control), sessionFor(control));
+  }
+
+  function resolveRadioGroupPreviewValue(control, clientX, clientY) {
+    if (String(getBehavior(control)?.buttonType ?? '') !== 'radio') return '';
+
+    const rect = pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return '';
+
+    const transformSection = control?._children?.Transform ?? null;
+    const contentLayout = control?._children?.ContentLayout ?? null;
+    const layout = resolveRadioGroupLayout({
+      behavior: getBehavior(control),
+      valueRows: control?._children?.Value?.rows ?? [],
+      width: transformSection?.width ?? rect.width,
+      height: transformSection?.height ?? rect.height,
+      paddingLeft: contentLayout?.paddingLeft ?? 0,
+      paddingRight: contentLayout?.paddingRight ?? 0,
+      paddingTop: contentLayout?.paddingTop ?? 0,
+      paddingBottom: contentLayout?.paddingBottom ?? 0,
+      gap: contentLayout?.gap ?? 8,
+    });
+
+    const localX = ((clientX - rect.left) / Math.max(rect.width, 1)) * (transformSection?.width ?? rect.width);
+    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
+    return resolveRadioGroupValueAtPoint(layout, localX, localY);
   }
 
   function patchControlSession(controlId, patch = {}) {
@@ -352,7 +386,29 @@
     window.removeEventListener('pointerup', handleWindowPointerUp);
   }
 
-  onDestroy(removeWindowListeners);
+  onDestroy(() => {
+    removeWindowListeners();
+    timedButtonPreview.destroy();
+  });
+
+  $effect(() => {
+    const activeControlIds = orderedControls.map((control) => getControlId(control)).filter(Boolean);
+    timedButtonPreview.syncKeys(activeControlIds);
+
+    if (pointerActiveControlId && !activeControlIds.includes(pointerActiveControlId)) {
+      pointerActiveControlId = '';
+      pointerActiveElement = null;
+      draggingRange = false;
+      pointerDownZone = '';
+      removeWindowListeners();
+    }
+
+    for (const control of orderedControls) {
+      const controlId = getControlId(control);
+      if (!controlId) continue;
+      timedButtonPreview.syncSession(controlId, sessionFor(control));
+    }
+  });
 
   function handlePointerEnter(control) {
     if (isDisabled(control)) return;
@@ -403,6 +459,9 @@
       focused: false,
       dragging: draggingRange,
     });
+    if (isTimedButtonBehavior(getBehavior(control))) {
+      timedButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));
+    }
 
     if (draggingRange) {
       updateSliderRangeFromPointer(control, event);
@@ -440,13 +499,20 @@
     const activeId = pointerActiveControlId;
     const activeControl = orderedControls.find((control) => getControlId(control) === activeId) ?? null;
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
+    const activeBehavior = getBehavior(activeControl);
 
     if (!draggingRange && inside && activeControl && !isDisabled(activeControl)) {
       if (isRangeControl(activeControl) && !isSliderRangeBehavior(getBehavior(activeControl))) {
         handleRangePointerClick(activeControl, event);
+      } else if (isTimedButtonBehavior(activeBehavior)) {
+        timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
       } else if (String(getBehavior(activeControl)?.family ?? 'trigger') === 'select') {
-        commitPanelPreviewSelectAction(activeId);
+        commitPanelPreviewSelectAction(activeId, {
+          value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
+        });
       }
+    } else if (isTimedButtonBehavior(activeBehavior)) {
+      timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
     }
 
     patchControlSession(activeId, {
@@ -474,6 +540,9 @@
 
   function handleBlur(control) {
     const controlId = getControlId(control);
+    if (isTimedButtonBehavior(getBehavior(control))) {
+      timedButtonPreview.cancel(controlId);
+    }
 
     if (keyboardFocusControlId === controlId) {
       keyboardFocusControlId = '';
@@ -516,12 +585,16 @@
 
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
+      if (event.repeat) return;
       event.currentTarget?.focus?.();
       patchControlSession(controlId, {
         focused: true,
         hover: true,
         pressed: true,
       });
+      if (isTimedButtonBehavior(getBehavior(control))) {
+        timedButtonPreview.beginPress(controlId, getBehavior(control));
+      }
       return;
     }
 
@@ -543,7 +616,9 @@
 
     event.preventDefault();
     const controlId = getControlId(control);
-    if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
+    if (isTimedButtonBehavior(getBehavior(control))) {
+      timedButtonPreview.releasePress(controlId, getBehavior(control), { inside: true });
+    } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
       commitPanelPreviewSelectAction(controlId);
     }
     patchControlSession(controlId, {
@@ -557,8 +632,10 @@
     const behavior = getBehavior(control);
     const family = String(behavior?.family ?? 'trigger');
     const role = String(behavior?.role ?? '').trim().toLowerCase();
+    const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
 
     if (family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    if (buttonType === 'radio') return 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
     if (role === 'toggle' || role === 'checkbox') return 'checkbox';
     return 'button';

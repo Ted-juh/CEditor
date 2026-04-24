@@ -8,6 +8,12 @@
   import { normalizeEnumValues, resolveEnumDefaultValue } from '../utils/enumBehavior.js';
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
   import { adjustRangeValue, getCurrentRangeValue, getRangeMax, getRangeMin, snapRangeValue } from '../utils/rangeBehavior.js';
+  import {
+    formatSliderNumericValue,
+    getSliderValueMode,
+    parseSliderInputValue,
+    snapSliderValue,
+  } from '../utils/sliderBehavior.js';
 
   function getValueRows(control) {
     const rows = control?._children?.Value?.rows;
@@ -26,6 +32,11 @@
 
     if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
       next.checked = behavior?.defaultValue === true;
+    }
+
+    if (String(behavior?.family ?? '') === 'range' && String(behavior?.role ?? '') === 'slider') {
+      next.activeHandle = String(behavior?.valueMode ?? '') === 'range' ? 'start' : 'current';
+      next.valueInputRole = next.activeHandle;
     }
 
     return next;
@@ -109,7 +120,14 @@
   let buttonType = $derived(String(behavior?.buttonType ?? ''));
   let showChecked = $derived(behavior?.family === 'select' && behavior?.valueType === 'bool');
   let showMixed = $derived(behavior?.allowMixed === true && behavior?.valueType === 'bool');
-  let showRangeValue = $derived(behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float');
+  let isSliderPreview = $derived(String(behavior?.family ?? '') === 'range' && String(behavior?.role ?? '') === 'slider');
+  let sliderValueMode = $derived(getSliderValueMode(behavior));
+  let sliderRoles = $derived.by(() => (
+    sliderValueMode === 'range'
+      ? ['start', 'end']
+      : (sliderValueMode === 'band' ? ['start', 'current', 'end'] : ['current'])
+  ));
+  let showRangeValue = $derived(!isSliderPreview && (behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float'));
   let showEnumValue = $derived(behavior?.valueType === 'enum' || buttonType === 'cyclic' || buttonType === 'radio');
   let enumValues = $derived(normalizeEnumValues(behavior?.enumValues ?? []));
   let valueRows = $derived(getValueRows(control));
@@ -130,6 +148,11 @@
       ? String(session?.valueOverride ?? defaultPreviewValue)
       : defaultPreviewValue
   );
+  let sliderRuntimeValues = $derived({
+    start: runtime?.signals?.startValueRaw ?? 0,
+    current: runtime?.signals?.currentValueRaw ?? runtime?.signals?.valueRaw ?? 0,
+    end: runtime?.signals?.endValueRaw ?? 0,
+  });
 
   function patchControlSession(targetControlId, patch = {}) {
     const targetControl = previewControlMap.get(targetControlId) ?? null;
@@ -219,6 +242,40 @@
     });
   }
 
+  function handleSliderActiveHandleChange(event) {
+    patchSession({
+      activeHandle: String(event.currentTarget.value ?? 'current'),
+      valueInputRole: String(event.currentTarget.value ?? 'current'),
+    });
+  }
+
+  function handleSliderValueChange(role, event) {
+    const parsed = parseSliderInputValue(behavior, event.currentTarget.value);
+    if (parsed === null) return;
+    patchSession({
+      activeHandle: role,
+      valueInputRole: role,
+      [`${role}ValueOverrideEnabled`]: true,
+      [`${role}ValueOverride`]: parsed,
+      valueInputActive: false,
+      valueInputBuffer: '',
+    });
+  }
+
+  function handleSliderRoleStep(role, direction) {
+    patchSession({
+      activeHandle: role,
+      valueInputRole: role,
+      [`${role}ValueOverrideEnabled`]: true,
+      [`${role}ValueOverride`]: snapSliderValue(
+        behavior,
+        Number(sliderRuntimeValues?.[role] ?? 0) + (direction * numberOr(behavior?.step, 0.01))
+      ),
+      valueInputActive: false,
+      valueInputBuffer: '',
+    });
+  }
+
   function handleRangeStep(direction) {
     patchSession({
       valueOverrideEnabled: true,
@@ -301,6 +358,14 @@
             <span>Auto Debug Overlay</span>
             <input type="checkbox" checked={session.autoDebug === true} onchange={(event) => handleToggle('autoDebug', event)} />
           </label>
+          <label class="toggle-row">
+            <span>Reduced Motion</span>
+            <input type="checkbox" checked={session.reducedMotion === true} onchange={(event) => handleToggle('reducedMotion', event)} />
+          </label>
+          <label class="toggle-row">
+            <span>High Contrast</span>
+            <input type="checkbox" checked={session.highContrast === true} onchange={(event) => handleToggle('highContrast', event)} />
+          </label>
         </section>
 
         <section class="preview-section">
@@ -322,6 +387,14 @@
             <input type="checkbox" checked={session.dragging === true} onchange={(event) => handleToggle('dragging', event)} />
           </label>
           <label class="toggle-row">
+            <span>Pending</span>
+            <input type="checkbox" checked={session.pending === true} onchange={(event) => handleToggle('pending', event)} />
+          </label>
+          <label class="toggle-row">
+            <span>Executed</span>
+            <input type="checkbox" checked={session.executed === true} onchange={(event) => handleToggle('executed', event)} />
+          </label>
+          <label class="toggle-row">
             <span>Disabled</span>
             <input type="checkbox" checked={session.disabled === true} onchange={(event) => handleToggle('disabled', event)} />
           </label>
@@ -341,7 +414,47 @@
 
         <section class="preview-section">
           <div class="section-title">Value</div>
-          {#if showRangeValue}
+          {#if isSliderPreview}
+            {#if sliderRoles.length > 1}
+              <label class="field-stack">
+                <span class="field-label">Active Handle</span>
+                <select class="select-input" value={session.activeHandle ?? sliderRoles[0]} onchange={handleSliderActiveHandleChange}>
+                  {#each sliderRoles as role}
+                    <option value={role}>{role}</option>
+                  {/each}
+                </select>
+              </label>
+            {/if}
+            {#each sliderRoles as role}
+              <div class="slider-role-card">
+                <label class="toggle-row">
+                  <span>Override {role}</span>
+                  <input
+                    type="checkbox"
+                    checked={session?.[`${role}ValueOverrideEnabled`] === true}
+                    onchange={(event) => handleToggle(`${role}ValueOverrideEnabled`, event)}
+                  />
+                </label>
+                <div class="range-stepper">
+                  <button type="button" class="step-btn" onclick={() => handleSliderRoleStep(role, -1)}>-</button>
+                  <input
+                    class="number-input"
+                    type="number"
+                    min={getRangeMin(behavior)}
+                    max={getRangeMax(behavior)}
+                    step={numberOr(behavior?.step, 0.01)}
+                    value={Number(sliderRuntimeValues?.[role] ?? 0)}
+                    oninput={(event) => handleSliderValueChange(role, event)}
+                  />
+                  <button type="button" class="step-btn" onclick={() => handleSliderRoleStep(role, 1)}>+</button>
+                </div>
+                <div class="slider-role-readout">{formatSliderNumericValue(behavior, Number(sliderRuntimeValues?.[role] ?? 0))}</div>
+              </div>
+            {/each}
+            <div class="value-readout">
+              Drag the live stage or use these role overrides to test `single`, `range`, and `band` slider behavior.
+            </div>
+          {:else if showRangeValue}
             <label class="toggle-row">
               <span>Override Value</span>
               <input type="checkbox" checked={session.valueOverrideEnabled === true} onchange={(event) => handleToggle('valueOverrideEnabled', event)} />
@@ -403,6 +516,36 @@
             <span>Normalized</span>
             <strong>{numberOr(runtime?.signals?.valueNormalized, 0).toFixed(3)}</strong>
           </div>
+          {#if isSliderPreview}
+            <div class="meta-row">
+              <span>Geometry</span>
+              <strong>{runtime?.signals?.geometry ?? '-'}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Mode</span>
+              <strong>{runtime?.signals?.valueMode ?? '-'}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Active Handle</span>
+              <strong>{runtime?.signals?.activeHandle ?? '-'}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Start</span>
+              <strong>{String(runtime?.signals?.startValueRaw ?? '-')}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Current</span>
+              <strong>{String(runtime?.signals?.currentValueRaw ?? '-')}</strong>
+            </div>
+            <div class="meta-row">
+              <span>End</span>
+              <strong>{String(runtime?.signals?.endValueRaw ?? '-')}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Dirty</span>
+              <strong>{runtime?.signals?.isDirty === true ? 'yes' : 'no'}</strong>
+            </div>
+          {/if}
           <div class="chip-group">
             {#if runtime?.activeStates?.length}
               {#each runtime.activeStates as stateName}
@@ -556,6 +699,20 @@
     accent-color: #5B9BD5;
   }
 
+  .field-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 11px;
+  }
+
+  .field-label {
+    color: #9A9A9A;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+  }
+
   .number-input {
     width: 100%;
   }
@@ -610,6 +767,21 @@
   .value-readout,
   .runtime-empty {
     color: #676767;
+    font-size: 11px;
+  }
+
+  .slider-role-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid #2E2E2E;
+    border-radius: 8px;
+    background: #171717;
+  }
+
+  .slider-role-readout {
+    color: #A6D2FF;
     font-size: 11px;
   }
 

@@ -21,6 +21,10 @@
     linked = true,
     controlId = null,
     onupdate = null,
+    borderPath = 'Background.Border',
+    cornersPath = 'Background.Corners',
+    buildColorTarget = null,
+    buildGradientTarget = null,
   } = $props();
 
   // Which block is selected for editing (right-click)
@@ -49,17 +53,26 @@
   };
 
   function set(path, value) { onupdate?.(path, value); }
+  function joinPath(root, prop = '') {
+    return prop ? `${root}.${prop}` : root;
+  }
+  function borderPropPath(prop = '') {
+    return joinPath(borderPath, prop);
+  }
+  function cornersPropPath(prop = '') {
+    return joinPath(cornersPath, prop);
+  }
   function selectAll(e) { e.target.select(); }
 
   // --- Thickness/gap "All" writers ---
   // Fan a single value out to both border (all sides) and corners (all keys)
   function writeAll(prop, value) {
-    if (border?.linked) set(`Background.Border.${prop}`, value);
-    else for (const s of SIDES) set(`Background.Border.${s}.${prop}`, value);
-    set(`Background.Border.${prop}`, value);
-    if (corners?.linked) set(`Background.Corners.${prop}`, value);
-    else for (const k of CORNERS) set(`Background.Corners.${k}.${prop}`, value);
-    set(`Background.Corners.${prop}`, value);
+    if (border?.linked) set(borderPropPath(prop), value);
+    else for (const s of SIDES) set(borderPropPath(`${s}.${prop}`), value);
+    set(borderPropPath(prop), value);
+    if (corners?.linked) set(cornersPropPath(prop), value);
+    else for (const k of CORNERS) set(cornersPropPath(`${k}.${prop}`), value);
+    set(cornersPropPath(prop), value);
   }
 
   function setAllThickness(value) { writeAll('thickness', value); }
@@ -69,14 +82,14 @@
   function toggleLink() {
     const newLinked = !linked;
     if (!newLinked) {
-      if (corners) cascadeUnlink('Background.Corners', corners, CORNERS, CORNER_UNLINK_PROPS, set);
+      if (corners) cascadeUnlink(cornersPath, corners, CORNERS, CORNER_UNLINK_PROPS, set);
       if (border) {
-        cascadeUnlink('Background.Border', border, SIDES, BORDER_UNLINK_PROPS, set);
-        set('Background.Border.linked', false);
+        cascadeUnlink(borderPath, border, SIDES, BORDER_UNLINK_PROPS, set);
+        set(borderPropPath('linked'), false);
       }
     }
-    set('Background.Corners.linked', newLinked);
-    if (border) set('Background.Border.linked', newLinked);
+    set(cornersPropPath('linked'), newLinked);
+    if (border) set(borderPropPath('linked'), newLinked);
   }
 
   // --- Grid cell readers ---
@@ -109,23 +122,23 @@
     const visuallyOn = isSideEnabled(side);
     if (visuallyOn) {
       if (linked || border.linked) {
-        set('Background.Border.enabled', false);
+        set(borderPropPath('enabled'), false);
       } else {
-        set(`Background.Border.${side}.style`, 'none');
+        set(borderPropPath(`${side}.style`), 'none');
       }
     } else {
-      if (!border.enabled) set('Background.Border.enabled', true);
+      if (!border.enabled) set(borderPropPath('enabled'), true);
       if (!(linked || border.linked)) {
         const s = border[side];
         if (!s || s.style === 'none') {
           // Restore from the parent/linked style instead of hardcoding 'solid'
           const fallback = border.style || 'solid';
-          set(`Background.Border.${side}.style`, fallback);
+          set(borderPropPath(`${side}.style`), fallback);
           // If restoring a double style, also copy the double parameters
           if (fallback === 'double') {
-            set(`Background.Border.${side}.doubleGap`, border.doubleGap ?? 2);
-            set(`Background.Border.${side}.doubleAnchor`, border.doubleAnchor ?? 'center');
-            set(`Background.Border.${side}.doubleDirection`, border.doubleDirection ?? 'outward');
+            set(borderPropPath(`${side}.doubleGap`), border.doubleGap ?? 2);
+            set(borderPropPath(`${side}.doubleAnchor`), border.doubleAnchor ?? 'center');
+            set(borderPropPath(`${side}.doubleDirection`), border.doubleDirection ?? 'outward');
           }
         }
       }
@@ -135,17 +148,17 @@
   function toggleCornerBorder(key) {
     const current = isCornerBorderEnabled(key);
     if (linked || corners?.linked) {
-      set('Background.Corners.borderEnabled', !current);
+      set(cornersPropPath('borderEnabled'), !current);
     } else {
-      set(`Background.Corners.${key}.borderEnabled`, !current);
+      set(cornersPropPath(`${key}.borderEnabled`), !current);
     }
   }
 
   function setCornerRadius(key, value) {
     if (linked || corners?.linked) {
-      set('Background.Corners.radius', value);
+      set(cornersPropPath('radius'), value);
     } else {
-      set(`Background.Corners.${key}.radius`, value);
+      set(cornersPropPath(`${key}.radius`), value);
     }
   }
 
@@ -211,14 +224,16 @@
   // Returns the root section path when linked, per-slot path otherwise.
   function ctxPath(prop) {
     if (!ctx) return null;
-    if (linked || ctx.sectionLinked) return `Background.${ctx.section}.${prop}`;
-    return `Background.${ctx.section}.${selected}.${prop}`;
+    const root = ctx.section === 'Border' ? borderPath : cornersPath;
+    if (linked || ctx.sectionLinked) return joinPath(root, prop);
+    return joinPath(root, `${selected}.${prop}`);
   }
 
   function ctxRootPath() {
     if (!ctx) return null;
-    if (linked || ctx.sectionLinked) return `Background.${ctx.section}`;
-    return `Background.${ctx.section}.${selected}`;
+    const root = ctx.section === 'Border' ? borderPath : cornersPath;
+    if (linked || ctx.sectionLinked) return root;
+    return joinPath(root, selected);
   }
 
   function setSelectedProp(prop, value) {
@@ -227,9 +242,14 @@
   }
 
   function handleColourClick() {
-    if (!controlId || !ctx) return;
+    if (!ctx) return;
     const colour = ctx.data?.colour ?? ctx.defaultColour;
-    activateColorTarget({ type: 'control', controlId, path: ctxPath('colour') }, colour);
+    const path = ctxPath('colour');
+    const target = typeof buildColorTarget === 'function'
+      ? buildColorTarget({ path, colour, kind: ctx.kind, selected, data: ctx.data })
+      : (controlId ? { type: 'control', controlId, path } : null);
+    if (!target) return;
+    activateColorTarget(target, colour);
   }
 
   // --- Fill modes (unified) ---
@@ -258,7 +278,7 @@
   }
 
   function openGradientEditor() {
-    if (!controlId || !ctx) return;
+    if (!ctx) return;
     let currentGrad = ctx.data?.gradient;
     const rootPath = ctxRootPath();
     // Seed default gradient if none exists yet so the renderer has data
@@ -266,7 +286,11 @@
       currentGrad = JSON.parse(JSON.stringify(DEFAULT_GRADIENT));
       set(`${rootPath}.gradient`, currentGrad);
     }
-    activateGradientTarget({ type: 'control', controlId, path: rootPath }, currentGrad);
+    const target = typeof buildGradientTarget === 'function'
+      ? buildGradientTarget({ path: rootPath, gradient: currentGrad, kind: ctx.kind, selected, data: ctx.data })
+      : (controlId ? { type: 'control', controlId, path: rootPath } : null);
+    if (!target) return;
+    activateGradientTarget(target, currentGrad);
   }
 
   function handleFillClick(mode) {
@@ -343,12 +367,12 @@
   function applyCornerCombo(combo) {
     const d = cornerComboToData(combo);
     if (linked || corners?.linked) {
-      set('Background.Corners.style', d.style);
-      set('Background.Corners.direction', d.direction);
+      set(cornersPropPath('style'), d.style);
+      set(cornersPropPath('direction'), d.direction);
     } else {
       for (const key of CORNERS) {
-        set(`Background.Corners.${key}.style`, d.style);
-        set(`Background.Corners.${key}.direction`, d.direction);
+        set(cornersPropPath(`${key}.style`), d.style);
+        set(cornersPropPath(`${key}.direction`), d.direction);
       }
     }
   }

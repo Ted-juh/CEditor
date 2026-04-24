@@ -1,6 +1,20 @@
 import { deepClone } from './deepClone.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
 import { getCurrentRangeValue, getRangeMax, getRangeMin, resolveRangeDisplayValue, snapRangeValue } from './rangeBehavior.js';
+import {
+  formatSliderNumericValue,
+  formatSliderReadout,
+  getSliderActiveHandle,
+  getSliderDisplayValue,
+  getSliderGeometry,
+  getSliderLegalRangeForHandle,
+  getSliderNormalizedValues,
+  getSliderResolvedValues,
+  getSliderValueMode,
+  isSliderBehavior,
+  isSliderDirty,
+} from './sliderBehavior.js';
+import { sliderValueToAngle } from './sliderGeometry.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -9,6 +23,10 @@ function getNodeChild(node, key) {
 function getValueRows(control) {
   const rows = getNodeChild(control, 'Value')?.rows;
   return Array.isArray(rows) ? rows : [];
+}
+
+function hasCheckedStateSignal(signals) {
+  return signals?.checked === true || signals?.selectionActive === true;
 }
 
 function findDefaultRow(rows = []) {
@@ -117,12 +135,30 @@ function evaluateBindingSource(binding, signals) {
       return signals.valueRaw;
     case 'value.normalized':
       return signals.valueNormalized;
+    case 'value.start.raw':
+      return signals.startValueRaw;
+    case 'value.current.raw':
+      return signals.currentValueRaw;
+    case 'value.end.raw':
+      return signals.endValueRaw;
+    case 'value.start.normalized':
+      return signals.startValueNormalized;
+    case 'value.current.normalized':
+      return signals.currentValueNormalized;
+    case 'value.end.normalized':
+      return signals.endValueNormalized;
     case 'value.display':
       return signals.valueDisplay;
     case 'value.bool':
       return signals.checked;
     case 'value.enum':
       return signals.valueEnum;
+    case 'state.activeHandleIsStart':
+      return signals.activeHandle === 'start';
+    case 'state.activeHandleIsCurrent':
+      return signals.activeHandle === 'current';
+    case 'state.activeHandleIsEnd':
+      return signals.activeHandle === 'end';
     case 'state.hover':
       return signals.hover;
     case 'state.pressed':
@@ -134,7 +170,7 @@ function evaluateBindingSource(binding, signals) {
     case 'state.disabled':
       return signals.disabled;
     case 'state.checked':
-      return signals.checked;
+      return hasCheckedStateSignal(signals);
     default:
       return undefined;
   }
@@ -190,11 +226,12 @@ function stateSignalValue(key, signals) {
     case 'focused': return signals.focused;
     case 'dragging': return signals.dragging;
     case 'disabled': return signals.disabled;
-    case 'checked': return signals.checked;
+    case 'checked': return hasCheckedStateSignal(signals);
     case 'mixed': return signals.mixed;
     case 'value': return signals.valueRaw;
     case 'valueNormalized': return signals.valueNormalized;
     case 'valueEnum': return signals.valueEnum;
+    case 'activeHandle': return signals.activeHandle;
     default: return signals[key];
   }
 }
@@ -234,6 +271,10 @@ export function resolveStateScopedControl(control, stateName = '') {
 
   const resolved = deepClone(control);
   applyStatePatches(resolved, state);
+  const resolvedValue = getNodeChild(resolved, 'Value');
+  if (resolvedValue) {
+    resolvedValue.__segmentPreviewState = stateName;
+  }
   return resolved;
 }
 
@@ -308,6 +349,78 @@ export function serializeInteractionRuntime(runtime = {}) {
   };
 }
 
+function resolveSliderInteractionContext(control, previewSession = {}) {
+  const core = getNodeChild(control, 'Core');
+  const behavior = getNodeChild(control, 'Behavior');
+  const values = getSliderResolvedValues(behavior, previewSession);
+  const normalizedValues = getSliderNormalizedValues(behavior, previewSession);
+  const geometry = getSliderGeometry(behavior);
+  const valueMode = getSliderValueMode(behavior);
+  const activeHandle = getSliderActiveHandle(behavior, previewSession);
+  const legalRange = getSliderLegalRangeForHandle(behavior, previewSession, activeHandle);
+  const primaryValue = values?.[activeHandle] ?? values.current;
+  const primaryNormalized = normalizedValues?.[activeHandle] ?? normalizedValues.current;
+  const startAngle = sliderValueToAngle(behavior, values.start);
+  const currentAngle = sliderValueToAngle(behavior, values.current);
+  const endAngle = sliderValueToAngle(behavior, values.end);
+  const direction = String(behavior?.direction ?? '').trim().toLowerCase();
+  const crossesSeam = geometry === 'circular'
+    && behavior?.allowWrapAround === true
+    && (
+      (direction === 'ccw' && normalizedValues.end > normalizedValues.start)
+      || (direction !== 'ccw' && normalizedValues.end < normalizedValues.start)
+    );
+
+  return {
+    family: 'range',
+    role: 'slider',
+    valueType: String(behavior?.valueType ?? 'float'),
+    geometry,
+    valueMode,
+    activeHandle,
+    primaryRole: activeHandle,
+    valueRaw: primaryValue,
+    valueDisplay: formatSliderReadout(behavior, previewSession),
+    valueInputDisplay: getSliderDisplayValue(behavior, previewSession),
+    valueEnum: '',
+    valueNormalized: primaryNormalized,
+    startValueRaw: values.start,
+    currentValueRaw: values.current,
+    endValueRaw: values.end,
+    startValueNormalized: normalizedValues.start,
+    currentValueNormalized: normalizedValues.current,
+    endValueNormalized: normalizedValues.end,
+    rangeSpan: Math.abs(values.end - values.start),
+    rangeSpanNormalized: Math.abs(normalizedValues.end - normalizedValues.start),
+    bandMidpoint: (values.start + values.end) / 2,
+    bandMidpointNormalized: (normalizedValues.start + normalizedValues.end) / 2,
+    isDirty: isSliderDirty(behavior, previewSession),
+    legalMin: legalRange.min,
+    legalMax: legalRange.max,
+    startAngle,
+    currentAngle,
+    endAngle,
+    crossesSeam,
+    ariaValueNow: primaryValue,
+    ariaValueMin: legalRange.min,
+    ariaValueMax: legalRange.max,
+    ariaValueText: `${activeHandle}: ${formatSliderNumericValue(behavior, primaryValue)}`,
+    hover: previewSession?.hover === true,
+    pressed: previewSession?.pressed === true,
+    focused: previewSession?.focused === true,
+    dragging: previewSession?.dragging === true,
+    disabled: previewSession?.disabled === true || core?.enabled === false,
+    checked: false,
+    selectionActive: false,
+    mixed: false,
+    pending: previewSession?.pending === true,
+    executed: previewSession?.executed === true,
+    animationsEnabled: previewSession?.animationsEnabled !== false,
+    reducedMotion: previewSession?.reducedMotion === true,
+    highContrast: previewSession?.highContrast === true,
+  };
+}
+
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
@@ -317,6 +430,10 @@ export function resolveInteractionContext(control, previewSession = {}) {
   const valueType = String(behavior?.valueType ?? 'none');
   const defaultValue = behavior?.defaultValue;
   const enumValues = normalizeEnumValues(behavior?.enumValues ?? []);
+
+  if (isSliderBehavior(behavior)) {
+    return resolveSliderInteractionContext(control, previewSession);
+  }
 
   let valueRaw = previewSession?.valueOverrideEnabled
     ? previewSession?.valueOverride
@@ -346,6 +463,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
       dragging: previewSession?.dragging === true,
       disabled: previewSession?.disabled === true || core?.enabled === false,
       checked,
+      selectionActive: checked,
       mixed: previewSession?.mixed === true,
       pending: previewSession?.pending === true,
       executed: previewSession?.executed === true,
@@ -356,6 +474,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
   if (buttonType === 'radio' || buttonType === 'cyclic') {
     const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
       ?? findDefaultRow(valueRows);
+    const selectionActive = resolvedRow != null;
     valueRaw = resolvedRow?.internalValue ?? resolvedRow?.id ?? defaultValue ?? '';
     const rowIndex = Math.max(0, valueRows.findIndex((row) => row?.id === resolvedRow?.id));
     const normalizedRow = valueRows.length > 1 ? rowIndex / (valueRows.length - 1) : (resolvedRow ? 1 : 0);
@@ -372,7 +491,8 @@ export function resolveInteractionContext(control, previewSession = {}) {
       focused: previewSession?.focused === true,
       dragging: previewSession?.dragging === true,
       disabled: previewSession?.disabled === true || core?.enabled === false,
-      checked: buttonType === 'radio' ? resolvedRow != null : previewSession?.checked === true,
+      checked: buttonType === 'radio' ? false : previewSession?.checked === true,
+      selectionActive,
       mixed: previewSession?.mixed === true,
       pending: previewSession?.pending === true,
       executed: previewSession?.executed === true,
@@ -410,6 +530,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     dragging: previewSession?.dragging === true,
     disabled: previewSession?.disabled === true || core?.enabled === false,
     checked: previewSession?.checked === true || valueRaw === true,
+    selectionActive: false,
     mixed: previewSession?.mixed === true,
     pending: previewSession?.pending === true,
     executed: previewSession?.executed === true,

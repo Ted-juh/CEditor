@@ -124,6 +124,7 @@ function createButtonType({
       Value: {
         showMapping: value.showMapping === true,
         rows: buildValueRows(rows),
+        segmentStyle: value.segmentStyle ?? { shared: {}, rows: {} },
       },
     },
   };

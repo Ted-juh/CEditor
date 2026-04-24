@@ -49,7 +49,14 @@ export function activateGradientTarget(target, currentGradient) {
  */
 export function applyGradientToTarget(newGradient) {
   const target = get(gradientTarget);
-  if (!target || target.type !== 'control') return false;
+  if (!target) return false;
+
+  if (target.type === 'callback' && typeof target.apply === 'function') {
+    target.apply(newGradient);
+    return true;
+  }
+
+  if (target.type !== 'control') return false;
 
   // Write gradient to the control property
   updateControlProperty(target.controlId, `${target.path}.gradient`, newGradient);

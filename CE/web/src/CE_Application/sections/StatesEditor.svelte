@@ -264,7 +264,7 @@
               {/each}
             </div>
             <div class="override-footnote">
-              Keep using `Background`, `Border`, `Text`, `Icon`, `Effects`, or `Transform` while `{selectedStateName}` is targeted to refine these overrides.
+              Keep using `Background`, `Border`, `Text`, `Icon`, `Effects`, `Transform`, or `Segments` while `{selectedStateName}` is targeted to refine these overrides.
             </div>
           {:else}
             <div class="override-empty">

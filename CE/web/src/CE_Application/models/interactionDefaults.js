@@ -1,5 +1,6 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 import { deepClone } from '../utils/deepClone.js';
+import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
 
 function createStateNode(name, {
   group = 'interaction',
@@ -320,7 +321,7 @@ function rangeParts() {
 }
 
 const BUTTON_PRIORITY = ['hover', 'focused', 'checked', 'mixed', 'pressed', 'disabled'];
-const SLIDER_PRIORITY = ['hover', 'focused', 'dragging', 'pressed', 'disabled'];
+const SLIDER_PRIORITY = ['disabled', 'dragging', 'pressed', 'activehandlestart', 'activehandlecurrent', 'activehandleend', 'hover', 'focused'];
 const RANGE_PRIORITY = ['hover', 'focused', 'dragging', 'pressed', 'disabled'];
 
 export function createBehaviorDefaults(type) {
@@ -365,7 +366,13 @@ export function createBehaviorDefaults(type) {
       family: 'range',
       role: 'slider',
       valueType: 'float',
+      geometry: 'linear',
+      valueMode: 'single',
       defaultValue: 0.5,
+      defaultCurrentValue: 0.5,
+      defaultStartValue: 0.25,
+      defaultEndValue: 0.75,
+      centerValue: 0.5,
       selectionMode: 'none',
       enumValues: [],
       wrapEnum: false,
@@ -379,6 +386,12 @@ export function createBehaviorDefaults(type) {
       min: 0,
       max: 1,
       step: 0.01,
+      startAngle: 135,
+      sweepAngle: 270,
+      allowWrapAround: false,
+      allowHandleCross: false,
+      activeHandlePolicy: 'currentFirst',
+      trackClickMode: 'moveNearestHandle',
       keyboardEnabled: true,
       focusable: true,
       activationKeys: ['Enter', 'Space'],
@@ -388,6 +401,26 @@ export function createBehaviorDefaults(type) {
       dragEnabled: true,
       wheelEnabled: true,
       snapToStep: true,
+      snapToTicks: false,
+      emitValueCommit: true,
+      emitActiveHandleChange: true,
+      showTicks: true,
+      majorTickCount: 11,
+      minorTickCount: 3,
+      majorTickLength: 12,
+      minorTickLength: 7,
+      tickPlacement: 'outside',
+      showMinMaxLabels: true,
+      showHandleLabels: false,
+      showValueReadout: true,
+      showCenterMarker: false,
+      precision: 2,
+      prefix: '',
+      suffix: '',
+      unit: '',
+      rangeSeparator: ' - ',
+      bandSeparator: ' | ',
+      showSign: false,
       emitClick: true,
       emitValueChange: true,
       emitStateChange: true,
@@ -522,42 +555,78 @@ export function createStatesDefaults(type) {
       priority: SLIDER_PRIORITY,
       _children: {
         Hover: createStateNode('Hover', {
-          description: 'Lift the thumb while hovering.',
+          description: 'Slightly lift the active pointer while hovering.',
           when: { hover: true },
           parts: {
-            thumb: {
+            pointerCurrent: {
               'Layout.scale': 1.06,
             },
           },
         }),
         Pressed: createStateNode('Pressed', {
-          description: 'Tighten the thumb while pressing.',
+          description: 'Tighten the active pointer while pressing.',
           when: { pressed: true },
           parts: {
-            thumb: {
+            pointerCurrent: {
               'Layout.scale': 0.96,
             },
           },
         }),
         Dragging: createStateNode('Dragging', {
-          description: 'Brighten the fill while dragging.',
+          description: 'Brighten the active body span while dragging.',
           when: { dragging: true },
           parts: {
-            fill: {
+            bodyTrackFill: {
               'Background.Fill.colour': 'FF71B8F1',
             },
-            thumb: {
+            bodySelectedRange: {
+              'Background.Fill.colour': 'FF9FD0FF',
+            },
+            pointerCurrent: {
               'Background.Fill.colour': 'FFFFFFFF',
               'Layout.scale': 1.08,
             },
           },
         }),
         Focused: createStateNode('Focused', {
-          description: 'Accent the thumb while focused.',
+          description: 'Accent the active pointer while focused.',
           when: { focused: true },
           parts: {
-            thumb: {
+            pointerCurrent: {
               'Background.Border.colour': 'FF89C2FF',
+            },
+            labelValue: {
+              'Text.Fill.colour': 'FFDAEEFF',
+            },
+          },
+        }),
+        ActiveHandleStart: createStateNode('ActiveHandleStart', {
+          group: 'logical',
+          description: 'Emphasize the start handle when it is active.',
+          when: { activeHandle: 'start' },
+          parts: {
+            pointerStart: {
+              'Layout.scale': 1.08,
+            },
+          },
+        }),
+        ActiveHandleCurrent: createStateNode('ActiveHandleCurrent', {
+          group: 'logical',
+          description: 'Emphasize the current handle when it is active.',
+          when: { activeHandle: 'current' },
+          parts: {
+            pointerCurrent: {
+              'Layout.scale': 1.08,
+            },
+          },
+        }),
+        ActiveHandleEnd: createStateNode('ActiveHandleEnd', {
+          group: 'logical',
+          description: 'Emphasize the end handle when it is active.',
+          when: { activeHandle: 'end' },
+          parts: {
+            pointerEnd: {
+              'Layout.scale': 1.08,
             },
           },
         }),
@@ -687,24 +756,7 @@ export function createBindingsDefaults(type) {
       _type: 'Bindings',
       enabled: true,
       debug: false,
-      _children: {
-        fillWidth: createBindingNode('fillWidth', {
-          source: 'value.normalized',
-          mapMode: 'range',
-          target: 'Parts.fill.Layout.width',
-          outputUnit: 'percent',
-          outputMin: 0,
-          outputMax: 86,
-        }),
-        thumbX: createBindingNode('thumbX', {
-          source: 'value.normalized',
-          mapMode: 'range',
-          target: 'Parts.thumb.Layout.x',
-          outputUnit: 'percent',
-          outputMin: 7,
-          outputMax: 93,
-        }),
-      },
+      _children: {},
     };
   }
 
@@ -739,24 +791,30 @@ export function createAnimationsDefaults(type) {
       enabled: true,
       debug: false,
       _children: {
-        thumbSlide: createAnimationNode('thumbSlide', {
+        pointerSlide: createAnimationNode('pointerSlide', {
           trigger: {
             type: 'valueChange',
             source: 'value.normalized',
           },
           targets: [
-            { path: 'Parts.thumb.Layout.x', properties: ['transform'] },
+            { path: 'Parts.pointerCurrent.Layout.x', properties: ['transform'] },
+            { path: 'Parts.pointerCurrent.Layout.y', properties: ['transform'] },
+            { path: 'Parts.pointerStart.Layout.x', properties: ['transform'] },
+            { path: 'Parts.pointerStart.Layout.y', properties: ['transform'] },
+            { path: 'Parts.pointerEnd.Layout.x', properties: ['transform'] },
+            { path: 'Parts.pointerEnd.Layout.y', properties: ['transform'] },
           ],
           duration: 140,
           easing: 'outCubic',
         }),
-        fillSlide: createAnimationNode('fillSlide', {
+        rangeSlide: createAnimationNode('rangeSlide', {
           trigger: {
             type: 'valueChange',
             source: 'value.normalized',
           },
           targets: [
-            { path: 'Parts.fill.Layout.width', properties: ['size'] },
+            { path: 'Parts.bodyTrackFill.Layout.width', properties: ['size'] },
+            { path: 'Parts.bodySelectedRange.Layout.width', properties: ['size'] },
           ],
           duration: 140,
           easing: 'outCubic',
@@ -826,7 +884,7 @@ export function createPartsDefaults(type) {
   }
 
   if (type === 'Slider') {
-    return sliderParts();
+    return createSliderSemanticParts();
   }
 
   return {

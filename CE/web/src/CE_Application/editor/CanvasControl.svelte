@@ -2,6 +2,7 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
+  import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import { selectedComponentIds, selectComponent, multiDragDelta, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -15,6 +16,15 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
+  import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
+  import { segmentEditScope } from '../stores/segmentEditScope.js';
+  import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
+  import {
+    buildRadioWholeBackground,
+    resolveRadioSegmentStyle,
+    resolveRadioSelectedKeys,
+    resolveRadioShapeRadius,
+  } from '../utils/radioSegmentStyle.js';
   import {
     computeResizedRect, snapRectToGrid, snapToGridAxis,
     clientToPanelPoint, angleFromCenter, computeRotation, normalizeRotation,
@@ -23,6 +33,7 @@
 
   let {
     control,
+    sourceControl = control,
     scale = 1,
     previewSessionOverride = null,
     resolvedControlOverride = null,
@@ -89,21 +100,41 @@
   let renderTransform = $derived(getSection(renderControl, 'Transform') ?? transform);
   let background = $derived(getSection(renderControl, 'Background'));
   let text = $derived(getSection(renderControl, 'Text'));
+  let sourceBackground = $derived(getSection(sourceControl, 'Background') ?? background);
+  let sourceText = $derived(getSection(sourceControl, 'Text') ?? text);
   let icon = $derived(getSection(renderControl, 'Icon'));
   let effects = $derived(getSection(renderControl, 'Effects'));
   let contentLayout = $derived(getSection(renderControl, 'ContentLayout'));
   let behavior = $derived(getSection(renderControl, 'Behavior'));
   let valueSection = $derived(getSection(renderControl, 'Value'));
   let statesSection = $derived(getSection(renderControl, 'States'));
-  let buttonType = $derived(String(behavior?.buttonType ?? '').trim().toLowerCase());
-  let valueRows = $derived(getEnabledValueRows(valueSection));
+  let sourceBehavior = $derived(getSection(sourceControl, 'Behavior') ?? behavior);
+  let sourceValueSection = $derived(getSection(sourceControl, 'Value') ?? valueSection);
+  let sourceStatesSection = $derived(getSection(sourceControl, 'States') ?? statesSection);
+  let buttonType = $derived(String(sourceBehavior?.buttonType ?? behavior?.buttonType ?? '').trim().toLowerCase());
+  let valueRows = $derived(getEnabledValueRows(sourceValueSection ?? valueSection));
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let renderParts = $derived(getSection(renderControl, 'Parts'));
+  const SLIDER_SEMANTIC_PARTS = new Set([
+    'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker',
+    'pointerStart', 'pointerCurrent', 'pointerEnd',
+    'tickMajor', 'tickMinor', 'tickAccent',
+    'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',
+  ]);
   let renderPartEntries = $derived.by(() =>
     Object.entries(renderParts?._children ?? {})
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0))
   );
+  let isSliderControl = $derived(
+    String(sourceBehavior?.family ?? behavior?.family ?? '').trim().toLowerCase() === 'range'
+    && String(sourceBehavior?.role ?? behavior?.role ?? '').trim().toLowerCase() === 'slider'
+  );
+  let renderedPartEntries = $derived.by(() => (
+    isSliderControl
+      ? renderPartEntries.filter(([partName]) => !SLIDER_SEMANTIC_PARTS.has(String(partName)))
+      : renderPartEntries
+  ));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
   let isKeyObject = $derived(core?.id != null && $keyObjectId === core.id && $selectedComponentIds.size > 1);
   let isLocked = $derived(core?.locked === true);
@@ -121,7 +152,11 @@
     }
 
     const family = interactionRuntime?.signals?.family;
-    if (family === 'range' || family === 'select') {
+    const role = String(interactionRuntime?.signals?.role ?? '').trim().toLowerCase();
+    if (family === 'range' && role === 'slider') {
+      segments.push(`value:${String(interactionRuntime?.signals?.valueDisplay ?? interactionRuntime?.signals?.valueRaw ?? '-')}`);
+      segments.push(`handle:${String(interactionRuntime?.signals?.activeHandle ?? '-')}`);
+    } else if (family === 'range' || family === 'select') {
       segments.push(`value:${String(interactionRuntime?.signals?.valueRaw ?? '-')}`);
     }
 
@@ -699,6 +734,10 @@
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  function normalizeKey(value) {
+    return String(value ?? '').trim().toLowerCase();
   }
 
   function normalizeTextOrientation(value) {
@@ -2461,7 +2500,13 @@
   let textFontVariationSettings = $derived(buildFontVariationSettings(textFont?.variationAxes));
   let textVariantCaps = $derived(textCaseVariantCaps(textCaseMode));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
-  let rawTextContent = $derived(String(text?.content ?? ''));
+  let rawTextContent = $derived.by(() => {
+    if (buttonType === 'cyclic' && interactionRuntime?.signals?.valueDisplay !== undefined) {
+      return String(interactionRuntime.signals.valueDisplay ?? '');
+    }
+
+    return String(text?.content ?? '');
+  });
   let casedTextContent = $derived.by(() => applyTextCaseMode(rawTextContent, textCaseMode));
   let renderedTextContent = $derived.by(() => applyTextReadingOrientation(casedTextContent, textReadingOrientation));
   let textFillImageUrl = $derived.by(() => {
@@ -3492,10 +3537,53 @@
 
     return $storedIcons.find((entry) => entry.name === iconName && entry.enabled) ?? null;
   });
-  let selectedStateNode = $derived(statesSection?._children?.Selected ?? null);
-  let radioGroupSelectionMode = $derived(String(behavior?.selectionMode ?? 'single').trim().toLowerCase() === 'multi' ? 'multi' : 'single');
+  let radioGroupPreviewStateName = $derived(String(valueSection?.__segmentPreviewState ?? '').trim());
+  let radioGroupPreviewSegmentIds = $derived(
+    radioGroupPreviewStateName
+      ? normalizeSegmentTargetIds(
+        sourceValueSection,
+        $segmentEditScope?.mode === 'segments'
+          ? $segmentEditScope.segmentIds ?? []
+          : []
+      )
+      : []
+  );
+  let radioGroupActiveStateNames = $derived.by(() => {
+    if (!isRadioGroupControl) return [];
+    if (Array.isArray(interactionRuntime?.activeStates) && interactionRuntime.activeStates.length > 0) {
+      return interactionRuntime.activeStates;
+    }
+    return radioGroupPreviewStateName ? [radioGroupPreviewStateName] : [];
+  });
+  let radioGroupSelectionMode = $derived(String(sourceBehavior?.selectionMode ?? 'single').trim().toLowerCase() === 'multi' ? 'multi' : 'single');
+  let radioGroupVisualStyle = $derived(String(sourceBehavior?.visualStyle ?? sourceBehavior?.subtype ?? 'radio'));
+  let radioGroupLayout = $derived.by(() => resolveRadioGroupLayout({
+    behavior: sourceBehavior,
+    valueRows,
+    width: displayW,
+    height: displayH,
+    paddingLeft: layoutPaddingLeft,
+    paddingRight: layoutPaddingRight,
+    paddingTop: layoutPaddingTop,
+    paddingBottom: layoutPaddingBottom,
+    gap: layoutGap,
+  }));
   let radioGroupSelectedKeys = $derived.by(() => {
     if (!isRadioGroupControl) return new Set();
+
+    const forcedSelectedRowIds = radioGroupPreviewStateName
+      && (
+        normalizeKey(radioGroupPreviewStateName) === 'selected'
+        || normalizeKey(radioGroupPreviewStateName) === 'checked'
+        || sourceStatesSection?._children?.[radioGroupPreviewStateName]?.when?.checked === true
+      )
+      && radioGroupPreviewSegmentIds.length > 0
+      ? radioGroupPreviewSegmentIds
+      : [];
+
+    if (forcedSelectedRowIds.length > 0) {
+      return resolveRadioSelectedKeys(valueRows, sourceBehavior, { forceSelectedRowIds: forcedSelectedRowIds });
+    }
 
     const selected = new Set();
     const runtimeValue = interactionRuntime?.signals?.valueRaw;
@@ -3507,65 +3595,78 @@
       selected.add(String(runtimeValue));
     }
 
-    if (selected.size === 0) {
-      for (const row of valueRows) {
-        if (row?.selectedByDefault === true) {
-          selected.add(String(row?.internalValue ?? row?.id ?? ''));
-          if (radioGroupSelectionMode !== 'multi') break;
-        }
+    if (selected.size > 0) {
+      if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
+        return new Set([selected.values().next().value]);
       }
+      return selected;
     }
 
-    if (selected.size === 0) {
-      const defaultValue = behavior?.defaultValue;
-      if (Array.isArray(defaultValue)) {
-        for (const entry of defaultValue) {
-          selected.add(String(entry));
-        }
-      } else if (defaultValue !== undefined && defaultValue !== null && defaultValue !== '') {
-        selected.add(String(defaultValue));
-      }
-    }
-
-    if (selected.size === 0 && valueRows[0]) {
-      selected.add(String(valueRows[0]?.internalValue ?? valueRows[0]?.id ?? ''));
-    }
-
-    if (radioGroupSelectionMode !== 'multi' && selected.size > 1) {
-      return new Set([selected.values().next().value]);
-    }
-
-    return selected;
+    return resolveRadioSelectedKeys(valueRows, sourceBehavior);
   });
   let radioGroupItems = $derived.by(() => {
     if (!isRadioGroupControl) return [];
 
-    return valueRows.map((row, index) => {
+    return radioGroupLayout.items.map((entry, index) => {
+      const row = entry.row;
       const internalKey = String(row?.internalValue ?? row?.id ?? `item_${index + 1}`);
-      const overrides = row?.visualOverrides ?? {};
       const selected = radioGroupSelectedKeys.has(internalKey);
-      const baseFill = overrides.backgroundColour ?? background?._children?.Fill?.colour ?? 'FF3A3A3A';
-      const selectedFill = overrides.selectedBackgroundColour
-        ?? selectedStateNode?.patches?.component?.['Background.Fill.colour']
-        ?? 'FF2D6F9C';
-      const baseTextColour = overrides.textColour ?? text?._children?.Fill?.colour ?? 'FFFFFFFF';
-      const selectedTextColour = overrides.selectedTextColour
-        ?? selectedStateNode?.patches?.component?.['Text.Fill.colour']
-        ?? baseTextColour;
-      const borderColour = overrides.borderColour ?? background?._children?.Border?.colour ?? '66FFFFFF';
-      const selectedBorderColour = overrides.selectedBorderColour
-        ?? selectedStateNode?.patches?.component?.['Background.Border.colour']
-        ?? borderColour;
+      const resolvedStyle = resolveRadioSegmentStyle({
+        row,
+        behavior: sourceBehavior,
+        background: sourceBackground,
+        text: sourceText,
+        valueSection: sourceValueSection,
+        statesSection: sourceStatesSection,
+        selected,
+        activeStateNames: radioGroupActiveStateNames,
+      });
+      const outerShape = String(resolvedStyle?.indicatorOuter?.shape ?? '').trim().toLowerCase();
+      const innerShape = String(resolvedStyle?.indicatorInner?.shape ?? '').trim().toLowerCase();
+      const outerVisible = resolvedStyle?.indicatorOuter?.visible !== false;
+      const innerVisible = resolvedStyle?.indicatorInner?.visible !== false
+        && (resolvedStyle?.indicatorInner?.selectedOnly !== true || selected);
 
       return {
         id: row?.id ?? `row_${index + 1}`,
         label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
         selected,
-        style: [
-          `background:${cssColor(selected ? selectedFill : baseFill)}`,
-          `border-color:${cssColor(selected ? selectedBorderColour : borderColour)}`,
-          `color:${cssColor(selected ? selectedTextColour : baseTextColour)}`,
+        shellBackground: buildRadioWholeBackground(resolvedStyle?.whole),
+        shellWidth: Math.max(0, numberOr(entry?.width, 0)),
+        shellHeight: Math.max(0, numberOr(entry?.height, 0)),
+        contentStyle: [
+          `padding:${Math.max(0, numberOr(resolvedStyle?.whole?.paddingY, 0))}px ${Math.max(0, numberOr(resolvedStyle?.whole?.paddingX, 0))}px`,
+          `gap:${Math.max(0, numberOr(resolvedStyle?.whole?.indicatorGap, 0))}px`,
         ].join('; '),
+        indicatorOuterVisible: outerVisible,
+        indicatorOuterStyle: [
+          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.width, 0))}px`,
+          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.height, 0))}px`,
+          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorOuter?.borderWidth, 0))}px`,
+          `border-radius:${resolveRadioShapeRadius(outerShape, resolvedStyle?.indicatorOuter?.radius)}`,
+          `background:${cssColor(resolvedStyle?.indicatorOuter?.fillColour)}`,
+          `border-color:${cssColor(resolvedStyle?.indicatorOuter?.borderColour)}`,
+        ].join('; '),
+        indicatorInnerVisible: innerVisible,
+        indicatorInnerStandalone: !outerVisible && innerVisible,
+        indicatorInnerStyle: [
+          `width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.width, 0))}px`,
+          `height:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.height, 0))}px`,
+          `border-width:${Math.max(0, numberOr(resolvedStyle?.indicatorInner?.borderWidth, 0))}px`,
+          `border-radius:${resolveRadioShapeRadius(innerShape, resolvedStyle?.indicatorInner?.radius)}`,
+          `background:${cssColor(resolvedStyle?.indicatorInner?.fillColour)}`,
+          `border-color:${cssColor(resolvedStyle?.indicatorInner?.borderColour)}`,
+          innerVisible ? 'opacity:1; transform:scale(1)' : 'opacity:0; transform:scale(0.7)',
+        ].join('; '),
+        labelStyle: [
+          `color:${cssColor(resolvedStyle?.label?.colour)}`,
+          `font-size:${Math.max(1, numberOr(resolvedStyle?.label?.fontSize, 11))}px`,
+          `font-weight:${resolvedStyle?.label?.fontWeight ?? 600}`,
+          `letter-spacing:${numberOr(resolvedStyle?.label?.letterSpacing, 0)}px`,
+          resolvedStyle?.label?.fontFamily ? `font-family:${JSON.stringify(resolvedStyle.label.fontFamily)}` : '',
+          resolvedStyle?.label?.fontStyle ? `font-style:${String(resolvedStyle.label.fontStyle).trim().toLowerCase()}` : '',
+          resolvedStyle?.label?.textTransform ? `text-transform:${resolvedStyle.label.textTransform}` : '',
+        ].filter(Boolean).join('; '),
       };
     });
   });
@@ -3574,6 +3675,8 @@
     return [
       `padding:${layoutPaddingTop}px ${layoutPaddingRight}px ${layoutPaddingBottom}px ${layoutPaddingLeft}px`,
       `gap:${layoutGap}px`,
+      `--radio-columns:${Math.max(1, radioGroupLayout.columns)}`,
+      `--radio-rows:${Math.max(1, radioGroupLayout.rowCount)}`,
     ].join('; ');
   });
   let hasIcon = $derived(!isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
@@ -3684,8 +3787,19 @@
       <BackgroundRenderer {background} width={displayW} height={displayH} />
     {/if}
 
-    {#if renderPartEntries.length}
-      {#each renderPartEntries as [partName, part] (partName)}
+    {#if isSliderControl}
+      <SliderFamilyRenderer
+        control={renderControl}
+        runtime={interactionRuntime}
+        width={displayW}
+        height={displayH}
+        partTransitions={interactionRuntime?.transitions?.partTransitions ?? null}
+        debug={interactionDebugEnabled}
+      />
+    {/if}
+
+    {#if renderedPartEntries.length}
+      {#each renderedPartEntries as [partName, part] (partName)}
         <InteractivePartRenderer
           {part}
           parentWidth={displayW}
@@ -3711,16 +3825,24 @@
           <div
             class="radio-group-item"
             class:selected={item.selected}
-            class:segmented={String(behavior?.visualStyle ?? 'radio') === 'segmented'}
-            class:tab={String(behavior?.visualStyle ?? 'radio') === 'tab'}
-            style={item.style}
+            class:segmented={radioGroupVisualStyle === 'segmented'}
+            class:tab={radioGroupVisualStyle === 'tab'}
           >
-            {#if String(behavior?.visualStyle ?? 'radio') === 'radio'}
-              <span class="radio-dot-shell">
-                <span class="radio-dot"></span>
-              </span>
-            {/if}
-            <span class="radio-group-label">{item.label}</span>
+            <div class="radio-group-item-shell">
+              <BackgroundRenderer background={item.shellBackground} width={item.shellWidth} height={item.shellHeight} />
+            </div>
+            <div class="radio-group-item-content" style={item.contentStyle}>
+              {#if item.indicatorOuterVisible}
+                <span class="radio-indicator-outer" style={item.indicatorOuterStyle}>
+                  {#if item.indicatorInnerVisible}
+                    <span class="radio-indicator-inner" style={item.indicatorInnerStyle}></span>
+                  {/if}
+                </span>
+              {:else if item.indicatorInnerStandalone}
+                <span class="radio-indicator-inner standalone" style={item.indicatorInnerStyle}></span>
+              {/if}
+              <span class="radio-group-label" style={item.labelStyle}>{item.label}</span>
+            </div>
           </div>
         {/each}
       </div>
@@ -4994,9 +5116,9 @@
   .radio-group-content {
     position: absolute;
     inset: 0;
-    display: flex;
-    flex-wrap: wrap;
-    align-content: stretch;
+    display: grid;
+    grid-template-columns: repeat(var(--radio-columns, 1), minmax(0, 1fr));
+    grid-template-rows: repeat(var(--radio-rows, 1), minmax(0, 1fr));
     box-sizing: border-box;
     pointer-events: none;
     z-index: 3;
@@ -5004,54 +5126,51 @@
 
   .radio-group-item {
     min-width: 0;
-    flex: 1 1 96px;
-    min-height: 28px;
+    min-height: 0;
+    position: relative;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .radio-group-item-shell {
+    position: absolute;
+    inset: 0;
+  }
+
+  .radio-group-item-content {
+    position: absolute;
+    inset: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 7px 12px;
-    border: 1px solid transparent;
-    border-radius: 999px;
+    min-width: 0;
+    min-height: 0;
     box-sizing: border-box;
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.1px;
-    overflow: hidden;
   }
 
-  .radio-group-item.segmented,
-  .radio-group-item.tab {
-    border-radius: 9px;
-  }
-
-  .radio-group-item.tab {
-    align-self: stretch;
-    min-height: 32px;
-  }
-
-  .radio-dot-shell {
-    width: 12px;
-    height: 12px;
+  .radio-indicator-outer,
+  .radio-indicator-inner {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    border: 1px solid currentColor;
-    border-radius: 999px;
     flex-shrink: 0;
+    box-sizing: border-box;
   }
 
-  .radio-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 999px;
-    background: currentColor;
-    transform: scale(0);
-    transition: transform 0.14s ease;
+  .radio-indicator-outer {
+    border-style: solid;
   }
 
-  .radio-group-item.selected .radio-dot {
-    transform: scale(1);
+  .radio-indicator-inner {
+    border-style: solid;
+    transition: transform 0.14s ease, opacity 0.14s ease;
+  }
+
+  .radio-indicator-inner.standalone {
+    align-self: center;
   }
 
   .radio-group-label {
@@ -5059,6 +5178,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    line-height: 1.1;
   }
 
   .icon-content {

@@ -62,6 +62,8 @@ export function applyColorToTarget(hex) {
   } else if (target.type === 'control') {
     // Control properties use AARRGGBB
     updateControlProperty(target.controlId, target.path, hex);
+  } else if (target.type === 'callback' && typeof target.apply === 'function') {
+    target.apply(hex);
   }
 }
 

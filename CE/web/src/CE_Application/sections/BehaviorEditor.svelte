@@ -21,7 +21,9 @@
   let behavior = $derived(getSection(control, 'Behavior'));
   let buttonType = $derived(String(behavior?.buttonType ?? inferButtonType(core?.controlType)));
   let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? ['custom']);
+  let showSubtypeSelector = $derived(buttonType !== 'radio');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
+  let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
 
   function inferButtonType(controlType = '') {
     switch (String(controlType ?? '')) {
@@ -74,16 +76,18 @@
 
 {#if behavior}
   <PropertySection title="Behavior">
-    <PropertyCell label="Type" span={2} hint="Behavior is defined by the inserted button type.">
+    <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />
     </PropertyCell>
-    <PropertyCell label="Subtype" span={2} hint="Choose the exact behavior variant for this button type.">
-      <select class="val" value={behavior.subtype ?? subtypeOptions[0]} onchange={(event) => handleSubtypeChange(event.target.value)}>
-        {#each subtypeOptions as option}
-          <option value={option}>{option}</option>
-        {/each}
-      </select>
-    </PropertyCell>
+    {#if showSubtypeSelector}
+      <PropertyCell label="Subtype" span={2} hint="Choose the exact behavior variant for this button type.">
+        <select class="val" value={behavior.subtype ?? subtypeOptions[0]} onchange={(event) => handleSubtypeChange(event.target.value)}>
+          {#each subtypeOptions as option}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   {#if buttonType === 'momentary'}
@@ -123,11 +127,20 @@
   {:else if buttonType === 'radio'}
     <PropertySection title="Radio Group">
       <PropertyCell label="Style" span={2} hint="Choose the visual style for the group items.">
-        <select class="val" value={behavior.visualStyle ?? 'radio'} onchange={(event) => set('visualStyle', event.target.value)}>
+        <select class="val" value={radioVisualStyle} onchange={(event) => set('visualStyle', event.target.value)}>
           <option value="radio">radio</option>
           <option value="segmented">segmented</option>
           <option value="tab">tab</option>
         </select>
+      </PropertyCell>
+      <PropertyCell label="Layout" span={1} hint="Horizontal lays items in rows, vertical stacks them in one column by default.">
+        <select class="val" value={behavior.orientation ?? 'horizontal'} onchange={(event) => set('orientation', event.target.value)}>
+          <option value="horizontal">horizontal</option>
+          <option value="vertical">vertical</option>
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Columns" span={1} hint="Set to 0 for auto layout, or 2 for a 2 x 2 grid with four items.">
+        <NumberInput value={behavior.itemColumns ?? 0} step={1} min={0} onchange={(value) => set('itemColumns', Math.max(0, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Select" span={2} hint="Single keeps one item active, multi allows several at once.">
         <select class="val" value={behavior.selectionMode ?? 'single'} onchange={(event) => set('selectionMode', event.target.value)}>

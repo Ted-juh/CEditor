@@ -13,14 +13,27 @@ const DEFAULT_SESSION = {
   focused: false,
   dragging: false,
   disabled: false,
+  pending: false,
+  executed: false,
   checked: false,
   mixed: false,
   valueOverrideEnabled: false,
   valueOverride: 0,
+  startValueOverrideEnabled: false,
+  startValueOverride: 0,
+  currentValueOverrideEnabled: false,
+  currentValueOverride: 0,
+  endValueOverrideEnabled: false,
+  endValueOverride: 0,
+  activeHandle: 'current',
   valueInputActive: false,
+  valueInputRole: 'current',
   valueInputBuffer: '',
   animationsEnabled: true,
   autoDebug: false,
+  reducedMotion: false,
+  highContrast: false,
+  inputModality: 'pointer',
 };
 
 export const interactionPreviewSessions = writable({});
@@ -37,6 +50,10 @@ export function createInteractionPreviewSession(control = null) {
   const behavior = control?._children?.Behavior ?? null;
   if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
     next.checked = behavior?.defaultValue === true;
+  }
+  if (String(behavior?.family ?? '') === 'range' && String(behavior?.role ?? '') === 'slider') {
+    next.activeHandle = String(behavior?.valueMode ?? 'single') === 'range' ? 'start' : 'current';
+    next.valueInputRole = next.activeHandle;
   }
   return next;
 }
@@ -65,6 +82,11 @@ function getActivePanel() {
 function getActivePanelControlById(controlId = '') {
   if (!controlId) return null;
   return getActivePanel()?.controls?.find((control) => getControlId(control) === controlId) ?? null;
+}
+
+function getEnabledValueRows(control) {
+  const rows = control?._children?.Value?.rows;
+  return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
 }
 
 function currentPreviewBoolValue(control, session = null) {
@@ -208,7 +230,7 @@ export function resetPanelPreviewSession(controlId) {
   updatePanelPreviewSession(controlId, createInteractionPreviewSession(control));
 }
 
-export function commitPanelPreviewSelectAction(controlId) {
+export function commitPanelPreviewSelectAction(controlId, options = {}) {
   const control = getActivePanelControlById(controlId);
   if (!control) return;
 
@@ -216,7 +238,9 @@ export function commitPanelPreviewSelectAction(controlId) {
   if (String(behavior?.family ?? '') !== 'select') return;
 
   const role = String(behavior?.role ?? '');
+  const buttonType = String(behavior?.buttonType ?? '');
   const valueType = String(behavior?.valueType ?? '');
+  const requestedValue = String(options?.value ?? '').trim();
   const currentSession = {
     ...createInteractionPreviewSession(control),
     ...(get(panelPreviewSessions)?.[controlId] ?? {}),
@@ -244,10 +268,41 @@ export function commitPanelPreviewSelectAction(controlId) {
   }
 
   if (role === 'radio') {
+    const valueRows = getEnabledValueRows(control);
+    const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === requestedValue)
+      ?? valueRows.find((row) => row?.selectedByDefault === true)
+      ?? valueRows[0]
+      ?? null;
+    if (!nextRow) return;
+
     updatePanelPreviewSession(controlId, {
-      checked: true,
+      checked: false,
       mixed: false,
-      valueOverrideEnabled: false,
+      valueOverrideEnabled: true,
+      valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+    });
+    return;
+  }
+
+  if (buttonType === 'cyclic') {
+    const valueRows = getEnabledValueRows(control);
+    if (!valueRows.length) return;
+
+    const currentValue = currentSession?.valueOverrideEnabled === true
+      ? currentSession?.valueOverride
+      : (behavior?.defaultValue ?? valueRows[0]?.internalValue ?? valueRows[0]?.id);
+    const currentIndex = Math.max(
+      0,
+      valueRows.findIndex((row) => String(row?.internalValue ?? row?.id) === String(currentValue ?? ''))
+    );
+    const nextIndex = currentIndex >= valueRows.length - 1
+      ? (behavior?.wrapBehavior === false ? currentIndex : 0)
+      : currentIndex + 1;
+    const nextRow = valueRows[nextIndex] ?? valueRows[0];
+
+    updatePanelPreviewSession(controlId, {
+      valueOverrideEnabled: true,
+      valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
     });
     return;
   }

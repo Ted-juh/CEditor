@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import { PaintBucket, Blend, Image, Layers, ChevronUp, ChevronDown } from 'lucide-svelte';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
@@ -15,7 +16,14 @@
   import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   import { backgroundLayerClipboard, copyBackgroundLayer, getBackgroundLayerClipboard } from '../stores/backgroundLayerClipboard.js';
 
-  let { control = null } = $props();
+  let {
+    control = null,
+    background = null,
+    pathPrefix = 'Background',
+    sectionTitle = 'Background',
+    editorId = '',
+    imageRequestPrefix = 'componentBackground',
+  } = $props();
 
   const DEFAULT_FILL_GRADIENT = {
     type: 'linear',
@@ -42,8 +50,12 @@
   };
 
   let core = $derived(getSection(control, 'Core'));
-  let background = $derived(getSection(control, 'Background'));
-  let fill = $derived(background?._children?.Fill);
+  let resolvedBackground = $derived(background ?? getSection(control, 'Background'));
+  let fill = $derived(resolvedBackground?._children?.Fill);
+
+  function editorKey() {
+    return String(editorId || pathPrefix || 'background').replace(/[^a-zA-Z0-9:_-]+/g, '_');
+  }
 
   function set(path, value) {
     if (!core?.id) return;
@@ -59,7 +71,7 @@
   }
 
   function legacyMode() {
-    return background?.mode === 'none' ? 'overlay' : (background?.mode ?? 'solid');
+    return resolvedBackground?.mode === 'none' ? 'overlay' : (resolvedBackground?.mode ?? 'solid');
   }
 
   function fillOrder() {
@@ -83,16 +95,16 @@
   }
 
   function layerCollapseKey(layerId) {
-    return `component-bg:${core?.id ?? 'global'}:layer:${layerId}`;
+    return `component-bg:${core?.id ?? 'global'}:${editorKey()}:layer:${layerId}`;
   }
 
   function sectionKey(name) {
-    return `component-bg:${core?.id ?? 'global'}:${name}`;
+    return `component-bg:${core?.id ?? 'global'}:${editorKey()}:${name}`;
   }
 
   function setPrimaryLayer(layerId) {
-    set('Background.mode', layerId);
-    set('Background.Fill.mode', layerId);
+    set(`${pathPrefix}.mode`, layerId);
+    set(`${pathPrefix}.Fill.mode`, layerId);
   }
 
   function topEnabledLayer(excluding = null) {
@@ -106,7 +118,7 @@
   function ensureFillGradient() {
     if (fill?.gradient?.stops?.length >= 2) return fill.gradient;
     const seeded = deepClone(DEFAULT_FILL_GRADIENT);
-    set('Background.Fill.gradient', seeded);
+    set(`${pathPrefix}.Fill.gradient`, seeded);
     return seeded;
   }
 
@@ -114,29 +126,33 @@
     if (!core?.id || $selectedComponentIds.size > 1) return;
     const currentGradient = ensureFillGradient();
     activateGradientTarget(
-      { type: 'control', controlId: core.id, path: 'Background.Fill' },
+      { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill` },
       currentGradient
     );
   }
 
   function chooseFillAsset(layerId) {
     if ($selectedComponentIds.size > 1) return;
-    browseImage(`componentBackground:${core?.id ?? 'unknown'}:${layerId}`);
+    browseImage(`${imageRequestPrefix}:${core?.id ?? 'unknown'}:${editorKey()}:${layerId}`);
   }
 
-  onImageBrowsed((result) => {
+  const removeImageBrowsedListener = onImageBrowsed((result) => {
     if (!core?.id) return;
-    const imageRequestId = `componentBackground:${core.id}:image`;
-    const overlayRequestId = `componentBackground:${core.id}:overlay`;
+    const imageRequestId = `${imageRequestPrefix}:${core.id}:${editorKey()}:image`;
+    const overlayRequestId = `${imageRequestPrefix}:${core.id}:${editorKey()}:overlay`;
     if (result.requestId === imageRequestId) {
-      set('Background.Fill.imageSrc', result.filePath);
+      set(`${pathPrefix}.Fill.imageSrc`, result.filePath);
     } else if (result.requestId === overlayRequestId) {
-      set('Background.Fill.overlaySrc', result.filePath);
+      set(`${pathPrefix}.Fill.overlaySrc`, result.filePath);
     }
   });
 
+  onDestroy(() => {
+    removeImageBrowsedListener?.();
+  });
+
   function setFillProp(prop, value) {
-    set(`Background.Fill.${prop}`, value);
+    set(`${pathPrefix}.Fill.${prop}`, value);
   }
 
   function getFillDefault(prop) {
@@ -188,16 +204,16 @@
       setFillProp(prop, deepClone(value));
     }
     if (layerId === 'gradient' && clip.data?.gradient && !isLayerEnabled('gradient')) {
-      set('Background.Fill.gradientEnabled', true);
+      set(`${pathPrefix}.Fill.gradientEnabled`, true);
     }
     if (layerId === 'image' && !isLayerEnabled('image')) {
-      set('Background.Fill.imageEnabled', true);
+      set(`${pathPrefix}.Fill.imageEnabled`, true);
     }
     if (layerId === 'overlay' && !isLayerEnabled('overlay')) {
-      set('Background.Fill.overlayEnabled', true);
+      set(`${pathPrefix}.Fill.overlayEnabled`, true);
     }
     if (layerId === 'solid' && !isLayerEnabled('solid')) {
-      set('Background.Fill.solidEnabled', true);
+      set(`${pathPrefix}.Fill.solidEnabled`, true);
     }
   }
 
@@ -215,7 +231,7 @@
     const fillProp = prop.startsWith('bg') ? (panelKeyToFillProp(prop, prop.startsWith('bgImage') ? 'Image' : 'Texture')) : prop;
     if (!fillProp) return;
     activateColorTarget(
-      { type: 'control', controlId: core.id, path: `Background.Fill.${fillProp}` },
+      { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill.${fillProp}` },
       currentColor
     );
   }
@@ -256,14 +272,14 @@
     const next = !isLayerEnabled(layerId);
 
     if (layerId === 'solid') {
-      set('Background.Fill.solidEnabled', next);
+      set(`${pathPrefix}.Fill.solidEnabled`, next);
     } else if (layerId === 'gradient') {
       if (next) ensureFillGradient();
-      set('Background.Fill.gradientEnabled', next);
+      set(`${pathPrefix}.Fill.gradientEnabled`, next);
     } else if (layerId === 'image') {
-      set('Background.Fill.imageEnabled', next);
+      set(`${pathPrefix}.Fill.imageEnabled`, next);
     } else if (layerId === 'overlay') {
-      set('Background.Fill.overlayEnabled', next);
+      set(`${pathPrefix}.Fill.overlayEnabled`, next);
     }
 
     if (next) {
@@ -285,14 +301,14 @@
 
     if (!isLayerEnabled(layerId)) {
       if (layerId === 'solid') {
-        set('Background.Fill.solidEnabled', true);
+        set(`${pathPrefix}.Fill.solidEnabled`, true);
       } else if (layerId === 'gradient') {
         ensureFillGradient();
-        set('Background.Fill.gradientEnabled', true);
+        set(`${pathPrefix}.Fill.gradientEnabled`, true);
       } else if (layerId === 'image') {
-        set('Background.Fill.imageEnabled', true);
+        set(`${pathPrefix}.Fill.imageEnabled`, true);
       } else if (layerId === 'overlay') {
-        set('Background.Fill.overlayEnabled', true);
+        set(`${pathPrefix}.Fill.overlayEnabled`, true);
       }
     }
 
@@ -312,13 +328,13 @@
     const newIdx = idx + dir;
     if (idx < 0 || newIdx < 0 || newIdx >= order.length) return;
     [order[idx], order[newIdx]] = [order[newIdx], order[idx]];
-    set('Background.Fill.layerOrder', order);
+    set(`${pathPrefix}.Fill.layerOrder`, order);
   }
 
   function handleSwatchClick() {
     if (!core?.id || !fill?.colour) return;
     activateColorTarget(
-      { type: 'control', controlId: core.id, path: 'Background.Fill.colour' },
+      { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill.colour` },
       fill.colour
     );
   }
@@ -326,16 +342,16 @@
   function setColour(e) {
     let val = e.target.value.replace(/^#/, '').toUpperCase();
     if (val.length === 6) val = 'FF' + val;
-    set('Background.Fill.colour', val);
+    set(`${pathPrefix}.Fill.colour`, val);
   }
 
   let displayColour = $derived(fill?.colour ? fill.colour.slice(-6) : '3A3A3A');
   let gradientPreview = $derived(gradientToCSS(fill?.gradient ?? DEFAULT_FILL_GRADIENT));
 </script>
 
-{#if background}
+{#if resolvedBackground}
   <div class="bg-editor">
-    <PropertySection title="Background">
+    <PropertySection title={sectionTitle}>
       <div class="bg-layer-buttons">
         {#each fillOrder() as layerId (layerId)}
           {@const Icon = layerIcons[layerId]}

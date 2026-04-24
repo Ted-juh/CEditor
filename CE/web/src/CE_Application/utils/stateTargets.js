@@ -10,7 +10,7 @@ const KNOWN_STATE_META = {
   mixed: { shortLabel: 'M', order: 70, title: 'Mixed' },
 };
 
-export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects', 'contentlayout']);
+export const STATE_SCOPABLE_TABS = new Set(['transform', 'background', 'border', 'text', 'icon', 'effects', 'contentlayout', 'segments']);
 export { BASE_STATE_TARGET };
 
 export function isStateScopableTabId(tabId = '') {
@@ -29,11 +29,42 @@ function countStatePartOverrides(parts = {}) {
   return count;
 }
 
+function countLeafEntries(node) {
+  if (!node || typeof node !== 'object') return 0;
+
+  let count = 0;
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      count += countLeafEntries(value);
+      continue;
+    }
+    if (value !== undefined) count += 1;
+  }
+  return count;
+}
+
+function appendLeafPaths(node, prefix, entries, limit) {
+  if (!node || typeof node !== 'object') return;
+
+  for (const [key, value] of Object.entries(node)) {
+    const nextPrefix = prefix ? `${prefix}.${key}` : key;
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      appendLeafPaths(value, nextPrefix, entries, limit);
+      if (entries.length >= limit) return;
+      continue;
+    }
+    if (value === undefined) continue;
+    entries.push(nextPrefix);
+    if (entries.length >= limit) return;
+  }
+}
+
 export function stateHasOverrides(state) {
   if (!state) return false;
   const componentCount = Object.keys(state?.patches?.component ?? {}).length;
   const partsCount = countStatePartOverrides(state?.patches?.parts);
-  return componentCount + partsCount > 0;
+  const segmentsCount = countLeafEntries(state?.patches?.segments);
+  return componentCount + partsCount + segmentsCount > 0;
 }
 
 export function summarizeStateOverrides(state, { limit = 6 } = {}) {
@@ -50,6 +81,8 @@ export function summarizeStateOverrides(state, { limit = 6 } = {}) {
       if (entries.length >= limit) return entries;
     }
   }
+
+  appendLeafPaths(state?.patches?.segments, 'Segments', entries, limit);
 
   return entries;
 }

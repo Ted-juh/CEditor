@@ -3,6 +3,12 @@
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { deepClone } from '../utils/deepClone.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
+  import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import {
+    createTimedButtonPreviewController,
+    isTimedButtonBehavior,
+    resolveTimedButtonConfig,
+  } from '../utils/timedButtonPreview.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -18,6 +24,18 @@
     scrubRangeValue,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
+  import {
+    formatSliderNumericValue,
+    getSliderActiveHandle,
+    getSliderDisplayValue,
+    getSliderLegalRangeForHandle,
+    getSliderResolvedValues,
+    getSliderValueMode,
+    isSliderBehavior,
+    parseSliderInputValue,
+    snapSliderValue,
+  } from '../utils/sliderBehavior.js';
+  import { resolveSliderNormalizedFromPoint } from '../utils/sliderGeometry.js';
 
   function getValueRows(control) {
     const rows = control?._children?.Value?.rows;
@@ -45,6 +63,12 @@
   let pointerStartValue = $state(0);
   let keyboardFocusActive = $state(false);
   let lastInputMode = $state('pointer');
+  let lastControlId = $state('');
+  let commitResetTimer = null;
+
+  const timedButtonPreview = createTimedButtonPreviewController({
+    patchSession: (_controlId, patch) => patchSession(patch),
+  });
 
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
@@ -57,6 +81,16 @@
 
   function patchSession(patch = {}) {
     onpatchsession?.(patch);
+  }
+
+  function pulseCommitState() {
+    if (behavior?.emitValueCommit !== true) return;
+    patchSession({ executed: true });
+    if (commitResetTimer) clearTimeout(commitResetTimer);
+    commitResetTimer = setTimeout(() => {
+      commitResetTimer = null;
+      patchSession({ executed: false });
+    }, 180);
   }
 
   let behavior = $derived(control?._children?.Behavior ?? null);
@@ -91,6 +125,13 @@
   let isDisabled = $derived(session?.enabled === false || session?.disabled === true);
   let helperLabel = $derived.by(() => {
     if (!behavior) return 'Hover and click to test the selected control.';
+    if (isTimedButtonBehavior(behavior)) {
+      const config = resolveTimedButtonConfig(behavior);
+      if (config.subtype === 'double_click') {
+        return `Click ${config.requiredClicks} times within ${config.clickWindow} ms to trigger this button.`;
+      }
+      return `Press and hold for ${config.holdDuration} ms to trigger this button.`;
+    }
     if (behavior.family === 'range') {
       return isSliderRangeBehavior(behavior)
         ? 'Drag across the control to test slider travel.'
@@ -101,18 +142,70 @@
   });
   let previewRole = $derived.by(() => {
     if (!behavior) return 'button';
-    if (behavior.family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
-    if (behavior.role === 'radio' || behavior.role === 'segmented') return 'radio';
-    if (behavior.role === 'toggle' || behavior.role === 'checkbox') return 'checkbox';
+    const family = String(behavior.family ?? 'trigger').trim().toLowerCase();
+    const role = String(behavior.role ?? '').trim().toLowerCase();
+    const buttonType = String(behavior.buttonType ?? '').trim().toLowerCase();
+
+    if (family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    if (buttonType === 'radio') return 'radiogroup';
+    if (role === 'radio' || role === 'segmented') return 'radio';
+    if (role === 'toggle' || role === 'checkbox') return 'checkbox';
     return 'button';
   });
+  let previewAriaValueNow = $derived(
+    isRangeControl()
+      ? (isSliderControl() ? resolvedRuntime?.signals?.ariaValueNow : currentRangeValue())
+      : undefined
+  );
+  let previewAriaValueMin = $derived(
+    isRangeControl()
+      ? (isSliderControl() ? resolvedRuntime?.signals?.ariaValueMin : getRangeMin(behavior))
+      : undefined
+  );
+  let previewAriaValueMax = $derived(
+    isRangeControl()
+      ? (isSliderControl() ? resolvedRuntime?.signals?.ariaValueMax : getRangeMax(behavior))
+      : undefined
+  );
+  let previewAriaValueText = $derived(
+    isRangeControl()
+      ? (isSliderControl() ? resolvedRuntime?.signals?.ariaValueText : resolveRangeDisplayValue(behavior, session))
+      : undefined
+  );
 
   function removeWindowListeners() {
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
   }
 
-  onDestroy(removeWindowListeners);
+  onDestroy(() => {
+    removeWindowListeners();
+    if (commitResetTimer) {
+      clearTimeout(commitResetTimer);
+      commitResetTimer = null;
+    }
+    timedButtonPreview.destroy();
+  });
+
+  $effect(() => {
+    const nextControlId = String(control?._children?.Core?.id ?? '');
+    timedButtonPreview.syncKeys(nextControlId ? [nextControlId] : []);
+    if (nextControlId !== lastControlId) {
+      lastControlId = nextControlId;
+      pointerActive = false;
+      draggingRange = false;
+      pointerDownZone = '';
+      keyboardFocusActive = false;
+      if (commitResetTimer) {
+        clearTimeout(commitResetTimer);
+        commitResetTimer = null;
+      }
+      removeWindowListeners();
+    }
+    if (nextControlId) {
+      timedButtonPreview.syncSession(nextControlId, session);
+    }
+  });
 
   function isRangeControl() {
     return isRangeBehavior(behavior);
@@ -133,13 +226,109 @@
     return getCurrentRangeValue(behavior, session);
   }
 
-  function commitSelectAction() {
+  function isSliderControl() {
+    return isSliderBehavior(behavior);
+  }
+
+  function currentSliderValues() {
+    return getSliderResolvedValues(behavior, session);
+  }
+
+  function currentSliderActiveHandle() {
+    return getSliderActiveHandle(behavior, session);
+  }
+
+  function currentSliderRoleValue(role = 'current') {
+    return currentSliderValues()?.[role] ?? currentSliderValues().current;
+  }
+
+  function sliderValueForPoint(event) {
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return currentSliderRoleValue(currentSliderActiveHandle());
+    const min = getRangeMin(behavior);
+    const max = getRangeMax(behavior);
+    const normalized = resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
+    return snapSliderValue(behavior, min + ((max - min) * normalized));
+  }
+
+  function pickNearestSliderHandle(event) {
+    const values = currentSliderValues();
+    const roles = getSliderValueMode(behavior) === 'range'
+      ? ['start', 'end']
+      : (getSliderValueMode(behavior) === 'band' ? ['start', 'current', 'end'] : ['current']);
+    const targetValue = sliderValueForPoint(event);
+    let nearestRole = currentSliderActiveHandle();
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const role of roles) {
+      const distance = Math.abs((values?.[role] ?? 0) - targetValue);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestRole = role;
+      }
+    }
+
+    return nearestRole;
+  }
+
+  function setSliderRoleValue(role = 'current', nextValue = 0, extraPatch = {}) {
+    const legal = getSliderLegalRangeForHandle(behavior, session, role);
+    const clamped = Math.max(legal.min, Math.min(legal.max, snapSliderValue(behavior, nextValue)));
+    patchSession({
+      activeHandle: role,
+      valueInputRole: role,
+      [`${role}ValueOverrideEnabled`]: true,
+      [`${role}ValueOverride`]: clamped,
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...extraPatch,
+    });
+  }
+
+  function resolveRadioGroupPreviewValue(clientX, clientY) {
+    if (String(behavior?.buttonType ?? '') !== 'radio') return '';
+
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return '';
+
+    const transformSection = control?._children?.Transform ?? null;
+    const contentLayout = control?._children?.ContentLayout ?? null;
+    const valueRows = getValueRows(control);
+    const layout = resolveRadioGroupLayout({
+      behavior,
+      valueRows,
+      width: transformSection?.width ?? rect.width,
+      height: transformSection?.height ?? rect.height,
+      paddingLeft: contentLayout?.paddingLeft ?? 0,
+      paddingRight: contentLayout?.paddingRight ?? 0,
+      paddingTop: contentLayout?.paddingTop ?? 0,
+      paddingBottom: contentLayout?.paddingBottom ?? 0,
+      gap: contentLayout?.gap ?? 8,
+    });
+
+    const localX = ((clientX - rect.left) / Math.max(rect.width, 1)) * (transformSection?.width ?? rect.width);
+    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
+    return resolveRadioGroupValueAtPoint(layout, localX, localY);
+  }
+
+  function commitSelectAction(nextValue = '') {
     const buttonType = String(behavior?.buttonType ?? '');
     const role = String(behavior?.role ?? '');
     const valueType = String(behavior?.valueType ?? '');
     const valueRows = getValueRows(control);
     if (role === 'radio') {
-      patchSession({ checked: true, mixed: false, valueOverrideEnabled: false });
+      const selectedValue = String(nextValue ?? '').trim();
+      const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === selectedValue)
+        ?? valueRows.find((row) => row?.selectedByDefault === true)
+        ?? valueRows[0]
+        ?? null;
+      if (!nextRow) return;
+      patchSession({
+        checked: false,
+        mixed: false,
+        valueOverrideEnabled: true,
+        valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+      });
       return;
     }
     if (buttonType === 'cyclic' && valueRows.length) {
@@ -179,11 +368,23 @@
   function clearRangeInput() {
     patchSession({
       valueInputActive: false,
+      valueInputRole: currentSliderActiveHandle(),
       valueInputBuffer: '',
     });
   }
 
   function beginRangeFieldEdit() {
+    if (isSliderControl()) {
+      patchSession({
+        focused: true,
+        hover: true,
+        valueInputActive: true,
+        valueInputRole: currentSliderActiveHandle(),
+        valueInputBuffer: getSliderDisplayValue(behavior, session),
+      });
+      return;
+    }
+
     patchSession({
       focused: true,
       hover: true,
@@ -193,6 +394,28 @@
   }
 
   function commitRangeFieldInput() {
+    if (isSliderControl()) {
+      const role = String(session?.valueInputRole ?? currentSliderActiveHandle()).trim().toLowerCase();
+      const rawValue = session?.valueInputActive === true
+        ? String(session?.valueInputBuffer ?? '')
+        : formatSliderNumericValue(behavior, currentSliderRoleValue(role));
+      const parsed = parseSliderInputValue(behavior, rawValue);
+
+      const nextPatch = {
+        valueInputActive: false,
+        valueInputRole: role,
+        valueInputBuffer: '',
+        ...(parsed === null ? {} : {
+          activeHandle: role,
+          [`${role}ValueOverrideEnabled`]: true,
+          [`${role}ValueOverride`]: parsed,
+        }),
+      };
+      patchSession(nextPatch);
+      if (parsed !== null) pulseCommitState();
+      return;
+    }
+
     const rawValue = session?.valueInputActive === true
       ? String(session?.valueInputBuffer ?? '')
       : resolveRangeDisplayValue(behavior, session);
@@ -206,11 +429,28 @@
         valueOverride: parsed,
       }),
     });
+    if (parsed !== null) pulseCommitState();
   }
 
   function handleRangeFieldInput(event) {
     event.stopPropagation();
     const rawValue = String(event?.currentTarget?.value ?? '');
+    if (isSliderControl()) {
+      const role = String(session?.valueInputRole ?? currentSliderActiveHandle()).trim().toLowerCase();
+      const parsed = parseSliderInputValue(behavior, rawValue);
+      patchSession({
+        valueInputActive: true,
+        valueInputRole: role,
+        valueInputBuffer: rawValue,
+        ...(parsed === null ? {} : {
+          activeHandle: role,
+          [`${role}ValueOverrideEnabled`]: true,
+          [`${role}ValueOverride`]: parsed,
+        }),
+      });
+      return;
+    }
+
     const parsed = parseRangeInputValue(behavior, rawValue);
     patchSession({
       valueInputActive: true,
@@ -270,6 +510,11 @@
 
   function updateSliderRangeFromPointer(event) {
     if (!isRangeControl()) return;
+    if (isSliderControl()) {
+      setSliderRoleValue(currentSliderActiveHandle(), sliderValueForPoint(event), { dragging: true });
+      return;
+    }
+
     const rect = hitboxElement?.getBoundingClientRect?.();
     if (!rect) return;
 
@@ -316,6 +561,35 @@
   function adjustRangeFromKey(key) {
     if (!isRangeControl()) return;
 
+    if (isSliderControl()) {
+      const role = currentSliderActiveHandle();
+      const legal = getSliderLegalRangeForHandle(behavior, session, role);
+      let nextValue = currentSliderRoleValue(role);
+
+      switch (key) {
+        case 'Home':
+          nextValue = legal.min;
+          break;
+        case 'End':
+          nextValue = legal.max;
+          break;
+        case 'ArrowLeft':
+        case 'ArrowDown':
+          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01));
+          break;
+        case 'ArrowRight':
+        case 'ArrowUp':
+          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01));
+          break;
+        default:
+          return;
+      }
+
+      setSliderRoleValue(role, nextValue);
+      pulseCommitState();
+      return;
+    }
+
     let nextValue = currentRangeValue();
 
     switch (key) {
@@ -338,9 +612,60 @@
     }
 
     setRangeValue(nextValue);
+    pulseCommitState();
   }
 
   function handleRangeTextInput(key) {
+    if (isSliderControl()) {
+      const role = String(session?.valueInputRole ?? currentSliderActiveHandle()).trim().toLowerCase();
+      const currentBuffer = session?.valueInputActive === true ? String(session?.valueInputBuffer ?? '') : '';
+
+      if (key === 'Escape') {
+        clearRangeInput();
+        return true;
+      }
+
+      if (key === 'Enter') {
+        const parsed = parseSliderInputValue(behavior, currentBuffer);
+        patchSession({
+          valueInputActive: false,
+          valueInputRole: role,
+          valueInputBuffer: '',
+          ...(parsed === null ? {} : {
+            activeHandle: role,
+            [`${role}ValueOverrideEnabled`]: true,
+            [`${role}ValueOverride`]: parsed,
+          }),
+        });
+        if (parsed !== null) pulseCommitState();
+        return true;
+      }
+
+      let nextBuffer = currentBuffer;
+      if (key === 'Backspace') {
+        nextBuffer = currentBuffer.slice(0, -1);
+      } else if (key === 'Delete') {
+        nextBuffer = '';
+      } else if (/^[0-9]$/.test(String(key ?? '')) || key === '.' || key === '-') {
+        nextBuffer = `${currentBuffer}${key}`;
+      } else {
+        return false;
+      }
+
+      const parsed = parseSliderInputValue(behavior, nextBuffer);
+      patchSession({
+        valueInputActive: true,
+        valueInputRole: role,
+        valueInputBuffer: nextBuffer,
+        ...(parsed === null ? {} : {
+          activeHandle: role,
+          [`${role}ValueOverrideEnabled`]: true,
+          [`${role}ValueOverride`]: parsed,
+        }),
+      });
+      return true;
+    }
+
     const currentBuffer = session?.valueInputActive === true ? String(session?.valueInputBuffer ?? '') : '';
 
     if (key === 'Escape') {
@@ -358,6 +683,7 @@
           valueOverride: parsed,
         }),
       });
+      if (parsed !== null) pulseCommitState();
       return true;
     }
 
@@ -389,10 +715,21 @@
 
     event.preventDefault();
     const direction = event.deltaY < 0 ? 1 : -1;
+    if (isSliderControl()) {
+      const role = currentSliderActiveHandle();
+      setSliderRoleValue(role, currentSliderRoleValue(role) + (direction * numberOr(behavior?.step, 0.01)), {
+        hover: true,
+        focused: true,
+      });
+      pulseCommitState();
+      return;
+    }
+
     setRangeValue(adjustRangeValue(behavior, currentRangeValue(), direction), {
       hover: true,
       focused: true,
     });
+    pulseCommitState();
   }
 
   function handlePointerEnter() {
@@ -416,16 +753,31 @@
     keyboardFocusActive = false;
     pointerActive = true;
     pointerDownPoint = { x: event.clientX, y: event.clientY };
-    pointerStartValue = currentRangeValue();
-    draggingRange = isRangeControl() && isSliderRangeBehavior(behavior);
+    pointerStartValue = isSliderControl() ? currentSliderRoleValue(currentSliderActiveHandle()) : currentRangeValue();
+    draggingRange = isRangeControl() && (isSliderControl() || isSliderRangeBehavior(behavior));
     pointerDownZone = isRangeControl()
       ? resolveRangeZone(behavior, hitboxElement?.getBoundingClientRect?.(), event.clientX, event.clientY)
       : '';
+
+    if (isSliderControl()) {
+      const clickMode = String(behavior?.trackClickMode ?? 'moveNearestHandle').trim().toLowerCase();
+      const nextHandle = clickMode === 'moveactivehandle'
+        ? currentSliderActiveHandle()
+        : pickNearestSliderHandle(event);
+      patchSession({
+        activeHandle: nextHandle,
+        valueInputRole: nextHandle,
+      });
+    }
+
     patchSession({
       hover: true,
       pressed: true,
       dragging: draggingRange,
     });
+    if (isTimedButtonBehavior(behavior)) {
+      timedButtonPreview.beginPress(control?._children?.Core?.id, behavior);
+    }
     if (draggingRange) {
       updateSliderRangeFromPointer(event);
     }
@@ -436,7 +788,7 @@
   function handleWindowPointerMove(event) {
     if (!pointerActive || isDisabled || !isRangeControl()) return;
 
-    if (isSliderRangeBehavior(behavior)) {
+    if (isSliderControl() || isSliderRangeBehavior(behavior)) {
       if (!draggingRange) return;
       updateSliderRangeFromPointer(event);
       return;
@@ -457,18 +809,24 @@
     const inside = isPointInsideHitbox(event.clientX, event.clientY);
 
     if (!draggingRange && inside && !isDisabled) {
-      if (isRangeControl() && !isSliderRangeBehavior(behavior)) {
+      if (isRangeControl() && !isSliderControl() && !isSliderRangeBehavior(behavior)) {
         handleRangePointerClick(event);
+      } else if (isTimedButtonBehavior(behavior)) {
+        timedButtonPreview.releasePress(control?._children?.Core?.id, behavior, { inside });
       } else if (String(behavior?.family ?? 'trigger') === 'select') {
-        commitSelectAction();
+        commitSelectAction(resolveRadioGroupPreviewValue(event.clientX, event.clientY));
       }
+    } else if (isTimedButtonBehavior(behavior)) {
+      timedButtonPreview.releasePress(control?._children?.Core?.id, behavior, { inside });
     }
 
     patchSession({
       hover: inside,
       pressed: false,
       dragging: false,
+      inputModality: 'pointer',
     });
+    if (draggingRange && isRangeControl()) pulseCommitState();
 
     pointerActive = false;
     draggingRange = false;
@@ -484,6 +842,9 @@
   }
 
   function handleBlur() {
+    if (isTimedButtonBehavior(behavior)) {
+      timedButtonPreview.cancel(control?._children?.Core?.id);
+    }
     keyboardFocusActive = false;
     patchSession({ focused: false, pressed: false, dragging: false, valueInputActive: false });
     pointerActive = false;
@@ -493,6 +854,7 @@
 
   function handleKeyDown(event) {
     if (isDisabled) return;
+    if (behavior?.keyboardEnabled === false) return;
     lastInputMode = 'keyboard';
     keyboardFocusActive = true;
 
@@ -507,8 +869,12 @@
 
     if (event.key === ' ' || event.key === 'Enter') {
       event.preventDefault();
+      if (event.repeat) return;
       hitboxElement?.focus?.();
       patchSession({ focused: true, pressed: true, hover: true });
+      if (isTimedButtonBehavior(behavior)) {
+        timedButtonPreview.beginPress(control?._children?.Core?.id, behavior);
+      }
       return;
     }
 
@@ -522,10 +888,13 @@
 
   function handleKeyUp(event) {
     if (isDisabled) return;
+    if (behavior?.keyboardEnabled === false) return;
     if (event.key !== ' ' && event.key !== 'Enter') return;
 
     event.preventDefault();
-    if (String(behavior?.family ?? 'trigger') === 'select') {
+    if (isTimedButtonBehavior(behavior)) {
+      timedButtonPreview.releasePress(control?._children?.Core?.id, behavior, { inside: true });
+    } else if (String(behavior?.family ?? 'trigger') === 'select') {
       commitSelectAction();
     }
     patchSession({ focused: true, hover: true, pressed: false });
@@ -554,10 +923,10 @@
           role={previewRole}
           aria-label="Interactive preview surface"
           aria-disabled={session?.disabled === true}
-          aria-valuenow={isRangeControl() ? currentRangeValue() : undefined}
-          aria-valuemin={isRangeControl() ? getRangeMin(behavior) : undefined}
-          aria-valuemax={isRangeControl() ? getRangeMax(behavior) : undefined}
-          aria-valuetext={isRangeControl() ? resolveRangeDisplayValue(behavior, session) : undefined}
+          aria-valuenow={previewAriaValueNow}
+          aria-valuemin={previewAriaValueMin}
+          aria-valuemax={previewAriaValueMax}
+          aria-valuetext={previewAriaValueText}
           tabindex={isDisabled ? undefined : 0}
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}

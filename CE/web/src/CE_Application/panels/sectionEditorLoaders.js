@@ -24,8 +24,10 @@ const LAZY_COMPONENT_LOADERS = {
   icon: () => import('../sections/IconEditor.svelte'),
   effects: () => import('../sections/EffectsEditor.svelte'),
   behavior: () => import('../sections/BehaviorEditor.svelte'),
+  slider: () => import('../sections/SliderEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),
   value: () => import('../sections/ValueEditor.svelte'),
+  segments: () => import('../sections/SegmentsEditor.svelte'),
   bindings: () => import('../sections/BindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
 };
