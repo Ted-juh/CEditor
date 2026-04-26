@@ -34,6 +34,21 @@
     scrubRangeValue,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
+  import {
+    getSliderActiveHandle,
+    getSliderLegalRangeForHandle,
+    getSliderResolvedValues,
+    getSliderValueMode,
+    isSliderBehavior,
+    snapSliderValue,
+  } from '../utils/sliderBehavior.js';
+  import {
+    resolveCircularPoint,
+    resolveCircularTrackMetrics,
+    resolveLinearPointerPoint,
+    resolveSliderNormalizedFromPoint,
+    sliderValueToAngle,
+  } from '../utils/sliderGeometry.js';
 
   let {
     panel,
@@ -54,6 +69,7 @@
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
   let pointerStartValue = $state(0);
+  let pointerSliderHandle = $state('');
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
 
@@ -108,6 +124,159 @@
 
   function currentRangeValue(control) {
     return getCurrentRangeValue(getBehavior(control), sessionFor(control));
+  }
+
+  function isSliderControl(control) {
+    return isSliderBehavior(getBehavior(control));
+  }
+
+  function currentSliderValues(control) {
+    return getSliderResolvedValues(getBehavior(control), sessionFor(control));
+  }
+
+  function currentSliderActiveHandle(control) {
+    return getSliderActiveHandle(getBehavior(control), sessionFor(control));
+  }
+
+  function currentSliderRoleValue(control, role = 'current') {
+    const values = currentSliderValues(control);
+    return values?.[role] ?? values?.current ?? currentRangeValue(control);
+  }
+
+  function sliderHandleRoles(control) {
+    const behavior = getBehavior(control);
+    return getSliderValueMode(behavior) === 'range'
+      ? ['start', 'end']
+      : (getSliderValueMode(behavior) === 'band' ? ['start', 'current', 'end'] : ['current']);
+  }
+
+  function sliderPreviewScale(control, rect = null) {
+    if (!rect) return 1;
+    const transform = control?._children?.Transform ?? null;
+    const widthScale = rect.width / Math.max(1, numberOr(transform?.width, rect.width));
+    const heightScale = rect.height / Math.max(1, numberOr(transform?.height, rect.height));
+    return Math.max(0.01, Math.min(widthScale || 1, heightScale || 1));
+  }
+
+  function sliderPartsFor(control) {
+    return control?._children?.Parts?._children ?? {};
+  }
+
+  function sliderTrackThickness(control) {
+    const trackLayout = sliderPartsFor(control)?.bodyTrackBase?._children?.Layout ?? null;
+    return Math.max(4, numberOr(trackLayout?.height, 10));
+  }
+
+  function sliderMajorTickLength(control) {
+    const behavior = getBehavior(control);
+    const tickLayout = sliderPartsFor(control)?.tickMajor?._children?.Layout ?? null;
+    return Math.max(0, numberOr(tickLayout?.height, numberOr(behavior?.majorTickLength, 12)));
+  }
+
+  function sliderPointerSize(control, role = 'current') {
+    const partName = role === 'start'
+      ? 'pointerStart'
+      : role === 'end'
+        ? 'pointerEnd'
+        : 'pointerCurrent';
+    const fallback = role === 'current' ? 20 : 18;
+    const pointerLayout = sliderPartsFor(control)?.[partName]?._children?.Layout ?? null;
+    return Math.max(8, numberOr(pointerLayout?.width, numberOr(pointerLayout?.height, fallback)));
+  }
+
+  function sliderHandlePoint(control, role = 'current', rect = null) {
+    if (!rect) return null;
+
+    const behavior = getBehavior(control);
+    const scaleFactor = sliderPreviewScale(control, rect);
+    const trackThickness = sliderTrackThickness(control) * scaleFactor;
+    const pointerSize = sliderPointerSize(control, role) * scaleFactor;
+    const showReadout = behavior?.showValueReadout !== false;
+    const min = getRangeMin(behavior);
+    const max = getRangeMax(behavior);
+    const span = max - min;
+    const normalized = span > 0
+      ? Math.max(0, Math.min(1, (currentSliderRoleValue(control, role) - min) / span))
+      : 0;
+
+    if (String(behavior?.geometry ?? 'linear').trim().toLowerCase() === 'circular') {
+      const maxPointerSize = Math.max(...sliderHandleRoles(control).map((handleRole) => sliderPointerSize(control, handleRole))) * scaleFactor;
+      const metrics = resolveCircularTrackMetrics(rect.width, rect.height, {
+        trackThickness,
+        pointerSize: maxPointerSize,
+        majorTickLength: sliderMajorTickLength(control) * scaleFactor,
+        hasReadout: showReadout,
+        circularDiameter: numberOr(behavior?.circularDiameter, 0) * scaleFactor,
+      });
+      return resolveCircularPoint(
+        rect.width,
+        rect.height,
+        sliderValueToAngle(behavior, currentSliderRoleValue(control, role)),
+        metrics.radius,
+        { x: metrics.centerX, y: metrics.centerY },
+      );
+    }
+
+    return resolveLinearPointerPoint(
+      behavior,
+      rect.width,
+      rect.height,
+      normalized,
+      trackThickness,
+      pointerSize,
+      showReadout,
+    );
+  }
+
+  function sliderValueForPoint(control, event) {
+    const rect = pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return currentSliderRoleValue(control, currentSliderActiveHandle(control));
+    const behavior = getBehavior(control);
+    const min = getRangeMin(behavior);
+    const max = getRangeMax(behavior);
+    const normalized = resolveSliderNormalizedFromPoint(behavior, rect, event.clientX, event.clientY);
+    return snapSliderValue(behavior, min + ((max - min) * normalized));
+  }
+
+  function pickNearestSliderHandle(control, event) {
+    const values = currentSliderValues(control);
+    const targetValue = sliderValueForPoint(control, event);
+    let nearestRole = currentSliderActiveHandle(control);
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const role of sliderHandleRoles(control)) {
+      const distance = Math.abs((values?.[role] ?? 0) - targetValue);
+      if (distance < nearestDistance) {
+        nearestDistance = distance;
+        nearestRole = role;
+      }
+    }
+
+    return nearestRole;
+  }
+
+  function pickDirectSliderHandle(control, event) {
+    const rect = pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return '';
+
+    const scaleFactor = sliderPreviewScale(control, rect);
+    const localX = event.clientX - rect.left;
+    const localY = event.clientY - rect.top;
+    let nearestRole = '';
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    for (const role of sliderHandleRoles(control)) {
+      const point = sliderHandlePoint(control, role, rect);
+      if (!point) continue;
+
+      const hitRadius = Math.max((sliderPointerSize(control, role) * scaleFactor) / 2, 12);
+      const distance = Math.hypot(localX - point.x, localY - point.y);
+      if (distance > hitRadius || distance >= nearestDistance) continue;
+      nearestDistance = distance;
+      nearestRole = role;
+    }
+
+    return nearestRole;
   }
 
   function resolveRadioGroupPreviewValue(control, clientX, clientY) {
@@ -241,10 +410,56 @@
     });
   }
 
+  function setSliderRoleValue(control, role = 'current', nextValue = 0, extraPatch = {}) {
+    if (!isSliderControl(control)) return;
+
+    const behavior = getBehavior(control);
+    const session = sessionFor(control);
+    const legal = getSliderLegalRangeForHandle(behavior, session, role);
+    const clamped = Math.max(legal.min, Math.min(legal.max, snapSliderValue(behavior, nextValue)));
+    patchControlSession(getControlId(control), {
+      activeHandle: role,
+      valueInputRole: role,
+      [`${role}ValueOverrideEnabled`]: true,
+      [`${role}ValueOverride`]: clamped,
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...extraPatch,
+    });
+  }
+
   function adjustRangeFromKey(control, key) {
     if (!isRangeControl(control)) return;
 
     const behavior = getBehavior(control);
+    if (isSliderControl(control)) {
+      const role = currentSliderActiveHandle(control);
+      const legal = getSliderLegalRangeForHandle(behavior, sessionFor(control), role);
+      let nextValue = currentSliderRoleValue(control, role);
+
+      switch (key) {
+        case 'Home':
+          nextValue = legal.min;
+          break;
+        case 'End':
+          nextValue = legal.max;
+          break;
+        case 'ArrowLeft':
+        case 'ArrowDown':
+          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01));
+          break;
+        case 'ArrowRight':
+        case 'ArrowUp':
+          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01));
+          break;
+        default:
+          return;
+      }
+
+      setSliderRoleValue(control, role, nextValue);
+      return;
+    }
+
     let nextValue = currentRangeValue(control);
 
     switch (key) {
@@ -315,8 +530,14 @@
     return true;
   }
 
-  function updateSliderRangeFromPointer(control, event) {
+  function updateSliderRangeFromPointer(control, event, roleOverride = '') {
     if (!isRangeControl(control)) return;
+    if (isSliderControl(control)) {
+      const role = String(roleOverride || pointerSliderHandle || currentSliderActiveHandle(control)).trim().toLowerCase();
+      setSliderRoleValue(control, role, sliderValueForPoint(control, event), { dragging: true });
+      return;
+    }
+
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return;
 
@@ -362,6 +583,15 @@
 
     event.preventDefault();
     const direction = event.deltaY < 0 ? 1 : -1;
+    if (isSliderControl(control)) {
+      const role = currentSliderActiveHandle(control);
+      setSliderRoleValue(control, role, currentSliderRoleValue(control, role) + (direction * numberOr(behavior?.step, 0.01)), {
+        hover: true,
+        focused: true,
+      });
+      return;
+    }
+
     setRangeValue(control, adjustRangeValue(behavior, currentRangeValue(control), direction), {
       hover: true,
       focused: true,
@@ -400,6 +630,7 @@
       pointerActiveElement = null;
       draggingRange = false;
       pointerDownZone = '';
+      pointerSliderHandle = '';
       removeWindowListeners();
     }
 
@@ -444,13 +675,32 @@
     pointerActiveElement = event.currentTarget;
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerDownZone = '';
-    pointerStartValue = currentRangeValue(control);
+    pointerSliderHandle = '';
+    pointerStartValue = isSliderControl(control)
+      ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
+      : currentRangeValue(control);
     draggingRange = isRangeControl(control) && isSliderRangeBehavior(getBehavior(control));
     setPreviewInspectedControlId(pointerActiveControlId);
 
     if (isRangeControl(control)) {
       const rect = pointerActiveElement?.getBoundingClientRect?.();
       pointerDownZone = resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
+    }
+
+    let nextSliderHandle = '';
+    if (isSliderControl(control)) {
+      const directHandle = pickDirectSliderHandle(control, event);
+      const clickMode = String(getBehavior(control)?.trackClickMode ?? 'moveNearestHandle').trim().toLowerCase();
+      nextSliderHandle = directHandle || (
+        clickMode === 'moveactivehandle'
+          ? currentSliderActiveHandle(control)
+          : pickNearestSliderHandle(control, event)
+      );
+      pointerSliderHandle = nextSliderHandle;
+      patchControlSession(pointerActiveControlId, {
+        activeHandle: nextSliderHandle,
+        valueInputRole: nextSliderHandle,
+      });
     }
 
     patchControlSession(pointerActiveControlId, {
@@ -464,7 +714,7 @@
     }
 
     if (draggingRange) {
-      updateSliderRangeFromPointer(control, event);
+      updateSliderRangeFromPointer(control, event, nextSliderHandle);
     }
 
     window.addEventListener('pointermove', handleWindowPointerMove);
@@ -479,7 +729,7 @@
     if (!isRangeControl(activeControl)) return;
     if (isSliderRangeBehavior(getBehavior(activeControl))) {
       if (!draggingRange) return;
-      updateSliderRangeFromPointer(activeControl, event);
+      updateSliderRangeFromPointer(activeControl, event, pointerSliderHandle);
       return;
     }
 
@@ -525,6 +775,7 @@
     pointerActiveElement = null;
     draggingRange = false;
     pointerDownZone = '';
+    pointerSliderHandle = '';
     removeWindowListeners();
   }
 
@@ -559,6 +810,7 @@
       pointerActiveControlId = '';
       pointerActiveElement = null;
       draggingRange = false;
+      pointerSliderHandle = '';
       removeWindowListeners();
     }
   }

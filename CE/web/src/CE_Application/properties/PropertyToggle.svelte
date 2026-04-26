@@ -1,12 +1,17 @@
 <script>
-  let { value = false, onchange = null } = $props();
+  let {
+    value = false,
+    active = false,
+    onchange = null,
+    oncontextmenu = null,
+  } = $props();
 
   function toggle() {
     onchange?.(!value);
   }
 </script>
 
-<button class="property-toggle" class:on={value} onclick={toggle}>
+<button class="property-toggle" class:on={value} class:active onclick={toggle} oncontextmenu={oncontextmenu}>
   {value ? 'On' : 'Off'}
 </button>
 
@@ -29,6 +34,12 @@
     background: #094771;
     border-color: #0B6EB5;
     color: #DDD;
+  }
+
+  .property-toggle.active {
+    background: #5F4A12;
+    border-color: #D5A93A;
+    color: #FFE7A3;
   }
 
   .property-toggle:hover {

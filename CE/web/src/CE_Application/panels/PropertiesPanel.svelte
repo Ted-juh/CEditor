@@ -109,6 +109,7 @@
     { id: 'effects',    icon: Sparkles,      label: 'Effects',    section: 'Effects' },
     { id: 'behavior',   icon: Settings2,     label: 'Behavior',   section: 'Behavior' },
     { id: 'slider',     icon: SlidersHorizontal, label: 'Slider', section: 'Behavior', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
+    { id: 'label',      icon: Type,          label: 'Label',      section: 'Parts', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
     { id: 'states',     icon: Workflow,      label: 'States',     section: 'States' },
     { id: 'value',      icon: Link,          label: 'Value',      section: 'Value' },
     { id: 'segments',   icon: Rows3,         label: 'Segments',   section: 'Value', when: (control) => String(getSection(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio' },

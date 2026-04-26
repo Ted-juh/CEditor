@@ -20,22 +20,18 @@
   ];
 
   let selectedStyleTarget = $state('bodyTrackBase');
+  let labelPositionTarget = $state('');
+
+  const READOUT_POSITION_OPTIONS = [
+    { value: 'auto', label: 'auto' },
+    { value: 'top', label: 'top' },
+    { value: 'center', label: 'center' },
+    { value: 'bottom', label: 'bottom' },
+  ];
 
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function colorInputValue(argb = 'FFFFFFFF') {
-    const raw = String(argb ?? '').replace(/^#/, '').trim();
-    if (raw.length === 8) return `#${raw.slice(2)}`;
-    if (raw.length === 6) return `#${raw}`;
-    return '#ffffff';
-  }
-
-  function colorInputToArgb(value = '#FFFFFF') {
-    const raw = String(value ?? '#FFFFFF').replace(/^#/, '').trim();
-    return `FF${raw.padEnd(6, 'F').slice(0, 6).toUpperCase()}`;
   }
 
   function set(path, value) {
@@ -58,26 +54,52 @@
     }
   }
 
-  function setSharedLabelColour(colour) {
-    setPatch({
-      'Parts.labelMin.Text.Fill.colour': colour,
-      'Parts.labelMax.Text.Fill.colour': colour,
-      'Parts.labelStart.Text.Fill.colour': colour,
-      'Parts.labelCurrent.Text.Fill.colour': colour,
-      'Parts.labelEnd.Text.Fill.colour': colour,
-      'Parts.labelValue.Text.Fill.colour': colour,
-      'Parts.labelTitle.Text.Fill.colour': colour,
-      'Parts.labelUnit.Text.Fill.colour': colour,
-    });
-  }
-
   function regenerateSliderParts() {
     setPatch({
       Parts: createSliderSemanticParts(),
     });
   }
 
+  function midpoint(min, max) {
+    return min + ((max - min) * 0.5);
+  }
+
+  function showLabelPositionEditor(target, event) {
+    event?.preventDefault?.();
+    labelPositionTarget = labelPositionTarget === target ? '' : target;
+  }
+
+  function minMaxPositionOptions() {
+    if (geometry === 'circular') {
+      return [
+        { value: 'auto', label: 'auto' },
+        { value: 'outside', label: 'outside' },
+        { value: 'inside', label: 'inside' },
+        { value: 'center', label: 'center' },
+      ];
+    }
+
+    if (String(behavior?.orientation ?? 'horizontal') === 'vertical') {
+      return [
+        { value: 'auto', label: 'auto' },
+        { value: 'right', label: 'right' },
+        { value: 'left', label: 'left' },
+        { value: 'center', label: 'center' },
+      ];
+    }
+
+    return [
+      { value: 'auto', label: 'auto' },
+      { value: 'below', label: 'below' },
+      { value: 'above', label: 'above' },
+      { value: 'center', label: 'center' },
+    ];
+  }
+
   function applyPreset(preset) {
+    const min = preset.bipolar === true ? -1 : numberOr(behavior?.min, 0);
+    const max = preset.bipolar === true ? 1 : numberOr(behavior?.max, 1);
+    const center = preset.bipolar === true ? 0 : midpoint(min, max);
     const basePatch = {
       'Behavior.geometry': preset.geometry,
       'Behavior.valueMode': preset.valueMode,
@@ -85,14 +107,23 @@
       'Behavior.direction': preset.direction,
       'Behavior.startAngle': preset.startAngle ?? 135,
       'Behavior.sweepAngle': preset.sweepAngle ?? 270,
+      'Behavior.circularDiameter': preset.circularDiameter ?? 0,
       'Behavior.allowWrapAround': preset.allowWrapAround ?? false,
+      'Behavior.min': min,
+      'Behavior.max': max,
+      'Behavior.step': preset.bipolar === true ? 0.01 : numberOr(behavior?.step, 0.01),
+      'Behavior.precision': preset.bipolar === true ? 2 : numberOr(behavior?.precision, 2),
+      'Behavior.centerValue': center,
+      'Behavior.fillOrigin': preset.bipolar === true ? 'center' : 'min',
       'Behavior.showHandleLabels': preset.valueMode !== 'single',
       'Behavior.showValueReadout': true,
       'Behavior.showTicks': true,
       'Behavior.showMinMaxLabels': true,
-      'Behavior.defaultStartValue': numberOr(behavior?.min, 0) + ((numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0)) * 0.25),
-      'Behavior.defaultCurrentValue': numberOr(behavior?.min, 0) + ((numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0)) * 0.5),
-      'Behavior.defaultEndValue': numberOr(behavior?.min, 0) + ((numberOr(behavior?.max, 1) - numberOr(behavior?.min, 0)) * 0.75),
+      'Behavior.showCenterMarker': preset.bipolar === true,
+      'Behavior.showSign': preset.bipolar === true,
+      'Behavior.defaultStartValue': min + ((max - min) * 0.25),
+      'Behavior.defaultCurrentValue': preset.bipolar === true ? center : midpoint(min, max),
+      'Behavior.defaultEndValue': min + ((max - min) * 0.75),
       Parts: createSliderSemanticParts(),
       'Transform.width': preset.width,
       'Transform.height': preset.height,
@@ -104,7 +135,6 @@
   let parts = $derived(getSection(control, 'Parts'));
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
-  let labelColour = $derived(parts?._children?.labelValue?._children?.Text?._children?.Fill?.colour ?? 'FFF5F5F5');
   let selectedStyleTargetMeta = $derived(STYLE_TARGETS.find((target) => target.id === selectedStyleTarget) ?? STYLE_TARGETS[0]);
   let selectedStyleBackground = $derived(parts?._children?.[selectedStyleTargetMeta?.id]?._children?.Background ?? null);
 </script>
@@ -114,6 +144,7 @@
     <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts.">
       <div class="preset-grid">
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 220, height: 48 })}>Single</button>
+        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 240, height: 56, bipolar: true })}>Bipolar</button>
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'range', direction: 'ltr', width: 240, height: 56 })}>Range</button>
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'band', direction: 'ltr', width: 260, height: 64 })}>Band</button>
       </div>
@@ -121,6 +152,7 @@
     <PropertyCell label="Circular" span={4} hint="Circular presets keep the same slider family and just change geometry/value mode defaults.">
       <div class="preset-grid">
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 180, height: 180 })}>Single</button>
+        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200, bipolar: true })}>Bipolar</button>
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'range', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200 })}>Range</button>
         <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'band', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 220, height: 220 })}>Band</button>
       </div>
@@ -179,6 +211,9 @@
       <PropertyCell label="Sweep" span={2} hint="How much of the circle is active.">
         <NumberInput value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} onchange={(value) => set('Behavior.sweepAngle', value)} />
       </PropertyCell>
+      <PropertyCell label="Diameter" span={2} hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
+        <NumberInput value={behavior.circularDiameter ?? 0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
+      </PropertyCell>
     {/if}
   </PropertySection>
 
@@ -197,6 +232,12 @@
     </PropertyCell>
     <PropertyCell label="Center" span={1} hint="Optional center reference value for bipolar sliders and center markers.">
       <NumberInput value={behavior.centerValue ?? ((numberOr(behavior.min, 0) + numberOr(behavior.max, 1)) / 2)} step={numberOr(behavior.step, 0.01)} onchange={(value) => set('Behavior.centerValue', value)} />
+    </PropertyCell>
+    <PropertyCell label="Fill Origin" span={1} hint="Choose where single-value fill starts.">
+      <select class="val" value={behavior.fillOrigin ?? 'min'} onchange={(event) => set('Behavior.fillOrigin', event.target.value)}>
+        <option value="min">min</option>
+        <option value="center">center</option>
+      </select>
     </PropertyCell>
 
     {#if valueMode !== 'single'}
@@ -238,14 +279,61 @@
       <PropertyToggle value={behavior.showTicks !== false} onchange={() => set('Behavior.showTicks', !(behavior.showTicks !== false))} />
     </PropertyCell>
     <PropertyCell label="Min / Max" span={1} hint="Show generated min and max labels.">
-      <PropertyToggle value={behavior.showMinMaxLabels !== false} onchange={() => set('Behavior.showMinMaxLabels', !(behavior.showMinMaxLabels !== false))} />
+      <PropertyToggle
+        value={behavior.showMinMaxLabels !== false}
+        active={labelPositionTarget === 'minMax'}
+        onchange={() => set('Behavior.showMinMaxLabels', !(behavior.showMinMaxLabels !== false))}
+        oncontextmenu={(event) => showLabelPositionEditor('minMax', event)}
+      />
     </PropertyCell>
     <PropertyCell label="Handle Labels" span={1} hint="Show generated handle labels beside the active handles.">
       <PropertyToggle value={behavior.showHandleLabels === true} onchange={() => set('Behavior.showHandleLabels', !(behavior.showHandleLabels === true))} />
     </PropertyCell>
     <PropertyCell label="Readout" span={1} hint="Show the primary slider readout label.">
-      <PropertyToggle value={behavior.showValueReadout !== false} onchange={() => set('Behavior.showValueReadout', !(behavior.showValueReadout !== false))} />
+      <PropertyToggle
+        value={behavior.showValueReadout !== false}
+        active={labelPositionTarget === 'readout'}
+        onchange={() => set('Behavior.showValueReadout', !(behavior.showValueReadout !== false))}
+        oncontextmenu={(event) => showLabelPositionEditor('readout', event)}
+      />
     </PropertyCell>
+
+    {#if labelPositionTarget === 'minMax'}
+      <PropertyCell label="MinMax Pos" span={1} hint="Position for generated min and max labels.">
+        <select class="val" value={behavior.labelMinMaxPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelMinMaxPlacement', event.target.value)}>
+          {#each minMaxPositionOptions() as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Gap" span={1} hint="Distance from the track for generated min and max labels.">
+        <NumberInput value={behavior.labelMinMaxGap ?? 22} step={1} onchange={(value) => set('Behavior.labelMinMaxGap', value)} />
+      </PropertyCell>
+      <PropertyCell label="Offset X" span={1} hint="Horizontal offset for generated min and max labels.">
+        <NumberInput value={behavior.labelMinMaxOffsetX ?? 0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetX', value)} />
+      </PropertyCell>
+      <PropertyCell label="Offset Y" span={1} hint="Vertical offset for generated min and max labels.">
+        <NumberInput value={behavior.labelMinMaxOffsetY ?? 0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
+      </PropertyCell>
+    {:else if labelPositionTarget === 'readout'}
+      <PropertyCell label="Readout Pos" span={1} hint="Position for the generated value readout.">
+        <select class="val" value={behavior.labelReadoutPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelReadoutPlacement', event.target.value)}>
+          {#each READOUT_POSITION_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Gap" span={1} hint="Distance from the component edge for top or bottom readout placement.">
+        <NumberInput value={behavior.labelReadoutGap ?? 14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
+      </PropertyCell>
+      <PropertyCell label="Offset X" span={1} hint="Horizontal offset for the generated value readout.">
+        <NumberInput value={behavior.labelReadoutOffsetX ?? 0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetX', value)} />
+      </PropertyCell>
+      <PropertyCell label="Offset Y" span={1} hint="Vertical offset for the generated value readout.">
+        <NumberInput value={behavior.labelReadoutOffsetY ?? 0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetY', value)} />
+      </PropertyCell>
+    {/if}
+
     <PropertyCell label="Center Mark" span={1} hint="Show a generated center marker using the authored center value.">
       <PropertyToggle value={behavior.showCenterMarker === true} onchange={() => set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true))} />
     </PropertyCell>
@@ -317,9 +405,6 @@
       </div>
     </PropertyCell>
 
-    <PropertyCell label="Labels" span={1} hint="Shared generated label colour.">
-      <input class="color-input" type="color" value={colorInputValue(labelColour)} onchange={(event) => setSharedLabelColour(colorInputToArgb(event.target.value))} />
-    </PropertyCell>
     <PropertyCell label="Track Size" span={1} hint="Thickness used by the ready-made slider body.">
       <NumberInput value={parts?._children?.bodyTrackBase?._children?.Layout?.height ?? 10} step={1} min={2} onchange={(value) => setPatch({
         'Parts.bodyTrackBase.Layout.height': value,
@@ -344,6 +429,7 @@
     <PropertyCell label="Tick Minor" span={1} hint="Generated minor tick length.">
       <NumberInput value={parts?._children?.tickMinor?._children?.Layout?.height ?? 7} step={1} min={1} onchange={(value) => set('Parts.tickMinor.Layout.height', value)} />
     </PropertyCell>
+
   </PropertySection>
 
   {#if selectedStyleBackground}
@@ -379,7 +465,7 @@
 
   .preset-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
   }
@@ -433,12 +519,4 @@
     color: #FFFFFF;
   }
 
-  .color-input {
-    width: 100%;
-    height: 30px;
-    padding: 0;
-    border: 1px solid #333;
-    border-radius: 4px;
-    background: #141414;
-  }
 </style>

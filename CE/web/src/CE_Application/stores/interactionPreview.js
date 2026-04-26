@@ -267,7 +267,7 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
     return;
   }
 
-  if (role === 'radio') {
+  if (buttonType === 'radio' || role === 'radio') {
     const valueRows = getEnabledValueRows(control);
     const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === requestedValue)
       ?? valueRows.find((row) => row?.selectedByDefault === true)

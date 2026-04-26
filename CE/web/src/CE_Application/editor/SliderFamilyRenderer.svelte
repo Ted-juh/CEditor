@@ -109,9 +109,53 @@
     return transition ? `transition: all ${transition};` : '';
   }
 
+  function textTransformForCase(caseMode) {
+    const value = String(caseMode ?? 'normal').trim().toLowerCase();
+    if (value === 'uppercase') return 'uppercase';
+    if (value === 'lowercase') return 'lowercase';
+    if (value === 'smallcaps') return 'none';
+    return 'none';
+  }
+
+  function textDecorationForFont(font) {
+    const lines = [];
+    if (font?.underline === true) lines.push('underline');
+    if (font?.strikethrough === true) lines.push('line-through');
+    if (font?.overline === true) lines.push('overline');
+    return lines.length ? lines.join(' ') : 'none';
+  }
+
+  function buildLabelShadow(textEffects, fallbackColour) {
+    const shadows = [];
+    if (textEffects?.shadowEnabled === true && String(textEffects?.shadowStyle ?? 'soft') === 'soft') {
+      shadows.push([
+        `${numberOr(textEffects?.shadowOffsetX, 1)}px`,
+        `${numberOr(textEffects?.shadowOffsetY, 1)}px`,
+        `${Math.max(0, numberOr(textEffects?.shadowBlur, 2))}px`,
+        argbToCss(textEffects?.shadowColour, 'rgba(0,0,0,0.5)'),
+      ].join(' '));
+    }
+    if (textEffects?.glowEnabled === true) {
+      shadows.push([
+        '0',
+        '0',
+        `${Math.max(0, numberOr(textEffects?.glowSize, 4))}px`,
+        argbToCss(textEffects?.glowColour, argbToCss(fallbackColour, '#FFFFFF')),
+      ].join(' '));
+    }
+    return shadows.join(', ');
+  }
+
+  function buildLabelFilter(textEffects) {
+    if (textEffects?.blurEnabled === true) {
+      return `blur(${Math.max(0, numberOr(textEffects?.blurAmount, 1))}px)`;
+    }
+    return '';
+  }
+
   function highlightStop(stop, mode, startValue, currentValue, endValue) {
     if (mode === 'single') {
-      return stop <= currentValue;
+      return stop >= Math.min(startValue, currentValue) && stop <= Math.max(startValue, currentValue);
     }
 
     if (startValue <= endValue) {
@@ -125,6 +169,9 @@
     const text = part?._children?.Text ?? null;
     const fill = text?._children?.Fill ?? null;
     const font = text?._children?.Font ?? null;
+    const effects = text?._children?.Effects ?? null;
+    const shadow = buildLabelShadow(effects, fill?.colour ?? 'FFFFFFFF');
+    const filter = buildLabelFilter(effects);
     return [
       `left:${numberOr(anchor?.x, 0)}px`,
       `top:${numberOr(anchor?.y, 0)}px`,
@@ -132,8 +179,27 @@
       `font-family:${JSON.stringify(font?.family ?? 'Arial')}`,
       `font-size:${numberOr(font?.size, 11)}px`,
       `font-weight:${numberOr(font?.weightValue, 600)}`,
+      `font-style:${String(font?.style ?? 'Normal').trim().toLowerCase() === 'italic' ? 'italic' : 'normal'}`,
+      `letter-spacing:${numberOr(font?.letterSpacing, 0)}px`,
+      `word-spacing:${numberOr(font?.wordSpacing, 0)}px`,
+      `text-transform:${textTransformForCase(font?.caseMode)}`,
+      `font-variant-caps:${String(font?.caseMode ?? '').trim().toLowerCase() === 'smallcaps' ? 'small-caps' : 'normal'}`,
+      `text-decoration-line:${textDecorationForFont(font)}`,
+      `text-decoration-thickness:${Math.max(1, numberOr(font?.underlineThickness, 1))}px`,
+      `text-shadow:${shadow || 'none'}`,
+      `filter:${filter || 'none'}`,
+      effects?.outlineEnabled === true ? `-webkit-text-stroke:${Math.max(0, numberOr(effects?.outlineThickness ?? effects?.outlineWidth, 1))}px ${argbToCss(effects?.outlineColour, '#000000')}` : '',
       `opacity:${numberOr(part?.opacity, 1)}`,
-    ].join(';');
+    ].filter(Boolean).join(';');
+  }
+
+  function labelFontSize(part, fallback = 11) {
+    return Math.max(1, numberOr(part?._children?.Text?._children?.Font?.size, fallback));
+  }
+
+  function labelContent(part, fallback = '') {
+    const authored = String(part?._children?.Text?.content ?? '').trim();
+    return authored || fallback;
   }
 
   let behavior = $derived(control?._children?.Behavior ?? null);
@@ -173,6 +239,13 @@
     end: parts?._children?.labelEnd ?? null,
     title: parts?._children?.labelTitle ?? null,
     value: parts?._children?.labelValue ?? null,
+    unit: parts?._children?.labelUnit ?? null,
+  });
+  let labelMetrics = $derived({
+    readoutSize: labelFontSize(labelParts.value, 12),
+    titleSize: labelFontSize(labelParts.title, 11),
+    minMaxSize: Math.max(labelFontSize(labelParts.min, 11), labelFontSize(labelParts.max, 11)),
+    handleSize: Math.max(labelFontSize(labelParts.start, 11), labelFontSize(labelParts.current, 11), labelFontSize(labelParts.end, 11)),
   });
   let trackThickness = $derived(numberOr(trackBasePart?._children?.Layout?.height, 10));
   let pointerCurrentSize = $derived(numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
@@ -193,12 +266,14 @@
     if (!(span > 0)) return 0.5;
     return clamp((numberOr(behavior?.centerValue, min) - min) / span, 0, 1);
   });
-  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout));
+  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout, labelMetrics));
   let circularMetrics = $derived(resolveCircularTrackMetrics(width, height, {
     trackThickness,
     pointerSize: maxPointerSize,
     majorTickLength,
     hasReadout: showReadout,
+    circularDiameter: behavior?.circularDiameter,
+    labelMetrics,
   }));
   let circularCenter = $derived({
     x: circularMetrics.centerX,
@@ -208,24 +283,31 @@
     trackThickness,
     pointerSize: maxPointerSize,
     hasReadout: showReadout,
+    labelMetrics,
   }));
   let tickStops = $derived(buildSliderTickStops(behavior));
   let readoutText = $derived(String(signals?.valueDisplay ?? formatSliderReadout(behavior, null)));
   let activeHandleLabel = $derived(String(signals?.activeHandle ?? 'current'));
-  let titleText = $derived(String(control?._children?.Text?.content ?? '').trim());
+  let titleText = $derived(String(labelParts.title?._children?.Text?.content ?? control?._children?.Text?.content ?? '').trim());
   let sliderMaskSeed = $derived(safeSvgId(control?._children?.Core?.id ?? 'slider'));
-  let selectionStart = $derived(valueMode === 'single' ? 0 : normalizedValues.start);
+  let singleFillOrigin = $derived(String(behavior?.fillOrigin ?? 'min').trim().toLowerCase() === 'center' ? centerMarkerNormalized : 0);
+  let selectionStart = $derived(valueMode === 'single' ? singleFillOrigin : normalizedValues.start);
   let selectionEnd = $derived(valueMode === 'single' ? normalizedValues.current : normalizedValues.end);
   let circularStartAngle = $derived(sliderNormalizedToAngle(behavior, selectionStart));
   let circularEndAngle = $derived(sliderNormalizedToAngle(behavior, selectionEnd));
   let circularSelectionSweep = $derived(resolveCircularArcSweep(behavior, circularStartAngle, circularEndAngle));
+  let authoredCircularDirection = $derived(String(behavior?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw');
+  let singleFillDirection = $derived(normalizedValues.current >= selectionStart
+    ? authoredCircularDirection
+    : oppositeDirection(authoredCircularDirection));
+  let singleFillSweep = $derived(Math.abs(normalizedValues.current - selectionStart) * numberOr(behavior?.sweepAngle, 270));
   let trackPath = $derived.by(() => {
     if (geometry !== 'circular') return '';
     return describeArcPath(
       circularMetrics.radius,
       numberOr(behavior?.startAngle, 135),
       numberOr(behavior?.sweepAngle, 270),
-      String(behavior?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw',
+      authoredCircularDirection,
       circularCenter,
     );
   });
@@ -233,11 +315,11 @@
     if (geometry !== 'circular') return '';
     return describeArcPath(
       circularMetrics.radius,
-      numberOr(behavior?.startAngle, 135),
+      valueMode === 'single' ? circularStartAngle : numberOr(behavior?.startAngle, 135),
       valueMode === 'single'
-        ? resolveCircularArcSweep(behavior, circularStartAngle, sliderNormalizedToAngle(behavior, normalizedValues.current))
+        ? singleFillSweep
         : circularSelectionSweep,
-      String(behavior?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw',
+      valueMode === 'single' ? singleFillDirection : authoredCircularDirection,
       circularCenter,
     );
   });
@@ -257,7 +339,7 @@
       : role === 'end'
         ? pointerEndSize
         : pointerCurrentSize;
-    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size, showReadout);
+    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size, showReadout, labelMetrics);
   }
 
   function circularPointerPoint(role) {
@@ -270,7 +352,7 @@
   }
 
   function linearTickLine(normalized, length) {
-    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize, showReadout);
+    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize, showReadout, labelMetrics);
     const placement = String(behavior?.tickPlacement ?? 'outside').trim().toLowerCase();
 
     if (orientation === 'vertical') {
@@ -359,7 +441,7 @@
       };
     }
 
-    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize, showReadout);
+    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize, showReadout, labelMetrics);
     if (orientation === 'vertical') {
       return {
         x1: point.x - (centerMarkerLength / 2),
@@ -379,6 +461,10 @@
 
   function pointerStyleFor(partName) {
     return buildTransitionStyle(partTransitions?.get?.(partName) ?? null);
+  }
+
+  function oppositeDirection(direction) {
+    return direction === 'ccw' ? 'cw' : 'ccw';
   }
 </script>
 
@@ -417,14 +503,15 @@
         />
       {/if}
       {#if valueMode === 'single'}
+        {@const fillStartPoint = resolveLinearPointerPoint(behavior, width, height, selectionStart, trackThickness, pointerCurrentSize, showReadout, labelMetrics)}
         {@const currentPoint = linearPointerPoint('current')}
         <SliderShapeFill
           background={trackFillPart?._children?.Background ?? null}
-          bounds={lineBounds(lineFrame.x1, lineFrame.y1, currentPoint.x, currentPoint.y, trackThickness)}
+          bounds={lineBounds(fillStartPoint.x, fillStartPoint.y, currentPoint.x, currentPoint.y, trackThickness)}
           shape={{
             kind: 'line',
-            x1: lineFrame.x1,
-            y1: lineFrame.y1,
+            x1: fillStartPoint.x,
+            y1: fillStartPoint.y,
             x2: currentPoint.x,
             y2: currentPoint.y,
             strokeWidth: trackThickness,
@@ -512,27 +599,29 @@
         />
       {/if}
 
-      {@const currentPointerPoint = linearPointerPoint('current')}
-      <SliderShapeFill
-        background={pointerCurrentPart?._children?.Background ?? null}
-        bounds={circleBounds(currentPointerPoint.x, currentPointerPoint.y, pointerCurrentSize / 2)}
-        shape={{ kind: 'circle', cx: currentPointerPoint.x, cy: currentPointerPoint.y, r: pointerCurrentSize / 2 }}
-        maskId={maskIdFor('pointerCurrent')}
-        svgWidth={width}
-        svgHeight={height}
-        opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-        style={pointerStyleFor('pointerCurrent')}
-      />
-      <circle
-        cx={currentPointerPoint.x}
-        cy={currentPointerPoint.y}
-        r={pointerCurrentSize / 2}
-        fill="none"
-        stroke={partBorderColour(pointerCurrentPart, '#333333')}
-        stroke-width={partBorderWidth(pointerCurrentPart, 1)}
-        opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-        style={pointerStyleFor('pointerCurrent')}
-      />
+      {#if valueMode === 'single' || valueMode === 'band'}
+        {@const currentPointerPoint = linearPointerPoint('current')}
+        <SliderShapeFill
+          background={pointerCurrentPart?._children?.Background ?? null}
+          bounds={circleBounds(currentPointerPoint.x, currentPointerPoint.y, pointerCurrentSize / 2)}
+          shape={{ kind: 'circle', cx: currentPointerPoint.x, cy: currentPointerPoint.y, r: pointerCurrentSize / 2 }}
+          maskId={maskIdFor('pointerCurrent')}
+          svgWidth={width}
+          svgHeight={height}
+          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+          style={pointerStyleFor('pointerCurrent')}
+        />
+        <circle
+          cx={currentPointerPoint.x}
+          cy={currentPointerPoint.y}
+          r={pointerCurrentSize / 2}
+          fill="none"
+          stroke={partBorderColour(pointerCurrentPart, '#333333')}
+          stroke-width={partBorderWidth(pointerCurrentPart, 1)}
+          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+          style={pointerStyleFor('pointerCurrent')}
+        />
+      {/if}
 
       {#if valueMode !== 'single'}
         {@const endPoint = linearPointerPoint('end')}
@@ -679,27 +768,29 @@
         />
       {/if}
 
-      {@const currentCircularPoint = circularPointerPoint('current')}
-      <SliderShapeFill
-        background={pointerCurrentPart?._children?.Background ?? null}
-        bounds={circleBounds(currentCircularPoint.x, currentCircularPoint.y, pointerCurrentSize / 2)}
-        shape={{ kind: 'circle', cx: currentCircularPoint.x, cy: currentCircularPoint.y, r: pointerCurrentSize / 2 }}
-        maskId={maskIdFor('pointerCurrentCircle')}
-        svgWidth={width}
-        svgHeight={height}
-        opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-        style={pointerStyleFor('pointerCurrent')}
-      />
-      <circle
-        cx={currentCircularPoint.x}
-        cy={currentCircularPoint.y}
-        r={pointerCurrentSize / 2}
-        fill="none"
-        stroke={partBorderColour(pointerCurrentPart, '#333333')}
-        stroke-width={partBorderWidth(pointerCurrentPart, 1)}
-        opacity={numberOr(pointerCurrentPart?.opacity, 1)}
-        style={pointerStyleFor('pointerCurrent')}
-      />
+      {#if valueMode === 'single' || valueMode === 'band'}
+        {@const currentCircularPoint = circularPointerPoint('current')}
+        <SliderShapeFill
+          background={pointerCurrentPart?._children?.Background ?? null}
+          bounds={circleBounds(currentCircularPoint.x, currentCircularPoint.y, pointerCurrentSize / 2)}
+          shape={{ kind: 'circle', cx: currentCircularPoint.x, cy: currentCircularPoint.y, r: pointerCurrentSize / 2 }}
+          maskId={maskIdFor('pointerCurrentCircle')}
+          svgWidth={width}
+          svgHeight={height}
+          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+          style={pointerStyleFor('pointerCurrent')}
+        />
+        <circle
+          cx={currentCircularPoint.x}
+          cy={currentCircularPoint.y}
+          r={pointerCurrentSize / 2}
+          fill="none"
+          stroke={partBorderColour(pointerCurrentPart, '#333333')}
+          stroke-width={partBorderWidth(pointerCurrentPart, 1)}
+          opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+          style={pointerStyleFor('pointerCurrent')}
+        />
+      {/if}
 
       {#if valueMode !== 'single'}
         {@const endPoint = circularPointerPoint('end')}
@@ -729,7 +820,7 @@
 
   {#if showReadout}
     <div class="slider-label slider-readout" style={labelStyle(labelParts.value, labelAnchors.value)}>
-      {readoutText}
+      {labelContent(labelParts.value, readoutText)}
     </div>
   {/if}
 
@@ -741,28 +832,28 @@
 
   {#if showMinMaxLabels}
     <div class="slider-label" style={labelStyle(labelParts.min, labelAnchors.min)}>
-      {formatSliderNumericValue(behavior, numberOr(behavior?.min, 0))}
+      {labelContent(labelParts.min, formatSliderNumericValue(behavior, numberOr(behavior?.min, 0)))}
     </div>
     <div class="slider-label" style={labelStyle(labelParts.max, labelAnchors.max)}>
-      {formatSliderNumericValue(behavior, numberOr(behavior?.max, 1))}
+      {labelContent(labelParts.max, formatSliderNumericValue(behavior, numberOr(behavior?.max, 1)))}
     </div>
   {/if}
 
   {#if showHandleLabels && valueMode !== 'single'}
     <div class="slider-label" style={labelStyle(labelParts.start, labelAnchors.start)}>
-      {formatSliderNumericValue(behavior, rawValues.start)}
+      {labelContent(labelParts.start, formatSliderNumericValue(behavior, rawValues.start))}
     </div>
     {#if valueMode === 'band'}
       <div class="slider-label" style={labelStyle(labelParts.current, labelAnchors.current)}>
-        {formatSliderNumericValue(behavior, rawValues.current)}
+        {labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current))}
       </div>
     {/if}
     <div class="slider-label" style={labelStyle(labelParts.end, labelAnchors.end)}>
-      {formatSliderNumericValue(behavior, rawValues.end)}
+      {labelContent(labelParts.end, formatSliderNumericValue(behavior, rawValues.end))}
     </div>
   {:else if showHandleLabels}
     <div class="slider-label" style={labelStyle(labelParts.current, labelAnchors.current)}>
-      {formatSliderNumericValue(behavior, rawValues.current)}
+      {labelContent(labelParts.current, formatSliderNumericValue(behavior, rawValues.current))}
     </div>
   {/if}
 

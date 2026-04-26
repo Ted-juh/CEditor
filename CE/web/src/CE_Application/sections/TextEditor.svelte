@@ -27,11 +27,16 @@
     TYPOGRAPHY_FEATURE_OPTIONS,
   } from './textEditorOptions.js';
 
-  let { control = null } = $props();
+  let {
+    control = null,
+    textPathPrefix = 'Text',
+    textOverride = null,
+    editorScope = 'component-text',
+  } = $props();
 
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
-  let text = $derived(getSection(control, 'Text'));
+  let text = $derived(textOverride ?? getSection(control, 'Text'));
   let textFill = $derived(text?._children?.Fill ?? null);
   let font = $derived(text?._children?.Font ?? null);
   let multiline = $derived(text?._children?.Multiline ?? null);
@@ -67,7 +72,7 @@
   let selectedFontFeatureSupportKnown = $derived(selectedFontOption?.featureSupportKnown === true);
   let editScope = $derived($stateEditScope);
   let fontEditorRenderKey = $derived(
-    `${core?.id ?? 'global'}:${editScope?.mode ?? 'base'}:${editScope?.stateName ?? ''}:${font?.family ?? 'Arial'}:${font?.weightValue ?? font?.weight ?? 400}:${font?.style ?? 'Normal'}`
+    `${core?.id ?? 'global'}:${textPathPrefix}:${editScope?.mode ?? 'base'}:${editScope?.stateName ?? ''}:${font?.family ?? 'Arial'}:${font?.weightValue ?? font?.weight ?? 400}:${font?.style ?? 'Normal'}`
   );
   let textReadingOrientationValue = $derived.by(() => {
     const value = String(position?.readingOrientation ?? 'ltr');
@@ -79,11 +84,11 @@
   });
   let textFlowAngleValue = $derived(resolveFlowAngle(position));
   function sectionKey(name) {
-    return `component-text:${core?.id ?? 'global'}:${name}`;
+    return `${editorScope}:${core?.id ?? 'global'}:${textPathPrefix}:${name}`;
   }
 
   function fillLayerCollapseKey(layerId) {
-    return `component-text:${core?.id ?? 'global'}:fill-layer:${layerId}`;
+    return `${editorScope}:${core?.id ?? 'global'}:${textPathPrefix}:fill-layer:${layerId}`;
   }
 
   let textSectionCollapsed = $derived($sectionCollapse[sectionKey('text')] ?? false);
@@ -130,11 +135,24 @@
 
   function set(path, value) {
     if (!core?.id) return;
+    const scoped = scopeTextPath(path);
     if ($selectedComponentIds.size > 1) {
-      updateSelectedProperty(path, value);
+      updateSelectedProperty(scoped, value);
     } else {
-      updateControlProperty(core.id, path, value);
+      updateControlProperty(core.id, scoped, value);
     }
+  }
+
+  function scopeTextPath(path) {
+    const raw = String(path ?? '');
+    if (textPathPrefix === 'Text') return raw;
+    if (raw === 'Text') return textPathPrefix;
+    if (raw.startsWith('Text.')) return `${textPathPrefix}${raw.slice('Text'.length)}`;
+    return raw;
+  }
+
+  function textFillAssetRequestId(kind) {
+    return `componentTextFill:${core?.id ?? 'global'}:${textPathPrefix}:${kind}`;
   }
 
   function fillProp(name, fallback) {
@@ -159,7 +177,7 @@
   function handleFillColorSwatch() {
     if (!core?.id) return;
     activateColorTarget(
-      { type: 'control', controlId: core.id, path: 'Text.Fill.colour' },
+      { type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.colour') },
       String(textFill?.colour ?? 'FFFFFFFF')
     );
   }
@@ -175,14 +193,14 @@
     if (!core?.id || $selectedComponentIds.size > 1) return;
     const currentGradient = ensureTextGradient();
     activateGradientTarget(
-      { type: 'control', controlId: core.id, path: 'Text.Fill' },
+      { type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill') },
       currentGradient
     );
   }
 
   function chooseTextFillAsset(kind) {
     if (!core?.id || $selectedComponentIds.size > 1) return;
-    browseImage(`componentTextFill:${core.id}:${kind}`);
+    browseImage(textFillAssetRequestId(kind));
   }
 
   function setTextFillMode(mode) {
@@ -203,11 +221,11 @@
 
   onImageBrowsed((result) => {
     if (!core?.id) return;
-    if (result.requestId === `componentTextFill:${core.id}:image`) {
+    if (result.requestId === textFillAssetRequestId('image')) {
       set('Text.Fill.imageSrc', result.filePath);
       set('Text.Fill.imageEnabled', true);
       set('Text.Fill.mode', 'image');
-    } else if (result.requestId === `componentTextFill:${core.id}:texture`) {
+    } else if (result.requestId === textFillAssetRequestId('texture')) {
       set('Text.Fill.textureSrc', result.filePath);
       set('Text.Fill.textureEnabled', true);
       set('Text.Fill.mode', 'texture');
@@ -1176,7 +1194,7 @@
             <PropertyColor
               value={String(fillProp('imageTint', 'FFFFFFFF'))}
               onchange={(value) => setTextFillTint('Text.Fill.imageTint', value)}
-              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: 'Text.Fill.imageTint' }, String(fillProp('imageTint', 'FFFFFFFF')))}
+              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.imageTint') }, String(fillProp('imageTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
           <PropertyCell label="Fill Order" span={1} hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">
@@ -1218,7 +1236,7 @@
             <PropertyColor
               value={String(fillProp('textureTint', 'FFFFFFFF'))}
               onchange={(value) => setTextFillTint('Text.Fill.textureTint', value)}
-              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: 'Text.Fill.textureTint' }, String(fillProp('textureTint', 'FFFFFFFF')))}
+              onswatchclick={() => activateColorTarget({ type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill.textureTint') }, String(fillProp('textureTint', 'FFFFFFFF')))}
             />
           </PropertyCell>
           <PropertyCell label="Fill Order" span={1} hint="Draw order of the main text fill layer. Lower draws earlier, higher draws later.">

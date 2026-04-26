@@ -40,6 +40,10 @@ function findRowByInternalValue(rows = [], value) {
     ?? null;
 }
 
+function isRadioGroupControl(control) {
+  return String(getNodeChild(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio';
+}
+
 function normalizeKey(value) {
   return String(value ?? '').trim().toLowerCase();
 }
@@ -252,9 +256,11 @@ function applyPatchMap(target, patchMap = {}) {
   }
 }
 
-function applyStatePatches(control, state) {
+function applyStatePatches(control, state, { skipComponentPatch = false } = {}) {
   const patches = state?.patches ?? {};
-  applyPatchMap(control, patches.component);
+  if (!skipComponentPatch) {
+    applyPatchMap(control, patches.component);
+  }
   const partsSection = getNodeChild(control, 'Parts');
   for (const [partName, patchMap] of Object.entries(patches.parts ?? {})) {
     const partNode = partsSection?._children?.[partName];
@@ -270,7 +276,7 @@ export function resolveStateScopedControl(control, stateName = '') {
   if (!state) return control;
 
   const resolved = deepClone(control);
-  applyStatePatches(resolved, state);
+  applyStatePatches(resolved, state, { skipComponentPatch: isRadioGroupControl(control) });
   const resolvedValue = getNodeChild(resolved, 'Value');
   if (resolvedValue) {
     resolvedValue.__segmentPreviewState = stateName;
@@ -592,8 +598,9 @@ export function resolveInteractiveControl(control, previewSession = {}) {
         return safeLeft - safeRight;
       });
 
+  const skipRootComponentStatePatches = isRadioGroupControl(control);
   for (const [, state] of activeStates) {
-    applyStatePatches(resolved, state);
+    applyStatePatches(resolved, state, { skipComponentPatch: skipRootComponentStatePatches });
   }
 
   const transitions = buildTransitionCatalog(resolved, previewSession);

@@ -3548,6 +3548,11 @@
       )
       : []
   );
+  let radioGroupEditTargetSegmentIds = $derived(
+    $segmentEditScope?.mode === 'segments'
+      ? normalizeSegmentTargetIds(sourceValueSection, $segmentEditScope.segmentIds ?? [])
+      : []
+  );
   let radioGroupActiveStateNames = $derived.by(() => {
     if (!isRadioGroupControl) return [];
     if (Array.isArray(interactionRuntime?.activeStates) && interactionRuntime.activeStates.length > 0) {
@@ -3609,8 +3614,10 @@
 
     return radioGroupLayout.items.map((entry, index) => {
       const row = entry.row;
+      const rowId = String(row?.id ?? `row_${index + 1}`);
       const internalKey = String(row?.internalValue ?? row?.id ?? `item_${index + 1}`);
-      const selected = radioGroupSelectedKeys.has(internalKey);
+      const selected = radioGroupSelectedKeys.has(internalKey) || radioGroupSelectedKeys.has(rowId);
+      const editTarget = radioGroupEditTargetSegmentIds.includes(rowId);
       const resolvedStyle = resolveRadioSegmentStyle({
         row,
         behavior: sourceBehavior,
@@ -3628,9 +3635,10 @@
         && (resolvedStyle?.indicatorInner?.selectedOnly !== true || selected);
 
       return {
-        id: row?.id ?? `row_${index + 1}`,
+        id: rowId,
         label: String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`),
         selected,
+        editTarget,
         shellBackground: buildRadioWholeBackground(resolvedStyle?.whole),
         shellWidth: Math.max(0, numberOr(entry?.width, 0)),
         shellHeight: Math.max(0, numberOr(entry?.height, 0)),
@@ -3825,6 +3833,7 @@
           <div
             class="radio-group-item"
             class:selected={item.selected}
+            class:edit-target={item.editTarget}
             class:segmented={radioGroupVisualStyle === 'segmented'}
             class:tab={radioGroupVisualStyle === 'tab'}
           >
@@ -3843,6 +3852,9 @@
               {/if}
               <span class="radio-group-label" style={item.labelStyle}>{item.label}</span>
             </div>
+            {#if item.editTarget}
+              <div class="radio-edit-target-badge">Editing</div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -5132,6 +5144,19 @@
     overflow: hidden;
   }
 
+  .radio-group-item.edit-target::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 2px solid rgba(46, 139, 87, 0.95);
+    border-radius: 8px;
+    box-shadow:
+      0 0 0 1px rgba(0, 0, 0, 0.55),
+      0 0 10px rgba(46, 139, 87, 0.45);
+    pointer-events: none;
+    z-index: 6;
+  }
+
   .radio-group-item-shell {
     position: absolute;
     inset: 0;
@@ -5179,6 +5204,23 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     line-height: 1.1;
+  }
+
+  .radio-edit-target-badge {
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    z-index: 7;
+    border-radius: 999px;
+    padding: 2px 5px;
+    background: rgba(14, 63, 42, 0.92);
+    border: 1px solid rgba(46, 139, 87, 0.95);
+    color: #FFF;
+    font-size: 8px;
+    font-weight: 700;
+    line-height: 1;
+    text-transform: uppercase;
+    pointer-events: none;
   }
 
   .icon-content {

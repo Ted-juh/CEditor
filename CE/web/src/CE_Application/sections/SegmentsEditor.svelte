@@ -6,7 +6,15 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import { BASE_STATE_TARGET } from '../utils/stateTargets.js';
-  import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
+  import {
+    ALL_SEGMENT_TARGET,
+    buildSegmentTargetOptions,
+    normalizeSegmentTargetIds,
+  } from '../utils/segmentTargets.js';
+  import {
+    setSegmentEditScopeAll,
+    toggleSegmentEditScopeSegment,
+  } from '../stores/segmentEditScope.js';
   import { deepClone } from '../utils/deepClone.js';
   import {
     createEmptyRadioSegmentStyle,
@@ -83,6 +91,7 @@
       ? normalizeSegmentTargetIds(valueSection, activeSegmentScope?.segmentIds ?? [])
       : []
   );
+  let segmentTargets = $derived(buildSegmentTargetOptions(valueSection));
   let isEditingAllSegments = $derived(selectedSegmentIds.length === 0);
   let targetRows = $derived(
     isEditingAllSegments
@@ -98,6 +107,12 @@
     const partLabel = RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label ?? 'Whole Item';
     return `${stateLabel} | ${segmentLabel || 'All Segments'} | ${partLabel}`;
   });
+  let stateLayerLabel = $derived(activeStateName || 'Base');
+  let segmentLayerLabel = $derived.by(() => (
+    isEditingAllSegments
+      ? 'All Segments'
+      : targetRows.map((row, index) => getRowLabel(row, index)).join(' + ')
+  ));
 
   function normalizeKey(value) {
     return String(value ?? '').trim().toLowerCase();
@@ -105,6 +120,15 @@
 
   function getRowLabel(row, index = 0) {
     return String(row?.displayText ?? row?.internalValue ?? row?.id ?? `Option ${index + 1}`);
+  }
+
+  function handleSegmentTargetClick(targetId) {
+    if (!targetId || targetId === ALL_SEGMENT_TARGET) {
+      setSegmentEditScopeAll();
+      return;
+    }
+
+    toggleSegmentEditScopeSegment(targetId);
   }
 
   function objectPathValue(source, path = '') {
@@ -441,7 +465,36 @@
 {:else}
   <PropertySection title="Segment Scope">
     <PropertyCell label="Editing" span={4} hint="States and Segments in the top bar define which portion of the radio group these properties affect.">
-      <div class="scope-banner">{scopeSummary}</div>
+      <div class="scope-stack">
+        <div class="scope-banner">
+          <span class="scope-label">State Layer</span>
+          <strong>{stateLayerLabel}</strong>
+          <span class="scope-separator">/</span>
+          <span class="scope-label">Segment Target</span>
+          <strong>{segmentLayerLabel || 'All Segments'}</strong>
+          <span class="scope-separator">/</span>
+          <span class="scope-label">Part</span>
+          <strong>{RADIO_SEGMENT_PART_OPTIONS.find((part) => part.id === activePartId)?.label ?? 'Whole Item'}</strong>
+        </div>
+        <div class="scope-help">
+          Base means the normal state layer. The segment chips below decide whether you are editing all options or specific radio options.
+        </div>
+      </div>
+    </PropertyCell>
+    <PropertyCell label="Segments" span={4} hint="Choose the radio option(s) these segment style edits target.">
+      <div class="segment-target-grid">
+        {#each segmentTargets as target (target.id)}
+          <button
+            class="segment-target-chip"
+            class:active={target.id === ALL_SEGMENT_TARGET ? selectedSegmentIds.length === 0 : selectedSegmentIds.includes(target.id)}
+            type="button"
+            title={target.id === ALL_SEGMENT_TARGET ? 'Edit all radio options' : `Edit ${target.label}`}
+            onclick={() => handleSegmentTargetClick(target.id)}
+          >
+            {target.label}
+          </button>
+        {/each}
+      </div>
     </PropertyCell>
     <PropertyCell label="Part" span={4} hint="Choose which part of the segment you want to style.">
       <div class="part-strip">
@@ -558,12 +611,73 @@
     min-height: 28px;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 5px;
     padding: 0 8px;
     border: 1px solid #303030;
     border-radius: 4px;
     background: #171717;
     color: #D7D7D7;
     font-size: 11px;
+  }
+
+  .scope-stack {
+    width: 100%;
+    display: grid;
+    gap: 5px;
+  }
+
+  .scope-label {
+    color: #8F8F8F;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+    text-transform: uppercase;
+  }
+
+  .scope-separator {
+    color: #555;
+  }
+
+  .scope-help {
+    color: #8E8E8E;
+    font-size: 10px;
+    line-height: 1.35;
+  }
+
+  .segment-target-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .segment-target-chip {
+    flex: 0 0 auto;
+    min-width: 54px;
+    border: 1px solid #454545;
+    border-radius: 999px;
+    background: #232323;
+    color: #B6B6B6;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: inherit;
+    line-height: 1;
+    padding: 6px 10px;
+  }
+
+  .segment-target-chip:hover {
+    background: #313131;
+    border-color: #5A5A5A;
+    color: #F2F2F2;
+  }
+
+  .segment-target-chip.active {
+    background: #0E3F2A;
+    border-color: #2E8B57;
+    color: #FFF;
+    box-shadow: 0 0 0 1px rgba(46, 139, 87, 0.25);
   }
 
   .part-strip {
