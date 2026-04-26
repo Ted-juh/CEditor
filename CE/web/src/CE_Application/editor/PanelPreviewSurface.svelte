@@ -72,6 +72,7 @@
   let pointerSliderHandle = $state('');
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
+  let openComboboxControlId = $state('');
 
   const timedButtonPreview = createTimedButtonPreviewController({
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
@@ -120,6 +121,60 @@
 
   function isRangeControl(control) {
     return isRangeBehavior(getBehavior(control));
+  }
+
+  function isComboboxControl(control) {
+    return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'combobox';
+  }
+
+  function getValueRows(control) {
+    const rows = control?._children?.Value?.rows;
+    return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
+  }
+
+  function rowValue(row) {
+    return row?.internalValue ?? row?.id ?? '';
+  }
+
+  function rowLabel(row) {
+    return row?.displayText ?? row?.label ?? row?.internalValue ?? row?.id ?? '';
+  }
+
+  function currentComboboxValue(control) {
+    const session = sessionFor(control);
+    const behavior = getBehavior(control);
+    const rows = getValueRows(control);
+    if (session?.valueOverrideEnabled === true) return session?.valueOverride;
+    return behavior?.defaultValue
+      ?? rows.find((row) => row?.selectedByDefault === true)?.internalValue
+      ?? rows[0]?.internalValue
+      ?? rows[0]?.id
+      ?? '';
+  }
+
+  function comboboxMenuStyle(control) {
+    const transform = control?._children?.Transform ?? {};
+    const x = numberOr(transform?.x, 0);
+    const y = numberOr(transform?.y, 0);
+    const width = Math.max(32, numberOr(transform?.width, 160));
+    const height = Math.max(1, numberOr(transform?.height, 34));
+    return `left:${x}px; top:${y + height + 4}px; width:${width}px;`;
+  }
+
+  function selectComboboxRow(control, row) {
+    const controlId = getControlId(control);
+    if (!controlId || !row) return;
+    setPreviewInspectedControlId(controlId);
+    patchControlSession(controlId, {
+      valueOverrideEnabled: true,
+      valueOverride: rowValue(row),
+      checked: false,
+      mixed: false,
+      hover: true,
+      focused: true,
+      pressed: false,
+    });
+    openComboboxControlId = '';
   }
 
   function currentRangeValue(control) {
@@ -672,6 +727,9 @@
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
+    if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
+      openComboboxControlId = '';
+    }
     pointerActiveElement = event.currentTarget;
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerDownZone = '';
@@ -757,9 +815,17 @@
       } else if (isTimedButtonBehavior(activeBehavior)) {
         timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
       } else if (String(getBehavior(activeControl)?.family ?? 'trigger') === 'select') {
-        commitPanelPreviewSelectAction(activeId, {
-          value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
-        });
+        if (isComboboxControl(activeControl)) {
+          openComboboxControlId = openComboboxControlId === activeId ? '' : activeId;
+          patchControlSession(activeId, {
+            focused: true,
+            hover: true,
+          });
+        } else {
+          commitPanelPreviewSelectAction(activeId, {
+            value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
+          });
+        }
       }
     } else if (isTimedButtonBehavior(activeBehavior)) {
       timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
@@ -797,6 +863,10 @@
 
     if (keyboardFocusControlId === controlId) {
       keyboardFocusControlId = '';
+    }
+
+    if (openComboboxControlId === controlId) {
+      openComboboxControlId = '';
     }
 
     patchControlSession(controlId, {
@@ -871,7 +941,11 @@
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.releasePress(controlId, getBehavior(control), { inside: true });
     } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
-      commitPanelPreviewSelectAction(controlId);
+      if (isComboboxControl(control)) {
+        openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;
+      } else {
+        commitPanelPreviewSelectAction(controlId);
+      }
     }
     patchControlSession(controlId, {
       focused: true,
@@ -887,6 +961,7 @@
     const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
 
     if (family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    if (buttonType === 'combobox') return 'combobox';
     if (buttonType === 'radio') return 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
     if (role === 'toggle' || role === 'checkbox') return 'checkbox';
@@ -939,6 +1014,7 @@
       previewAriaLabel={`${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control'} preview`}
       previewAriaDisabled={isDisabled(control)}
       previewAriaChecked={previewAriaCheckedFor(control)}
+      previewAriaExpanded={isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined}
       previewAriaValueNow={isRangeControl(control) ? currentRangeValue(control) : undefined}
       previewAriaValueMin={isRangeControl(control) ? getRangeMin(getBehavior(control)) : undefined}
       previewAriaValueMax={isRangeControl(control) ? getRangeMax(getBehavior(control)) : undefined}
@@ -965,6 +1041,30 @@
       onpreviewvaluefieldfocus={(event) => handleRangeFieldFocus(control, event)}
       onpreviewvaluefieldblur={(event) => handleRangeFieldBlur(control, event)}
     />
+    {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
+      <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">
+        {#each getValueRows(control) as row (row.id ?? row.internalValue ?? row.displayText)}
+          {@const selected = String(rowValue(row)) === String(currentComboboxValue(control))}
+          <button
+            type="button"
+            class:selected
+            role="option"
+            aria-selected={selected}
+            onpointerdown={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+            }}
+            onclick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              selectComboboxRow(control, row);
+            }}
+          >
+            {rowLabel(row)}
+          </button>
+        {/each}
+      </div>
+    {/if}
   {/each}
 </div>
 
@@ -994,5 +1094,37 @@
     inset: 0;
     pointer-events: none;
     z-index: 0;
+  }
+
+  .panel-combobox-menu {
+    position: absolute;
+    z-index: 10000;
+    max-height: 184px;
+    overflow: auto;
+    padding: 4px;
+    border: 1px solid #4A4A4A;
+    border-radius: 6px;
+    background: #202020;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  }
+
+  .panel-combobox-menu button {
+    display: block;
+    width: 100%;
+    min-height: 26px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #E5E5E5;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .panel-combobox-menu button:hover,
+  .panel-combobox-menu button.selected {
+    background: rgba(91, 155, 213, 0.24);
   }
 </style>

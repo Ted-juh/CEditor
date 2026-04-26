@@ -116,7 +116,7 @@
                 />
               </div>
               <div class="row-actions">
-                {#if buttonType === 'radio'}
+                {#if buttonType === 'radio' || buttonType === 'combobox'}
                   <label class="flag">
                     <input
                       type="checkbox"

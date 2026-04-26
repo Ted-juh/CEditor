@@ -13,6 +13,7 @@
     toggle: ['toggle', 'sticky'],
     radio: ['segmented', 'radio', 'tab'],
     cyclic: ['cycle', 'tri_state'],
+    combobox: ['dropdown', 'searchable'],
     timed: ['hold_to_confirm', 'double_click'],
     one_shot: ['single_use'],
   };
@@ -21,7 +22,7 @@
   let behavior = $derived(getSection(control, 'Behavior'));
   let buttonType = $derived(String(behavior?.buttonType ?? inferButtonType(core?.controlType)));
   let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? ['custom']);
-  let showSubtypeSelector = $derived(buttonType !== 'radio');
+  let showSubtypeSelector = $derived(buttonType !== 'radio' && buttonType !== 'combobox');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
   let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
 
@@ -30,6 +31,7 @@
       case 'ToggleButton': return 'toggle';
       case 'RadioButtonGroup': return 'radio';
       case 'CyclicButton': return 'cyclic';
+      case 'Combobox': return 'combobox';
       case 'TimedButton': return 'timed';
       case 'OneShotButton': return 'one_shot';
       default: return 'momentary';
@@ -162,6 +164,24 @@
       </PropertyCell>
       <PropertyCell label="Mixed" span={2} hint="Allow a mixed state where the design calls for it.">
         <PropertyToggle value={behavior.allowMixed === true} onchange={() => handleToggle('allowMixed')} />
+      </PropertyCell>
+    </PropertySection>
+  {:else if buttonType === 'combobox'}
+    <PropertySection title="Combobox">
+      <PropertyCell label="Mode" span={2} hint="Dropdown uses the value rows as selectable options.">
+        <select class="val" value={behavior.subtype ?? 'dropdown'} onchange={(event) => handleSubtypeChange(event.target.value)}>
+          <option value="dropdown">dropdown</option>
+          <option value="searchable">searchable</option>
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Default" span={2} hint="Internal value selected when the panel opens.">
+        <input class="val" type="text" value={behavior.defaultValue ?? ''} onchange={(event) => set('defaultValue', event.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="Group ID" span={2} hint="Optional logical group id for external routing.">
+        <input class="val" type="text" value={behavior.groupId ?? ''} onchange={(event) => set('groupId', event.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="Emit Value" span={2} hint="Expose selected value changes to the future scripting/runtime layer.">
+        <PropertyToggle value={behavior.emitValueChange === true} onchange={() => set('emitValueChange', !(behavior.emitValueChange === true))} />
       </PropertyCell>
     </PropertySection>
   {:else if buttonType === 'timed'}

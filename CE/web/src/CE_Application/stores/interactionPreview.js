@@ -284,6 +284,29 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
     return;
   }
 
+  if (buttonType === 'combobox') {
+    const valueRows = getEnabledValueRows(control);
+    if (!valueRows.length) return;
+
+    const currentValue = currentSession?.valueOverrideEnabled === true
+      ? currentSession?.valueOverride
+      : behavior?.defaultValue;
+    const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === requestedValue)
+      ?? valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === String(currentValue ?? ''))
+      ?? valueRows.find((row) => row?.selectedByDefault === true)
+      ?? valueRows[0]
+      ?? null;
+    if (!nextRow) return;
+
+    updatePanelPreviewSession(controlId, {
+      checked: false,
+      mixed: false,
+      valueOverrideEnabled: true,
+      valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
+    });
+    return;
+  }
+
   if (buttonType === 'cyclic') {
     const valueRows = getEnabledValueRows(control);
     if (!valueRows.length) return;

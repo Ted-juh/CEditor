@@ -477,7 +477,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     };
   }
 
-  if (buttonType === 'radio' || buttonType === 'cyclic') {
+  if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox') {
     const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
       ?? findDefaultRow(valueRows);
     const selectionActive = resolvedRow != null;
@@ -497,7 +497,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
       focused: previewSession?.focused === true,
       dragging: previewSession?.dragging === true,
       disabled: previewSession?.disabled === true || core?.enabled === false,
-      checked: buttonType === 'radio' ? false : previewSession?.checked === true,
+      checked: buttonType === 'radio' || buttonType === 'combobox' ? false : previewSession?.checked === true,
       selectionActive,
       mixed: previewSession?.mixed === true,
       pending: previewSession?.pending === true,

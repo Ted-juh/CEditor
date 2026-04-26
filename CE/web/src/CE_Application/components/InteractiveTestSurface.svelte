@@ -71,6 +71,7 @@
   let keyboardFocusActive = $state(false);
   let lastInputMode = $state('pointer');
   let lastControlId = $state('');
+  let comboboxOpen = $state(false);
   let commitResetTimer = null;
 
   const timedButtonPreview = createTimedButtonPreviewController({
@@ -131,6 +132,10 @@
   let sceneTop = $derived(Math.max(SURFACE_PADDING, (stageHeight - sceneHeight) / 2));
   let previewSession = $derived(session?.enabled === false ? {} : (session ?? {}));
   let isDisabled = $derived(session?.enabled === false || session?.disabled === true);
+  let isComboboxControl = $derived(
+    String(behavior?.buttonType ?? '').trim().toLowerCase() === 'combobox'
+  );
+  let comboboxRows = $derived(getValueRows(control));
   let helperLabel = $derived.by(() => {
     if (!behavior) return 'Hover and click to test the selected control.';
     if (isTimedButtonBehavior(behavior)) {
@@ -155,6 +160,7 @@
     const buttonType = String(behavior.buttonType ?? '').trim().toLowerCase();
 
     if (family === 'range') return isSliderRangeBehavior(behavior) ? 'slider' : 'spinbutton';
+    if (buttonType === 'combobox') return 'combobox';
     if (buttonType === 'radio') return 'radiogroup';
     if (role === 'radio' || role === 'segmented') return 'radio';
     if (role === 'toggle' || role === 'checkbox') return 'checkbox';
@@ -205,6 +211,7 @@
       pointerDownZone = '';
       pointerSliderHandle = '';
       keyboardFocusActive = false;
+      comboboxOpen = false;
       if (commitResetTimer) {
         clearTimeout(commitResetTimer);
         commitResetTimer = null;
@@ -233,6 +240,39 @@
 
   function currentRangeValue() {
     return getCurrentRangeValue(behavior, session);
+  }
+
+  function currentComboboxValue() {
+    const rows = comboboxRows;
+    if (session?.valueOverrideEnabled === true) return session?.valueOverride;
+    return behavior?.defaultValue
+      ?? rows.find((row) => row?.selectedByDefault === true)?.internalValue
+      ?? rows[0]?.internalValue
+      ?? rows[0]?.id
+      ?? '';
+  }
+
+  function rowValue(row) {
+    return row?.internalValue ?? row?.id ?? '';
+  }
+
+  function rowLabel(row) {
+    return row?.displayText ?? row?.label ?? row?.internalValue ?? row?.id ?? '';
+  }
+
+  function selectComboboxRow(row) {
+    if (!row) return;
+    patchSession({
+      valueOverrideEnabled: true,
+      valueOverride: rowValue(row),
+      checked: false,
+      mixed: false,
+      focused: true,
+      hover: true,
+      pressed: false,
+    });
+    comboboxOpen = false;
+    pulseCommitState();
   }
 
   function isSliderControl() {
@@ -424,6 +464,16 @@
     const role = String(behavior?.role ?? '');
     const valueType = String(behavior?.valueType ?? '');
     const valueRows = getValueRows(control);
+    if (buttonType === 'combobox') {
+      if (!valueRows.length) return;
+      comboboxOpen = !comboboxOpen;
+      patchSession({
+        focused: true,
+        hover: true,
+        pressed: false,
+      });
+      return;
+    }
     if (buttonType === 'radio' || role === 'radio') {
       const selectedValue = String(nextValue ?? '').trim();
       const nextRow = valueRows.find((row) => String(row?.internalValue ?? row?.id ?? '') === selectedValue)
@@ -861,6 +911,7 @@
     lastInputMode = 'pointer';
     keyboardFocusActive = false;
     pointerActive = true;
+    if (!isComboboxControl) comboboxOpen = false;
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerStartValue = isSliderControl() ? currentSliderRoleValue(currentSliderActiveHandle()) : currentRangeValue();
     draggingRange = isRangeControl() && (isSliderControl() || isSliderRangeBehavior(behavior));
@@ -962,6 +1013,7 @@
       timedButtonPreview.cancel(control?._children?.Core?.id);
     }
     keyboardFocusActive = false;
+    comboboxOpen = false;
     patchSession({ focused: false, pressed: false, dragging: false, valueInputActive: false });
     pointerActive = false;
     draggingRange = false;
@@ -1044,6 +1096,7 @@
           aria-valuemin={previewAriaValueMin}
           aria-valuemax={previewAriaValueMax}
           aria-valuetext={previewAriaValueText}
+          aria-expanded={isComboboxControl ? comboboxOpen : undefined}
           tabindex={isDisabled ? undefined : 0}
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}
@@ -1078,6 +1131,34 @@
             onpreviewvaluefieldblur={handleRangeFieldBlur}
           />
         </div>
+        {#if isComboboxControl && comboboxOpen && comboboxRows.length}
+          <div
+            class="combobox-menu"
+            style="top:{controlHeight + 4}px; width:{controlWidth}px;"
+            role="listbox"
+          >
+            {#each comboboxRows as row (row.id ?? row.internalValue ?? row.displayText)}
+              {@const selected = String(rowValue(row)) === String(currentComboboxValue())}
+              <button
+                type="button"
+                class:selected
+                role="option"
+                aria-selected={selected}
+                onpointerdown={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                }}
+                onclick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  selectComboboxRow(row);
+                }}
+              >
+                {rowLabel(row)}
+              </button>
+            {/each}
+          </div>
+        {/if}
       </div>
       {#if session?.enabled === false}
         <div class="surface-overlay">Preview disabled</div>
@@ -1160,6 +1241,39 @@
     border: 1px solid rgba(91, 155, 213, 0.6);
     border-radius: 12px;
     pointer-events: none;
+  }
+
+  .combobox-menu {
+    position: absolute;
+    left: 0;
+    z-index: 40;
+    max-height: 184px;
+    overflow: auto;
+    padding: 4px;
+    border: 1px solid #4A4A4A;
+    border-radius: 6px;
+    background: #202020;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.42);
+  }
+
+  .combobox-menu button {
+    display: block;
+    width: 100%;
+    min-height: 26px;
+    padding: 4px 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #E5E5E5;
+    font: inherit;
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .combobox-menu button:hover,
+  .combobox-menu button.selected {
+    background: rgba(91, 155, 213, 0.24);
   }
 
   .surface-overlay,

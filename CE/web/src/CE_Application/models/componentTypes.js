@@ -55,6 +55,29 @@ function createButtonStates({ includeSelected = false, includeExecuted = false }
   };
 }
 
+function createComboboxStates() {
+  return {
+    _type: 'States',
+    enabled: true,
+    debug: false,
+    priority: ['disabled', 'pressed', 'hover', 'focused'],
+    _children: {
+      Hover: createStateNode('Hover', { hover: true }, {
+        'Background.Fill.colour': 'FF414141',
+      }),
+      Pressed: createStateNode('Pressed', { pressed: true }, {
+        'Background.Fill.colour': 'FF2A2A2A',
+      }),
+      Focused: createStateNode('Focused', { focused: true }, {
+        'Background.Border.colour': 'FF89C2FF',
+      }),
+      Disabled: createStateNode('Disabled', { disabled: true }, {
+        'Transform.opacity': 0.55,
+      }),
+    },
+  };
+}
+
 function buildValueRows(rows = []) {
   return rows.map((row, index) => ({
     id: row.id ?? `row_${index + 1}`,
@@ -233,6 +256,55 @@ export const COMPONENT_TYPES = {
     },
     value: { showMapping: true },
   }),
+
+  Combobox: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'Animations', 'Scripts'],
+    defaultOverrides: {
+      Transform: { width: 160, height: 34 },
+      Text: { content: 'Option 1' },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF2F2F2F' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'center',
+        gap: 8,
+        paddingLeft: 10,
+        paddingRight: 30,
+        paddingTop: 6,
+        paddingBottom: 6,
+      },
+      Behavior: {
+        buttonType: 'combobox',
+        subtype: 'dropdown',
+        family: 'select',
+        role: 'combobox',
+        valueType: 'enum',
+        defaultValue: 'option_1',
+        selectionMode: 'single',
+        keyboardEnabled: true,
+        focusable: true,
+        emitClick: true,
+        emitValueChange: true,
+        emitStateChange: true,
+      },
+      States: createComboboxStates(),
+      Value: {
+        showMapping: true,
+        rows: buildValueRows([
+          { id: 'option_1', displayText: 'Option 1', internalValue: 'option_1', sendValue: 0, selectedByDefault: true },
+          { id: 'option_2', displayText: 'Option 2', internalValue: 'option_2', sendValue: 1 },
+          { id: 'option_3', displayText: 'Option 3', internalValue: 'option_3', sendValue: 2 },
+        ]),
+        segmentStyle: { shared: {}, rows: {} },
+      },
+    },
+  },
 
   TimedButton: createButtonType({
     label: 'Hold',

@@ -55,6 +55,7 @@
     previewAriaLabel = '',
     previewAriaDisabled = undefined,
     previewAriaChecked = undefined,
+    previewAriaExpanded = undefined,
     previewAriaValueNow = undefined,
     previewAriaValueMin = undefined,
     previewAriaValueMax = undefined,
@@ -114,6 +115,7 @@
   let buttonType = $derived(String(sourceBehavior?.buttonType ?? behavior?.buttonType ?? '').trim().toLowerCase());
   let valueRows = $derived(getEnabledValueRows(sourceValueSection ?? valueSection));
   let isRadioGroupControl = $derived(buttonType === 'radio');
+  let isComboboxControl = $derived(buttonType === 'combobox');
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   const SLIDER_SEMANTIC_PARTS = new Set([
     'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker',
@@ -2501,7 +2503,7 @@
   let textVariantCaps = $derived(textCaseVariantCaps(textCaseMode));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
   let rawTextContent = $derived.by(() => {
-    if (buttonType === 'cyclic' && interactionRuntime?.signals?.valueDisplay !== undefined) {
+    if ((buttonType === 'cyclic' || buttonType === 'combobox') && interactionRuntime?.signals?.valueDisplay !== undefined) {
       return String(interactionRuntime.signals.valueDisplay ?? '');
     }
 
@@ -3785,6 +3787,7 @@
   aria-label={previewInteractive ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
   aria-checked={previewInteractive ? previewAriaChecked : undefined}
+  aria-expanded={previewInteractive ? previewAriaExpanded : undefined}
   aria-valuenow={previewInteractive ? previewAriaValueNow : undefined}
   aria-valuemin={previewInteractive ? previewAriaValueMin : undefined}
   aria-valuemax={previewInteractive ? previewAriaValueMax : undefined}
@@ -3858,6 +3861,10 @@
           </div>
         {/each}
       </div>
+    {/if}
+
+    {#if isComboboxControl}
+      <div class="combobox-arrow" aria-hidden="true"></div>
     {/if}
 
     {#if hasIcon}
@@ -5221,6 +5228,20 @@
     line-height: 1;
     text-transform: uppercase;
     pointer-events: none;
+  }
+
+  .combobox-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid rgba(255, 255, 255, 0.78);
+    transform: translateY(-35%);
+    pointer-events: none;
+    z-index: 14;
   }
 
   .icon-content {

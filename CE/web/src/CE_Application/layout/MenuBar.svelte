@@ -63,6 +63,7 @@
       { label: 'Toggle Button', action: () => addControl('ToggleButton') },
       { label: 'Radio Button Group', action: () => addControl('RadioButtonGroup') },
       { label: 'Cyclic Button', action: () => addControl('CyclicButton') },
+      { label: 'Combobox', action: () => addControl('Combobox') },
       { label: 'Timed Button', action: () => addControl('TimedButton') },
       { label: 'One-Shot Button', action: () => addControl('OneShotButton') },
       { label: 'Container',  action: () => addControl('Container') },
