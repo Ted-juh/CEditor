@@ -141,6 +141,151 @@ export function setPerfDebugEnabled(enabled) {
   window.__JUCE__.backend.emitEvent('setPerfDebugEnabled', enabled === true);
 }
 
+// --- Device profile / MIDI preview operations ---
+
+export function listDeviceProfiles() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('listDeviceProfiles', {});
+}
+
+export function importDeviceProfile() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('importDeviceProfile', {});
+}
+
+export function setDeviceRoleMapping(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('setDeviceRoleMapping', payload ?? {});
+}
+
+export function listProfileParameters(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('listProfileParameters', payload ?? {});
+}
+
+export function listMidiDestinations() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('listMidiDestinations', {});
+}
+
+export function compileParameterMessage(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('compileParameterMessage', payload ?? {});
+}
+
+export function setDeviceParameter(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('setDeviceParameter', payload ?? {});
+}
+
+export function compileRawMidiAction(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('compileRawMidiAction', payload ?? {});
+}
+
+export function triggerRawMidiAction(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('triggerRawMidiAction', payload ?? {});
+}
+
+export function runDeviceProfileTests(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('runDeviceProfileTests', payload ?? {});
+}
+
+export function getDeviceRuntimeState() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getDeviceRuntimeState', {});
+}
+
+export function getMidiMonitorEvents() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getMidiMonitorEvents', {});
+}
+
+export function getDeviceDiagnostics() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getDeviceDiagnostics', {});
+}
+
+export function onDeviceProfilesListed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfilesListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceProfileImported(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfileImported', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceRoleMappingSet(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceRoleMappingSet', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onProfileParametersListed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('profileParametersListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onMidiDestinationsListed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiDestinationsListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onMidiPreview(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiPreview', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceParameterSet(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceParameterSet', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onRawMidiPreview(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('rawMidiPreview', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onRawMidiActionTriggered(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('rawMidiActionTriggered', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceProfileTestsFinished(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfileTestsFinished', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceRuntimeState(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceRuntimeState', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onMidiMonitorEvents(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiMonitorEvents', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceDiagnostics(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceDiagnostics', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Request a font import dialog. C++ emits 'fontsImported' on success. */
 export function importFonts() {
   if (!isJuceAvailable()) {

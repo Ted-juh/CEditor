@@ -21,11 +21,12 @@
 
   const DISPLAY_TAB_STORAGE_KEY = 'ce.displayPanel.activeTab';
   const DEFAULT_DISPLAY_TAB = 'colors';
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'notepad', 'viewer', 'align', 'device', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     notepad: () => import('./NotepadTab.svelte').then((module) => ({ default: module.default })),
     viewer: () => import('./ViewerTab.svelte').then((module) => ({ default: module.default })),
     align: () => import('../components/AlignmentPanel.svelte').then((module) => ({ default: module.default })),
+    device: () => import('../components/ParameterBrowserTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
     console: async () => {
       const [debugModule, consoleModule] = await Promise.all([
@@ -401,6 +402,7 @@
     { id: 'notepad',  label: 'Notepad' },
     { id: 'viewer',   label: 'Viewer' },
     { id: 'align',    label: 'Align' },
+    { id: 'device',   label: 'Device' },
     { id: 'preview',  label: 'Preview' },
     { id: 'console',  label: 'Console' },
   ];
@@ -506,6 +508,11 @@
       {@const AlignmentPanel = activeTabComponent.default}
       <div class="tab-pane">
         <AlignmentPanel />
+      </div>
+    {:else if activeTab === 'device' && activeTabComponent?.default}
+      {@const ParameterBrowserTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <ParameterBrowserTab />
       </div>
     {:else if activeTab === 'preview' && activeTabComponent?.default}
       {@const PreviewTabComponent = activeTabComponent.default}

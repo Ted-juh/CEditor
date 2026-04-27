@@ -1,6 +1,6 @@
 <script>
   import {
-    Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play,
+    Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play, Cable,
     LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal,
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
@@ -16,6 +16,7 @@
   import { stateEditScope, setStateEditScopeBase } from '../stores/stateEditScope.js';
   import { setSegmentEditScopeAll } from '../stores/segmentEditScope.js';
   import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
+  import { getComponentPorts } from '../models/componentPorts.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
 
@@ -114,6 +115,7 @@
     { id: 'value',      icon: Link,          label: 'Value',      section: 'Value' },
     { id: 'segments',   icon: Rows3,         label: 'Segments',   section: 'Value', when: (control) => String(getSection(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio' },
     { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
+    { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
   ];
@@ -122,7 +124,9 @@
   let componentTabs = $derived(
     $selectedControl
       ? allComponentTabs.filter((tab) => (
-        (!tab.section || hasSection($selectedControl, tab.section))
+        (!tab.section
+          || hasSection($selectedControl, tab.section)
+          || (tab.id === 'devicebindings' && getComponentPorts(getSection($selectedControl, 'Core')?.controlType).length > 0))
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
       ))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')

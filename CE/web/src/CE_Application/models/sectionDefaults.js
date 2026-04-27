@@ -646,6 +646,14 @@ export const SECTION_DEFAULTS = {
     _children: {},
   },
 
+  /** DeviceBindings — component ports bound to semantic device parameters. */
+  DeviceBindings: {
+    _type: 'DeviceBindings',
+    enabled: true,
+    debug: false,
+    bindings: [],
+  },
+
   /** States — contains named state override children. Starts empty. */
   States: {
     _type: 'States',

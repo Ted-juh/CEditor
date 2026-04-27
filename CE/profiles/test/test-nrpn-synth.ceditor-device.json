@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.9.0",
+  "id": "test-nrpn-synth",
+  "name": "Test NRPN Synth",
+  "manufacturer": "CEditor",
+  "family": "Internal Test",
+  "status": "experimental",
+  "trust": "local",
+  "variables": {
+    "channel": 1
+  },
+  "coverage": {
+    "singleParameterWrite": "complete",
+    "realtimeEditing": "complete"
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 0
+  },
+  "parameters": [
+    {
+      "id": "filter.cutoff",
+      "name": "Filter Cutoff",
+      "group": "Filter",
+      "type": "integer",
+      "range": { "min": 0, "max": 127 },
+      "default": 64,
+      "display": { "mode": "number", "unit": "", "shortLabel": "Cutoff" },
+      "normalization": { "mode": "linear" },
+      "encoding": { "type": "u7" },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 0,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cutoffNrpn7",
+      "ui": { "preferredComponent": "Slider" }
+    },
+    {
+      "id": "osc.pitch",
+      "name": "Oscillator Pitch",
+      "group": "Oscillator",
+      "type": "integer",
+      "range": { "min": 0, "max": 16383 },
+      "default": 8192,
+      "display": { "mode": "number", "unit": "", "shortLabel": "Pitch" },
+      "normalization": { "mode": "linear" },
+      "encoding": { "type": "u14-msb-lsb" },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 0,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "pitchNrpn14",
+      "ui": { "preferredComponent": "Slider" }
+    }
+  ],
+  "messageRecipes": [
+    {
+      "id": "cutoffNrpn7",
+      "kind": "nrpn",
+      "channel": "$channel",
+      "parameterMsb": 1,
+      "parameterLsb": 32,
+      "valueResolution": 7,
+      "value": "$encodedValue",
+      "nullAfterSend": false
+    },
+    {
+      "id": "pitchNrpn14",
+      "kind": "nrpn",
+      "channel": "$channel",
+      "parameterMsb": 2,
+      "parameterLsb": 16,
+      "valueResolution": 14,
+      "value": "$encodedValue",
+      "nullAfterSend": false
+    }
+  ],
+  "tests": [
+    {
+      "name": "Filter Cutoff 64 NRPN7",
+      "parameter": "filter.cutoff",
+      "value": 64,
+      "expectedHex": "B0 63 01\nB0 62 20\nB0 06 40"
+    },
+    {
+      "name": "Osc Pitch Center NRPN14",
+      "parameter": "osc.pitch",
+      "value": 8192,
+      "expectedHex": "B0 63 02\nB0 62 10\nB0 06 40\nB0 26 00"
+    }
+  ],
+  "sources": [
+    {
+      "type": "internal",
+      "title": "CEditor Test NRPN Synth",
+      "notes": "Synthetic profile for Device Profile Engine NRPN tests."
+    }
+  ],
+  "testedWith": []
+}

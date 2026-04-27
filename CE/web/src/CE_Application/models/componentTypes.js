@@ -1,5 +1,6 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 import { createDefaultInteractiveSections } from './interactionDefaults.js';
+import { getComponentPorts } from './componentPorts.js';
 
 function createStateNode(name, when = {}, component = {}) {
   return {
@@ -107,9 +108,11 @@ function createButtonType({
   behavior = {},
   value = {},
   contentLayout = {},
+  portType = 'Button',
 } = {}) {
   return {
-    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'Animations', 'Scripts'],
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
+    ports: getComponentPorts(portType),
     defaultOverrides: {
       Transform: { width, height },
       Text: { content: label },
@@ -206,6 +209,7 @@ export const COMPONENT_TYPES = {
     valueType: 'bool',
     defaultValue: false,
     includeSelectedState: true,
+    portType: 'ToggleButton',
     rows: [
       { id: 'off', displayText: 'Off', internalValue: false, sendValue: 0 },
       { id: 'on', displayText: 'On', internalValue: true, sendValue: 1 },
@@ -224,6 +228,7 @@ export const COMPONENT_TYPES = {
     valueType: 'enum',
     defaultValue: 'option_1',
     includeSelectedState: true,
+    portType: 'RadioButtonGroup',
     rows: [
       { id: 'option_1', displayText: 'Option 1', internalValue: 'option_1', sendValue: 0, selectedByDefault: true },
       { id: 'option_2', displayText: 'Option 2', internalValue: 'option_2', sendValue: 1 },
@@ -246,6 +251,7 @@ export const COMPONENT_TYPES = {
     valueType: 'enum',
     defaultValue: 'state_1',
     includeSelectedState: true,
+    portType: 'CyclicButton',
     rows: [
       { id: 'state_1', displayText: 'State 1', internalValue: 'state_1', sendValue: 0 },
       { id: 'state_2', displayText: 'State 2', internalValue: 'state_2', sendValue: 1 },
@@ -258,7 +264,8 @@ export const COMPONENT_TYPES = {
   }),
 
   Combobox: {
-    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'Animations', 'Scripts'],
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Combobox'),
     defaultOverrides: {
       Transform: { width: 160, height: 34 },
       Text: { content: 'Option 1' },
@@ -337,7 +344,8 @@ export const COMPONENT_TYPES = {
   }),
 
   Range: {
-    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Range'),
     defaultOverrides: {
       Transform: { width: 180, height: 40 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
@@ -346,7 +354,8 @@ export const COMPONENT_TYPES = {
   },
 
   Slider: {
-    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'States', 'Animations', 'Scripts'],
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Slider'),
     defaultOverrides: {
       Transform: { width: 220, height: 48 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },

@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.9.0",
+  "id": "test-sysex-synth",
+  "name": "Test SysEx Synth",
+  "manufacturer": "CEditor",
+  "family": "Internal Test",
+  "status": "experimental",
+  "trust": "local",
+  "variables": {
+    "deviceId": 16
+  },
+  "coverage": {
+    "singleParameterWrite": "complete",
+    "realtimeEditing": "partial"
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 20
+  },
+  "parameters": [
+    {
+      "id": "filter.cutoff",
+      "name": "Filter Cutoff",
+      "group": "Filter",
+      "type": "integer",
+      "range": { "min": 0, "max": 127 },
+      "default": 64,
+      "address": "20",
+      "display": { "mode": "number", "unit": "", "shortLabel": "Cutoff" },
+      "normalization": { "mode": "linear" },
+      "encoding": { "type": "u7" },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter",
+        "dumpReadable": false,
+        "requiresConfirmation": false
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "singleParameterWrite",
+      "ui": { "preferredComponent": "Slider" }
+    },
+    {
+      "id": "osc.waveform",
+      "name": "Oscillator Waveform",
+      "group": "Oscillator",
+      "type": "choice",
+      "default": "saw",
+      "address": "21",
+      "choices": [
+        { "id": "saw", "label": "Saw", "value": 0 },
+        { "id": "square", "label": "Square", "value": 1 },
+        { "id": "triangle", "label": "Triangle", "value": 2 }
+      ],
+      "display": { "mode": "choice", "shortLabel": "Wave" },
+      "normalization": { "mode": "choiceIndex" },
+      "encoding": { "type": "enum" },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true
+      },
+      "messageRecipe": "singleParameterWrite",
+      "ui": { "preferredComponent": "Combobox" }
+    }
+  ],
+  "messageRecipes": [
+    {
+      "id": "singleParameterWrite",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "7D",
+        "$deviceId",
+        "$address",
+        "$encodedValue",
+        "$checksum",
+        "F7"
+      ],
+      "checksum": {
+        "type": "sum-7bit",
+        "from": "$address",
+        "to": "$encodedValue"
+      }
+    }
+  ],
+  "tests": [
+    {
+      "name": "Filter Cutoff 64",
+      "parameter": "filter.cutoff",
+      "value": 64,
+      "expectedHex": "F0 7D 10 20 40 60 F7"
+    },
+    {
+      "name": "Waveform Triangle",
+      "parameter": "osc.waveform",
+      "value": "triangle",
+      "expectedHex": "F0 7D 10 21 02 23 F7"
+    }
+  ],
+  "sources": [
+    {
+      "type": "internal",
+      "title": "CEditor Test SysEx Synth",
+      "notes": "Synthetic profile for Device Profile Engine SysEx tests."
+    }
+  ],
+  "testedWith": []
+}

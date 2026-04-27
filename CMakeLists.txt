@@ -32,6 +32,8 @@ juce_add_gui_app(CEditor
 
 target_sources(CEditor PRIVATE
     "${CE_ROOT}/src/Main.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
     "${CE_ROOT}/src/WebViewHost.cpp"
     "${CE_ROOT}/src/ValueTreeBridge.cpp"
     "${CE_ROOT}/src/ValueTreeBridgeHandlers.cpp"
@@ -39,6 +41,7 @@ target_sources(CEditor PRIVATE
 )
 
 target_compile_definitions(CEditor PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
     JUCE_WEB_BROWSER=1
     JUCE_USE_WIN_WEBVIEW2=1
     JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
@@ -54,6 +57,8 @@ target_include_directories(CEditor PRIVATE
 
 target_link_libraries(CEditor PRIVATE
     juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_devices
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics
@@ -62,6 +67,26 @@ target_link_libraries(CEditor PRIVATE
     "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
     dwmapi
     CEditorData
+)
+
+add_executable(CEditorDeviceProfileTests
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/tests/DeviceProfileEngineTests.cpp"
+)
+
+target_compile_definitions(CEditorDeviceProfileTests PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+)
+
+target_include_directories(CEditorDeviceProfileTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorDeviceProfileTests PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_devices
 )
 
 install(TARGETS CEditor

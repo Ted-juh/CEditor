@@ -30,6 +30,7 @@ const LAZY_COMPONENT_LOADERS = {
   value: () => import('../sections/ValueEditor.svelte'),
   segments: () => import('../sections/SegmentsEditor.svelte'),
   bindings: () => import('../sections/BindingsEditor.svelte'),
+  devicebindings: () => import('../sections/DeviceBindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
 };
 

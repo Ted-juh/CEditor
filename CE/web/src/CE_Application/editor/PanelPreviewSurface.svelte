@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
   import {
@@ -359,8 +360,59 @@
     return resolveRadioGroupValueAtPoint(layout, localX, localY);
   }
 
+  function activeDeviceBindings(control) {
+    const deviceBindings = control?._children?.DeviceBindings;
+    if (deviceBindings?.enabled === false) return [];
+    const bindings = deviceBindings?.bindings;
+    return Array.isArray(bindings)
+      ? bindings.filter((binding) => binding?.kind === 'deviceParameter' && binding?.parameterId)
+      : [];
+  }
+
+  function bindingValueForPatch(binding, patch = {}) {
+    const port = String(binding?.port ?? 'value');
+    if (port === 'trigger') {
+      if (patch.executed === true || patch.pressed === false) return true;
+      return undefined;
+    }
+    if (port === 'state') {
+      return Object.prototype.hasOwnProperty.call(patch, 'checked') ? patch.checked : undefined;
+    }
+    if (port === 'selectedChoice') {
+      return Object.prototype.hasOwnProperty.call(patch, 'valueOverride') ? patch.valueOverride : undefined;
+    }
+    if (port === 'value') {
+      if (Object.prototype.hasOwnProperty.call(patch, 'valueOverride')) return patch.valueOverride;
+      if (Object.prototype.hasOwnProperty.call(patch, 'currentValueOverride')) return patch.currentValueOverride;
+      if (Object.prototype.hasOwnProperty.call(patch, 'activeHandle')) {
+        const activeHandle = String(patch.activeHandle ?? 'current');
+        const handleKey = `${activeHandle}ValueOverride`;
+        if (Object.prototype.hasOwnProperty.call(patch, handleKey)) return patch[handleKey];
+      }
+    }
+    return undefined;
+  }
+
+  function emitDeviceBindingsForPatch(control, patch = {}) {
+    const controlId = getControlId(control);
+    for (const binding of activeDeviceBindings(control)) {
+      const value = bindingValueForPatch(binding, patch);
+      if (value === undefined) continue;
+      commitDeviceParameter({
+        requestId: `panel_preview_${controlId || 'control'}_${Date.now()}`,
+        deviceRole: binding.deviceRole || 'mainSynth',
+        parameterId: binding.parameterId,
+        value,
+        interactionPhase: patch.dragging === true ? 'continuous' : 'commit',
+        dryRun: binding.dryRun !== false,
+      });
+    }
+  }
+
   function patchControlSession(controlId, patch = {}) {
     updatePanelPreviewSession(controlId, patch);
+    const control = orderedControls.find((entry) => getControlId(entry) === controlId) ?? null;
+    if (control) emitDeviceBindingsForPatch(control, patch);
   }
 
   function isPointInsideActiveHitbox(clientX, clientY) {

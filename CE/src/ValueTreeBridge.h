@@ -2,6 +2,7 @@
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
+#include "DeviceProfile/DeviceProfileService.h"
 
 class AppSettings;
 
@@ -88,4 +89,5 @@ private:
 
     AppSettings* appSettings = nullptr;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    ceditor::device::DeviceProfileService deviceProfileService;
 };

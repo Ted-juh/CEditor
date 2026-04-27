@@ -1,6 +1,7 @@
 <script>
   import { onDestroy } from 'svelte';
   import CanvasControl from '../editor/CanvasControl.svelte';
+  import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { deepClone } from '../utils/deepClone.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
@@ -89,6 +90,55 @@
 
   function patchSession(patch = {}) {
     onpatchsession?.(patch);
+    emitDeviceBindingsForPatch(patch);
+  }
+
+  function activeDeviceBindings() {
+    const deviceBindings = control?._children?.DeviceBindings;
+    if (deviceBindings?.enabled === false) return [];
+    const bindings = deviceBindings?.bindings;
+    return Array.isArray(bindings)
+      ? bindings.filter((binding) => binding?.kind === 'deviceParameter' && binding?.parameterId)
+      : [];
+  }
+
+  function bindingValueForPatch(binding, patch = {}) {
+    const port = String(binding?.port ?? 'value');
+    if (port === 'trigger') {
+      if (patch.executed === true || patch.pressed === false) return true;
+      return undefined;
+    }
+    if (port === 'state') {
+      return Object.prototype.hasOwnProperty.call(patch, 'checked') ? patch.checked : undefined;
+    }
+    if (port === 'selectedChoice') {
+      return Object.prototype.hasOwnProperty.call(patch, 'valueOverride') ? patch.valueOverride : undefined;
+    }
+    if (port === 'value') {
+      if (Object.prototype.hasOwnProperty.call(patch, 'valueOverride')) return patch.valueOverride;
+      if (Object.prototype.hasOwnProperty.call(patch, 'currentValueOverride')) return patch.currentValueOverride;
+      if (Object.prototype.hasOwnProperty.call(patch, 'activeHandle')) {
+        const activeHandle = String(patch.activeHandle ?? 'current');
+        const handleKey = `${activeHandle}ValueOverride`;
+        if (Object.prototype.hasOwnProperty.call(patch, handleKey)) return patch[handleKey];
+      }
+    }
+    return undefined;
+  }
+
+  function emitDeviceBindingsForPatch(patch = {}) {
+    for (const binding of activeDeviceBindings()) {
+      const value = bindingValueForPatch(binding, patch);
+      if (value === undefined) continue;
+      commitDeviceParameter({
+        requestId: `surface_${control?._children?.Core?.id ?? 'control'}_${Date.now()}`,
+        deviceRole: binding.deviceRole || 'mainSynth',
+        parameterId: binding.parameterId,
+        value,
+        interactionPhase: patch.dragging === true ? 'continuous' : 'commit',
+        dryRun: binding.dryRun !== false,
+      });
+    }
   }
 
   function pulseCommitState() {
