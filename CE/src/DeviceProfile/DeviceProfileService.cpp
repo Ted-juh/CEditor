@@ -30,6 +30,91 @@ juce::String varToStringOr (const juce::var& value, const juce::String& fallback
     auto text = value.toString();
     return text.isNotEmpty() ? text : fallback;
 }
+
+int objectIntOr (const juce::DynamicObject* object, const juce::Identifier& name, int fallback)
+{
+    if (object == nullptr || ! object->hasProperty (name))
+        return fallback;
+
+    auto value = object->getProperty (name);
+    if (value.isInt() || value.isInt64() || value.isDouble() || value.isBool())
+        return static_cast<int> (value);
+
+    auto text = value.toString().trim();
+    return text.containsOnly ("-0123456789") ? text.getIntValue() : fallback;
+}
+
+bool textMatches (const juce::String& haystack, const juce::String& needle)
+{
+    return needle.isEmpty() || haystack.toLowerCase().contains (needle.toLowerCase());
+}
+
+bool descriptorMatches (const juce::DynamicObject& descriptor,
+                        const juce::String& query,
+                        const juce::String& group,
+                        const juce::String& type,
+                        const juce::String& access)
+{
+    auto descriptorGroup = objectString (&descriptor, "group");
+    auto descriptorType = objectString (&descriptor, "type");
+    auto* accessObject = descriptor.getProperty ("access").getDynamicObject();
+    auto canWrite = accessObject == nullptr || ! accessObject->hasProperty ("canWrite") || static_cast<bool> (accessObject->getProperty ("canWrite"));
+    auto realtimeSafe = accessObject == nullptr || ! accessObject->hasProperty ("realtimeSafe") || static_cast<bool> (accessObject->getProperty ("realtimeSafe"));
+
+    if (group.isNotEmpty() && group != "all" && descriptorGroup != group)
+        return false;
+
+    if (type.isNotEmpty() && type != "all" && descriptorType != type)
+        return false;
+
+    if (access == "writable" && ! canWrite)
+        return false;
+
+    if (access == "readonly" && canWrite)
+        return false;
+
+    if (access == "realtimeWarning" && realtimeSafe)
+        return false;
+
+    if (query.isEmpty())
+        return true;
+
+    return textMatches (objectString (&descriptor, "id"), query)
+        || textMatches (objectString (&descriptor, "name"), query)
+        || textMatches (descriptorGroup, query)
+        || textMatches (descriptorType, query);
+}
+
+const juce::Array<juce::var>* varArray (const juce::var& value)
+{
+    return value.getArray();
+}
+
+juce::var cloneVar (const juce::var& value)
+{
+    if (auto* object = value.getDynamicObject())
+    {
+        auto* clone = new juce::DynamicObject();
+        for (const auto& property : object->getProperties())
+            clone->setProperty (property.name, cloneVar (property.value));
+        return juce::var (clone);
+    }
+
+    if (auto* array = value.getArray())
+    {
+        juce::Array<juce::var> clone;
+        for (const auto& item : *array)
+            clone.add (cloneVar (item));
+        return clone;
+    }
+
+    return value;
+}
+
+juce::String normalizeLineEndingsForCompare (juce::String text)
+{
+    return text.replace ("\r\n", "\n").replace ("\r", "\n");
+}
 }
 
 DeviceProfileService::DeviceProfileService()
@@ -85,24 +170,344 @@ juce::var DeviceProfileService::loadProfileFromFile (const juce::File& file)
     return juce::var (response);
 }
 
+juce::var DeviceProfileService::getProfileSource (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    auto requestId = objectString (obj, "requestId");
+    auto profileId = objectString (obj, "profileId");
+
+    auto profile = profiles.find (profileId);
+    if (profile == profiles.end())
+        return errorResponse (requestId, "Unknown profileId: " + profileId);
+
+    const auto& file = profile->second.file;
+    if (! file.existsAsFile())
+        return errorResponse (requestId, "Profile file does not exist: " + file.getFullPathName());
+
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", true);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("profileId", profileId);
+    response->setProperty ("filePath", file.getFullPathName());
+    response->setProperty ("source", file.loadFileAsString());
+    response->setProperty ("lastModified", file.getLastModificationTime().toISO8601 (true));
+    return juce::var (response);
+}
+
+juce::var DeviceProfileService::validateProfileSource (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    auto requestId = objectString (obj, "requestId");
+    auto requestedProfileId = objectString (obj, "profileId");
+    auto source = objectString (obj, "source");
+
+    juce::String error;
+    DeviceProfileEngine probe;
+    auto ok = probe.loadFromJson (source, error);
+
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", ok);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("profileId", requestedProfileId);
+    response->setProperty ("detectedProfileId", probe.getProfileId());
+    response->setProperty ("name", probe.getProfileName());
+    response->setProperty ("error", error);
+    response->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));
+    return juce::var (response);
+}
+
+juce::var DeviceProfileService::saveProfileSource (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    auto requestId = objectString (obj, "requestId");
+    auto profileId = objectString (obj, "profileId");
+    auto source = objectString (obj, "source");
+
+    auto profile = profiles.find (profileId);
+    if (profile == profiles.end())
+        return errorResponse (requestId, "Unknown profileId: " + profileId);
+
+    juce::String error;
+    DeviceProfileEngine probe;
+    if (! probe.loadFromJson (source, error))
+    {
+        auto response = errorResponse (requestId, error);
+        if (auto* responseObj = response.getDynamicObject())
+            responseObj->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));
+        return response;
+    }
+
+    auto file = profile->second.file;
+    if (! file.replaceWithText (source))
+        return errorResponse (requestId, "Could not save profile: " + file.getFullPathName());
+
+    auto savedSource = file.loadFileAsString();
+    if (normalizeLineEndingsForCompare (savedSource) != normalizeLineEndingsForCompare (source))
+        return errorResponse (requestId, "Profile save verification failed: " + file.getFullPathName());
+
+    auto oldProfileId = profileId;
+    auto newProfileId = probe.getProfileId();
+    if (! loadProfileFile (file, error))
+        return errorResponse (requestId, "Profile saved but reload failed: " + error);
+
+    if (newProfileId.isNotEmpty() && newProfileId != oldProfileId)
+        profiles.erase (oldProfileId);
+
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", true);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("profileId", newProfileId);
+    response->setProperty ("name", probe.getProfileName());
+    response->setProperty ("filePath", file.getFullPathName());
+    response->setProperty ("source", source);
+    response->setProperty ("lastModified", file.getLastModificationTime().toISO8601 (true));
+    response->setProperty ("savedBytes", static_cast<int> (source.getNumBytesAsUTF8()));
+    response->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));
+    return juce::var (response);
+}
+
 juce::var DeviceProfileService::listProfileParameters (const juce::var& payload)
 {
     auto* obj = payload.getDynamicObject();
     auto requestId = objectString (obj, "requestId");
     auto profileId = objectString (obj, "profileId");
     auto deviceRole = varToStringOr (obj != nullptr ? obj->getProperty ("deviceRole") : juce::var {}, "mainSynth");
+    auto offset = juce::jmax (0, objectIntOr (obj, "offset", 0));
+    auto limit = objectIntOr (obj, "limit", 160);
+    if (limit <= 0)
+        limit = 160;
+    limit = juce::jlimit (1, 500, limit);
+    auto query = objectString (obj, "query").trim();
+    auto group = objectString (obj, "group").trim();
+    auto type = objectString (obj, "type").trim();
+    auto access = objectString (obj, "access").trim();
 
     auto* engine = resolveEngine (profileId, deviceRole);
     if (engine == nullptr)
         return errorResponse (requestId, profileId.isNotEmpty() ? "Unknown profileId: " + profileId
                                                                 : "No profile mapped for role: " + deviceRole);
 
+    auto allDescriptors = engine->listParameterDescriptors();
+    juce::Array<juce::var> page;
+    juce::StringArray groups;
+    juce::StringArray types;
+    auto total = 0;
+
+    if (auto* descriptorArray = allDescriptors.getArray())
+    {
+        for (const auto& descriptorValue : *descriptorArray)
+        {
+            auto* descriptor = descriptorValue.getDynamicObject();
+            if (descriptor == nullptr)
+                continue;
+
+            groups.addIfNotAlreadyThere (objectString (descriptor, "group").isNotEmpty() ? objectString (descriptor, "group") : "Ungrouped");
+            types.addIfNotAlreadyThere (objectString (descriptor, "type").isNotEmpty() ? objectString (descriptor, "type") : "unknown");
+
+            if (! descriptorMatches (*descriptor, query, group, type, access))
+                continue;
+
+            if (total >= offset && page.size() < limit)
+                page.add (descriptorValue);
+
+            ++total;
+        }
+    }
+
+    groups.sort (true);
+    types.sort (true);
+    juce::Array<juce::var> groupItems;
+    juce::Array<juce::var> typeItems;
+    for (const auto& item : groups)
+        groupItems.add (item);
+    for (const auto& item : types)
+        typeItems.add (item);
+
     auto* response = new juce::DynamicObject();
     response->setProperty ("ok", true);
     response->setProperty ("requestId", requestId);
     response->setProperty ("profileId", resolveProfileId (profileId, deviceRole));
     response->setProperty ("deviceRole", deviceRole);
-    response->setProperty ("parameters", engine->listParameterDescriptors());
+    response->setProperty ("parameters", page);
+    response->setProperty ("offset", offset);
+    response->setProperty ("limit", limit);
+    response->setProperty ("total", total);
+    response->setProperty ("hasMore", offset + page.size() < total);
+    response->setProperty ("query", query);
+    response->setProperty ("group", group);
+    response->setProperty ("type", type);
+    response->setProperty ("access", access);
+    response->setProperty ("groups", groupItems);
+    response->setProperty ("types", typeItems);
+    return juce::var (response);
+}
+
+juce::var DeviceProfileService::getProfileParameterDetail (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    auto requestId = objectString (obj, "requestId");
+    auto profileId = objectString (obj, "profileId");
+    auto deviceRole = varToStringOr (obj != nullptr ? obj->getProperty ("deviceRole") : juce::var {}, "mainSynth");
+    auto parameterId = objectString (obj, "parameterId");
+    auto resolvedProfileId = resolveProfileId (profileId, deviceRole);
+
+    auto profile = profiles.find (resolvedProfileId);
+    if (profile == profiles.end())
+        return errorResponse (requestId, resolvedProfileId.isNotEmpty() ? "Unknown profileId: " + resolvedProfileId
+                                                                        : "No profile mapped for role: " + deviceRole);
+
+    const auto source = profile->second.file.loadFileAsString();
+    juce::var parsed;
+    auto parseResult = juce::JSON::parse (source, parsed);
+    if (parseResult.failed())
+        return errorResponse (requestId, parseResult.getErrorMessage());
+
+    auto* root = parsed.getDynamicObject();
+    auto parametersValue = root != nullptr ? root->getProperty ("parameters") : juce::var {};
+    auto* parameters = varArray (parametersValue);
+    if (parameters == nullptr)
+        return errorResponse (requestId, "Profile has no parameter array: " + resolvedProfileId);
+
+    juce::var parameter;
+    int parameterIndex = -1;
+    for (int index = 0; index < parameters->size(); ++index)
+    {
+        auto* candidate = (*parameters)[index].getDynamicObject();
+        if (candidate != nullptr && objectString (candidate, "id") == parameterId)
+        {
+            parameter = cloneVar ((*parameters)[index]);
+            parameterIndex = index;
+            break;
+        }
+    }
+
+    if (parameterIndex < 0)
+        return errorResponse (requestId, "Unknown parameter: " + parameterId);
+
+    auto* parameterObject = parameter.getDynamicObject();
+    auto recipeId = objectString (parameterObject, "messageRecipe");
+    juce::var recipe;
+    auto recipesValue = root != nullptr ? root->getProperty ("messageRecipes") : juce::var {};
+    if (auto* recipes = varArray (recipesValue))
+    {
+        for (const auto& recipeValue : *recipes)
+        {
+            auto* candidate = recipeValue.getDynamicObject();
+            if (candidate != nullptr && objectString (candidate, "id") == recipeId)
+            {
+                recipe = cloneVar (recipeValue);
+                break;
+            }
+        }
+    }
+
+    juce::Array<juce::var> tests;
+    auto testsValue = root != nullptr ? root->getProperty ("tests") : juce::var {};
+    if (auto* testArray = varArray (testsValue))
+    {
+        for (const auto& testValue : *testArray)
+        {
+            auto* candidate = testValue.getDynamicObject();
+            if (candidate != nullptr && objectString (candidate, "parameter") == parameterId)
+                tests.add (cloneVar (testValue));
+        }
+    }
+
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", true);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("profileId", resolvedProfileId);
+    response->setProperty ("deviceRole", deviceRole);
+    response->setProperty ("parameterId", parameterId);
+    response->setProperty ("parameterIndex", parameterIndex);
+    response->setProperty ("parameter", parameter);
+    response->setProperty ("recipe", recipe);
+    response->setProperty ("tests", tests);
+    response->setProperty ("filePath", profile->second.file.getFullPathName());
+    response->setProperty ("lastModified", profile->second.file.getLastModificationTime().toISO8601 (true));
+    return juce::var (response);
+}
+
+juce::var DeviceProfileService::saveProfileParameterDetail (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    auto requestId = objectString (obj, "requestId");
+    auto profileId = objectString (obj, "profileId");
+    auto deviceRole = varToStringOr (obj != nullptr ? obj->getProperty ("deviceRole") : juce::var {}, "mainSynth");
+    auto parameterId = objectString (obj, "parameterId");
+    auto parameter = obj != nullptr ? cloneVar (obj->getProperty ("parameter")) : juce::var {};
+    auto* parameterObject = parameter.getDynamicObject();
+    auto savedParameterId = objectString (parameterObject, "id");
+    auto resolvedProfileId = resolveProfileId (profileId, deviceRole);
+
+    if (parameterObject == nullptr)
+        return errorResponse (requestId, "Parameter payload is required");
+
+    if (savedParameterId.isEmpty())
+        return errorResponse (requestId, "Parameter id is required");
+
+    auto profile = profiles.find (resolvedProfileId);
+    if (profile == profiles.end())
+        return errorResponse (requestId, resolvedProfileId.isNotEmpty() ? "Unknown profileId: " + resolvedProfileId
+                                                                        : "No profile mapped for role: " + deviceRole);
+
+    const auto source = profile->second.file.loadFileAsString();
+    juce::var parsed;
+    auto parseResult = juce::JSON::parse (source, parsed);
+    if (parseResult.failed())
+        return errorResponse (requestId, parseResult.getErrorMessage());
+
+    auto* root = parsed.getDynamicObject();
+    auto parametersValue = root != nullptr ? root->getProperty ("parameters") : juce::var {};
+    auto* parameters = parametersValue.getArray();
+    if (parameters == nullptr)
+        return errorResponse (requestId, "Profile has no parameter array: " + resolvedProfileId);
+
+    auto replaceId = parameterId.isNotEmpty() ? parameterId : savedParameterId;
+    auto found = false;
+    for (auto& item : *parameters)
+    {
+        auto* candidate = item.getDynamicObject();
+        if (candidate != nullptr && objectString (candidate, "id") == replaceId)
+        {
+            item = parameter;
+            found = true;
+            break;
+        }
+    }
+
+    if (! found)
+        return errorResponse (requestId, "Unknown parameter: " + replaceId);
+
+    auto nextSource = juce::JSON::toString (parsed, true);
+    juce::String error;
+    DeviceProfileEngine probe;
+    if (! probe.loadFromJson (nextSource, error))
+    {
+        auto response = errorResponse (requestId, error);
+        if (auto* responseObj = response.getDynamicObject())
+            responseObj->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));
+        return response;
+    }
+
+    auto file = profile->second.file;
+    if (! file.replaceWithText (nextSource))
+        return errorResponse (requestId, "Could not save profile: " + file.getFullPathName());
+
+    if (! loadProfileFile (file, error))
+        return errorResponse (requestId, "Parameter saved but profile reload failed: " + error);
+
+    auto* response = new juce::DynamicObject();
+    response->setProperty ("ok", true);
+    response->setProperty ("requestId", requestId);
+    response->setProperty ("profileId", probe.getProfileId());
+    response->setProperty ("deviceRole", deviceRole);
+    response->setProperty ("parameterId", savedParameterId);
+    response->setProperty ("parameter", parameter);
+    response->setProperty ("filePath", file.getFullPathName());
+    response->setProperty ("lastModified", file.getLastModificationTime().toISO8601 (true));
+    response->setProperty ("savedBytes", static_cast<int> (nextSource.getNumBytesAsUTF8()));
+    response->setProperty ("validation", validationMessagesToVar (probe.getValidationMessages()));
     return juce::var (response);
 }
 
@@ -277,6 +682,56 @@ juce::var DeviceProfileService::compileRawMidiAction (const juce::var& payload, 
     return juce::var (response);
 }
 
+juce::var DeviceProfileService::parseDumpMessage (const juce::var& payload, bool updateState)
+{
+    auto* obj = payload.getDynamicObject();
+    if (obj == nullptr)
+        return errorResponse ({}, "parseDumpMessage payload must be an object");
+
+    auto requestId = obj->getProperty ("requestId").toString();
+    auto deviceRole = varToStringOr (obj->getProperty ("deviceRole"), "mainSynth");
+    auto profileId = obj->getProperty ("profileId").toString();
+    auto hex = obj->getProperty ("hex").toString();
+
+    if (hex.trim().isEmpty())
+        return errorResponse (requestId, "Dump hex is required");
+
+    auto* engine = resolveEngine (profileId, deviceRole);
+    if (engine == nullptr)
+        return errorResponse (requestId, "No device profile mapped for role: " + deviceRole);
+
+    auto resolvedProfileId = resolveProfileId (profileId, deviceRole);
+    auto result = engine->parseDumpMessage (hex);
+    if (! result.ok)
+    {
+        auto response = dumpParseResultToVar (requestId, resolvedProfileId, deviceRole, result);
+        if (updateState)
+            appendMonitorEvent ("error", deviceRole, "sysex", "dump parse", hex, result.error);
+        return response;
+    }
+
+    if (updateState)
+    {
+        if (auto* values = result.values.getDynamicObject())
+            for (const auto& property : values->getProperties())
+                runtimeState[deviceRole][property.name.toString()] = property.value;
+
+        appendMonitorEvent ("in",
+                            deviceRole,
+                            "sysex",
+                            result.dumpName.isNotEmpty() ? result.dumpName : result.dumpId,
+                            hex,
+                            "Parsed " + juce::String (result.values.getDynamicObject() != nullptr
+                                ? result.values.getDynamicObject()->getProperties().size()
+                                : 0) + " value(s)");
+    }
+
+    auto response = dumpParseResultToVar (requestId, resolvedProfileId, deviceRole, result);
+    if (auto* responseObject = response.getDynamicObject())
+        responseObject->setProperty ("runtimeState", getRuntimeState());
+    return response;
+}
+
 juce::var DeviceProfileService::runProfileTests (const juce::var& payload)
 {
     auto* obj = payload.getDynamicObject();
@@ -402,12 +857,6 @@ bool DeviceProfileService::loadProfileFile (const juce::File& file, juce::String
         error = "Profile id is empty";
         return false;
     }
-
-    auto existing = profiles.find (profileId);
-    if (existing != profiles.end()
-        && existing->second.file == file
-        && existing->second.lastModificationTime == file.getLastModificationTime())
-        return true;
 
     profiles[profileId] = LoadedProfile { file, file.getLastModificationTime(), std::move (engine) };
     return true;
@@ -584,6 +1033,24 @@ juce::var DeviceProfileService::transactionToVar (const MidiTransaction& transac
     return juce::var (obj);
 }
 
+juce::var DeviceProfileService::dumpParseResultToVar (const juce::String& requestId,
+                                                      const juce::String& profileId,
+                                                      const juce::String& deviceRole,
+                                                      const DumpParseResult& result)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("ok", result.ok);
+    obj->setProperty ("requestId", requestId);
+    obj->setProperty ("profileId", profileId);
+    obj->setProperty ("deviceRole", deviceRole);
+    obj->setProperty ("dumpId", result.dumpId);
+    obj->setProperty ("dumpName", result.dumpName);
+    obj->setProperty ("checksumStatus", result.checksumStatus);
+    obj->setProperty ("values", result.values);
+    obj->setProperty ("error", result.error);
+    return juce::var (obj);
+}
+
 juce::var DeviceProfileService::testResultsToVar (const juce::String& profileId, const juce::Array<ProfileTestResult>& results)
 {
     auto* obj = new juce::DynamicObject();
@@ -599,9 +1066,12 @@ juce::var DeviceProfileService::testResultsToVar (const juce::String& profileId,
 
         auto* item = new juce::DynamicObject();
         item->setProperty ("name", result.name);
+        item->setProperty ("kind", result.kind);
         item->setProperty ("passed", result.passed);
         item->setProperty ("expectedHex", result.expectedHex);
         item->setProperty ("actualHex", result.actualHex);
+        item->setProperty ("expectedValues", result.expectedValues);
+        item->setProperty ("actualValues", result.actualValues);
         item->setProperty ("error", result.error);
         items.add (juce::var (item));
     }
@@ -611,6 +1081,21 @@ juce::var DeviceProfileService::testResultsToVar (const juce::String& profileId,
     obj->setProperty ("total", results.size());
     obj->setProperty ("results", juce::var (items));
     return juce::var (obj);
+}
+
+juce::var DeviceProfileService::validationMessagesToVar (const juce::Array<ValidationMessage>& messages)
+{
+    juce::Array<juce::var> items;
+    for (const auto& message : messages)
+    {
+        auto* item = new juce::DynamicObject();
+        item->setProperty ("level", validationLevelToString (message.level));
+        item->setProperty ("path", message.path);
+        item->setProperty ("message", message.message);
+        items.add (juce::var (item));
+    }
+
+    return juce::var (items);
 }
 
 juce::var DeviceProfileService::errorResponse (const juce::String& requestId, const juce::String& error)

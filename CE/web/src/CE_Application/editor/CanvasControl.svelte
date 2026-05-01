@@ -3,7 +3,7 @@
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
-  import { selectedComponentIds, selectComponent, multiDragDelta, keyObjectId } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
@@ -19,6 +19,8 @@
   import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
   import { normalizeSegmentTargetIds } from '../utils/segmentTargets.js';
+  import { getBindingCompatibility } from '../models/componentPorts.js';
+  import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import {
     buildRadioWholeBackground,
     resolveRadioSegmentStyle,
@@ -200,6 +202,19 @@
   // During multi-drag, non-dragged selected components offset by the shared delta
   let multiDragOffsetX = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.x : 0);
   let multiDragOffsetY = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  let deviceDropCompatibility = $derived($deviceParameterDrag?.parameter
+    ? getBindingCompatibility(core?.controlType, $deviceParameterDrag.parameter)
+    : null
+  );
+  let deviceDropStatus = $derived(
+    !editorInteractionEnabled || panelLocked || isEditorLocked || !$deviceParameterDrag
+      ? ''
+      : deviceDropCompatibility?.status === 'compatible'
+        ? 'compatible'
+        : deviceDropCompatibility?.status === 'warning'
+          ? 'warning'
+          : 'incompatible'
+  );
 
   let displayX = $derived((transientX ?? transform?.x ?? 0) + multiDragOffsetX);
   let displayY = $derived((transientY ?? transform?.y ?? 0) + multiDragOffsetY);
@@ -273,6 +288,189 @@
 
     window.addEventListener('mousemove', handleDragMove);
     window.addEventListener('mouseup', handleDragEnd);
+  }
+
+  function parseDeviceParameterDrag(event) {
+    const raw = event.dataTransfer?.getData('application/x-ceditor-device-parameter');
+    if (!raw) return null;
+
+    try {
+      const payload = JSON.parse(raw);
+      if (payload?.kind !== 'ceditor.deviceParameter' || !payload?.parameter?.id) return null;
+      return payload;
+    } catch {
+      return null;
+    }
+  }
+
+  function canAcceptDeviceParameterDrop(payload) {
+    if (!editorInteractionEnabled || panelLocked || isEditorLocked || !core?.id) return false;
+    const compatibility = getBindingCompatibility(core.controlType, payload?.parameter);
+    return compatibility.status !== 'incompatible' && !!compatibility.port;
+  }
+
+  function handleDeviceParameterDragOver(event) {
+    const types = Array.from(event.dataTransfer?.types ?? []);
+    if (!types.includes('application/x-ceditor-device-parameter')) return;
+
+    if (editorInteractionEnabled && !panelLocked && !isEditorLocked && !!core?.id) {
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+    } else {
+      event.dataTransfer.dropEffect = 'none';
+    }
+  }
+
+  function handleDeviceParameterDrop(event) {
+    const payload = parseDeviceParameterDrag(event);
+    if (!payload || !canAcceptDeviceParameterDrop(payload)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    bindDroppedDeviceParameter(payload);
+  }
+
+  function bindDroppedDeviceParameter(payload) {
+    const parameter = payload.parameter;
+    const compatibility = getBindingCompatibility(core.controlType, parameter);
+    if (!compatibility.port) return;
+
+    selectComponent(core.id, false);
+
+    const deviceBindings = getSection(sourceControl, 'DeviceBindings');
+    const existing = deviceBindings?.bindings;
+    const nextBindings = Array.isArray(existing) ? [...existing] : [];
+    const bindingIndex = nextBindings.findIndex((binding) => binding.port === compatibility.port.id);
+    const nextBinding = {
+      kind: 'deviceParameter',
+      port: compatibility.port.id,
+      deviceRole: payload.deviceRole || 'mainSynth',
+      parameterId: parameter.id,
+      parameterType: parameter.type,
+      adoptMetadata: true,
+      dryRun: true,
+      feedback: {
+        receiveUpdates: true,
+        ignoreOwnEchoes: true,
+        echoWindowMs: 250,
+      },
+    };
+
+    if (bindingIndex >= 0) nextBindings[bindingIndex] = nextBinding;
+    else nextBindings.push(nextBinding);
+
+    if (deviceBindings) {
+      updateControlProperty(core.id, 'DeviceBindings.bindings', nextBindings);
+    } else {
+      updateControlProperty(core.id, 'DeviceBindings', {
+        _type: 'DeviceBindings',
+        enabled: true,
+        debug: false,
+        bindings: nextBindings,
+      });
+    }
+
+    adoptDroppedParameterMetadata(core.id, core.controlType, parameter);
+    persistDroppedPanelDeviceReference(payload);
+  }
+
+  function persistDroppedPanelDeviceReference(payload) {
+    const panel = get(activePanel);
+    const parameter = payload?.parameter;
+    if (!panel?.id || !parameter?.id || !payload?.profileId) return;
+
+    const role = payload.deviceRole || 'mainSynth';
+    const requiredProfiles = Array.isArray(panel.requiredProfiles) ? [...panel.requiredProfiles] : [];
+    const existingIndex = requiredProfiles.findIndex((entry) => entry?.role === role);
+    const requiredProfile = {
+      role,
+      profileId: payload.profileId,
+      version: '*',
+    };
+
+    if (existingIndex >= 0) requiredProfiles[existingIndex] = requiredProfile;
+    else requiredProfiles.push(requiredProfile);
+
+    const snapshotKey = `${role}.${parameter.id}`;
+    const parameterSnapshots = {
+      ...(panel.parameterSnapshots ?? {}),
+      [snapshotKey]: {
+        id: parameter.id,
+        name: parameter.name ?? parameter.id,
+        type: parameter.type ?? '',
+        group: parameter.group ?? '',
+        range: parameter.range ?? null,
+        choices: Array.isArray(parameter.choices)
+          ? parameter.choices.map((choice) => ({
+            id: choice.id,
+            label: choice.label,
+            value: choice.value,
+          }))
+          : undefined,
+        display: parameter.display ?? null,
+      },
+    };
+
+    updatePanel(panel.id, {
+      requiredProfiles,
+      parameterSnapshots,
+    });
+  }
+
+  function adoptDroppedParameterMetadata(controlId, controlType, parameter) {
+    const shortLabel = parameter?.display?.shortLabel || parameter?.name || parameter?.id;
+    if (shortLabel && ['Button', 'MomentaryButton', 'TimedButton', 'OneShotButton', 'ToggleButton', 'RadioButtonGroup', 'CyclicButton', 'Combobox', 'Label'].includes(controlType)) {
+      updateControlProperty(controlId, 'Text.content', shortLabel);
+    }
+
+    if (parameter?.type === 'integer' || parameter?.type === 'float' || parameter?.type === 'bipolar') {
+      const min = Number(parameter?.range?.min ?? 0);
+      const max = Number(parameter?.range?.max ?? 127);
+      const value = Number(parameter?.default ?? min);
+      updateControlProperty(controlId, 'Behavior.min', min);
+      updateControlProperty(controlId, 'Behavior.max', max);
+      updateControlProperty(controlId, 'Behavior.defaultCurrentValue', value);
+      updateControlProperty(controlId, 'Behavior.valueType', parameter.type === 'float' ? 'float' : 'int');
+    }
+
+    if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {
+      updateControlProperty(controlId, 'Value.rows', parameter.choices.map((choice, index) => ({
+        id: choice.id ?? `choice_${index + 1}`,
+        displayText: choice.label ?? choice.id ?? String(choice.value ?? index),
+        internalValue: choice.id ?? String(choice.value ?? index),
+        sendValue: choice.value ?? index,
+        receiveValue: choice.value ?? index,
+        selectedByDefault: (choice.id ?? String(choice.value)) === parameter.default,
+        enabled: true,
+        visualOverrides: {},
+      })));
+      updateControlProperty(controlId, 'Behavior.valueType', 'enum');
+      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default ?? parameter.choices[0]?.id ?? '');
+    }
+
+    if (parameter?.type === 'boolean') {
+      updateControlProperty(controlId, 'Behavior.family', 'select');
+      updateControlProperty(controlId, 'Behavior.role', 'toggle');
+      updateControlProperty(controlId, 'Behavior.valueType', 'bool');
+      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default === true);
+      updateControlProperty(controlId, 'Behavior.allowMixed', false);
+    }
+
+    if (parameter?.type === 'action' || parameter?.type === 'momentary') {
+      updateControlProperty(controlId, 'Behavior.family', 'trigger');
+      updateControlProperty(controlId, 'Behavior.role', 'button');
+      updateControlProperty(controlId, 'Behavior.valueType', 'none');
+      if (controlType === 'TimedButton') {
+        updateControlProperty(controlId, 'Behavior.buttonType', 'timed');
+        updateControlProperty(controlId, 'Behavior.subtype', 'hold_to_confirm');
+      } else if (controlType === 'OneShotButton') {
+        updateControlProperty(controlId, 'Behavior.buttonType', 'one_shot');
+        updateControlProperty(controlId, 'Behavior.subtype', 'single_use');
+      } else {
+        updateControlProperty(controlId, 'Behavior.buttonType', parameter.type === 'momentary' ? 'momentary' : 'one_shot');
+        updateControlProperty(controlId, 'Behavior.subtype', parameter.type === 'momentary' ? 'momentary' : 'action');
+      }
+    }
   }
 
   function handleDragMove(e) {
@@ -3772,8 +3970,13 @@
   class:preview-disabled={previewInteractive && previewAriaDisabled === true}
   class:preview-keyboard-focus={previewInteractive && previewKeyboardFocus}
   class:preview-highlighted={previewInteractive && previewHighlighted}
+  class:device-drop-compatible={deviceDropStatus === 'compatible'}
+  class:device-drop-warning={deviceDropStatus === 'warning'}
+  class:device-drop-incompatible={deviceDropStatus === 'incompatible'}
   style="left:{displayX}px; top:{displayY}px; width:{displayW}px; height:{displayH}px; opacity:{renderOpacity}; {canvasTransformCSS} {rootTransitionCSS} {shadowCSS} {blendCSS}"
   onmousedown={editorInteractionEnabled ? handleMouseDown : undefined}
+  ondragover={editorInteractionEnabled ? handleDeviceParameterDragOver : undefined}
+  ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
   onpointerleave={previewInteractive ? onpreviewpointerleave : undefined}
   onpointerdown={previewInteractive ? onpreviewpointerdown : undefined}
@@ -5351,6 +5554,24 @@
 
   .canvas-control.locked {
     cursor: not-allowed;
+  }
+
+  .canvas-control.device-drop-compatible {
+    outline: 2px solid rgba(124, 193, 141, 0.9);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(124, 193, 141, 0.14);
+  }
+
+  .canvas-control.device-drop-warning {
+    outline: 2px solid rgba(213, 180, 91, 0.95);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(213, 180, 91, 0.16);
+  }
+
+  .canvas-control.device-drop-incompatible {
+    outline: 2px solid rgba(213, 107, 107, 0.9);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px rgba(213, 107, 107, 0.14);
   }
 
 </style>

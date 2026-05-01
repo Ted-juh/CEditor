@@ -102,9 +102,16 @@
       : [];
   }
 
-  function bindingValueForPatch(binding, patch = {}) {
-    const port = String(binding?.port ?? 'value');
-    if (port === 'trigger') {
+    function bindingValueForPatch(binding, patch = {}) {
+        if (isTimedButtonBehavior(behavior)) {
+            return patch.executed === true ? true : undefined;
+        }
+
+        const port = String(binding?.port ?? 'value');
+        if (port === 'trigger') {
+            if (String(binding?.parameterType ?? '') === 'momentary') {
+                return Object.prototype.hasOwnProperty.call(patch, 'pressed') ? patch.pressed === true : undefined;
+            }
       if (patch.executed === true || patch.pressed === false) return true;
       return undefined;
     }
@@ -472,11 +479,20 @@
   function setSliderRoleValue(role = 'current', nextValue = 0, extraPatch = {}) {
     const legal = getSliderLegalRangeForHandle(behavior, session, role);
     const clamped = Math.max(legal.min, Math.min(legal.max, snapSliderValue(behavior, nextValue)));
+    const currentRolePatch = role === 'current'
+      ? {
+          valueOverrideEnabled: true,
+          valueOverride: clamped,
+        }
+      : {
+          valueOverrideEnabled: false,
+        };
     patchSession({
       activeHandle: role,
       valueInputRole: role,
       [`${role}ValueOverrideEnabled`]: true,
       [`${role}ValueOverride`]: clamped,
+      ...currentRolePatch,
       valueInputActive: false,
       valueInputBuffer: '',
       ...extraPatch,

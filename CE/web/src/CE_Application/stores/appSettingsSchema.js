@@ -31,7 +31,12 @@ export function getBuiltinFonts() {
 }
 
 export function createDefaultSettings() {
-  return { general: { ...DEFAULT_GENERAL_SETTINGS }, fonts: [], icons: [] };
+  return {
+    general: { ...DEFAULT_GENERAL_SETTINGS },
+    fonts: [],
+    icons: [],
+    deviceSession: createDefaultDeviceSession(),
+  };
 }
 
 export function createFontId(prefix = 'font') {
@@ -190,6 +195,75 @@ function clampInteger(value, fallback, min, max) {
   return Math.max(min, Math.min(max, parsed));
 }
 
+function normalizeMidiDestination(destination) {
+  const type = String(destination?.type ?? 'previewOnly');
+  const id = String(destination?.id ?? (type === 'previewOnly' ? 'previewOnly' : ''));
+  const name = String(destination?.name ?? (id === 'previewOnly' ? 'Preview Only' : id));
+
+  return {
+    type: type || 'previewOnly',
+    id: id || 'previewOnly',
+    name: name || 'Preview Only',
+  };
+}
+
+function normalizeDeviceRoleMapping(mapping, role = 'mainSynth') {
+  return {
+    role: String(mapping?.role ?? role),
+    profileId: String(mapping?.profileId ?? 'test-cc-synth'),
+    midiDestination: normalizeMidiDestination(mapping?.midiDestination),
+    variables: mapping?.variables && typeof mapping.variables === 'object' ? { ...mapping.variables } : {},
+    timingOverrides: mapping?.timingOverrides && typeof mapping.timingOverrides === 'object'
+      ? { ...mapping.timingOverrides }
+      : {},
+  };
+}
+
+export function createDefaultDeviceSession() {
+  const mainSynth = normalizeDeviceRoleMapping(null, 'mainSynth');
+
+  return {
+    selectedProfileId: mainSynth.profileId,
+    selectedDestinationId: mainSynth.midiDestination.id,
+    roleMappings: {
+      mainSynth,
+    },
+  };
+}
+
+export function normalizeDeviceSession(session) {
+  const fallback = createDefaultDeviceSession();
+  const rawMappings = session?.roleMappings && typeof session.roleMappings === 'object'
+    ? session.roleMappings
+    : {};
+  const roleMappings = {};
+
+  for (const [role, mapping] of Object.entries(rawMappings)) {
+    roleMappings[role] = normalizeDeviceRoleMapping(mapping, role);
+  }
+
+  if (!roleMappings.mainSynth) {
+    roleMappings.mainSynth = normalizeDeviceRoleMapping(session?.mainSynth, 'mainSynth');
+  }
+
+  const selectedProfileId = String(
+    session?.selectedProfileId
+    ?? roleMappings.mainSynth?.profileId
+    ?? fallback.selectedProfileId
+  );
+  const selectedDestinationId = String(
+    session?.selectedDestinationId
+    ?? roleMappings.mainSynth?.midiDestination?.id
+    ?? fallback.selectedDestinationId
+  );
+
+  return {
+    selectedProfileId,
+    selectedDestinationId,
+    roleMappings,
+  };
+}
+
 export function normalizeGeneralSettings(general) {
   return {
     reopenLastSession: general?.reopenLastSession !== false,
@@ -231,6 +305,7 @@ export function normalizeGeneralSettings(general) {
 
 export function normalizeSettings(data) {
   const general = normalizeGeneralSettings(data?.general);
+  const deviceSession = normalizeDeviceSession(data?.deviceSession);
   const fonts = Array.isArray(data?.fonts)
     ? data.fonts.map(normalizeFontEntry).filter((font) => font.family)
     : [];
@@ -238,7 +313,7 @@ export function normalizeSettings(data) {
     ? data.icons.map(normalizeIconEntry).filter((icon) => icon.name && icon.dataUrl)
     : [];
 
-  return { general, fonts, icons };
+  return { general, fonts, icons, deviceSession };
 }
 
 export function sanitizeSettingsForPersistence(settings) {
@@ -259,6 +334,7 @@ export function sanitizeSettingsForPersistence(settings) {
       })
       : [],
     icons: Array.isArray(settings?.icons) ? settings.icons : [],
+    deviceSession: normalizeDeviceSession(settings?.deviceSession),
   };
 }
 

@@ -17,11 +17,17 @@ public:
 
     juce::var listProfiles();
     juce::var loadProfileFromFile (const juce::File& file);
+    juce::var getProfileSource (const juce::var& payload);
+    juce::var validateProfileSource (const juce::var& payload);
+    juce::var saveProfileSource (const juce::var& payload);
     juce::var listProfileParameters (const juce::var& payload);
+    juce::var getProfileParameterDetail (const juce::var& payload);
+    juce::var saveProfileParameterDetail (const juce::var& payload);
     juce::var listMidiDestinations() const;
     juce::var setDeviceRoleMapping (const juce::var& payload);
     juce::var compileParameterMessage (const juce::var& payload, bool updateState);
     juce::var compileRawMidiAction (const juce::var& payload, bool appendToMonitor);
+    juce::var parseDumpMessage (const juce::var& payload, bool updateState);
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
     juce::var getMonitorEvents() const;
@@ -73,7 +79,12 @@ private:
     void timerCallback() override;
 
     static juce::var transactionToVar (const MidiTransaction& transaction);
+    static juce::var dumpParseResultToVar (const juce::String& requestId,
+                                           const juce::String& profileId,
+                                           const juce::String& deviceRole,
+                                           const DumpParseResult& result);
     static juce::var testResultsToVar (const juce::String& profileId, const juce::Array<ProfileTestResult>& results);
+    static juce::var validationMessagesToVar (const juce::Array<ValidationMessage>& messages);
     static juce::var errorResponse (const juce::String& requestId, const juce::String& error);
     static juce::String validationLevelToString (ValidationMessage::Level level);
     static bool parseRawMidiHex (const juce::String& hex, juce::Array<int>& bytes, juce::String& error);

@@ -153,6 +153,26 @@ export function importDeviceProfile() {
   window.__JUCE__.backend.emitEvent('importDeviceProfile', {});
 }
 
+export function getDeviceProfileSource(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getDeviceProfileSource', payload ?? {});
+}
+
+export function validateDeviceProfileSource(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('validateDeviceProfileSource', payload ?? {});
+}
+
+export function saveDeviceProfileSource(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('saveDeviceProfileSource', payload ?? {});
+}
+
+export function saveProfileParameterDetail(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('saveProfileParameterDetail', payload ?? {});
+}
+
 export function setDeviceRoleMapping(payload) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('setDeviceRoleMapping', payload ?? {});
@@ -161,6 +181,11 @@ export function setDeviceRoleMapping(payload) {
 export function listProfileParameters(payload) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('listProfileParameters', payload ?? {});
+}
+
+export function getProfileParameterDetail(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getProfileParameterDetail', payload ?? {});
 }
 
 export function listMidiDestinations() {
@@ -186,6 +211,11 @@ export function compileRawMidiAction(payload) {
 export function triggerRawMidiAction(payload) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('triggerRawMidiAction', payload ?? {});
+}
+
+export function parseDumpMessage(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('parseDumpMessage', payload ?? {});
 }
 
 export function runDeviceProfileTests(payload) {
@@ -220,6 +250,24 @@ export function onDeviceProfileImported(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function onDeviceProfileSource(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfileSource', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceProfileSourceValidated(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfileSourceValidated', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceProfileSourceSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceProfileSourceSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onDeviceRoleMappingSet(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('deviceRoleMappingSet', callback);
@@ -229,6 +277,18 @@ export function onDeviceRoleMappingSet(callback) {
 export function onProfileParametersListed(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('profileParametersListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onProfileParameterDetail(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('profileParameterDetail', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onProfileParameterDetailSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('profileParameterDetailSaved', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
@@ -259,6 +319,12 @@ export function onRawMidiPreview(callback) {
 export function onRawMidiActionTriggered(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('rawMidiActionTriggered', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDumpMessageParsed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('dumpMessageParsed', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 

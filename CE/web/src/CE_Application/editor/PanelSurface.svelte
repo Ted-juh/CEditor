@@ -11,6 +11,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { showGuides } from '../stores/editorView.js';
+  import { deviceParameterDrag } from '../stores/deviceParameterDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
 
   let {
@@ -51,6 +52,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <div
   class="panel-surface"
+  class:device-drop-background={$deviceParameterDrag}
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
   use:bindSurface
   onclick={onclick}
@@ -105,6 +107,27 @@
     box-shadow: 0 4px 24px rgba(0,0,0,0.4);
     flex-shrink: 0;
     overflow: hidden;
+  }
+
+  .panel-surface.device-drop-background {
+    box-shadow:
+      0 4px 24px rgba(0,0,0,0.4),
+      inset 0 0 0 2px rgba(213, 107, 107, 0.45);
+  }
+
+  .panel-surface.device-drop-background::after {
+    content: 'Drop on a component';
+    position: absolute;
+    right: 8px;
+    bottom: 8px;
+    padding: 4px 7px;
+    border-radius: 3px;
+    background: rgba(24, 24, 24, 0.9);
+    border: 1px solid rgba(213, 107, 107, 0.55);
+    color: #D56B6B;
+    font-size: 10px;
+    pointer-events: none;
+    z-index: 250;
   }
 
   .bg-layer {

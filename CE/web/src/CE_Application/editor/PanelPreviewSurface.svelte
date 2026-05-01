@@ -369,9 +369,16 @@
       : [];
   }
 
-  function bindingValueForPatch(binding, patch = {}) {
+  function bindingValueForPatch(binding, patch = {}, control = null) {
+    if (isTimedButtonBehavior(getBehavior(control))) {
+      return patch.executed === true ? true : undefined;
+    }
+
     const port = String(binding?.port ?? 'value');
     if (port === 'trigger') {
+      if (String(binding?.parameterType ?? '') === 'momentary') {
+        return Object.prototype.hasOwnProperty.call(patch, 'pressed') ? patch.pressed === true : undefined;
+      }
       if (patch.executed === true || patch.pressed === false) return true;
       return undefined;
     }
@@ -395,16 +402,56 @@
 
   function emitDeviceBindingsForPatch(control, patch = {}) {
     const controlId = getControlId(control);
+    const interactionPhase = patch.dragging === true ? 'continuous' : 'commit';
     for (const binding of activeDeviceBindings(control)) {
-      const value = bindingValueForPatch(binding, patch);
+      const value = bindingValueForPatch(binding, patch, control);
       if (value === undefined) continue;
       commitDeviceParameter({
-        requestId: `panel_preview_${controlId || 'control'}_${Date.now()}`,
+        requestId: `panel_preview_${controlId || 'control'}_${interactionPhase}_${Date.now()}`,
         deviceRole: binding.deviceRole || 'mainSynth',
         parameterId: binding.parameterId,
         value,
-        interactionPhase: patch.dragging === true ? 'continuous' : 'commit',
+        interactionPhase,
         dryRun: binding.dryRun !== false,
+      });
+    }
+  }
+
+  function commitSelectActionAndEmit(control, options = {}) {
+    const controlId = getControlId(control);
+    if (!controlId) return;
+
+    const requestedValue = Object.prototype.hasOwnProperty.call(options, 'value')
+      ? options.value
+      : undefined;
+
+    const appliedPatch = commitPanelPreviewSelectAction(controlId, options);
+
+    if (appliedPatch?.valueOverrideEnabled === true) {
+      emitDeviceBindingsForPatch(control, {
+        valueOverride: appliedPatch.valueOverride,
+      });
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(appliedPatch ?? {}, 'checked')) {
+      emitDeviceBindingsForPatch(control, {
+        checked: appliedPatch.checked === true,
+      });
+      return;
+    }
+
+    if (requestedValue !== undefined && requestedValue !== '') {
+      emitDeviceBindingsForPatch(control, {
+        valueOverride: requestedValue,
+      });
+      return;
+    }
+
+    const currentSession = sessionFor(control);
+    if (currentSession?.valueOverrideEnabled === true) {
+      emitDeviceBindingsForPatch(control, {
+        valueOverride: currentSession.valueOverride,
       });
     }
   }
@@ -524,11 +571,20 @@
     const session = sessionFor(control);
     const legal = getSliderLegalRangeForHandle(behavior, session, role);
     const clamped = Math.max(legal.min, Math.min(legal.max, snapSliderValue(behavior, nextValue)));
+    const currentRolePatch = role === 'current'
+      ? {
+          valueOverrideEnabled: true,
+          valueOverride: clamped,
+        }
+      : {
+          valueOverrideEnabled: false,
+        };
     patchControlSession(getControlId(control), {
       activeHandle: role,
       valueInputRole: role,
       [`${role}ValueOverrideEnabled`]: true,
       [`${role}ValueOverride`]: clamped,
+      ...currentRolePatch,
       valueInputActive: false,
       valueInputBuffer: '',
       ...extraPatch,
@@ -874,8 +930,9 @@
             hover: true,
           });
         } else {
-          commitPanelPreviewSelectAction(activeId, {
-            value: resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY),
+          const value = resolveRadioGroupPreviewValue(activeControl, event.clientX, event.clientY);
+          commitSelectActionAndEmit(activeControl, {
+            value,
           });
         }
       }
@@ -996,7 +1053,7 @@
       if (isComboboxControl(control)) {
         openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;
       } else {
-        commitPanelPreviewSelectAction(controlId);
+        commitSelectActionAndEmit(control);
       }
     }
     patchControlSession(controlId, {

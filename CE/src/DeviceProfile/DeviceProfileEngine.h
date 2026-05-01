@@ -54,9 +54,22 @@ struct ProfileTestResult
 {
     juce::String name;
     bool passed = false;
+    juce::String kind = "parameter";
     juce::String expectedHex;
     juce::String actualHex;
+    juce::var expectedValues;
+    juce::var actualValues;
     juce::String error;
+};
+
+struct DumpParseResult
+{
+    bool ok = false;
+    juce::String error;
+    juce::String dumpId;
+    juce::String dumpName;
+    juce::String checksumStatus = "none";
+    juce::var values;
 };
 
 class DeviceProfileEngine
@@ -74,6 +87,8 @@ public:
                                        const juce::String& parameterId,
                                        const juce::var& value,
                                        bool dryRun = true) const;
+
+    DumpParseResult parseDumpMessage (const juce::String& hex) const;
 
     juce::var listParameterDescriptors() const;
     juce::Array<ProfileTestResult> runTests() const;
@@ -93,7 +108,14 @@ private:
     [[nodiscard]] const juce::DynamicObject* profileObject() const;
     [[nodiscard]] const juce::DynamicObject* findParameter (const juce::String& parameterId) const;
     [[nodiscard]] const juce::DynamicObject* findMessageRecipe (const juce::String& recipeId) const;
+    [[nodiscard]] const juce::DynamicObject* findDumpDefinition (const juce::String& dumpId) const;
     [[nodiscard]] juce::var resolveVariable (const juce::String& name) const;
+
+    DumpParseResult parseDumpWithDefinition (const juce::DynamicObject& dump, const juce::Array<int>& bytes) const;
+    juce::Result decodeDumpParameterValue (const juce::DynamicObject& parameter,
+                                           const juce::Array<int>& bytes,
+                                           int offset,
+                                           juce::var& semanticValue) const;
 
     CompileResult compileWithParameter (const juce::String& deviceRole,
                                         const juce::DynamicObject& parameter,

@@ -59,6 +59,7 @@
         port,
         deviceRole: 'mainSynth',
         parameterId: '',
+        parameterType: '',
         adoptMetadata: true,
         dryRun: true,
         feedback: {
@@ -135,6 +136,17 @@
       </PropertyCell>
       <PropertyCell label="Parameter" span={2} hint="Semantic parameter id from the device profile.">
         <input class="val" value={selectedBinding?.parameterId ?? ''} placeholder="filter.cutoff" onchange={(e) => setBindingProp('parameterId', e.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="Type" span={2} hint="Semantic parameter type. Dragging from the parameter browser fills this automatically.">
+        <select class="val" value={selectedBinding?.parameterType ?? ''} onchange={(e) => setBindingProp('parameterType', e.target.value)}>
+          <option value="">Auto / unspecified</option>
+          <option value="integer">Integer</option>
+          <option value="float">Float</option>
+          <option value="choice">Choice</option>
+          <option value="boolean">Boolean</option>
+          <option value="momentary">Momentary</option>
+          <option value="action">Action</option>
+        </select>
       </PropertyCell>
       <PropertyCell label="Adopt" span={1} hint="Allow this component to adopt compatible metadata from the parameter.">
         <PropertyToggle value={selectedBinding?.adoptMetadata !== false} onchange={() => setBindingProp('adoptMetadata', !(selectedBinding?.adoptMetadata !== false))} />

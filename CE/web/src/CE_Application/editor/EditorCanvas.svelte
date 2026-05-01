@@ -1,5 +1,5 @@
 <script>
-  import { activePanel, activeEditorTab, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection } from '../stores/panels.js';
+  import { activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize } from '../stores/panels.js';
   import { getSection, removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -14,9 +14,11 @@
   import PanelSurface from './PanelSurface.svelte';
   import PanelPreviewSurface from './PanelPreviewSurface.svelte';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
+  import DeviceProfileDesigner from './DeviceProfileDesigner.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
+  import { deviceProfiles, deviceRoleMappings } from '../stores/deviceProfiles.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
@@ -24,6 +26,23 @@
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
+  let panelDesignerSplit = $derived($activePanelDesignerSplit);
+  let splitDeviceProfileId = $derived(
+    $deviceRoleMappings?.mainSynth?.profileId
+      || panelDesignerSplit?.profileId
+      || ''
+  );
+  let splitDeviceProfileName = $derived(
+    $deviceProfiles.find((profile) => profile.id === splitDeviceProfileId)?.name
+      || panelDesignerSplit?.profileName
+      || splitDeviceProfileId
+  );
+  let splitDeviceOnLeft = $derived(panelDesignerSplit?.deviceOnLeft !== false);
+  let splitVisibleForActiveTab = $derived($activeEditorTab?.type === 'panel' && !!panelDesignerSplit);
+  let splitDesignerSize = $derived(Number(panelDesignerSplit?.designerSize ?? 0.5));
+  let splitPanelSize = $derived(1 - splitDesignerSize);
+  let splitGridStyle = $derived(buildEditorSplitStyle(panelDesignerSplit, splitDeviceOnLeft, splitDesignerSize, splitPanelSize));
+  let canvasPanel = $derived($activePanel);
 
   function bindViewport(node) {
     viewportEl = node;
@@ -54,8 +73,8 @@
   // the ResizeObserver above won't fire on zoom. We trigger it manually.
   $effect(() => {
     scale;
-    $activePanel?.width;
-    $activePanel?.height;
+    canvasPanel?.width;
+    canvasPanel?.height;
     metrics.width;
     metrics.height;
     if (zoomContainerEl) {
@@ -64,19 +83,19 @@
     }
   });
 
-  let gridEnabled = $derived($activePanel?.gridEnabled ?? false);
-  let gridSize = $derived($activePanel?.gridSize ?? 10);
-  let snapToGrid = $derived($activePanel?.snapToGrid ?? false);
-  let panelLocked = $derived($activePanel?.locked ?? false);
+  let gridEnabled = $derived(canvasPanel?.gridEnabled ?? false);
+  let gridSize = $derived(canvasPanel?.gridSize ?? 10);
+  let snapToGrid = $derived(canvasPanel?.snapToGrid ?? false);
+  let panelLocked = $derived(canvasPanel?.locked ?? false);
 
   // Grid snap origin — same centering math as the visual grid, without the visual fudge
-  let gridOrigin = $derived(computeGridOrigin($activePanel, gridSize));
+  let gridOrigin = $derived(computeGridOrigin(canvasPanel, gridSize));
 
-  let gridColour = $derived($activePanel?.gridColour ?? '33FFFFFF');
-  let gridLineWidth = $derived($activePanel?.gridLineWidth ?? 1);
+  let gridColour = $derived(canvasPanel?.gridColour ?? '33FFFFFF');
+  let gridLineWidth = $derived(canvasPanel?.gridLineWidth ?? 1);
 
   // Dynamic grid CSS — rendered on the panel surface
-  let gridStyle = $derived(buildGridStyle($activePanel, { gridEnabled, gridSize, gridColour, gridLineWidth }));
+  let gridStyle = $derived(buildGridStyle(canvasPanel, { gridEnabled, gridSize, gridColour, gridLineWidth }));
   let activeStateScope = $derived($stateEditScope);
   let scopedEditingControl = $derived(activeStateScope.mode === 'state' ? $selectedScopedEditingControl : null);
   let editorStateBadge = $derived(
@@ -87,17 +106,17 @@
 
   // Trigger file loading when paths change
   $effect(() => {
-    if ($activePanel?.bgImageEnabled && $activePanel?.bgImage) loadFile($activePanel.bgImage);
-    if ($activePanel?.bgTextureEnabled && $activePanel?.bgTexture) loadFile($activePanel.bgTexture);
+    if (canvasPanel?.bgImageEnabled && canvasPanel?.bgImage) loadFile(canvasPanel.bgImage);
+    if (canvasPanel?.bgTextureEnabled && canvasPanel?.bgTexture) loadFile(canvasPanel.bgTexture);
   });
 
   // Background layers as one keyed object — the PanelSurface loop picks
   // entries by layer id, so null/empty layers simply don't render.
   let bgLayers = $derived({
-    solid: buildSolidStyle($activePanel),
-    gradient: buildGradientStyle($activePanel),
-    image: buildLayerStyle($activePanel, 'Image', $activePanel?.bgImage ? $fileCache[$activePanel.bgImage] : null),
-    texture: buildLayerStyle($activePanel, 'Texture', $activePanel?.bgTexture ? $fileCache[$activePanel.bgTexture] : null),
+    solid: buildSolidStyle(canvasPanel),
+    gradient: buildGradientStyle(canvasPanel),
+    image: buildLayerStyle(canvasPanel, 'Image', canvasPanel?.bgImage ? $fileCache[canvasPanel.bgImage] : null),
+    texture: buildLayerStyle(canvasPanel, 'Texture', canvasPanel?.bgTexture ? $fileCache[canvasPanel.bgTexture] : null),
   });
 
   // --- DOM refs ---
@@ -105,9 +124,11 @@
   let zoomContainerEl = $state(null);
   let panelSurfaceEl = $state(null);
   let lastViewportPanelId = $state(null);
+  let splitContainerEl = $state(null);
+  let splitResizing = $state(false);
 
-  let scaledPanelWidth = $derived($activePanel ? $activePanel.width * scale : 0);
-  let scaledPanelHeight = $derived($activePanel ? $activePanel.height * scale : 0);
+  let scaledPanelWidth = $derived(canvasPanel ? canvasPanel.width * scale : 0);
+  let scaledPanelHeight = $derived(canvasPanel ? canvasPanel.height * scale : 0);
   let stageMarginLeft = $derived(Math.max(40, (metrics.width - scaledPanelWidth) / 2));
   let stageMarginTop = $derived(Math.max(40, (metrics.height - scaledPanelHeight) / 2));
   let previewBadge = $derived(
@@ -124,7 +145,7 @@
     pan.spaceHeld = false;
     pan.isPanning = false;
 
-    const controls = $activePanel?.controls ?? [];
+    const controls = canvasPanel?.controls ?? [];
     syncPanelPreviewSessions(controls);
 
     const availableIds = new Set(
@@ -147,12 +168,12 @@
   });
 
   $effect(() => {
-    const panelId = $activePanel?.id ?? null;
+    const panelId = canvasPanel?.id ?? null;
     if (!viewportEl || panelId == null || panelId === lastViewportPanelId) return;
 
     lastViewportPanelId = panelId;
     requestAnimationFrame(() => {
-      if (!viewportEl || $activePanel?.id !== panelId) return;
+      if (!viewportEl || canvasPanel?.id !== panelId) return;
       viewportEl.scrollLeft = 0;
       viewportEl.scrollTop = 0;
     });
@@ -175,7 +196,7 @@
     onSelect: (rect) => {
       // Only select if the marquee has a meaningful size (not just a click)
       if (rect.w < 3 && rect.h < 3) { clearSelection(); return; }
-      const ids = $activePanel ? findControlsInRect($activePanel.controls, rect, getSection) : new Set();
+      const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection) : new Set();
       selectedComponentIds.set(ids);
     },
   });
@@ -185,7 +206,7 @@
   // --- Zoom controller (wheel, fit-to-window, zoom-to-selection) ---
   const zoomCtrl = createZoomController({
     getViewport: () => viewportEl,
-    getPanel: () => $activePanel,
+    getPanel: () => canvasPanel,
     getSelection: () => $selectedComponentIds,
     getZoom: () => $editorZoom,
     editorZoom,
@@ -237,7 +258,7 @@
 
     panCtrl.handleKeyDown(e);
     handleEditorShortcut(e, {
-      panel: $activePanel, panelLocked, gridSize,
+      panel: canvasPanel, panelLocked, gridSize,
       editorZoom, editorZoomIncrement: $editorZoomIncrement,
       selectedComponentIds: $selectedComponentIds,
       fitToWindow: zoomCtrl.fitToWindow,
@@ -271,15 +292,54 @@
 
   function showContextMenuAt(screenX, screenY) {
     if ($previewModeEnabled) { ctxMenu = null; return; }
-    if (!$activePanel || !panelSurfaceEl) { ctxMenu = null; return; }
+    if (!canvasPanel || !panelSurfaceEl) { ctxMenu = null; return; }
     const rect = panelSurfaceEl.getBoundingClientRect();
     const panelX = (screenX - rect.left) / scale;
     const panelY = (screenY - rect.top) / scale;
     // If right-clicking on a control that isn't selected, select it
-    const clickedCtrl = findControlAtPoint($activePanel.controls, panelX, panelY);
+    const clickedCtrl = findControlAtPoint(canvasPanel.controls, panelX, panelY);
     const cid = clickedCtrl?._children?.Core?.id;
     if (cid && !$selectedComponentIds.has(cid)) selectComponent(cid);
     ctxMenu = { screenX, screenY, panelX, panelY };
+  }
+
+  function buildEditorSplitStyle(split, deviceFirst, designerSize, panelSize) {
+    const orientation = split?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
+    const designerFr = `${Math.round(designerSize * 1000) / 1000}fr`;
+    const panelFr = `${Math.round(panelSize * 1000) / 1000}fr`;
+    const before = deviceFirst ? designerFr : panelFr;
+    const after = deviceFirst ? panelFr : designerFr;
+    return orientation === 'horizontal'
+      ? `grid-template-rows: minmax(75px, ${before}) 7px minmax(75px, ${after});`
+      : `grid-template-columns: minmax(75px, ${before}) 7px minmax(75px, ${after});`;
+  }
+
+  function handleSplitResizeStart(event) {
+    if (!panelDesignerSplit || $activeEditorTab?.type !== 'panel') return;
+    event.preventDefault();
+    splitResizing = true;
+
+    const handleMove = (moveEvent) => {
+      if (!splitContainerEl) return;
+      const rect = splitContainerEl.getBoundingClientRect();
+      const orientation = panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
+      const deviceFirst = panelDesignerSplit?.deviceOnLeft !== false;
+      const raw = orientation === 'horizontal'
+        ? (deviceFirst ? (moveEvent.clientY - rect.top) / rect.height : (rect.bottom - moveEvent.clientY) / rect.height)
+        : (deviceFirst ? (moveEvent.clientX - rect.left) / rect.width : (rect.right - moveEvent.clientX) / rect.width);
+      setPanelDesignerSplitSize($activeEditorTab.id, raw);
+    };
+
+    const handleUp = () => {
+      splitResizing = false;
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', handleUp);
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+    window.addEventListener('pointercancel', handleUp);
   }
 </script>
 
@@ -290,13 +350,94 @@
   </div>
 
   <div class="canvas-area">
-    {#key `${$activeEditorTab?.type ?? 'panel'}:${$activeEditorTab?.id ?? 'none'}:${$activePanel?.id ?? 'none'}`}
-      {#if $activeEditorTab?.type === 'settings'}
+    {#key `${$activeEditorTab?.type ?? 'panel'}:${$activeEditorTab?.id ?? 'none'}:${canvasPanel?.id ?? 'none'}`}
+      {#if splitVisibleForActiveTab && splitDeviceProfileId && canvasPanel}
+        <div
+          class={['editor-split', panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical']}
+          class:resizing={splitResizing}
+          style={splitGridStyle}
+          bind:this={splitContainerEl}
+        >
+          {#if splitDeviceOnLeft}
+            <div class="designer-pane" title={splitDeviceProfileName}>
+              {#key splitDeviceProfileId}
+                <DeviceProfileDesigner profileId={splitDeviceProfileId} />
+              {/key}
+            </div>
+          {/if}
+          {#if splitDeviceOnLeft}
+            <button class="editor-split-resizer" aria-label="Resize editor split" onpointerdown={handleSplitResizeStart}></button>
+          {/if}
+          <div class="designer-panel-pane">
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <div class="canvas-viewport designer-split-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
+                 onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
+                 onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
+              <div class="canvas-stage">
+                <div
+                  class="zoom-container"
+                  use:bindZoomContainer
+                  style="width: {scaledPanelWidth}px; height: {scaledPanelHeight}px; margin-left: {stageMarginLeft}px; margin-top: {stageMarginTop}px;"
+                >
+                  {#if $previewModeEnabled}
+                    <PanelPreviewSurface
+                      panel={canvasPanel}
+                      {scale}
+                      {bgLayers}
+                      {gridStyle}
+                      bind:surfaceRef={panelSurfaceEl}
+                    />
+                  {:else}
+                    <PanelSurface
+                      panel={canvasPanel}
+                      {scale}
+                      {snapToGrid}
+                      {gridSize}
+                      {gridOrigin}
+                      {panelLocked}
+                      {bgLayers}
+                      {gridStyle}
+                      {scopedEditingControl}
+                      {marquee}
+                      {marqueeRect}
+                      bind:surfaceRef={panelSurfaceEl}
+                      onclick={handleCanvasClick}
+                      onmousedown={marqueeCtrl.handleMouseDown}
+                      oncontextmenu={handleContextMenu}
+                    />
+                  {/if}
+                  {#if $previewModeEnabled}
+                    <div class="editor-state-badge preview-active">{previewBadge}</div>
+                  {:else if editorStateBadge}
+                    <div class="editor-state-badge">{editorStateBadge}</div>
+                  {/if}
+                </div>
+              </div>
+            </div>
+            {#if !$previewModeEnabled}
+              <CanvasContextMenu bind:target={ctxMenu} panel={canvasPanel} />
+            {/if}
+          </div>
+          {#if !splitDeviceOnLeft}
+            <button class="editor-split-resizer" aria-label="Resize editor split" onpointerdown={handleSplitResizeStart}></button>
+          {/if}
+          {#if !splitDeviceOnLeft}
+            <div class="designer-pane" title={splitDeviceProfileName}>
+              {#key splitDeviceProfileId}
+                <DeviceProfileDesigner profileId={splitDeviceProfileId} />
+              {/key}
+            </div>
+          {/if}
+        </div>
+      {:else if $activeEditorTab?.type === 'settings'}
         <SettingsView />
-      {:else if $activePanel}
+      {:else if $activeEditorTab?.type === 'deviceProfile'}
+        <DeviceProfileDesigner profileId={$activeEditorTab.id} />
+      {:else if canvasPanel}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={$activePanel} 
+        <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
              onclick={handleCanvasClick} oncontextmenu={handleContextMenu}
              onmousedown={panCtrl.handleMouseDown} onwheel={zoomCtrl.handleWheel}>
           <div class="canvas-stage">
@@ -307,7 +448,7 @@
             >
               {#if $previewModeEnabled}
                 <PanelPreviewSurface
-                  panel={$activePanel}
+                  panel={canvasPanel}
                   {scale}
                   {bgLayers}
                   {gridStyle}
@@ -315,7 +456,7 @@
                 />
               {:else}
                 <PanelSurface
-                  panel={$activePanel}
+                  panel={canvasPanel}
                   {scale}
                   {snapToGrid}
                   {gridSize}
@@ -346,7 +487,7 @@
           <div class="ruler-corner"></div>
         {/if}
         {#if !$previewModeEnabled}
-          <CanvasContextMenu bind:target={ctxMenu} panel={$activePanel} />
+          <CanvasContextMenu bind:target={ctxMenu} panel={canvasPanel} />
         {/if}
       {:else}
         <div class="empty-state">
@@ -383,6 +524,77 @@
     background: #1A1A1A;
     overflow: hidden;
     position: relative;
+  }
+
+  .editor-split {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .designer-pane,
+  .designer-panel-pane {
+    min-width: 0;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .designer-pane {
+    border: 0;
+  }
+
+  .editor-split-resizer {
+    min-width: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: #303030;
+    position: relative;
+    z-index: 30;
+  }
+
+  .editor-split.vertical .editor-split-resizer {
+    cursor: col-resize;
+    border-left: 1px solid #202020;
+    border-right: 1px solid #202020;
+  }
+
+  .editor-split.horizontal .editor-split-resizer {
+    cursor: row-resize;
+    border-top: 1px solid #202020;
+    border-bottom: 1px solid #202020;
+  }
+
+  .editor-split-resizer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(91, 155, 213, 0);
+    transition: background 120ms ease;
+  }
+
+  .editor-split-resizer:hover::after,
+  .editor-split.resizing .editor-split-resizer::after {
+    background: rgba(91, 155, 213, 0.32);
+  }
+
+  .editor-split.resizing,
+  .editor-split.resizing * {
+    user-select: none;
+  }
+
+  .editor-split.vertical.resizing,
+  .editor-split.vertical.resizing * {
+    cursor: col-resize !important;
+  }
+
+  .editor-split.horizontal.resizing,
+  .editor-split.horizontal.resizing * {
+    cursor: row-resize !important;
   }
 
   .canvas-viewport {

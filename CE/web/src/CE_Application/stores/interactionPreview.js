@@ -232,10 +232,10 @@ export function resetPanelPreviewSession(controlId) {
 
 export function commitPanelPreviewSelectAction(controlId, options = {}) {
   const control = getActivePanelControlById(controlId);
-  if (!control) return;
+  if (!control) return null;
 
   const behavior = control?._children?.Behavior ?? null;
-  if (String(behavior?.family ?? '') !== 'select') return;
+  if (String(behavior?.family ?? '') !== 'select') return null;
 
   const role = String(behavior?.role ?? '');
   const buttonType = String(behavior?.buttonType ?? '');
@@ -264,7 +264,11 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
     }
 
     panelPreviewSessions.set(nextSessions);
-    return;
+    return {
+      checked: true,
+      mixed: false,
+      valueOverrideEnabled: false,
+    };
   }
 
   if (buttonType === 'radio' || role === 'radio') {
@@ -273,20 +277,21 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       ?? valueRows.find((row) => row?.selectedByDefault === true)
       ?? valueRows[0]
       ?? null;
-    if (!nextRow) return;
+    if (!nextRow) return null;
 
-    updatePanelPreviewSession(controlId, {
+    const patch = {
       checked: false,
       mixed: false,
       valueOverrideEnabled: true,
       valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
-    });
-    return;
+    };
+    updatePanelPreviewSession(controlId, patch);
+    return patch;
   }
 
   if (buttonType === 'combobox') {
     const valueRows = getEnabledValueRows(control);
-    if (!valueRows.length) return;
+    if (!valueRows.length) return null;
 
     const currentValue = currentSession?.valueOverrideEnabled === true
       ? currentSession?.valueOverride
@@ -296,20 +301,21 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       ?? valueRows.find((row) => row?.selectedByDefault === true)
       ?? valueRows[0]
       ?? null;
-    if (!nextRow) return;
+    if (!nextRow) return null;
 
-    updatePanelPreviewSession(controlId, {
+    const patch = {
       checked: false,
       mixed: false,
       valueOverrideEnabled: true,
       valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
-    });
-    return;
+    };
+    updatePanelPreviewSession(controlId, patch);
+    return patch;
   }
 
   if (buttonType === 'cyclic') {
     const valueRows = getEnabledValueRows(control);
-    if (!valueRows.length) return;
+    if (!valueRows.length) return null;
 
     const currentValue = currentSession?.valueOverrideEnabled === true
       ? currentSession?.valueOverride
@@ -323,34 +329,38 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       : currentIndex + 1;
     const nextRow = valueRows[nextIndex] ?? valueRows[0];
 
-    updatePanelPreviewSession(controlId, {
+    const patch = {
       valueOverrideEnabled: true,
       valueOverride: nextRow?.internalValue ?? nextRow?.id ?? '',
-    });
-    return;
+    };
+    updatePanelPreviewSession(controlId, patch);
+    return patch;
   }
 
   if (valueType === 'enum') {
     const values = Array.isArray(behavior?.enumValues) ? behavior.enumValues : [];
-    if (!values.length) return;
+    if (!values.length) return null;
 
     const currentValue = currentSession?.valueOverrideEnabled === true
       ? currentSession?.valueOverride
       : behavior?.defaultValue;
     const nextValue = getNextEnumValue(values, currentValue, behavior?.wrapEnum === true);
 
-    updatePanelPreviewSession(controlId, {
+    const patch = {
       valueOverrideEnabled: true,
       valueOverride: nextValue,
-    });
-    return;
+    };
+    updatePanelPreviewSession(controlId, patch);
+    return patch;
   }
 
-  updatePanelPreviewSession(controlId, {
+  const patch = {
     checked: !currentPreviewBoolValue(control, currentSession),
     mixed: false,
     valueOverrideEnabled: false,
-  });
+  };
+  updatePanelPreviewSession(controlId, patch);
+  return patch;
 }
 
 export const selectedInteractionPreview = derived(

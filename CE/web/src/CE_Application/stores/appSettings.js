@@ -38,6 +38,7 @@ import {
   normalizeFamilyName,
   normalizeFontEntry,
   normalizeGeneralSettings,
+  normalizeDeviceSession,
   normalizeSettings,
   normalizeSupportedFeatures,
   sanitizeSettingsForPersistence,
@@ -852,6 +853,24 @@ export function updateGeneralSettings(updates) {
 
   const general = get(appSettings).general ?? { ...DEFAULT_GENERAL_SETTINGS };
   applyGeneralSettingsToRuntime(general);
+  persistSettings();
+}
+
+export function updateDeviceSessionSettings(updates) {
+  if (!updates || typeof updates !== 'object') return;
+
+  appSettings.update((current) => ({
+    ...current,
+    deviceSession: normalizeDeviceSession({
+      ...(current.deviceSession ?? {}),
+      ...updates,
+      roleMappings: {
+        ...(current.deviceSession?.roleMappings ?? {}),
+        ...(updates.roleMappings ?? {}),
+      },
+    }),
+  }));
+
   persistSettings();
 }
 

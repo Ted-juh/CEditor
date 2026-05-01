@@ -98,6 +98,8 @@ export function createPanel(name = null) {
       images: [],
       activeImageIndex: 0,
     },
+    requiredProfiles: [],
+    parameterSnapshots: {},
     modified: false,
     controls: [],
   };

@@ -38,6 +38,17 @@ bool isMidiDataByte (int value)
     return value >= 0 && value <= 127;
 }
 
+bool varsEqual (const juce::var& left, const juce::var& right)
+{
+    if (left.isBool() || right.isBool())
+        return static_cast<bool> (left) == static_cast<bool> (right);
+
+    if (left.isInt() || left.isDouble() || right.isInt() || right.isDouble())
+        return std::abs ((double) left - (double) right) < 0.000001;
+
+    return left.toString() == right.toString();
+}
+
 juce::String byteToHex (int value)
 {
     return juce::String::toHexString (value).paddedLeft ('0', 2).toUpperCase();
@@ -58,6 +69,60 @@ juce::Array<int> parseHexBytes (const juce::String& text)
         bytes.add (parseHexByte (token));
 
     return bytes;
+}
+
+juce::Array<int> parsePatternBytes (const juce::var& patternValue,
+                                    const std::function<juce::var (const juce::String&)>& resolveVariable)
+{
+    juce::Array<int> bytes;
+    juce::StringArray tokens;
+
+    if (auto* patternArray = patternValue.getArray())
+    {
+        for (const auto& item : *patternArray)
+            tokens.add (item.toString());
+    }
+    else
+    {
+        tokens.addTokens (patternValue.toString(), " ,\t\r\n", "");
+    }
+
+    tokens.removeEmptyStrings();
+    for (const auto& tokenValue : tokens)
+    {
+        auto token = tokenValue.trim();
+        if (token.startsWithChar ('$'))
+            bytes.add ((int) resolveVariable (token.substring (1)));
+        else
+            bytes.add (parseHexByte (token));
+    }
+
+    return bytes;
+}
+
+bool startsWithBytes (const juce::Array<int>& bytes, const juce::Array<int>& prefix)
+{
+    if (prefix.size() > bytes.size())
+        return false;
+
+    for (int i = 0; i < prefix.size(); ++i)
+        if (bytes[i] != prefix[i])
+            return false;
+
+    return true;
+}
+
+bool endsWithBytes (const juce::Array<int>& bytes, const juce::Array<int>& suffix)
+{
+    if (suffix.size() > bytes.size())
+        return false;
+
+    auto offset = bytes.size() - suffix.size();
+    for (int i = 0; i < suffix.size(); ++i)
+        if (bytes[offset + i] != suffix[i])
+            return false;
+
+    return true;
 }
 
 bool isIntegerType (const juce::String& type)
@@ -238,6 +303,47 @@ juce::Array<ProfileTestResult> DeviceProfileEngine::runTests() const
         }
 
         result.name = propString (*test, "name");
+        result.kind = propString (*test, "kind").isNotEmpty() ? propString (*test, "kind") : "parameter";
+
+        if (result.kind == "dumpParse")
+        {
+            auto parseResult = parseDumpMessage (propString (*test, "inputHex"));
+            result.expectedValues = test->getProperty ("expectedValues");
+            result.actualValues = parseResult.values;
+
+            if (! parseResult.ok)
+            {
+                result.error = parseResult.error;
+                results.add (result);
+                continue;
+            }
+
+            auto* expected = result.expectedValues.getDynamicObject();
+            auto* actual = result.actualValues.getDynamicObject();
+            if (expected == nullptr)
+            {
+                result.error = "Dump parse test requires expectedValues";
+                results.add (result);
+                continue;
+            }
+
+            result.passed = true;
+            for (const auto& property : expected->getProperties())
+            {
+                auto actualValue = actual != nullptr ? actual->getProperty (property.name) : juce::var {};
+                if (! varsEqual (property.value, actualValue))
+                {
+                    result.passed = false;
+                    result.error = "Expected " + property.name.toString() + " = " + property.value.toString()
+                                   + " but got " + actualValue.toString();
+                    break;
+                }
+            }
+
+            results.add (result);
+            continue;
+        }
+
         result.expectedHex = propString (*test, "expectedHex").trim().toUpperCase();
 
         auto compileResult = compileSetParameter ("mainSynth",
@@ -261,6 +367,44 @@ juce::Array<ProfileTestResult> DeviceProfileEngine::runTests() const
     }
 
     return results;
+}
+
+DumpParseResult DeviceProfileEngine::parseDumpMessage (const juce::String& hex) const
+{
+    if (hasErrors())
+        return { false, "Profile has validation errors", {}, {}, "none", {} };
+
+    auto bytes = parseHexBytes (hex);
+    if (bytes.isEmpty())
+        return { false, "Dump message is empty", {}, {}, "none", {} };
+
+    if (bytes[0] == 0xf0 && bytes.getLast() != 0xf7)
+        return { false, "SysEx dump must end with F7", {}, {}, "none", {} };
+
+    for (int index = 1; index < bytes.size() - 1; ++index)
+        if (! isMidiDataByte (bytes[index]))
+            return { false, "SysEx data byte outside 0-127: " + byteToHex (bytes[index]), {}, {}, "none", {} };
+
+    auto* root = profileObject();
+    auto* dumps = root != nullptr ? asArray (root->getProperty ("dumpDefinitions")) : nullptr;
+    if (dumps == nullptr || dumps->isEmpty())
+        return { false, "Profile has no dump definitions", {}, {}, "none", {} };
+
+    juce::String lastError;
+    for (const auto& dumpValue : *dumps)
+    {
+        auto* dump = asObject (dumpValue);
+        if (dump == nullptr)
+            continue;
+
+        auto parsed = parseDumpWithDefinition (*dump, bytes);
+        if (parsed.ok)
+            return parsed;
+
+        lastError = parsed.error;
+    }
+
+    return { false, lastError.isNotEmpty() ? lastError : "No dump definition matched message", {}, {}, "none", {} };
 }
 
 juce::String DeviceProfileEngine::bytesToHex (const juce::Array<int>& bytes)
@@ -393,6 +537,21 @@ const juce::DynamicObject* DeviceProfileEngine::findMessageRecipe (const juce::S
     return nullptr;
 }
 
+const juce::DynamicObject* DeviceProfileEngine::findDumpDefinition (const juce::String& dumpId) const
+{
+    auto* root = profileObject();
+    auto* dumps = root != nullptr ? asArray (root->getProperty ("dumpDefinitions")) : nullptr;
+    if (dumps == nullptr)
+        return nullptr;
+
+    for (const auto& dumpValue : *dumps)
+        if (auto* dump = asObject (dumpValue))
+            if (propString (*dump, "id") == dumpId)
+                return dump;
+
+    return nullptr;
+}
+
 juce::var DeviceProfileEngine::resolveVariable (const juce::String& name) const
 {
     auto* root = profileObject();
@@ -401,6 +560,148 @@ juce::var DeviceProfileEngine::resolveVariable (const juce::String& name) const
         return {};
 
     return variables->getProperty (name);
+}
+
+DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::DynamicObject& dump, const juce::Array<int>& bytes) const
+{
+    auto* matcher = asObject (dump.getProperty ("matcher"));
+    auto prefix = matcher != nullptr ? parsePatternBytes (matcher->getProperty ("prefix"), [this] (const juce::String& name) { return resolveVariable (name); }) : juce::Array<int> {};
+    auto suffix = matcher != nullptr ? parsePatternBytes (matcher->getProperty ("suffix"), [this] (const juce::String& name) { return resolveVariable (name); }) : juce::Array<int> {};
+
+    if (! prefix.isEmpty() && ! startsWithBytes (bytes, prefix))
+        return { false, "Dump prefix did not match " + propString (dump, "id"), {}, {}, "none", {} };
+
+    if (! suffix.isEmpty() && ! endsWithBytes (bytes, suffix))
+        return { false, "Dump suffix did not match " + propString (dump, "id"), {}, {}, "none", {} };
+
+    juce::String checksumStatus = "none";
+    if (auto* checksum = asObject (dump.getProperty ("checksum")))
+    {
+        auto type = propString (*checksum, "type");
+        auto fromOffset = propInt (*checksum, "fromOffset", 0);
+        auto toOffset = propInt (*checksum, "toOffset", bytes.size() - 2);
+        auto byteOffset = propInt (*checksum, "byteOffset", bytes.size() - 2);
+        if (fromOffset < 0 || toOffset >= bytes.size() || fromOffset > toOffset || byteOffset < 0 || byteOffset >= bytes.size())
+            return { false, "Dump checksum range is outside message", {}, {}, "error", {} };
+
+        auto expected = 0;
+        for (int index = fromOffset; index <= toOffset; ++index)
+            expected = (expected + bytes[index]) & 0x7f;
+
+        if (type == "roland-7bit")
+            expected = (128 - expected) & 0x7f;
+        else if (type != "sum-7bit")
+            return { false, "Unsupported dump checksum type: " + type, {}, {}, "error", {} };
+
+        if (bytes[byteOffset] != expected)
+            return { false, "Dump checksum failed; expected " + byteToHex (expected) + " but got " + byteToHex (bytes[byteOffset]), {}, {}, "error", {} };
+
+        checksumStatus = "ok";
+    }
+
+    auto* payload = asObject (dump.getProperty ("payload"));
+    auto payloadOffset = payload != nullptr ? propInt (*payload, "offset", prefix.size()) : prefix.size();
+    auto* mappings = asArray (dump.getProperty ("mappings"));
+    if (mappings == nullptr || mappings->isEmpty())
+        return { false, "Dump definition has no mappings: " + propString (dump, "id"), {}, {}, checksumStatus, {} };
+
+    auto* values = new juce::DynamicObject();
+    for (const auto& mappingValue : *mappings)
+    {
+        auto* mapping = asObject (mappingValue);
+        if (mapping == nullptr)
+            continue;
+
+        auto parameterId = propString (*mapping, "parameter");
+        auto* parameter = findParameter (parameterId);
+        if (parameter == nullptr)
+            return { false, "Dump mapping references unknown parameter: " + parameterId, {}, {}, checksumStatus, {} };
+
+        juce::var semanticValue;
+        auto decoded = decodeDumpParameterValue (*parameter, bytes, payloadOffset + propInt (*mapping, "offset"), semanticValue);
+        if (decoded.failed())
+            return { false, decoded.getErrorMessage(), {}, {}, checksumStatus, {} };
+
+        values->setProperty (parameterId, semanticValue);
+    }
+
+    return { true, {}, propString (dump, "id"), propString (dump, "name"), checksumStatus, juce::var (values) };
+}
+
+juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicObject& parameter,
+                                                            const juce::Array<int>& bytes,
+                                                            int offset,
+                                                            juce::var& semanticValue) const
+{
+    if (offset < 0 || offset >= bytes.size())
+        return juce::Result::fail ("Dump value offset is outside message for " + propString (parameter, "id"));
+
+    auto type = propString (parameter, "type");
+    auto* encoding = asObject (parameter.getProperty ("encoding"));
+    auto encodingType = encoding != nullptr ? propString (*encoding, "type") : "u7";
+
+    if (type == "text")
+    {
+        auto length = encoding != nullptr ? propInt (*encoding, "length", 1) : 1;
+        if (length <= 0 || offset + length > bytes.size())
+            return juce::Result::fail ("Text dump value is outside message for " + propString (parameter, "id"));
+
+        juce::String text;
+        for (int index = 0; index < length; ++index)
+        {
+            auto byte = bytes[offset + index];
+            if (byte >= 32 && byte <= 127)
+                text += juce::String::charToString ((juce::juce_wchar) byte);
+        }
+
+        semanticValue = text.trimEnd();
+        return juce::Result::ok();
+    }
+
+    auto numeric = bytes[offset];
+    if (encodingType == "u14-msb-lsb" || encodingType == "u14")
+    {
+        if (offset + 1 >= bytes.size())
+            return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
+        numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
+    }
+    else if (encodingType == "nibbled")
+    {
+        auto nibbles = encoding != nullptr ? propInt (*encoding, "nibbles", 2) : 2;
+        if (nibbles <= 0 || offset + nibbles > bytes.size())
+            return juce::Result::fail ("Nibbled dump value is outside message for " + propString (parameter, "id"));
+
+        numeric = 0;
+        for (int index = 0; index < nibbles; ++index)
+            numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
+    }
+
+    if (type == "choice" || type == "enum")
+    {
+        auto* choices = asArray (parameter.getProperty ("choices"));
+        if (choices != nullptr)
+        {
+            for (const auto& choiceValue : *choices)
+            {
+                auto* choice = asObject (choiceValue);
+                if (choice != nullptr && propInt (*choice, "value") == numeric)
+                {
+                    semanticValue = propString (*choice, "id");
+                    return juce::Result::ok();
+                }
+            }
+        }
+    }
+
+    if (type == "boolean" || type == "momentary")
+    {
+        auto trueValue = propInt (parameter, "trueValue", 1);
+        semanticValue = numeric == trueValue;
+        return juce::Result::ok();
+    }
+
+    semanticValue = numeric;
+    return juce::Result::ok();
 }
 
 CompileResult DeviceProfileEngine::compileWithParameter (const juce::String& deviceRole,
@@ -464,14 +765,6 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
     auto* encoding = asObject (parameter.getProperty ("encoding"));
     auto encodingType = encoding != nullptr ? propString (*encoding, "type") : "u7";
 
-    if (type == "action")
-    {
-        semanticValue = true;
-        normalizedValue = 1.0;
-        displayedValue = "trigger";
-        return juce::Result::ok();
-    }
-
     if (isIntegerType (type))
     {
         auto* range = asObject (parameter.getProperty ("range"));
@@ -506,6 +799,27 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
                 return juce::Result::fail ("Encoded u14 value outside 0-16383 for " + propString (parameter, "id"));
             encodedBytes.add ((value >> 7) & 0x7f);
             encodedBytes.add (value & 0x7f);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "nibbled")
+        {
+            auto value = (int) std::round (numeric);
+            auto nibbles = encoding != nullptr ? propInt (*encoding, "nibbles", 2) : 2;
+
+            if (nibbles <= 0 || nibbles > 8)
+                return juce::Result::fail ("Nibbled encoder requires 1-8 nibbles for " + propString (parameter, "id"));
+
+            auto maxEncoded = 1;
+            for (int i = 0; i < nibbles; ++i)
+                maxEncoded *= 16;
+
+            if (value < 0 || value >= maxEncoded)
+                return juce::Result::fail ("Nibbled value outside 0-" + juce::String (maxEncoded - 1) + " for " + propString (parameter, "id"));
+
+            for (auto shift = (nibbles - 1) * 4; shift >= 0; shift -= 4)
+                encodedBytes.add ((value >> shift) & 0x0f);
+
             return juce::Result::ok();
         }
 
@@ -545,14 +859,61 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
         return juce::Result::fail ("Unknown choice value '" + requested + "' for " + propString (parameter, "id"));
     }
 
-    if (type == "boolean")
+    if (type == "text")
+    {
+        auto text = inputValue.toString();
+        auto fixedLength = encoding != nullptr ? propInt (*encoding, "length", text.length()) : text.length();
+        auto padByte = encoding != nullptr ? propInt (*encoding, "pad", 32) : 32;
+
+        if (encodingType != "text-ascii")
+            return juce::Result::fail ("Unsupported text encoder: " + encodingType);
+
+        if (fixedLength <= 0)
+            return juce::Result::fail ("Text encoder requires a positive length for " + propString (parameter, "id"));
+
+        if (text.length() > fixedLength)
+            return juce::Result::fail ("Text is longer than " + juce::String (fixedLength) + " characters for " + propString (parameter, "id"));
+
+        if (! isMidiDataByte (padByte))
+            return juce::Result::fail ("Text pad byte outside MIDI data byte range for " + propString (parameter, "id"));
+
+        for (int i = 0; i < fixedLength; ++i)
+        {
+            auto byte = i < text.length() ? (int) text[i] : padByte;
+            if (byte < 32 || byte > 127)
+                return juce::Result::fail ("Text contains non-ASCII/MIDI byte for " + propString (parameter, "id"));
+            encodedBytes.add (byte);
+        }
+
+        semanticValue = text;
+        normalizedValue = juce::jlimit (0.0, 1.0, (double) text.length() / (double) fixedLength);
+        displayedValue = text;
+        return juce::Result::ok();
+    }
+
+    if (type == "action")
+    {
+        auto encoded = propInt (parameter, "triggerValue", propInt (parameter, "value", 0));
+        if (! isMidiDataByte (encoded))
+            return juce::Result::fail ("Action encoded value outside MIDI data byte range for " + propString (parameter, "id"));
+
+        semanticValue = true;
+        normalizedValue = 1.0;
+        displayedValue = "Trigger";
+        encodedBytes.add (encoded);
+        return juce::Result::ok();
+    }
+
+    if (type == "boolean" || type == "momentary")
     {
         auto boolValue = (bool) inputValue;
         auto falseValue = propInt (parameter, "falseValue", 0);
         auto trueValue = propInt (parameter, "trueValue", 1);
         auto encoded = boolValue ? trueValue : falseValue;
         if (! isMidiDataByte (encoded))
-            return juce::Result::fail ("Boolean encoded value outside MIDI data byte range for " + propString (parameter, "id"));
+            return juce::Result::fail (juce::String (type == "momentary" ? "Momentary" : "Boolean")
+                                       + " encoded value outside MIDI data byte range for "
+                                       + propString (parameter, "id"));
 
         semanticValue = boolValue;
         normalizedValue = boolValue ? 1.0 : 0.0;
@@ -690,6 +1051,7 @@ CompileResult DeviceProfileEngine::compileSysex (const juce::String& deviceRole,
         return { false, "SysEx recipe requires a template", {} };
 
     auto address = parseHexBytes (propString (parameter, "address"));
+    auto size = parseHexBytes (propString (parameter, "size"));
     juce::Array<int> bytes;
     juce::Array<int> checksumBytes;
     bool checksumInserted = false;
@@ -713,6 +1075,11 @@ CompileResult DeviceProfileEngine::compileSysex (const juce::String& deviceRole,
             appendBytes (bytes, encodedBytes);
             appendBytes (checksumBytes, encodedBytes);
         }
+        else if (token == "$size")
+        {
+            appendBytes (bytes, size);
+            appendBytes (checksumBytes, size);
+        }
         else if (token == "$checksum")
         {
             auto* checksum = asObject (recipe.getProperty ("checksum"));
@@ -723,6 +1090,12 @@ CompileResult DeviceProfileEngine::compileSysex (const juce::String& deviceRole,
             {
                 for (auto byte : checksumBytes)
                     value = (value + byte) & 0x7f;
+            }
+            else if (type == "roland-7bit")
+            {
+                for (auto byte : checksumBytes)
+                    value = (value + byte) & 0x7f;
+                value = (128 - value) & 0x7f;
             }
             else if (type == "none")
             {

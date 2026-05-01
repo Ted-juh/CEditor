@@ -23,12 +23,23 @@
       "id": "filter.cutoff",
       "name": "Filter Cutoff",
       "group": "Filter",
-      "type": "integer",
-      "range": { "min": 0, "max": 127 },
+      "type": "bipolar",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
       "default": 64,
-      "display": { "mode": "number", "unit": "", "shortLabel": "Cutoff" },
-      "normalization": { "mode": "linear" },
-      "encoding": { "type": "u7" },
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
       "access": {
         "canRead": true,
         "canWrite": true,
@@ -44,18 +55,31 @@
         "sendFinalOnRelease": true
       },
       "messageRecipe": "cutoffCc",
-      "ui": { "preferredComponent": "Slider" }
+      "ui": {
+        "preferredComponent": "Slider"
+      }
     },
     {
       "id": "filter.resonance",
       "name": "Filter Resonance",
       "group": "Filter",
       "type": "integer",
-      "range": { "min": 0, "max": 127 },
+      "range": {
+        "min": 0,
+        "max": 127
+      },
       "default": 32,
-      "display": { "mode": "number", "unit": "", "shortLabel": "Res" },
-      "normalization": { "mode": "linear" },
-      "encoding": { "type": "u7" },
+      "display": {
+        "mode": "number",
+        "unit": "",
+        "shortLabel": "Res"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
       "access": {
         "canRead": true,
         "canWrite": true,
@@ -69,7 +93,40 @@
         "sendFinalOnRelease": true
       },
       "messageRecipe": "resonanceCc",
-      "ui": { "preferredComponent": "Slider" }
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter.enabled",
+      "name": "Filter Enabled",
+      "group": "Filter",
+      "type": "boolean",
+      "default": true,
+      "falseValue": 0,
+      "trueValue": 127,
+      "display": {
+        "mode": "boolean",
+        "shortLabel": "Filter"
+      },
+      "encoding": {
+        "type": "boolean-u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "onCommit",
+        "coalesce": true,
+        "minIntervalMs": 0
+      },
+      "messageRecipe": "filterEnabledCc",
+      "ui": {
+        "preferredComponent": "ToggleButton"
+      }
     },
     {
       "id": "osc.waveform",
@@ -78,13 +135,32 @@
       "type": "choice",
       "default": "saw",
       "choices": [
-        { "id": "saw", "label": "Saw", "value": 0 },
-        { "id": "square", "label": "Square", "value": 1 },
-        { "id": "triangle", "label": "Triangle", "value": 2 }
+        {
+          "id": "saw",
+          "label": "Saw",
+          "value": 0
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "value": 1
+        },
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "value": 2
+        }
       ],
-      "display": { "mode": "choice", "shortLabel": "Wave" },
-      "normalization": { "mode": "choiceIndex" },
-      "encoding": { "type": "enum" },
+      "display": {
+        "mode": "choice",
+        "shortLabel": "Wave"
+      },
+      "normalization": {
+        "mode": "choiceIndex"
+      },
+      "encoding": {
+        "type": "enum"
+      },
       "access": {
         "canRead": true,
         "canWrite": true,
@@ -96,7 +172,63 @@
         "coalesce": true
       },
       "messageRecipe": "waveformCc",
-      "ui": { "preferredComponent": "Combobox" }
+      "ui": {
+        "preferredComponent": "Combobox"
+      }
+    },
+    {
+      "id": "actions.panic",
+      "name": "Panic",
+      "group": "Actions",
+      "type": "action",
+      "triggerValue": 0,
+      "display": {
+        "mode": "action",
+        "shortLabel": "Panic"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter",
+        "requiresConfirmation": false
+      },
+      "sendPolicy": {
+        "mode": "explicitAction",
+        "coalesce": false,
+        "minIntervalMs": 0
+      },
+      "messageRecipe": "panicCc",
+      "ui": {
+        "preferredComponent": "Button"
+      }
+    },
+    {
+      "id": "pedal.sustain",
+      "name": "Sustain Pedal",
+      "group": "Pedal",
+      "type": "momentary",
+      "falseValue": 0,
+      "trueValue": 127,
+      "display": {
+        "mode": "boolean",
+        "shortLabel": "Sustain"
+      },
+      "access": {
+        "canRead": false,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "momentary",
+        "coalesce": false,
+        "minIntervalMs": 0
+      },
+      "messageRecipe": "sustainCc",
+      "ui": {
+        "preferredComponent": "MomentaryButton"
+      }
     }
   ],
   "messageRecipes": [
@@ -115,10 +247,31 @@
       "value": "$encodedValue"
     },
     {
+      "id": "filterEnabledCc",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 75,
+      "value": "$encodedValue"
+    },
+    {
       "id": "waveformCc",
       "kind": "cc",
       "channel": "$channel",
       "controller": 80,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "panicCc",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 123,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "sustainCc",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 64,
       "value": "$encodedValue"
     }
   ],
@@ -136,10 +289,40 @@
       "expectedHex": "B0 47 20"
     },
     {
+      "name": "Filter Enabled On",
+      "parameter": "filter.enabled",
+      "value": true,
+      "expectedHex": "B0 4B 7F"
+    },
+    {
+      "name": "Filter Enabled Off",
+      "parameter": "filter.enabled",
+      "value": false,
+      "expectedHex": "B0 4B 00"
+    },
+    {
       "name": "Waveform Square",
       "parameter": "osc.waveform",
       "value": "square",
       "expectedHex": "B0 50 01"
+    },
+    {
+      "name": "Panic Action",
+      "parameter": "actions.panic",
+      "value": true,
+      "expectedHex": "B0 7B 00"
+    },
+    {
+      "name": "Sustain On",
+      "parameter": "pedal.sustain",
+      "value": true,
+      "expectedHex": "B0 40 7F"
+    },
+    {
+      "name": "Sustain Off",
+      "parameter": "pedal.sustain",
+      "value": false,
+      "expectedHex": "B0 40 00"
     }
   ],
   "sources": [

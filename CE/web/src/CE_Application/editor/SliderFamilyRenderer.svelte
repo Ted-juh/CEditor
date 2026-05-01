@@ -105,6 +105,7 @@
 
   function buildTransitionStyle(bucket) {
     if (runtime?.signals?.reducedMotion === true) return '';
+    if (runtime?.signals?.dragging === true) return '';
     const transition = bucket?.transform ?? bucket?.size ?? bucket?.opacity ?? '';
     return transition ? `transition: all ${transition};` : '';
   }
@@ -460,6 +461,16 @@
   }
 
   function pointerStyleFor(partName) {
+    if ([
+      'bodyTrackFill',
+      'bodySelectedRange',
+      'pointerStart',
+      'pointerCurrent',
+      'pointerEnd',
+    ].includes(String(partName))) {
+      return '';
+    }
+
     return buildTransitionStyle(partTransitions?.get?.(partName) ?? null);
   }
 

@@ -43,6 +43,33 @@ let pendingManualOpenTimer = null;
 let panelDataRequestCounter = 0;
 const pendingPanelDataRequests = new Map();
 let panelDataListenerRegistered = false;
+const DPD_SPLIT_SIZE_STORAGE_KEY = 'ceditor.dpdSplitSizes.v1';
+
+function readDesignerSplitSizes() {
+  if (typeof localStorage === 'undefined') return {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DPD_SPLIT_SIZE_STORAGE_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function storedDesignerSplitSize(panelId) {
+  const value = Number(readDesignerSplitSizes()[String(panelId)]);
+  return Number.isFinite(value) ? Math.min(0.94, Math.max(0.06, value)) : 0.5;
+}
+
+function persistDesignerSplitSize(panelId, size) {
+  if (typeof localStorage === 'undefined' || panelId == null) return;
+  try {
+    const values = readDesignerSplitSizes();
+    values[String(panelId)] = Math.min(0.94, Math.max(0.06, Number(size) || 0.5));
+    localStorage.setItem(DPD_SPLIT_SIZE_STORAGE_KEY, JSON.stringify(values));
+  } catch {
+    // UI preference persistence is optional.
+  }
+}
 
 function formatBytes(bytes) {
   const value = Number(bytes);
@@ -281,8 +308,30 @@ export const activePanelId = writable(null);
 /** Whether the global Settings editor tab is open */
 export const settingsTabOpen = writable(false);
 
-/** Active editor tab descriptor: { type: 'panel'|'settings', id } */
+/** Open device profile editor tabs */
+export const deviceProfileTabs = writable([]);
+
+/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
+
+/** Editor split layout. Primary and secondary pin the two tabs shown in the split workspace. */
+export const editorSplitLayout = writable({
+  mode: 'single',
+  orientation: 'vertical',
+  primary: null,
+  secondary: null,
+});
+
+/** Per-panel Device Profile Designer companions keyed by panel id. */
+export const panelDesignerSplits = writable({});
+
+export const activePanelDesignerSplit = derived(
+  [panelDesignerSplits, activeEditorTab],
+  ([$panelDesignerSplits, $activeEditorTab]) => {
+    const panelId = $activeEditorTab?.type === 'panel' ? $activeEditorTab.id : null;
+    return panelId != null ? ($panelDesignerSplits?.[panelId] ?? null) : null;
+  }
+);
 
 /** Active panel id with fallback resolution when selection state lags behind open panels. */
 export const resolvedActivePanelId = derived(
@@ -293,8 +342,8 @@ export const resolvedActivePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen],
-  ([$panels, $settingsTabOpen]) => {
+  [panels, settingsTabOpen, deviceProfileTabs],
+  ([$panels, $settingsTabOpen, $deviceProfileTabs]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -308,6 +357,15 @@ export const editorTabs = derived(
         tabType: 'settings',
         name: 'Settings',
         modified: false,
+      });
+    }
+
+    for (const profileTab of $deviceProfileTabs) {
+      tabs.push({
+        id: profileTab.id,
+        tabType: 'deviceProfile',
+        name: profileTab.name || `Profile: ${profileTab.id}`,
+        modified: profileTab.modified === true,
       });
     }
 
@@ -347,6 +405,7 @@ export function addPanel(panel = null) {
 export function openSettingsTab() {
   settingsTabOpen.set(true);
   activeEditorTab.set({ type: 'settings', id: 'settings' });
+  editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
   clearSelection();
 }
 
@@ -362,8 +421,240 @@ export function closeSettingsTab() {
   }
 }
 
+/** Open a device profile designer beside the active panel. */
+export function openDeviceProfileTab(profile) {
+  const id = String(profile?.id ?? '').trim();
+  if (!id) return;
+  const currentPanelId = get(activePanelId);
+  const name = profile?.name || `Profile: ${id}`;
+
+  ensureDeviceProfileTab(id, name);
+
+  if (currentPanelId != null) {
+    panelDesignerSplits.update((splits) => ({
+      ...splits,
+      [currentPanelId]: {
+        profileId: id,
+        profileName: name,
+        orientation: splits?.[currentPanelId]?.orientation ?? 'vertical',
+        deviceOnLeft: splits?.[currentPanelId]?.deviceOnLeft ?? true,
+        designerSize: splits?.[currentPanelId]?.designerSize ?? storedDesignerSplitSize(currentPanelId),
+      },
+    }));
+    activeEditorTab.set({ type: 'panel', id: currentPanelId });
+  }
+  clearSelection();
+}
+
+/** Update the active panel's already-open DPD companion to a different profile. */
+export function syncOpenDeviceProfileDesigner(profile) {
+  const id = String(profile?.id ?? '').trim();
+  if (!id) return;
+  const currentPanelId = get(activePanelId);
+  if (currentPanelId == null) return;
+
+  const currentSplit = get(panelDesignerSplits)?.[currentPanelId];
+  if (!currentSplit) return;
+
+  const name = profile?.name || `Profile: ${id}`;
+
+  panelDesignerSplits.update((splits) => ({
+    ...splits,
+    [currentPanelId]: {
+      ...splits[currentPanelId],
+      profileId: id,
+      profileName: name,
+    },
+  }));
+}
+
+function ensureDeviceProfileTab(id, name) {
+  deviceProfileTabs.update((tabs) => {
+    const existing = tabs.find((tab) => tab.id === id);
+    if (existing) {
+      return tabs.map((tab) =>
+        tab.id === id
+          ? { ...tab, name: name || tab.name || `Profile: ${id}` }
+          : tab
+      );
+    }
+
+    return [
+      ...tabs,
+      {
+        id,
+        name,
+        modified: false,
+      },
+    ];
+  });
+}
+
+/** Close a device profile editor tab */
+export function closeDeviceProfileTab(id) {
+  const closingActive = get(activeEditorTab)?.type === 'deviceProfile' && get(activeEditorTab)?.id === id;
+  deviceProfileTabs.update((tabs) => tabs.filter((tab) => tab.id !== id));
+  panelDesignerSplits.update((splits) => {
+    const next = { ...splits };
+    for (const [panelId, split] of Object.entries(next)) {
+      if (split?.profileId === id) delete next[panelId];
+    }
+    return next;
+  });
+  editorSplitLayout.update((layout) => {
+    if (layout.primary?.type === 'deviceProfile' && layout.primary?.id === id) return { mode: 'single', orientation: 'vertical', primary: null, secondary: null };
+    if (layout.secondary?.type === 'deviceProfile' && layout.secondary?.id === id) return { ...layout, mode: 'single', secondary: null };
+    return layout;
+  });
+
+  if (closingActive) {
+    const panelId = get(activePanelId);
+    if (panelId != null) {
+      activeEditorTab.set({ type: 'panel', id: panelId });
+    } else if (get(settingsTabOpen)) {
+      activeEditorTab.set({ type: 'settings', id: 'settings' });
+    } else {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
+  }
+}
+
+export function openEditorSplit(primaryTab, secondaryTab) {
+  if (!primaryTab || !secondaryTab) return;
+  editorSplitLayout.set({
+    mode: 'split',
+    orientation: 'vertical',
+    primary: normalizeEditorTabDescriptor(primaryTab),
+    secondary: normalizeEditorTabDescriptor(secondaryTab),
+  });
+}
+
+export function closeEditorSplit() {
+  editorSplitLayout.set({
+    mode: 'single',
+    orientation: 'vertical',
+    primary: null,
+    secondary: null,
+  });
+}
+
+export function swapEditorSplit() {
+  const activeTab = get(activeEditorTab);
+  const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
+  if (panelId != null) {
+    let didSwap = false;
+    panelDesignerSplits.update((splits) => {
+      const split = splits?.[panelId];
+      if (!split) return splits;
+      didSwap = true;
+      return {
+        ...splits,
+        [panelId]: {
+          ...split,
+          deviceOnLeft: !split.deviceOnLeft,
+        },
+      };
+    });
+    if (didSwap) return;
+  }
+
+  const layout = get(editorSplitLayout);
+  if (layout.mode !== 'split' || !layout.primary || !layout.secondary) return;
+
+  editorSplitLayout.set({
+    ...layout,
+    primary: layout.secondary,
+    secondary: layout.primary,
+  });
+  setActiveEditorTab(layout.secondary);
+}
+
+export function toggleEditorSplitOrientation() {
+  const activeTab = get(activeEditorTab);
+  const panelId = activeTab?.type === 'panel' ? activeTab.id : get(activePanelId);
+  if (panelId != null) {
+    let didToggle = false;
+    panelDesignerSplits.update((splits) => {
+      const split = splits?.[panelId];
+      if (!split) return splits;
+      didToggle = true;
+      return {
+        ...splits,
+        [panelId]: {
+          ...split,
+          orientation: split.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+        },
+      };
+    });
+    if (didToggle) return;
+  }
+
+  editorSplitLayout.update((layout) => {
+    if (layout.mode !== 'split') return layout;
+    return {
+      ...layout,
+      orientation: layout.orientation === 'horizontal' ? 'vertical' : 'horizontal',
+    };
+  });
+}
+
+export function setPanelDesignerSplitSize(panelId, designerSize) {
+  if (panelId == null) return;
+  const size = Math.min(0.94, Math.max(0.06, Number(designerSize) || 0.5));
+  persistDesignerSplitSize(panelId, size);
+  panelDesignerSplits.update((splits) => {
+    const split = splits?.[panelId];
+    if (!split) return splits;
+    return {
+      ...splits,
+      [panelId]: {
+        ...split,
+        designerSize: size,
+      },
+    };
+  });
+}
+
+export function openTabToSide(tab) {
+  if (!tab) return;
+  const current = get(activeEditorTab);
+  const panelId = current?.type === 'panel' ? current.id : get(activePanelId);
+  if ((tab.tabType === 'deviceProfile' || tab.type === 'deviceProfile') && panelId != null) {
+    const profileId = tab.id;
+    panelDesignerSplits.update((splits) => ({
+      ...splits,
+      [panelId]: {
+        profileId,
+        profileName: tab.name || `Profile: ${profileId}`,
+        orientation: splits?.[panelId]?.orientation ?? 'vertical',
+        deviceOnLeft: splits?.[panelId]?.deviceOnLeft ?? true,
+        designerSize: splits?.[panelId]?.designerSize ?? storedDesignerSplitSize(panelId),
+      },
+    }));
+    activeEditorTab.set({ type: 'panel', id: panelId });
+    clearSelection();
+    return;
+  }
+  openEditorSplit(current, tab);
+}
+
+function normalizeEditorTabDescriptor(tab) {
+  if (!tab) return null;
+  return {
+    type: tab.type || tab.tabType || 'panel',
+    id: tab.id ?? null,
+  };
+}
+
 /** Close a panel by id */
 export function closePanel(id) {
+  panelDesignerSplits.update((splits) => {
+    if (!splits || !(id in splits)) return splits;
+    const next = { ...splits };
+    delete next[id];
+    return next;
+  });
+
   panels.update(list => {
     const idx = list.findIndex(p => p.id === id);
     const newList = list.filter(p => p.id !== id);
@@ -402,8 +693,9 @@ export function closePanel(id) {
 
 /** Switch to a panel by id */
 export function setActivePanel(id) {
+  const nextTab = { type: 'panel', id };
   activePanelId.set(id);
-  activeEditorTab.set({ type: 'panel', id });
+  activeEditorTab.set(nextTab);
 }
 
 /** Switch to any editor tab by descriptor */
@@ -412,6 +704,14 @@ export function setActiveEditorTab(tab) {
 
   if (tab.tabType === 'settings' || tab.type === 'settings' || tab.id === 'settings') {
     openSettingsTab();
+    editorSplitLayout.update((layout) => layout.mode === 'split' ? { ...layout, primary: { type: 'settings', id: 'settings' } } : layout);
+    return;
+  }
+
+  if (tab.tabType === 'deviceProfile' || tab.type === 'deviceProfile') {
+    const nextTab = { type: 'deviceProfile', id: tab.id };
+    activeEditorTab.set(nextTab);
+    clearSelection();
     return;
   }
 
@@ -428,6 +728,11 @@ export function closeActiveEditorTab() {
 
   if (tab.type === 'settings') {
     closeSettingsTab();
+    return;
+  }
+
+  if (tab.type === 'deviceProfile') {
+    closeDeviceProfileTab(tab.id);
     return;
   }
 
@@ -488,7 +793,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -533,7 +838,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile') return;
   syncPanelSelection();
 });
 
