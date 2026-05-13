@@ -5,6 +5,9 @@ import { setDebugDock } from './debugDock.js';
 import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
 import { getNextEnumValue } from '../utils/enumBehavior.js';
 import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../utils/selectGroupUtils.js';
+import { normalizeCustomChannelValue, seedCustomValues } from '../utils/customComponentInteraction.js';
+import { syncCustomArpeggiatorValues } from '../utils/customComponentArpeggiator.js';
+import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.js';
 
 const DEFAULT_SESSION = {
   enabled: true,
@@ -34,6 +37,10 @@ const DEFAULT_SESSION = {
   reducedMotion: false,
   highContrast: false,
   inputModality: 'pointer',
+  customValues: {},
+  customNormalizedValue: 0,
+  activeCustomBehavior: '',
+  activeCustomHitZone: '',
 };
 
 export const interactionPreviewSessions = writable({});
@@ -42,11 +49,17 @@ export const panelPreviewSessions = writable({});
 export const previewInspectedControlId = writable('');
 
 export function getDefaultInteractionPreviewSession() {
-  return { ...DEFAULT_SESSION };
+  return { ...DEFAULT_SESSION, customValues: {} };
 }
 
 export function createInteractionPreviewSession(control = null) {
   const next = getDefaultInteractionPreviewSession();
+  if (String(control?._children?.Core?.controlType ?? '') === 'CustomComponent') {
+    next.customValues = seedCustomValues(control);
+    const channels = control?._children?.ValueChannels?._children ?? {};
+    const mainChannel = channels.mainValue ?? Object.values(channels)[0] ?? null;
+    next.customNormalizedValue = normalizeCustomChannelValue(mainChannel, next.customValues?.[mainChannel?.name ?? 'mainValue']);
+  }
   const behavior = control?._children?.Behavior ?? null;
   if (String(behavior?.valueType ?? '') === 'bool' || String(behavior?.family ?? '') === 'select') {
     next.checked = behavior?.defaultValue === true;
@@ -99,12 +112,14 @@ function currentPreviewBoolValue(control, session = null) {
 }
 
 function createPreviewSessionsMap(controls = []) {
-  return (Array.isArray(controls) ? controls : []).reduce((sessions, control) => {
+  const controlList = Array.isArray(controls) ? controls : [];
+  const sessions = controlList.reduce((nextSessions, control) => {
     const controlId = getControlId(control);
-    if (!controlId) return sessions;
-    sessions[controlId] = createInteractionPreviewSession(control);
-    return sessions;
+    if (!controlId) return nextSessions;
+    nextSessions[controlId] = createInteractionPreviewSession(control);
+    return nextSessions;
   }, {});
+  return applyPanelCustomLinkRoutes(controlList, sessions);
 }
 
 export function updateInteractionPreviewSession(controlId, patch = {}) {
@@ -123,10 +138,11 @@ export function updateInteractionPreviewSession(controlId, patch = {}) {
       return current;
     }
 
-    return {
+    const nextSessions = {
       ...current,
       [controlId]: nextSession,
     };
+    return applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions);
   });
 }
 
@@ -190,8 +206,9 @@ export function syncPanelPreviewSessions(controls = []) {
 
     const currentKeys = Object.keys(current ?? {});
     if (currentKeys.length !== Object.keys(next).length) changed = true;
-    if (!changed) return current;
-    return next;
+    const routed = applyPanelCustomLinkRoutes(controlList, next);
+    if (!changed && routed === next) return current;
+    return routed;
   });
 }
 
@@ -204,19 +221,29 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
       ...createInteractionPreviewSession(control),
       ...(current?.[controlId] ?? {}),
     };
+    const nextPatch = patch?.customValues
+      ? {
+        ...patch,
+        customValues: syncCustomArpeggiatorValues(control, {
+          ...(previousSession.customValues ?? {}),
+          ...(patch.customValues ?? {}),
+        }),
+      }
+      : patch;
     const nextSession = {
       ...previousSession,
-      ...patch,
+      ...nextPatch,
     };
 
     if (shallowEqualSession(previousSession, nextSession)) {
       return current;
     }
 
-    return {
+    const nextSessions = {
       ...current,
       [controlId]: nextSession,
     };
+    return applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions);
   });
 }
 
@@ -263,7 +290,7 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       };
     }
 
-    panelPreviewSessions.set(nextSessions);
+    panelPreviewSessions.set(applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions));
     return {
       checked: true,
       mixed: false,

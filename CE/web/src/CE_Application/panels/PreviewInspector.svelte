@@ -1,6 +1,7 @@
 <script>
   import { activePanel } from '../stores/panels.js';
   import {
+    panelPreviewSessions,
     previewInspection,
     updatePanelPreviewSession,
     resetPanelPreviewSessions,
@@ -40,6 +41,86 @@
   let session = $derived(inspection?.session ?? null);
   let activeStates = $derived(Array.isArray(runtime?.activeStates) ? runtime.activeStates : []);
   let normalizedValue = $derived(numberOr(runtime?.signals?.valueNormalized, 0).toFixed(3));
+
+  function controlIdOf(entry) {
+    return String(entry?._children?.Core?.id ?? '');
+  }
+
+  function isCustomComponent(entry) {
+    return String(entry?._children?.Core?.controlType ?? '') === 'CustomComponent';
+  }
+
+  function valueRowsFor(entry, entrySession) {
+    if (!isCustomComponent(entry)) return [];
+    const channels = entry?._children?.ValueChannels?._children ?? {};
+    return Object.entries(channels).map(([name, channel]) => ({
+      name,
+      type: String(channel?.type ?? 'float'),
+      value: entrySession?.customValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue ?? '',
+    }));
+  }
+
+  function parseRouteTarget(link) {
+    const explicitControlId = String(link?.targetControlId ?? link?.targetComponentId ?? '').trim();
+    const explicitPort = String(link?.targetPort ?? link?.targetInput ?? '').trim();
+    if (explicitControlId && explicitPort) return { controlId: explicitControlId, port: explicitPort };
+
+    const target = String(link?.target ?? '').trim();
+    const match = target.match(/^([^.:/]+)[.:/]([^.:/]+)$/);
+    return match ? { controlId: match[1], port: match[2] } : null;
+  }
+
+  function resolveTargetChannel(entry, port) {
+    const inputs = entry?._children?.PublishedProperties?.inputs ?? {};
+    const input = inputs?.[port] ?? Object.values(inputs).find((candidate) => String(candidate?.channel ?? '') === port);
+    return String(input?.channel || port);
+  }
+
+  function routeRowsFor(entry, panel, sessions) {
+    if (!isCustomComponent(entry)) return [];
+    const selectedId = controlIdOf(entry);
+    const controls = Array.isArray(panel?.controls) ? panel.controls : [];
+    const controlMap = new Map(controls.map((candidate) => [controlIdOf(candidate), candidate]));
+    const rows = [];
+
+    for (const sourceControl of controls) {
+      if (!isCustomComponent(sourceControl)) continue;
+      const sourceId = controlIdOf(sourceControl);
+      const sourceSession = sessions?.[sourceId] ?? {};
+      const links = sourceControl?._children?.Links;
+      if (links?.enabled === false) continue;
+
+      for (const [name, link] of Object.entries(links?._children ?? {})) {
+        if (!link || link.enabled === false) continue;
+        const type = String(link?.type ?? '').trim().toLowerCase();
+        if (!['external-output', 'route-value', 'mirror'].includes(type)) continue;
+
+        const target = parseRouteTarget(link);
+        if (!target) continue;
+        const targetControl = controlMap.get(target.controlId);
+        if (!isCustomComponent(targetControl)) continue;
+        if (sourceId !== selectedId && target.controlId !== selectedId) continue;
+
+        const source = String(link?.source ?? '').trim();
+        const targetChannel = resolveTargetChannel(targetControl, target.port);
+        const targetSession = sessions?.[target.controlId] ?? {};
+        rows.push({
+          name,
+          direction: sourceId === selectedId ? 'Out' : 'In',
+          type: String(link?.type ?? 'external-output'),
+          sourceLabel: `${sourceControl?._children?.Core?.name ?? sourceId}.${source}`,
+          targetLabel: `${targetControl?._children?.Core?.name ?? target.controlId}.${targetChannel}`,
+          sourceValue: sourceSession?.customValues?.[source],
+          targetValue: targetSession?.customValues?.[targetChannel],
+        });
+      }
+    }
+
+    return rows;
+  }
+
+  let customRows = $derived(valueRowsFor(control, session));
+  let routeRows = $derived(routeRowsFor(control, $activePanel, $panelPreviewSessions));
 </script>
 
 {#if !$activePanel}
@@ -155,6 +236,38 @@
             <div class="readout mono">{readout(runtime?.signals?.valueEnum)}</div>
           </PropertyCell>
         </PropertySection>
+
+        {#if customRows.length}
+          <PropertySection title="Custom Values">
+            <div class="value-table">
+              {#each customRows as row (row.name)}
+                <div class="value-row">
+                  <div class="value-name">{row.name}</div>
+                  <div class="value-type">{row.type}</div>
+                  <div class="value-current mono">{readout(row.value)}</div>
+                </div>
+              {/each}
+            </div>
+          </PropertySection>
+        {/if}
+
+        {#if routeRows.length}
+          <PropertySection title="Panel Routes">
+            <div class="route-table">
+              {#each routeRows as row (row.name)}
+                <div class="route-row">
+                  <span class="route-pill">{row.direction}</span>
+                  <div class="route-main">
+                    <div class="route-title">{row.sourceLabel} → {row.targetLabel}</div>
+                    <div class="route-detail mono">
+                      {row.type}: {readout(row.sourceValue)} → {readout(row.targetValue)}
+                    </div>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </PropertySection>
+        {/if}
 
         <PropertySection title="States">
           <div class="chip-group">
@@ -312,5 +425,86 @@
   .runtime-empty {
     color: #676767;
     font-size: 11px;
+  }
+
+  .value-table,
+  .route-table {
+    grid-column: span 4;
+    display: grid;
+    gap: 6px;
+  }
+
+  .value-row {
+    display: grid;
+    grid-template-columns: minmax(80px, 1fr) 64px minmax(72px, auto);
+    gap: 8px;
+    align-items: center;
+    min-height: 28px;
+    padding: 5px 7px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #1A1A1A;
+  }
+
+  .value-name,
+  .route-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #DDD;
+    font-size: 11px;
+  }
+
+  .value-type {
+    color: #8F8F8F;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .value-current {
+    justify-self: end;
+    color: #CFE7FF;
+    font-size: 11px;
+  }
+
+  .mono {
+    font-family: Consolas, 'Courier New', monospace;
+  }
+
+  .route-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    padding: 6px 7px;
+    border: 1px solid #343434;
+    border-radius: 4px;
+    background: #1A1A1A;
+  }
+
+  .route-pill {
+    flex: 0 0 auto;
+    min-width: 28px;
+    padding: 2px 5px;
+    border: 1px solid rgba(91, 155, 213, 0.4);
+    border-radius: 999px;
+    color: #CFE7FF;
+    background: rgba(91, 155, 213, 0.12);
+    font-size: 9px;
+    text-align: center;
+  }
+
+  .route-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .route-detail {
+    margin-top: 2px;
+    color: #8F8F8F;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 </style>

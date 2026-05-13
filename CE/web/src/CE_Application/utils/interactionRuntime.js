@@ -15,6 +15,7 @@ import {
   isSliderDirty,
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
+import { materializeCustomComponent } from './customComponentMaterializer.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -23,6 +24,10 @@ function getNodeChild(node, key) {
 function getValueRows(control) {
   const rows = getNodeChild(control, 'Value')?.rows;
   return Array.isArray(rows) ? rows : [];
+}
+
+function getValueChannels(control) {
+  return getNodeChild(control, 'ValueChannels')?._children ?? {};
 }
 
 function hasCheckedStateSignal(signals) {
@@ -134,6 +139,11 @@ function setTreeValueAtPath(node, path, value) {
 }
 
 function evaluateBindingSource(binding, signals) {
+  const source = String(binding?.source ?? '');
+  if (source.startsWith('channel.')) {
+    return signals?.customChannels?.[source];
+  }
+
   switch (binding?.source) {
     case 'value.raw':
       return signals.valueRaw;
@@ -427,6 +437,69 @@ function resolveSliderInteractionContext(control, previewSession = {}) {
   };
 }
 
+function normalizeCustomChannelValue(channel = null, rawValue = 0) {
+  const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'bool' || type === 'boolean') return rawValue === true ? 1 : 0;
+  if (type === 'enum' || type === 'text' || type === 'note') return 0;
+
+  const min = numberOr(channel?.min, 0);
+  const max = Math.max(min, numberOr(channel?.max, min + 1));
+  const numeric = numberOr(rawValue, numberOr(channel?.defaultValue, min));
+  return clamp(normalizeRange(numeric, min, max), 0, 1);
+}
+
+function resolveCustomComponentInteractionContext(control, previewSession = {}) {
+  const core = getNodeChild(control, 'Core');
+  const channels = getValueChannels(control);
+  const mainChannel = channels.mainValue
+    ?? Object.values(channels).find((channel) => String(channel?.type ?? '').trim().toLowerCase() !== 'enum')
+    ?? Object.values(channels)[0]
+    ?? null;
+  const modeChannel = channels.mode ?? null;
+  const overrideValue = previewSession?.valueOverrideEnabled === true
+    ? previewSession?.valueOverride
+    : previewSession?.customValues?.mainValue;
+  const rawValue = overrideValue ?? mainChannel?.currentValue ?? mainChannel?.defaultValue ?? 0;
+  const valueNormalized = previewSession?.valueOverrideEnabled === true
+    ? normalizeCustomChannelValue(mainChannel, rawValue)
+    : numberOr(previewSession?.customNormalizedValue, normalizeCustomChannelValue(mainChannel, rawValue));
+  const modeValue = previewSession?.customValues?.mode ?? modeChannel?.currentValue ?? modeChannel?.defaultValue ?? '';
+
+  const channelSignals = {};
+  for (const [name, channel] of Object.entries(channels)) {
+    const channelRaw = previewSession?.customValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
+    channelSignals[`channel.${name}.raw`] = channelRaw;
+    channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
+    channelSignals[`channel.${name}.display`] = String(channelRaw ?? '');
+  }
+
+  return {
+    family: 'custom',
+    role: 'component',
+    valueType: String(mainChannel?.type ?? 'float'),
+    valueRaw: rawValue,
+    valueDisplay: String(rawValue ?? ''),
+    valueEnum: String(modeValue ?? ''),
+    valueNormalized,
+    customChannels: channelSignals,
+    arpeggiator: previewSession?.customValues?.__arpeggiator ?? null,
+    mode: modeValue,
+    hover: previewSession?.hover === true,
+    pressed: previewSession?.pressed === true,
+    focused: previewSession?.focused === true,
+    dragging: previewSession?.dragging === true,
+    disabled: previewSession?.disabled === true || core?.enabled === false,
+    checked: previewSession?.checked === true,
+    selectionActive: false,
+    mixed: previewSession?.mixed === true,
+    pending: previewSession?.pending === true,
+    executed: previewSession?.executed === true,
+    animationsEnabled: previewSession?.animationsEnabled !== false,
+    reducedMotion: previewSession?.reducedMotion === true,
+    highContrast: previewSession?.highContrast === true,
+  };
+}
+
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
@@ -439,6 +512,10 @@ export function resolveInteractionContext(control, previewSession = {}) {
 
   if (isSliderBehavior(behavior)) {
     return resolveSliderInteractionContext(control, previewSession);
+  }
+
+  if (String(core?.controlType ?? '') === 'CustomComponent') {
+    return resolveCustomComponentInteractionContext(control, previewSession);
   }
 
   let valueRaw = previewSession?.valueOverrideEnabled
@@ -566,6 +643,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
 
   const resolved = deepClone(control);
   const signals = resolveInteractionContext(control, previewSession);
+  materializeCustomComponent(resolved, signals);
   const resolvedBindings = getNodeChild(resolved, 'Bindings');
   const resolvedStates = getNodeChild(resolved, 'States');
 
@@ -598,9 +676,8 @@ export function resolveInteractiveControl(control, previewSession = {}) {
         return safeLeft - safeRight;
       });
 
-  const skipRootComponentStatePatches = isRadioGroupControl(control);
   for (const [, state] of activeStates) {
-    applyStatePatches(resolved, state, { skipComponentPatch: skipRootComponentStatePatches });
+    applyStatePatches(resolved, state);
   }
 
   const transitions = buildTransitionCatalog(resolved, previewSession);

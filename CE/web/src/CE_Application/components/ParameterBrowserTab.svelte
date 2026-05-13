@@ -616,7 +616,7 @@
           });
         }
 
-        const compatibility = getBindingCompatibility(control?._children?.Core?.controlType, parameter);
+        const compatibility = getBindingCompatibility(control, parameter);
         if (compatibility.status === 'incompatible') {
           issues.push({
             level: 'error',
@@ -706,7 +706,7 @@
     const core = control?._children?.Core;
     if (!core?.id) return;
 
-    const compatibility = getBindingCompatibility(core.controlType, parameter);
+    const compatibility = getBindingCompatibility(control, parameter);
     if (compatibility.status === 'incompatible' || !compatibility.port) return;
 
     const existing = control?._children?.DeviceBindings?.bindings;
@@ -949,7 +949,7 @@
 
   <div class="list">
     {#each filteredParameters as parameter}
-      {@const compatibility = getBindingCompatibility(selectedControlType, parameter)}
+      {@const compatibility = getBindingCompatibility($selectedControl, parameter)}
       <button
         class={['parameter-row', compatibility.status, parameter.snapshotOnly ? 'snapshot' : '']}
         disabled={parameter.snapshotOnly || !selectedControlType || compatibility.status === 'incompatible'}

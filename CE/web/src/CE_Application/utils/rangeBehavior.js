@@ -62,6 +62,14 @@ export function adjustRangeValue(behavior = null, currentValue = 0, direction = 
   return snapRangeValue(behavior, numberOr(currentValue, getRangeMin(behavior)) + delta);
 }
 
+export function isMouseDirectionReversed(behavior = null) {
+  return behavior?.reverseMouseDirection === true;
+}
+
+export function resolveMouseDirection(behavior = null, direction = 1) {
+  return numberOr(direction, 1) * (isMouseDirectionReversed(behavior) ? -1 : 1);
+}
+
 export function formatRangeValue(behavior = null, value = 0) {
   const snapped = snapRangeValue(behavior, value);
   if (String(behavior?.valueType ?? '') === 'int') {
@@ -156,6 +164,9 @@ export function scrubRangeValue(behavior = null, startValue = 0, startClient = {
     : numberOr(currentClient?.x, 0) - numberOr(startClient?.x, 0);
 
   if ((orientation === 'horizontal' && direction === 'rtl') || (orientation === 'vertical' && direction === 'ttb')) {
+    primaryDelta *= -1;
+  }
+  if (isMouseDirectionReversed(behavior)) {
     primaryDelta *= -1;
   }
 

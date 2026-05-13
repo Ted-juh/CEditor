@@ -5,7 +5,7 @@
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
-  import { selectedControl, hasSection, getSection } from '../stores/controls.js';
+  import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import PreviewInspector from './PreviewInspector.svelte';
@@ -16,6 +16,7 @@
   import { stateEditScope, setStateEditScopeBase } from '../stores/stateEditScope.js';
   import { setSegmentEditScopeAll } from '../stores/segmentEditScope.js';
   import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
+  import { openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { getComponentPorts } from '../models/componentPorts.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
@@ -54,6 +55,9 @@
   let panelName = $derived($activePanel?.name ?? 'Panel');
   let componentName = $derived($selectedControl?._children?.Core?.name ?? 'Component');
   let ownerName = $derived(contextMode === 'panel' ? panelName : componentName);
+  let selectedIsCustomComponent = $derived(
+    String(getSection($selectedControl, 'Core')?.controlType ?? '') === 'CustomComponent'
+  );
 
   // View mode: 'single' or 'multi'
   let viewMode = $state(storedUiState.viewMode);
@@ -117,6 +121,19 @@
     { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
     { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
+    { id: 'custompublic', icon: Cable,       label: 'Public',     section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
+    { id: 'designer',   icon: LayoutDashboard, label: 'Designer', section: 'Designer' },
+    { id: 'surface',    icon: Frame,           label: 'Surface',  section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
+    { id: 'customlayers', icon: Rows3,       label: 'Layers',     section: 'Parts', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
+    { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
+    { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
+    { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },
+    { id: 'generators', icon: Grid3x3,       label: 'Generators', section: 'Generators' },
+    { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
+    { id: 'links',      icon: Workflow,      label: 'Links',      section: 'Links' },
+    { id: 'published',  icon: Cable,         label: 'Public API', section: 'PublishedProperties' },
+    { id: 'variants',   icon: Rows3,         label: 'Variants',   section: 'Variants' },
+    { id: 'testbench',  icon: Play,          label: 'Test Bench', section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
   ];
 
@@ -126,12 +143,13 @@
       ? allComponentTabs.filter((tab) => (
         (!tab.section
           || hasSection($selectedControl, tab.section)
-          || (tab.id === 'devicebindings' && getComponentPorts(getSection($selectedControl, 'Core')?.controlType).length > 0))
+          || (tab.id === 'devicebindings' && getComponentPorts($selectedControl).length > 0))
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
       ))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
   let selectedControlId = $derived($selectedControl?._children?.Core?.id ?? '');
+  let designerFocusSection = $derived(getSection($selectedControl, 'Designer')?.focusSection ?? '');
   let selectedStates = $derived(getSection($selectedControl, 'States'));
   let stateTargetOptions = $derived(buildStateTargetOptions(selectedStates));
   let activeScope = $derived($stateEditScope);
@@ -161,17 +179,19 @@
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
   let tabs = $derived(contextMode === 'panel' ? panelTabs : componentTabs);
+  let contentTabs = $derived(tabs.filter((tab) => tab.id !== 'surface'));
+  let componentContentTabs = $derived(componentTabs.filter((tab) => tab.id !== 'surface'));
 
   let visibleTabs = $derived(
     viewMode === 'single'
-      ? tabs.filter(t => t.id === singleTab)
-      : tabs.filter(t => multiTabs.has(t.id))
+      ? contentTabs.filter(t => t.id === singleTab)
+      : contentTabs.filter(t => multiTabs.has(t.id))
   );
 
   let visibleComponentTabs = $derived(
     viewMode === 'single'
-      ? componentTabs.filter(t => t.id === singleTab)
-      : componentTabs.filter(t => multiTabs.has(t.id))
+      ? componentContentTabs.filter(t => t.id === singleTab)
+      : componentContentTabs.filter(t => multiTabs.has(t.id))
   );
 
   let visiblePinnedPanelTabs = $derived(
@@ -181,7 +201,7 @@
   );
 
   function ensureValidMainTabs() {
-    const validIds = new Set(tabs.map((tab) => tab.id));
+    const validIds = new Set(contentTabs.map((tab) => tab.id));
     if (validIds.size === 0) return;
 
     if (!validIds.has(singleTab)) {
@@ -264,6 +284,20 @@
     activeComponentPropertiesTab.set(String(singleTab ?? ''));
   });
 
+  $effect(() => {
+    const focusTab = String(designerFocusSection ?? '').trim();
+    if (contextMode !== 'component' || !selectedControlId || !focusTab) return;
+    if (!componentTabs.some((tab) => tab.id === focusTab)) return;
+
+    if (viewMode === 'single') {
+      singleTab = focusTab;
+    } else if (!multiTabs.has(focusTab)) {
+      multiTabs = new Set([...multiTabs, focusTab]);
+    }
+
+    updateControlProperty(selectedControlId, 'Designer.focusSection', '');
+  });
+
   function toggleViewMode() {
     if (viewMode === 'single') {
       viewMode = 'multi';
@@ -279,7 +313,17 @@
   }
 
   function handleComponentTabClick(id, event) {
+    if (id === 'surface') {
+      openComponentSurfaceWorkspace();
+      return;
+    }
     main.handleClick(id, event);
+  }
+
+  function handleOpenComponentDesigner(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    openComponentSurfaceWorkspace();
   }
 </script>
 
@@ -295,6 +339,17 @@
       ontoggleview={toggleViewMode}
       ontogglepreview={togglePreviewMode}
     />
+
+    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
+      <button
+        type="button"
+        class="component-designer-entry"
+        data-testid="properties-component-designer-launch"
+        onclick={handleOpenComponentDesigner}
+      >
+        Open Component Designer
+      </button>
+    {/if}
 
     {#if $previewModeEnabled}
       <div class="preview-wrapper">
@@ -419,6 +474,23 @@
     min-width: 600px;
     background: #1E1E1E;
     border-left: 1px solid #1A1A1A;
+  }
+
+  .component-designer-entry {
+    flex: 0 0 32px;
+    margin: 6px 8px 0 58px;
+    border: 1px solid #335371;
+    border-radius: 4px;
+    background: #142538;
+    color: #DDEEFF;
+    font-size: 12px;
+    font-weight: 800;
+    cursor: pointer;
+  }
+
+  .component-designer-entry:hover {
+    border-color: #5B9BD5;
+    background: #20344B;
   }
 
   /* --- Normal view: icon bar + content side by side --- */

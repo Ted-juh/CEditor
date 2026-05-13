@@ -64,6 +64,23 @@
     return min + ((max - min) * 0.5);
   }
 
+  function clampSweep(value) {
+    return Math.max(1, Math.min(360, Math.abs(numberOr(value, 270))));
+  }
+
+  function circularEndAngle() {
+    const start = numberOr(behavior?.startAngle, 135);
+    const sweep = numberOr(behavior?.sweepAngle, 270);
+    return String(behavior?.direction ?? 'cw') === 'ccw'
+      ? start - sweep
+      : start + sweep;
+  }
+
+  function setCircularEndAngle(value) {
+    const start = numberOr(behavior?.startAngle, 135);
+    set('Behavior.sweepAngle', clampSweep(numberOr(value, start) - start));
+  }
+
   function showLabelPositionEditor(target, event) {
     event?.preventDefault?.();
     labelPositionTarget = labelPositionTarget === target ? '' : target;
@@ -208,8 +225,11 @@
       <PropertyCell label="Start Angle" span={2} hint="Angle where the circular slider begins.">
         <NumberInput value={behavior.startAngle ?? 135} step={1} min={-720} max={720} onchange={(value) => set('Behavior.startAngle', value)} />
       </PropertyCell>
+      <PropertyCell label="End Angle" span={2} hint="Angle where the circular slider ends; changing it updates the sweep.">
+        <NumberInput value={circularEndAngle()} step={1} min={-720} max={720} onchange={setCircularEndAngle} />
+      </PropertyCell>
       <PropertyCell label="Sweep" span={2} hint="How much of the circle is active.">
-        <NumberInput value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} onchange={(value) => set('Behavior.sweepAngle', value)} />
+        <NumberInput value={behavior.sweepAngle ?? 270} step={1} min={1} max={360} onchange={(value) => set('Behavior.sweepAngle', clampSweep(value))} />
       </PropertyCell>
       <PropertyCell label="Diameter" span={2} hint="Circular track diameter in pixels. Set to 0 for automatic fitting.">
         <NumberInput value={behavior.circularDiameter ?? 0} step={1} min={0} onchange={(value) => set('Behavior.circularDiameter', Math.max(0, value))} />
@@ -365,6 +385,9 @@
     </PropertyCell>
     <PropertyCell label="Wheel" span={1} hint="Allow mouse-wheel scrubbing while focused or hovered.">
       <PropertyToggle value={behavior.wheelEnabled === true} onchange={() => set('Behavior.wheelEnabled', !(behavior.wheelEnabled === true))} />
+    </PropertyCell>
+    <PropertyCell label="Reverse Mouse" span={2} hint="Invert wheel and scrub-drag value direction without changing the visual track direction.">
+      <PropertyToggle value={behavior.reverseMouseDirection === true} onchange={() => set('Behavior.reverseMouseDirection', !(behavior.reverseMouseDirection === true))} />
     </PropertyCell>
     <PropertyCell label="Commit Emit" span={2} hint="Keep commit emission metadata enabled for pointer-release and confirmed edits.">
       <PropertyToggle value={behavior.emitValueCommit !== false} onchange={() => set('Behavior.emitValueCommit', !(behavior.emitValueCommit !== false))} />

@@ -14,6 +14,12 @@
     parseSliderInputValue,
     snapSliderValue,
   } from '../utils/sliderBehavior.js';
+  import {
+    getCustomValueChannels,
+    normalizeCustomChannelValue,
+    seedCustomValues,
+    snapCustomChannelValue,
+  } from '../utils/customComponentInteraction.js';
 
   function getValueRows(control) {
     const rows = control?._children?.Value?.rows;
@@ -27,6 +33,15 @@
 
   function createPreviewSession(control) {
     const next = getDefaultInteractionPreviewSession();
+    if (String(control?._children?.Core?.controlType ?? '') === 'CustomComponent') {
+      next.customValues = seedCustomValues(control);
+      next.customNormalizedValue = normalizeCustomChannelValue(
+        control?._children?.ValueChannels?._children?.mainValue,
+        next.customValues?.mainValue
+      );
+      return next;
+    }
+
     const behavior = control?._children?.Behavior ?? null;
     if (!behavior) return next;
 
@@ -59,6 +74,7 @@
   let control = $derived($selectedControl);
   let controlId = $derived(control?._children?.Core?.id ?? '');
   let behavior = $derived(control?._children?.Behavior ?? null);
+  let isCustomComponent = $derived(String(control?._children?.Core?.controlType ?? '') === 'CustomComponent');
   let panelControls = $derived($activePanel?.controls ?? []);
   let groupPreviewControls = $derived.by(() =>
     controlId ? findExclusiveSelectGroupControls(panelControls, controlId) : []
@@ -129,6 +145,7 @@
   ));
   let showRangeValue = $derived(!isSliderPreview && (behavior?.family === 'range' || behavior?.valueType === 'int' || behavior?.valueType === 'float'));
   let showEnumValue = $derived(behavior?.valueType === 'enum' || buttonType === 'cyclic' || buttonType === 'radio');
+  let customChannelEntries = $derived.by(() => Object.entries(getCustomValueChannels(control)));
   let enumValues = $derived(normalizeEnumValues(behavior?.enumValues ?? []));
   let valueRows = $derived(getValueRows(control));
   let previewValueOptions = $derived.by(() =>
@@ -292,6 +309,41 @@
     });
   }
 
+  function customChannelValue(channelName, channel) {
+    return session?.customValues?.[channelName] ?? channel?.currentValue ?? channel?.defaultValue ?? '';
+  }
+
+  function handleCustomChannelChange(channelName, channel, event) {
+    const type = String(channel?.type ?? 'float').trim().toLowerCase();
+    const rawValue = type === 'bool'
+      ? event.currentTarget.checked
+      : (type === 'enum' ? String(event.currentTarget.value ?? '') : Number(event.currentTarget.value));
+    const nextValue = snapCustomChannelValue(channel, rawValue);
+    const nextValues = {
+      ...seedCustomValues(control),
+      ...(session?.customValues ?? {}),
+      [channelName]: nextValue,
+    };
+    patchSession({
+      customValues: nextValues,
+      customNormalizedValue: channelName === 'mainValue'
+        ? normalizeCustomChannelValue(channel, nextValue)
+        : session?.customNormalizedValue,
+      valueOverrideEnabled: channelName === 'mainValue',
+      valueOverride: channelName === 'mainValue' ? nextValue : session?.valueOverride,
+      activeCustomBehavior: '',
+      activeCustomHitZone: '',
+    });
+  }
+
+  function customChannelOptions(channel) {
+    const values = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
+    const normalized = values
+      .map((entry) => ({ value: String(entry?.value ?? entry?.id ?? entry ?? ''), label: String(entry?.label ?? entry?.value ?? entry?.id ?? entry ?? '') }))
+      .filter((entry) => entry.value);
+    return normalized.length ? normalized : ['A', 'B'].map((entry) => ({ value: entry, label: entry }));
+  }
+
   function handleGroupCommit(targetControlId) {
     const targetSession = sessionsById?.[targetControlId];
     const isChecked = targetSession?.checked === true;
@@ -414,7 +466,66 @@
 
         <section class="preview-section">
           <div class="section-title">Value</div>
-          {#if isSliderPreview}
+          {#if isCustomComponent}
+            {#if customChannelEntries.length}
+              {#each customChannelEntries as [channelName, channel] (channelName)}
+                {@const channelType = String(channel?.type ?? 'float').trim().toLowerCase()}
+                <div class="slider-role-card">
+                  <div class="meta-row">
+                    <span>{channel?.label ?? channelName}</span>
+                    <strong>{channelType}</strong>
+                  </div>
+                  {#if channelType === 'bool'}
+                    <label class="toggle-row">
+                      <span>Value</span>
+                      <input
+                        type="checkbox"
+                        checked={customChannelValue(channelName, channel) === true}
+                        onchange={(event) => handleCustomChannelChange(channelName, channel, event)}
+                      />
+                    </label>
+                  {:else if channelType === 'enum'}
+                    <select
+                      class="select-input"
+                      value={String(customChannelValue(channelName, channel) ?? '')}
+                      onchange={(event) => handleCustomChannelChange(channelName, channel, event)}
+                    >
+                      {#each customChannelOptions(channel) as option (option.value)}
+                        <option value={option.value}>{option.label}</option>
+                      {/each}
+                    </select>
+                  {:else}
+                    <div class="range-stepper">
+                      <button type="button" class="step-btn" onclick={() => {
+                        const next = Number(customChannelValue(channelName, channel)) - numberOr(channel?.step, 0.01);
+                        handleCustomChannelChange(channelName, channel, { currentTarget: { value: next } });
+                      }}>-</button>
+                      <input
+                        class="number-input"
+                        type="number"
+                        min={numberOr(channel?.min, 0)}
+                        max={numberOr(channel?.max, 1)}
+                        step={numberOr(channel?.step, 0.01)}
+                        value={customChannelValue(channelName, channel)}
+                        oninput={(event) => handleCustomChannelChange(channelName, channel, event)}
+                      />
+                      <button type="button" class="step-btn" onclick={() => {
+                        const next = Number(customChannelValue(channelName, channel)) + numberOr(channel?.step, 0.01);
+                        handleCustomChannelChange(channelName, channel, { currentTarget: { value: next } });
+                      }}>+</button>
+                    </div>
+                  {/if}
+                  <div class="slider-role-readout">
+                    normalized {normalizeCustomChannelValue(channel, customChannelValue(channelName, channel)).toFixed(3)}
+                  </div>
+                </div>
+              {/each}
+            {:else}
+              <div class="value-readout">
+                Add value channels to make this custom component react in the preview.
+              </div>
+            {/if}
+          {:else if isSliderPreview}
             {#if sliderRoles.length > 1}
               <label class="field-stack">
                 <span class="field-label">Active Handle</span>
@@ -516,6 +627,22 @@
             <span>Normalized</span>
             <strong>{numberOr(runtime?.signals?.valueNormalized, 0).toFixed(3)}</strong>
           </div>
+          {#if isCustomComponent}
+            <div class="meta-row">
+              <span>Hit Zone</span>
+              <strong>{session?.activeCustomHitZone || '-'}</strong>
+            </div>
+            <div class="meta-row">
+              <span>Behavior</span>
+              <strong>{session?.activeCustomBehavior || '-'}</strong>
+            </div>
+            {#each customChannelEntries as [channelName, channel] (channelName)}
+              <div class="meta-row">
+                <span>{channelName}</span>
+                <strong>{String(customChannelValue(channelName, channel) ?? '-')}</strong>
+              </div>
+            {/each}
+          {/if}
           {#if isSliderPreview}
             <div class="meta-row">
               <span>Geometry</span>

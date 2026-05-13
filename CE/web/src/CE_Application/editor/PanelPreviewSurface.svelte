@@ -32,6 +32,7 @@
     parseRangeInputValue,
     resolveRangeDisplayValue,
     resolveRangeZone,
+    resolveMouseDirection,
     scrubRangeValue,
     snapRangeValue,
   } from '../utils/rangeBehavior.js';
@@ -50,6 +51,17 @@
     resolveSliderNormalizedFromPoint,
     sliderValueToAngle,
   } from '../utils/sliderGeometry.js';
+  import {
+    getCustomHitZones,
+    getCustomValueChannels,
+    getCustomBehaviors,
+    isCustomMouseDirectionReversed,
+    normalizeCustomChannelValue,
+    resolveCustomHitZoneAtPoint,
+    resolveCustomInteractionPatch,
+    seedCustomValues,
+    snapCustomChannelValue,
+  } from '../utils/customComponentInteraction.js';
 
   let {
     panel,
@@ -71,6 +83,7 @@
   let pointerDownZone = $state('');
   let pointerStartValue = $state(0);
   let pointerSliderHandle = $state('');
+  let pointerCustomHitZone = $state(null);
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
   let openComboboxControlId = $state('');
@@ -122,6 +135,10 @@
 
   function isRangeControl(control) {
     return isRangeBehavior(getBehavior(control));
+  }
+
+  function isCustomComponent(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'CustomComponent';
   }
 
   function isComboboxControl(control) {
@@ -462,6 +479,141 @@
     if (control) emitDeviceBindingsForPatch(control, patch);
   }
 
+  function customSessionValues(control) {
+    return {
+      ...seedCustomValues(control),
+      ...(sessionFor(control)?.customValues ?? {}),
+    };
+  }
+
+  function customMainChannelName(control) {
+    const channels = getCustomValueChannels(control);
+    return channels?.mainValue ? 'mainValue' : (Object.keys(channels ?? {})[0] ?? '');
+  }
+
+  function customMainBehaviorModule(control) {
+    const channelName = customMainChannelName(control);
+    return Object.values(getCustomBehaviors(control) ?? {}).find((entry) => entry?.valueChannel === channelName) ?? null;
+  }
+
+  function customHitZoneEntry(control, hitZoneName = '') {
+    const name = String(hitZoneName ?? '').trim();
+    if (!name) return null;
+    const zone = getCustomHitZones(control)?.[name] ?? null;
+    return zone ? { name, zone } : null;
+  }
+
+  function customHitZoneFromEventTarget(control, event) {
+    const hitZoneElement = event?.target?.closest?.('.custom-hit-zone');
+    if (!hitZoneElement) return null;
+    const label = hitZoneElement.querySelector?.('span')?.textContent ?? '';
+    return customHitZoneEntry(control, label);
+  }
+
+  function defaultCustomActivationHitZone(control) {
+    const entries = Object.entries(getCustomHitZones(control) ?? {})
+      .filter(([, zone]) => zone?.enabled !== false)
+      .sort((left, right) => numberOr(right?.[1]?.priority, 0) - numberOr(left?.[1]?.priority, 0));
+    const actionPriority = ['cyclevalue', 'togglevalue', 'setvalue', 'selectvalue', 'cellvalue', 'notevalue'];
+    for (const wantedAction of actionPriority) {
+      const match = entries.find(([, zone]) => String(zone?.action ?? '').trim().toLowerCase() === wantedAction);
+      if (match) return { name: match[0], zone: match[1] };
+    }
+    const first = entries[0];
+    return first ? { name: first[0], zone: first[1] } : null;
+  }
+
+  function patchCustomInteraction(control, hitZoneEntry, event, extraPatch = {}) {
+    const controlId = getControlId(control);
+    const rect = pointerActiveElement?.getBoundingClientRect?.()
+      ?? event?.currentTarget?.getBoundingClientRect?.();
+    const patch = resolveCustomInteractionPatch(control, sessionFor(control), hitZoneEntry, {
+      rect,
+      clientX: event?.clientX ?? rect?.left ?? 0,
+      clientY: event?.clientY ?? rect?.top ?? 0,
+    });
+    if (!controlId || !Object.keys(patch).length) return;
+    patchControlSession(controlId, {
+      ...patch,
+      ...extraPatch,
+    });
+  }
+
+  function updateCustomDragFromPointer(control, event) {
+    if (!pointerCustomHitZone) return;
+    const rect = pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return;
+    const patch = resolveCustomInteractionPatch(control, sessionFor(control), pointerCustomHitZone, {
+      rect,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    });
+    if (!Object.keys(patch).length) return;
+    patchControlSession(getControlId(control), {
+      ...patch,
+      activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+      activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+      dragging: true,
+    });
+  }
+
+  function adjustCustomMainValue(control, direction = 1) {
+    const channelName = customMainChannelName(control);
+    const channel = getCustomValueChannels(control)?.[channelName] ?? null;
+    if (!channel) return;
+    const currentValues = customSessionValues(control);
+    const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
+    const nextValue = snapCustomChannelValue(channel, numberOr(currentValue, 0) + (direction * numberOr(channel?.step, 0.01)));
+    patchControlSession(getControlId(control), {
+      customValues: {
+        ...currentValues,
+        [channelName]: nextValue,
+      },
+      customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
+      valueOverrideEnabled: channelName === 'mainValue',
+      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      focused: true,
+      hover: true,
+    });
+  }
+
+  function setCustomMainValue(control, value) {
+    const channelName = customMainChannelName(control);
+    const channel = getCustomValueChannels(control)?.[channelName] ?? null;
+    if (!channel) return;
+    const nextValue = snapCustomChannelValue(channel, value);
+    patchControlSession(getControlId(control), {
+      customValues: {
+        ...customSessionValues(control),
+        [channelName]: nextValue,
+      },
+      customNormalizedValue: normalizeCustomChannelValue(channel, nextValue),
+      valueOverrideEnabled: channelName === 'mainValue',
+      valueOverride: channelName === 'mainValue' ? nextValue : sessionFor(control)?.valueOverride,
+      focused: true,
+      hover: true,
+    });
+  }
+
+  function patchCustomKeyboardActivation(control, event) {
+    const resolvedPreview = resolvedPreviewFor(control);
+    const hitZoneEntry = defaultCustomActivationHitZone(resolvedPreview?.control ?? control)
+      ?? defaultCustomActivationHitZone(control);
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    patchCustomInteraction(control, hitZoneEntry, {
+      ...event,
+      currentTarget: event?.currentTarget,
+      clientX: rect ? rect.left + rect.width / 2 : undefined,
+      clientY: rect ? rect.top + rect.height / 2 : undefined,
+    }, {
+      focused: true,
+      hover: true,
+      pressed: false,
+      dragging: false,
+      inputModality: 'keyboard',
+    });
+  }
+
   function isPointInsideActiveHitbox(clientX, clientY) {
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return false;
@@ -741,11 +893,21 @@
   }
 
   function handleRangeWheel(control, event) {
+    if (isCustomComponent(control)) {
+      if (isDisabled(control)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const baseDirection = event.deltaY < 0 ? 1 : -1;
+      adjustCustomMainValue(control, baseDirection * (isCustomMouseDirectionReversed(customMainBehaviorModule(control)) ? -1 : 1));
+      return;
+    }
+
     const behavior = getBehavior(control);
     if (!isRangeControl(control) || behavior?.wheelEnabled !== true) return;
 
     event.preventDefault();
-    const direction = event.deltaY < 0 ? 1 : -1;
+    event.stopPropagation();
+    const direction = resolveMouseDirection(behavior, event.deltaY < 0 ? 1 : -1);
     if (isSliderControl(control)) {
       const role = currentSliderActiveHandle(control);
       setSliderRoleValue(control, role, currentSliderRoleValue(control, role) + (direction * numberOr(behavior?.step, 0.01)), {
@@ -794,6 +956,7 @@
       draggingRange = false;
       pointerDownZone = '';
       pointerSliderHandle = '';
+      pointerCustomHitZone = null;
       removeWindowListeners();
     }
 
@@ -831,6 +994,8 @@
     if (isDisabled(control)) return;
 
     event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget?.setPointerCapture?.(event.pointerId);
     event.currentTarget?.focus?.();
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
@@ -842,11 +1007,43 @@
     pointerDownPoint = { x: event.clientX, y: event.clientY };
     pointerDownZone = '';
     pointerSliderHandle = '';
+    pointerCustomHitZone = null;
     pointerStartValue = isSliderControl(control)
       ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
       : currentRangeValue(control);
     draggingRange = isRangeControl(control) && isSliderRangeBehavior(getBehavior(control));
     setPreviewInspectedControlId(pointerActiveControlId);
+
+    if (isCustomComponent(control)) {
+      const rect = pointerActiveElement?.getBoundingClientRect?.();
+      const resolvedPreview = resolvedPreviewFor(control);
+      pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY)
+        ?? customHitZoneFromEventTarget(resolvedPreview?.control ?? control, event)
+        ?? customHitZoneFromEventTarget(control, event);
+      const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
+      const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || action === '';
+      if (isDragAction) {
+        patchCustomInteraction(control, pointerCustomHitZone, event, {
+          hover: true,
+          pressed: true,
+          focused: false,
+          dragging: true,
+        });
+        updateCustomDragFromPointer(control, event);
+      } else {
+        patchControlSession(pointerActiveControlId, {
+          hover: true,
+          pressed: true,
+          focused: false,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        });
+      }
+      window.addEventListener('pointermove', handleWindowPointerMove);
+      window.addEventListener('pointerup', handleWindowPointerUp);
+      return;
+    }
 
     if (isRangeControl(control)) {
       const rect = pointerActiveElement?.getBoundingClientRect?.();
@@ -889,8 +1086,15 @@
 
   function handleWindowPointerMove(event) {
     if (!pointerActiveControlId) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
     const activeControl = orderedControls.find((control) => getControlId(control) === pointerActiveControlId) ?? null;
     if (!activeControl || isDisabled(activeControl)) return;
+
+    if (isCustomComponent(activeControl)) {
+      updateCustomDragFromPointer(activeControl, event);
+      return;
+    }
 
     if (!isRangeControl(activeControl)) return;
     if (isSliderRangeBehavior(getBehavior(activeControl))) {
@@ -911,11 +1115,41 @@
 
   function handleWindowPointerUp(event) {
     if (!pointerActiveControlId) return;
+    event.preventDefault?.();
+    event.stopPropagation?.();
 
     const activeId = pointerActiveControlId;
     const activeControl = orderedControls.find((control) => getControlId(control) === activeId) ?? null;
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
+
+    if (isCustomComponent(activeControl)) {
+      const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
+      if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue') {
+        patchCustomInteraction(activeControl, pointerCustomHitZone, event, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      } else {
+        patchControlSession(activeId, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      }
+
+      pointerActiveControlId = '';
+      pointerActiveElement = null;
+      draggingRange = false;
+      pointerDownZone = '';
+      pointerSliderHandle = '';
+      pointerCustomHitZone = null;
+      removeWindowListeners();
+      return;
+    }
 
     if (!draggingRange && inside && activeControl && !isDisabled(activeControl)) {
       if (isRangeControl(activeControl) && !isSliderRangeBehavior(getBehavior(activeControl))) {
@@ -951,6 +1185,7 @@
     draggingRange = false;
     pointerDownZone = '';
     pointerSliderHandle = '';
+    pointerCustomHitZone = null;
     removeWindowListeners();
   }
 
@@ -1030,6 +1265,23 @@
     }
 
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+      if (isCustomComponent(control)) {
+        event.preventDefault();
+        event.currentTarget?.focus?.();
+        patchControlSession(controlId, {
+          focused: true,
+          hover: true,
+        });
+        const channel = getCustomValueChannels(control)?.[customMainChannelName(control)] ?? null;
+        if (event.key === 'Home' && channel) {
+          setCustomMainValue(control, channel?.min ?? 0);
+        } else if (event.key === 'End' && channel) {
+          setCustomMainValue(control, channel?.max ?? 1);
+        } else {
+          adjustCustomMainValue(control, (event.key === 'ArrowLeft' || event.key === 'ArrowDown') ? -1 : 1);
+        }
+        return;
+      }
       if (!isRangeControl(control)) return;
       event.preventDefault();
       event.currentTarget?.focus?.();
@@ -1049,6 +1301,8 @@
     const controlId = getControlId(control);
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.releasePress(controlId, getBehavior(control), { inside: true });
+    } else if (isCustomComponent(control)) {
+      patchCustomKeyboardActivation(control, event);
     } else if (String(getBehavior(control)?.family ?? 'trigger') === 'select') {
       if (isComboboxControl(control)) {
         openComboboxControlId = openComboboxControlId === controlId ? '' : controlId;

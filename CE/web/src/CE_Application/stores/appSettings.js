@@ -800,6 +800,16 @@ export function initAppSettingsBridge() {
   if (listenersInitialized) return;
   listenersInitialized = true;
 
+  if (!isJuceAvailable()) {
+    const normalized = normalizeSettings(createDefaultSettings());
+    appSettings.set(normalized);
+    applyGeneralSettingsToRuntime(normalized.general);
+    settingsLoaded = true;
+    restoreSessionFromPreferences();
+    scheduleSettingsCompaction(normalized);
+    return;
+  }
+
   onAppSettingsLoaded((payload) => {
     const stopTimer = createPerfDebugTimer('bridge app settings load');
     const normalized = normalizeSettings(payload ?? createDefaultSettings());

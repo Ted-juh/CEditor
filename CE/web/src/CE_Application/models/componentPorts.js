@@ -100,22 +100,115 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  CustomComponent: [
+    {
+      id: 'mainValue',
+      label: 'Main Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'mode',
+      label: 'Mode',
+      accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.CHOICE, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+    {
+      id: 'trigger',
+      label: 'Trigger',
+      accepts: [PARAMETER_TYPES.ACTION, PARAMETER_TYPES.MOMENTARY, PARAMETER_TYPES.RAW_MIDI_ACTION],
+      defaultBindingMode: 'explicitAction',
+    },
+  ],
 };
 
-export function getComponentPorts(componentType) {
+function componentTypeOf(componentOrType) {
+  return typeof componentOrType === 'string'
+    ? componentOrType
+    : String(componentOrType?._children?.Core?.controlType ?? '');
+}
+
+function parameterTypesForPublishedType(type) {
+  switch (String(type ?? 'float').trim().toLowerCase()) {
+    case 'int':
+    case 'integer':
+    case 'note':
+      return [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED];
+    case 'bool':
+    case 'boolean':
+      return [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.ENUM];
+    case 'enum':
+    case 'choice':
+      return [PARAMETER_TYPES.CHOICE, PARAMETER_TYPES.ENUM, PARAMETER_TYPES.CHOICE_STEPPED];
+    case 'text':
+      return [PARAMETER_TYPES.TEXT];
+    case 'action':
+    case 'trigger':
+      return [PARAMETER_TYPES.ACTION, PARAMETER_TYPES.MOMENTARY, PARAMETER_TYPES.RAW_MIDI_ACTION];
+    case 'float':
+    case 'bipolar':
+    case 'normalized':
+    default:
+      return [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED];
+  }
+}
+
+function publishedPorts(control) {
+  const published = control?._children?.PublishedProperties;
+  if (!published) return [];
+  const inputs = Object.entries(published.inputs ?? {})
+    .filter(([, entry]) => entry?.enabled !== false)
+    .map(([name, entry]) => ({
+      id: String(entry?.channel || name),
+      label: entry?.label || name,
+      accepts: parameterTypesForPublishedType(entry?.type),
+      defaultBindingMode: ['float', 'int', 'integer', 'note', 'bipolar', 'normalized'].includes(String(entry?.type ?? '').toLowerCase())
+        ? 'continuous'
+        : 'onCommit',
+      custom: true,
+      direction: 'input',
+      publishedName: name,
+      channel: entry?.channel || name,
+    }));
+  const outputs = Object.entries(published.outputs ?? {})
+    .filter(([, entry]) => entry?.enabled !== false)
+    .map(([name, entry]) => ({
+      id: `out:${entry?.channel || name}`,
+      label: `${entry?.label || name} Out`,
+      accepts: parameterTypesForPublishedType(entry?.type),
+      defaultBindingMode: 'feedback',
+      custom: true,
+      direction: 'output',
+      publishedName: name,
+      channel: entry?.channel || name,
+    }));
+  return [...inputs, ...outputs];
+}
+
+export function getComponentPorts(componentOrType) {
+  const componentType = componentTypeOf(componentOrType);
+  if (componentType === 'CustomComponent' && typeof componentOrType === 'object') {
+    const dynamicPorts = publishedPorts(componentOrType);
+    return dynamicPorts.length ? dynamicPorts : DEFAULT_COMPONENT_PORTS.CustomComponent;
+  }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }
 
-export function getPreferredPort(componentType, parameterType) {
-  const ports = getComponentPorts(componentType);
+export function getBindableComponentPorts(componentOrType) {
+  return getComponentPorts(componentOrType).filter((port) => port.direction !== 'output');
+}
+
+export function getPreferredPort(componentOrType, parameterType) {
+  const ports = getBindableComponentPorts(componentOrType);
   return ports.find((port) => port.accepts?.includes(parameterType))
     ?? ports.find((port) => parameterType === PARAMETER_TYPES.CHOICE && port.accepts?.includes(PARAMETER_TYPES.CHOICE_STEPPED))
     ?? ports[0]
     ?? null;
 }
 
-export function getBindingCompatibility(componentType, parameter = {}) {
-  const ports = getComponentPorts(componentType);
+export function getBindingCompatibility(componentOrType, parameter = {}) {
+  const componentType = componentTypeOf(componentOrType);
+  const ports = getBindableComponentPorts(componentOrType);
   const parameterType = String(parameter?.type ?? '').trim();
   const rangeMin = Number(parameter?.range?.min ?? 0);
   const rangeMax = Number(parameter?.range?.max ?? 0);

@@ -1,7 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { getComponentPorts } from '../models/componentPorts.js';
+  import { getBindableComponentPorts } from '../models/componentPorts.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -11,7 +11,7 @@
   let core = $derived(getSection(control, 'Core'));
   let deviceBindings = $derived(getSection(control, 'DeviceBindings'));
   let multiEdit = $derived($selectedComponentIds.size > 1);
-  let ports = $derived(getComponentPorts(core?.controlType));
+  let ports = $derived(getBindableComponentPorts(control));
   let bindings = $derived(Array.isArray(deviceBindings?.bindings) ? deviceBindings.bindings : []);
 
   let selectedIndex = $state(0);

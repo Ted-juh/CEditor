@@ -4,6 +4,7 @@ import { createControl as createControlFromType, getSection, hasSection } from '
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
+import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
@@ -163,6 +164,38 @@ export function addControl(type, overrides = {}) {
   );
 
   // Auto-select the new control
+  selectComponent(id);
+  return control;
+}
+
+export function addCustomComponentPackage(value, overrides = {}) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null) return null;
+
+  const panel = get(panels).find(p => p.id === panelId);
+  const nextId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  let transformOverrides = overrides.Transform ?? overrides.transform ?? null;
+  if (panel && !transformOverrides) {
+    const baseOffset = get(insertOffset);
+    const offset = panel.controls.length * baseOffset;
+    transformOverrides = { x: baseOffset + offset, y: baseOffset + offset };
+  }
+
+  const control = instantiateCustomComponentPackageControl(value, {
+    ...overrides,
+    id: nextId,
+    Transform: transformOverrides,
+  });
+  if (!control?._children?.Core?.id) return null;
+  const id = control._children.Core.id;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+      return { ...p, controls: [...p.controls, control], modified: true };
+    })
+  );
+
   selectComponent(id);
   return control;
 }

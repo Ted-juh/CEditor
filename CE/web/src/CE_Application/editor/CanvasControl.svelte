@@ -82,9 +82,10 @@
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
+  let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   let previewSession = $derived(previewSessionOverride ?? null);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
-  let interactiveRenderingEnabled = $derived(previewSessionOverride !== null || editorInteractionEnabled === false);
+  let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
   let shouldResolveInteractive = $derived(interactiveRenderingEnabled && resolvedControlOverride == null && interactionRuntimeOverride == null);
   let resolvedInteractive = $derived(shouldResolveInteractive ? resolveInteractiveControl(control, appliedPreviewSession) : null);
   let renderControl = $derived(
@@ -119,6 +120,18 @@
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let isComboboxControl = $derived(buttonType === 'combobox');
   let renderParts = $derived(getSection(renderControl, 'Parts'));
+  let designer = $derived(getSection(renderControl, 'Designer'));
+  let hitZones = $derived(getSection(renderControl, 'HitZones'));
+  let showCustomHitZones = $derived(
+    String(core?.controlType ?? '') === 'CustomComponent'
+    && editorInteractionEnabled
+    && designer?.preview?.showHitZones === true
+  );
+  let customHitZoneEntries = $derived.by(() =>
+    Object.entries(hitZones?._children ?? {})
+      .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
+      .sort((left, right) => numberOr(left?.[1]?.priority, 0) - numberOr(right?.[1]?.priority, 0))
+  );
   const SLIDER_SEMANTIC_PARTS = new Set([
     'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker',
     'pointerStart', 'pointerCurrent', 'pointerEnd',
@@ -203,7 +216,7 @@
   let multiDragOffsetX = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.x : 0);
   let multiDragOffsetY = $derived(!isDragging && isSelected && $multiDragDelta.active ? $multiDragDelta.y : 0);
   let deviceDropCompatibility = $derived($deviceParameterDrag?.parameter
-    ? getBindingCompatibility(core?.controlType, $deviceParameterDrag.parameter)
+    ? getBindingCompatibility(sourceControl, $deviceParameterDrag.parameter)
     : null
   );
   let deviceDropStatus = $derived(
@@ -305,7 +318,7 @@
 
   function canAcceptDeviceParameterDrop(payload) {
     if (!editorInteractionEnabled || panelLocked || isEditorLocked || !core?.id) return false;
-    const compatibility = getBindingCompatibility(core.controlType, payload?.parameter);
+    const compatibility = getBindingCompatibility(sourceControl, payload?.parameter);
     return compatibility.status !== 'incompatible' && !!compatibility.port;
   }
 
@@ -332,7 +345,7 @@
 
   function bindDroppedDeviceParameter(payload) {
     const parameter = payload.parameter;
-    const compatibility = getBindingCompatibility(core.controlType, parameter);
+    const compatibility = getBindingCompatibility(sourceControl, parameter);
     if (!compatibility.port) return;
 
     selectComponent(core.id, false);
@@ -934,6 +947,24 @@
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
     return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  function customHitZoneStyle(zone) {
+    const bounds = zone?.bounds ?? {};
+    const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : '%';
+    const width = Math.max(0, numberOr(bounds.width, 100));
+    const height = Math.max(0, numberOr(bounds.height, 100));
+    const x = numberOr(bounds.x, 0);
+    const y = numberOr(bounds.y, 0);
+    const shape = String(zone?.shape ?? 'rectangle');
+
+    return [
+      `left:${x}${unit}`,
+      `top:${y}${unit}`,
+      `width:${width}${unit}`,
+      `height:${height}${unit}`,
+      `border-radius:${shape === 'circle' || shape === 'ellipse' || shape === 'ring' ? '999px' : '4px'}`,
+    ].join(';');
   }
 
   function normalizeKey(value) {
@@ -4033,6 +4064,21 @@
       <div class="interaction-debug-badge">{interactionDebugSummary}</div>
     {/if}
 
+    {#if showCustomHitZones && customHitZoneEntries.length}
+      <div class="custom-hit-zone-overlay">
+        {#each customHitZoneEntries as [zoneName, zone] (zoneName)}
+          <div
+            class="custom-hit-zone"
+            class:ring-zone={zone.shape === 'ring' || zone.shape === 'circle'}
+            style={customHitZoneStyle(zone)}
+            title={`${zoneName}: ${zone.action ?? 'action'} -> ${zone.targetBehavior ?? ''}`}
+          >
+            <span>{zoneName}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     {#if isRadioGroupControl && radioGroupItems.length}
       <div class="radio-group-content" style={radioGroupStyle}>
         {#each radioGroupItems as item (item.id)}
@@ -5321,6 +5367,42 @@
     z-index: 12;
   }
 
+  .custom-hit-zone-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 30;
+  }
+
+  .custom-hit-zone {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px dashed rgba(245, 184, 61, 0.9);
+    background: rgba(245, 184, 61, 0.08);
+    color: #FFE2A1;
+    font-size: 9px;
+    line-height: 1;
+    overflow: hidden;
+  }
+
+  .custom-hit-zone.ring-zone {
+    border-style: solid;
+    box-shadow: inset 0 0 0 4px rgba(245, 184, 61, 0.12);
+  }
+
+  .custom-hit-zone span {
+    position: absolute;
+    left: 4px;
+    top: 4px;
+    max-width: calc(100% - 8px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: rgba(20, 18, 12, 0.82);
+    border-radius: 3px;
+    padding: 2px 4px;
+  }
+
   .text-content {
     position: absolute;
     inset: 0;
@@ -5515,6 +5597,10 @@
   .canvas-control.preview-interactive {
     cursor: pointer;
     outline: none;
+    touch-action: none;
+    overscroll-behavior: contain;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .canvas-control.preview-disabled {

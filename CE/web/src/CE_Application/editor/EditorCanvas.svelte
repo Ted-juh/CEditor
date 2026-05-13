@@ -1,6 +1,6 @@
 <script>
   import { activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize } from '../stores/panels.js';
-  import { getSection, removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
+  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
@@ -17,12 +17,14 @@
   import DeviceProfileDesigner from './DeviceProfileDesigner.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
+  import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { deviceProfiles, deviceRoleMappings } from '../stores/deviceProfiles.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
+  import { closeComponentWorkspace, componentWorkspaceMode, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -138,6 +140,20 @@
         : 'Preview')
       : ''
   );
+  let selectedIsCustomComponent = $derived(String(getSection($selectedControl, 'Core')?.controlType ?? '') === 'CustomComponent');
+  let selectedCustomComponentName = $derived(getSection($selectedControl, 'Core')?.name ?? 'Custom Component');
+  let componentSurfaceWorkspaceActive = $derived(
+    $componentWorkspaceMode === 'surface'
+    && selectedIsCustomComponent
+    && !$previewModeEnabled
+    && $activeEditorTab?.type === 'panel'
+  );
+
+  $effect(() => {
+    if ($componentWorkspaceMode === 'panel') return;
+    if (selectedIsCustomComponent && !$previewModeEnabled && $activeEditorTab?.type === 'panel') return;
+    closeComponentWorkspace();
+  });
 
   $effect(() => {
     if (!$previewModeEnabled) return;
@@ -251,6 +267,8 @@
   }
 
   function handleEditorKeyDown(e) {
+    if (componentSurfaceWorkspaceActive) return;
+
     if ($previewModeEnabled) {
       handlePreviewShortcut(e);
       return;
@@ -269,6 +287,7 @@
   }
 
   function handleEditorKeyUp(e) {
+    if (componentSurfaceWorkspaceActive) return;
     if ($previewModeEnabled) return;
     panCtrl.handleKeyUp(e);
   }
@@ -341,6 +360,12 @@
     window.addEventListener('pointerup', handleUp);
     window.addEventListener('pointercancel', handleUp);
   }
+
+  function launchComponentWorkspace(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    openComponentSurfaceWorkspace();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -351,7 +376,20 @@
 
   <div class="canvas-area">
     {#key `${$activeEditorTab?.type ?? 'panel'}:${$activeEditorTab?.id ?? 'none'}:${canvasPanel?.id ?? 'none'}`}
-      {#if splitVisibleForActiveTab && splitDeviceProfileId && canvasPanel}
+      {#if componentSurfaceWorkspaceActive}
+        <section class="component-workspace" aria-label="Component Designer Workspace">
+          <header class="component-workspace-header">
+            <div>
+              <strong>Component Designer</strong>
+              <span>{selectedCustomComponentName}</span>
+            </div>
+            <button type="button" onclick={closeComponentWorkspace}>Back to Panel Canvas</button>
+          </header>
+          <div class="component-workspace-body">
+            <CustomDesignSurfaceEditor control={$selectedControl} />
+          </div>
+        </section>
+      {:else if splitVisibleForActiveTab && splitDeviceProfileId && canvasPanel}
         <div
           class={['editor-split', panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical']}
           class:resizing={splitResizing}
@@ -435,6 +473,21 @@
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesigner profileId={$activeEditorTab.id} />
       {:else if canvasPanel}
+        {#if selectedIsCustomComponent && !$previewModeEnabled}
+          <div class="component-workspace-launcher" aria-label="Custom component workspace launcher">
+            <button
+              type="button"
+              class="component-workspace-launch"
+              data-testid="component-designer-launch"
+              aria-label="Open Component Designer"
+              title="Open Component Designer"
+              onpointerdown={(event) => event.stopPropagation()}
+              onclick={launchComponentWorkspace}
+            >
+              Component Designer
+            </button>
+          </div>
+        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}
@@ -595,6 +648,98 @@
   .editor-split.horizontal.resizing,
   .editor-split.horizontal.resizing * {
     cursor: row-resize !important;
+  }
+
+  .component-workspace {
+    position: absolute;
+    inset: 0;
+    z-index: 140;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    background: #16181A;
+  }
+
+  .component-workspace-header {
+    flex: 0 0 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 12px;
+    background: #202224;
+    border-bottom: 1px solid #30343A;
+    box-sizing: border-box;
+  }
+
+  .component-workspace-header div {
+    min-width: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .component-workspace-header strong {
+    color: #F0F4F8;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .component-workspace-header span {
+    color: #9FB2C3;
+    font-size: 12px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .component-workspace-header button,
+  .component-workspace-launch {
+    height: 28px;
+    border: 1px solid #3B4652;
+    border-radius: 4px;
+    background: #182331;
+    color: #DCEBFA;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .component-workspace-header button:hover,
+  .component-workspace-launch:hover {
+    border-color: #5B9BD5;
+    background: #20344B;
+  }
+
+  .component-workspace-body {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .component-workspace-body :global(.surface-shell) {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .component-workspace-launcher {
+    position: absolute;
+    right: 14px;
+    top: 12px;
+    z-index: 120;
+    display: flex;
+    pointer-events: none;
+  }
+
+  .component-workspace-launch {
+    pointer-events: auto;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   }
 
   .canvas-viewport {

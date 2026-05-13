@@ -316,7 +316,7 @@
     if (geometry !== 'circular') return '';
     return describeArcPath(
       circularMetrics.radius,
-      valueMode === 'single' ? circularStartAngle : numberOr(behavior?.startAngle, 135),
+      circularStartAngle,
       valueMode === 'single'
         ? singleFillSweep
         : circularSelectionSweep,

@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, removeControlNode } from '../stores/controls.js';
+  import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { setDebugDock } from '../stores/debugDock.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -10,18 +10,29 @@
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
+  let designer = $derived(getSection(control, 'Designer'));
+  let parts = $derived(getSection(control, 'Parts'));
   let animations = $derived(getSection(control, 'Animations'));
   let multiEdit = $derived($selectedComponentIds.size > 1);
+  let partNames = $derived(Object.keys(parts?._children ?? {}));
+  let selectedLayer = $derived(partNames.includes(designer?.selectedLayer) ? designer.selectedLayer : (partNames[0] ?? ''));
 
   let selectedAnimationName = $state('');
   let newAnimationName = $state('');
   let targetsDraft = $state('[]');
   let parseError = $state('');
+  let targetPart = $state('');
+  let targetProperty = $state('Layout.scale');
+  let quickState = $state('pressed');
 
   let animationNames = $derived(Object.keys(animations?._children ?? {}));
   let selectedAnimation = $derived(animations?._children?.[selectedAnimationName] ?? null);
 
   $effect(() => {
+    if (designer?.selectedAnimation && animationNames.includes(designer.selectedAnimation)) {
+      selectedAnimationName = designer.selectedAnimation;
+      return;
+    }
     if (!animationNames.length) {
       selectedAnimationName = '';
       return;
@@ -97,8 +108,86 @@
     });
   }
 
+  function selectedTargetDescriptor() {
+    const target = TARGET_PROPERTIES.find((entry) => entry.path === targetProperty) ?? TARGET_PROPERTIES[0];
+    return {
+      path: `Parts.${targetPart || selectedLayer}.${target.path}`,
+      properties: target.props,
+    };
+  }
+
+  function appendTarget() {
+    if (!core?.id || !selectedAnimationName || !(targetPart || selectedLayer)) return;
+    try {
+      const parsed = JSON.parse(targetsDraft || '[]');
+      const nextTargets = Array.isArray(parsed) ? parsed : [];
+      nextTargets.push(selectedTargetDescriptor());
+      updateControlProperty(core.id, `Animations.${selectedAnimationName}.targets`, nextTargets);
+      targetsDraft = JSON.stringify(nextTargets, null, 2);
+      parseError = '';
+    } catch (error) {
+      parseError = error?.message ?? 'Invalid JSON';
+    }
+  }
+
+  function addQuickAnimation(kind) {
+    if (!core?.id || !(targetPart || selectedLayer)) return;
+    const partName = targetPart || selectedLayer;
+    const stateName = quickState || 'pressed';
+    const property = kind === 'rotate' ? 'rotation' : 'scale';
+    const animationName = `${partName}_${kind}_${stateName}`;
+    const target = kind === 'fade'
+      ? { path: `Parts.${partName}.opacity`, properties: ['opacity'] }
+      : { path: `Parts.${partName}.Layout.${property}`, properties: ['transform'] };
+    const partPatch = kind === 'fade'
+      ? { opacity: stateName === 'disabled' ? 0.45 : 0.82 }
+      : { [`Layout.${property}`]: kind === 'rotate' ? 12 : 0.94 };
+
+    applyControlPatch(core.id, {
+      [`Animations.${animationName}`]: {
+        _type: 'Animation',
+        name: animationName,
+        enabled: true,
+        kind: 'transition',
+        trigger: { type: 'stateChange', from: ['*'], to: [stateName] },
+        targets: [target],
+        duration: kind === 'press' ? 90 : 140,
+        delay: 0,
+        easing: kind === 'press' ? 'outQuad' : 'inOutQuad',
+      },
+      [`States.${stateName}`]: {
+        _type: 'State',
+        name: stateName,
+        group: 'interaction',
+        description: `${stateName} visual state for ${partName}.`,
+        enabled: true,
+        when: { [stateName]: true },
+        patches: {
+          component: {},
+          parts: { [partName]: partPatch },
+        },
+      },
+      'Designer.selectedLayer': partName,
+    });
+    selectedAnimationName = animationName;
+  }
+
   const TRIGGER_TYPES = ['stateChange', 'valueChange'];
   const EASING_OPTIONS = ['linear', 'outQuad', 'inOutQuad', 'outCubic'];
+  const TARGET_PROPERTIES = [
+    { path: 'Layout.scale', props: ['transform'], label: 'Scale' },
+    { path: 'Layout.rotation', props: ['transform'], label: 'Rotation' },
+    { path: 'Layout.x', props: ['transform'], label: 'X Position' },
+    { path: 'Layout.y', props: ['transform'], label: 'Y Position' },
+    { path: 'opacity', props: ['opacity'], label: 'Opacity' },
+    { path: 'Background.Fill.colour', props: ['background-color'], label: 'Fill Colour' },
+    { path: 'Text.Fill.colour', props: ['color'], label: 'Text Colour' },
+  ];
+  const QUICK_STATES = ['hover', 'pressed', 'focused', 'dragging', 'disabled', 'checked'];
+
+  $effect(() => {
+    if (!targetPart && selectedLayer) targetPart = selectedLayer;
+  });
 </script>
 
 {#if multiEdit}
@@ -124,6 +213,42 @@
   </PropertySection>
 
   {#if selectedAnimation}
+    {#if partNames.length}
+      <PropertySection title="Guided Targets">
+        <PropertyCell label="Part" span={2} hint="Layer/part this animation target should affect.">
+          <select class="val" bind:value={targetPart}>
+            {#each partNames as name}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Property" span={2} hint="Common animatable property.">
+          <select class="val" bind:value={targetProperty}>
+            {#each TARGET_PROPERTIES as target}
+              <option value={target.path}>{target.label}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Append" span={2} hint="Add this target to the selected animation target list.">
+          <button class="action-btn" onclick={appendTarget}>Append Target</button>
+        </PropertyCell>
+        <PropertyCell label="State" span={1} hint="State used by quick animation presets.">
+          <select class="val" bind:value={quickState}>
+            {#each QUICK_STATES as state}
+              <option value={state}>{state}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Quick" span={1} hint="Create a state and animation preset for the chosen part.">
+          <div class="mini-actions">
+            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('press')}>Scale</button>
+            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('rotate')}>Rotate</button>
+            <button class="mini-btn" type="button" onclick={() => addQuickAnimation('fade')}>Fade</button>
+          </div>
+        </PropertyCell>
+      </PropertySection>
+    {/if}
+
     <PropertySection title="Animation">
       <PropertyCell label="Enabled" span={1} hint="Enable or disable this animation.">
         <PropertyToggle value={selectedAnimation.enabled !== false} onchange={() => setAnimationProp('enabled', !(selectedAnimation.enabled !== false))} />
@@ -237,6 +362,30 @@
 
   .action-btn.danger:hover:not(:disabled) {
     border-color: #D56B6B;
+  }
+
+  .mini-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+    width: 100%;
+  }
+
+  .mini-btn {
+    min-height: 24px;
+    border: 1px solid #3B3B3B;
+    background: #252525;
+    color: #DDD;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .mini-btn:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
   }
 
   .patch-footer {

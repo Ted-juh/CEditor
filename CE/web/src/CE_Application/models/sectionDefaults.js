@@ -587,6 +587,7 @@ export const SECTION_DEFAULTS = {
     homeEndAdjust: false,
     dragEnabled: false,
     wheelEnabled: false,
+    reverseMouseDirection: false,
     snapToStep: true,
     snapToTicks: false,
     emitValueCommit: false,
@@ -673,6 +674,104 @@ export const SECTION_DEFAULTS = {
     _type: 'Animations',
     enabled: true,
     debug: false,
+    _children: {},
+  },
+
+  /** Designer — authoring metadata for custom component workshop controls. */
+  Designer: {
+    _type: 'Designer',
+    version: 1,
+    mode: 'workshop',
+    authoringStage: 'foundation',
+    selectedAssistantContext: 'overview',
+    selectedLayer: '',
+    selectedValueChannel: '',
+    selectedBehavior: '',
+    selectedHitZone: '',
+    selectedGenerator: '',
+    selectedAsset: '',
+    activeVariant: 'default',
+    preview: {
+      state: 'base',
+      animationsEnabled: true,
+      showHitZones: false,
+      showBounds: true,
+      showValues: true,
+      testValue: 0.5,
+    },
+    notes: '',
+  },
+
+  /** Assets — packaged resources for custom components. */
+  Assets: {
+    _type: 'Assets',
+    images: {},
+    filmstrips: {},
+    fonts: {},
+    thumbnails: {},
+    packagePolicy: {
+      embedAssets: true,
+      warnMissingFonts: true,
+    },
+  },
+
+  /** ValueChannels — named internal/public values for custom components. */
+  ValueChannels: {
+    _type: 'ValueChannels',
+    _children: {},
+  },
+
+  /** Behaviors — named behavior modules for custom components. */
+  Behaviors: {
+    _type: 'Behaviors',
+    _children: {},
+  },
+
+  /** HitZones — independent interactive surfaces for custom components. */
+  HitZones: {
+    _type: 'HitZones',
+    _children: {},
+  },
+
+  /** Generators — rules that create repeated/structured layers and zones. */
+  Generators: {
+    _type: 'Generators',
+    _children: {},
+  },
+
+  /** Links — internal/external logic links between values and behaviors. */
+  Links: {
+    _type: 'Links',
+    enabled: true,
+    debug: false,
+    _children: {},
+  },
+
+  /** PublishedProperties — public component API shown in normal panel editing. */
+  PublishedProperties: {
+    _type: 'PublishedProperties',
+    inputs: {},
+    outputs: {},
+    editableProperties: {},
+  },
+
+  /** ExternalAPI — first-class link contract for other panel components. */
+  ExternalAPI: {
+    _type: 'ExternalAPI',
+    version: 1,
+    addressableName: '',
+    acceptsExternalLinks: true,
+    emitsExternalLinks: true,
+    linkPolicy: 'publishedOnly',
+    inputs: [],
+    outputs: [],
+    events: [],
+  },
+
+  /** Variants — reusable layout/style modes for custom components. */
+  Variants: {
+    _type: 'Variants',
+    active: 'default',
     _children: {},
   },
 };

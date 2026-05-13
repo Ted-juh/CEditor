@@ -21,6 +21,7 @@
   ];
 
   let core = $derived(getSection(control, 'Core'));
+  let designer = $derived(getSection(control, 'Designer'));
   let states = $derived(getSection(control, 'States'));
   let multiEdit = $derived($selectedComponentIds.size > 1);
   let stateTargetOptions = $derived(buildStateTargetOptions(states));
@@ -49,6 +50,10 @@
   );
 
   $effect(() => {
+    if (designer?.selectedState && stateTargetOptions.some((option) => option.id === designer.selectedState)) {
+      selectedStateName = designer.selectedState;
+      return;
+    }
     const nextSelectedStateName = resolveSelectedStateName(
       stateTargetOptions,
       selectedStateName,

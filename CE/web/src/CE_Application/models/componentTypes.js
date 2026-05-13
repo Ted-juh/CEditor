@@ -1,6 +1,11 @@
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 import { createDefaultInteractiveSections } from './interactionDefaults.js';
 import { getComponentPorts } from './componentPorts.js';
+import {
+  createCustomComponentBlankBindingsDefaults,
+  createCustomComponentBlankPartsDefaults,
+  createCustomComponentSections,
+} from '../utils/customComponentFactory.js';
 
 function createStateNode(name, when = {}, component = {}) {
   return {
@@ -360,6 +365,58 @@ export const COMPONENT_TYPES = {
       Transform: { width: 220, height: 48 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
       ...createDefaultInteractiveSections('Slider'),
+    },
+  },
+
+  CustomComponent: {
+    sections: [
+      'Background',
+      'Effects',
+      'Mouse',
+      'Designer',
+      'Parts',
+      'Assets',
+      'ValueChannels',
+      'Behaviors',
+      'HitZones',
+      'Generators',
+      'Bindings',
+      'Links',
+      'States',
+      'Animations',
+      'DeviceBindings',
+      'PublishedProperties',
+      'ExternalAPI',
+      'Variants',
+      'Scripts',
+    ],
+    ports: getComponentPorts('CustomComponent'),
+    defaultOverrides: {
+      Transform: { width: 260, height: 120 },
+      Background: {
+        _children: {
+          Fill: { colour: '00000000', solidEnabled: false },
+          Border: { enabled: false },
+          Corners: { radius: 10 },
+        },
+      },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      Parts: createCustomComponentBlankPartsDefaults(),
+      Bindings: createCustomComponentBlankBindingsDefaults(),
+      States: {
+        _type: 'States',
+        enabled: true,
+        debug: false,
+        priority: [],
+        _children: {},
+      },
+      Animations: {
+        _type: 'Animations',
+        enabled: true,
+        debug: false,
+        _children: {},
+      },
+      ...createCustomComponentSections(),
     },
   },
 
