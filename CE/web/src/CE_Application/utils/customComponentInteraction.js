@@ -77,11 +77,102 @@ export function denormalizeCustomChannelValue(channel, normalized) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   const clamped = clamp(numberOr(normalized, 0), 0, 1);
   if (type === 'bool') return clamped >= 0.5;
-  if (type === 'enum') return nextCustomEnumValue(channel, customChannelDefaultValue(channel));
+  if (type === 'enum') {
+    const explicitValues = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
+    const values = explicitValues
+      .map((entry) => entry?.value ?? entry?.id ?? entry)
+      .filter((entry) => entry !== undefined && entry !== null);
+    const enumValues = values.length ? values : ['A', 'B'];
+    const index = clamp(Math.round(clamped * Math.max(0, enumValues.length - 1)), 0, Math.max(0, enumValues.length - 1));
+    return enumValues[index];
+  }
 
   const min = numberOr(channel?.min, 0);
   const max = numberOr(channel?.max, 1);
   return snapCustomChannelValue(channel, min + ((max - min) * clamped));
+}
+
+function normalizedConstraintValue(spec, values = {}, channels = {}) {
+  if (spec === undefined || spec === null || spec === '') return null;
+  if (typeof spec === 'number') return clamp(spec, 0, 1);
+  const text = String(spec).trim();
+  if (!text) return null;
+
+  const numeric = Number(text);
+  if (Number.isFinite(numeric)) return clamp(numeric, 0, 1);
+
+  const channelMatch = text.match(/^channel\.([A-Za-z_$][\w$]*)\.(normalized|raw)$/);
+  if (channelMatch) {
+    const [, channelName] = channelMatch;
+    const channel = channels?.[channelName];
+    const rawValue = values?.[channelName] ?? customChannelDefaultValue(channel);
+    return normalizeCustomChannelValue(channel, rawValue);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(values, text)) {
+    return normalizeCustomChannelValue(channels?.[text], values[text]);
+  }
+
+  return null;
+}
+
+function customChannelNormalizedBounds(channelName, channel, values, channels) {
+  const constraints = channel?.constraints ?? channel?.constraint ?? null;
+  if (!constraints || constraints.enabled === false) return { min: 0, max: 1 };
+  const minSpec = constraints.normalizedMin ?? constraints.minNormalized ?? constraints.min;
+  const maxSpec = constraints.normalizedMax ?? constraints.maxNormalized ?? constraints.max;
+  const minGap = clamp(numberOr(constraints.normalizedMinGap ?? constraints.minGap, 0), 0, 1);
+  const maxGap = clamp(numberOr(constraints.normalizedMaxGap ?? constraints.maxGap, 0), 0, 1);
+  const min = (normalizedConstraintValue(minSpec, values, channels) ?? 0) + minGap;
+  const max = (normalizedConstraintValue(maxSpec, values, channels) ?? 1) - maxGap;
+  return {
+    min: clamp(Math.min(min, max), 0, 1),
+    max: clamp(Math.max(min, max), 0, 1),
+  };
+}
+
+export function constrainCustomValues(control, values = {}, options = {}) {
+  const channels = getCustomValueChannels(control);
+  let nextValues = {
+    ...seedCustomValues(control),
+    ...(values ?? {}),
+  };
+  const primaryChannelName = String(options?.primaryChannelName ?? '').trim();
+
+  if (primaryChannelName && channels?.[primaryChannelName]) {
+    const channel = channels[primaryChannelName];
+    const type = String(channel?.type ?? 'float').trim().toLowerCase();
+    if (!['enum', 'bool', 'boolean'].includes(type)) {
+      const bounds = customChannelNormalizedBounds(primaryChannelName, channel, nextValues, channels);
+      const raw = nextValues[primaryChannelName] ?? customChannelDefaultValue(channel);
+      const normalized = normalizeCustomChannelValue(channel, raw);
+      nextValues = {
+        ...nextValues,
+        [primaryChannelName]: denormalizeCustomChannelValue(channel, clamp(normalized, bounds.min, bounds.max)),
+      };
+    }
+  }
+
+  for (let pass = 0; pass < 3; pass += 1) {
+    let changed = false;
+    for (const [name, channel] of Object.entries(channels)) {
+      if (name === primaryChannelName) continue;
+      const type = String(channel?.type ?? 'float').trim().toLowerCase();
+      if (type === 'enum' || type === 'bool' || type === 'boolean') continue;
+      const bounds = customChannelNormalizedBounds(name, channel, nextValues, channels);
+      const raw = nextValues[name] ?? customChannelDefaultValue(channel);
+      const normalized = normalizeCustomChannelValue(channel, raw);
+      const clampedNormalized = clamp(normalized, bounds.min, bounds.max);
+      const clampedValue = denormalizeCustomChannelValue(channel, clampedNormalized);
+      if (clampedValue !== nextValues[name]) {
+        nextValues = { ...nextValues, [name]: clampedValue };
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+
+  return nextValues;
 }
 
 export function isCustomMouseDirectionReversed(behaviorModule = null) {
@@ -260,9 +351,9 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
   const currentValue = previousValues[channelName] ?? customChannelDefaultValue(channel);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || String(behaviorModule?.type ?? '') === 'cycle') {
+  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = nextCustomEnumValue(channel, currentValue);
-  } else if (action === 'togglevalue' || String(behaviorModule?.type ?? '') === 'toggle') {
+  } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
   } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
     applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
@@ -276,7 +367,7 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
     }
   }
 
-  return nextValues;
+  return constrainCustomValues(control, nextValues, { primaryChannelName: channelName });
 }
 
 function conditionMatches(condition, values) {
@@ -460,11 +551,13 @@ function isPointInZone(zone, rect, localX, localY) {
   return true;
 }
 
-export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY) {
+export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, values = {}) {
   if (!rect) return null;
   const localX = clientX - rect.left;
   const localY = clientY - rect.top;
+  const conditionValues = constrainCustomValues(control, values ?? {});
   const entries = enabledEntries(getCustomHitZones(control))
+    .filter(([, zone]) => conditionMatches(zone?.condition, conditionValues))
     .sort((left, right) => {
       const priorityDelta = numberOr(right[1]?.priority, 0) - numberOr(left[1]?.priority, 0);
       if (priorityDelta !== 0) return priorityDelta;
@@ -484,17 +577,39 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY) {
   return null;
 }
 
-export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, clientY) {
+export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, clientY, dragContext = null) {
   if (!rect) return 0;
   const localX = clamp(clientX - rect.left, 0, rect.width);
   const localY = clamp(clientY - rect.top, 0, rect.height);
   const geometry = String(behaviorModule?.geometry ?? 'linear').trim().toLowerCase();
+  const configuredDragMode = String(behaviorModule?.dragMode ?? 'auto').trim().toLowerCase();
+  const dragMode = configuredDragMode === 'auto'
+    ? (['vertical', 'linear-vertical'].includes(geometry) ? 'vertical'
+      : (['circular', 'ring', 'dial', 'arc'].includes(geometry) ? 'circular' : 'horizontal'))
+    : configuredDragMode;
+  const hasDragStart = dragContext
+    && Number.isFinite(Number(dragContext.startClientX))
+    && Number.isFinite(Number(dragContext.startClientY))
+    && Number.isFinite(Number(dragContext.startNormalized));
+
+  if (hasDragStart && ['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
+    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1));
+    const deltaX = (clientX - dragContext.startClientX) / Math.max(1, rect.width);
+    const deltaY = (dragContext.startClientY - clientY) / Math.max(1, rect.height);
+    const rawMovement = dragMode === 'vertical'
+      ? deltaY
+      : (dragMode === 'horizontal'
+        ? deltaX
+        : (Math.abs(deltaX) >= Math.abs(deltaY) ? deltaX : deltaY));
+    const movement = isCustomMouseDirectionReversed(behaviorModule) ? -rawMovement : rawMovement;
+    return clamp(numberOr(dragContext.startNormalized, 0) + (movement * sensitivity), 0, 1);
+  }
 
   if (['vertical', 'linear-vertical'].includes(geometry)) {
     return applyCustomMouseDirection(behaviorModule, 1 - (localY / Math.max(1, rect.height)));
   }
 
-  if (['circular', 'ring', 'dial', 'arc'].includes(geometry)) {
+  if (['circular', 'ring', 'dial', 'arc'].includes(geometry) && !['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
     const centerX = rect.width * (clamp(numberOr(behaviorModule?.centerX, 50), 0, 100) / 100);
     const centerY = rect.height * (clamp(numberOr(behaviorModule?.centerY, 50), 0, 100) / 100);
     const angle = dialAngleFromPoint(localX, localY, centerX, centerY);
@@ -568,10 +683,10 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   let normalized = normalizeCustomChannelValue(channel, currentValue);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || String(behaviorModule?.type ?? '') === 'cycle') {
+  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = nextCustomEnumValue(channel, currentValue);
     normalized = normalizeCustomChannelValue(channel, nextValue);
-  } else if (action === 'togglevalue' || String(behaviorModule?.type ?? '') === 'toggle') {
+  } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
     normalized = nextValue ? 1 : 0;
   } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
@@ -589,15 +704,22 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         nextValues[secondaryChannelName] = denormalizeCustomChannelValue(channels[secondaryChannelName], xy.y);
       }
     } else {
-      normalized = resolveCustomNormalizedFromPoint(behaviorModule, point.rect, point.clientX, point.clientY);
+      normalized = resolveCustomNormalizedFromPoint(behaviorModule, point.rect, point.clientX, point.clientY, {
+        startClientX: point.startClientX,
+        startClientY: point.startClientY,
+        startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),
+      });
     }
     nextValue = denormalizeCustomChannelValue(channel, normalized);
   }
   nextValues[channelName] = nextValue;
-  const linked = applyCustomLinks(control, nextValues);
-  const linkedValues = syncCustomArpeggiatorValues(control, linked.values);
+  const constrainedValues = constrainCustomValues(control, nextValues, { primaryChannelName: channelName });
+  const linked = applyCustomLinks(control, constrainedValues);
+  const linkedValues = syncCustomArpeggiatorValues(control, constrainCustomValues(control, linked.values, { primaryChannelName: channelName }));
   const mainChannel = channels?.mainValue ?? channel;
-  const mainTouched = channelName === 'mainValue' || linked.targets.has('mainValue');
+  const mainTouched = channelName === 'mainValue'
+    || linked.targets.has('mainValue')
+    || (previousValues.mainValue !== undefined && linkedValues.mainValue !== previousValues.mainValue);
   const mainValue = linkedValues.mainValue;
   const mainNormalized = mainTouched ? normalizeCustomChannelValue(mainChannel, mainValue) : session?.customNormalizedValue;
 

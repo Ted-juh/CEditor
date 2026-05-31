@@ -1,4 +1,5 @@
 <script>
+  import { onDestroy } from 'svelte';
   import {
     ArrowDown,
     ArrowUp,
@@ -11,6 +12,7 @@
     Unlock,
   } from 'lucide-svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
+  import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
     createBackground,
@@ -26,6 +28,10 @@
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
+  import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+  import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
+  import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import {
     angleFromCenter,
     computeResizedRect,
@@ -42,6 +48,7 @@
   let valueChannels = $derived(getSection(control, 'ValueChannels'));
   let behaviors = $derived(getSection(control, 'Behaviors'));
   let bindings = $derived(getSection(control, 'Bindings'));
+  let generators = $derived(getSection(control, 'Generators'));
   let states = $derived(getSection(control, 'States'));
   let renderControl = $derived.by(() => materializedCustomComponentSnapshot(control, previewSignals(preview)));
   let parts = $derived(getSection(renderControl, 'Parts'));
@@ -71,22 +78,79 @@
   });
   let selectedLayerSet = $derived(new Set(selectedLayerNames));
   let selectedHitZone = $derived(String(designer?.selectedHitZone ?? ''));
+  let selectedKit = $derived(String(designer?.selectedKit ?? ''));
   let selectedSurfaceKind = $derived(String(designer?.selectedSurfaceKind ?? 'layer'));
+  let hoveredSurfaceItem = $state(null);
+  let dockTab = $state('layers');
+  let collapsedGeneratedSources = $state({});
   let surfaceZoom = $state(1);
   let snapEnabled = $state(true);
   let snapSize = $state(10);
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
-  let surfaceGridStyle = $derived(`background-size:${Math.max(4, snapSize * surfaceZoom)}px ${Math.max(4, snapSize * surfaceZoom)}px;`);
+  let surfaceGridStyle = $derived(`--surface-grid-size:${Math.max(4, snapSize * surfaceZoom)}px;`);
   let showBounds = $derived(preview?.showBounds !== false);
   let showHitZones = $derived(preview?.showHitZones === true);
+  let showGeneratedLabels = $derived(preview?.showGeneratedLabels === true);
+  let designerPreviewing = $derived(String(preview?.mode ?? 'edit') === 'preview');
+  let livePreviewSession = $state(null);
+  let livePreviewControlId = $state('');
   let topDownPartEntries = $derived([...allPartEntries].sort((left, right) => Number(right?.[1]?.zIndex ?? 0) - Number(left?.[1]?.zIndex ?? 0)));
+  let kitEntries = $derived.by(() => {
+    const kits = new Map();
+    for (const [name, part] of Object.entries(parts?._children ?? {})) {
+      const kitId = kitIdFor(part);
+      if (!kitId) continue;
+      const entry = kits.get(kitId) ?? {
+        id: kitId,
+        label: part?.meta?.kitLabel ?? kitId,
+        kind: part?.meta?.kitKind ?? 'kit',
+        control: part?.meta?.valueControl ?? null,
+        layerNames: [],
+        zoneNames: [],
+      };
+      entry.layerNames.push(name);
+      kits.set(kitId, entry);
+    }
+    for (const [name, zone] of Object.entries(hitZones?._children ?? {})) {
+      const kitId = kitIdFor(zone);
+      if (!kitId) continue;
+      const entry = kits.get(kitId) ?? {
+        id: kitId,
+        label: zone?.meta?.kitLabel ?? kitId,
+        kind: zone?.meta?.kitKind ?? 'kit',
+        control: zone?.meta?.valueControl ?? null,
+        layerNames: [],
+        zoneNames: [],
+      };
+      entry.zoneNames.push(name);
+      kits.set(kitId, entry);
+    }
+    return [...kits.values()];
+  });
+  let generatedSourceEntries = $derived.by(() => buildGeneratedSourceEntries());
+  let topLevelPartEntries = $derived(topDownPartEntries.filter(([, part]) => {
+    const source = generatedSourceForNode(part);
+    return !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
+  }));
+  let dockHitZoneEntries = $derived(hitZoneEntries.filter(([, zone]) => {
+    const source = generatedSourceForNode(zone);
+    return !source || !isGeneratedSourceCollapsed(source);
+  }));
+  let overlayPartEntries = $derived(partEntries.filter(([name, part]) => !kitIdFor(part) || selectedLayerSet.has(name)));
+  let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
+  let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
   let selectedAuthoredPart = $derived(authoredParts?._children?.[selectedLayer] ?? null);
   let selectedZone = $derived(hitZones?._children?.[selectedHitZone] ?? null);
   let selectedAuthoredZone = $derived(authoredHitZones?._children?.[selectedHitZone] ?? null);
-  let activeSelectionKind = $derived(selectedSurfaceKind === 'hitZone' && selectedZone ? 'hitZone' : 'layer');
+  let activeSelectionKind = $derived(
+    selectedSurfaceKind === 'artboard'
+      ? 'artboard'
+      : (selectedSurfaceKind === 'kit' && selectedKitEntry ? 'kit'
+        : (selectedSurfaceKind === 'hitZone' && selectedZone ? 'hitZone' : 'layer'))
+  );
   let multiSelectionActive = $derived(activeSelectionKind === 'layer' && selectedLayerNames.length > 1);
   let selectedPartEditable = $derived(isEditablePart(selectedAuthoredPart));
   let selectedZoneEditable = $derived(isEditableZone(selectedAuthoredZone));
@@ -119,6 +183,7 @@
   let drawNoticeTimer = null;
   let lastDrawCreatedAt = 0;
   let zoneDisplayMode = $state('selected');
+  let arpTool = $state('draw');
   let arpDraftBlock = $state(null);
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
@@ -132,21 +197,62 @@
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
   let behaviorEntries = $derived(Object.entries(behaviors?._children ?? {}));
   let bindingEntries = $derived(Object.entries(bindings?._children ?? {}));
+  let generatorEntries = $derived(Object.entries(generators?._children ?? {}));
   let stateEntries = $derived(Object.entries(states?._children ?? {}));
-  let activeSelectionName = $derived(activeSelectionKind === 'hitZone' ? selectedHitZone : selectedLayer);
+  let stateFilmstripEntries = $derived([
+    { name: 'base', state: null, base: true },
+    ...stateEntries.map(([name, state]) => ({ name, state, base: false })),
+  ]);
+  let statePreviewCards = $derived.by(() => stateFilmstripEntries.map((entry, index) => statePreviewCard(entry, index)));
+  let activeSelectionName = $derived(activeSelectionKind === 'kit' ? selectedKit : (activeSelectionKind === 'hitZone' ? selectedHitZone : selectedLayer));
   let activeSelectionLabel = $derived.by(() => {
+    if (activeSelectionKind === 'artboard') return 'Artboard';
+    if (activeSelectionKind === 'kit' && selectedKitEntry) return selectedKitEntry.label;
     if (multiSelectionActive) return `${selectedLayerNames.length} layers`;
     if (activeSelectionKind === 'hitZone' && selectedZone) return selectedHitZone;
     if (selectedPart) return selectedLayer;
     return 'No selection';
   });
   let activeSelectionDescription = $derived.by(() => {
+    if (activeSelectionKind === 'artboard') return `${Math.round(artboardWidth)} x ${Math.round(artboardHeight)} workspace`;
+    if (activeSelectionKind === 'kit' && selectedKitEntry) {
+      const zoneLabel = selectedKitEntry.zoneNames.length === 1 ? 'zone' : 'zones';
+      const style = valueControlStyleLabel(selectedKitEntry.control?.style);
+      return `${style} / ${selectedKitEntry.layerNames.length} layers / ${selectedKitEntry.zoneNames.length} ${zoneLabel}`;
+    }
     if (multiSelectionActive) return 'Multi-selection';
     if (activeSelectionKind === 'hitZone' && selectedZone) {
       return `${selectedZone?.shape ?? 'zone'} / ${selectedZone?.action ?? 'action'}`;
     }
     if (selectedPart) return `${selectedPart?.kind ?? selectedPart?.role ?? 'part'} layer`;
     return 'Pick a layer or hit zone on the canvas';
+  });
+  let surfaceNameTrayEntries = $derived.by(() => {
+    const entries = [];
+    const seen = new Set();
+    const add = (kind, label) => {
+      const clean = String(label ?? '').trim();
+      if (!clean) return;
+      const key = `${kind}:${clean}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({ kind, label: clean });
+    };
+
+    if (hoveredSurfaceItem?.name) {
+      add(hoveredSurfaceItem.kind, hoveredSurfaceItem.name);
+    }
+    if (activeSelectionKind === 'kit' && selectedKitEntry) {
+      add('kit', selectedKitEntry.label);
+    } else if (activeSelectionKind === 'hitZone' && selectedHitZone) {
+      add('hitZone', selectedHitZone);
+    } else if (multiSelectionActive) {
+      add('layer', `${selectedLayerNames.length} layers`);
+    } else if (activeSelectionKind === 'layer' && selectedLayer) {
+      add('layer', selectedLayer);
+    }
+
+    return entries;
   });
 
   const INSPECTOR_TABS = [
@@ -181,10 +287,65 @@
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
   const SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => SHAPE_TOOL_IDS.has(tool.id));
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
+
+  $effect(() => {
+    componentDesignerStatus.set({
+      kind: activeSelectionKind === 'artboard' ? 'Artboard' : (activeSelectionKind === 'kit' ? 'Kit' : (activeSelectionKind === 'hitZone' ? 'Hit Zone' : 'Layer')),
+      tool: activeToolMeta?.label ?? 'Select',
+      layer: selectedPart ? selectedLayer : 'none',
+      zone: selectedZone ? selectedHitZone : 'none',
+      artboard: `${Math.round(artboardWidth)} x ${Math.round(artboardHeight)}`,
+      layerCount: allPartEntries.length,
+      zoneCount: hitZoneEntries.length,
+      lockedNote: activeSelectionKind === 'layer' && selectedPart && selectedAuthoredPart?.locked === true
+        ? 'Locked'
+        : '',
+      previewMode: designerPreviewing ? 'preview' : 'edit',
+      warning: activeSelectionKind === 'layer' && selectedPart && !selectedPartEditable
+        ? 'Generated part'
+        : '',
+    });
+  });
+
+  let lastPreviewRequestToken = $state(0);
+  $effect(() => {
+    const request = $componentDesignerPreviewRequest;
+    if (!request?.token || request.token === lastPreviewRequestToken) return;
+    lastPreviewRequestToken = request.token;
+    if (request.mode === 'preview') {
+      applyControlPatch(core.id, {
+        'Designer.preview.mode': 'preview',
+        'Designer.preview.showBounds': false,
+        'Designer.preview.showHitZones': false,
+      });
+    } else if (request.mode === 'edit') {
+      applyControlPatch(core.id, {
+        'Designer.preview.mode': 'edit',
+        'Designer.preview.showBounds': true,
+        'Designer.preview.showHitZones': true,
+      });
+    }
+  });
+
+  onDestroy(() => {
+    componentDesignerStatus.set({
+      kind: '',
+      tool: '',
+      layer: '',
+      zone: '',
+      warning: '',
+      artboard: '',
+      layerCount: 0,
+      zoneCount: 0,
+      lockedNote: '',
+      previewMode: 'edit',
+    });
+  });
   let activeShapeTool = $derived(SHAPE_TOOLS.find((tool) => tool.id === lastShapeTool) ?? SHAPE_TOOLS[0]);
   let shapeToolActive = $derived(SHAPE_TOOL_IDS.has(activeTool));
   let selectedArcMeta = $derived(selectedAuthoredPart?.meta?.arcTrack ?? null);
   let selectedIsArc = $derived(activeSelectionKind === 'layer' && selectedPartEditable && !!selectedArcMeta);
+  let selectedArcPivotTarget = $derived.by(() => nearestArcPivotTarget());
   let arpeggiator = $derived.by(() => normalizeArpeggiator(designer?.arpeggiator));
   let arpeggiatorEnabled = $derived(arpeggiator?.enabled === true);
   let arpBlocks = $derived(Array.isArray(arpeggiator?.blocks) ? arpeggiator.blocks : []);
@@ -216,6 +377,7 @@
     return '';
   });
   let activeSelectionFrame = $derived.by(() => {
+    if (activeSelectionKind === 'kit') return selectedKitFrame;
     if (activeSelectionKind === 'hitZone') return activeZoneFrame ?? selectedZoneFrame;
     if (multiSelectionActive) return multiSelectionBounds();
     return activeFrame ?? selectedFrame;
@@ -234,6 +396,7 @@
       applyControlPatch(core.id, {
         'Designer.selectedSurfaceKind': 'layer',
         'Designer.selectedHitZone': '',
+        'Designer.selectedKit': '',
       });
     }
   }
@@ -340,7 +503,7 @@
   }
 
   function beginArpDraw(event) {
-    if (!arpeggiatorEnabled || event.button !== 0) return;
+    if (arpTool !== 'draw' || !arpeggiatorEnabled || event.button !== 0) return;
     event.stopPropagation();
     event.preventDefault();
     const start = arpCellFromEvent(event);
@@ -407,6 +570,24 @@
     updateArpVelocityFromEvent(block.id, event);
   }
 
+  function handleArpBlockPointer(block, event) {
+    if (!block || event.button !== 0) return;
+    if (arpTool === 'draw' || arpTool === 'select') {
+      event.stopPropagation();
+      selectArpBlock(block.id);
+      return;
+    }
+    if (arpTool === 'resize') {
+      beginArpBlockResize(block, event);
+      return;
+    }
+    if (arpTool === 'velocity') {
+      beginArpVelocityDrag(block, event);
+      return;
+    }
+    beginArpBlockMove(block, event);
+  }
+
   function updateArpVelocityFromEvent(id, event) {
     const blockEl = event.currentTarget?.closest?.('.arp-block') ?? document.querySelector(`.arp-block[data-block-id="${id}"]`);
     const rect = blockEl?.getBoundingClientRect?.();
@@ -425,6 +606,33 @@
     return {
       valueNormalized: Math.max(0, Math.min(1, numberOr(value?.testValue, 0.5))),
       customChannels: {},
+    };
+  }
+
+  $effect(() => {
+    const nextId = String(core?.id ?? '');
+    if (!nextId) {
+      livePreviewControlId = '';
+      livePreviewSession = null;
+      return;
+    }
+    if (nextId !== livePreviewControlId) {
+      livePreviewControlId = nextId;
+      livePreviewSession = createInteractionPreviewSession(control);
+    }
+  });
+
+  function patchLivePreviewSession(patch = {}) {
+    if (!control) return;
+    const base = createInteractionPreviewSession(control);
+    const previous = livePreviewSession ?? base;
+    livePreviewSession = {
+      ...base,
+      ...previous,
+      ...patch,
+      customValues: patch.customValues
+        ? { ...(previous.customValues ?? base.customValues ?? {}), ...(patch.customValues ?? {}) }
+        : (previous.customValues ?? base.customValues ?? {}),
     };
   }
 
@@ -473,6 +681,102 @@
     return true;
   }
 
+  function isGeneratedPart(part) {
+    return part?.generated === true || part?.meta?.generated === true;
+  }
+
+  function canManagePartName(name) {
+    return !!authoredParts?._children?.[name];
+  }
+
+  function generatorNameForEntry(part) {
+    return String(part?.meta?.generatedBy ?? part?.generatedBy ?? '').trim();
+  }
+
+  function generatedSourceForNode(node) {
+    const source = String(node?.meta?.generatedBy ?? node?.generatedBy ?? '').trim();
+    if (source) return source;
+    if (node?.generated === true || node?.meta?.generated === true) return 'generated';
+    return '';
+  }
+
+  function isGeneratedSourceCollapsed(source) {
+    if (!source) return false;
+    return collapsedGeneratedSources[source] !== false;
+  }
+
+  function toggleGeneratedSource(source, event = null) {
+    event?.stopPropagation?.();
+    if (!source) return;
+    collapsedGeneratedSources = {
+      ...collapsedGeneratedSources,
+      [source]: !isGeneratedSourceCollapsed(source),
+    };
+  }
+
+  function buildGeneratedSourceEntries() {
+    const groups = new Map();
+    const ensure = (source) => {
+      const key = source || 'generated';
+      if (!groups.has(key)) {
+        groups.set(key, {
+          source: key,
+          partNames: [],
+          zoneNames: [],
+          hasGenerator: Boolean(generators?._children?.[key]),
+        });
+      }
+      return groups.get(key);
+    };
+    for (const [name, part] of topDownPartEntries) {
+      if (kitIdFor(part)) continue;
+      const source = generatedSourceForNode(part);
+      if (!source) continue;
+      ensure(source).partNames.push(name);
+    }
+    for (const [name, zone] of hitZoneEntries) {
+      if (kitIdFor(zone)) continue;
+      const source = generatedSourceForNode(zone);
+      if (!source) continue;
+      ensure(source).zoneNames.push(name);
+    }
+    return [...groups.values()].map((group) => ({
+      ...group,
+      collapsed: isGeneratedSourceCollapsed(group.source),
+      label: generators?._children?.[group.source]?.label ?? group.source,
+      partCount: group.partNames.length,
+      zoneCount: group.zoneNames.length,
+    }));
+  }
+
+  function editGeneratorForLayer(name, part, event = null) {
+    event?.stopPropagation?.();
+    if (!core?.id || !name) return;
+    const generatorName = generatorNameForEntry(part);
+    if (!generatorName || !generators?._children?.[generatorName]) return;
+    dockTab = 'generators';
+    applyControlPatch(core.id, {
+      'Designer.selectedLayer': name,
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+      'Designer.selectedKit': '',
+      'Designer.selectedGenerator': generatorName,
+    });
+  }
+
+  function kitIdFor(node) {
+    return String(node?.meta?.kitId ?? '');
+  }
+
+  function kitFrame(kit) {
+    if (!kit?.layerNames?.length) return null;
+    return boundsForFrames(
+      kit.layerNames
+        .map((name) => parts?._children?.[name] ? partFrame(parts._children[name]) : null)
+        .filter(Boolean)
+    );
+  }
+
   function isEditableZone(zone) {
     if (!zone) return false;
     if (zone?.locked === true || zone?.meta?.locked === true) return false;
@@ -508,6 +812,48 @@
       name = `${safeBase}_${index}`;
     }
     return name;
+  }
+
+  function nextValueChannelName(base = 'valueControl') {
+    const existing = new Set(Object.keys(valueChannels?._children ?? {}));
+    const safeBase = String(base || 'valueControl').replace(/[^a-zA-Z0-9_]/g, '') || 'valueControl';
+    let name = safeBase;
+    let index = 1;
+    while (existing.has(name)) {
+      index += 1;
+      name = `${safeBase}_${index}`;
+    }
+    return name;
+  }
+
+  function nextBehaviorName(base = 'valueDrag') {
+    const existing = new Set(Object.keys(behaviors?._children ?? {}));
+    const safeBase = String(base || 'valueDrag').replace(/[^a-zA-Z0-9_]/g, '') || 'valueDrag';
+    let name = safeBase;
+    let index = 1;
+    while (existing.has(name)) {
+      index += 1;
+      name = `${safeBase}_${index}`;
+    }
+    return name;
+  }
+
+  function nextKitName(base = 'kit') {
+    const existing = new Set(kitEntries.map((entry) => entry.id));
+    const safeBase = String(base || 'kit').replace(/[^a-zA-Z0-9_]/g, '') || 'kit';
+    let name = safeBase;
+    let index = 1;
+    while (existing.has(name)) {
+      index += 1;
+      name = `${safeBase}_${index}`;
+    }
+    return name;
+  }
+
+  function valueControlStyleLabel(style = 'dial') {
+    if (style === 'horizontal') return 'Horizontal Scale';
+    if (style === 'vertical') return 'Vertical Scale';
+    return 'Dial Control';
   }
 
   function defaultDrawSize(tool = activeTool) {
@@ -572,6 +918,259 @@
         },
       },
     };
+  }
+
+  function isArcCenterPart(part) {
+    const kind = String(part?.kind ?? '').trim();
+    return kind === 'arcTrack'
+      || kind === 'valueArc'
+      || !!part?.meta?.arcTrack
+      || !!part?.meta?.valueArc;
+  }
+
+  function frameCenter(frame) {
+    return {
+      x: numberOr(frame?.left, 0) + (numberOr(frame?.width, 0) / 2),
+      y: numberOr(frame?.top, 0) + (numberOr(frame?.height, 0) / 2),
+    };
+  }
+
+  function nearestArcPivotTarget() {
+    if (activeSelectionKind !== 'layer' || !selectedPart || !selectedFrame) return null;
+    const selectedCenter = frameCenter(selectedFrame);
+    const candidates = Object.entries(parts?._children ?? {})
+      .filter(([name, part]) => name !== selectedLayer && part?.visible !== false && isArcCenterPart(part))
+      .map(([name, part]) => {
+        const frame = partFrame(part);
+        const center = frameCenter(frame);
+        return {
+          name,
+          frame,
+          center,
+          distance: Math.hypot(center.x - selectedCenter.x, center.y - selectedCenter.y),
+        };
+      })
+      .sort((left, right) => left.distance - right.distance);
+    return candidates[0] ?? null;
+  }
+
+  const STATE_ACCENTS = ['#14B8A6', '#5B9BD5', '#E5A029', '#9B7FEA', '#70C08F', '#E26D6D'];
+
+  function hashIndex(value, size) {
+    const text = String(value ?? '');
+    let hash = 0;
+    for (let index = 0; index < text.length; index += 1) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(index);
+      hash |= 0;
+    }
+    return Math.abs(hash) % Math.max(1, size);
+  }
+
+  function stateLabel(name, state, base = false) {
+    if (base) return 'Base';
+    return String(state?.label ?? state?.name ?? name ?? 'State');
+  }
+
+  function stateDescription(name, state, base = false) {
+    if (base) return 'Default component look';
+    const flags = Object.entries(state?.when ?? {})
+      .filter(([, value]) => value === true)
+      .map(([key]) => key);
+    if (flags.length) return flags.join(' + ');
+    return state?.description || state?.group || name;
+  }
+
+  function statePatchCount(state) {
+    const patches = state?.patches ?? {};
+    return Object.values(patches).reduce((total, patch) => {
+      if (!patch || typeof patch !== 'object') return total;
+      return total + Object.keys(patch).length;
+    }, 0);
+  }
+
+  function stateCardStyle(name, index = 0) {
+    const accent = STATE_ACCENTS[(hashIndex(name, STATE_ACCENTS.length) + index) % STATE_ACCENTS.length];
+    return `--state-accent:${accent};`;
+  }
+
+  function statePreviewCard(entry, index = 0) {
+    const stateName = entry?.name ?? 'base';
+    const scopedControl = entry?.base ? control : resolveStateScopedControl(control, stateName);
+    const materialized = materializedCustomComponentSnapshot(scopedControl, previewSignals({
+      ...preview,
+      state: stateName,
+    }));
+    const previewTransform = getSection(materialized, 'Transform') ?? transform ?? {};
+    const previewWidth = Math.max(1, numberOr(previewTransform?.width, artboardWidth));
+    const previewHeight = Math.max(1, numberOr(previewTransform?.height, artboardHeight));
+    const previewParts = Object.entries(getSection(materialized, 'Parts')?._children ?? {})
+      .filter(([, part]) => part?.visible !== false)
+      .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0));
+    return {
+      ...entry,
+      index,
+      previewWidth,
+      previewHeight,
+      previewParts,
+    };
+  }
+
+  function statePreviewStageStyle(entry) {
+    const previewWidth = Math.max(1, numberOr(entry?.previewWidth, artboardWidth));
+    const previewHeight = Math.max(1, numberOr(entry?.previewHeight, artboardHeight));
+    const scale = Math.min(44 / previewWidth, 30 / previewHeight);
+    const left = Math.max(0, (44 - (previewWidth * scale)) / 2);
+    const top = Math.max(0, (30 - (previewHeight * scale)) / 2);
+    return [
+      `width:${previewWidth}px`,
+      `height:${previewHeight}px`,
+      `transform:translate(${left}px, ${top}px) scale(${scale})`,
+      'transform-origin:top left',
+    ].join(';');
+  }
+
+  function selectStateCard(name) {
+    if (!core?.id) return;
+    const stateName = String(name || 'base');
+    setPreviewFlag('state', stateName);
+    updateControlProperty(core.id, 'Designer.selectedState', stateName);
+  }
+
+  function nextStateName(base = 'State') {
+    const existing = new Set(Object.keys(states?._children ?? {}));
+    const safeBase = String(base || 'State').replace(/[^a-zA-Z0-9_]/g, '') || 'State';
+    if (!existing.has(safeBase)) return safeBase;
+    let index = 2;
+    let name = `${safeBase}_${index}`;
+    while (existing.has(name)) {
+      index += 1;
+      name = `${safeBase}_${index}`;
+    }
+    return name;
+  }
+
+  function addQuickState(event = null) {
+    event?.stopPropagation?.();
+    if (!core?.id) return;
+    const candidates = ['Hover', 'Active', 'Pressed', 'Editing', 'Disabled', 'Focused'];
+    const existing = new Set(Object.keys(states?._children ?? {}));
+    const name = candidates.find((candidate) => !existing.has(candidate)) ?? nextStateName('State');
+    updateControlProperty(core.id, `States.${name}`, {
+      _type: 'State',
+      name,
+      group: 'interaction',
+      description: '',
+      enabled: true,
+      when: {},
+      patches: {
+        component: {},
+        parts: {},
+      },
+    });
+    selectStateCard(name);
+    inspectorTab = 'states';
+  }
+
+  function duplicateStateCard(name, state, event = null) {
+    event?.stopPropagation?.();
+    if (!core?.id) return;
+    if (!state || name === 'base') {
+      addQuickState(event);
+      return;
+    }
+    const nextName = nextStateName(`${name}_copy`);
+    updateControlProperty(core.id, `States.${nextName}`, {
+      ...cloneValue(state),
+      name: nextName,
+    });
+    selectStateCard(nextName);
+    inspectorTab = 'states';
+  }
+
+  function removeStateCard(name, event = null) {
+    event?.stopPropagation?.();
+    if (!core?.id || !name || name === 'base') return;
+    removeControlNode(core.id, `States.${name}`);
+    if (designer?.preview?.state === name) selectStateCard('base');
+  }
+
+  function partBackground(part) {
+    return part?._children?.Background ?? {};
+  }
+
+  function partFillColour(part, fallback = '#14B8A6') {
+    return colorInputValue(partBackground(part)?._children?.Fill?.colour, fallback);
+  }
+
+  function partStrokeColour(part, fallback = '#DCEBFA') {
+    return colorInputValue(partBackground(part)?._children?.Border?.colour, fallback);
+  }
+
+  function partCornerRadius(part) {
+    return numberOr(partBackground(part)?._children?.Corners?.radius, 4);
+  }
+
+  function layerKind(part) {
+    return String(part?.kind ?? part?.role ?? 'part');
+  }
+
+  function layerKindLabel(part) {
+    const kind = layerKind(part);
+    const labels = {
+      roundedRectangle: 'Rounded',
+      rectangle: 'Rect',
+      circle: 'Circle',
+      ellipse: 'Ellipse',
+      text: 'Text',
+      arcTrack: 'Arc',
+      valueArc: 'Arc',
+      capsule: 'Capsule',
+      ring: 'Ring',
+      viewport: 'View',
+    };
+    return labels[kind] ?? kind;
+  }
+
+  function layerKindClass(part) {
+    const kind = layerKind(part);
+    if (['circle', 'ellipse', 'ring'].includes(kind)) return 'ellipse';
+    if (['arcTrack', 'valueArc'].includes(kind)) return 'arc';
+    if (kind === 'text') return 'text';
+    if (kind === 'capsule') return 'capsule';
+    return 'rect';
+  }
+
+  function layerThumbPartStyle(name, part) {
+    const frame = frameForPart(name, part);
+    const left = clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100);
+    const top = clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100);
+    const width = clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 6, 110);
+    const height = clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 6, 110);
+    const radius = ['circle', 'ellipse', 'ring'].includes(layerKind(part))
+      ? 999
+      : Math.min(999, Math.max(2, partCornerRadius(part) / 3));
+    return [
+      `left:${left}%`,
+      `top:${top}%`,
+      `width:${width}%`,
+      `height:${height}%`,
+      `border-radius:${radius}px`,
+      `background:${partFillColour(part, '#23323B')}`,
+      `border-color:${partStrokeColour(part, '#5B9BD5')}`,
+      `opacity:${clampNumber(numberOr(part?.opacity, 1), 0.18, 1)}`,
+    ].join(';');
+  }
+
+  function zoneThumbPartStyle(name, zone) {
+    const frame = zoneFrame(zone);
+    const shape = String(zone?.shape ?? 'rectangle');
+    return [
+      `left:${clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100)}%`,
+      `top:${clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100)}%`,
+      `width:${clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 8, 110)}%`,
+      `height:${clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 8, 110)}%`,
+      `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
+    ].join(';');
   }
 
   function isLayerSelected(name) {
@@ -659,13 +1258,6 @@
     if (!frame) return '';
     const left = Math.max(4, Math.min(artboardWidth - 118, frame.left + frame.width + 8));
     const top = Math.max(4, Math.min(artboardHeight - 24, frame.top + frame.height + 8));
-    return `left:${left}px;top:${top}px;`;
-  }
-
-  function selectionQuickbarStyle(frame = activeSelectionFrame) {
-    if (!frame) return '';
-    const top = Math.max(4, frame.top - 34);
-    const left = Math.max(4, Math.min(artboardWidth - 180, frame.left));
     return `left:${left}px;top:${top}px;`;
   }
 
@@ -931,11 +1523,46 @@
     requestAnimationFrame(fitArtboardToView);
   }
 
+  function assignKitPart(part, kitMeta, role) {
+    part.generated = true;
+    part.meta = { ...(part.meta ?? {}), ...kitMeta, kitRole: role };
+    return part;
+  }
+
+  function setPartFill(part, colour, borderColour = '00000000', borderThickness = 0) {
+    const background = part?._children?.Background;
+    if (!background) return part;
+    background._children.Fill.solidEnabled = true;
+    background._children.Fill.colour = colour;
+    background._children.Border.enabled = borderThickness > 0;
+    background._children.Border.colour = borderColour;
+    background._children.Border.thickness = borderThickness;
+    return part;
+  }
+
   function addDialKit() {
+    addValueControlKit('dial');
+  }
+
+  function addHorizontalScaleKit() {
+    addValueControlKit('horizontal');
+  }
+
+  function addVerticalScaleKit() {
+    addValueControlKit('vertical');
+  }
+
+  function addValueControlKit(style = 'dial', frameOverride = null) {
     if (!core?.id) return;
-    const size = Math.min(120, Math.max(72, Math.min(artboardWidth, artboardHeight) - 28));
-    const left = Math.round((artboardWidth - size) / 2);
-    const top = Math.round((artboardHeight - size) / 2);
+    if (style === 'horizontal' || style === 'vertical') {
+      addScaleValueControlKit(style, frameOverride);
+      return;
+    }
+    const size = frameOverride
+      ? Math.min(Math.max(72, Math.min(frameOverride.width, frameOverride.height)), 140)
+      : Math.min(120, Math.max(72, Math.min(artboardWidth, artboardHeight) - 28));
+    const left = frameOverride ? Math.round(frameOverride.left + (frameOverride.width - size) / 2) : Math.round((artboardWidth - size) / 2);
+    const top = frameOverride ? Math.round(frameOverride.top + (frameOverride.height - size) / 2) : Math.round((artboardHeight - size) / 2);
     const centerX = left + size / 2;
     const centerY = top + size / 2;
     const trackName = nextPartName('dialTrack');
@@ -943,13 +1570,23 @@
     const pointerName = nextPartName('dialPointer');
     const readoutName = nextPartName('dialValue');
     const zoneName = nextHitZoneName('dialZone');
-    const channelName = 'dialValue';
-    const behaviorName = 'dialDrag';
+    const kitId = nextKitName('valueControl');
+    const channelName = nextValueChannelName('dialValue');
+    const behaviorName = nextBehaviorName('dialDrag');
+    const kitMeta = {
+      kitId,
+      kitLabel: 'Dial Control',
+      kitKind: 'Value Control',
+      valueControl: { style: 'dial', channelName, min: 0, max: 127, value: 64, tickCount: 11 },
+      generated: true,
+      locked: true,
+    };
 
     const track = makeDrawnPart('ring', { left, top, width: size, height: size });
     track.name = trackName;
     track.role = 'dialTrack';
     track.zIndex = maxLayerZIndex() + 1;
+    assignKitPart(track, kitMeta, 'track');
     track._children.Background._children.Border.thickness = 8;
     track._children.Background._children.Border.colour = 'FF2D3A44';
 
@@ -957,8 +1594,11 @@
     arc.name = arcName;
     arc.role = 'dialArc';
     arc.zIndex = maxLayerZIndex() + 2;
+    assignKitPart(arc, kitMeta, 'arc');
     arc.meta.arcTrack.thickness = 8;
     arc.meta.arcTrack.colour = 'FF5B9BD5';
+    arc._children.Background._children.Fill.solidEnabled = false;
+    arc._children.Background._children.Border.enabled = false;
 
     const pointer = makeDrawnPart('capsule', {
       left: centerX - 3,
@@ -969,6 +1609,7 @@
     pointer.name = pointerName;
     pointer.role = 'dialPointer';
     pointer.zIndex = maxLayerZIndex() + 3;
+    assignKitPart(pointer, kitMeta, 'pointer');
     pointer._children.Layout.anchorX = 'center';
     pointer._children.Layout.anchorY = 'bottom';
     pointer._children.Layout.rotation = -45;
@@ -984,6 +1625,7 @@
     readout.name = readoutName;
     readout.role = 'dialValue';
     readout.zIndex = maxLayerZIndex() + 4;
+    assignKitPart(readout, kitMeta, 'readout');
     readout._children.Text.content = '64';
     readout._children.Text._children.Font.size = 16;
 
@@ -994,8 +1636,11 @@
       action: 'dragValue',
       bounds: { x: left, y: top, width: size, height: size, unit: 'px' },
     });
+    zone.generated = true;
+    zone.visibleInEditor = false;
+    zone.meta = { ...(zone.meta ?? {}), ...kitMeta, kitRole: 'hitZone' };
 
-    localSelectedLayerNames = [arcName, pointerName, readoutName];
+    localSelectedLayerNames = [];
     applyControlPatch(core.id, {
       [`Parts.${trackName}`]: track,
       [`Parts.${arcName}`]: arc,
@@ -1004,16 +1649,164 @@
       [`ValueChannels.${channelName}`]: createValueChannel(channelName, { label: 'Dial Value', defaultValue: 64, min: 0, max: 127, step: 1 }),
       [`Behaviors.${behaviorName}`]: createBehaviorModule(behaviorName, { type: 'slider', role: 'slider', valueChannel: channelName, geometry: 'circular' }),
       [`HitZones.${zoneName}`]: zone,
-      'Designer.selectedLayer': arcName,
-      'Designer.selectedLayers': [arcName, pointerName, readoutName],
+      'Designer.selectedKit': kitId,
+      'Designer.selectedLayer': '',
+      'Designer.selectedLayers': [],
       'Designer.selectedHitZone': '',
-      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedSurfaceKind': 'kit',
       'Designer.selectedValueChannel': channelName,
       'Designer.selectedBehavior': behaviorName,
-      'Designer.preview.showHitZones': true,
+      'Designer.preview.showHitZones': false,
     });
     activeTool = 'select';
-    pulseSelection(`layer:${arcName}`);
+    pulseSelection(`kit:${kitId}`);
+  }
+
+  function addScaleValueControlKit(style = 'horizontal', frameOverride = null) {
+    const horizontal = style !== 'vertical';
+    const width = frameOverride
+      ? Math.max(horizontal ? 150 : 80, horizontal ? frameOverride.width : Math.min(110, frameOverride.width))
+      : (horizontal ? Math.min(260, Math.max(150, artboardWidth - 32)) : 92);
+    const height = frameOverride
+      ? Math.max(horizontal ? 80 : 96, horizontal ? Math.min(110, frameOverride.height) : frameOverride.height)
+      : (horizontal ? 92 : Math.min(240, Math.max(96, artboardHeight - 24)));
+    const left = frameOverride ? Math.round(frameOverride.left + (frameOverride.width - width) / 2) : Math.round((artboardWidth - width) / 2);
+    const top = frameOverride ? Math.round(frameOverride.top + (frameOverride.height - height) / 2) : Math.round((artboardHeight - height) / 2);
+    const trackStart = horizontal ? left + 18 : top + 18;
+    const trackLength = (horizontal ? width : height) - 36;
+    const trackCenter = horizontal ? top + Math.round(height / 2) : left + Math.round(width / 2);
+    const valueRatio = 0.5;
+    const kitId = nextKitName('valueControl');
+    const channelName = nextValueChannelName(horizontal ? 'horizontalValue' : 'verticalValue');
+    const behaviorName = nextBehaviorName(horizontal ? 'horizontalDrag' : 'verticalDrag');
+    const kitMeta = {
+      kitId,
+      kitLabel: horizontal ? 'Horizontal Scale' : 'Vertical Scale',
+      kitKind: 'Value Control',
+      valueControl: { style, channelName, min: 0, max: 127, value: 64, tickCount: 11 },
+      generated: true,
+      locked: true,
+    };
+    const patch = {};
+    const reservedNames = new Set(authoredPartNames);
+    const allocatePartName = (base) => {
+      const safeBase = String(base || 'layer').replace(/[^a-zA-Z0-9_]/g, '') || 'layer';
+      let name = safeBase;
+      let index = 1;
+      while (reservedNames.has(name)) {
+        index += 1;
+        name = `${safeBase}_${index}`;
+      }
+      reservedNames.add(name);
+      return name;
+    };
+    let zIndex = maxLayerZIndex();
+
+    const track = makeDrawnPart('capsule', horizontal
+      ? { left: trackStart, top: trackCenter - 3, width: trackLength, height: 6 }
+      : { left: trackCenter - 3, top: trackStart, width: 6, height: trackLength });
+    track.name = allocatePartName(horizontal ? 'hScaleTrack' : 'vScaleTrack');
+    track.role = 'scaleTrack';
+    track.zIndex = ++zIndex;
+    assignKitPart(track, kitMeta, 'track');
+    setPartFill(track, 'FF2D3A44', '00000000', 0);
+    patch[`Parts.${track.name}`] = track;
+
+    const fillLength = Math.max(6, Math.round(trackLength * valueRatio));
+    const fill = makeDrawnPart('capsule', horizontal
+      ? { left: trackStart, top: trackCenter - 3, width: fillLength, height: 6 }
+      : { left: trackCenter - 3, top: trackStart + trackLength - fillLength, width: 6, height: fillLength });
+    fill.name = allocatePartName(horizontal ? 'hScaleFill' : 'vScaleFill');
+    fill.role = 'scaleFill';
+    fill.zIndex = ++zIndex;
+    assignKitPart(fill, kitMeta, 'fill');
+    setPartFill(fill, 'FF5B9BD5', '00000000', 0);
+    patch[`Parts.${fill.name}`] = fill;
+
+    const pointerPosition = horizontal
+      ? trackStart + Math.round(trackLength * valueRatio)
+      : trackStart + Math.round(trackLength * (1 - valueRatio));
+    const pointer = makeDrawnPart('capsule', horizontal
+      ? { left: pointerPosition - 3, top: trackCenter - 17, width: 6, height: 34 }
+      : { left: trackCenter - 17, top: pointerPosition - 3, width: 34, height: 6 });
+    pointer.name = allocatePartName(horizontal ? 'hScalePointer' : 'vScalePointer');
+    pointer.role = 'scalePointer';
+    pointer.zIndex = ++zIndex;
+    assignKitPart(pointer, kitMeta, 'pointer');
+    setPartFill(pointer, 'FFEAF6FF', '00000000', 0);
+    patch[`Parts.${pointer.name}`] = pointer;
+
+    for (let index = 0; index < 11; index += 1) {
+      const ratio = index / 10;
+      const major = index % 5 === 0;
+      const position = horizontal
+        ? trackStart + Math.round(trackLength * ratio)
+        : trackStart + Math.round(trackLength * (1 - ratio));
+      const tick = makeDrawnPart('rectangle', horizontal
+        ? { left: position - 1, top: trackCenter + 11, width: 2, height: major ? 16 : 9 }
+        : { left: trackCenter - 27, top: position - 1, width: major ? 16 : 9, height: 2 });
+      tick.name = allocatePartName(horizontal ? 'hScaleTick' : 'vScaleTick');
+      tick.role = 'scaleTick';
+      tick.zIndex = ++zIndex;
+      assignKitPart(tick, kitMeta, 'tick');
+      setPartFill(tick, major ? 'FFEAF6FF' : 'FF7C8B96', '00000000', 0);
+      patch[`Parts.${tick.name}`] = tick;
+
+      if (major) {
+        const labelValue = index === 0 ? '0' : (index === 5 ? '64' : '127');
+        const label = makeDrawnPart('text', horizontal
+          ? { left: position - 15, top: trackCenter + 29, width: 30, height: 16 }
+          : { left: trackCenter - 62, top: position - 8, width: 28, height: 16 });
+        label.name = allocatePartName(horizontal ? 'hScaleLabel' : 'vScaleLabel');
+        label.role = 'scaleLabel';
+        label.zIndex = ++zIndex;
+        assignKitPart(label, kitMeta, 'label');
+        label._children.Text.content = labelValue;
+        label._children.Text._children.Font.size = 10;
+        patch[`Parts.${label.name}`] = label;
+      }
+    }
+
+    const readout = makeDrawnPart('text', horizontal
+      ? { left: left + width - 58, top: top + 6, width: 48, height: 20 }
+      : { left: left + 20, top: top + 4, width: 52, height: 20 });
+    readout.name = allocatePartName(horizontal ? 'hScaleValue' : 'vScaleValue');
+    readout.role = 'scaleValue';
+    readout.zIndex = ++zIndex;
+    assignKitPart(readout, kitMeta, 'readout');
+    readout._children.Text.content = '64';
+    readout._children.Text._children.Font.size = 14;
+    patch[`Parts.${readout.name}`] = readout;
+
+    const zoneName = nextHitZoneName(horizontal ? 'hScaleZone' : 'vScaleZone');
+    const zone = createHitZone(zoneName, {
+      shape: 'rectangle',
+      targetBehavior: behaviorName,
+      targetValueChannel: channelName,
+      action: 'dragValue',
+      bounds: { x: left, y: top, width, height, unit: 'px' },
+    });
+    zone.generated = true;
+    zone.visibleInEditor = false;
+    zone.meta = { ...(zone.meta ?? {}), ...kitMeta, kitRole: 'hitZone' };
+    patch[`HitZones.${zoneName}`] = zone;
+
+    localSelectedLayerNames = [];
+    applyControlPatch(core.id, {
+      ...patch,
+      [`ValueChannels.${channelName}`]: createValueChannel(channelName, { label: horizontal ? 'Horizontal Scale Value' : 'Vertical Scale Value', defaultValue: 64, min: 0, max: 127, step: 1 }),
+      [`Behaviors.${behaviorName}`]: createBehaviorModule(behaviorName, { type: 'slider', role: 'slider', valueChannel: channelName, geometry: horizontal ? 'horizontal' : 'vertical' }),
+      'Designer.selectedKit': kitId,
+      'Designer.selectedLayer': '',
+      'Designer.selectedLayers': [],
+      'Designer.selectedHitZone': '',
+      'Designer.selectedSurfaceKind': 'kit',
+      'Designer.selectedValueChannel': channelName,
+      'Designer.selectedBehavior': behaviorName,
+      'Designer.preview.showHitZones': false,
+    });
+    activeTool = 'select';
+    pulseSelection(`kit:${kitId}`);
   }
 
   function partOverlayStyle(name, part) {
@@ -1031,7 +1824,7 @@
       `width:${frame.width}px`,
       `height:${frame.height}px`,
       `z-index:${1000 + numberOr(part?.zIndex, 0)}`,
-      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:center center` : '',
+      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout.pivotX, 50)}% ${numberOr(layout.pivotY, 50)}%` : '',
     ].filter(Boolean).join(';');
   }
 
@@ -1199,6 +1992,23 @@
     updateControlProperty(core.id, `Parts.${selectedLayer}.Layout.${relativePath}`, value);
   }
 
+  function setSelectedPivotToArcCenter() {
+    if (!selectedPartEditable || !selectedLayer || !selectedFrame || !selectedArcPivotTarget) return;
+    const width = Math.max(1, numberOr(selectedFrame.width, 1));
+    const height = Math.max(1, numberOr(selectedFrame.height, 1));
+    const pivotX = ((selectedArcPivotTarget.center.x - selectedFrame.left) / width) * 100;
+    const pivotY = ((selectedArcPivotTarget.center.y - selectedFrame.top) / height) * 100;
+    applyLayerPatch({
+      [`Parts.${selectedLayer}.Layout.pivotX`]: roundLayoutValue(pivotX),
+      [`Parts.${selectedLayer}.Layout.pivotY`]: roundLayoutValue(pivotY),
+    });
+  }
+
+  function setArtboardSize(path, value) {
+    if (!core?.id || !['width', 'height'].includes(path)) return;
+    updateControlProperty(core.id, `Transform.${path}`, Math.max(1, Math.round(numberOr(value, path === 'width' ? artboardWidth : artboardHeight))));
+  }
+
   function setHitZoneProperty(relativePath, value) {
     if (!core?.id || !selectedHitZone || !selectedZoneEditable || !relativePath) return;
     updateControlProperty(core.id, `HitZones.${selectedHitZone}.${relativePath}`, value);
@@ -1328,6 +2138,7 @@
       'Designer.selectedLayer': part.name,
       'Designer.selectedLayers': [part.name],
       'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedKit': '',
     });
     activeTool = 'select';
     pulseSelection(`layer:${part.name}`);
@@ -1347,6 +2158,7 @@
       [`HitZones.${zone.name}`]: zone,
       'Designer.selectedHitZone': zone.name,
       'Designer.selectedSurfaceKind': 'hitZone',
+      'Designer.selectedKit': '',
       'Designer.preview.showHitZones': true,
     });
     activeTool = 'select';
@@ -1396,6 +2208,31 @@
       'Designer.selectedLayer': next,
       'Designer.selectedLayers': next ? [next] : [],
       'Designer.selectedSurfaceKind': 'layer',
+    });
+  }
+
+  function removeSelectedKit() {
+    if (!core?.id || activeSelectionKind !== 'kit' || !selectedKitEntry) return;
+    removeKitEntry(selectedKitEntry);
+  }
+
+  function removeKitEntry(kit) {
+    if (!core?.id || !kit) return;
+    const currentKitId = kit.id;
+    const nextKit = kitEntries.find((entry) => entry.id !== currentKitId) ?? null;
+    for (const name of kit.layerNames) {
+      if (authoredParts?._children?.[name]) removeControlNode(core.id, `Parts.${name}`);
+    }
+    for (const name of kit.zoneNames) {
+      if (authoredHitZones?._children?.[name]) removeControlNode(core.id, `HitZones.${name}`);
+    }
+    localSelectedLayerNames = [];
+    applyControlPatch(core.id, {
+      'Designer.selectedKit': nextKit?.id ?? '',
+      'Designer.selectedLayer': '',
+      'Designer.selectedLayers': [],
+      'Designer.selectedHitZone': '',
+      'Designer.selectedSurfaceKind': nextKit ? 'kit' : 'artboard',
     });
   }
 
@@ -1575,12 +2412,44 @@
     if (!core?.id) return;
     const clean = [...new Set((names ?? []).map((entry) => String(entry)).filter((entry) => parts?._children?.[entry]))];
     const nextPrimary = clean.includes(primary) ? primary : clean[0] ?? '';
+    const generatorName = parts?._children?.[nextPrimary]?.meta?.generatedBy ?? parts?._children?.[nextPrimary]?.generatedBy ?? '';
     localSelectedLayerNames = clean;
     applyControlPatch(core.id, {
       'Designer.selectedLayer': nextPrimary,
       'Designer.selectedSurfaceKind': 'layer',
       'Designer.selectedHitZone': '',
+      'Designer.selectedKit': '',
+      ...(generatorName && generators?._children?.[generatorName] ? { 'Designer.selectedGenerator': generatorName } : {}),
     });
+  }
+
+  function selectKit(kitId) {
+    if (!core?.id || !kitId) return;
+    localSelectedLayerNames = [];
+    pulseSelection(`kit:${kitId}`);
+    applyControlPatch(core.id, {
+      'Designer.selectedKit': kitId,
+      'Designer.selectedLayer': '',
+      'Designer.selectedLayers': [],
+      'Designer.selectedHitZone': '',
+      'Designer.selectedSurfaceKind': 'kit',
+    });
+  }
+
+  function editKitParts(kitId) {
+    const kit = kitEntries.find((entry) => entry.id === kitId);
+    const primary = kit?.layerNames?.[0] ?? '';
+    if (!primary) return;
+    commitLayerSelection(kit.layerNames, primary);
+  }
+
+  function convertSelectedValueControl(style) {
+    if (!core?.id || activeSelectionKind !== 'kit' || !selectedKitEntry) return;
+    if (selectedKitEntry.control?.style === style) return;
+    const frame = selectedKitFrame ? { ...selectedKitFrame } : null;
+    for (const name of selectedKitEntry.layerNames) removeControlNode(core.id, `Parts.${name}`);
+    for (const name of selectedKitEntry.zoneNames) removeControlNode(core.id, `HitZones.${name}`);
+    addValueControlKit(style, frame);
   }
 
   function selectLayer(name, event = null) {
@@ -2005,8 +2874,11 @@
   function selectHitZone(name) {
     if (!core?.id || !name) return;
     pulseSelection(`zone:${name}`);
-    updateControlProperty(core.id, 'Designer.selectedHitZone', name);
-    updateControlProperty(core.id, 'Designer.selectedSurfaceKind', 'hitZone');
+    applyControlPatch(core.id, {
+      'Designer.selectedHitZone': name,
+      'Designer.selectedSurfaceKind': 'hitZone',
+      'Designer.selectedKit': '',
+    });
   }
 
   function removeSelectedHitZone() {
@@ -2085,10 +2957,25 @@
 
   function clearSurfaceSelection() {
     if (!core?.id) return;
-    updateControlProperty(core.id, 'Designer.selectedSurfaceKind', 'layer');
-    updateControlProperty(core.id, 'Designer.selectedHitZone', '');
-    localSelectedLayerNames = selectedLayer ? [selectedLayer] : [];
+    applyControlPatch(core.id, {
+      'Designer.selectedSurfaceKind': 'artboard',
+      'Designer.selectedLayer': '',
+      'Designer.selectedLayers': [],
+      'Designer.selectedHitZone': '',
+      'Designer.selectedKit': '',
+    });
+    localSelectedLayerNames = [];
     inlineTextEditLayer = '';
+  }
+
+  function setSurfaceHover(kind, name) {
+    hoveredSurfaceItem = { kind, name };
+  }
+
+  function clearSurfaceHover(kind, name) {
+    if (hoveredSurfaceItem?.kind === kind && hoveredSurfaceItem?.name === name) {
+      hoveredSurfaceItem = null;
+    }
   }
 
   function cycleLayer(direction = 1) {
@@ -2156,6 +3043,11 @@
       removeSelectedHitZone();
       return;
     }
+    if (activeSelectionKind === 'kit' && selectedKitEntry && (event.key === 'Delete' || event.key === 'Backspace')) {
+      event.preventDefault();
+      removeSelectedKit();
+      return;
+    }
     if (activeSelectionKind === 'layer' && canManageLayer && event.key.toLowerCase() === 'd' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       duplicateSelectedLayer();
@@ -2190,27 +3082,14 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     class="surface-shell"
+    class:previewing={designerPreviewing}
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
     onkeydown={handleSurfaceKeydown}
     onkeyup={handleSurfaceKeyup}
   >
-    <div class="surface-topline">
-      <div>
-        <strong>{core?.name ?? 'Custom Component'}</strong>
-        <span>{Math.round(artboardWidth)} x {Math.round(artboardHeight)}</span>
-      </div>
-      <div>
-        <span>{allPartEntries.length} layers</span>
-        <span>{hitZoneEntries.length} zones</span>
-        {#if activeSelectionKind === 'layer' && selectedPart && !selectedPartEditable}
-          <span class="locked-note">{selectedAuthoredPart?.locked === true ? 'locked' : 'generated'}</span>
-        {/if}
-      </div>
-    </div>
-
-    {#if activeSelectionKind === 'layer' && selectedPart}
+    {#if !designerPreviewing && activeSelectionKind === 'layer' && selectedPart}
       <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
         {#if selectedBackground}
           <label class="paint-swatch">
@@ -2354,7 +3233,7 @@
       </div>
     {/if}
 
-    {#if activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
+    {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
       <div class="precision-strip" aria-label="Selection precision controls">
         <label>
           <span>X</span>
@@ -2431,7 +3310,7 @@
       </div>
     {/if}
 
-    {#if selectedIsArc}
+    {#if !designerPreviewing && selectedIsArc}
       <div class="arc-strip" aria-label="Arc controls">
         <strong>Arc</strong>
         <label>
@@ -2507,6 +3386,10 @@
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
         <span>Bounds</span>
       </label>
+      <label class="toggle-option" title="Show generated layer names, such as dial tick names, on the canvas">
+        <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
+        <span>Gen Names</span>
+      </label>
       <label class="toggle-option">
         <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
         <span>Zones</span>
@@ -2536,7 +3419,9 @@
         <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete Note</button>
       {/if}
       <button type="button" class="surface-command" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
-      <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a dial/meter kit with layers and a circular hit zone">Dial Kit</button>
+      <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a circular value control">Dial</button>
+      <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
+      <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
     </div>
 
@@ -2604,6 +3489,138 @@
         </button>
       </div>
 
+      <aside class="palette-panel" aria-label="Designer quick tools">
+        <div class="palette-header">
+          <strong>Shapes</strong>
+          <span>Draw and style</span>
+        </div>
+
+        <section class="palette-group">
+          <span>Basic</span>
+          <div class="palette-grid">
+            {#each SHAPE_TOOLS as tool (tool.id)}
+              <button
+                type="button"
+                class:active={activeTool === tool.id}
+                title={`${tool.label} (${tool.key})`}
+                onclick={() => setActiveTool(tool.id)}
+              >
+                <span class={`tool-icon ${tool.id}`}></span>
+              </button>
+            {/each}
+          </div>
+        </section>
+
+        <section class="palette-group">
+          <span>Value Controls</span>
+          <div class="palette-grid compact">
+            <button type="button" onclick={addDialKit} title="Add circular dial value control">
+              <span class="palette-glyph dial"></span>
+            </button>
+            <button type="button" onclick={addHorizontalScaleKit} title="Add horizontal tick scale">
+              <span class="palette-glyph hscale"></span>
+            </button>
+            <button type="button" onclick={addVerticalScaleKit} title="Add vertical tick scale">
+              <span class="palette-glyph vscale"></span>
+            </button>
+            <button type="button" onclick={addArpeggiatorKit} title="Add graphical arpeggiator kit">
+              <span class="palette-glyph grid"></span>
+            </button>
+            <button type="button" onclick={addHitZoneAtCenter} title="Add hit zone">
+              <span class="tool-icon hitZone"></span>
+            </button>
+            <button type="button" onclick={() => addLayerAtCenter('text')} title="Add text layer">
+              <span class="tool-icon text"></span>
+            </button>
+          </div>
+        </section>
+
+        <section class="palette-group">
+          <span>Pen</span>
+          <div class="palette-grid brush-grid">
+            <button type="button" class:active={activeTool === 'arcTrack'} onclick={() => setActiveTool('arcTrack')} title="Arc pen">
+              <span class="brush-preview thin"></span>
+            </button>
+            <button type="button" class:active={activeTool === 'ring'} onclick={() => setActiveTool('ring')} title="Ring pen">
+              <span class="brush-preview soft"></span>
+            </button>
+            <button type="button" class:active={activeTool === 'capsule'} onclick={() => setActiveTool('capsule')} title="Capsule pen">
+              <span class="brush-preview bold"></span>
+            </button>
+          </div>
+          <label class="palette-slider">
+            <span>Size</span>
+            <input type="range" min="1" max="24" value={selectedBorder?.thickness ?? 1} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))} />
+            <strong>{Math.round(numberOr(selectedBorder?.thickness, 1))}px</strong>
+          </label>
+        </section>
+
+        <section class="palette-group">
+          <span>Fill</span>
+          <label class="palette-swatch-row">
+            <input
+              type="color"
+              value={colorInputValue(selectedFill?.colour)}
+              disabled={!canPaintLayer || !selectedBackground}
+              oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
+            />
+            <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
+            <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
+          </label>
+        </section>
+
+        <section class="palette-group">
+          <span>Stroke</span>
+          <label class="palette-swatch-row">
+            <input
+              type="color"
+              value={colorInputValue(selectedBorder?.colour, '#FFFFFF')}
+              disabled={!canPaintLayer || !selectedBackground}
+              oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')}
+            />
+            <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
+            <strong>{Math.round(numberOr(selectedBorder?.thickness, 1))}px</strong>
+          </label>
+        </section>
+
+        <section class="palette-group">
+          <span>Path Operations</span>
+          <div class="palette-grid compact">
+            <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate">
+              <Copy size={14} aria-hidden="true" />
+            </button>
+            <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
+              <ArrowUp size={14} aria-hidden="true" />
+            </button>
+            <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
+              <ArrowDown size={14} aria-hidden="true" />
+            </button>
+            <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title="Toggle lock">
+              {#if selectedAuthoredPart?.locked === true}
+                <Unlock size={14} aria-hidden="true" />
+              {:else}
+                <Lock size={14} aria-hidden="true" />
+              {/if}
+            </button>
+          </div>
+        </section>
+
+        <section class="palette-group">
+          <span>Corner</span>
+          <label class="palette-corner">
+            <input
+              type="number"
+              min="0"
+              max="999"
+              value={numberOr(selectedCorners?.radius, 0)}
+              disabled={!canPaintLayer || !selectedBackground}
+              onchange={(event) => setLayerProperty('Background.Corners.radius', numericInputValue(event, 0))}
+            />
+            <strong>radius</strong>
+          </label>
+        </section>
+      </aside>
+
       <div
         class="surface-scroll"
         class:space-pan={spacePanActive}
@@ -2624,10 +3641,33 @@
             class="artboard"
             class:drawing={activeTool !== 'select'}
             style={artboardStyle}
-            onclick={clearSurfaceSelection}
-            onmousedown={(event) => { if (!beginDraw(event)) clearSurfaceSelection(); }}
+            onclick={() => { if (!designerPreviewing) clearSurfaceSelection(); }}
+            onmousedown={(event) => { if (!designerPreviewing && !beginDraw(event)) clearSurfaceSelection(); }}
           >
-            {#if activeTool !== 'select'}
+            {#if !designerPreviewing && surfaceNameTrayEntries.length}
+              <div class="surface-name-tray" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
+                {#each surfaceNameTrayEntries as entry (`${entry.kind}:${entry.label}`)}
+                  <span class:hit-zone-label={entry.kind === 'hitZone'} class:kit-label={entry.kind === 'kit'}>{entry.label}</span>
+                {/each}
+              </div>
+            {/if}
+
+            {#if designerPreviewing}
+              <div
+                class="designer-live-preview"
+                onmousedown={stopSelectionAction}
+                onclick={stopSelectionAction}
+              >
+                <InteractiveTestSurface
+                  {control}
+                  session={livePreviewSession ?? createInteractionPreviewSession(control)}
+                  onpatchsession={patchLivePreviewSession}
+                  compact={true}
+                />
+              </div>
+            {/if}
+
+            {#if !designerPreviewing && activeTool !== 'select'}
               <!-- svelte-ignore a11y_no_static_element_interactions -->
               <div
                 class="draw-capture"
@@ -2637,13 +3677,15 @@
               ></div>
             {/if}
 
-            {#if partEntries.length === 0 && !drawDraft}
+            {#if !designerPreviewing && partEntries.length === 0 && !drawDraft}
               <div class="artboard-create-palette" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
                 <button type="button" onclick={() => addLayerAtCenter('rectangle')}>Rectangle</button>
                 <button type="button" onclick={() => addLayerAtCenter('ellipse')}>Ellipse</button>
                 <button type="button" onclick={() => addLayerAtCenter('text')}>Text</button>
                 <button type="button" onclick={() => { setActiveTool('hitZone'); addHitZoneAtCenter(); }}>Hit Zone</button>
-                <button type="button" onclick={addDialKit}>Dial Kit</button>
+                <button type="button" onclick={addDialKit}>Dial</button>
+                <button type="button" onclick={addHorizontalScaleKit}>H Scale</button>
+                <button type="button" onclick={addVerticalScaleKit}>V Scale</button>
                 <button type="button" onclick={addArpeggiatorKit}>Arp Kit</button>
               </div>
             {/if}
@@ -2656,8 +3698,15 @@
               />
             {/each}
 
-            {#if arpeggiatorEnabled}
+            {#if !designerPreviewing && arpeggiatorEnabled}
               <div class="arp-editor" style={`--arp-steps:${arpStepCount};`} onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
+                <div class="arp-tool-strip" role="toolbar" aria-label="Arpeggiator edit tools">
+                  {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool}
+                    <button type="button" class:active={arpTool === tool} onclick={() => { arpTool = tool; }} title={`Arpeggiator ${tool} tool`}>
+                      {tool}
+                    </button>
+                  {/each}
+                </div>
                 <div class="arp-ruler">
                   <span></span>
                   {#each Array.from({ length: arpStepCount }, (_, index) => index) as step (step)}
@@ -2689,7 +3738,7 @@
                       data-block-id={block.id}
                       style={arpBlockStyle(block)}
                       title={`${noteName(block.note)} · step ${block.step + 1} · length ${block.length} · velocity ${block.velocity}`}
-                      onmousedown={(event) => beginArpBlockMove(block, event)}
+                      onmousedown={(event) => handleArpBlockPointer(block, event)}
                       onclick={(event) => { event.stopPropagation(); selectArpBlock(block.id); }}
                     >
                       <span class="arp-velocity-fill" style={arpVelocityStyle(block)}></span>
@@ -2717,62 +3766,83 @@
               </div>
             {/if}
 
-            {#each partEntries as [name, part] (name)}
-              <button
-                class="part-bound"
-                class:selected={isLayerSelected(name)}
-                class:primary={activeSelectionKind === 'layer' && selectedLayer === name}
-                class:generated={part?.generated === true || part?.meta?.generated === true}
-                class:bounds-hidden={!showBounds}
-                class:arp-muted={arpeggiatorEnabled && part?.meta?.arpeggiatorSurface === true}
-                class:tiny={isTinyPart(name, part)}
-                class:locked={activeSelectionKind === 'layer' && selectedLayer === name && !selectedPartEditable}
-                class:pulse={selectionPulseTarget === `layer:${name}`}
-                type="button"
-                style={partOverlayStyle(name, part)}
-                title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
-                onclick={(event) => { event.stopPropagation(); selectLayer(name, event); }}
-                ondblclick={(event) => beginInlineTextEdit(name, event)}
-                onmousedown={(event) => beginMove(name, part, event)}
-              >
-                <span class="selection-label">{name}</span>
-                {#if activeSelectionKind === 'layer' && selectedLayer === name && selectedPartEditable && !multiSelectionActive}
-                  <span class="rotate-handle" onmousedown={beginRotate}></span>
-                  {#if selectedIsArc && selectedFrame}
-                    <span
-                      class="arc-handle arc-start"
-                      title="Drag arc start"
-                      style={arcPointStyle(selectedFrame, selectedArcMeta?.startAngle)}
-                      onmousedown={(event) => beginArcHandleDrag('start', event)}
-                    ></span>
-                    <span
-                      class="arc-handle arc-end"
-                      title="Drag arc end"
-                      style={arcPointStyle(selectedFrame, numberOr(selectedArcMeta?.startAngle, -135) + numberOr(selectedArcMeta?.sweepAngle, 270))}
-                      onmousedown={(event) => beginArcHandleDrag('end', event)}
-                    ></span>
-                  {/if}
-                  {#each RESIZE_HANDLES as handle (handle.id)}
-                    {#if !isTinyPart(name, part) || ['tl', 'tr', 'br', 'bl'].includes(handle.id)}
+            {#if !designerPreviewing}
+              {#each overlayPartEntries as [name, part] (name)}
+                <button
+                  class="part-bound"
+                  class:selected={isLayerSelected(name)}
+                  class:primary={activeSelectionKind === 'layer' && selectedLayer === name}
+                  class:generated={isGeneratedPart(part)}
+                  class:generated-labels-hidden={isGeneratedPart(part) && !showGeneratedLabels}
+                  class:bounds-hidden={!showBounds}
+                  class:arp-muted={arpeggiatorEnabled && part?.meta?.arpeggiatorSurface === true}
+                  class:tiny={isTinyPart(name, part)}
+                  class:locked={activeSelectionKind === 'layer' && selectedLayer === name && !selectedPartEditable}
+                  class:pulse={selectionPulseTarget === `layer:${name}`}
+                  type="button"
+                  style={partOverlayStyle(name, part)}
+                  title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
+                  onclick={(event) => { event.stopPropagation(); selectLayer(name, event); }}
+                  ondblclick={(event) => beginInlineTextEdit(name, event)}
+                  onpointerenter={() => setSurfaceHover('layer', name)}
+                  onpointerleave={() => clearSurfaceHover('layer', name)}
+                  onmousedown={(event) => beginMove(name, part, event)}
+                >
+                  <span class="selection-label">{name}</span>
+                  {#if activeSelectionKind === 'layer' && selectedLayer === name && selectedPartEditable && !multiSelectionActive}
+                    <span class="rotate-handle" onmousedown={beginRotate}></span>
+                    {#if selectedIsArc && selectedFrame}
                       <span
-                        class="resize-handle"
-                        style={`${handleStyle(handle.id)} cursor:${handle.cursor};`}
-                        onmousedown={(event) => beginResize(handle.id, event)}
+                        class="arc-handle arc-start"
+                        title="Drag arc start"
+                        style={arcPointStyle(selectedFrame, selectedArcMeta?.startAngle)}
+                        onmousedown={(event) => beginArcHandleDrag('start', event)}
+                      ></span>
+                      <span
+                        class="arc-handle arc-end"
+                        title="Drag arc end"
+                        style={arcPointStyle(selectedFrame, numberOr(selectedArcMeta?.startAngle, -135) + numberOr(selectedArcMeta?.sweepAngle, 270))}
+                        onmousedown={(event) => beginArcHandleDrag('end', event)}
                       ></span>
                     {/if}
-                  {/each}
-                {/if}
-              </button>
-            {/each}
+                    {#each RESIZE_HANDLES as handle (handle.id)}
+                      {#if !isTinyPart(name, part) || ['tl', 'tr', 'br', 'bl'].includes(handle.id)}
+                        <span
+                          class="resize-handle"
+                          style={`${handleStyle(handle.id)} cursor:${handle.cursor};`}
+                          onmousedown={(event) => beginResize(handle.id, event)}
+                        ></span>
+                      {/if}
+                    {/each}
+                  {/if}
+                </button>
+              {/each}
+            {/if}
 
-            {#if multiSelectionActive && activeSelectionFrame}
+            {#if !designerPreviewing && activeSelectionKind === 'kit' && selectedKitEntry && selectedKitFrame}
+              <button
+                class="part-bound kit-bound"
+                class:selected={true}
+                class:pulse={selectionPulseTarget === `kit:${selectedKitEntry.id}`}
+                type="button"
+                style={selectionBoundsStyle(selectedKitFrame)}
+                title={`${selectedKitEntry.label}: grouped kit`}
+                onclick={(event) => { event.stopPropagation(); selectKit(selectedKitEntry.id); }}
+                onpointerenter={() => setSurfaceHover('kit', selectedKitEntry.label)}
+                onpointerleave={() => clearSurfaceHover('kit', selectedKitEntry.label)}
+              >
+                <span class="selection-label">{selectedKitEntry.label}</span>
+              </button>
+            {/if}
+
+            {#if !designerPreviewing && multiSelectionActive && activeSelectionFrame}
               <div class="multi-selection-bound" style={selectionBoundsStyle(activeSelectionFrame)}>
                 <span>{selectedLayerNames.length} layers</span>
               </div>
             {/if}
 
             {#each partEntries as [name, part] (name)}
-              {#if inlineTextEditLayer === name && authoredParts?._children?.[name]?._children?.Text && isEditablePart(authoredParts?._children?.[name])}
+              {#if !designerPreviewing && inlineTextEditLayer === name && authoredParts?._children?.[name]?._children?.Text && isEditablePart(authoredParts?._children?.[name])}
                 <input
                   class="inline-text-editor"
                   style={inlineTextEditorStyle(name, part)}
@@ -2798,7 +3868,7 @@
               {/if}
             {/each}
 
-            {#if showHitZones}
+            {#if !designerPreviewing && showHitZones}
               {#each zoneOverlayEntries as [name, zone] (name)}
                 <button
                   class="hit-zone"
@@ -2810,6 +3880,8 @@
                   style={hitZoneStyle(name, zone)}
                   title={`${name}: ${zone?.action ?? 'action'}`}
                   onclick={(event) => { event.stopPropagation(); selectHitZone(name); }}
+                  onpointerenter={() => setSurfaceHover('hitZone', name)}
+                  onpointerleave={() => clearSurfaceHover('hitZone', name)}
                   onmousedown={(event) => beginZoneMove(name, zone, event)}
                 >
                   <span class="selection-label">{name}</span>
@@ -2826,55 +3898,13 @@
               {/each}
             {/if}
 
-            {#if activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
-              <div
-                class="selection-quickbar"
-                class:zone-tools={activeSelectionKind === 'hitZone'}
-                style={selectionQuickbarStyle(activeSelectionFrame)}
-                onmousedown={stopSelectionAction}
-                onclick={stopSelectionAction}
-              >
-                {#if activeSelectionKind === 'layer'}
-                  <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
-                    <Copy size={13} aria-hidden="true" />
-                  </button>
-                  <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
-                    <ArrowUp size={13} aria-hidden="true" />
-                  </button>
-                  <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
-                    F
-                  </button>
-                  <button type="button" onclick={() => moveSelectedLayer(-1)} disabled={!canManageLayer} title="Send backward">
-                    <ArrowDown size={13} aria-hidden="true" />
-                  </button>
-                  <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
-                    B
-                  </button>
-                  <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
-                    {#if selectedAuthoredPart?.locked === true}
-                      <Unlock size={13} aria-hidden="true" />
-                    {:else}
-                      <Lock size={13} aria-hidden="true" />
-                    {/if}
-                  </button>
-                  <button type="button" class="danger" onclick={removeSelectedLayer} disabled={!canManageLayer} title="Delete layer">
-                    <Trash2 size={13} aria-hidden="true" />
-                  </button>
-                {:else}
-                  <button type="button" class="danger" onclick={removeSelectedHitZone} disabled={!selectedAuthoredZone} title="Delete hit zone">
-                    <Trash2 size={13} aria-hidden="true" />
-                  </button>
-                {/if}
-              </div>
-            {/if}
-
-            {#if drawDraft}
+            {#if !designerPreviewing && drawDraft}
               <div class={`draw-preview ${drawDraft.tool}`} style={drawPreviewStyle()}>
                 <span>{DRAW_TOOLS.find((tool) => tool.id === drawDraft?.tool)?.label ?? 'Layer'}</span>
               </div>
             {/if}
 
-            {#if feedbackFrame}
+            {#if !designerPreviewing && feedbackFrame}
               {#each snapGuides(feedbackFrame) as guide, index (`${guide.axis}-${guide.value}-${index}`)}
                 <span class={`snap-guide ${guide.axis}`} style={guide.style}></span>
               {/each}
@@ -2885,14 +3915,62 @@
             {/if}
           </div>
         </div>
+        {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
+          <div
+            class="selection-quickbar"
+            class:zone-tools={activeSelectionKind === 'hitZone'}
+            role="toolbar"
+            tabindex="-1"
+            aria-label={activeSelectionKind === 'hitZone' ? 'Selected hit zone quick actions' : 'Selected layer quick actions'}
+            onmousedown={stopSelectionAction}
+          >
+            <span class="quickbar-label">{activeSelectionKind === 'hitZone' ? 'Zone' : 'Layer'}</span>
+            {#if activeSelectionKind === 'layer'}
+              <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
+                <Copy size={13} aria-hidden="true" />
+              </button>
+              <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
+                <ArrowUp size={13} aria-hidden="true" />
+              </button>
+              <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
+                F
+              </button>
+              <button type="button" onclick={() => moveSelectedLayer(-1)} disabled={!canManageLayer} title="Send backward">
+                <ArrowDown size={13} aria-hidden="true" />
+              </button>
+              <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
+                B
+              </button>
+              <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
+                {#if selectedAuthoredPart?.locked === true}
+                  <Unlock size={13} aria-hidden="true" />
+                {:else}
+                  <Lock size={13} aria-hidden="true" />
+                {/if}
+              </button>
+              <button type="button" class="danger" onclick={removeSelectedLayer} disabled={!canManageLayer} title="Delete layer">
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
+            {:else}
+              <button type="button" class="danger" onclick={removeSelectedHitZone} disabled={!selectedAuthoredZone} title="Delete hit zone">
+                <Trash2 size={13} aria-hidden="true" />
+              </button>
+            {/if}
+          </div>
+        {/if}
       </div>
 
       <div class="surface-dock">
         <section class="dock-pane layer-tree" aria-label="Object tree">
           <div class="list-header">
-            <span>Layers</span>
-            <strong>{allPartEntries.length}</strong>
+            <div class="dock-tab-row" role="tablist" aria-label="Right dock sections">
+              <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
+              <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
+              <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
+            </div>
+            <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
+          {#if dockTab === 'layers'}
           <div class="dock-add-strip" aria-label="Create layer">
             <button type="button" onclick={() => addLayerAtCenter('rectangle')} title="Add rectangle">
               <span class="tool-icon rectangle"></span>
@@ -2908,7 +3986,78 @@
             </button>
           </div>
           <div class="list-scroll layer-scroll">
-          {#each topDownPartEntries as [name, part] (name)}
+          {#each kitEntries as kit (kit.id)}
+            <div
+              class="list-row kit-row"
+              class:selected={activeSelectionKind === 'kit' && selectedKit === kit.id}
+              class:primary={activeSelectionKind === 'kit' && selectedKit === kit.id}
+              class:pulse={selectionPulseTarget === `kit:${kit.id}`}
+              role="group"
+              aria-label={`${kit.label} kit controls`}
+              title={`${kit.label}: ${kit.layerNames.length} generated layers`}
+            >
+              <button type="button" class="row-main" onclick={() => selectKit(kit.id)}>
+                <span class={`layer-thumb kit-thumb ${kit.control?.style ?? 'dial'}`} aria-hidden="true">
+                  <span class="kit-thumb-ring"></span>
+                  <span class="kit-thumb-pointer"></span>
+                </span>
+                <span class="row-text">
+                  <strong>{kit.label}</strong>
+                  <em>{kit.layerNames.length} layers · {kit.zoneNames.length} zone{kit.zoneNames.length === 1 ? '' : 's'}</em>
+                </span>
+                <span class="row-badge kit">KIT</span>
+              </button>
+              <div class="row-actions">
+                <button
+                  type="button"
+                  onclick={(event) => { event.stopPropagation(); editKitParts(kit.id); }}
+                  title="Edit generated parts"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  class="danger"
+                  onclick={(event) => { event.stopPropagation(); removeKitEntry(kit); }}
+                  title="Delete value control"
+                >
+                  <Trash2 size={12} aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          {/each}
+          {#each generatedSourceEntries as source (source.source)}
+            <div
+              class="list-row generated-group-row"
+              class:collapsed={source.collapsed}
+              role="group"
+              aria-label={`${source.label} generated output group`}
+              title={`${source.label}: ${source.partCount} generated layers, ${source.zoneCount} generated zones`}
+            >
+              <button type="button" class="row-main" onclick={(event) => toggleGeneratedSource(source.source, event)}>
+                <span class="layer-thumb generated-group-thumb" aria-hidden="true">
+                  <span></span>
+                </span>
+                <span class="row-text">
+                  <strong>{source.label}</strong>
+                  <em>{source.partCount} layers · {source.zoneCount} zone{source.zoneCount === 1 ? '' : 's'} · {source.collapsed ? 'folded' : 'expanded'}</em>
+                </span>
+                <span class="row-badge gen-group">{source.collapsed ? '+' : '-'}</span>
+              </button>
+              <div class="row-actions">
+                {#if source.hasGenerator}
+                  <button
+                    type="button"
+                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source, 'Designer.focusSection': 'generators' }); }}
+                    title={`Edit ${source.source} generator`}
+                  >
+                    Gen
+                  </button>
+                {/if}
+              </div>
+            </div>
+          {/each}
+          {#each topLevelPartEntries as [name, part] (name)}
             <div
               class="list-row"
               class:selected={isLayerSelected(name)}
@@ -2926,13 +4075,29 @@
               ondragend={() => { draggingLayerName = ''; }}
               ondragover={(event) => event.preventDefault()}
               ondrop={(event) => dropLayerOn(name, event)}
-            >
-              <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)}>
-                <span class="row-dot"></span>
-                <strong>{name}</strong>
-                <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{part?.kind ?? part?.role ?? 'part'}</em>
+          >
+            <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)}>
+                <span class="layer-thumb" aria-hidden="true">
+                  <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
+                    {#if layerKind(part) === 'text'}T{/if}
+                  </span>
+                </span>
+                <span class="row-text">
+                  <strong>{name}</strong>
+                  <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
+                </span>
+                <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
               </button>
               <div class="row-actions">
+                {#if generatorNameForEntry(part)}
+                  <button
+                    type="button"
+                    onclick={(event) => editGeneratorForLayer(name, part, event)}
+                    title={`Edit ${generatorNameForEntry(part)} generator`}
+                  >
+                    Gen
+                  </button>
+                {/if}
                 <button
                   type="button"
                   class:selected={selectedLayerSet.has(name)}
@@ -2942,20 +4107,20 @@
                 >
                   +
                 </button>
-                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, 1); }} title="Bring forward">
+                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, 1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Bring forward' : 'Generated layer: edit the generator or detach first'}>
                   <ArrowUp size={12} aria-hidden="true" />
                 </button>
-                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, -1); }} title="Send backward">
+                <button type="button" onclick={(event) => { event.stopPropagation(); moveLayer(name, -1); }} disabled={!canManagePartName(name)} title={canManagePartName(name) ? 'Send backward' : 'Generated layer: edit the generator or detach first'}>
                   <ArrowDown size={12} aria-hidden="true" />
                 </button>
-                <button type="button" onclick={(event) => toggleLayerVisibility(name, part, event)} title={part?.visible === false ? 'Show layer' : 'Hide layer'}>
+                <button type="button" onclick={(event) => toggleLayerVisibility(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.visible === false ? 'Show layer' : 'Hide layer') : 'Generated layer: edit the generator or detach first'}>
                   {#if part?.visible === false}
                     <Eye size={12} aria-hidden="true" />
                   {:else}
                     <EyeOff size={12} aria-hidden="true" />
                   {/if}
                 </button>
-                <button type="button" onclick={(event) => toggleLayerLock(name, part, event)} title={part?.locked === true || part?.meta?.locked === true ? 'Unlock layer' : 'Lock layer'}>
+                <button type="button" onclick={(event) => toggleLayerLock(name, part, event)} disabled={!canManagePartName(name)} title={canManagePartName(name) ? (part?.locked === true || part?.meta?.locked === true ? 'Unlock layer' : 'Lock layer') : 'Generated layer: edit the generator or detach first'}>
                   {#if part?.locked === true || part?.meta?.locked === true}
                     <Unlock size={12} aria-hidden="true" />
                   {:else}
@@ -2968,11 +4133,11 @@
           </div>
           <div class="list-header secondary">
             <span>Hit Zones</span>
-            <strong>{hitZoneEntries.length}</strong>
+            <strong>{dockHitZoneEntries.length}</strong>
           </div>
           <div class="list-scroll zones">
-          {#if hitZoneEntries.length}
-            {#each hitZoneEntries as [name, zone] (name)}
+          {#if dockHitZoneEntries.length}
+            {#each dockHitZoneEntries as [name, zone] (name)}
               <div
                 class="list-row zone-row"
                 class:selected={activeSelectionKind === 'hitZone' && selectedHitZone === name}
@@ -2983,16 +4148,30 @@
                 title={`${name}: ${zone?.action ?? 'action'}`}
               >
                 <button type="button" class="row-main" onclick={() => selectHitZone(name)}>
-                  <span class="row-dot"></span>
-                  <strong>{name}</strong>
-                  <em>{zone?.shape ?? 'zone'} · {zone?.action ?? 'action'}</em>
+                  <span class="layer-thumb zone-thumb" aria-hidden="true">
+                    <span class="zone-thumb-shape" style={zoneThumbPartStyle(name, zone)}></span>
+                  </span>
+                  <span class="row-text">
+                    <strong>{name}</strong>
+                    <em>{zone?.shape ?? 'zone'} · {zone?.action ?? 'action'}</em>
+                  </span>
+                  <span class="row-badge zone">ZONE</span>
                 </button>
               </div>
             {/each}
           {:else}
-            <div class="list-empty">No zones</div>
+            <div class="list-empty">{hitZoneEntries.length ? 'Generated zones are folded above' : 'No zones'}</div>
           {/if}
           </div>
+          {:else if dockTab === 'generators'}
+            <div class="dock-generator-editor">
+              <CustomGeneratorsEditor {control} />
+            </div>
+          {:else}
+            <div class="dock-empty dock-empty-tab">
+              Assets are edited in the inspector for now.
+            </div>
+          {/if}
         </section>
 
         <section class="dock-pane inspector-pane" aria-label="Context inspector">
@@ -3025,9 +4204,86 @@
 
           <div class="inspector-content">
             {#if inspectorTab === 'object'}
-              {#if !activeSelectionName && !multiSelectionActive}
+              {#if activeSelectionKind === 'artboard'}
+                <div class="dock-section">
+                  <div class="dock-section-title">Artboard</div>
+                  <div class="dock-number-grid">
+                    <label>
+                      <span>W</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={Math.round(artboardWidth)}
+                        onchange={(event) => setArtboardSize('width', numericInputValue(event, artboardWidth))}
+                      />
+                    </label>
+                    <label>
+                      <span>H</span>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={Math.round(artboardHeight)}
+                        onchange={(event) => setArtboardSize('height', numericInputValue(event, artboardHeight))}
+                      />
+                    </label>
+                  </div>
+                  <div class="dock-note">This is the saved custom component workspace size. It does not require a panel.</div>
+                  <div class="dock-button-grid">
+                    <button type="button" onclick={() => { setArtboardSize('width', 152); setArtboardSize('height', 92); }}>Button</button>
+                    <button type="button" onclick={() => { setArtboardSize('width', 260); setArtboardSize('height', 120); }}>Default</button>
+                    <button type="button" onclick={fitArtboardToView}>Fit View</button>
+                  </div>
+                </div>
+              {:else if !activeSelectionName && !multiSelectionActive}
                 <div class="dock-empty">Select artwork, a text layer, or a hit zone to edit it here.</div>
               {:else}
+                {#if activeSelectionKind === 'kit' && selectedKitEntry}
+                  <div class="dock-section">
+                    <div class="dock-section-title">Value Control</div>
+                    <div class="segmented">
+                      <button type="button" class:active={selectedKitEntry.control?.style === 'dial'} onclick={() => convertSelectedValueControl('dial')}>Dial</button>
+                      <button type="button" class:active={selectedKitEntry.control?.style === 'horizontal'} onclick={() => convertSelectedValueControl('horizontal')}>Horizontal</button>
+                      <button type="button" class:active={selectedKitEntry.control?.style === 'vertical'} onclick={() => convertSelectedValueControl('vertical')}>Vertical</button>
+                    </div>
+                    <div class="mini-list">
+                      <div>
+                        <strong>Style</strong>
+                        <span>{valueControlStyleLabel(selectedKitEntry.control?.style)}</span>
+                      </div>
+                      <div>
+                        <strong>Channel</strong>
+                        <span>{selectedKitEntry.control?.channelName ?? 'value'}</span>
+                      </div>
+                      <div>
+                        <strong>Range</strong>
+                        <span>{selectedKitEntry.control?.min ?? 0} to {selectedKitEntry.control?.max ?? 127}</span>
+                      </div>
+                      <div>
+                        <strong>Ticks</strong>
+                        <span>{selectedKitEntry.control?.tickCount ?? 0}</span>
+                      </div>
+                      <div>
+                        <strong>Parts</strong>
+                        <span>{selectedKitEntry.layerNames.length} layers</span>
+                      </div>
+                      <div>
+                        <strong>Hit Zones</strong>
+                        <span>{selectedKitEntry.zoneNames.length}</span>
+                      </div>
+                    </div>
+                    <div class="dock-note">This is one smart value control. The visible ticks, track, pointer, readout, and hidden interaction area stay grouped by default.</div>
+                    <div class="dock-button-grid">
+                      <button type="button" onclick={() => editKitParts(selectedKitEntry.id)}>Edit Internal Parts</button>
+                      <button type="button" class="danger" onclick={removeSelectedKit}>
+                        <Trash2 size={13} aria-hidden="true" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                {/if}
+
                 {#if activeSelectionKind === 'layer' && selectedPart}
                   <div class="dock-section">
                     <div class="dock-section-title">Layer</div>
@@ -3170,8 +4426,43 @@
                             onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
                           />
                         </label>
+                        <label>
+                          <span>Pivot X</span>
+                          <input
+                            type="number"
+                            step="1"
+                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotX, 50))}
+                            disabled={!selectedPartEditable}
+                            onchange={(event) => setLayerLayoutProperty('pivotX', numericInputValue(event, 50))}
+                          />
+                        </label>
+                        <label>
+                          <span>Pivot Y</span>
+                          <input
+                            type="number"
+                            step="1"
+                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50))}
+                            disabled={!selectedPartEditable}
+                            onchange={(event) => setLayerLayoutProperty('pivotY', numericInputValue(event, 50))}
+                          />
+                        </label>
                       {/if}
                     </div>
+                    {#if activeSelectionKind === 'layer'}
+                      <div class="dock-section-subtitle">Rotation Pivot</div>
+                      <div class="pivot-actions">
+                        <button
+                          type="button"
+                          disabled={!selectedPartEditable || !selectedArcPivotTarget}
+                          onclick={setSelectedPivotToArcCenter}
+                          title={selectedArcPivotTarget ? `Set pivot to ${selectedArcPivotTarget.name} center` : 'No arc/value arc layer available'}
+                        >
+                          Rotate around arc center
+                        </button>
+                        <span>{selectedArcPivotTarget ? selectedArcPivotTarget.name : 'No arc found'}</span>
+                      </div>
+                    {/if}
+                    <div class="dock-section-subtitle">Quick Positioning</div>
                     <div class="align-grid">
                       <button type="button" onclick={() => alignSelection('left')}>Left</button>
                       <button type="button" onclick={() => alignSelection('centerX')}>Center X</button>
@@ -3317,6 +4608,10 @@
                   <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
                 </label>
                 <label class="dock-field">
+                  <span>Gen Names</span>
+                  <input type="checkbox" checked={showGeneratedLabels} onchange={(event) => setPreviewFlag('showGeneratedLabels', event.currentTarget.checked)} />
+                </label>
+                <label class="dock-field">
                   <span>Zones</span>
                   <input type="checkbox" checked={showHitZones} onchange={(event) => setPreviewFlag('showHitZones', event.currentTarget.checked)} />
                 </label>
@@ -3388,16 +4683,64 @@
       </div>
     </div>
 
-    <div class="surface-footer">
-      <span class="workspace-label"><strong>Designer workspace</strong></span>
-      <span>Editing: <strong>{activeSelectionKind === 'hitZone' ? 'Hit Zone' : 'Layer'}</strong></span>
-      <span>Tool: <strong>{activeToolMeta?.label ?? 'Select'}</strong></span>
-      <span>Layer: <strong>{selectedPart ? selectedLayer : 'none'}</strong></span>
-      {#if activeSelectionKind === 'layer' && selectedPart && !selectedPartEditable}
-        <span><strong>Generated parts must be detached before editing</strong></span>
-      {/if}
-      <span>Hit zone: <strong>{selectedZone ? selectedHitZone : 'none'}</strong></span>
+    {#if !designerPreviewing}
+    <div class="state-filmstrip" aria-label="Component states">
+      <div class="state-title">
+        <strong>States</strong>
+        <span>{Math.max(1, stateFilmstripEntries.length)}</span>
+      </div>
+      <div class="state-chip-row">
+        {#each statePreviewCards as entry (entry.name)}
+          <div
+            class="state-card"
+            class:active={(designer?.preview?.state ?? 'base') === entry.name}
+            class:base={entry.base}
+            style={stateCardStyle(entry.name, entry.index)}
+            title={stateDescription(entry.name, entry.state, entry.base)}
+          >
+            <button
+              type="button"
+              class="state-main"
+              onclick={() => selectStateCard(entry.name)}
+            >
+              <span class="state-thumb" aria-hidden="true">
+                <span class="state-preview-stage" style={statePreviewStageStyle(entry)}>
+                  {#each entry.previewParts as [partName, part] (partName)}
+                    <InteractivePartRenderer
+                      part={part}
+                      parentWidth={entry.previewWidth}
+                      parentHeight={entry.previewHeight}
+                    />
+                  {/each}
+                </span>
+              </span>
+              <span class="state-copy">
+                <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
+                <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
+              </span>
+              <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
+            </button>
+            <div class="state-actions" aria-label={`${entry.name} state actions`}>
+              <button type="button" onclick={(event) => { event.stopPropagation(); inspectorTab = 'states'; selectStateCard(entry.name); }} title="Edit state">
+                Edit
+              </button>
+              <button type="button" onclick={(event) => duplicateStateCard(entry.name, entry.state, event)} title={entry.base ? 'Create state from base' : 'Duplicate state'}>
+                Copy
+              </button>
+              {#if !entry.base}
+                <button type="button" class="danger" onclick={(event) => removeStateCard(entry.name, event)} title="Delete state">
+                  Del
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/each}
+        <button type="button" class="add-state" title="Add state" onclick={addQuickState}>
+          +
+        </button>
+      </div>
     </div>
+    {/if}
   </div>
 {:else}
   <div class="empty-state">Select a custom component to use the design surface.</div>
@@ -3417,58 +4760,6 @@
 
   .surface-shell:focus-within {
     border-color: #3D6688;
-  }
-
-  .surface-topline,
-  .surface-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    flex-shrink: 0;
-    padding: 8px 10px;
-    background: #202020;
-    border-bottom: 1px solid #2A2A2A;
-    color: #AFC5D8;
-    font-size: 11px;
-  }
-
-  .surface-footer {
-    border-top: 1px solid #2A2A2A;
-    border-bottom: 0;
-    background: #14191D;
-  }
-
-  .surface-topline div,
-  .surface-footer {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-  }
-
-  .surface-topline strong,
-  .surface-footer strong {
-    color: #E8EEF5;
-    font-weight: 700;
-  }
-
-  .surface-topline span,
-  .surface-footer span {
-    white-space: nowrap;
-  }
-
-  .workspace-label {
-    padding: 2px 7px;
-    border: 1px solid rgba(91, 155, 213, 0.42);
-    border-radius: 4px;
-    background: rgba(91, 155, 213, 0.12);
-  }
-
-  .locked-note {
-    color: #E5A029;
-    font-weight: 700;
-    text-transform: uppercase;
   }
 
   .surface-shell > .paint-strip,
@@ -4113,18 +5404,44 @@
     min-height: 0;
   }
 
+  .surface-shell.previewing .surface-options-strip,
+  .surface-shell.previewing .tool-strip,
+  .surface-shell.previewing .palette-panel,
+  .surface-shell.previewing .surface-dock {
+    display: none;
+  }
+
+  .surface-shell.previewing .surface-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .surface-shell.previewing .surface-scroll {
+    background:
+      radial-gradient(circle at center, rgba(20, 184, 166, 0.08), transparent 38%),
+      #0D1216;
+  }
+
+  .surface-shell.previewing .artboard {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.12),
+      0 18px 42px rgba(0, 0, 0, 0.34);
+  }
+
   .surface-dock {
     min-height: 0;
     border-left: 1px solid #2A2A2A;
     background: #15181B;
-    display: grid;
-    grid-template-rows: minmax(190px, 42%) minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .dock-pane {
-    min-height: 0;
     display: flex;
     flex-direction: column;
+    flex: 0 0 auto;
+    min-height: 0;
   }
 
   .layer-tree {
@@ -4141,6 +5458,9 @@
     justify-content: space-between;
     gap: 8px;
     flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 6;
     padding: 8px 10px;
     color: #8DBFE5;
     background: #202429;
@@ -4163,6 +5483,7 @@
   }
 
   .list-header.secondary {
+    position: static;
     border-top: 1px solid #2A2A2A;
   }
 
@@ -4194,18 +5515,29 @@
 
   .list-scroll {
     min-height: 0;
-    max-height: 50%;
-    overflow-y: auto;
+    max-height: none;
+    overflow: visible;
   }
 
   .list-scroll.layer-scroll {
-    flex: 1;
+    flex: 0 0 auto;
     max-height: none;
   }
 
   .list-scroll.zones {
-    min-height: 82px;
-    max-height: 34%;
+    min-height: 0;
+    max-height: none;
+  }
+
+  .dock-generator-editor {
+    min-height: 0;
+    flex: 0 0 auto;
+    overflow: visible;
+    padding: 8px;
+  }
+
+  .dock-empty-tab {
+    margin: 10px;
   }
 
   .inspector-head {
@@ -4264,6 +5596,9 @@
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     flex-shrink: 0;
+    position: sticky;
+    top: 40px;
+    z-index: 5;
     padding: 5px;
     gap: 3px;
     border-bottom: 1px solid #2A2A2A;
@@ -4297,7 +5632,7 @@
   .inspector-content {
     min-height: 0;
     max-height: none;
-    overflow-y: auto;
+    overflow: visible;
     padding: 8px;
   }
 
@@ -4316,6 +5651,15 @@
     margin-bottom: 8px;
     color: #8DBFE5;
     font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .dock-section-subtitle {
+    margin: 9px 0 2px;
+    color: #7F929F;
+    font-size: 9px;
     font-weight: 900;
     letter-spacing: 0.04em;
     text-transform: uppercase;
@@ -4405,8 +5749,17 @@
     margin-top: 8px;
   }
 
+  .pivot-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+  }
+
   .dock-button-grid button,
   .align-grid button,
+  .pivot-actions button,
   .segmented button {
     display: inline-grid;
     grid-auto-flow: column;
@@ -4431,6 +5784,7 @@
 
   .dock-button-grid button:hover:not(:disabled),
   .align-grid button:hover,
+  .pivot-actions button:hover:not(:disabled),
   .segmented button:hover,
   .segmented button.active {
     border-color: #5B9BD5;
@@ -4444,7 +5798,20 @@
     color: #FFE8E8;
   }
 
+  .pivot-actions span {
+    min-width: 0;
+    max-width: 92px;
+    overflow: hidden;
+    color: #8394A0;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: right;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
   .dock-button-grid button:disabled,
+  .pivot-actions button:disabled,
   .dock-field input:disabled,
   .dock-field select:disabled,
   .paint-grid input:disabled {
@@ -4564,37 +5931,212 @@
       inset 0 0 0 1px rgba(229, 160, 41, 0.36);
   }
 
+  .list-row.kit-row {
+    color: #D9EAF4;
+  }
+
+  .list-row.kit-row.selected {
+    background: #18333A;
+    color: #F2FCFF;
+    box-shadow:
+      inset 3px 0 0 #14B8A6,
+      inset 0 0 0 1px rgba(20, 184, 166, 0.34);
+  }
+
+  .list-row.generated-group-row {
+    color: #F1D8A1;
+    background: #191710;
+  }
+
+  .list-row.generated-group-row:hover {
+    background: #242017;
+  }
+
+  .list-row.generated-group-row.collapsed {
+    background: #151512;
+  }
+
   .list-row.pulse {
     animation: row-pulse 720ms ease-out;
   }
 
-  .row-dot {
-    grid-row: 1 / span 2;
-    align-self: center;
-    width: 7px;
-    height: 7px;
-    border-radius: 999px;
-    background: #5B9BD5;
-  }
-
-  .zone-row .row-dot,
-  .list-row.generated .row-dot {
-    background: #E5A029;
-  }
-
   .row-main {
     display: grid;
-    grid-template-columns: 9px minmax(0, 1fr);
-    grid-template-rows: auto auto;
-    column-gap: 7px;
+    grid-template-columns: 46px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 9px;
     min-width: 0;
-    padding: 7px 9px;
+    padding: 6px 8px;
     border: 0;
     background: transparent;
     color: inherit;
     cursor: pointer;
     text-align: left;
     font: inherit;
+  }
+
+  .layer-thumb {
+    position: relative;
+    width: 42px;
+    height: 30px;
+    overflow: hidden;
+    border: 1px solid #31404A;
+    border-radius: 4px;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+      #0C1217;
+    background-size: 7px 7px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  }
+
+  .kit-thumb {
+    display: grid;
+    place-items: center;
+  }
+
+  .kit-thumb.horizontal .kit-thumb-ring,
+  .kit-thumb.vertical .kit-thumb-ring {
+    border: 0 !important;
+    border-radius: 999px !important;
+    background: #5B9BD5 !important;
+  }
+
+  .kit-thumb.horizontal .kit-thumb-ring {
+    width: 28px !important;
+    height: 3px !important;
+  }
+
+  .kit-thumb.vertical .kit-thumb-ring {
+    width: 3px !important;
+    height: 22px !important;
+  }
+
+  .kit-thumb.horizontal .kit-thumb-pointer {
+    width: 3px !important;
+    height: 18px !important;
+    transform: none !important;
+  }
+
+  .kit-thumb.vertical .kit-thumb-pointer {
+    width: 18px !important;
+    height: 3px !important;
+    transform: none !important;
+  }
+
+  .kit-thumb-ring {
+    width: 20px;
+    height: 20px;
+    border: 3px solid #5B9BD5;
+    border-right-color: #14B8A6;
+    border-radius: 999px;
+  }
+
+  .kit-thumb-pointer {
+    position: absolute;
+    width: 4px;
+    height: 14px;
+    border-radius: 99px;
+    background: #EAF6FF;
+    transform: translateY(-4px) rotate(-35deg);
+    transform-origin: 50% 100%;
+  }
+
+  .generated-group-thumb {
+    display: grid;
+    place-items: center;
+    border-color: #6E5A2E;
+    background:
+      linear-gradient(90deg, rgba(229, 192, 107, 0.18) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(229, 192, 107, 0.18) 1px, transparent 1px),
+      #16140E;
+    background-size: 8px 8px;
+  }
+
+  .generated-group-thumb span {
+    width: 23px;
+    height: 15px;
+    border: 1px dashed #E5C06B;
+    border-radius: 3px;
+    box-shadow:
+      5px 4px 0 rgba(229, 192, 107, 0.16),
+      -5px -4px 0 rgba(229, 192, 107, 0.12);
+  }
+
+  .layer-thumb-shape,
+  .zone-thumb-shape {
+    position: absolute;
+    display: grid;
+    place-items: center;
+    min-width: 4px;
+    min-height: 4px;
+    border: 1px solid #5B9BD5;
+    color: #0A1116;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+  }
+
+  .layer-thumb-shape.text {
+    background: #E8F3FA !important;
+    border-color: #8FA4B0 !important;
+  }
+
+  .layer-thumb-shape.arc {
+    background: transparent !important;
+    border-width: 3px;
+    border-left-color: transparent !important;
+  }
+
+  .layer-thumb-shape.capsule {
+    border-radius: 999px !important;
+  }
+
+  .zone-thumb {
+    border-color: rgba(229, 160, 41, 0.42);
+    background:
+      linear-gradient(90deg, rgba(229, 160, 41, 0.07) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(229, 160, 41, 0.07) 1px, transparent 1px),
+      #11120E;
+    background-size: 7px 7px;
+  }
+
+  .zone-thumb-shape {
+    border: 1px dashed #E5A029;
+    background: rgba(229, 160, 41, 0.16);
+  }
+
+  .row-text {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .row-badge {
+    justify-self: end;
+    max-width: 58px;
+    overflow: hidden;
+    padding: 2px 5px;
+    border: 1px solid #2F404B;
+    border-radius: 4px;
+    background: #10181E;
+    color: #8FA4B0;
+    font-size: 8px;
+    font-weight: 900;
+    line-height: 1.2;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .row-badge.zone {
+    border-color: rgba(229, 160, 41, 0.34);
+    color: #E5A029;
+  }
+
+  .row-badge.kit {
+    border-color: rgba(20, 184, 166, 0.38);
+    color: #52D7CA;
   }
 
   .row-actions {
@@ -4628,6 +6170,17 @@
     border-color: #5B9BD5;
     background: rgba(91, 155, 213, 0.18);
     color: #EAF5FF;
+  }
+
+  .row-actions button:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+  }
+
+  .row-actions button:disabled:hover {
+    border-color: transparent;
+    background: transparent;
+    color: #AFC5D8;
   }
 
   .row-actions button.selected {
@@ -4723,6 +6276,13 @@
     cursor: crosshair;
   }
 
+  .designer-live-preview {
+    position: absolute;
+    inset: 0;
+    z-index: 5200;
+    background: transparent;
+  }
+
   .draw-capture {
     position: absolute;
     inset: 0;
@@ -4769,7 +6329,7 @@
     z-index: 1850;
     display: grid;
     grid-template-columns: 46px 1fr;
-    grid-template-rows: 24px 1fr;
+    grid-template-rows: 28px 24px 1fr;
     overflow: hidden;
     border: 1px solid #344653;
     border-radius: 4px;
@@ -4777,6 +6337,36 @@
     box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
     color: #D9E7F0;
     user-select: none;
+  }
+
+  .arp-tool-strip {
+    grid-column: 1 / 3;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    padding: 4px;
+    border-bottom: 1px solid #2D3A43;
+    background: #12191F;
+  }
+
+  .arp-tool-strip button {
+    min-width: 0;
+    border: 1px solid #2E3C46;
+    border-radius: 3px;
+    background: #1B252C;
+    color: #AFC0CB;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: capitalize;
+  }
+
+  .arp-tool-strip button.active,
+  .arp-tool-strip button:hover {
+    border-color: #5B9BD5;
+    background: #173449;
+    color: #FFFFFF;
   }
 
   .arp-ruler {
@@ -4967,14 +6557,6 @@
     border-color: transparent;
   }
 
-  .part-bound.bounds-hidden > .selection-label {
-    opacity: 0;
-  }
-
-  .part-bound.arp-muted > .selection-label {
-    opacity: 0;
-  }
-
   .part-bound.bounds-hidden:hover {
     border-color: rgba(91, 155, 213, 0.42);
   }
@@ -4982,6 +6564,21 @@
   .part-bound.generated {
     border-style: dotted;
     border-color: rgba(229, 160, 41, 0.72);
+  }
+
+  .part-bound.kit-bound {
+    border: 2px solid #14B8A6;
+    color: #DFFFFB;
+    background: rgba(20, 184, 166, 0.04);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.56),
+      0 0 0 4px rgba(20, 184, 166, 0.15),
+      0 0 18px rgba(20, 184, 166, 0.24);
+  }
+
+  .part-bound.kit-bound > .selection-label {
+    background: rgba(12, 54, 50, 0.96);
+    color: #E6FFFB;
   }
 
   .part-bound.selected {
@@ -5025,27 +6622,54 @@
     border-color: #5B9BD5;
   }
 
-  .part-bound.bounds-hidden.selected > .selection-label,
-  .part-bound.bounds-hidden:hover > .selection-label {
-    opacity: 1;
-  }
-
   .part-bound > .selection-label,
   .hit-zone > .selection-label {
     position: absolute;
-    left: 3px;
-    top: -17px;
-    max-width: 140px;
+    display: none;
+    left: -1px;
+    top: -6px;
+    z-index: 12;
+    max-width: min(180px, max(120px, 100%));
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: rgba(20, 38, 53, 0.94);
+    padding: 3px 8px;
+    border: 1px solid rgba(125, 196, 243, 0.32);
+    border-radius: 4px;
+    background: rgba(12, 23, 31, 0.96);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.38);
     color: #DDEEFF;
-    font-size: 9px;
-    line-height: 1.2;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.1;
+    opacity: 0;
     pointer-events: none;
+    transform: translateY(calc(-100% - 6px));
+    transition:
+      opacity 90ms ease,
+      transform 90ms ease;
+  }
+
+  .part-bound:hover > .selection-label,
+  .part-bound:focus-visible > .selection-label,
+  .part-bound.selected > .selection-label,
+  .part-bound.primary > .selection-label,
+  .part-bound.pulse > .selection-label,
+  .hit-zone:hover > .selection-label,
+  .hit-zone:focus-visible > .selection-label,
+  .hit-zone.selected > .selection-label,
+  .hit-zone.pulse > .selection-label {
+    opacity: 1;
+    transform: translateY(calc(-100% - 8px));
+  }
+
+  .part-bound.arp-muted > .selection-label {
+    opacity: 0;
+  }
+
+  .part-bound.generated:not(.generated-labels-hidden) > .selection-label {
+    opacity: 1;
+    transform: translateY(calc(-100% - 8px));
   }
 
   .part-bound > .resize-handle,
@@ -5145,10 +6769,6 @@
     opacity: 0.55;
   }
 
-  .hit-zone.dimmed > .selection-label {
-    opacity: 0.42;
-  }
-
   .hit-zone.selected {
     border-width: 2px;
     background: rgba(229, 160, 41, 0.24);
@@ -5160,6 +6780,7 @@
 
   .hit-zone > .selection-label {
     background: rgba(73, 49, 12, 0.96);
+    border-color: rgba(229, 160, 41, 0.38);
     color: #FFE6B2;
   }
 
@@ -5177,6 +6798,7 @@
 
   .multi-selection-bound span {
     position: absolute;
+    display: none;
     left: 0;
     top: -20px;
     padding: 2px 6px;
@@ -5186,6 +6808,50 @@
     font-size: 9px;
     font-weight: 800;
     white-space: nowrap;
+  }
+
+  .surface-name-tray {
+    position: absolute;
+    left: 0;
+    top: -36px;
+    z-index: 2620;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    max-width: max(240px, 100%);
+    overflow: hidden;
+    padding: 5px 6px;
+    border: 1px solid rgba(125, 196, 243, 0.34);
+    border-radius: 5px;
+    background: rgba(12, 23, 31, 0.96);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.42);
+    color: #DDEEFF;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .surface-name-tray span {
+    min-width: 0;
+    max-width: 150px;
+    overflow: hidden;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: rgba(125, 196, 243, 0.12);
+    color: #DDEEFF;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1.1;
+    text-overflow: ellipsis;
+  }
+
+  .surface-name-tray span.hit-zone-label {
+    background: rgba(229, 160, 41, 0.14);
+    color: #FFE6B2;
+  }
+
+  .surface-name-tray span.kit-label {
+    background: rgba(20, 184, 166, 0.16);
+    color: #DFFFFA;
   }
 
   .inline-text-editor {
@@ -5201,12 +6867,19 @@
 
   .selection-quickbar {
     position: absolute;
+    right: 16px;
+    bottom: 14px;
+    left: auto;
+    top: auto;
     z-index: 2420;
     display: inline-flex;
     align-items: center;
-    gap: 3px;
-    height: 27px;
-    padding: 2px 4px;
+    gap: 4px;
+    width: max-content;
+    max-width: calc(100% - 32px);
+    height: 31px;
+    margin: 0;
+    padding: 3px 5px;
     border: 1px solid rgba(91, 155, 213, 0.62);
     border-radius: 4px;
     background: rgba(13, 18, 23, 0.94);
@@ -5215,6 +6888,20 @@
 
   .selection-quickbar.zone-tools {
     border-color: rgba(229, 160, 41, 0.64);
+  }
+
+  .quickbar-label {
+    max-width: 72px;
+    overflow: hidden;
+    padding: 0 7px 0 4px;
+    border-right: 1px solid rgba(255, 255, 255, 0.11);
+    color: #9EB2BE;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
+    text-overflow: ellipsis;
+    text-transform: uppercase;
+    white-space: nowrap;
   }
 
   .selection-quickbar button {
@@ -5390,5 +7077,733 @@
     justify-content: center;
     color: #777;
     font-size: 12px;
+  }
+
+  /* Affinity-style workspace pass: keep the existing editor logic, but make
+     the space read as a dedicated graphical component designer. */
+  .surface-shell {
+    min-height: 0;
+    height: 100%;
+    border: 0;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(20, 184, 166, 0.09), transparent 34%),
+      linear-gradient(180deg, #111820 0%, #0F151B 100%);
+    color: #C9D6DF;
+  }
+
+  .surface-shell:focus-within {
+    border-color: transparent;
+  }
+
+  .surface-options-strip {
+    justify-content: center;
+    min-height: 31px;
+    padding: 3px 8px;
+    background: linear-gradient(180deg, #172027, #11181F);
+    border-bottom-color: #26313A;
+    scrollbar-width: thin;
+  }
+
+  .surface-options-strip label,
+  .surface-options-strip button,
+  .zone-mode-control {
+    height: 24px;
+    border-color: #2D3A44;
+    border-radius: 4px;
+    background: #18232B;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035);
+  }
+
+  .surface-options-strip .surface-command.accent {
+    border-color: rgba(20, 184, 166, 0.54);
+    color: #BFFAF2;
+  }
+
+  .surface-options-strip input[type='range'],
+  .surface-options-strip input[type='checkbox'] {
+    accent-color: #14B8A6;
+  }
+
+  .surface-body {
+    grid-template-columns: 52px 220px minmax(420px, 1fr) clamp(340px, 25vw, 430px);
+    background: #0E141A;
+  }
+
+  .tool-strip {
+    gap: 8px;
+    padding: 12px 7px;
+    background: linear-gradient(180deg, #111A21, #0E141A);
+    border-right: 1px solid #26313A;
+  }
+
+  .tool-strip button {
+    width: 38px;
+    height: 38px;
+    border-color: #32414B;
+    background: #172229;
+    color: #D8E6EE;
+  }
+
+  .tool-strip button:hover,
+  .tool-strip button.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.18);
+    box-shadow:
+      0 0 0 1px rgba(20, 184, 166, 0.22),
+      0 8px 18px rgba(20, 184, 166, 0.08);
+  }
+
+  .tool-flyout {
+    border-color: #31434F;
+    background: #111A21;
+  }
+
+  .tool-icon.rectangle::before,
+  .tool-icon.roundedRectangle::before,
+  .tool-icon.capsule::before,
+  .tool-icon.text::before,
+  .tool-icon.ellipse::before,
+  .tool-icon.ring::before,
+  .tool-icon.arcTrack::before {
+    border-color: #DCEBFA;
+  }
+
+  .tool-icon.text::after {
+    color: #DCEBFA;
+  }
+
+  .palette-panel {
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 12px 16px;
+    background:
+      linear-gradient(180deg, rgba(28, 40, 49, 0.96), rgba(15, 22, 28, 0.96)),
+      #111920;
+    border-right: 1px solid #2A3741;
+    box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.025);
+    scrollbar-width: thin;
+  }
+
+  .palette-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    color: #E7F2F7;
+  }
+
+  .palette-header strong {
+    font-size: 12px;
+    font-weight: 800;
+  }
+
+  .palette-header span {
+    color: #93A5B1;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .palette-group {
+    display: grid;
+    gap: 8px;
+    padding: 0 0 13px;
+    margin-bottom: 13px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
+  }
+
+  .palette-group > span {
+    color: #8FA4B0;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .palette-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 7px;
+  }
+
+  .palette-grid.compact,
+  .palette-grid.brush-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .palette-grid button {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    height: 31px;
+    border: 1px solid #303F49;
+    border-radius: 4px;
+    background: #1C2831;
+    color: #DCEBFA;
+    cursor: pointer;
+  }
+
+  .palette-grid button:hover,
+  .palette-grid button.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.18);
+    color: #F3FFFD;
+  }
+
+  .palette-grid button:disabled,
+  .palette-swatch-row input:disabled,
+  .palette-slider input:disabled,
+  .palette-corner input:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+
+  .palette-glyph {
+    position: relative;
+    display: block;
+    width: 18px;
+    height: 18px;
+  }
+
+  .palette-glyph.dial {
+    border: 2px solid #DCEBFA;
+    border-radius: 999px;
+  }
+
+  .palette-glyph.dial::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 2px;
+    width: 2px;
+    height: 8px;
+    border-radius: 999px;
+    background: #14B8A6;
+  }
+
+  .palette-glyph.hscale::before,
+  .palette-glyph.vscale::before {
+    content: '';
+    position: absolute;
+    border-radius: 999px;
+    background: #DCEBFA;
+  }
+
+  .palette-glyph.hscale::before {
+    left: 1px;
+    right: 1px;
+    top: 8px;
+    height: 2px;
+  }
+
+  .palette-glyph.vscale::before {
+    top: 1px;
+    bottom: 1px;
+    left: 8px;
+    width: 2px;
+  }
+
+  .palette-glyph.hscale::after,
+  .palette-glyph.vscale::after {
+    content: '';
+    position: absolute;
+    background:
+      linear-gradient(90deg, #14B8A6 0 2px, transparent 2px 6px, #14B8A6 6px 8px, transparent 8px 12px, #14B8A6 12px 14px);
+  }
+
+  .palette-glyph.hscale::after {
+    left: 2px;
+    top: 12px;
+    width: 14px;
+    height: 5px;
+  }
+
+  .palette-glyph.vscale::after {
+    left: 1px;
+    top: 2px;
+    width: 5px;
+    height: 14px;
+    transform: rotate(90deg);
+  }
+
+  .palette-glyph.grid {
+    background:
+      linear-gradient(90deg, transparent 32%, #DCEBFA 32% 40%, transparent 40% 62%, #DCEBFA 62% 70%, transparent 70%),
+      linear-gradient(0deg, transparent 32%, #DCEBFA 32% 40%, transparent 40% 62%, #DCEBFA 62% 70%, transparent 70%);
+    border: 1px solid #DCEBFA;
+  }
+
+  .brush-preview {
+    display: block;
+    width: 24px;
+    height: 3px;
+    border-radius: 999px;
+    background: #DCEBFA;
+    transform: rotate(-20deg);
+  }
+
+  .brush-preview.soft {
+    height: 5px;
+    opacity: 0.8;
+  }
+
+  .brush-preview.bold {
+    height: 7px;
+    background: #8FA4B0;
+  }
+
+  .palette-slider,
+  .palette-swatch-row,
+  .palette-corner {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-height: 30px;
+    color: #9FB2BF;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .palette-slider input {
+    min-width: 0;
+    accent-color: #14B8A6;
+  }
+
+  .palette-swatch-row input[type='color'] {
+    width: 30px;
+    height: 24px;
+    padding: 0;
+    border: 1px solid #0A0E12;
+    border-radius: 4px;
+    background: transparent;
+  }
+
+  .palette-swatch-row code,
+  .palette-swatch-row strong,
+  .palette-slider strong,
+  .palette-corner strong {
+    min-width: 0;
+    color: #DFEAF0;
+    font: inherit;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .palette-corner input {
+    width: 60px;
+    height: 28px;
+    border: 1px solid #34444F;
+    border-radius: 4px;
+    background: #0D1419;
+    color: #E8EEF5;
+    font: inherit;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .surface-scroll {
+    background:
+      linear-gradient(90deg, rgba(126, 151, 164, 0.055) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(126, 151, 164, 0.055) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(20, 184, 166, 0.11) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(20, 184, 166, 0.11) 1px, transparent 1px),
+      radial-gradient(circle at center, rgba(41, 61, 72, 0.32), transparent 56%),
+      #0D1318;
+    background-size:
+      var(--surface-grid-size, 20px) var(--surface-grid-size, 20px),
+      var(--surface-grid-size, 20px) var(--surface-grid-size, 20px),
+      calc(var(--surface-grid-size, 20px) * 10) calc(var(--surface-grid-size, 20px) * 10),
+      calc(var(--surface-grid-size, 20px) * 10) calc(var(--surface-grid-size, 20px) * 10),
+      auto,
+      auto;
+    scrollbar-width: thin;
+  }
+
+  .surface-pad {
+    padding: 96px 112px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .artboard {
+    border-radius: 8px;
+    background:
+      radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.055), transparent 38%),
+      #10161B;
+    box-shadow:
+      0 0 0 1px rgba(20, 184, 166, 0.72),
+      0 0 0 8px rgba(20, 184, 166, 0.035),
+      0 28px 72px rgba(0, 0, 0, 0.5);
+  }
+
+  .part-bound.selected {
+    border-color: #14B8A6;
+    box-shadow:
+      0 0 0 1px rgba(236, 255, 251, 0.82),
+      0 0 0 5px rgba(20, 184, 166, 0.18),
+      0 0 22px rgba(20, 184, 166, 0.22);
+  }
+
+  .resize-handle,
+  .rotate-handle,
+  .arc-handle {
+    border-color: #DAFFFA;
+    background: #14B8A6;
+  }
+
+  .selection-quickbar {
+    height: 31px;
+    padding: 3px 5px;
+    border-color: #34444F;
+    background: rgba(20, 27, 33, 0.96);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38);
+  }
+
+  .surface-dock {
+    border-left: 1px solid #2A3741;
+    background:
+      linear-gradient(180deg, rgba(23, 33, 41, 0.98), rgba(13, 19, 25, 0.98)),
+      #121A21;
+  }
+
+  .list-header,
+  .inspector-head {
+    background: #172129;
+    border-bottom-color: #2A3741;
+  }
+
+  .dock-tab-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 2px;
+    border: 1px solid #2C3A44;
+    border-radius: 5px;
+    background: #10181E;
+  }
+
+  .dock-tab-row button {
+    height: 23px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: #7F929F;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .dock-tab-row button.active,
+  .dock-tab-row button:hover {
+    background: rgba(20, 184, 166, 0.16);
+    color: #DFFFFA;
+  }
+
+  .list-header span,
+  .dock-section-title,
+  .dock-section-subtitle,
+  .inspector-tabs button.active {
+    color: #8FEDE3;
+  }
+
+  .dock-add-strip,
+  .inspector-tabs {
+    background: #111A21;
+    border-bottom-color: #24313A;
+  }
+
+  .dock-add-strip button,
+  .dock-button-grid button,
+  .align-grid button,
+  .pivot-actions button,
+  .segmented button {
+    border-color: #303F49;
+    background: #1B2730;
+  }
+
+  .dock-add-strip button:hover,
+  .dock-button-grid button:hover:not(:disabled),
+  .align-grid button:hover,
+  .pivot-actions button:hover:not(:disabled),
+  .segmented button:hover,
+  .segmented button.active,
+  .inspector-tabs button:hover,
+  .inspector-tabs button.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.17);
+    color: #F0FFFC;
+  }
+
+  .list-row {
+    min-height: 54px;
+    border-bottom-color: #222D35;
+  }
+
+  .list-row:hover {
+    background: #18252D;
+  }
+
+  .list-row.selected {
+    background: linear-gradient(90deg, rgba(20, 184, 166, 0.28), rgba(20, 184, 166, 0.13));
+    box-shadow:
+      inset 3px 0 0 #14B8A6,
+      inset 0 0 0 1px rgba(20, 184, 166, 0.28);
+  }
+
+  .layer-thumb {
+    border-color: #344650;
+    background-color: #0B1116;
+  }
+
+  .list-row.selected .layer-thumb {
+    border-color: #14B8A6;
+    box-shadow:
+      inset 0 0 0 1px rgba(20, 184, 166, 0.24),
+      0 0 14px rgba(20, 184, 166, 0.12);
+  }
+
+  .row-badge {
+    border-color: #31404A;
+    background: rgba(13, 20, 25, 0.92);
+  }
+
+  .inspector-pane,
+  .dock-section {
+    background: #141E25;
+  }
+
+  .dock-section {
+    border-color: #2A3741;
+    border-radius: 6px;
+  }
+
+  .dock-field input,
+  .dock-field select,
+  .dock-number-grid input,
+  .paint-grid input {
+    border-color: #33434E;
+    background: #0D1419;
+  }
+
+  .dock-field input[type='checkbox'],
+  .dock-field input[type='range'] {
+    accent-color: #14B8A6;
+  }
+
+  .state-filmstrip {
+    display: grid;
+    grid-template-columns: 72px minmax(0, 1fr);
+    align-items: stretch;
+    min-height: 86px;
+    border-top: 1px solid #2A3741;
+    background: linear-gradient(180deg, #151E25, #10171D);
+  }
+
+  .state-title {
+    display: grid;
+    align-content: center;
+    gap: 4px;
+    align-items: center;
+    padding: 0 14px;
+    border-right: 1px solid #2A3741;
+    color: #D8E6EE;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .state-title strong,
+  .state-title span {
+    display: block;
+  }
+
+  .state-title span {
+    width: max-content;
+    min-width: 24px;
+    padding: 2px 6px;
+    border: 1px solid #31404A;
+    border-radius: 999px;
+    background: #10181E;
+    color: #8FEDE3;
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .state-chip-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    overflow-x: auto;
+    padding: 9px 12px;
+  }
+
+  .state-card {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) 22px;
+    flex: 0 0 160px;
+    height: 68px;
+    overflow: hidden;
+    border: 1px solid #2E3B45;
+    border-radius: 6px;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--state-accent) 12%, #1A252D), #141D24 62%),
+      #1A252D;
+    color: #C9D6DF;
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--state-accent) 82%, #FFFFFF);
+  }
+
+  .state-card.active {
+    border-color: var(--state-accent);
+    box-shadow:
+      inset 3px 0 0 var(--state-accent),
+      inset 0 0 0 1px color-mix(in srgb, var(--state-accent) 34%, transparent),
+      0 0 18px color-mix(in srgb, var(--state-accent) 16%, transparent);
+  }
+
+  .state-main {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 7px 8px 5px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .state-thumb {
+    position: relative;
+    width: 46px;
+    height: 32px;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--state-accent) 46%, #31404A);
+    border-radius: 4px;
+    background:
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      #0B1116;
+    background-size: 7px 7px;
+  }
+
+  .state-preview-stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .state-copy {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .state-count {
+    align-self: start;
+    padding: 2px 5px;
+    border: 1px solid color-mix(in srgb, var(--state-accent) 34%, #2E3B45);
+    border-radius: 999px;
+    background: rgba(8, 13, 17, 0.48);
+    color: color-mix(in srgb, var(--state-accent) 72%, #FFFFFF);
+    font-size: 8px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .state-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 7px 6px 57px;
+  }
+
+  .state-actions button {
+    height: 18px;
+    padding: 0 6px;
+    border: 1px solid #33434E;
+    border-radius: 3px;
+    background: rgba(11, 17, 22, 0.62);
+    color: #9FB2BF;
+    cursor: pointer;
+    font: inherit;
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .state-actions button:hover {
+    border-color: var(--state-accent);
+    color: #F0FFFC;
+  }
+
+  .state-actions button.danger:hover {
+    border-color: #E26D6D;
+    color: #FFD2D2;
+  }
+
+  .state-chip-row button.add-state {
+    flex: 0 0 44px;
+    min-width: 44px;
+    height: 68px;
+    place-items: center;
+    border: 1px solid #2E3B45;
+    border-radius: 6px;
+    background: #172129;
+    color: #8FEDE3;
+    cursor: pointer;
+    font-size: 20px;
+    font-weight: 300;
+  }
+
+  .state-copy strong,
+  .state-copy em {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .state-copy strong {
+    color: #F2F8FB;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .state-copy em {
+    color: #8FA4B0;
+    font-size: 10px;
+    font-style: normal;
+  }
+
+  @media (max-width: 1380px) {
+    .surface-body {
+      grid-template-columns: 52px 176px minmax(300px, 1fr) 330px;
+    }
+
+    .palette-panel {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .palette-grid {
+      gap: 5px;
+    }
+  }
+
+  @media (max-width: 920px) {
+    .surface-body {
+      grid-template-columns: 52px minmax(0, 1fr) 318px;
+    }
+
+    .palette-panel {
+      display: none;
+    }
   }
 </style>

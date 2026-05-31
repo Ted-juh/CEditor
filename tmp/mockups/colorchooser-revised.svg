@@ -1,0 +1,288 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1728" height="1000" viewBox="0 0 1728 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0b1418"/>
+      <stop offset="1" stop-color="#132027"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#18242b"/>
+      <stop offset="1" stop-color="#10191f"/>
+    </linearGradient>
+    <linearGradient id="fieldHue" x1="0" x2="1">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="1" stop-color="#11c7c3"/>
+    </linearGradient>
+    <linearGradient id="fieldShade" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000"/>
+    </linearGradient>
+    <linearGradient id="hueBand" x1="0" x2="1">
+      <stop offset="0" stop-color="#f33"/>
+      <stop offset=".16" stop-color="#ff0"/>
+      <stop offset=".33" stop-color="#0f0"/>
+      <stop offset=".5" stop-color="#0ff"/>
+      <stop offset=".66" stop-color="#00f"/>
+      <stop offset=".83" stop-color="#f0f"/>
+      <stop offset="1" stop-color="#f33"/>
+    </linearGradient>
+    <linearGradient id="satBand" x1="0" x2="1">
+      <stop offset="0" stop-color="#87969b"/>
+      <stop offset="1" stop-color="#14b8b4"/>
+    </linearGradient>
+    <linearGradient id="brightBand" x1="0" x2="1">
+      <stop offset="0" stop-color="#000"/>
+      <stop offset=".5" stop-color="#0c7775"/>
+      <stop offset="1" stop-color="#18e5df"/>
+    </linearGradient>
+    <pattern id="checker" width="18" height="18" patternUnits="userSpaceOnUse">
+      <rect width="18" height="18" fill="#dce5e8"/>
+      <rect width="9" height="9" fill="#a9b5ba"/>
+      <rect x="9" y="9" width="9" height="9" fill="#a9b5ba"/>
+    </pattern>
+    <linearGradient id="alphaBand" x1="0" x2="1">
+      <stop offset="0" stop-color="#14b8b4" stop-opacity="0"/>
+      <stop offset="1" stop-color="#14b8b4"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000" flood-opacity=".38"/>
+    </filter>
+    <style>
+      .bg { fill: url(#bg); }
+      .top { fill: #0a1115; }
+      .bar { fill: #121c22; stroke: #24343d; stroke-width: 1; }
+      .panel { fill: url(#panel); stroke: #263840; stroke-width: 1; }
+      .sub { fill: #111b21; stroke: #263840; stroke-width: 1; }
+      .chip { fill: #16242b; stroke: #30434d; stroke-width: 1; }
+      .chipOn { fill: #12383a; stroke: #18c8c2; stroke-width: 1.4; }
+      .field { fill: #0d161b; stroke: #31454f; stroke-width: 1; }
+      .accent { fill: #14b8b4; }
+      .accent2 { fill: #f2a42b; }
+      .text { fill: #e7edf0; font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .muted { fill: #8d9ca3; font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .dim { fill: #5f7078; font-family: Inter, Segoe UI, Arial, sans-serif; }
+      .mono { font-family: "JetBrains Mono", Consolas, monospace; }
+      .small { font-size: 14px; }
+      .tiny { font-size: 12px; }
+      .label { font-size: 13px; letter-spacing: .04em; }
+      .h1 { font-size: 22px; font-weight: 650; }
+      .h2 { font-size: 16px; font-weight: 650; }
+      .btnText { font-size: 13px; font-weight: 600; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1728" height="1000"/>
+  <rect class="top" x="0" y="0" width="1728" height="48"/>
+  <circle cx="23" cy="24" r="7" fill="#ff5f57"/>
+  <circle cx="46" cy="24" r="7" fill="#ffbd2e"/>
+  <circle cx="69" cy="24" r="7" fill="#28c840"/>
+  <rect x="96" y="0" width="210" height="48" rx="8" fill="#131c22"/>
+  <text x="126" y="30" class="text small">Panel Canvas</text>
+  <rect x="308" y="0" width="246" height="48" rx="8" fill="#0d1419"/>
+  <text x="338" y="30" class="text small">Component Designer</text>
+
+  <rect x="0" y="48" width="1728" height="54" class="bar"/>
+  <text x="76" y="81" class="muted small">Panel</text>
+  <text x="127" y="81" class="dim small">›</text>
+  <text x="148" y="81" class="muted small">Display Studio</text>
+  <text x="250" y="81" class="dim small">›</text>
+  <text x="272" y="81" class="text small">Colors</text>
+  <rect x="1280" y="62" width="84" height="28" rx="4" class="chip"/>
+  <text x="1300" y="81" class="muted tiny">Preview</text>
+  <rect x="1376" y="62" width="96" height="28" rx="4" class="chipOn"/>
+  <text x="1404" y="81" class="text tiny">Live</text>
+  <rect x="1540" y="60" width="132" height="32" rx="4" fill="#0fb7ae"/>
+  <text x="1584" y="81" class="text btnText">Apply</text>
+
+  <rect x="0" y="102" width="64" height="818" fill="#10191f" stroke="#24343d"/>
+  <rect x="10" y="120" width="44" height="44" rx="6" class="chipOn"/>
+  <text x="24" y="147" class="text tiny">Col</text>
+  <rect x="10" y="174" width="44" height="44" rx="6" class="chip"/>
+  <text x="23" y="201" class="muted tiny">Grd</text>
+  <rect x="10" y="228" width="44" height="44" rx="6" class="chip"/>
+  <text x="25" y="255" class="muted tiny">Fx</text>
+  <rect x="10" y="282" width="44" height="44" rx="6" class="chip"/>
+  <text x="22" y="309" class="muted tiny">Nte</text>
+  <rect x="10" y="336" width="44" height="44" rx="6" class="chip"/>
+  <text x="23" y="363" class="muted tiny">Img</text>
+  <rect x="10" y="390" width="44" height="44" rx="6" class="chip"/>
+  <text x="23" y="417" class="muted tiny">Dev</text>
+  <rect x="10" y="444" width="44" height="44" rx="6" class="chip"/>
+  <text x="23" y="471" class="muted tiny">Con</text>
+
+  <rect x="88" y="126" width="1552" height="762" rx="10" class="panel" filter="url(#shadow)"/>
+  <text x="116" y="166" class="text h1">Revised Color Chooser</text>
+  <text x="116" y="190" class="muted small">Same power as the current Display Panel, reorganized around target, pick, refine, reuse.</text>
+
+  <rect x="116" y="214" width="1496" height="66" rx="6" class="sub"/>
+  <text x="138" y="240" class="muted label">TARGET</text>
+  <rect x="138" y="250" width="174" height="24" rx="4" class="chipOn"/>
+  <text x="158" y="267" class="text tiny">Selected Object</text>
+  <rect x="322" y="250" width="84" height="24" rx="4" class="chip"/>
+  <text x="347" y="267" class="muted tiny">Fill</text>
+  <rect x="414" y="250" width="92" height="24" rx="4" class="chip"/>
+  <text x="436" y="267" class="muted tiny">Stroke</text>
+  <rect x="514" y="250" width="84" height="24" rx="4" class="chip"/>
+  <text x="540" y="267" class="muted tiny">Text</text>
+  <rect x="608" y="250" width="128" height="24" rx="4" class="chip"/>
+  <text x="634" y="267" class="muted tiny">Theme Token</text>
+  <text x="790" y="266" class="muted tiny mono">binding: selected.parts.noteBlocks.fill</text>
+  <rect x="1336" y="238" width="108" height="28" rx="4" class="chipOn"/>
+  <text x="1364" y="257" class="text tiny">Live apply</text>
+  <rect x="1456" y="238" width="132" height="28" rx="4" class="chip"/>
+  <text x="1483" y="257" class="muted tiny">Lock alpha</text>
+
+  <rect x="116" y="304" width="514" height="548" rx="8" class="sub"/>
+  <text x="138" y="334" class="text h2">Pick</text>
+  <text x="138" y="356" class="muted small">2D field plus existing H / S / B / A bands</text>
+  <rect x="138" y="378" width="470" height="286" rx="5" fill="url(#fieldHue)" stroke="#41545d"/>
+  <rect x="138" y="378" width="470" height="286" rx="5" fill="url(#fieldShade)"/>
+  <circle cx="464" cy="512" r="11" fill="none" stroke="#fff" stroke-width="3"/>
+  <circle cx="464" cy="512" r="5" fill="#14b8b4" stroke="#071013" stroke-width="2"/>
+  <rect x="138" y="688" width="470" height="34" rx="4" fill="url(#hueBand)" stroke="#33474f"/>
+  <text x="152" y="710" class="text tiny">H</text>
+  <circle cx="407" cy="705" r="9" fill="#0d161b" stroke="#fff" stroke-width="2"/>
+  <rect x="138" y="734" width="470" height="34" rx="4" fill="url(#satBand)" stroke="#33474f"/>
+  <text x="152" y="756" class="text tiny">S</text>
+  <circle cx="565" cy="751" r="9" fill="#0d161b" stroke="#fff" stroke-width="2"/>
+  <rect x="138" y="780" width="470" height="34" rx="4" fill="url(#brightBand)" stroke="#33474f"/>
+  <text x="152" y="802" class="text tiny">B</text>
+  <circle cx="522" cy="797" r="9" fill="#0d161b" stroke="#fff" stroke-width="2"/>
+  <rect x="138" y="826" width="470" height="18" rx="4" fill="url(#checker)" stroke="#33474f"/>
+  <rect x="138" y="826" width="470" height="18" rx="4" fill="url(#alphaBand)"/>
+  <text x="152" y="840" class="text tiny">A</text>
+  <circle cx="565" cy="835" r="8" fill="#0d161b" stroke="#fff" stroke-width="2"/>
+
+  <rect x="654" y="304" width="358" height="548" rx="8" class="sub"/>
+  <text x="676" y="334" class="text h2">Refine</text>
+  <text x="676" y="356" class="muted small">Exact values, compare, and copy formats</text>
+  <rect x="676" y="382" width="148" height="84" rx="6" fill="url(#checker)" stroke="#34464f"/>
+  <rect x="676" y="382" width="148" height="84" rx="6" fill="#14b8b4"/>
+  <text x="697" y="494" class="muted tiny">Current</text>
+  <rect x="842" y="382" width="148" height="84" rx="6" fill="#0e151a" stroke="#34464f"/>
+  <text x="883" y="430" class="muted small">Previous</text>
+  <text x="879" y="494" class="muted tiny">Before edit</text>
+
+  <text x="676" y="532" class="muted label">NUMERIC</text>
+  <rect x="676" y="548" width="150" height="34" rx="4" class="field"/>
+  <text x="690" y="570" class="muted tiny">HEX</text>
+  <text x="742" y="570" class="text tiny mono">FF14B8B4</text>
+  <rect x="842" y="548" width="148" height="34" rx="4" class="field"/>
+  <text x="856" y="570" class="muted tiny">RGB</text>
+  <text x="904" y="570" class="text tiny mono">20 184 180</text>
+  <rect x="676" y="592" width="150" height="34" rx="4" class="field"/>
+  <text x="690" y="614" class="muted tiny">HSL</text>
+  <text x="742" y="614" class="text tiny mono">179 80 40</text>
+  <rect x="842" y="592" width="148" height="34" rx="4" class="field"/>
+  <text x="856" y="614" class="muted tiny">A</text>
+  <text x="904" y="614" class="text tiny mono">100%</text>
+  <text x="676" y="662" class="muted label">STEP SIZE</text>
+  <rect x="676" y="678" width="54" height="28" rx="4" class="chip"/>
+  <text x="696" y="696" class="muted tiny">1%</text>
+  <rect x="738" y="678" width="54" height="28" rx="4" class="chipOn"/>
+  <text x="758" y="696" class="text tiny">5%</text>
+  <rect x="800" y="678" width="62" height="28" rx="4" class="chip"/>
+  <text x="817" y="696" class="muted tiny">10%</text>
+  <rect x="870" y="678" width="62" height="28" rx="4" class="chip"/>
+  <text x="887" y="696" class="muted tiny">25%</text>
+
+  <text x="676" y="744" class="muted label">FORMAT COPY</text>
+  <rect x="676" y="760" width="68" height="28" rx="4" class="chipOn"/>
+  <text x="696" y="778" class="text tiny">HEX</text>
+  <rect x="752" y="760" width="68" height="28" rx="4" class="chip"/>
+  <text x="772" y="778" class="muted tiny">RGB</text>
+  <rect x="828" y="760" width="68" height="28" rx="4" class="chip"/>
+  <text x="846" y="778" class="muted tiny">RGBA</text>
+  <rect x="904" y="760" width="68" height="28" rx="4" class="chip"/>
+  <text x="925" y="778" class="muted tiny">HSL</text>
+  <rect x="676" y="804" width="314" height="28" rx="4" class="field"/>
+  <text x="694" y="822" class="text tiny mono">copied: #14B8B4</text>
+
+  <rect x="1036" y="304" width="552" height="548" rx="8" class="sub"/>
+  <text x="1058" y="334" class="text h2">Reuse and Validate</text>
+  <text x="1058" y="356" class="muted small">Existing actions plus better palettes and feedback</text>
+
+  <text x="1058" y="396" class="muted label">HARMONY</text>
+  <rect x="1058" y="414" width="92" height="30" rx="4" class="chip"/>
+  <text x="1077" y="434" class="muted tiny">Complement</text>
+  <rect x="1158" y="414" width="86" height="30" rx="4" class="chipOn"/>
+  <text x="1181" y="434" class="text tiny">Triadic</text>
+  <rect x="1252" y="414" width="92" height="30" rx="4" class="chip"/>
+  <text x="1269" y="434" class="muted tiny">Analogous</text>
+  <rect x="1352" y="414" width="108" height="30" rx="4" class="chip"/>
+  <text x="1373" y="434" class="muted tiny">Split comp</text>
+  <circle cx="1076" cy="478" r="18" fill="#14b8b4"/>
+  <circle cx="1126" cy="478" r="18" fill="#b814b8"/>
+  <circle cx="1176" cy="478" r="18" fill="#b8b414"/>
+  <circle cx="1226" cy="478" r="18" fill="#1468b8"/>
+  <rect x="1280" y="462" width="132" height="32" rx="4" class="chip"/>
+  <text x="1303" y="483" class="muted tiny">Add as palette</text>
+
+  <text x="1058" y="540" class="muted label">QUICK ACTIONS</text>
+  <rect x="1058" y="558" width="76" height="28" rx="4" class="chip"/>
+  <text x="1077" y="576" class="muted tiny">Lighten</text>
+  <rect x="1142" y="558" width="76" height="28" rx="4" class="chip"/>
+  <text x="1160" y="576" class="muted tiny">Darken</text>
+  <rect x="1226" y="558" width="84" height="28" rx="4" class="chip"/>
+  <text x="1242" y="576" class="muted tiny">Saturate</text>
+  <rect x="1318" y="558" width="96" height="28" rx="4" class="chip"/>
+  <text x="1336" y="576" class="muted tiny">Desaturate</text>
+  <rect x="1422" y="558" width="64" height="28" rx="4" class="chip"/>
+  <text x="1439" y="576" class="muted tiny">Invert</text>
+
+  <text x="1058" y="630" class="muted label">OPACITY PRESETS</text>
+  <rect x="1058" y="648" width="56" height="28" rx="4" class="chip"/>
+  <text x="1075" y="666" class="muted tiny">0</text>
+  <rect x="1122" y="648" width="56" height="28" rx="4" class="chip"/>
+  <text x="1136" y="666" class="muted tiny">25</text>
+  <rect x="1186" y="648" width="56" height="28" rx="4" class="chip"/>
+  <text x="1200" y="666" class="muted tiny">50</text>
+  <rect x="1250" y="648" width="56" height="28" rx="4" class="chip"/>
+  <text x="1264" y="666" class="muted tiny">75</text>
+  <rect x="1314" y="648" width="64" height="28" rx="4" class="chipOn"/>
+  <text x="1330" y="666" class="text tiny">100</text>
+
+  <text x="1058" y="720" class="muted label">DEPTH AND CONTRAST</text>
+  <rect x="1058" y="738" width="58" height="28" rx="4" class="chip"/>
+  <text x="1074" y="756" class="muted tiny">8-bit</text>
+  <rect x="1124" y="738" width="64" height="28" rx="4" class="chip"/>
+  <text x="1138" y="756" class="muted tiny">16-bit</text>
+  <rect x="1196" y="738" width="64" height="28" rx="4" class="chipOn"/>
+  <text x="1210" y="756" class="text tiny">24-bit</text>
+  <rect x="1268" y="738" width="64" height="28" rx="4" class="chip"/>
+  <text x="1282" y="756" class="muted tiny">32-bit</text>
+  <rect x="1348" y="730" width="184" height="44" rx="5" fill="#102028" stroke="#27505a"/>
+  <text x="1364" y="748" class="muted tiny">Text contrast</text>
+  <text x="1364" y="766" class="text tiny">AA 7.4:1 on panel bg</text>
+
+  <rect x="116" y="870" width="1496" height="1" fill="#263840"/>
+  <text x="120" y="904" class="muted label">PALETTE SCOPE</text>
+  <rect x="236" y="884" width="80" height="30" rx="4" class="chipOn"/>
+  <text x="258" y="904" class="text tiny">Panel</text>
+  <rect x="326" y="884" width="92" height="30" rx="4" class="chip"/>
+  <text x="342" y="904" class="muted tiny">Global</text>
+  <rect x="428" y="884" width="118" height="30" rx="4" class="chip"/>
+  <text x="448" y="904" class="muted tiny">Component</text>
+
+  <text x="604" y="904" class="muted label">RECENT</text>
+  <rect x="672" y="886" width="28" height="28" rx="4" fill="#14b8b4"/>
+  <rect x="710" y="886" width="28" height="28" rx="4" fill="#f2a42b"/>
+  <rect x="748" y="886" width="28" height="28" rx="4" fill="#f5f7f8"/>
+  <rect x="786" y="886" width="28" height="28" rx="4" fill="#16242b"/>
+  <rect x="824" y="886" width="28" height="28" rx="4" fill="#7a55d9"/>
+  <text x="906" y="904" class="muted label">FAVORITES</text>
+  <rect x="1002" y="886" width="28" height="28" rx="4" fill="#11c7c3"/>
+  <rect x="1040" y="886" width="28" height="28" rx="4" fill="#0e151a"/>
+  <rect x="1078" y="886" width="28" height="28" rx="4" fill="#e7edf0"/>
+  <rect x="1116" y="886" width="28" height="28" rx="4" fill="#38575f"/>
+  <rect x="1190" y="884" width="138" height="30" rx="4" class="chip"/>
+  <text x="1214" y="904" class="muted tiny">Eyedropper</text>
+  <rect x="1340" y="884" width="126" height="30" rx="4" class="chip"/>
+  <text x="1362" y="904" class="muted tiny">Save swatch</text>
+  <rect x="1478" y="884" width="110" height="30" rx="4" fill="#0fb7ae"/>
+  <text x="1513" y="904" class="text tiny">Apply</text>
+
+  <rect x="0" y="920" width="1728" height="80" fill="#0f171c" stroke="#263840"/>
+  <text x="24" y="952" class="muted small">Status</text>
+  <text x="88" y="952" class="text small">Color ready: Fill on selected part uses FF14B8B4</text>
+  <text x="88" y="978" class="dim tiny">No separate modal needed. The chooser stays docked in Display Studio and can also appear as a compact popover from canvas color chips.</text>
+</svg>

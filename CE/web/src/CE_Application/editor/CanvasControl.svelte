@@ -67,6 +67,7 @@
     previewHighlighted = false,
     onpreviewpointerenter = null,
     onpreviewpointerleave = null,
+    onpreviewpointermove = null,
     onpreviewpointerdown = null,
     onpreviewwheel = null,
     onpreviewfocus = null,
@@ -186,6 +187,7 @@
       || previewTabIndex !== undefined
       || onpreviewpointerenter != null
       || onpreviewpointerleave != null
+      || onpreviewpointermove != null
       || onpreviewpointerdown != null
       || onpreviewwheel != null
       || onpreviewfocus != null
@@ -4010,13 +4012,15 @@
   ondrop={editorInteractionEnabled ? handleDeviceParameterDrop : undefined}
   onpointerenter={previewInteractive ? onpreviewpointerenter : undefined}
   onpointerleave={previewInteractive ? onpreviewpointerleave : undefined}
+  onpointermove={previewInteractive ? onpreviewpointermove : undefined}
   onpointerdown={previewInteractive ? onpreviewpointerdown : undefined}
   onwheel={previewInteractive ? onpreviewwheel : undefined}
   onfocus={previewInteractive ? onpreviewfocus : undefined}
   onblur={previewInteractive ? onpreviewblur : undefined}
   onkeydown={previewInteractive ? onpreviewkeydown : undefined}
   onkeyup={previewInteractive ? onpreviewkeyup : undefined}
-  role={previewInteractive ? (previewRole || 'button') : undefined}
+  role={previewInteractive && previewRole ? previewRole : undefined}
+  data-preview-role={previewInteractive ? (previewRole || '') : undefined}
   tabindex={previewInteractive ? previewTabIndex : undefined}
   aria-label={previewInteractive ? previewAriaLabel : undefined}
   aria-disabled={previewInteractive ? previewAriaDisabled : undefined}
@@ -4072,9 +4076,7 @@
             class:ring-zone={zone.shape === 'ring' || zone.shape === 'circle'}
             style={customHitZoneStyle(zone)}
             title={`${zoneName}: ${zone.action ?? 'action'} -> ${zone.targetBehavior ?? ''}`}
-          >
-            <span>{zoneName}</span>
-          </div>
+          ></div>
         {/each}
       </div>
     {/if}
@@ -5319,6 +5321,14 @@
     {/if}
   </div>
 
+  {#if showCustomHitZones && customHitZoneEntries.length}
+    <div class="custom-hit-zone-label-tray" aria-hidden="true">
+      {#each customHitZoneEntries as [zoneName] (zoneName)}
+        <span>{zoneName}</span>
+      {/each}
+    </div>
+  {/if}
+
   <CanvasControlSelectionOverlay
     showHandles={editorInteractionEnabled && isSelected && !isEditorLocked}
     {handles}
@@ -5372,6 +5382,7 @@
     inset: 0;
     pointer-events: none;
     z-index: 30;
+    overflow: visible;
   }
 
   .custom-hit-zone {
@@ -5382,7 +5393,7 @@
     color: #FFE2A1;
     font-size: 9px;
     line-height: 1;
-    overflow: hidden;
+    overflow: visible;
   }
 
   .custom-hit-zone.ring-zone {
@@ -5390,17 +5401,49 @@
     box-shadow: inset 0 0 0 4px rgba(245, 184, 61, 0.12);
   }
 
-  .custom-hit-zone span {
+  .custom-hit-zone-label-tray {
     position: absolute;
-    left: 4px;
-    top: 4px;
-    max-width: calc(100% - 8px);
+    left: 0;
+    top: -32px;
+    z-index: 46;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    max-width: max(220px, 100%);
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
-    background: rgba(20, 18, 12, 0.82);
+    background: rgba(20, 18, 12, 0.94);
+    border: 1px solid rgba(245, 184, 61, 0.38);
+    border-radius: 4px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.38);
+    opacity: 0;
+    padding: 4px 6px;
+    pointer-events: none;
+    transform: translateY(3px);
+    transition:
+      opacity 90ms ease,
+      transform 90ms ease;
+  }
+
+  .canvas-control:hover > .custom-hit-zone-label-tray,
+  .canvas-control.selected > .custom-hit-zone-label-tray,
+  .canvas-control:focus-within > .custom-hit-zone-label-tray {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .custom-hit-zone-label-tray span {
+    min-width: 0;
+    max-width: 120px;
+    overflow: hidden;
+    padding: 2px 6px;
     border-radius: 3px;
-    padding: 2px 4px;
+    background: rgba(245, 184, 61, 0.12);
+    color: #FFE2A1;
+    font-size: 9px;
+    font-weight: 800;
+    line-height: 1.1;
+    text-overflow: ellipsis;
   }
 
   .text-content {
@@ -5595,12 +5638,24 @@
   }
 
   .canvas-control.preview-interactive {
-    cursor: pointer;
+    cursor: default;
     outline: none;
     touch-action: none;
     overscroll-behavior: contain;
     user-select: none;
     -webkit-user-select: none;
+  }
+
+  .canvas-control.preview-interactive[data-preview-role='button'],
+  .canvas-control.preview-interactive[data-preview-role='checkbox'],
+  .canvas-control.preview-interactive[data-preview-role='radio'],
+  .canvas-control.preview-interactive[data-preview-role='combobox'] {
+    cursor: pointer;
+  }
+
+  .canvas-control.preview-interactive[data-preview-role='slider'],
+  .canvas-control.preview-interactive[data-preview-role='spinbutton'] {
+    cursor: ns-resize;
   }
 
   .canvas-control.preview-disabled {

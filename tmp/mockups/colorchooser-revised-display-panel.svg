@@ -1,0 +1,217 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0e1418"/>
+      <stop offset="1" stop-color="#181d21"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20282e"/>
+      <stop offset="1" stop-color="#171d22"/>
+    </linearGradient>
+    <linearGradient id="hue" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff0000"/>
+      <stop offset=".17" stop-color="#ffff00"/>
+      <stop offset=".33" stop-color="#00ff00"/>
+      <stop offset=".5" stop-color="#00ffff"/>
+      <stop offset=".67" stop-color="#0000ff"/>
+      <stop offset=".83" stop-color="#ff00ff"/>
+      <stop offset="1" stop-color="#ff0000"/>
+    </linearGradient>
+    <linearGradient id="sat" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8fa5a5"/>
+      <stop offset="1" stop-color="#14b8a6"/>
+    </linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#000000"/>
+      <stop offset=".5" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <linearGradient id="alpha" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#14b8a6" stop-opacity="0"/>
+      <stop offset="1" stop-color="#14b8a6" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="preview" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b1d22"/>
+      <stop offset=".45" stop-color="#14b8a6"/>
+      <stop offset="1" stop-color="#eff7f6"/>
+    </linearGradient>
+    <pattern id="checker" width="16" height="16" patternUnits="userSpaceOnUse">
+      <rect width="16" height="16" fill="#1a1f23"/>
+      <rect width="8" height="8" fill="#2b3237"/>
+      <rect x="8" y="8" width="8" height="8" fill="#2b3237"/>
+    </pattern>
+    <style>
+      text { font-family: Inter, Segoe UI, Arial, sans-serif; fill: #dfeaf0; }
+      .title { fill: #f2fbff; font-size: 34px; font-weight: 850; }
+      .muted { fill: #91a2ab; font-size: 18px; }
+      .tiny { fill: #8fa0aa; font-size: 15px; }
+      .mini { fill: #83949e; font-size: 12px; font-weight: 650; }
+      .label { fill: #dceaf0; font-size: 19px; font-weight: 760; }
+      .chip { fill: #d9eef4; font-size: 14px; font-weight: 780; }
+      .mono { font-family: Consolas, ui-monospace, monospace; fill: #cfe0e6; font-size: 15px; }
+      .panel { fill: url(#panel); stroke: #33434d; stroke-width: 2; rx: 10; }
+      .rail { fill: #151c20; stroke: #2f3b43; stroke-width: 1.5; }
+      .railBtn { fill: #20292f; stroke: #394852; stroke-width: 1.4; }
+      .railActive { fill: #0c5660; stroke: #25c1b4; stroke-width: 2; }
+      .card { fill: #1b2227; stroke: #33404a; stroke-width: 1.5; rx: 7; }
+      .field { fill: #11181c; stroke: #33404a; stroke-width: 1.2; rx: 5; }
+      .activeField { fill: #123d4a; stroke: #25c1b4; stroke-width: 1.5; rx: 5; }
+      .button { fill: #20282e; stroke: #40505a; stroke-width: 1.2; rx: 5; }
+      .buttonOn { fill: #0f5360; stroke: #25c1b4; stroke-width: 1.5; rx: 5; }
+      .cyan { fill: #25c1b4; }
+      .amber { fill: #edb94d; }
+      .red { fill: #ff5570; }
+      .line { stroke: #42515b; stroke-width: 1.2; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <text x="60" y="62" class="title">Revised Display Panel: Color Studio</text>
+  <text x="60" y="96" class="muted">Keeps the current chooser features, but makes target, precision, harmony, swatches, and accessibility easier to reach.</text>
+
+  <rect x="50" y="130" width="1500" height="705" class="panel"/>
+
+  <!-- studio rail -->
+  <rect x="50" y="130" width="54" height="705" class="rail"/>
+  <g transform="translate(61 150)">
+    <rect x="0" y="0" width="32" height="34" class="railActive"/><text x="5" y="23" class="chip">Col</text>
+    <rect x="0" y="44" width="32" height="34" class="railBtn"/><text x="5" y="67" class="chip">Grd</text>
+    <rect x="0" y="88" width="32" height="34" class="railBtn"/><text x="8" y="111" class="chip">Fx</text>
+    <rect x="0" y="132" width="32" height="34" class="railBtn"/><text x="5" y="155" class="chip">Nte</text>
+    <rect x="0" y="176" width="32" height="34" class="railBtn"/><text x="4" y="199" class="chip">Img</text>
+    <rect x="0" y="220" width="32" height="34" class="railBtn"/><text x="5" y="243" class="chip">Aln</text>
+    <rect x="0" y="264" width="32" height="34" class="railBtn"/><text x="5" y="287" class="chip">Dev</text>
+    <rect x="0" y="308" width="32" height="34" class="railBtn"/><text x="4" y="331" class="chip">Prv</text>
+    <rect x="0" y="352" width="32" height="34" class="railBtn"/><text x="4" y="375" class="chip">Con</text>
+  </g>
+
+  <!-- header -->
+  <g transform="translate(128 154)">
+    <text x="0" y="0" dy="24" class="label">Color Studio</text>
+    <rect x="160" y="0" width="150" height="34" class="activeField"/><text x="182" y="22" class="chip">Fill Target</text>
+    <rect x="318" y="0" width="120" height="34" class="field"/><text x="344" y="22" class="chip">Stroke</text>
+    <rect x="446" y="0" width="120" height="34" class="field"/><text x="480" y="22" class="chip">Text</text>
+    <rect x="574" y="0" width="156" height="34" class="field"/><text x="600" y="22" class="chip">Panel Theme</text>
+    <rect x="1110" y="0" width="160" height="34" class="button"/><text x="1142" y="22" class="chip">Eyedropper</text>
+    <rect x="1280" y="0" width="70" height="34" class="buttonOn"/><text x="1303" y="22" class="chip">Apply</text>
+  </g>
+
+  <!-- main chooser -->
+  <g transform="translate(128 215)">
+    <rect x="0" y="0" width="710" height="500" class="card"/>
+    <text x="20" y="34" class="label">Live Color Field</text>
+    <text x="20" y="62" class="tiny">Current behavior stays: large live preview, alpha checkerboard, hex input, H/S/B/A bands.</text>
+    <rect x="20" y="82" width="670" height="260" fill="url(#checker)" stroke="#33404a"/>
+    <rect x="20" y="82" width="670" height="260" fill="url(#preview)" opacity=".92"/>
+    <circle cx="470" cy="170" r="14" fill="none" stroke="#ffffff" stroke-width="3"/>
+    <circle cx="470" cy="170" r="7" fill="#14b8a6" stroke="#0c1115" stroke-width="2"/>
+    <rect x="540" y="98" width="132" height="30" rx="4" fill="rgba(0,0,0,.48)" stroke="#6f858b"/>
+    <text x="558" y="118" class="mono">#FF14B8A6</text>
+
+    <g transform="translate(20 365)">
+      <text x="0" y="-10" class="mini">Bands</text>
+      <rect x="0" y="0" width="670" height="20" rx="4" fill="url(#hue)"/>
+      <circle cx="320" cy="10" r="10" fill="#14b8a6" stroke="#fff" stroke-width="2"/>
+      <text x="642" y="15" class="chip">H</text>
+      <rect x="0" y="32" width="670" height="20" rx="4" fill="url(#sat)"/>
+      <circle cx="520" cy="42" r="10" fill="#14b8a6" stroke="#fff" stroke-width="2"/>
+      <text x="642" y="47" class="chip">S</text>
+      <rect x="0" y="64" width="670" height="20" rx="4" fill="url(#light)"/>
+      <circle cx="400" cy="74" r="10" fill="#14b8a6" stroke="#fff" stroke-width="2"/>
+      <text x="642" y="79" class="chip">B</text>
+      <rect x="0" y="96" width="670" height="20" rx="4" fill="url(#checker)"/>
+      <rect x="0" y="96" width="670" height="20" rx="4" fill="url(#alpha)"/>
+      <circle cx="600" cy="106" r="10" fill="#14b8a6" stroke="#fff" stroke-width="2"/>
+      <text x="642" y="111" class="chip">A</text>
+    </g>
+  </g>
+
+  <!-- precision / values -->
+  <g transform="translate(868 215)">
+    <rect x="0" y="0" width="310" height="500" class="card"/>
+    <text x="18" y="34" class="label">Precision</text>
+    <text x="18" y="62" class="tiny">One place for formats, numeric entry, step size and copy.</text>
+
+    <text x="18" y="104" class="mini">Format</text>
+    <rect x="18" y="116" width="120" height="32" class="activeField"/><text x="55" y="137" class="chip">HEX</text>
+    <rect x="146" y="116" width="66" height="32" class="field"/><text x="168" y="137" class="chip">RGB</text>
+    <rect x="220" y="116" width="66" height="32" class="field"/><text x="240" y="137" class="chip">HSL</text>
+
+    <rect x="18" y="162" width="268" height="34" class="field"/><text x="34" y="184" class="mono">#FF14B8A6</text>
+    <rect x="18" y="206" width="268" height="32" class="button"/><text x="102" y="227" class="chip">Copy value</text>
+
+    <text x="18" y="274" class="mini">Numeric channels</text>
+    <g transform="translate(18 288)">
+      <rect x="0" y="0" width="58" height="30" class="field"/><text x="12" y="20" class="mono">H 174</text>
+      <rect x="70" y="0" width="58" height="30" class="field"/><text x="82" y="20" class="mono">S 80</text>
+      <rect x="140" y="0" width="58" height="30" class="field"/><text x="152" y="20" class="mono">B 40</text>
+      <rect x="210" y="0" width="58" height="30" class="field"/><text x="222" y="20" class="mono">A 1</text>
+      <rect x="0" y="42" width="58" height="30" class="field"/><text x="12" y="62" class="mono">R 20</text>
+      <rect x="70" y="42" width="58" height="30" class="field"/><text x="82" y="62" class="mono">G 184</text>
+      <rect x="140" y="42" width="58" height="30" class="field"/><text x="152" y="62" class="mono">B 166</text>
+      <rect x="210" y="42" width="58" height="30" class="field"/><text x="222" y="62" class="mono">255</text>
+    </g>
+
+    <text x="18" y="398" class="mini">Step</text>
+    <rect x="18" y="410" width="48" height="30" class="field"/><text x="31" y="430" class="chip">1%</text>
+    <rect x="74" y="410" width="48" height="30" class="field"/><text x="87" y="430" class="chip">5%</text>
+    <rect x="130" y="410" width="52" height="30" class="buttonOn"/><text x="143" y="430" class="chip">10%</text>
+    <rect x="190" y="410" width="52" height="30" class="field"/><text x="203" y="430" class="chip">20%</text>
+    <rect x="250" y="410" width="52" height="30" class="field"/><text x="263" y="430" class="chip">25%</text>
+  </g>
+
+  <!-- right column -->
+  <g transform="translate(1205 215)">
+    <rect x="0" y="0" width="300" height="500" class="card"/>
+    <text x="18" y="34" class="label">Assistants</text>
+    <text x="18" y="62" class="tiny">Existing helpers plus a few high-value additions.</text>
+
+    <text x="18" y="104" class="mini">Harmony</text>
+    <rect x="18" y="116" width="264" height="32" class="field"/><text x="34" y="137" class="chip">Complementary</text>
+    <g transform="translate(18 160)">
+      <rect x="0" y="0" width="34" height="34" rx="4" fill="#14b8a6" stroke="#8df5ec"/>
+      <rect x="42" y="0" width="34" height="34" rx="4" fill="#b81426"/>
+      <rect x="84" y="0" width="34" height="34" rx="4" fill="#14b83c"/>
+      <rect x="126" y="0" width="34" height="34" rx="4" fill="#1450b8"/>
+      <rect x="168" y="0" width="34" height="34" rx="4" fill="#b87514"/>
+    </g>
+
+    <text x="18" y="238" class="mini">Quick actions</text>
+    <g transform="translate(18 252)">
+      <rect x="0" y="0" width="78" height="30" class="button"/><text x="17" y="20" class="chip">Darken</text>
+      <rect x="88" y="0" width="78" height="30" class="button"/><text x="106" y="20" class="chip">Lighten</text>
+      <rect x="176" y="0" width="88" height="30" class="button"/><text x="190" y="20" class="chip">Saturate</text>
+      <rect x="0" y="40" width="78" height="30" class="button"/><text x="19" y="60" class="chip">Gray</text>
+      <rect x="88" y="40" width="78" height="30" class="button"/><text x="110" y="60" class="chip">Invert</text>
+      <rect x="176" y="40" width="88" height="30" class="buttonOn"/><text x="194" y="60" class="chip">Save</text>
+    </g>
+
+    <text x="18" y="358" class="mini">Accessibility</text>
+    <rect x="18" y="370" width="126" height="34" class="activeField"/><text x="38" y="392" class="chip">Contrast 7.4</text>
+    <rect x="154" y="370" width="128" height="34" class="field"/><text x="176" y="392" class="chip">Preview CVD</text>
+
+    <text x="18" y="446" class="mini">Depth</text>
+    <rect x="18" y="458" width="86" height="28" class="field"/><text x="39" y="477" class="chip">8-bit</text>
+    <rect x="112" y="458" width="86" height="28" class="field"/><text x="130" y="477" class="chip">16-bit</text>
+    <rect x="206" y="458" width="76" height="28" class="buttonOn"/><text x="225" y="477" class="chip">24-bit</text>
+  </g>
+
+  <!-- bottom swatches -->
+  <g transform="translate(128 740)">
+    <rect x="0" y="0" width="1377" height="70" class="card"/>
+    <text x="18" y="28" class="label">Swatches / History / Theme</text>
+    <text x="18" y="52" class="tiny">Same shared swatch behavior, expanded with recent colors, favorites, target theme slots, import/export palette.</text>
+    <g transform="translate(380 18)">
+      <rect x="0" y="0" width="32" height="32" rx="4" fill="#14b8a6"/>
+      <rect x="40" y="0" width="32" height="32" rx="4" fill="#ffffff"/>
+      <rect x="80" y="0" width="32" height="32" rx="4" fill="#edb94d"/>
+      <rect x="120" y="0" width="32" height="32" rx="4" fill="#ff5570"/>
+      <rect x="160" y="0" width="32" height="32" rx="4" fill="#2e90ff"/>
+      <rect x="200" y="0" width="32" height="32" rx="4" fill="#343d46"/>
+      <rect x="240" y="0" width="32" height="32" rx="4" fill="#11181c" stroke="#3d4a52" stroke-dasharray="4 3"/>
+      <rect x="280" y="0" width="32" height="32" rx="4" fill="#11181c" stroke="#3d4a52" stroke-dasharray="4 3"/>
+      <rect x="330" y="0" width="130" height="32" class="button"/><text x="356" y="21" class="chip">Import</text>
+      <rect x="470" y="0" width="130" height="32" class="button"/><text x="496" y="21" class="chip">Export</text>
+    </g>
+  </g>
+</svg>

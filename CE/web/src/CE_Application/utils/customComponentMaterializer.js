@@ -55,6 +55,45 @@ function normalizedSignalForValueSource(signals = {}, valueSource = 'mainValue')
   return clamp(numberOr(signals?.customChannels?.[`channel.${source}.normalized`], signals?.valueNormalized ?? 0), 0, 1);
 }
 
+function generatorBounds(generator = null) {
+  const bounds = generator?.bounds ?? generator?.rect ?? null;
+  if (!bounds) return null;
+  return {
+    x: clamp(numberOr(bounds.x, 0), 0, 100),
+    y: clamp(numberOr(bounds.y, 0), 0, 100),
+    width: clamp(numberOr(bounds.width, 100), 0.001, 100),
+    height: clamp(numberOr(bounds.height, 100), 0.001, 100),
+  };
+}
+
+function mapGeneratorX(bounds, x) {
+  return bounds ? bounds.x + ((numberOr(x, 0) / 100) * bounds.width) : x;
+}
+
+function mapGeneratorY(bounds, y) {
+  return bounds ? bounds.y + ((numberOr(y, 0) / 100) * bounds.height) : y;
+}
+
+function mapGeneratorWidth(bounds, width) {
+  return bounds ? (numberOr(width, 0) / 100) * bounds.width : width;
+}
+
+function mapGeneratorHeight(bounds, height) {
+  return bounds ? (numberOr(height, 0) / 100) * bounds.height : height;
+}
+
+function mapGeneratorHitZoneBounds(bounds, zoneBounds = {}) {
+  if (!bounds) return zoneBounds;
+  return {
+    ...zoneBounds,
+    x: mapGeneratorX(bounds, zoneBounds.x ?? 0),
+    y: mapGeneratorY(bounds, zoneBounds.y ?? 0),
+    width: mapGeneratorWidth(bounds, zoneBounds.width ?? 100),
+    height: mapGeneratorHeight(bounds, zoneBounds.height ?? 100),
+    unit: 'percent',
+  };
+}
+
 function addPart(parts, name, part, generatorName = '') {
   parts[name] = {
     ...part,
@@ -410,6 +449,7 @@ function materializeTicks(parts, generator, prefix, generatorName = '') {
   const minorCount = Math.max(0, Math.round(numberOr(generator?.minorCount, 0)));
   const geometry = String(generator?.geometry ?? 'linear').trim().toLowerCase();
   const zIndex = numberOr(generator?.zIndex, 6);
+  const bounds = generatorBounds(generator);
   if (count <= 0) return;
 
     if (geometry === 'circular' || geometry === 'ring') {
@@ -422,8 +462,8 @@ function materializeTicks(parts, generator, prefix, generatorName = '') {
       const angle = startAngle + (span * normalized);
       const radians = (angle * Math.PI) / 180;
       addPart(parts, `${prefix}_major_${index + 1}`, makeTickPart(`${prefix}_major_${index + 1}`, {
-        x: 50 + (Math.cos(radians) * radius),
-        y: 50 + (Math.sin(radians) * radius),
+        x: mapGeneratorX(bounds, 50 + (Math.cos(radians) * radius)),
+        y: mapGeneratorY(bounds, 50 + (Math.sin(radians) * radius)),
         width: 2,
         height: 13,
         zIndex,
@@ -436,8 +476,8 @@ function materializeTicks(parts, generator, prefix, generatorName = '') {
         const minorAngle = startAngle + (span * minorNormalized);
         const minorRadians = (minorAngle * Math.PI) / 180;
         addPart(parts, `${prefix}_minor_${index + 1}_${minor}`, makeTickPart(`${prefix}_minor_${index + 1}_${minor}`, {
-          x: 50 + (Math.cos(minorRadians) * radius),
-          y: 50 + (Math.sin(minorRadians) * radius),
+          x: mapGeneratorX(bounds, 50 + (Math.cos(minorRadians) * radius)),
+          y: mapGeneratorY(bounds, 50 + (Math.sin(minorRadians) * radius)),
           width: 1,
           height: 8,
           zIndex: zIndex - 0.1,
@@ -454,8 +494,8 @@ function materializeTicks(parts, generator, prefix, generatorName = '') {
   for (let index = 0; index < count; index += 1) {
     const normalized = count === 1 ? 0.5 : index / denominator;
     addPart(parts, `${prefix}_major_${index + 1}`, makeTickPart(`${prefix}_major_${index + 1}`, {
-      x: vertical ? 14 : 14 + (normalized * 72),
-      y: vertical ? 86 - (normalized * 72) : 82,
+      x: mapGeneratorX(bounds, vertical ? 14 : 14 + (normalized * 72)),
+      y: mapGeneratorY(bounds, vertical ? 86 - (normalized * 72) : 82),
       width: vertical ? 12 : 2,
       height: vertical ? 2 : 12,
       zIndex,
@@ -465,8 +505,8 @@ function materializeTicks(parts, generator, prefix, generatorName = '') {
     for (let minor = 1; minor <= minorCount; minor += 1) {
       const minorNormalized = (index + (minor / (minorCount + 1))) / denominator;
       addPart(parts, `${prefix}_minor_${index + 1}_${minor}`, makeTickPart(`${prefix}_minor_${index + 1}_${minor}`, {
-        x: vertical ? 18 : 14 + (minorNormalized * 72),
-        y: vertical ? 86 - (minorNormalized * 72) : 85,
+        x: mapGeneratorX(bounds, vertical ? 18 : 14 + (minorNormalized * 72)),
+        y: mapGeneratorY(bounds, vertical ? 86 - (minorNormalized * 72) : 85),
         width: vertical ? 8 : 1,
         height: vertical ? 1 : 7,
         zIndex: zIndex - 0.1,
@@ -489,6 +529,7 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
   const valueSource = generator?.valueSource ?? generator?.targetValueChannel ?? 'mainValue';
   const normalized = normalizedSignalForValueSource(signals, valueSource);
   const activationMode = String(generator?.activationMode ?? 'cumulative').trim().toLowerCase();
+  const bounds = generatorBounds(generator);
 
   function isActive(index) {
     if (activationMode === 'single') {
@@ -501,9 +542,11 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
     const active = isActive(index);
     const ledName = `${prefix}_${index + 1}`;
     const threshold = (index + 1) / count;
+    const mappedX = mapGeneratorX(bounds, x);
+    const mappedY = mapGeneratorY(bounds, y);
     addPart(parts, ledName, makeLedPart(ledName, {
-      x,
-      y,
+      x: mappedX,
+      y: mappedY,
       size,
       zIndex,
       colour: active ? activeColour : inactiveColour,
@@ -531,10 +574,10 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
           threshold,
         },
         bounds: {
-          x: x - 3,
-          y: y - 3,
-          width: 6,
-          height: 6,
+          x: mappedX - mapGeneratorWidth(bounds, 3),
+          y: mappedY - mapGeneratorHeight(bounds, 3),
+          width: mapGeneratorWidth(bounds, 6),
+          height: mapGeneratorHeight(bounds, 6),
           unit: 'percent',
         },
       }, generatorName);
@@ -574,14 +617,15 @@ function materializeGrid(parts, generator, prefix, generatorName = '', hitZones 
   const targetBehavior = generator?.targetBehavior ?? '';
   const targetValueChannel = generator?.targetValueChannel ?? 'mainValue';
   const targetValueChannelY = generator?.targetValueChannelY ?? generator?.targetYValueChannel ?? '';
+  const bounds = generatorBounds(generator);
 
   for (let column = 0; column <= columns; column += 1) {
     const x = (column / columns) * 100;
     addPart(parts, `${prefix}_v_${column}`, makeGridLinePart(`${prefix}_v_${column}`, {
-      x,
-      y: 50,
-      width: 0.35,
-      height: 100,
+      x: mapGeneratorX(bounds, x),
+      y: mapGeneratorY(bounds, 50),
+      width: mapGeneratorWidth(bounds, 0.35),
+      height: mapGeneratorHeight(bounds, 100),
       zIndex,
       colour,
     }), generatorName);
@@ -589,10 +633,10 @@ function materializeGrid(parts, generator, prefix, generatorName = '', hitZones 
   for (let row = 0; row <= rows; row += 1) {
     const y = (row / rows) * 100;
     addPart(parts, `${prefix}_h_${row}`, makeGridLinePart(`${prefix}_h_${row}`, {
-      x: 50,
-      y,
-      width: 100,
-      height: 0.35,
+      x: mapGeneratorX(bounds, 50),
+      y: mapGeneratorY(bounds, y),
+      width: mapGeneratorWidth(bounds, 100),
+      height: mapGeneratorHeight(bounds, 0.35),
       zIndex,
       colour,
     }), generatorName);
@@ -633,13 +677,13 @@ function materializeGrid(parts, generator, prefix, generatorName = '', hitZones 
             rowNormalized,
             rowNormalizedInverted: 1 - rowNormalized,
           },
-          bounds: {
+          bounds: mapGeneratorHitZoneBounds(bounds, {
             x: (column / columns) * 100,
             y: (row / rows) * 100,
             width: 100 / columns,
             height: 100 / rows,
             unit: 'percent',
-          },
+          }),
         }, generatorName);
       }
     }

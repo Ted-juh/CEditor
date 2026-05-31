@@ -118,6 +118,14 @@ export const CUSTOM_COMPONENT_STARTERS = [
     dimensions: { width: 220, height: 92 },
   },
   {
+    id: 'starter.labelledTwoStateButton',
+    group: 'Button',
+    label: 'Labelled Two-State Button',
+    summary: 'A bordered label above a two-state button, enclosed by one solid outlined background.',
+    creates: ['label', '2-state button', 'container outline', 'public API'],
+    dimensions: { width: 152, height: 92 },
+  },
+  {
     id: 'starter.xyGridPad',
     group: 'Grid',
     label: 'XY Grid Pad',
@@ -265,6 +273,7 @@ export function createValueChannel(name, {
   format = {},
   snap = {},
   curve = {},
+  constraints = {},
 } = {}) {
   return {
     _type: 'ValueChannel',
@@ -297,6 +306,12 @@ export function createValueChannel(name, {
       hysteresis: 0,
       ...curve,
     },
+    constraints: {
+      enabled: true,
+      normalizedMin: 0,
+      normalizedMax: 1,
+      ...constraints,
+    },
   };
 }
 
@@ -305,6 +320,7 @@ export function createBehaviorModule(name, {
   valueChannel = 'mainValue',
   role = 'custom',
   geometry = 'linear',
+  dragMode = 'auto',
   interaction = {},
   reverseMouseDirection = false,
 } = {}) {
@@ -317,6 +333,7 @@ export function createBehaviorModule(name, {
     valueChannel,
     valueChannels: [valueChannel].filter(Boolean),
     geometry,
+    dragMode,
     reverseMouseDirection,
     interaction: {
       pointer: true,
@@ -332,10 +349,14 @@ export function createHitZone(name, {
   shape = 'rectangle',
   targetBehavior = 'mainSlider',
   targetValueChannel = 'mainValue',
+  targetValueChannelX = '',
+  targetValueChannelY = '',
   action = 'dragValue',
   bounds = {},
+  payload = null,
+  meta = {},
 } = {}) {
-  return {
+  const hitZone = {
     _type: 'HitZone',
     name,
     shape,
@@ -345,6 +366,8 @@ export function createHitZone(name, {
     cursor: action === 'dragValue' ? 'pointer' : 'default',
     targetBehavior,
     targetValueChannel,
+    targetValueChannelX,
+    targetValueChannelY,
     action,
     bounds: {
       x: 0,
@@ -355,7 +378,10 @@ export function createHitZone(name, {
       ...bounds,
     },
     condition: '',
+    meta,
   };
+  if (payload !== null && payload !== undefined) hitZone.payload = payload;
+  return hitZone;
 }
 
 export function createCustomComponentDesignerDefaults() {
@@ -825,21 +851,21 @@ function createMacroRingsStarterPatch() {
           role: 'pointer',
           kind: 'capsule',
           zIndex: 8,
-          layout: { x: 50, y: 54, width: 6, height: 38, widthUnit: 'px', heightUnit: 'px', pivotX: 50, pivotY: 118 },
+          layout: { x: 50, y: 24.72, width: 6, height: 38, yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'center', anchorY: 'top', pivotX: 50, pivotY: 173.6842105263 },
           sections: { Background: createBackground('FFEAF6FF', { borderEnabled: false, radius: 999 }) },
         }),
         middlePointer: createPartNode('middlePointer', {
           role: 'pointer',
           kind: 'capsule',
           zIndex: 9,
-          layout: { x: 50, y: 54, width: 6, height: 28, widthUnit: 'px', heightUnit: 'px', pivotX: 50, pivotY: 116 },
+          layout: { x: 50, y: 42.72, width: 6, height: 28, yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'center', anchorY: 'top', pivotX: 50, pivotY: 171.4285714286 },
           sections: { Background: createBackground('FFFFEDB3', { borderEnabled: false, radius: 999 }) },
         }),
         innerPointer: createPartNode('innerPointer', {
           role: 'pointer',
           kind: 'capsule',
           zIndex: 10,
-          layout: { x: 50, y: 54, width: 6, height: 18, widthUnit: 'px', heightUnit: 'px', pivotX: 50, pivotY: 114 },
+          layout: { x: 50, y: 60.72, width: 6, height: 18, yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'center', anchorY: 'top', pivotX: 50, pivotY: 166.6666666667 },
           sections: { Background: createBackground('FFDDF6E6', { borderEnabled: false, radius: 999 }) },
         }),
       },
@@ -1303,6 +1329,184 @@ function createDualSliderSwitchStarterPatch() {
   };
 }
 
+function createLabelledTwoStateButtonStarterPatch() {
+  const channels = {
+    mode: createValueChannel('mode', {
+      label: 'Button State',
+      type: 'enum',
+      min: 0,
+      max: 1,
+      step: 1,
+      defaultValue: 'A',
+      format: { precision: 0 },
+    }),
+  };
+  channels.mode.values = ['A', 'B'];
+
+  return {
+    'Core.name': 'Labelled Two-State Button',
+    'Transform.width': 152,
+    'Transform.height': 92,
+    States: {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: ['stateA', 'stateB', 'pressed', 'hover', 'disabled'],
+      _children: {
+        StateA: {
+          _type: 'State',
+          name: 'StateA',
+          group: 'value',
+          description: 'State A keeps the button on its first background colour.',
+          enabled: true,
+          when: { valueEnum: 'A' },
+          patches: {
+            component: {},
+            parts: {
+              button: { 'Background.Fill.colour': 'FF2F6FED' },
+            },
+          },
+        },
+        StateB: {
+          _type: 'State',
+          name: 'StateB',
+          group: 'value',
+          description: 'State B changes only the button background colour.',
+          enabled: true,
+          when: { valueEnum: 'B' },
+          patches: {
+            component: {},
+            parts: {
+              button: { 'Background.Fill.colour': 'FFD97727' },
+            },
+          },
+        },
+        Hover: {
+          _type: 'State',
+          name: 'Hover',
+          group: 'interaction',
+          description: 'Lightly accents the shared outer outline on hover.',
+          enabled: true,
+          when: { hover: true },
+          patches: {
+            component: {},
+            parts: {
+              background: { 'Background.Border.colour': '885B9BD5' },
+            },
+          },
+        },
+        Pressed: {
+          _type: 'State',
+          name: 'Pressed',
+          group: 'interaction',
+          description: 'Compresses the button surface while pressed.',
+          enabled: true,
+          when: { pressed: true },
+          patches: {
+            component: {},
+            parts: {
+              button: { 'Layout.scale': 0.97 },
+            },
+          },
+        },
+        Disabled: {
+          _type: 'State',
+          name: 'Disabled',
+          group: 'system',
+          description: 'Dims the full custom component.',
+          enabled: true,
+          when: { disabled: true },
+          patches: {
+            component: { 'Transform.opacity': 0.55 },
+            parts: {},
+          },
+        },
+      },
+    },
+    Animations: createStarterAnimations(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        background: createPartNode('background', {
+          role: 'background',
+          kind: 'roundedRectangle',
+          zIndex: 0,
+          layout: { mode: 'fill', widthUnit: 'percent', heightUnit: 'percent' },
+          sections: {
+            Background: createBackground('FF171C21', { borderColour: 'FF6C7A86', borderThickness: 2, radius: 8 }),
+          },
+        }),
+        label: createPartNode('label', {
+          role: 'label',
+          kind: 'text',
+          zIndex: 2,
+          layout: { x: 50, y: 24, width: 118, height: 24, widthUnit: 'px', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('00171C21', { borderColour: '66FFFFFF', borderThickness: 1, radius: 4 }),
+            Text: createText('Label', { colour: 'FFEAF0F6', size: 11, weight: 700 }),
+          },
+        }),
+        button: createPartNode('button', {
+          role: 'button',
+          kind: 'roundedRectangle',
+          zIndex: 1,
+          layout: { x: 50, y: 63, width: 118, height: 34, widthUnit: 'px', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('FF2F6FED', { borderColour: '77FFFFFF', borderThickness: 1, radius: 6 }),
+          },
+        }),
+      },
+    },
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Behaviors: {
+      _type: 'Behaviors',
+      _children: {
+        buttonMode: createBehaviorModule('buttonMode', { type: 'cycle', role: 'button', valueChannel: 'mode', geometry: 'none' }),
+      },
+    },
+    HitZones: {
+      _type: 'HitZones',
+      _children: {
+        buttonZone: createHitZone('buttonZone', {
+          targetBehavior: 'buttonMode',
+          targetValueChannel: 'mode',
+          action: 'cycleValue',
+          bounds: { x: 11, y: 49, width: 78, height: 38, unit: 'percent' },
+        }),
+      },
+    },
+    Bindings: createCustomComponentBlankBindingsDefaults(),
+    Links: createCustomComponentLinksDefaults(),
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', defaultValue: 'Label', enabled: true },
+        labelBorder: { path: 'Parts.label.Background.Border.colour', label: 'Label Border', type: 'color', defaultValue: '66FFFFFF', enabled: true },
+        stateAColour: { path: 'States.StateA.patches.parts.button.Background.Fill.colour', label: 'State A Colour', type: 'color', defaultValue: 'FF2F6FED', enabled: true },
+        stateBColour: { path: 'States.StateB.patches.parts.button.Background.Fill.colour', label: 'State B Colour', type: 'color', defaultValue: 'FFD97727', enabled: true },
+        containerColour: { path: 'Parts.background.Background.Fill.colour', label: 'Container Colour', type: 'color', defaultValue: 'FF171C21', enabled: true },
+        containerOutline: { path: 'Parts.background.Background.Border.colour', label: 'Container Outline', type: 'color', defaultValue: 'FF6C7A86', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('labelledTwoStateButton', [
+      { id: 'modeChange', label: 'Mode Change', enabled: true },
+    ]),
+    Generators: { _type: 'Generators', _children: {} },
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'button',
+      selectedValueChannel: 'mode',
+      selectedBehavior: 'buttonMode',
+      selectedHitZone: 'buttonZone',
+      selectedState: 'StateB',
+      preview: { ...createCustomComponentDesignerDefaults().preview, state: 'StateA', showHitZones: false, showBounds: false },
+      notes: 'A single framed background contains a bordered label and a two-state button. The label is intentionally untouched by StateA/StateB patches.',
+    },
+  };
+}
+
 function createXYGridPadStarterPatch() {
   const channels = {
     xValue: createValueChannel('xValue', { label: 'X Value', defaultValue: 0.5 }),
@@ -1339,7 +1543,7 @@ function createXYGridPadStarterPatch() {
       _type: 'Behaviors',
       _children: {
         xyPad: {
-          ...createBehaviorModule('xyPad', { type: 'xy-pad', role: 'xy-pad', valueChannel: 'xValue', geometry: 'grid' }),
+          ...createBehaviorModule('xyPad', { type: 'xy-pad', role: 'xy-pad', valueChannel: 'xValue', geometry: 'xy' }),
           valueChannels: ['xValue', 'yValue', 'pressure'],
         },
       },
@@ -1350,7 +1554,8 @@ function createXYGridPadStarterPatch() {
         padDragArea: createHitZone('padDragArea', {
           targetBehavior: 'xyPad',
           targetValueChannel: 'xValue',
-          action: 'setValue',
+          targetValueChannelY: 'yValue',
+          action: 'dragValue',
           bounds: { x: 9, y: 20, width: 82, height: 70, unit: 'percent' },
         }),
       },
@@ -1370,8 +1575,8 @@ function createXYGridPadStarterPatch() {
           columns: 8,
           colour: '335B9BD5',
           generatedPartPrefix: 'xyGrid',
-          generatedHitZones: true,
-          hitZoneAction: 'setValue',
+          generatedHitZones: false,
+          hitZoneAction: 'dragValue',
           detachable: true,
           zIndex: 3,
         },
@@ -1747,7 +1952,7 @@ export function createCustomComponentStarterPatch(starterId) {
         ...createCustomComponentDesignerDefaults(),
         selectedLayer: '',
         selectedHitZone: '',
-        selectedSurfaceKind: 'layer',
+        selectedSurfaceKind: 'artboard',
         preview: {
           ...createCustomComponentDesignerDefaults().preview,
           showHitZones: true,
@@ -1761,6 +1966,7 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.circularTickSlider') return createCircularTickSliderStarterPatch();
   if (starterId === 'starter.circularLedRing') return createCircularLedRingStarterPatch();
   if (starterId === 'starter.dualSliderSwitch') return createDualSliderSwitchStarterPatch();
+  if (starterId === 'starter.labelledTwoStateButton') return createLabelledTwoStateButtonStarterPatch();
   if (starterId === 'starter.xyGridPad') return createXYGridPadStarterPatch();
   if (starterId === 'starter.scrollPianoBar') return createScrollPianoBarStarterPatch();
   if (starterId === 'starter.tripleValueSlider') return createTripleValueSliderStarterPatch();

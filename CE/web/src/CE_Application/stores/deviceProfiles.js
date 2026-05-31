@@ -76,6 +76,86 @@ let applyingPersistedDeviceSession = false;
 const pendingContinuousParameters = new Map();
 let pendingContinuousFrame = 0;
 const profileSourceFallbackRequests = new Map();
+let localDraftProfileCounter = 1;
+
+function uniqueDraftProfileId(base = 'new-device-profile') {
+  const existing = new Set(get(deviceProfiles).map((profile) => String(profile?.id ?? '')));
+  let id = base;
+  while (existing.has(id)) {
+    localDraftProfileCounter += 1;
+    id = `${base}-${localDraftProfileCounter}`;
+  }
+  return id;
+}
+
+function createBlankProfileSource(id, name) {
+  return {
+    id,
+    name,
+    manufacturer: '',
+    family: '',
+    profileVersion: '0.1.0',
+    minCEditorVersion: '0.1.0',
+    status: 'draft',
+    trust: 'local',
+    coverage: {
+      realtimeEditing: 'draft',
+    },
+    variables: {
+      channel: 1,
+      deviceId: 16,
+    },
+    timing: {
+      minDelayBetweenMessagesMs: 20,
+    },
+    messageRecipes: [],
+    dumpDefinitions: [],
+    parameters: [],
+    tests: [],
+  };
+}
+
+export function createDeviceProfileDraft({ id = '', name = 'Untitled Device Profile' } = {}) {
+  const profileId = String(id || uniqueDraftProfileId()).trim();
+  const profileName = String(name || 'Untitled Device Profile').trim();
+  const source = createBlankProfileSource(profileId, profileName);
+
+  deviceProfiles.update((profiles) => [
+    ...profiles.filter((profile) => String(profile?.id ?? '') !== profileId),
+    {
+      id: profileId,
+      name: profileName,
+      manufacturer: '',
+      family: '',
+      status: 'draft',
+      trust: 'local',
+      source: '',
+      localDraft: true,
+    },
+  ]);
+
+  profileSources.update((sources) => ({
+    ...sources,
+    [profileId]: {
+      profileId,
+      source: JSON.stringify(source, null, 2),
+      localDraft: true,
+    },
+  }));
+
+  profileParameters.update((profiles) => ({
+    ...profiles,
+    [profileId]: [],
+  }));
+
+  profileParameterPages.update((pages) => ({
+    ...pages,
+    [profileId]: { profileId, loaded: 0, total: 0, hasMore: false },
+  }));
+
+  selectedDeviceProfileId.set(profileId);
+  return { id: profileId, name: profileName, source };
+}
 
 function sourceControlIdFromRequestId(requestId = '') {
   const value = String(requestId ?? '');

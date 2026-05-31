@@ -64,6 +64,16 @@
     updateControlProperty(core.id, `Generators.${selectedName}.${path}`, value);
   }
 
+  function setBoundsPreset(preset) {
+    if (!core?.id || !selectedName) return;
+    const bounds = preset === 'inset'
+      ? { x: 8, y: 8, width: 84, height: 84, unit: 'percent' }
+      : { x: 0, y: 0, width: 100, height: 100, unit: 'percent' };
+    applyControlPatchesById(new Map([[core.id, Object.fromEntries(
+      Object.entries(bounds).map(([key, value]) => [`Generators.${selectedName}.bounds.${key}`, value])
+    )]]));
+  }
+
   function estimateOutput(generator) {
     if (!generator) return { parts: 0, zones: 0, label: 'No generator selected' };
     const type = String(generator.type ?? 'ticks');
@@ -242,7 +252,7 @@
       <PropertyCell label="Type" span={2} hint="Generator family.">
         <select class="val" value={selected.type ?? 'ticks'} onchange={(event) => set('type', event.target.value)}>
           {#each TYPES as type}
-            <option value={type}>{type}</option>
+            <option value={type}>{TYPE_LABELS[type] ?? type}</option>
           {/each}
         </select>
       </PropertyCell>
@@ -282,6 +292,33 @@
           <option value="cycleValue">cycleValue</option>
           <option value="toggleValue">toggleValue</option>
         </select>
+      </PropertyCell>
+    </PropertySection>
+
+    <PropertySection title="Bounds">
+      <PropertyCell label="Mode" span={2} hint="Most generators can be scoped to a rectangular percentage area inside the component.">
+        <select class="val" value={selected.bounds?.unit ?? 'percent'} onchange={(event) => set('bounds.unit', event.target.value)}>
+          <option value="percent">percent</option>
+          <option value="px">px</option>
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Preset" span={2} hint="Quickly fill the whole component or leave a useful inset.">
+        <div class="bounds-presets">
+          <button type="button" onclick={() => setBoundsPreset('full')}>Full</button>
+          <button type="button" onclick={() => setBoundsPreset('inset')}>Inset</button>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="X" span={1} hint="Left edge of the generated area.">
+        <NumberInput value={selected.bounds?.x ?? 0} step={1} onchange={(value) => set('bounds.x', value)} />
+      </PropertyCell>
+      <PropertyCell label="Y" span={1} hint="Top edge of the generated area.">
+        <NumberInput value={selected.bounds?.y ?? 0} step={1} onchange={(value) => set('bounds.y', value)} />
+      </PropertyCell>
+      <PropertyCell label="Width" span={1} hint="Generated area width.">
+        <NumberInput value={selected.bounds?.width ?? 100} step={1} min={1} onchange={(value) => set('bounds.width', Math.max(1, value))} />
+      </PropertyCell>
+      <PropertyCell label="Height" span={1} hint="Generated area height.">
+        <NumberInput value={selected.bounds?.height ?? 100} step={1} min={1} onchange={(value) => set('bounds.height', Math.max(1, value))} />
       </PropertyCell>
     </PropertySection>
 
@@ -341,6 +378,25 @@
 <style>
   .val { width: 100%; min-width: 0; background: #1A1A1A; border: 1px solid #333; border-radius: 3px; color: #DDD; font-size: 11px; padding: 4px 6px; font-family: inherit; outline: none; box-sizing: border-box; }
   .val:focus { border-color: #5B9BD5; }
+  .bounds-presets {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .bounds-presets button {
+    min-height: 26px;
+    border: 1px solid #34424D;
+    border-radius: 4px;
+    background: #22282D;
+    color: #DDE6EC;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+  }
+  .bounds-presets button:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
   .generator-preview {
     position: relative;
     width: 100%;

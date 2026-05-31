@@ -81,6 +81,8 @@
   let textPosition = $derived(text?._children?.Position ?? null);
   let valueArc = $derived(part?.meta?.valueArc ?? null);
   let arcTrack = $derived(part?.meta?.arcTrack ?? part?.meta?.ringArc ?? null);
+  let envelopePath = $derived(part?.meta?.envelopePath ?? null);
+  let waveformIcon = $derived(part?.meta?.waveformIcon ?? null);
   let rendersValueArc = $derived(
     String(part?.kind ?? '').toLowerCase() === 'valuearc'
     || String(part?.meta?.renderer ?? '').toLowerCase() === 'valuearc'
@@ -88,6 +90,14 @@
   let rendersArcTrack = $derived(
     ['arctrack', 'ringarc'].includes(String(part?.kind ?? '').toLowerCase())
     || ['arctrack', 'ringarc'].includes(String(part?.meta?.renderer ?? '').toLowerCase())
+  );
+  let rendersEnvelopePath = $derived(
+    String(part?.kind ?? '').toLowerCase() === 'envelopepath'
+    || String(part?.meta?.renderer ?? '').toLowerCase() === 'envelopepath'
+  );
+  let rendersWaveformIcon = $derived(
+    String(part?.kind ?? '').toLowerCase() === 'waveformicon'
+    || String(part?.meta?.renderer ?? '').toLowerCase() === 'waveformicon'
   );
   let usesSimpleBackground = $derived(
     background
@@ -147,7 +157,7 @@
       `opacity:${numberOr(part?.opacity, 1)}`,
       `z-index:${numberOr(part?.zIndex, 0)}`,
       `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
-      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:center center` : '',
+      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout?.pivotX, 50)}% ${numberOr(layout?.pivotY, 50)}%` : '',
       buildTransitionStyle(transitionBucket),
       shadowCSS,
       blendCSS,
@@ -258,12 +268,16 @@
     const thickness = clampNumber(valueArc?.thickness, 1, size / 2);
     const value = clampNumber(valueArc?.value, 0, 1);
     const sweepAngle = clampNumber(valueArc?.sweepAngle, 0, 360);
-    const filledAngle = Math.max(0.001, sweepAngle * value);
     const startAngle = numberOr(valueArc?.startAngle, -135);
+    const hasRange = valueArc?.startValue !== undefined || valueArc?.endValue !== undefined;
+    const rangeStartValue = hasRange ? clampNumber(valueArc?.startValue, 0, 1) : 0;
+    const rangeEndValue = hasRange ? clampNumber(valueArc?.endValue, rangeStartValue, 1) : value;
+    const renderedStartAngle = startAngle + (sweepAngle * rangeStartValue);
+    const filledAngle = Math.max(0.001, sweepAngle * Math.max(0, rangeEndValue - rangeStartValue));
     const colour = cssColour(valueArc?.colour ?? background?._children?.Border?.colour, '#5B9BD5');
 
     return [
-      `background:conic-gradient(from ${startAngle}deg, ${colour} 0deg ${filledAngle}deg, transparent ${filledAngle}deg 360deg)`,
+      `background:conic-gradient(from ${renderedStartAngle}deg, ${colour} 0deg ${filledAngle}deg, transparent ${filledAngle}deg 360deg)`,
       `-webkit-mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
       `mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
     ].join('; ');
@@ -309,6 +323,109 @@
       borderWidth > 0 ? `border:${borderWidth}px solid ${borderColour}` : 'border:none',
     ].join('; ');
   });
+
+  let envelopeSvg = $derived.by(() => {
+    if (!rendersEnvelopePath) return { d: '', fillD: '', stroke: '#65E6A0', fill: 'transparent', strokeWidth: 3 };
+    const width = Math.max(1, frame.width);
+    const height = Math.max(1, frame.height);
+    const padX = clampNumber(envelopePath?.padX, 0, width / 3);
+    const padY = clampNumber(envelopePath?.padY, 0, height / 3);
+    const innerWidth = Math.max(1, width - (padX * 2));
+    const bottom = Math.max(padY + 1, height - padY);
+    const top = padY;
+    const normalizedPoints = Array.isArray(envelopePath?.points) ? envelopePath.points : [];
+    const points = normalizedPoints.length >= 2
+      ? normalizedPoints.map((point) => {
+        const x = clampNumber(point?.x, 0, 1);
+        const y = clampNumber(point?.y, 0, 1);
+        return [
+          padX + (innerWidth * x),
+          bottom - ((bottom - top) * y),
+        ];
+      })
+      : (() => {
+        const attack = clampNumber(envelopePath?.attack, 0, 1);
+        const decay = clampNumber(envelopePath?.decay, 0, 1);
+        const sustain = clampNumber(envelopePath?.sustain, 0, 1);
+        const release = clampNumber(envelopePath?.release, 0, 1);
+        const attackX = padX + Math.max(12, innerWidth * (0.12 + attack * 0.18));
+        const sustainX = Math.min(width - padX - 36, attackX + Math.max(22, innerWidth * (0.12 + decay * 0.16)));
+        const releaseX = Math.max(sustainX + 28, width - padX - Math.max(20, innerWidth * (0.08 + release * 0.22)));
+        const sustainY = bottom - ((bottom - top) * sustain);
+        return [
+          [padX, bottom],
+          [attackX, top],
+          [sustainX, sustainY],
+          [releaseX, sustainY],
+          [width - padX, bottom],
+        ];
+      })();
+    const d = points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x.toFixed(2)} ${y.toFixed(2)}`).join(' ');
+    const firstX = points[0]?.[0] ?? padX;
+    const lastX = points.at(-1)?.[0] ?? (width - padX);
+    const fillD = `${d} L ${lastX.toFixed(2)} ${bottom.toFixed(2)} L ${firstX.toFixed(2)} ${bottom.toFixed(2)} Z`;
+    return {
+      d,
+      fillD,
+      stroke: cssColour(envelopePath?.stroke ?? 'FF65E6A0', '#65E6A0'),
+      fill: cssColour(envelopePath?.fill ?? '2265E6A0', 'rgba(101,230,160,0.12)'),
+      strokeWidth: clampNumber(envelopePath?.strokeWidth, 1, 12),
+    };
+  });
+
+  function waveformPath(type, left, right, top, bottom, mid) {
+    const width = right - left;
+    if (type === 'saw') {
+      return `M ${left} ${bottom} L ${right} ${top} L ${right} ${bottom}`;
+    }
+    if (type === 'square') {
+      return `M ${left} ${bottom} L ${left} ${top} L ${left + width * 0.5} ${top} L ${left + width * 0.5} ${bottom} L ${right} ${bottom}`;
+    }
+    if (type === 'noise') {
+      const amplitude = Math.max(2, (bottom - top) * 0.42);
+      const points = [
+        [left, mid],
+        [left + width * 0.12, mid - amplitude * 0.65],
+        [left + width * 0.23, mid + amplitude * 0.35],
+        [left + width * 0.34, mid - amplitude * 0.2],
+        [left + width * 0.46, mid + amplitude * 0.78],
+        [left + width * 0.58, mid - amplitude * 0.72],
+        [left + width * 0.7, mid + amplitude * 0.08],
+        [left + width * 0.82, mid - amplitude * 0.36],
+        [right, mid],
+      ];
+      return points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${clampNumber(x, left, right).toFixed(2)} ${clampNumber(y, top, bottom).toFixed(2)}`).join(' ');
+    }
+    return `M ${left} ${mid} C ${left + width * 0.25} ${top}, ${left + width * 0.25} ${top}, ${left + width * 0.5} ${mid} C ${left + width * 0.75} ${bottom}, ${left + width * 0.75} ${bottom}, ${right} ${mid}`;
+  }
+
+  let waveformSvg = $derived.by(() => {
+    if (!rendersWaveformIcon) return { d: '', tileD: '', tiles: [], stroke: '#EAF0F6', strokeWidth: 3, animate: false, animationMode: 'scroll', durationMs: 900 };
+    const width = Math.max(1, frame.width);
+    const height = Math.max(1, frame.height);
+    const pad = Math.max(2, Math.min(width, height) * 0.16);
+    const left = pad;
+    const right = width - pad;
+    const top = pad;
+    const mid = height / 2;
+    const bottom = height - pad;
+    const type = String(waveformIcon?.type ?? 'sine').trim().toLowerCase();
+    const d = waveformPath(type, left, right, top, bottom, mid);
+    const tileTop = top;
+    const tileBottom = bottom;
+    const tileMid = mid;
+    const tileD = waveformPath(type, 0, width, tileTop, tileBottom, tileMid);
+    return {
+      d,
+      tileD,
+      tiles: [0, width, width * 2],
+      stroke: cssColour(waveformIcon?.stroke ?? 'FFEAF0F6', '#EAF0F6'),
+      strokeWidth: clampNumber(waveformIcon?.strokeWidth, 1, 8),
+      animate: waveformIcon?.animate === true,
+      animationMode: String(waveformIcon?.animationMode ?? waveformIcon?.animation ?? 'scroll').trim().toLowerCase(),
+      durationMs: Math.max(120, numberOr(waveformIcon?.animationDurationMs ?? waveformIcon?.duration, 900)),
+    };
+  });
 </script>
 
 {#if part?.visible !== false}
@@ -325,6 +442,28 @@
 
     {#if rendersArcTrack}
       <div class="interactive-arc-track" style={arcTrackStyle}></div>
+    {/if}
+
+    {#if rendersEnvelopePath}
+      <svg class="interactive-envelope-path" viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
+        <path d={envelopeSvg.fillD} fill={envelopeSvg.fill}></path>
+        <path d={envelopeSvg.d} fill="none" stroke={envelopeSvg.stroke} stroke-width={envelopeSvg.strokeWidth} stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+    {/if}
+
+    {#if rendersWaveformIcon}
+      <svg class="interactive-waveform-icon" class:dash-scrolling={waveformSvg.animate && waveformSvg.animationMode === 'dash'} class:real-scrolling={waveformSvg.animate && waveformSvg.animationMode !== 'dash'} viewBox={`0 0 ${Math.max(1, frame.width)} ${Math.max(1, frame.height)}`} aria-hidden="true">
+        {#if waveformSvg.animate && waveformSvg.animationMode !== 'dash'}
+          <g class="waveform-strip">
+            <animateTransform attributeName="transform" type="translate" from="0 0" to={`-${Math.max(1, frame.width)} 0`} dur={`${waveformSvg.durationMs}ms`} repeatCount="indefinite" />
+            {#each waveformSvg.tiles as offset}
+              <path d={waveformSvg.tileD} transform={`translate(${offset} 0)`} fill="none" stroke={waveformSvg.stroke} stroke-width={waveformSvg.strokeWidth} stroke-linecap="round" stroke-linejoin="round"></path>
+            {/each}
+          </g>
+        {:else}
+          <path d={waveformSvg.d} fill="none" stroke={waveformSvg.stroke} stroke-width={waveformSvg.strokeWidth} stroke-linecap="round" stroke-linejoin="round"></path>
+        {/if}
+      </svg>
     {/if}
 
     {#if text && !editableInput}
@@ -371,6 +510,34 @@
     inset: 0;
     border-radius: 50%;
     pointer-events: none;
+  }
+
+  .interactive-envelope-path,
+  .interactive-waveform-icon {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .interactive-waveform-icon.real-scrolling {
+    overflow: hidden;
+  }
+
+  .interactive-waveform-icon path {
+    vector-effect: non-scaling-stroke;
+  }
+
+  .interactive-waveform-icon.dash-scrolling path {
+    stroke-dasharray: 14 8;
+    animation: waveform-icon-scroll 760ms linear infinite;
+  }
+
+  @keyframes waveform-icon-scroll {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: -22; }
   }
 
   .part-debug-chip {

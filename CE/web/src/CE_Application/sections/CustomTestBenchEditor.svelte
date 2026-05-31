@@ -122,6 +122,9 @@
       })).slice(0, 4),
     };
   }));
+  let stateCoverageDiagnostics = $derived.by(() => buildStateCoverageDiagnostics());
+  let enumGroupDiagnostics = $derived.by(() => buildEnumGroupDiagnostics());
+  let specializedInspectorDiagnostics = $derived.by(() => buildSpecializedInspectorDiagnostics());
   let bindingDiagnostics = $derived.by(() => Object.entries(bindings?._children ?? {}).map(([name, binding]) => {
     const sourceValue = bindingSourcePreview(binding, {
       testValue: preview.testValue ?? 0.5,
@@ -540,6 +543,101 @@
       .filter((entry) => entry !== undefined && entry !== null);
   }
 
+  function enumOptionsForChannel(channelName, channel) {
+    const options = new Set(channelOptions(channel).map((entry) => String(entry)));
+    if (channel?.defaultValue !== undefined && channel?.defaultValue !== null && channel?.defaultValue !== '') {
+      options.add(String(channel.defaultValue));
+    }
+    for (const [, zone] of materializedHitZoneEntries) {
+      if (zone?.targetValueChannel !== channelName) continue;
+      const payloadValue = zone?.payload?.value ?? zone?.value;
+      if (payloadValue !== undefined && payloadValue !== null && payloadValue !== '') options.add(String(payloadValue));
+    }
+    for (const [, state] of Object.entries(states?._children ?? {})) {
+      const valueEnum = state?.when?.valueEnum;
+      if (valueEnum !== undefined && valueEnum !== null && valueEnum !== '') options.add(String(valueEnum));
+    }
+    return [...options];
+  }
+
+  function buildStateCoverageDiagnostics() {
+    return Object.entries(values?._children ?? {})
+      .filter(([, channel]) => String(channel?.type ?? '').toLowerCase() === 'enum')
+      .map(([channelName, channel]) => {
+        const options = enumOptionsForChannel(channelName, channel);
+        const rows = options.map((option) => {
+          const matchingStates = Object.entries(states?._children ?? {})
+            .filter(([, state]) => state?.enabled !== false && String(state?.when?.valueEnum ?? '') === String(option))
+            .map(([stateName]) => stateName);
+          const matchingZones = materializedHitZoneEntries
+            .filter(([, zone]) => zone?.enabled !== false && zone?.targetValueChannel === channelName && String(zone?.payload?.value ?? zone?.value ?? '') === String(option))
+            .map(([zoneName]) => zoneName);
+          return {
+            option,
+            stateNames: matchingStates,
+            zoneNames: matchingZones,
+            covered: matchingStates.length > 0,
+            reachable: matchingZones.length > 0,
+          };
+        });
+        return {
+          channelName,
+          label: channel?.label ?? channelName,
+          rows,
+          missingStates: rows.filter((row) => !row.covered).length,
+          missingZones: rows.filter((row) => !row.reachable).length,
+        };
+      });
+  }
+
+  function buildEnumGroupDiagnostics() {
+    return Object.entries(values?._children ?? {})
+      .filter(([, channel]) => String(channel?.type ?? '').toLowerCase() === 'enum')
+      .map(([channelName, channel]) => {
+        const zones = materializedHitZoneEntries
+          .filter(([, zone]) => zone?.enabled !== false && zone?.targetValueChannel === channelName)
+          .map(([zoneName, zone]) => ({
+            name: zoneName,
+            value: zone?.payload?.value ?? zone?.value ?? '',
+            generated: zone?.generated === true,
+            source: zone?.meta?.generatedBy ?? '',
+          }));
+        const valuesCovered = new Set(zones.map((zone) => String(zone.value)).filter(Boolean));
+        return {
+          channelName,
+          label: channel?.label ?? channelName,
+          options: enumOptionsForChannel(channelName, channel),
+          zones,
+          valuesCovered: valuesCovered.size,
+          generated: zones.filter((zone) => zone.generated).length,
+        };
+      })
+      .filter((group) => group.zones.length || group.options.length);
+  }
+
+  function buildSpecializedInspectorDiagnostics() {
+    const found = [];
+    const channelKeys = new Set(Object.keys(values?._children ?? {}));
+    const behaviorTypes = Object.values(behaviors?._children ?? {}).map((behavior) => `${behavior?.type ?? ''} ${behavior?.role ?? ''} ${behavior?.geometry ?? ''}`.toLowerCase());
+    const generatorTypes = Object.values(generators?._children ?? {}).map((generator) => String(generator?.type ?? '').toLowerCase());
+    if ((channelKeys.has('x') && channelKeys.has('y')) || behaviorTypes.some((entry) => entry.includes('xy'))) {
+      found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'behaviors' }) });
+    }
+    if (generatorTypes.includes('repeated-leds') || generatorTypes.includes('meter-bars')) {
+      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSection': 'generators', 'Designer.preview.showHitZones': true }) });
+    }
+    if (enumGroupDiagnostics.length) {
+      found.push({ id: 'segmented', label: 'Segmented Enum', detail: `${enumGroupDiagnostics.length} enum group${enumGroupDiagnostics.length === 1 ? '' : 's'} with mutual exclusion and state coverage.`, action: 'Enum Groups', focus: () => {} });
+    }
+    if (designer?.arpeggiator?.enabled === true || materializedPartNames.some((name) => name.toLowerCase().includes('arp'))) {
+      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSection': 'customlayers' }) });
+    }
+    if (['attack', 'decay', 'sustain', 'release'].some((name) => channelKeys.has(name))) {
+      found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'valuechannels' }) });
+    }
+    return found;
+  }
+
   function setChannelTestValue(name, value) {
     if (!name || !values?._children?.[name]) return;
     const channelValues = {
@@ -698,6 +796,12 @@
     if (String(name) === stateName) return true;
     const when = state.when ?? {};
     return Object.entries(when).every(([key, expected]) => {
+      if (key === 'valueEnum') {
+        const enumValues = Object.entries(values?._children ?? {})
+          .filter(([, channel]) => String(channel?.type ?? '').toLowerCase() === 'enum')
+          .map(([channelName]) => linkedDefaults.values?.[channelName] ?? seededValues?.[channelName]);
+        return enumValues.some((value) => String(value) === String(expected));
+      }
       const actual = key === 'value'
         ? currentPreview.testValue
         : (key === 'valueNormalized' ? currentPreview.testValue : stateName === key);
@@ -937,6 +1041,21 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Specialized Inspectors">
+    <PropertyCell label="Detected" span={4} hint="Domain-specific helpers inferred from channels, behaviors, generators, and arpeggiator metadata.">
+      <div class="specialized-list">
+        {#each specializedInspectorDiagnostics as item (item.id)}
+          <button class="specialized-card" type="button" onclick={item.focus}>
+            <strong>{item.label}</strong>
+            <span>{item.detail}</span>
+            <em>{item.action}</em>
+          </button>
+        {/each}
+        {#if specializedInspectorDiagnostics.length === 0}<div class="empty-row">No specialized component family detected.</div>{/if}
+      </div>
+    </PropertyCell>
+  </PropertySection>
+
   <PropertySection title="Channel Rig">
     <PropertyCell label="Controls" span={4} hint="Drive each custom value channel directly while the bench evaluates links, generated output, and public surface.">
       <div class="channel-rig">
@@ -1080,6 +1199,61 @@
           </div>
         {/each}
         {#if stateDiagnostics.length === 0}<div class="empty-row">No states.</div>{/if}
+      </div>
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="State Coverage">
+    <PropertyCell label="Enum Matrix" span={4} hint="Verify each enum value has a reachable hit zone and a visual state patch.">
+      <div class="coverage-list">
+        {#each stateCoverageDiagnostics as coverage (coverage.channelName)}
+          <div class="coverage-card" class:warning={coverage.missingStates || coverage.missingZones}>
+            <div class="coverage-head">
+              <strong>{coverage.label}</strong>
+              <span>{coverage.channelName}</span>
+              <em>{coverage.rows.length} option{coverage.rows.length === 1 ? '' : 's'}</em>
+              <small>{coverage.missingStates ? `${coverage.missingStates} missing state${coverage.missingStates === 1 ? '' : 's'}` : 'states covered'}</small>
+            </div>
+            <div class="coverage-options">
+              {#each coverage.rows as row (row.option)}
+                <button class="coverage-option" class:covered={row.covered && row.reachable} class:missing={!row.covered || !row.reachable} type="button" onclick={() => setChannelTestValue(coverage.channelName, row.option)}>
+                  <strong>{row.option}</strong>
+                  <span>{row.covered ? row.stateNames.join(', ') : 'no visual state'}</span>
+                  <em>{row.reachable ? `${row.zoneNames.length} zone${row.zoneNames.length === 1 ? '' : 's'}` : 'no zone'}</em>
+                </button>
+              {/each}
+              {#if coverage.rows.length === 0}<div class="empty-row">No enum options discovered.</div>{/if}
+            </div>
+          </div>
+        {/each}
+        {#if stateCoverageDiagnostics.length === 0}<div class="empty-row">No enum channels to cover.</div>{/if}
+      </div>
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Enum Groups">
+    <PropertyCell label="Mutual Exclusion" span={4} hint="Enum channels act like one selected value, even when they are authored as separate buttons or generated zones.">
+      <div class="enum-group-list">
+        {#each enumGroupDiagnostics as group (group.channelName)}
+          <div class="enum-group-card">
+            <div class="enum-group-head">
+              <strong>{group.label}</strong>
+              <span>{group.channelName}</span>
+              <em>{group.valuesCovered}/{group.options.length} values reachable</em>
+              <small>{group.zones.length} zone{group.zones.length === 1 ? '' : 's'}</small>
+            </div>
+            <div class="enum-zone-pills">
+              {#each group.zones as zone (zone.name)}
+                <button type="button" onclick={() => setChannelTestValue(group.channelName, zone.value)} class:generated={zone.generated}>
+                  <strong>{zone.value || '?'}</strong>
+                  <span>{zone.name}</span>
+                </button>
+              {/each}
+              {#if group.zones.length === 0}<div class="empty-row">No zones target this enum channel.</div>{/if}
+            </div>
+          </div>
+        {/each}
+        {#if enumGroupDiagnostics.length === 0}<div class="empty-row">No enum groups.</div>{/if}
       </div>
     </PropertyCell>
   </PropertySection>
@@ -1504,6 +1678,55 @@
     width: 100%;
     margin-bottom: 7px;
   }
+  .specialized-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
+    gap: 7px;
+    width: 100%;
+  }
+  .specialized-card {
+    min-width: 0;
+    min-height: 72px;
+    display: grid;
+    gap: 4px;
+    align-content: start;
+    border: 1px solid #31424C;
+    border-radius: 5px;
+    background: #151B20;
+    color: #C9D3DA;
+    cursor: pointer;
+    font: inherit;
+    padding: 8px;
+    text-align: left;
+  }
+  .specialized-card:hover {
+    border-color: #5B9BD5;
+    background: #172330;
+    color: #FFFFFF;
+  }
+  .specialized-card strong,
+  .specialized-card span,
+  .specialized-card em {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: normal;
+  }
+  .specialized-card strong {
+    white-space: nowrap;
+    color: #F0F4F7;
+    font-size: 11px;
+  }
+  .specialized-card span {
+    color: #B8C7D0;
+    font-size: 10px;
+    line-height: 1.3;
+  }
+  .specialized-card em {
+    white-space: nowrap;
+    color: #82B8E5;
+    font-size: 10px;
+  }
   .probe-group {
     min-width: 0;
     border: 1px solid #303840;
@@ -1586,6 +1809,18 @@
     gap: 6px;
     width: 100%;
   }
+  .coverage-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+  }
+  .enum-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    width: 100%;
+  }
   .animation-card {
     min-width: 0;
     border: 1px solid #303840;
@@ -1598,6 +1833,24 @@
     border: 1px solid #303840;
     border-radius: 5px;
     background: #171C20;
+    padding: 7px;
+  }
+  .coverage-card {
+    min-width: 0;
+    border: 1px solid #30424D;
+    border-radius: 5px;
+    background: #161C20;
+    padding: 7px;
+  }
+  .coverage-card.warning {
+    border-color: #4B3E2C;
+    background: #1D1A16;
+  }
+  .enum-group-card {
+    min-width: 0;
+    border: 1px solid #31424C;
+    border-radius: 5px;
+    background: #151B20;
     padding: 7px;
   }
   .animation-card.active {
@@ -1668,6 +1921,156 @@
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
+  }
+  .coverage-head {
+    display: grid;
+    grid-template-columns: minmax(82px, 1fr) minmax(68px, 0.8fr) minmax(58px, 0.6fr) minmax(86px, 0.9fr);
+    gap: 7px;
+    align-items: center;
+    margin-bottom: 7px;
+  }
+  .coverage-head strong,
+  .coverage-head span,
+  .coverage-head em,
+  .coverage-head small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: normal;
+  }
+  .coverage-head strong {
+    color: #F0F4F7;
+    font-size: 11px;
+  }
+  .coverage-head span {
+    color: #B8C7D0;
+    font-size: 10px;
+  }
+  .coverage-head em {
+    color: #82B8E5;
+    font-size: 10px;
+  }
+  .coverage-head small {
+    color: #D8B36A;
+    font-size: 10px;
+  }
+  .coverage-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    gap: 6px;
+  }
+  .coverage-option {
+    min-width: 0;
+    min-height: 52px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+    border: 1px solid #303840;
+    border-radius: 5px;
+    background: #171C20;
+    color: #C9D3DA;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    padding: 7px;
+    text-align: left;
+  }
+  .coverage-option.covered {
+    border-color: #47613E;
+    background: #171D16;
+  }
+  .coverage-option.missing {
+    border-color: #5A3F2E;
+    background: #201916;
+  }
+  .coverage-option:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
+  .coverage-option strong,
+  .coverage-option span,
+  .coverage-option em {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: normal;
+  }
+  .coverage-option strong {
+    color: #F0F4F7;
+  }
+  .coverage-option span {
+    color: #CDE1EE;
+  }
+  .coverage-option em {
+    color: #82B8E5;
+  }
+  .enum-group-head {
+    display: grid;
+    grid-template-columns: minmax(82px, 1fr) minmax(68px, 0.8fr) minmax(86px, 0.9fr) minmax(56px, 0.6fr);
+    gap: 7px;
+    align-items: center;
+    margin-bottom: 7px;
+  }
+  .enum-group-head strong,
+  .enum-group-head span,
+  .enum-group-head em,
+  .enum-group-head small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-style: normal;
+  }
+  .enum-group-head strong {
+    color: #F0F4F7;
+    font-size: 11px;
+  }
+  .enum-group-head span,
+  .enum-group-head small {
+    color: #B8C7D0;
+    font-size: 10px;
+  }
+  .enum-group-head em {
+    color: #A9DCB8;
+    font-size: 10px;
+  }
+  .enum-zone-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .enum-zone-pills button {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 5px;
+    align-items: center;
+    max-width: 180px;
+    min-height: 25px;
+    border: 1px solid #34424D;
+    border-radius: 4px;
+    background: #1C252C;
+    color: #CDE1EE;
+    cursor: pointer;
+    font: inherit;
+    font-size: 10px;
+    text-align: left;
+  }
+  .enum-zone-pills button.generated {
+    border-color: #47613E;
+    background: #171D16;
+  }
+  .enum-zone-pills button:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
+  .enum-zone-pills strong,
+  .enum-zone-pills span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .animation-targets span,
   .animation-targets em,

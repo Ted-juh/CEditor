@@ -68,9 +68,9 @@
     resolvedRuntime = null,
     session = null,
     onpatchsession = null,
+    compact = false,
   } = $props();
 
-  const SURFACE_PADDING = 24;
   const MAX_PREVIEW_SCALE = 2.75;
 
   let stageWidth = $state(0);
@@ -83,6 +83,7 @@
   let pointerStartValue = $state(0);
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
+  let pointerCustomStartValues = $state({});
   let keyboardFocusActive = $state(false);
   let lastInputMode = $state('pointer');
   let lastControlId = $state('');
@@ -191,19 +192,21 @@
     }
     return clone;
   });
+  let customHitZones = $derived((previewControl?._children?.HitZones?._children ?? {}));
 
   let controlWidth = $derived(Math.max(24, numberOr(transform?.width, 100)));
   let controlHeight = $derived(Math.max(24, numberOr(transform?.height, 40)));
+  let surfacePadding = $derived(compact ? 0 : 24);
   let fitScale = $derived.by(() => {
     if (!stageWidth || !stageHeight) return 1;
-    const usableWidth = Math.max(1, stageWidth - (SURFACE_PADDING * 2));
-    const usableHeight = Math.max(1, stageHeight - (SURFACE_PADDING * 2));
+    const usableWidth = Math.max(1, stageWidth - (surfacePadding * 2));
+    const usableHeight = Math.max(1, stageHeight - (surfacePadding * 2));
     return clamp(Math.min(usableWidth / controlWidth, usableHeight / controlHeight, MAX_PREVIEW_SCALE), 0.25, MAX_PREVIEW_SCALE);
   });
   let sceneWidth = $derived(controlWidth * fitScale);
   let sceneHeight = $derived(controlHeight * fitScale);
-  let sceneLeft = $derived(Math.max(SURFACE_PADDING, (stageWidth - sceneWidth) / 2));
-  let sceneTop = $derived(Math.max(SURFACE_PADDING, (stageHeight - sceneHeight) / 2));
+  let sceneLeft = $derived(compact ? Math.max(0, (stageWidth - sceneWidth) / 2) : Math.max(surfacePadding, (stageWidth - sceneWidth) / 2));
+  let sceneTop = $derived(compact ? Math.max(0, (stageHeight - sceneHeight) / 2) : Math.max(surfacePadding, (stageHeight - sceneHeight) / 2));
   let previewSession = $derived(session?.enabled === false ? {} : (session ?? {}));
   let isDisabled = $derived(session?.enabled === false || session?.disabled === true);
   let isComboboxControl = $derived(
@@ -287,6 +290,7 @@
       pointerDownZone = '';
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
+      pointerCustomStartValues = {};
       keyboardFocusActive = false;
       comboboxOpen = false;
       if (commitResetTimer) {
@@ -311,6 +315,145 @@
     };
   }
 
+  function formatDebugNumber(value, precision = 3) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric.toFixed(precision) : String(value ?? '');
+  }
+
+  function customDebugValue(channel, value) {
+    const type = String(channel?.type ?? 'float').toLowerCase();
+    if (type === 'bool') return value === true ? 'true' : 'false';
+    if (type === 'enum') return String(value ?? channel?.defaultValue ?? '');
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return String(value ?? '');
+    const precision = type === 'int' ? 0 : Math.min(3, Math.max(0, Number(channel?.format?.precision ?? 3)));
+    const prefix = channel?.format?.prefix ?? '';
+    const suffix = channel?.format?.suffix ?? '';
+    return `${prefix}${numeric.toFixed(precision)}${suffix}`;
+  }
+
+  let customDebugRows = $derived.by(() => {
+    if (!isCustomComponent) return [];
+    const values = customSessionValues();
+    return Object.entries(customChannels ?? {}).map(([name, channel]) => {
+      const raw = values?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
+      return {
+        name,
+        label: channel?.label ?? name,
+        raw,
+        display: customDebugValue(channel, raw),
+        normalized: normalizeCustomChannelValue(channel, raw),
+      };
+    });
+  });
+
+  let activeCustomDebug = $derived.by(() => {
+    if (!isCustomComponent) return null;
+    const activeHitZoneName = pointerCustomHitZone?.name ?? session?.activeCustomHitZone ?? '';
+    const activeZone = pointerCustomHitZone?.zone ?? null;
+    const activeBehaviorName = activeZone?.targetBehavior ?? session?.activeCustomBehavior ?? '';
+    const activeBehavior = customBehaviors?.[activeBehaviorName] ?? customMainBehaviorModule();
+    return {
+      behavior: activeBehaviorName || activeBehavior?.name || '-',
+      hitZone: activeHitZoneName || '-',
+      dragMode: activeBehavior?.dragMode ?? 'auto',
+      geometry: activeBehavior?.geometry ?? '-',
+      active: pointerActive || session?.dragging === true || Boolean(session?.activeCustomHitZone),
+    };
+  });
+
+  function zoneBoundsPx(zone) {
+    const bounds = zone?.bounds ?? zone?._children?.Bounds ?? {};
+    const unit = String(bounds.unit ?? 'percent');
+    const x = numberOr(bounds.x, 0);
+    const y = numberOr(bounds.y, 0);
+    const width = numberOr(bounds.width, unit === 'percent' ? 100 : controlWidth);
+    const height = numberOr(bounds.height, unit === 'percent' ? 100 : controlHeight);
+    return {
+      left: unit === 'percent' ? (controlWidth * x) / 100 : x,
+      top: unit === 'percent' ? (controlHeight * y) / 100 : y,
+      width: unit === 'percent' ? (controlWidth * width) / 100 : width,
+      height: unit === 'percent' ? (controlHeight * height) / 100 : height,
+    };
+  }
+
+  function boundsForFrames(frames = []) {
+    if (!frames.length) return { left: 0, top: 0, width: 0, height: 0 };
+    const left = Math.min(...frames.map((frame) => frame.left));
+    const top = Math.min(...frames.map((frame) => frame.top));
+    const right = Math.max(...frames.map((frame) => frame.left + frame.width));
+    const bottom = Math.max(...frames.map((frame) => frame.top + frame.height));
+    return { left, top, width: right - left, height: bottom - top };
+  }
+
+  function zoneOverlayStyle(entry) {
+    const frame = entry.frame ?? {};
+    return [
+      `left:${numberOr(frame.left, 0)}px`,
+      `top:${numberOr(frame.top, 0)}px`,
+      `width:${Math.max(1, numberOr(frame.width, 0))}px`,
+      `height:${Math.max(1, numberOr(frame.height, 0))}px`,
+      entry.shape === 'circle' || entry.shape === 'ring' || entry.shape === 'ellipse' ? 'border-radius:999px' : '',
+    ].filter(Boolean).join('; ');
+  }
+
+  let customHitZoneOverlayEntries = $derived.by(() => {
+    if (!isCustomComponent) return [];
+    const entries = Object.entries(customHitZones ?? {})
+      .filter(([, zone]) => zone?.enabled !== false && zone?.visibleInEditor !== false)
+      .map(([name, zone]) => ({
+        name,
+        zone,
+        source: String(zone?.meta?.generatedBy ?? '').trim(),
+        generated: zone?.generated === true || zone?.meta?.generated === true,
+        shape: String(zone?.shape ?? 'rectangle'),
+        frame: zoneBoundsPx(zone),
+      }));
+    const generatedBySource = new Map();
+    const result = [];
+    for (const entry of entries) {
+      if (entry.generated && entry.source) {
+        if (!generatedBySource.has(entry.source)) generatedBySource.set(entry.source, []);
+        generatedBySource.get(entry.source).push(entry);
+      } else {
+        result.push({
+          ...entry,
+          id: entry.name,
+          label: entry.name,
+          count: 1,
+          summary: entry.zone?.action ?? 'zone',
+        });
+      }
+    }
+    for (const [source, sourceEntries] of generatedBySource) {
+      if (sourceEntries.length <= 4) {
+        for (const entry of sourceEntries) {
+          result.push({
+            ...entry,
+            id: entry.name,
+            label: entry.name,
+            count: 1,
+            summary: source,
+          });
+        }
+        continue;
+      }
+      result.push({
+        id: `generated:${source}`,
+        name: source,
+        source,
+        generated: true,
+        grouped: true,
+        shape: 'rectangle',
+        frame: boundsForFrames(sourceEntries.map((entry) => entry.frame)),
+        label: source,
+        count: sourceEntries.length,
+        summary: `${sourceEntries.length} generated zones`,
+      });
+    }
+    return result;
+  });
+
   function customMainChannelName() {
     return customChannels?.mainValue ? 'mainValue' : (Object.keys(customChannels ?? {})[0] ?? '');
   }
@@ -333,6 +476,9 @@
       rect,
       clientX: event?.clientX ?? rect?.left ?? 0,
       clientY: event?.clientY ?? rect?.top ?? 0,
+      startClientX: pointerDownPoint?.x,
+      startClientY: pointerDownPoint?.y,
+      startValues: pointerCustomStartValues,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -356,7 +502,34 @@
     }
     const { channelName, channel, behaviorModule } = customChannelForHitZone(pointerCustomHitZone);
     if (!channel) return;
-    const normalized = resolveCustomNormalizedFromPoint(behaviorModule, rect, event.clientX, event.clientY);
+    const secondaryChannelName = pointerCustomHitZone?.zone?.targetValueChannelY ?? pointerCustomHitZone?.zone?.targetYValueChannel ?? '';
+    const secondaryChannel = customChannels?.[secondaryChannelName] ?? null;
+    const behaviorType = String(behaviorModule?.type ?? '').trim().toLowerCase();
+    const behaviorGeometry = String(behaviorModule?.geometry ?? '').trim().toLowerCase();
+    if (secondaryChannel && (behaviorType.includes('xy') || behaviorGeometry === 'xy' || behaviorGeometry === 'grid')) {
+      const localX = clamp(event.clientX - rect.left, 0, rect.width);
+      const localY = clamp(event.clientY - rect.top, 0, rect.height);
+      const xNormalized = clamp(localX / Math.max(1, rect.width), 0, 1);
+      const yNormalized = clamp(1 - (localY / Math.max(1, rect.height)), 0, 1);
+      const nextX = denormalizeCustomChannelValue(channel, xNormalized);
+      const nextY = denormalizeCustomChannelValue(secondaryChannel, yNormalized);
+      patchSession({
+        customValues: {
+          ...customSessionValues(),
+          [channelName]: nextX,
+          [secondaryChannelName]: nextY,
+        },
+        activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+        activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        dragging: true,
+      });
+      return;
+    }
+    const normalized = resolveCustomNormalizedFromPoint(behaviorModule, rect, event.clientX, event.clientY, {
+      startClientX: pointerDownPoint?.x,
+      startClientY: pointerDownPoint?.y,
+      startNormalized: normalizeCustomChannelValue(channel, pointerCustomStartValues?.[channelName] ?? customSessionValues()?.[channelName] ?? channel?.defaultValue),
+    });
     const nextValue = denormalizeCustomChannelValue(channel, normalized);
     patchSession({
       customValues: {
@@ -1103,7 +1276,8 @@
 
     if (isCustomComponent) {
       const rect = hitboxElement?.getBoundingClientRect?.();
-      pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedControl ?? control, rect, event.clientX, event.clientY);
+      pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedControl ?? control, rect, event.clientX, event.clientY, customSessionValues());
+      pointerCustomStartValues = { ...customSessionValues() };
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || action.startsWith('arpeggiator') || action === '';
       if (isDragAction) {
@@ -1221,6 +1395,7 @@
       pointerDownZone = '';
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
+      pointerCustomStartValues = {};
       removeWindowListeners();
       return;
     }
@@ -1250,6 +1425,7 @@
     pointerDownZone = '';
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
+    pointerCustomStartValues = {};
     removeWindowListeners();
   }
 
@@ -1373,11 +1549,32 @@
   }
 </script>
 
-<div class="test-surface">
-  <div class="surface-header">
-    <div class="surface-title">Live Test Surface</div>
-    <div class="surface-subtitle">{helperLabel}</div>
-  </div>
+<div class="test-surface" class:compact>
+  {#if !compact}
+    <div class="surface-header">
+      <div class="surface-title">Live Test Surface</div>
+      <div class="surface-subtitle">{helperLabel}</div>
+    </div>
+  {/if}
+
+  {#if !compact && isCustomComponent && customDebugRows.length}
+    <div class="custom-debug-strip" class:active={activeCustomDebug?.active}>
+      <div class="debug-state">
+        <strong>{activeCustomDebug?.active ? 'Live input' : 'Ready'}</strong>
+        <span>zone {activeCustomDebug?.hitZone ?? '-'}</span>
+        <span>{activeCustomDebug?.geometry ?? '-'} · {activeCustomDebug?.dragMode ?? 'auto'}</span>
+      </div>
+      <div class="debug-channels">
+        {#each customDebugRows as row (row.name)}
+          <div class="debug-channel">
+            <strong>{row.label}</strong>
+            <span>{row.display}</span>
+            <em>{formatDebugNumber(row.normalized)}</em>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 
   <div class="surface-stage" bind:clientWidth={stageWidth} bind:clientHeight={stageHeight}>
     {#if previewControl}
@@ -1433,6 +1630,22 @@
             onpreviewvaluefieldfocus={handleRangeFieldFocus}
             onpreviewvaluefieldblur={handleRangeFieldBlur}
           />
+          {#if isCustomComponent && customHitZoneOverlayEntries.length}
+            <div class="custom-zone-overlay" aria-hidden="true">
+              {#each customHitZoneOverlayEntries as entry (entry.id)}
+                <span
+                  class="custom-zone-frame"
+                  class:generated={entry.generated}
+                  class:grouped={entry.grouped}
+                  class:active={entry.name === pointerCustomHitZone?.name || entry.name === session?.activeCustomHitZone}
+                  style={zoneOverlayStyle(entry)}
+                >
+                  <em>{entry.label}</em>
+                  {#if entry.count > 1}<strong>{entry.count}</strong>{/if}
+                </span>
+              {/each}
+            </div>
+          {/if}
         </div>
         {#if isComboboxControl && comboboxOpen && comboboxRows.length}
           <div
@@ -1481,6 +1694,10 @@
     height: 100%;
   }
 
+  .test-surface.compact {
+    gap: 0;
+  }
+
   .surface-header {
     display: flex;
     flex-direction: column;
@@ -1500,6 +1717,86 @@
     color: #8A8A8A;
   }
 
+  .custom-debug-strip {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.7fr) minmax(0, 1.8fr);
+    gap: 8px;
+    align-items: stretch;
+    padding: 8px;
+    border: 1px solid #2F3B40;
+    border-radius: 8px;
+    background: #171D20;
+  }
+
+  .custom-debug-strip.active {
+    border-color: rgba(45, 218, 204, 0.62);
+    background: #152224;
+  }
+
+  .debug-state,
+  .debug-channel {
+    min-width: 0;
+    border: 1px solid #28343A;
+    border-radius: 6px;
+    background: rgba(8, 12, 14, 0.46);
+  }
+
+  .debug-state {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 8px;
+  }
+
+  .debug-state strong,
+  .debug-channel strong {
+    font-size: 10px;
+    line-height: 1.2;
+    color: #E2F7F4;
+  }
+
+  .debug-state span {
+    overflow: hidden;
+    color: #8CA1A8;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .debug-channels {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .debug-channel {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 2px 6px;
+    padding: 6px 7px;
+  }
+
+  .debug-channel strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .debug-channel span {
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .debug-channel em {
+    grid-column: 1 / -1;
+    color: #75D9D0;
+    font-size: 10px;
+    font-style: normal;
+  }
+
   .surface-stage {
     position: relative;
     flex: 1;
@@ -1510,6 +1807,17 @@
     background:
       radial-gradient(circle at top, rgba(91, 155, 213, 0.12), transparent 42%),
       linear-gradient(180deg, #1C1C1C 0%, #161616 100%);
+  }
+
+  .test-surface.compact .surface-stage {
+    min-height: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .test-surface.compact .stage-grid {
+    display: none;
   }
 
   .stage-grid {
@@ -1548,6 +1856,62 @@
     border: 1px solid rgba(91, 155, 213, 0.6);
     border-radius: 12px;
     pointer-events: none;
+  }
+
+  .custom-zone-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 1000;
+    pointer-events: none;
+  }
+
+  .custom-zone-frame {
+    position: absolute;
+    box-sizing: border-box;
+    border: 1px solid rgba(45, 218, 204, 0.62);
+    background: rgba(45, 218, 204, 0.08);
+    color: #BFF6F1;
+    min-width: 10px;
+    min-height: 10px;
+  }
+
+  .custom-zone-frame.generated {
+    border-color: rgba(229, 192, 107, 0.58);
+    background: rgba(229, 192, 107, 0.08);
+    color: #F2D99A;
+  }
+
+  .custom-zone-frame.grouped {
+    border-style: dashed;
+    background: rgba(229, 192, 107, 0.12);
+  }
+
+  .custom-zone-frame.active {
+    border-color: rgba(255, 255, 255, 0.95);
+    background: rgba(45, 218, 204, 0.18);
+  }
+
+  .custom-zone-frame em,
+  .custom-zone-frame strong {
+    position: absolute;
+    left: 3px;
+    top: 3px;
+    max-width: calc(100% - 6px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-radius: 3px;
+    background: rgba(10, 15, 18, 0.82);
+    padding: 2px 4px;
+    font-size: 9px;
+    font-style: normal;
+    line-height: 1;
+  }
+
+  .custom-zone-frame strong {
+    left: auto;
+    right: 3px;
+    color: #FFFFFF;
   }
 
   .combobox-menu {

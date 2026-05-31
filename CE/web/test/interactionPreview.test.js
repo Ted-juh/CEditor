@@ -451,6 +451,28 @@ test('resolveCustomInteractionPatch maps drag hit zones into custom channel valu
   assert.equal(patch.activeCustomBehavior, 'mainSlider');
 });
 
+test('resolveCustomInteractionPatch reverses drag movement without flipping the starting value', () => {
+  const control = makeCustomComponent('custom_reverse_drag');
+  control._children.Behaviors._children.mainSlider.dragMode = 'horizontal';
+  control._children.Behaviors._children.mainSlider.reverseMouseDirection = true;
+  const rect = { left: 0, top: 0, width: 200, height: 100 };
+  const hitZone = resolveCustomHitZoneAtPoint(control, rect, 100, 50);
+  const session = createInteractionPreviewSession(control);
+  session.customValues = { ...session.customValues, mainValue: 0.72 };
+  const patch = resolveCustomInteractionPatch(control, session, hitZone, {
+    rect,
+    clientX: 120,
+    clientY: 50,
+    startClientX: 100,
+    startClientY: 50,
+    startNormalized: 0.72,
+    startValues: { mainValue: 0.72 },
+  });
+
+  assert.equal(patch.customValues.mainValue, 0.62);
+  assert.equal(patch.valueOverride, 0.62);
+});
+
 test('resolveCustomInteractionPatch cycles custom enum channels from hit zones', () => {
   const control = makeCustomComponent('custom_3');
   const rect = { left: 0, top: 0, width: 200, height: 100 };

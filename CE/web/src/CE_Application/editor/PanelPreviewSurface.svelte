@@ -7,6 +7,7 @@
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
   import {
     panelPreviewSessions,
+    panelPreviewDebugEnabled,
     previewInspectedControlId,
     createInteractionPreviewSession,
     updatePanelPreviewSession,
@@ -84,6 +85,7 @@
   let pointerStartValue = $state(0);
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
+  let pointerCustomStartValues = $state({});
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
   let openComboboxControlId = $state('');
@@ -104,6 +106,11 @@
 
   function getControlId(control) {
     return String(control?._children?.Core?.id ?? '');
+  }
+
+  function inspectPreviewControl(controlId = '') {
+    if (!$panelPreviewDebugEnabled) return;
+    setPreviewInspectedControlId(controlId);
   }
 
   function getBehavior(control) {
@@ -182,7 +189,7 @@
   function selectComboboxRow(control, row) {
     const controlId = getControlId(control);
     if (!controlId || !row) return;
-    setPreviewInspectedControlId(controlId);
+    inspectPreviewControl(controlId);
     patchControlSession(controlId, {
       valueOverrideEnabled: true,
       valueOverride: rowValue(row),
@@ -531,6 +538,9 @@
       rect,
       clientX: event?.clientX ?? rect?.left ?? 0,
       clientY: event?.clientY ?? rect?.top ?? 0,
+      startClientX: pointerDownPoint?.x,
+      startClientY: pointerDownPoint?.y,
+      startValues: pointerCustomStartValues,
     });
     if (!controlId || !Object.keys(patch).length) return;
     patchControlSession(controlId, {
@@ -547,6 +557,9 @@
       rect,
       clientX: event.clientX,
       clientY: event.clientY,
+      startClientX: pointerDownPoint?.x,
+      startClientY: pointerDownPoint?.y,
+      startValues: pointerCustomStartValues,
     });
     if (!Object.keys(patch).length) return;
     patchControlSession(getControlId(control), {
@@ -957,6 +970,7 @@
       pointerDownZone = '';
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
+      pointerCustomStartValues = {};
       removeWindowListeners();
     }
 
@@ -970,15 +984,37 @@
   function handlePointerEnter(control) {
     if (isDisabled(control)) return;
     const controlId = getControlId(control);
-    setPreviewInspectedControlId(controlId);
+    inspectPreviewControl(controlId);
     patchControlSession(controlId, { hover: true });
+  }
+
+  function handlePointerMove(control, event) {
+    if (isDisabled(control) || pointerActiveControlId) return;
+    if (!isCustomComponent(control)) return;
+    const controlId = getControlId(control);
+    const rect = event?.currentTarget?.getBoundingClientRect?.();
+    const resolvedPreview = resolvedPreviewFor(control);
+    const hoveredHitZone = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY, sessionFor(control)?.customValues ?? {})
+      ?? customHitZoneFromEventTarget(resolvedPreview?.control ?? control, event)
+      ?? customHitZoneFromEventTarget(control, event);
+    const hoveredName = hoveredHitZone?.name ?? '';
+    if ((sessionFor(control)?.hoveredCustomHitZone ?? '') === hoveredName) return;
+    patchControlSession(controlId, {
+      hover: true,
+      hoveredCustomBehavior: hoveredHitZone?.zone?.targetBehavior ?? '',
+      hoveredCustomHitZone: hoveredName,
+    });
   }
 
   function handlePointerLeave(control) {
     if (isDisabled(control)) return;
     const controlId = getControlId(control);
     if (pointerActiveControlId === controlId) {
-      patchControlSession(controlId, { hover: false });
+      patchControlSession(controlId, {
+        hover: false,
+        hoveredCustomBehavior: '',
+        hoveredCustomHitZone: '',
+      });
       return;
     }
 
@@ -986,6 +1022,8 @@
       hover: false,
       pressed: false,
       dragging: false,
+      hoveredCustomBehavior: '',
+      hoveredCustomHitZone: '',
     });
   }
 
@@ -1008,24 +1046,26 @@
     pointerDownZone = '';
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
+    pointerCustomStartValues = {};
     pointerStartValue = isSliderControl(control)
       ? currentSliderRoleValue(control, currentSliderActiveHandle(control))
       : currentRangeValue(control);
     draggingRange = isRangeControl(control) && isSliderRangeBehavior(getBehavior(control));
-    setPreviewInspectedControlId(pointerActiveControlId);
+    inspectPreviewControl(pointerActiveControlId);
 
     if (isCustomComponent(control)) {
       const rect = pointerActiveElement?.getBoundingClientRect?.();
       const resolvedPreview = resolvedPreviewFor(control);
-      pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY)
+      pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedPreview?.control ?? control, rect, event.clientX, event.clientY, sessionFor(control)?.customValues ?? {})
         ?? customHitZoneFromEventTarget(resolvedPreview?.control ?? control, event)
         ?? customHitZoneFromEventTarget(control, event);
+      pointerCustomStartValues = { ...(sessionFor(control)?.customValues ?? {}) };
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || action === '';
       if (isDragAction) {
         patchCustomInteraction(control, pointerCustomHitZone, event, {
           hover: true,
-          pressed: true,
+          pressed: false,
           focused: false,
           dragging: true,
         });
@@ -1033,7 +1073,7 @@
       } else {
         patchControlSession(pointerActiveControlId, {
           hover: true,
-          pressed: true,
+          pressed: false,
           focused: false,
           dragging: false,
           activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
@@ -1147,6 +1187,7 @@
       pointerDownZone = '';
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
+      pointerCustomStartValues = {};
       removeWindowListeners();
       return;
     }
@@ -1186,6 +1227,7 @@
     pointerDownZone = '';
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
+    pointerCustomStartValues = {};
     removeWindowListeners();
   }
 
@@ -1195,7 +1237,7 @@
 
     const controlId = getControlId(control);
     keyboardFocusControlId = controlId;
-    setPreviewInspectedControlId(controlId);
+    inspectPreviewControl(controlId);
     patchControlSession(controlId, { focused: true });
   }
 
@@ -1235,7 +1277,7 @@
     const controlId = getControlId(control);
     lastInputMode = 'keyboard';
     keyboardFocusControlId = controlId;
-    setPreviewInspectedControlId(controlId);
+    inspectPreviewControl(controlId);
 
     if (isRangeControl(control) && !event.ctrlKey && !event.metaKey && !event.altKey) {
       if (handleRangeTextInput(control, event.key)) {
@@ -1256,7 +1298,7 @@
       patchControlSession(controlId, {
         focused: true,
         hover: true,
-        pressed: true,
+        pressed: isCustomComponent(control) ? false : true,
       });
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
@@ -1318,6 +1360,8 @@
   }
 
   function previewRoleFor(control) {
+    if (isCustomComponent(control)) return previewRoleForCustomComponent(control);
+
     const behavior = getBehavior(control);
     const family = String(behavior?.family ?? 'trigger');
     const role = String(behavior?.role ?? '').trim().toLowerCase();
@@ -1331,10 +1375,52 @@
     return 'button';
   }
 
+  function previewRoleForCustomComponent(control) {
+    const hitZones = Object.values(getCustomHitZones(control) ?? {}).filter((zone) => zone?.enabled !== false);
+    const behaviors = getCustomBehaviors(control);
+    const behaviorNames = new Set(hitZones.map((zone) => String(zone?.targetBehavior ?? '').trim()).filter(Boolean));
+    const behaviorList = [...behaviorNames].map((name) => behaviors?.[name]).filter(Boolean);
+    if (!behaviorList.length) {
+      behaviorList.push(...Object.values(behaviors ?? {}).filter(Boolean));
+    }
+
+    const hasMultipleTargets = hitZones.length > 1 || behaviorList.length > 1;
+    if (hasMultipleTargets) return 'group';
+
+    const behavior = behaviorList[0] ?? null;
+    const role = String(behavior?.role ?? '').trim().toLowerCase();
+    const type = String(behavior?.type ?? '').trim().toLowerCase();
+    const geometry = String(behavior?.geometry ?? '').trim().toLowerCase();
+    const action = String(hitZones[0]?.action ?? type ?? '').trim().toLowerCase();
+
+    if (role.includes('button') || ['button', 'cycle', 'toggle'].includes(type) || ['cyclevalue', 'togglevalue', 'press'].includes(action)) {
+      return 'button';
+    }
+
+    if (
+      role.includes('slider')
+      || role.includes('dial')
+      || ['slider', 'dial', 'ring'].includes(type)
+      || ['linear', 'horizontal', 'vertical', 'linear-vertical', 'circular', 'ring', 'dial', 'arc'].includes(geometry)
+      || ['dragvalue', 'setvalue', 'scrubvalue'].includes(action)
+    ) {
+      return 'slider';
+    }
+
+    if (role.includes('meter') || type === 'meter') return 'meter';
+    return 'group';
+  }
+
   function previewAriaCheckedFor(control) {
     const role = previewRoleFor(control);
     if (role !== 'radio' && role !== 'checkbox') return undefined;
     return sessionFor(control)?.checked === true;
+  }
+
+  function previewTabIndexFor(control) {
+    if (isDisabled(control)) return undefined;
+    const role = previewRoleFor(control);
+    return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }
 </script>
 
@@ -1373,7 +1459,7 @@
       previewSessionOverride={sessionFor(control)}
       renderIdNamespace={previewRenderIdNamespace}
       previewRole={previewRoleFor(control)}
-      previewTabIndex={isDisabled(control) ? undefined : 0}
+      previewTabIndex={previewTabIndexFor(control)}
       previewAriaLabel={`${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control'} preview`}
       previewAriaDisabled={isDisabled(control)}
       previewAriaChecked={previewAriaCheckedFor(control)}
@@ -1393,6 +1479,7 @@
       previewHighlighted={$showPreviewSelectionRing && $previewInspectedControlId === getControlId(control)}
       onpreviewpointerenter={() => handlePointerEnter(control)}
       onpreviewpointerleave={() => handlePointerLeave(control)}
+      onpreviewpointermove={(event) => handlePointerMove(control, event)}
       onpreviewpointerdown={(event) => handlePointerDown(control, event)}
       onpreviewwheel={(event) => handleRangeWheel(control, event)}
       onpreviewfocus={() => handleFocus(control)}

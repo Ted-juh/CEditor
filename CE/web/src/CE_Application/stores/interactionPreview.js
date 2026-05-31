@@ -41,10 +41,13 @@ const DEFAULT_SESSION = {
   customNormalizedValue: 0,
   activeCustomBehavior: '',
   activeCustomHitZone: '',
+  hoveredCustomBehavior: '',
+  hoveredCustomHitZone: '',
 };
 
 export const interactionPreviewSessions = writable({});
 export const previewModeEnabled = writable(false);
+export const panelPreviewDebugEnabled = writable(false);
 export const panelPreviewSessions = writable({});
 export const previewInspectedControlId = writable('');
 
@@ -167,6 +170,7 @@ export function setPreviewModeEnabled(enabled) {
   const nextEnabled = enabled === true;
   previewModeEnabled.set(nextEnabled);
   if (!nextEnabled) {
+    panelPreviewDebugEnabled.set(false);
     panelPreviewSessions.set({});
     previewInspectedControlId.set('');
   }

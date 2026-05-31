@@ -3,6 +3,17 @@
    * Display Panel — bottom dock with mini displays/tools.
    * Tabs for: Colors, Gradient, Notepad, Viewer, Tools, Console.
    */
+  import {
+    AlignCenter,
+    Cable,
+    Image,
+    Palette,
+    Play,
+    Sparkles,
+    StickyNote,
+    SwatchBook,
+    Terminal,
+  } from 'lucide-svelte';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';
@@ -396,32 +407,35 @@
   }
 
   const tabs = [
-    { id: 'colors',   label: 'Colors' },
-    { id: 'gradient', label: 'Gradient' },
-    { id: 'effects',  label: 'Effects' },
-    { id: 'notepad',  label: 'Notepad' },
-    { id: 'viewer',   label: 'Viewer' },
-    { id: 'align',    label: 'Align' },
-    { id: 'device',   label: 'Device' },
-    { id: 'preview',  label: 'Preview' },
-    { id: 'console',  label: 'Console' },
+    { id: 'colors',   label: 'Colors',   icon: Palette,     short: 'Col' },
+    { id: 'gradient', label: 'Gradient', icon: SwatchBook,  short: 'Grd' },
+    { id: 'effects',  label: 'Effects',  icon: Sparkles,    short: 'Fx' },
+    { id: 'notepad',  label: 'Notepad',  icon: StickyNote,  short: 'Nte' },
+    { id: 'viewer',   label: 'Viewer',   icon: Image,       short: 'Img' },
+    { id: 'align',    label: 'Align',    icon: AlignCenter, short: 'Aln' },
+    { id: 'device',   label: 'Device',   icon: Cable,       short: 'Dev' },
+    { id: 'preview',  label: 'Preview',  icon: Play,        short: 'Prv' },
+    { id: 'console',  label: 'Console',  icon: Terminal,    short: 'Con' },
   ];
 </script>
 
 <div class="display-panel">
-  <div class="tab-bar">
+  <div class="studio-rail" aria-label="Display studios">
     {#each tabs as tab}
       <button
-        class="tab"
+        class="studio-tab"
         class:active={activeTab === tab.id}
+        aria-label={tab.label}
+        title={tab.label}
         onclick={() => handleTabClick(tab.id)}
       >
-        {tab.label}
+        <tab.icon size={15} strokeWidth={1.6} />
+        <span>{tab.short}</span>
       </button>
     {/each}
   </div>
 
-  <div class="tab-content">
+  <div class="studio-content">
     {#if activeTab === 'colors'}
       <div class="tab-pane">
         <div class="colors-layout">
@@ -548,45 +562,71 @@
 <style>
   .display-panel {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     height: 100%;
     background: #1E1E1E;
   }
 
-  .tab-bar {
+  .studio-rail {
     display: flex;
-    gap: 1px;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: 42px;
+    padding: 5px 4px;
     background: #1A1A1A;
-    padding: 0 4px;
     flex-shrink: 0;
+    border-right: 1px solid #333;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
 
-  .tab {
-    background: #252525;
-    border: none;
+  .studio-tab {
+    width: 32px;
+    min-height: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
     color: #888;
-    font-size: 10px;
-    padding: 4px 10px;
+    font-size: 8px;
+    line-height: 1;
+    padding: 3px 0;
     cursor: pointer;
-    border-top: 2px solid transparent;
     font-family: inherit;
     transition: all 0.1s;
   }
 
-  .tab:hover {
+  .studio-tab span {
+    max-width: 30px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .studio-tab:hover {
     color: #CCC;
-    background: #2A2A2A;
+    background: #262626;
+    border-color: #333;
   }
 
-  .tab.active {
+  .studio-tab.active {
     color: #DDD;
-    background: #2D2D2D;
-    border-top-color: #5B9BD5;
+    background: #094771;
+    border-color: #5B9BD5;
   }
 
-  .tab-content {
+  .studio-content {
     flex: 1;
-    overflow: auto;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   .tab-pane {

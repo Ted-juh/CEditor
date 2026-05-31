@@ -5,6 +5,8 @@
     { title: 'File', shortcuts: [
       ['Ctrl+N', 'New Panel'],
       ['Ctrl+O', 'Open Panel'],
+      ['File menu', 'New/Open Component'],
+      ['File menu', 'New/Open Device Profile'],
       ['Ctrl+S', 'Save'],
       ['Ctrl+Shift+S', 'Save As'],
       ['Ctrl+W', 'Close Panel'],

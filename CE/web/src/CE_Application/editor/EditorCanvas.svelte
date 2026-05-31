@@ -1,5 +1,5 @@
 <script>
-  import { activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize } from '../stores/panels.js';
+  import { activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab } from '../stores/panels.js';
   import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -19,12 +19,13 @@
   import SettingsView from './SettingsView.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
-  import { deviceProfiles, deviceRoleMappings } from '../stores/deviceProfiles.js';
+  import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
-  import { previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
-  import { closeComponentWorkspace, componentWorkspaceMode, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
+  import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -140,18 +141,22 @@
         : 'Preview')
       : ''
   );
-  let selectedIsCustomComponent = $derived(String(getSection($selectedControl, 'Core')?.controlType ?? '') === 'CustomComponent');
-  let selectedCustomComponentName = $derived(getSection($selectedControl, 'Core')?.name ?? 'Custom Component');
+  let componentWorkspaceControl = $derived($activeEditorTab?.type === 'component' ? $activeComponentControl : $selectedControl);
+  let standaloneComponentTabActive = $derived($activeEditorTab?.type === 'component');
+  let standaloneComponentTabLoading = $derived(standaloneComponentTabActive && !$activeComponentControl);
+  let selectedIsCustomComponent = $derived(String(getSection(componentWorkspaceControl, 'Core')?.controlType ?? '') === 'CustomComponent');
+  let selectedCustomComponentName = $derived(getSection(componentWorkspaceControl, 'Core')?.name ?? 'Custom Component');
   let componentSurfaceWorkspaceActive = $derived(
-    $componentWorkspaceMode === 'surface'
+    ($activeEditorTab?.type === 'component' || $componentWorkspaceMode === 'surface')
     && selectedIsCustomComponent
     && !$previewModeEnabled
-    && $activeEditorTab?.type === 'panel'
+    && ($activeEditorTab?.type === 'panel' || $activeEditorTab?.type === 'component')
   );
 
   $effect(() => {
     if ($componentWorkspaceMode === 'panel') return;
-    if (selectedIsCustomComponent && !$previewModeEnabled && $activeEditorTab?.type === 'panel') return;
+    if ($activeEditorTab?.type === 'component') return;
+    if (selectedIsCustomComponent && !$previewModeEnabled && ($activeEditorTab?.type === 'panel' || $activeEditorTab?.type === 'component')) return;
     closeComponentWorkspace();
   });
 
@@ -170,7 +175,7 @@
         .filter(Boolean)
     );
 
-    if (availableIds.size === 0) {
+    if (!$panelPreviewDebugEnabled || availableIds.size === 0) {
       setPreviewInspectedControlId('');
       return;
     }
@@ -366,6 +371,16 @@
     event?.stopPropagation?.();
     openComponentSurfaceWorkspace();
   }
+
+  function createStandaloneComponent() {
+    const document = createComponentDocument();
+    if (document?.id) setActiveEditorTab({ type: 'component', id: document.id });
+  }
+
+  function createStandaloneDeviceProfile() {
+    const profile = createDeviceProfileDraft();
+    openStandaloneDeviceProfileTab(profile);
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -379,16 +394,60 @@
       {#if componentSurfaceWorkspaceActive}
         <section class="component-workspace" aria-label="Component Designer Workspace">
           <header class="component-workspace-header">
-            <div>
-              <strong>Component Designer</strong>
-              <span>{selectedCustomComponentName}</span>
+            <div class="component-workspace-title">
+              <span>{$activeEditorTab?.type === 'component' ? 'Component Document' : 'Panel Canvas'}</span>
+              <span>Component Designer</span>
+              <strong>{selectedCustomComponentName}</strong>
             </div>
-            <button type="button" onclick={closeComponentWorkspace}>Back to Panel Canvas</button>
+            <div class="component-workspace-actions">
+              {#if $componentDesignerStatus?.kind}
+                <div class="component-workspace-status" aria-label="Component designer status">
+                  <span><strong>{$componentDesignerStatus.kind}</strong></span>
+                  <span title={`Tool: ${$componentDesignerStatus.tool}`}>T <strong>{$componentDesignerStatus.tool}</strong></span>
+                  <span title={`Layer: ${$componentDesignerStatus.layer}`}>L <strong>{$componentDesignerStatus.layer}</strong></span>
+                  <span title={`Zone: ${$componentDesignerStatus.zone}`}>Z <strong>{$componentDesignerStatus.zone}</strong></span>
+                  <span title={`Canvas: ${$componentDesignerStatus.artboard}`}>C <strong>{$componentDesignerStatus.artboard}</strong></span>
+                  <span title={`${$componentDesignerStatus.layerCount} layers`}><strong>{$componentDesignerStatus.layerCount}</strong>L</span>
+                  <span title={`${$componentDesignerStatus.zoneCount} zones`}><strong>{$componentDesignerStatus.zoneCount}</strong>Z</span>
+                  {#if $componentDesignerStatus.lockedNote}
+                    <span class="warn"><strong>{$componentDesignerStatus.lockedNote}</strong></span>
+                  {/if}
+                  {#if $componentDesignerStatus.warning}
+                    <span class="warn"><strong>{$componentDesignerStatus.warning}</strong></span>
+                  {/if}
+                </div>
+              {/if}
+              <button
+                type="button"
+                class:active={$componentDesignerStatus?.previewMode === 'preview'}
+                onclick={() => requestComponentDesignerPreview('preview')}
+                title="Hide authoring overlays for a clean component preview"
+              >
+                Preview
+              </button>
+              <button
+                type="button"
+                class:active={$componentDesignerStatus?.previewMode !== 'preview'}
+                onclick={() => requestComponentDesignerPreview('edit')}
+                title="Show selection bounds and hit zones"
+              >
+                Edit
+              </button>
+              {#if $activeEditorTab?.type === 'panel'}
+                <button type="button" onclick={closeComponentWorkspace}>Back to Panel</button>
+              {/if}
+            </div>
           </header>
           <div class="component-workspace-body">
-            <CustomDesignSurfaceEditor control={$selectedControl} />
+            <CustomDesignSurfaceEditor control={componentWorkspaceControl} />
           </div>
         </section>
+      {:else if standaloneComponentTabLoading}
+        <div class="workspace-empty-state">
+          <span class="workspace-empty-eyebrow">Component Designer</span>
+          <strong>Preparing component document</strong>
+          <span>This workspace is independent from panels.</span>
+        </div>
       {:else if splitVisibleForActiveTab && splitDeviceProfileId && canvasPanel}
         <div
           class={['editor-split', panelDesignerSplit?.orientation === 'horizontal' ? 'horizontal' : 'vertical']}
@@ -543,9 +602,17 @@
           <CanvasContextMenu bind:target={ctxMenu} panel={canvasPanel} />
         {/if}
       {:else}
-        <div class="empty-state">
-          <span class="empty-text">No panel open</span>
-          <span class="empty-hint">File → New Panel or press the + tab</span>
+        <div class="workspace-empty-state">
+          <span class="workspace-empty-eyebrow">Choose a workspace</span>
+          <strong>No document open</strong>
+          <span>Panels, custom components, and device profiles can all be opened independently.</span>
+          <div class="workspace-empty-actions">
+            <button type="button" onclick={() => addPanel()}>New Panel</button>
+            <button type="button" onclick={openPanelFromFile}>Open Panel</button>
+            <button type="button" onclick={createStandaloneComponent}>New Custom Component</button>
+            <button type="button" onclick={createStandaloneDeviceProfile}>New Device Profile</button>
+            <button type="button" onclick={importDeviceProfile}>Import Device Profile</button>
+          </div>
         </div>
       {/if}
     {/key}
@@ -658,60 +725,125 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    background: #16181A;
+    background: #0D1318;
   }
 
   .component-workspace-header {
-    flex: 0 0 42px;
+    flex: 0 0 32px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 0 12px;
-    background: #202224;
-    border-bottom: 1px solid #30343A;
+    gap: 8px;
+    padding: 0 10px;
+    background: linear-gradient(180deg, #111B22 0%, #0B1116 100%);
+    border-bottom: 1px solid #25323C;
     box-sizing: border-box;
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.025);
   }
 
-  .component-workspace-header div {
+  .component-workspace-title,
+  .component-workspace-actions {
     min-width: 0;
     display: flex;
-    align-items: baseline;
-    gap: 10px;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .component-workspace-title {
+    flex: 0 1 auto;
+    max-width: min(42vw, 540px);
+  }
+
+  .component-workspace-actions {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+  }
+
+  .component-workspace-status {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    min-width: 0;
+    max-width: min(52vw, 760px);
+    height: 24px;
+    padding: 0 4px;
+    border: 1px solid #2F404B;
+    border-radius: 4px;
+    background: rgba(10, 16, 20, 0.72);
+    color: #7E929E;
+    box-sizing: border-box;
+    overflow: hidden;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .component-workspace-status span {
+    min-width: 0;
+    overflow: hidden;
+    padding: 2px 5px;
+    border: 1px solid rgba(54, 72, 84, 0.74);
+    border-radius: 3px;
+    background: rgba(22, 32, 39, 0.88);
+    text-overflow: ellipsis;
+  }
+
+  .component-workspace-status strong {
+    color: #C8DCE5;
+    font-size: 10px;
+    font-weight: 900;
+  }
+
+  .component-workspace-status .warn strong {
+    color: #F2C979;
+  }
+
+  .component-workspace-status .warn {
+    border-color: rgba(229, 160, 41, 0.5);
+    background: rgba(229, 160, 41, 0.1);
+  }
+
+  .component-workspace-title span {
+    position: relative;
+    color: #7F929F;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .component-workspace-title span:not(:last-of-type)::after {
+    content: '>';
+    margin-left: 7px;
+    color: #4D606D;
   }
 
   .component-workspace-header strong {
-    color: #F0F4F8;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .component-workspace-header span {
-    color: #9FB2C3;
-    font-size: 12px;
+    min-width: 0;
     overflow: hidden;
+    color: #F0F8FB;
+    font-size: 11px;
     text-overflow: ellipsis;
     white-space: nowrap;
+    letter-spacing: 0.01em;
   }
 
   .component-workspace-header button,
   .component-workspace-launch {
-    height: 28px;
-    border: 1px solid #3B4652;
+    height: 24px;
+    border: 1px solid #2F404B;
     border-radius: 4px;
-    background: #182331;
+    background: #17242D;
     color: #DCEBFA;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    padding: 0 10px;
+    padding: 0 8px;
     cursor: pointer;
   }
 
   .component-workspace-header button:hover,
+  .component-workspace-header button.active,
   .component-workspace-launch:hover {
-    border-color: #5B9BD5;
-    background: #20344B;
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.16);
+    color: #F3FFFD;
   }
 
   .component-workspace-body {
@@ -824,23 +956,68 @@
     color: #FFE4A7;
   }
 
-  .empty-state {
+  .workspace-empty-state {
     width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 10px;
   }
 
-  .empty-text {
-    color: #555;
-    font-size: 14px;
+  .workspace-empty-state {
+    padding: 24px;
+    color: #8FA0AC;
+    text-align: center;
+    box-sizing: border-box;
   }
 
-  .empty-hint {
-    color: #3A3A3A;
+  .workspace-empty-state strong {
+    color: #E6EEF5;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .workspace-empty-state span {
+    max-width: 520px;
     font-size: 12px;
+    line-height: 1.45;
   }
+
+  .workspace-empty-eyebrow {
+    color: #5B9BD5;
+    font-size: 10px !important;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .workspace-empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    max-width: 560px;
+    margin-top: 6px;
+  }
+
+  .workspace-empty-actions button {
+    height: 28px;
+    padding: 0 10px;
+    border: 1px solid #3A4650;
+    border-radius: 4px;
+    background: #20262C;
+    color: #DCEBFA;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .workspace-empty-actions button:hover {
+    border-color: #5B9BD5;
+    background: #26384B;
+    color: #FFF;
+  }
+
 </style>

@@ -2,6 +2,7 @@
   import { activePanel } from '../stores/panels.js';
   import {
     panelPreviewSessions,
+    panelPreviewDebugEnabled,
     previewInspection,
     updatePanelPreviewSession,
     resetPanelPreviewSessions,
@@ -33,6 +34,10 @@
 
   function handleResetAll() {
     resetPanelPreviewSessions($activePanel?.controls ?? []);
+  }
+
+  function toggleDebugInspector() {
+    panelPreviewDebugEnabled.set(!($panelPreviewDebugEnabled === true));
   }
 
   let inspection = $derived($previewInspection);
@@ -121,6 +126,7 @@
 
   let customRows = $derived(valueRowsFor(control, session));
   let routeRows = $derived(routeRowsFor(control, $activePanel, $panelPreviewSessions));
+  let debugEnabled = $derived($panelPreviewDebugEnabled === true);
 </script>
 
 {#if !$activePanel}
@@ -131,24 +137,36 @@
   <div class="preview-inspector">
     <div class="preview-header">
       <div class="preview-title-group">
-        <div class="preview-title">Preview</div>
+        <div class="preview-title">Panel Preview</div>
         <div class="preview-subtitle">
-          {#if control}
+          {#if debugEnabled && control}
             {control?._children?.Core?.name ?? inspection?.controlId} · {control?._children?.Core?.controlType ?? 'Control'}
+          {:else if debugEnabled}
+            Click a control on the canvas to inspect runtime debug data.
           {:else}
-            Click a control on the canvas to inspect its live runtime state.
+            Running the panel as an output preview.
           {/if}
         </div>
       </div>
       <div class="toolbar-spacer"></div>
       <button class="toolbar-btn" onclick={handleResetAll}>Reset All</button>
-      <button class="toolbar-btn primary" onclick={dumpPreviewInspectionDebug} disabled={!control}>Debug</button>
+      <button class="toolbar-btn" class:active={debugEnabled} onclick={toggleDebugInspector}>
+        Debug Inspector
+      </button>
+      {#if debugEnabled}
+        <button class="toolbar-btn primary" onclick={dumpPreviewInspectionDebug} disabled={!control}>Dump</button>
+      {/if}
     </div>
 
     <div class="preview-scroll">
-      {#if !control}
+      {#if !debugEnabled}
+        <div class="preview-empty inner normal-preview">
+          <strong>Normal preview is running.</strong>
+          <span>Use the panel controls directly on the canvas. Debug details stay hidden unless you enable the inspector.</span>
+        </div>
+      {:else if !control}
         <div class="preview-empty inner">
-          Preview is active. Hover, click, or focus a control on the canvas to inspect its state here.
+          Debug Inspector is active. Click a control on the canvas to inspect its runtime data.
         </div>
       {:else}
         <PropertySection title="Target">
@@ -348,6 +366,12 @@
     border-color: #5B9BD5;
   }
 
+  .toolbar-btn.active {
+    border-color: #5B9BD5;
+    background: #094771;
+    color: #FFF;
+  }
+
   .toolbar-btn.primary:hover {
     background: #094771;
     color: #FFF;
@@ -378,6 +402,21 @@
 
   .preview-empty.inner {
     min-height: 220px;
+  }
+
+  .normal-preview {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+    color: #A8A8A8;
+    line-height: 1.45;
+  }
+
+  .normal-preview strong {
+    color: #E6E6E6;
+    font-size: 12px;
   }
 
   .readout {

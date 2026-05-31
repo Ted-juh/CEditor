@@ -8,6 +8,7 @@ import { instantiateCustomComponentPackageControl } from '../utils/customCompone
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
+import { mutateComponentDocumentControl } from './componentWorkspace.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -308,7 +309,20 @@ export function updateControlProperty(controlId, path, value) {
 
 export function applyControlPatchesById(patchesByControlId) {
   const panelId = get(resolvedActivePanelId);
-  if (panelId == null || !patchesByControlId || patchesByControlId.size === 0) return;
+  if (!patchesByControlId || patchesByControlId.size === 0) return;
+
+  if (panelId == null) {
+    for (const [controlId, patch] of patchesByControlId.entries()) {
+      mutateComponentDocumentControl(controlId, (draft) => {
+        if (!patch || Object.keys(patch).length === 0) return false;
+        for (const [path, value] of Object.entries(patch)) {
+          applyResolvedValue(draft, path, value);
+        }
+        return true;
+      });
+    }
+    return;
+  }
 
   const preferredControlIds = [...patchesByControlId.keys()];
   const shouldNormalize = shouldNormalizeExclusiveSelection(
@@ -372,7 +386,15 @@ export function applySelectedPatch(patch) {
 
 export function removeControlNode(controlId, path) {
   const panelId = get(resolvedActivePanelId);
-  if (panelId == null || !path) return;
+  if (!path) return;
+
+  if (panelId == null) {
+    mutateComponentDocumentControl(controlId, (draft) => {
+      deleteNestedValue(draft, path);
+      return true;
+    });
+    return;
+  }
 
   panels.update((list) =>
     mutatePanelControlsInList(

@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import MenuBar from './CE_Application/layout/MenuBar.svelte';
   import IconPanel from './CE_Application/layout/IconPanel.svelte';
   import EditorCanvas from './CE_Application/editor/EditorCanvas.svelte';
@@ -10,13 +11,19 @@
   import CommonPropertyBar from './CE_Application/layout/CommonPropertyBar.svelte';
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
-  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot } from './CE_Application/stores/panels.js';
+  import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
+  import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
+  import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
+  import { colorTarget } from './CE_Application/stores/colorTarget.js';
+  import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
+  import { displayTabRequest } from './CE_Application/stores/displayTab.js';
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
   import { syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
+  import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
 
   const isCutoutDebug = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('debug') === 'cutout';
@@ -73,6 +80,16 @@
   let showTreePanel = $state(readStoredBool(UI_STORAGE_KEYS.showTreePanel, true));
   let showShortcuts = $state(false);
   let isSettingsTab = $derived($activeEditorTab?.type === 'settings');
+  let viewportHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 900);
+
+  function maxDisplayPanelHeight() {
+    return Math.max(140, Math.floor(viewportHeight * 0.44));
+  }
+
+  function handleWindowResize() {
+    viewportHeight = window.innerHeight;
+    displayPanelHeight = Math.min(displayPanelHeight, maxDisplayPanelHeight());
+  }
 
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.showTreePanel, showTreePanel);
@@ -85,8 +102,13 @@
   });
   let displayPanelHeight = $state(readStoredNumber(UI_STORAGE_KEYS.displayPanelHeight, 480));
   let isResizingDisplay = $state(false);
-  let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, true));
+  let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, false));
   let showPropertiesPanel = $state(readStoredBool(UI_STORAGE_KEYS.showPropertiesPanel, true));
+  let componentDesignerWorkspaceActive = $derived($componentWorkspaceMode === 'surface');
+  let effectiveShowPropertiesPanel = $derived(showPropertiesPanel);
+  let effectiveShowTreePanel = $derived(showTreePanel);
+  let effectiveShowDisplayPanel = $derived(showDisplayPanel);
+  let displayPanelBasis = $derived(`${Math.min(displayPanelHeight, maxDisplayPanelHeight())}px`);
 
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.displayPanelHeight, displayPanelHeight);
@@ -97,11 +119,16 @@
   $effect(() => {
     writeStoredJson(UI_STORAGE_KEYS.showPropertiesPanel, showPropertiesPanel);
   });
+  $effect(() => {
+    if ($colorTarget || $gradientTarget || $displayTabRequest) {
+      showDisplayPanel = true;
+    }
+  });
   const tabDefaultHeights = { colors: 480, gradient: 580 };
 
   function handleDisplayTabChange(tabId) {
     const target = tabDefaultHeights[tabId];
-    if (target) displayPanelHeight = target;
+    if (target) displayPanelHeight = Math.min(target, maxDisplayPanelHeight());
   }
 
   function startPropsResize(e) {
@@ -152,7 +179,7 @@
 
     function onMouseMove(e) {
       const delta = startY - e.clientY;
-      displayPanelHeight = Math.max(80, Math.min(900, startHeight + delta));
+      displayPanelHeight = Math.max(80, Math.min(maxDisplayPanelHeight(), startHeight + delta));
     }
 
     function onMouseUp() {
@@ -169,14 +196,47 @@
     flushUnsavedSessionSnapshot();
   }
 
+  function maybeLoadCustomComponentStressTest() {
+    if (typeof window === 'undefined' || isCutoutDebug) return;
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('custom_component_stress')) return;
+    const requestId = params.get('custom_component_stress') || 'default';
+    const sessionKey = `ce.customComponentStress.loaded.${requestId}`;
+    if (window.sessionStorage?.getItem(sessionKey) === 'true') return;
+
+    const stress = createCustomComponentStressTest();
+    const entries = stress.definitions
+      .map((definition) => customComponentLibrary.saveControl(definition.component, definition.metadata))
+      .filter(Boolean);
+    const panel = createCustomComponentStressPanel(entries);
+    addPanel(panel);
+
+    window.__ceCustomComponentStressTest = {
+      generatedAt: stress.generatedAt,
+      componentCount: entries.length,
+      panelId: panel.id,
+      panelName: panel.name,
+      notes: stress.notes,
+    };
+    window.sessionStorage?.setItem(sessionKey, 'true');
+  }
+
+  onMount(() => {
+    maybeLoadCustomComponentStressTest();
+  });
+
 </script>
 
-<svelte:window onkeydown={handleGlobalKeyDown} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onkeydown={handleGlobalKeyDown} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
 
 {#if isCutoutDebug}
   <CutoutDebugPage />
 {:else}
-  <div class="app" style="--props-width: {showPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {showPropertiesPanel ? '8px' : '0px'}">
+  <div
+    class="app"
+    class:component-workspace-active={componentDesignerWorkspaceActive}
+    style="--props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
+  >
     <div class="menubar-area">
       <MenuBar />
     </div>
@@ -204,7 +264,7 @@
           <div class="editor-canvas-area">
             <EditorCanvas />
           </div>
-          {#if !isSettingsTab}
+          {#if !isSettingsTab && !componentDesignerWorkspaceActive}
             <div class="common-bar-area">
               <CommonPropertyBar />
             </div>
@@ -213,7 +273,7 @@
             </div>
           {/if}
         </div>
-        {#if showTreePanel}
+        {#if effectiveShowTreePanel}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div class="tree-resize-handle" class:active={isResizingTree} onmousedown={startTreeResize}></div>
           <div class="tree-area" style="flex: 0 0 {treePanelWidth}px;">
@@ -222,13 +282,13 @@
         {/if}
       </div>
       <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {showDisplayPanel ? 'block' : 'none'}"></div>
-      <div class="display-panel-area" style="flex: 0 0 {displayPanelHeight}px; display: {showDisplayPanel ? 'block' : 'none'}">
+      <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
+      <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
         <DisplayPanel onTabChange={handleDisplayTabChange} />
       </div>
     </div>
 
-    {#if showPropertiesPanel}
+    {#if effectiveShowPropertiesPanel}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
 

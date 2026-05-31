@@ -351,6 +351,12 @@
         <PropertyCell label="Scale" span={1} hint="Layer scale.">
           <NumberInput value={layout.scale ?? 1} step={0.01} min={0.01} onchange={(value) => set('Layout.scale', value)} />
         </PropertyCell>
+        <PropertyCell label="Pivot X" span={1} hint="Horizontal rotation origin as a percent of this layer. Values outside 0..100 allow orbiting around external centers.">
+          <NumberInput value={layout.pivotX ?? 50} step={1} onchange={(value) => set('Layout.pivotX', value)} />
+        </PropertyCell>
+        <PropertyCell label="Pivot Y" span={1} hint="Vertical rotation origin as a percent of this layer. Values outside 0..100 allow orbiting around external centers.">
+          <NumberInput value={layout.pivotY ?? 50} step={1} onchange={(value) => set('Layout.pivotY', value)} />
+        </PropertyCell>
       </PropertySection>
     {/if}
 

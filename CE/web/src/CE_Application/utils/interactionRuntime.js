@@ -16,6 +16,7 @@ import {
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
+import { constrainCustomValues } from './customComponentInteraction.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -195,6 +196,22 @@ function resolveBindingValue(binding, sourceValue) {
     return sourceValue;
   }
 
+  if (binding?.mapMode === 'format') {
+    const multiplier = numberOr(binding?.multiplier, 1);
+    const offset = numberOr(binding?.offset, 0);
+    const precision = Math.max(0, Math.min(8, Math.round(numberOr(binding?.precision, 0))));
+    const numeric = Number(sourceValue);
+    const formatted = Number.isFinite(numeric)
+      ? ((numeric * multiplier) + offset).toFixed(precision)
+      : String(sourceValue ?? '');
+    return `${binding?.prefix ?? ''}${formatted}${binding?.suffix ?? ''}`;
+  }
+
+  if (binding?.mapMode === 'template') {
+    const template = String(binding?.template ?? '{value}');
+    return template.replaceAll('{value}', String(sourceValue ?? ''));
+  }
+
   if (binding?.mapMode === 'boolean') {
     const boolValue = !!sourceValue;
     let resolved = boolValue ? binding.trueValue : binding.falseValue;
@@ -246,7 +263,9 @@ function stateSignalValue(key, signals) {
     case 'valueNormalized': return signals.valueNormalized;
     case 'valueEnum': return signals.valueEnum;
     case 'activeHandle': return signals.activeHandle;
-    default: return signals[key];
+    default:
+      if (String(key ?? '').startsWith('channel.')) return signals?.customChannels?.[key];
+      return signals[key];
   }
 }
 
@@ -451,6 +470,7 @@ function normalizeCustomChannelValue(channel = null, rawValue = 0) {
 function resolveCustomComponentInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const channels = getValueChannels(control);
+  const constrainedCustomValues = constrainCustomValues(control, previewSession?.customValues ?? {});
   const mainChannel = channels.mainValue
     ?? Object.values(channels).find((channel) => String(channel?.type ?? '').trim().toLowerCase() !== 'enum')
     ?? Object.values(channels)[0]
@@ -458,16 +478,16 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
   const modeChannel = channels.mode ?? null;
   const overrideValue = previewSession?.valueOverrideEnabled === true
     ? previewSession?.valueOverride
-    : previewSession?.customValues?.mainValue;
+    : constrainedCustomValues?.mainValue;
   const rawValue = overrideValue ?? mainChannel?.currentValue ?? mainChannel?.defaultValue ?? 0;
   const valueNormalized = previewSession?.valueOverrideEnabled === true
     ? normalizeCustomChannelValue(mainChannel, rawValue)
     : numberOr(previewSession?.customNormalizedValue, normalizeCustomChannelValue(mainChannel, rawValue));
-  const modeValue = previewSession?.customValues?.mode ?? modeChannel?.currentValue ?? modeChannel?.defaultValue ?? '';
+  const modeValue = constrainedCustomValues?.mode ?? modeChannel?.currentValue ?? modeChannel?.defaultValue ?? '';
 
   const channelSignals = {};
   for (const [name, channel] of Object.entries(channels)) {
-    const channelRaw = previewSession?.customValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
+    const channelRaw = constrainedCustomValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
     channelSignals[`channel.${name}.display`] = String(channelRaw ?? '');
@@ -482,8 +502,12 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     valueEnum: String(modeValue ?? ''),
     valueNormalized,
     customChannels: channelSignals,
-    arpeggiator: previewSession?.customValues?.__arpeggiator ?? null,
+    arpeggiator: constrainedCustomValues?.__arpeggiator ?? null,
     mode: modeValue,
+    activeCustomBehavior: previewSession?.activeCustomBehavior ?? '',
+    activeCustomHitZone: previewSession?.activeCustomHitZone ?? '',
+    hoveredCustomBehavior: previewSession?.hoveredCustomBehavior ?? '',
+    hoveredCustomHitZone: previewSession?.hoveredCustomHitZone ?? '',
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,
     focused: previewSession?.focused === true,
@@ -627,6 +651,10 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   const bindings = getNodeChild(control, 'Bindings');
   const states = getNodeChild(control, 'States');
   const animations = getNodeChild(control, 'Animations');
+  const isCustomComponent = String(getNodeChild(control, 'Core')?.controlType ?? '') === 'CustomComponent';
+  const effectivePreviewSession = isCustomComponent
+    ? { ...(previewSession ?? {}), pressed: false }
+    : previewSession;
   const hasInteractiveSections = !!behavior
     || Object.keys(parts?._children ?? {}).length > 0
     || Object.keys(bindings?._children ?? {}).length > 0
@@ -634,7 +662,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
     || Object.keys(animations?._children ?? {}).length > 0;
 
   if (!hasInteractiveSections) {
-    const signals = resolveInteractionContext(control, previewSession);
+    const signals = resolveInteractionContext(control, effectivePreviewSession);
     return {
       control,
       runtime: createEmptyRuntime(signals),
@@ -642,7 +670,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   }
 
   const resolved = deepClone(control);
-  const signals = resolveInteractionContext(control, previewSession);
+  const signals = resolveInteractionContext(control, effectivePreviewSession);
   materializeCustomComponent(resolved, signals);
   const resolvedBindings = getNodeChild(resolved, 'Bindings');
   const resolvedStates = getNodeChild(resolved, 'States');
@@ -680,7 +708,7 @@ export function resolveInteractiveControl(control, previewSession = {}) {
     applyStatePatches(resolved, state);
   }
 
-  const transitions = buildTransitionCatalog(resolved, previewSession);
+  const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
 
   return {
     control: resolved,

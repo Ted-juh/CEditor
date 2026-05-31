@@ -25,6 +25,12 @@
   let selectedSnapped = $derived(selected ? snapCustomChannelValue(selected, selectedDefault) : 0);
   let selectedFormatted = $derived(formatChannelValue(selected, selectedSnapped));
   let enumText = $derived((selected?.values ?? selected?.options ?? []).join(', '));
+  let selectedNumeric = $derived(!['bool', 'enum', 'text', 'color', 'note'].includes(String(selected?.type ?? 'float')));
+  let constraintChannelOptions = $derived(channelEntries
+    .filter(([name, channel]) => name !== selectedName && !['bool', 'enum', 'text', 'color'].includes(String(channel?.type ?? 'float')))
+    .map(([name, channel]) => ({ name, label: channel?.label || name })));
+  let lowerConstraintChannel = $derived(channelNameFromConstraint(selected?.constraints?.normalizedMin));
+  let upperConstraintChannel = $derived(channelNameFromConstraint(selected?.constraints?.normalizedMax));
 
   const TYPE_OPTIONS = ['float', 'int', 'bool', 'enum', 'note', 'color', 'text'];
   const CURVE_OPTIONS = ['linear', 'exponential', 'logarithmic', 's-curve', 'stepped', 'bipolar', 'dead-zone'];
@@ -54,6 +60,16 @@
   function set(path, value) {
     if (!core?.id || !selectedName) return;
     updateControlProperty(core.id, `ValueChannels.${selectedName}.${path}`, value);
+  }
+
+  function channelNameFromConstraint(value) {
+    const text = String(value ?? '').trim();
+    const match = text.match(/^channel\.([A-Za-z_$][\w$]*)\.normalized$/);
+    return match?.[1] ?? '';
+  }
+
+  function setConstraintChannel(path, channelName, fallback) {
+    set(path, channelName ? `channel.${channelName}.normalized` : fallback);
   }
 
   function addChannel() {
@@ -219,7 +235,7 @@
         </select>
       </PropertyCell>
 
-      {#if !['bool', 'enum', 'text', 'color', 'note'].includes(String(selected.type ?? 'float'))}
+      {#if selectedNumeric}
         <PropertyCell label="Min" span={1} hint="Minimum numeric value.">
           <NumberInput value={selected.min ?? 0} step={1} onchange={(value) => set('min', value)} />
         </PropertyCell>
@@ -243,6 +259,42 @@
         </PropertyCell>
       {/if}
     </PropertySection>
+
+    {#if selectedNumeric}
+      <PropertySection title="Constraints">
+        <PropertyCell label="Enabled" span={1} hint="Clamp this channel before bindings, states, links, and preview output use the value.">
+          <PropertyToggle value={selected.constraints?.enabled !== false} onchange={() => set('constraints.enabled', !(selected.constraints?.enabled !== false))} />
+        </PropertyCell>
+        <PropertyCell label="Lower From" span={1} hint="Optional channel this value cannot go below. Use this for value >= min.">
+          <select class="val" value={lowerConstraintChannel} onchange={(event) => setConstraintChannel('constraints.normalizedMin', event.target.value, 0)}>
+            <option value="">Fixed minimum</option>
+            {#each constraintChannelOptions as option}
+              <option value={option.name}>{option.label}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Upper From" span={1} hint="Optional channel this value cannot go above. Use this for min <= max.">
+          <select class="val" value={upperConstraintChannel} onchange={(event) => setConstraintChannel('constraints.normalizedMax', event.target.value, 1)}>
+            <option value="">Fixed maximum</option>
+            {#each constraintChannelOptions as option}
+              <option value={option.name}>{option.label}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Range" span={1} hint="Raw normalized clamp range currently configured for this channel.">
+          <div class="constraint-readout">
+            <span>{String(selected.constraints?.normalizedMin ?? 0)}</span>
+            <span>{String(selected.constraints?.normalizedMax ?? 1)}</span>
+          </div>
+        </PropertyCell>
+        <PropertyCell label="Lower Gap" span={2} hint="Minimum normalized distance above the lower source. For max, set this to keep it above min.">
+          <NumberInput value={selected.constraints?.normalizedMinGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMinGap', value)} />
+        </PropertyCell>
+        <PropertyCell label="Upper Gap" span={2} hint="Minimum normalized distance below the upper source. For min, set this to keep it below max.">
+          <NumberInput value={selected.constraints?.normalizedMaxGap ?? 0} step={0.01} min={0} max={1} onchange={(value) => set('constraints.normalizedMaxGap', value)} />
+        </PropertyCell>
+      </PropertySection>
+    {/if}
 
     <PropertySection title="Public API">
       <PropertyCell label="Input" span={1} hint="Allow other components or device links to drive this value.">
@@ -366,6 +418,24 @@
     color: #CDE1EE;
     font-size: 10px;
     font-style: normal;
+  }
+  .constraint-readout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px;
+    width: 100%;
+  }
+  .constraint-readout span {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #34424D;
+    border-radius: 3px;
+    background: #11171B;
+    color: #CDE1EE;
+    padding: 4px 5px;
+    font-size: 10px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .preset-grid {
     display: grid;

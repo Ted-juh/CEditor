@@ -1,17 +1,59 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile } from '../stores/panels.js';
+  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab } from '../stores/panels.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { editorZoom, editorZoomIncrement, activePanel, updatePanel } from '../stores/panels.js';
   import { requestZoomToSelection } from '../stores/editorCommands.js';
+  import { createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
+
+  function newCustomComponent() {
+    const document = createComponentDocument();
+    if (document?.id) setActiveEditorTab({ type: 'component', id: document.id });
+  }
+
+  function openSavedCustomComponent() {
+    const entry = get(customComponentLibrary)?.[0];
+    if (!entry) {
+      window.alert?.('No saved custom component packages yet.');
+      return;
+    }
+    const document = createComponentDocumentFromLibraryEntry(entry);
+    if (document?.id) setActiveEditorTab({ type: 'component', id: document.id });
+  }
+
+  function newDeviceProfile() {
+    const profile = createDeviceProfileDraft();
+    openStandaloneDeviceProfileTab(profile);
+  }
+
+  function openDeviceProfile() {
+    refreshDeviceProfiles();
+    const profiles = get(deviceProfiles) ?? [];
+    const selectedId = get(selectedDeviceProfileId);
+    const profile = profiles.find((item) => item.id === selectedId) ?? profiles[0];
+    if (profile?.id) {
+      openStandaloneDeviceProfileTab(profile);
+      return;
+    }
+    importDeviceProfile();
+  }
 
   const menus = {
     File: [
       { label: 'New Panel',  shortcut: 'Ctrl+N', action: () => addPanel() },
       { label: 'Open Panel', shortcut: 'Ctrl+O', action: () => openPanelFromFile() },
+      { type: 'separator' },
+      { label: 'New Custom Component', action: () => newCustomComponent() },
+      { label: 'Open Saved Custom Component', action: () => openSavedCustomComponent() },
+      { type: 'separator' },
+      { label: 'New Device Profile', action: () => newDeviceProfile() },
+      { label: 'Open Device Profile', action: () => openDeviceProfile() },
+      { label: 'Import Device Profile...', action: () => importDeviceProfile() },
       { type: 'separator' },
       { label: 'Save',       shortcut: 'Ctrl+S', action: () => saveActivePanel() },
       { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => saveActivePanelAs() },

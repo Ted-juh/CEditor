@@ -20,13 +20,15 @@
   let enabledCount = $derived(behaviorEntries.filter(([, behavior]) => behavior?.enabled !== false).length);
   let targetedChannels = $derived([...new Set(behaviorEntries.map(([, behavior]) => behavior?.valueChannel).filter(Boolean))]);
   let selectedChannel = $derived(channels?._children?.[selected?.valueChannel] ?? null);
+  let selectedValueChannels = $derived(Array.isArray(selected?.valueChannels) ? selected.valueChannels : [selected?.valueChannel].filter(Boolean));
   let behaviorPreviewClass = $derived(previewClassFor(selected));
   let routeSummary = $derived(routeLabel(selected));
   let recommendedGeometryOptions = $derived(geometryOptionsFor(selected));
   let currentGeometryIsRecommended = $derived(isRecommendedGeometry(selected));
 
   const TYPE_OPTIONS = ['button', 'toggle', 'radio', 'cycle', 'slider', 'multi-slider', 'three-value-slider', 'dial', 'ring', 'scroll', 'grid', 'piano-bar', 'filmstrip-control', 'xy-pad', 'drag-handle', 'visual-only'];
-  const GEOMETRY_OPTIONS = ['none', 'linear', 'vertical', 'circular', 'ring', 'grid', 'scroll', 'piano'];
+  const GEOMETRY_OPTIONS = ['none', 'linear', 'vertical', 'circular', 'ring', 'grid', 'xy', 'scroll', 'piano'];
+  const DRAG_MODE_OPTIONS = ['auto', 'vertical', 'horizontal', 'circular', 'both'];
   const TYPE_GEOMETRIES = {
     button: ['none'],
     toggle: ['none'],
@@ -41,7 +43,7 @@
     grid: ['grid'],
     'piano-bar': ['piano', 'linear'],
     'filmstrip-control': ['linear', 'vertical', 'circular'],
-    'xy-pad': ['grid'],
+    'xy-pad': ['xy', 'grid'],
     'drag-handle': ['linear', 'vertical', 'circular', 'ring'],
     'visual-only': ['none'],
   };
@@ -49,8 +51,8 @@
     { id: 'button', label: 'Button', type: 'button', role: 'button', geometry: 'none', interaction: { pointer: true, keyboard: true, wheel: false, snap: true } },
     { id: 'toggle', label: 'Toggle', type: 'toggle', role: 'button', geometry: 'none', interaction: { pointer: true, keyboard: true, wheel: false, snap: true } },
     { id: 'slider', label: 'Slider', type: 'slider', role: 'slider', geometry: 'linear', interaction: { pointer: true, keyboard: true, wheel: true, snap: true } },
-    { id: 'dial', label: 'Dial', type: 'dial', role: 'dial', geometry: 'circular', interaction: { pointer: true, keyboard: true, wheel: true, snap: true } },
-    { id: 'xyPad', label: 'XY Pad', type: 'xy-pad', role: 'xy-pad', geometry: 'grid', interaction: { pointer: true, keyboard: false, wheel: false, snap: false } },
+    { id: 'dial', label: 'Dial', type: 'dial', role: 'dial', geometry: 'circular', dragMode: 'vertical', interaction: { pointer: true, keyboard: true, wheel: true, snap: true } },
+    { id: 'xyPad', label: 'XY Pad', type: 'xy-pad', role: 'xyPad', geometry: 'xy', dragMode: 'both', interaction: { pointer: true, keyboard: false, wheel: false, snap: false } },
     { id: 'pianoBar', label: 'Piano', type: 'piano-bar', role: 'piano', geometry: 'piano', interaction: { pointer: true, keyboard: true, wheel: false, snap: true } },
     { id: 'scroll', label: 'Scroll', type: 'scroll', role: 'viewport', geometry: 'scroll', interaction: { pointer: true, keyboard: true, wheel: true, snap: false } },
     { id: 'filmstrip', label: 'Filmstrip', type: 'filmstrip-control', role: 'filmstrip', geometry: 'linear', interaction: { pointer: true, keyboard: true, wheel: true, snap: true } },
@@ -74,6 +76,17 @@
     applyControlPatch(core.id, Object.fromEntries(
       Object.entries(patch).map(([path, value]) => [`Behaviors.${selectedName}.${path}`, value])
     ));
+  }
+
+  function setValueChannelAt(index, channelName) {
+    if (!core?.id || !selectedName) return;
+    const nextChannels = [...selectedValueChannels];
+    nextChannels[index] = channelName;
+    const patch = {
+      valueChannels: nextChannels.filter(Boolean),
+    };
+    if (index === 0) patch.valueChannel = channelName;
+    setSelectedPatch(patch);
   }
 
   function addBehavior() {
@@ -109,6 +122,7 @@
         type: template.type,
         role: template.role,
         geometry: template.geometry,
+        dragMode: template.dragMode ?? selected?.dragMode ?? 'auto',
         enabled: true,
         valueChannel,
         valueChannels: template.type === 'xy-pad'
@@ -298,7 +312,49 @@
       <PropertyCell label="Reverse Mouse" span={2} hint="Invert pointer and wheel value direction for this behavior module while leaving the artwork unchanged.">
         <PropertyToggle value={selected.reverseMouseDirection === true} onchange={() => set('reverseMouseDirection', !(selected.reverseMouseDirection === true))} />
       </PropertyCell>
+      <PropertyCell label="Drag Mode" span={2} hint="How pointer movement changes value. Auto follows geometry; vertical is the usual knob/plugin drag.">
+        <select class="val" value={selected.dragMode ?? 'auto'} onchange={(event) => set('dragMode', event.target.value)}>
+          {#each DRAG_MODE_OPTIONS as option}
+            <option value={option}>{option}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Sensitivity" span={2} hint="Multiplier for vertical, horizontal, or both drag modes. 1 means one control height/width covers the full value range.">
+        <input class="val" type="number" min="0.01" max="10" step="0.05" value={selected.dragSensitivity ?? 1} onchange={(event) => set('dragSensitivity', Math.max(0.01, Math.min(10, Number(event.target.value) || 1)))} />
+      </PropertyCell>
     </PropertySection>
+
+    {#if selected.type === 'xy-pad' || selected.role === 'xyPad' || selected.role === 'xy-pad' || selected.geometry === 'xy' || selected.geometry === 'grid'}
+      <PropertySection title="XY Semantics">
+        <PropertyCell label="X Channel" span={2} hint="Horizontal value controlled by this XY behavior.">
+          <select class="val" value={selectedValueChannels[0] ?? selected.valueChannel ?? ''} onchange={(event) => setValueChannelAt(0, event.target.value)}>
+            <option value="">none</option>
+            {#each channelNames as name}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Y Channel" span={2} hint="Vertical value controlled by this XY behavior. Generated grid hit zones can target this as the Y value channel.">
+          <select class="val" value={selectedValueChannels[1] ?? ''} onchange={(event) => setValueChannelAt(1, event.target.value)}>
+            <option value="">none</option>
+            {#each channelNames as name}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Pointer Model" span={2} hint="Both axes update together from the pointer position in the target hit zone.">
+          <div class="semantic-card">
+            <strong>2-axis pointer</strong>
+            <span>{selectedValueChannels[0] ?? selected.valueChannel ?? '-'} / {selectedValueChannels[1] ?? '-'}</span>
+          </div>
+        </PropertyCell>
+        <PropertyCell label="Recommended" span={2} hint="Best defaults for an XY pad.">
+          <button class="action-btn" type="button" onclick={() => setSelectedPatch({ type: 'xy-pad', role: 'xyPad', geometry: 'xy', dragMode: 'both', interaction: { ...(selected.interaction ?? {}), pointer: true, keyboard: false, wheel: false, snap: false } })}>
+            Apply XY Defaults
+          </button>
+        </PropertyCell>
+      </PropertySection>
+    {/if}
 
     <PropertySection title="Notes">
       <PropertyCell label="Purpose" span={4} hint="Short design note for collaborators and downloaded components.">
@@ -324,6 +380,30 @@
   }
   .val.code { font-family: Consolas, 'Courier New', monospace; line-height: 1.4; }
   .val:focus { border-color: #5B9BD5; }
+  .semantic-card {
+    display: grid;
+    gap: 3px;
+    min-height: 36px;
+    padding: 7px;
+    border: 1px solid #34424D;
+    border-radius: 5px;
+    background: #151C22;
+  }
+  .semantic-card strong,
+  .semantic-card span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .semantic-card strong {
+    color: #E7F4FB;
+    font-size: 11px;
+  }
+  .semantic-card span {
+    color: #83BFEA;
+    font-size: 10px;
+  }
   .behavior-preview {
     position: relative;
     width: 100%;

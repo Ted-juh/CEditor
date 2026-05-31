@@ -27,6 +27,13 @@ import {
   readUnsavedActiveEditorTab,
   readUnsavedSessionSnapshot,
 } from './panelSessionPersistence.js';
+import {
+  activeComponentDocumentId,
+  closeComponentDocument,
+  componentDocuments,
+  openComponentSurfaceWorkspace,
+  setActiveComponentDocument,
+} from './componentWorkspace.js';
 
 export { createPanel };
 
@@ -252,6 +259,8 @@ function restoreUnsavedSessionFromSnapshot() {
   if (restoredActiveId != null) {
     activePanelId.set(restoredActiveId);
     activeEditorTab.set({ type: 'panel', id: restoredActiveId });
+    const restoredPanel = get(panels).find((panel) => panel.id === restoredActiveId);
+    maybeAutoOpenComponentDesigner(restoredPanel);
   }
 }
 
@@ -311,7 +320,7 @@ export const settingsTabOpen = writable(false);
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);
 
-/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile', id } */
+/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
 /** Editor split layout. Primary and secondary pin the two tabs shown in the split workspace. */
@@ -342,8 +351,8 @@ export const resolvedActivePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, deviceProfileTabs],
-  ([$panels, $settingsTabOpen, $deviceProfileTabs]) => {
+  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments],
+  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -369,6 +378,15 @@ export const editorTabs = derived(
       });
     }
 
+    for (const componentDocument of $componentDocuments) {
+      tabs.push({
+        id: componentDocument.id,
+        tabType: 'component',
+        name: componentDocument.name || 'Untitled Component',
+        modified: componentDocument.modified === true,
+      });
+    }
+
     return tabs;
   }
 );
@@ -376,6 +394,8 @@ export const editorTabs = derived(
 function resolvePanelSelection(list, activeId, tab) {
   if (!Array.isArray(list) || list.length === 0) return null;
   if (tab?.type === 'settings') return null;
+  if (tab?.type === 'component') return null;
+  if (tab?.type === 'deviceProfile') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -392,12 +412,33 @@ export const activePanel = derived(
     resolvePanelSelection($panels, $activePanelId, $activeEditorTab)
 );
 
+function firstCustomComponent(panel) {
+  return (panel?.controls ?? []).find((control) =>
+    control?._children?.Core?.controlType === 'CustomComponent'
+  ) ?? null;
+}
+
+function maybeAutoOpenComponentDesigner(panel) {
+  if (panel?._codexAutoOpenComponentDesigner !== true) return;
+  const customControl = firstCustomComponent(panel);
+  const customId = customControl?._children?.Core?.id;
+  if (!customId) return;
+
+  queueMicrotask(() => {
+    activePanelId.set(panel.id);
+    activeEditorTab.set({ type: 'panel', id: panel.id });
+    selectComponent(customId);
+    openComponentSurfaceWorkspace();
+  });
+}
+
 /** Add a new panel and make it active */
 export function addPanel(panel = null) {
   const p = panel ?? createPanel();
   panels.update(list => [...list, p]);
   activePanelId.set(p.id);
   activeEditorTab.set({ type: 'panel', id: p.id });
+  maybeAutoOpenComponentDesigner(p);
   return p;
 }
 
@@ -444,6 +485,17 @@ export function openDeviceProfileTab(profile) {
     activeEditorTab.set({ type: 'panel', id: currentPanelId });
   }
   clearSelection();
+}
+
+/** Open a standalone Device Profile Designer tab for MIDI CC, NRPN, and SysEx authoring. */
+export function openStandaloneDeviceProfileTab(profile) {
+  const id = String(profile?.id ?? '').trim();
+  if (!id) return null;
+  const name = profile?.name || `Profile: ${id}`;
+  ensureDeviceProfileTab(id, name);
+  activeEditorTab.set({ type: 'deviceProfile', id });
+  clearSelection();
+  return { id, name };
 }
 
 /** Update the active panel's already-open DPD companion to a different profile. */
@@ -715,9 +767,20 @@ export function setActiveEditorTab(tab) {
     return;
   }
 
+  if (tab.tabType === 'component' || tab.type === 'component') {
+    const nextTab = { type: 'component', id: tab.id };
+    activeEditorTab.set(nextTab);
+    setActiveComponentDocument(tab.id);
+    clearSelection();
+    return;
+  }
+
   const panelId = tab.id ?? null;
   if (panelId != null) {
     setActivePanel(panelId);
+  } else if (tab.tabType === 'panel' || tab.type === 'panel') {
+    activeEditorTab.set({ type: 'panel', id: null });
+    clearSelection();
   }
 }
 
@@ -733,6 +796,19 @@ export function closeActiveEditorTab() {
 
   if (tab.type === 'deviceProfile') {
     closeDeviceProfileTab(tab.id);
+    return;
+  }
+
+  if (tab.type === 'component') {
+    closeComponentDocument(tab.id);
+    const nextComponentId = get(activeComponentDocumentId);
+    if (nextComponentId) {
+      activeEditorTab.set({ type: 'component', id: nextComponentId });
+    } else if (get(activePanelId) != null) {
+      activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
+    } else {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
     return;
   }
 
@@ -793,7 +869,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -838,7 +914,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component') return;
   syncPanelSelection();
 });
 
@@ -905,6 +981,7 @@ export function initPanelBridge() {
       if (filePath) pendingOpenPanelFiles.delete(filePath);
       finishPendingPanelTimers(filePath, label, payloadSizeBytes, 'reused-after-load');
       setActivePanel(existingAfterLoad.id);
+      maybeAutoOpenComponentDesigner(existingAfterLoad);
       return;
     }
 

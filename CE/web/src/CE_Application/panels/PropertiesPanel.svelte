@@ -23,7 +23,7 @@
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
   const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
-  const PREVIEW_INFO_TEXT = 'Preview is active. Click, hover, or focus controls on the canvas to inspect live runtime values here.';
+  const PREVIEW_INFO_TEXT = 'Preview is active. The canvas is running panel behavior; debug inspection is optional.';
 
   function readStoredUiState() {
     const stored = readStoredJson(UI_STATE_STORAGE_KEY, {});

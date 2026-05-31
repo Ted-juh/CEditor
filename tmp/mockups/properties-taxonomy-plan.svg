@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#10161b"/>
+      <stop offset="1" stop-color="#15191d"/>
+    </linearGradient>
+    <linearGradient id="panel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#20282e"/>
+      <stop offset="1" stop-color="#181e23"/>
+    </linearGradient>
+    <style>
+      text { font-family: Inter, Segoe UI, Arial, sans-serif; fill: #dbe7ee; }
+      .muted { fill: #8ea0aa; font-size: 24px; }
+      .tiny { fill: #8fa0aa; font-size: 18px; }
+      .label { fill: #e8f3f7; font-size: 24px; font-weight: 700; }
+      .title { fill: #f2fbff; font-size: 38px; font-weight: 800; }
+      .sub { fill: #9db0bb; font-size: 22px; }
+      .chip { fill: #c7d9e1; font-size: 18px; font-weight: 650; }
+      .old-icon { fill: #2a343b; stroke: #41505a; stroke-width: 2; }
+      .new-icon { fill: #123d4a; stroke: #25c1b4; stroke-width: 2; }
+      .line { stroke: #33424b; stroke-width: 3; fill: none; }
+      .arrow { stroke: #25c1b4; stroke-width: 4; fill: none; marker-end: url(#arrowhead); }
+      .card { fill: url(#panel); stroke: #31404a; stroke-width: 2; rx: 8; }
+      .group { fill: #1b2228; stroke: #374650; stroke-width: 2; rx: 8; }
+      .accent { fill: #25c1b4; }
+      .warn { fill: #f0b84e; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="8" refY="4" orient="auto">
+      <path d="M0,0 L10,4 L0,8 Z" fill="#25c1b4"/>
+    </marker>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <text x="70" y="70" class="title">Custom Component Properties: Reduce The Icon Wall</text>
+  <text x="70" y="106" class="sub">Keep every existing property, but move from 30+ peer sections to 8 grouped studios with searchable sub-sections.</text>
+
+  <rect x="70" y="150" width="430" height="650" class="card"/>
+  <text x="100" y="200" class="label">Current Strip</text>
+  <text x="100" y="232" class="muted">Every section competes at the same level.</text>
+  <g transform="translate(100 270)">
+    <rect x="0" y="0" width="54" height="454" rx="8" fill="#161c20" stroke="#2f3b43"/>
+    <g transform="translate(10 12)">
+      <rect class="old-icon" x="0" y="0" width="34" height="34" rx="5"/><text x="52" y="24" class="tiny">Core</text>
+      <rect class="old-icon" x="0" y="42" width="34" height="34" rx="5"/><text x="52" y="66" class="tiny">Transform</text>
+      <rect class="old-icon" x="0" y="84" width="34" height="34" rx="5"/><text x="52" y="108" class="tiny">Background</text>
+      <rect class="old-icon" x="0" y="126" width="34" height="34" rx="5"/><text x="52" y="150" class="tiny">Border</text>
+      <rect class="old-icon" x="0" y="168" width="34" height="34" rx="5"/><text x="52" y="192" class="tiny">Text</text>
+      <rect class="old-icon" x="0" y="210" width="34" height="34" rx="5"/><text x="52" y="234" class="tiny">Grid</text>
+      <rect class="old-icon" x="0" y="252" width="34" height="34" rx="5"/><text x="52" y="276" class="tiny">States</text>
+      <rect class="old-icon" x="0" y="294" width="34" height="34" rx="5"/><text x="52" y="318" class="tiny">Bindings</text>
+      <rect class="old-icon" x="0" y="336" width="34" height="34" rx="5"/><text x="52" y="360" class="tiny">Layers</text>
+      <rect class="old-icon" x="0" y="378" width="34" height="34" rx="5"/><text x="52" y="402" class="tiny">... many more</text>
+    </g>
+  </g>
+  <text x="100" y="750" class="tiny">Problem: the icon rail becomes a scrollable memory test.</text>
+
+  <path d="M540 468 C625 468 650 468 735 468" class="arrow"/>
+
+  <rect x="780" y="150" width="750" height="650" class="card"/>
+  <text x="815" y="200" class="label">Proposed Strip</text>
+  <text x="815" y="232" class="muted">8 top-level studios. Old sections live inside them.</text>
+
+  <g transform="translate(815 275)">
+    <rect x="0" y="0" width="64" height="394" rx="8" fill="#151c20" stroke="#2f3b43"/>
+    <g transform="translate(11 13)">
+      <rect class="new-icon" x="0" y="0" width="42" height="42" rx="7"/><text x="66" y="28" class="chip">Identity</text>
+      <rect class="new-icon" x="0" y="48" width="42" height="42" rx="7"/><text x="66" y="76" class="chip">Layout</text>
+      <rect class="new-icon" x="0" y="96" width="42" height="42" rx="7"/><text x="66" y="124" class="chip">Appearance</text>
+      <rect class="new-icon" x="0" y="144" width="42" height="42" rx="7"/><text x="66" y="172" class="chip">Interaction</text>
+      <rect class="new-icon" x="0" y="192" width="42" height="42" rx="7"/><text x="66" y="220" class="chip">Data</text>
+      <rect class="new-icon" x="0" y="240" width="42" height="42" rx="7"/><text x="66" y="268" class="chip">Composition</text>
+      <rect class="new-icon" x="0" y="288" width="42" height="42" rx="7"/><text x="66" y="316" class="chip">Assets</text>
+      <rect class="new-icon" x="0" y="336" width="42" height="42" rx="7"/><text x="66" y="364" class="chip">Advanced</text>
+    </g>
+  </g>
+
+  <g transform="translate(1135 285)">
+    <rect x="0" y="0" width="340" height="62" class="group"/>
+    <circle cx="28" cy="31" r="8" class="accent"/><text x="52" y="38" class="chip">Search across all sections</text>
+    <rect x="0" y="80" width="340" height="62" class="group"/>
+    <circle cx="28" cy="111" r="8" class="accent"/><text x="52" y="118" class="chip">Pin favorite sections</text>
+    <rect x="0" y="160" width="340" height="62" class="group"/>
+    <circle cx="28" cy="191" r="8" class="accent"/><text x="52" y="198" class="chip">Show all inside a group</text>
+    <rect x="0" y="240" width="340" height="62" class="group"/>
+    <circle cx="28" cy="271" r="8" class="warn"/><text x="52" y="278" class="chip">Advanced keeps raw access</text>
+  </g>
+
+  <text x="815" y="745" class="tiny">Result: fewer top icons, no lost properties, faster scanning, better mobile/remote use.</text>
+</svg>
