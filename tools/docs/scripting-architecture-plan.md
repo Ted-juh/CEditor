@@ -4,6 +4,12 @@
 
 This document describes a scripting architecture for CEditor that works across custom components, panels, devices, and future exported runtimes. The goal is not to bolt JavaScript onto the editor, but to build a language-neutral scripting system that can be authored visually, displayed as readable script, executed in the editor, and translated to JavaScript, Lua, C++, or other targets later.
 
+Three design tensions drive every decision in this plan:
+
+1. **Approachable without being kiddy.** A first-time scripter and a career C++ engineer must both feel the tool was built for them. We solve this with progressive disclosure: one system, several authoring surfaces, no walls between them.
+2. **Multi-language as a promise, not an afterthought.** Multiple languages are supported because the source of truth is *not* a language. JavaScript, Lua, and C++ are projections of a shared model, so "supporting Lua" never means re-implementing the system.
+3. **A hard line between settings and scripts.** What a component/panel/device *is* lives in settings (declarative, safe, always portable). What it *does* in response to events lives in scripts. This boundary is defined explicitly below and enforced by the runtime, not left to convention.
+
 The core idea is simple:
 
 **Do not make JavaScript the real scripting system.**
@@ -56,35 +62,105 @@ This structured representation is the intermediate representation, or IR. It can
 
 The command graph is the product. JavaScript, Lua, C++, and CE Script are views or targets.
 
+---
+
+## The Settings / Scripting Boundary
+
+This is the most important architectural rule in the system, and the one most likely to be violated under deadline pressure. State it loudly and enforce it in code.
+
+### The rule
+
+> **Settings declare what something *is*. Scripts declare what something *does* in response to events.**
+
+If a value can be known by reading the document without running anything, it is a setting. If a value is only known by reacting to an event, it is a script.
+
+### Why the boundary matters
+
+- **Predictability.** Settings can be diffed, validated, migrated, and rendered without executing arbitrary logic. A panel with zero scripts is fully understood from its data alone.
+- **Safety.** Settings can never loop, never emit MIDI floods, never recurse. All dynamic risk is confined to the scripting layer, where the runtime applies guards.
+- **Portability.** Settings always export cleanly to every target. Scripts may contain non-portable blocks; settings never do.
+- **Approachability.** A beginner can build a working, attractive panel entirely in settings and never open the script editor. Scripting becomes opt-in power, not a prerequisite.
+- **Reviewability.** When something misbehaves, the first question — "is this configured or scripted?" — has an unambiguous answer.
+
+### What belongs in Settings (declarative)
+
+| Concern | Examples |
+|---|---|
+| Identity & metadata | name, id, label, description, tags |
+| Static appearance | default color, size, position, font, default visibility |
+| Value definition | min, max, default, step, unit, value type, enum options |
+| Static structure | which parts exist, layout, anchoring, z-order |
+| Static bindings | a control maps to CC#74 on channel 1 (a fixed, declarative mapping) |
+| Capability declaration | "this device supports SysEx dumps", "this control is bipolar" |
+| Static constraints | "this value is read-only", "this control is always 0–127" |
+
+A setting is a fact. It does not run.
+
+### What belongs in Scripts (behavioral)
+
+| Concern | Examples |
+|---|---|
+| Conditional behavior | "if cutoff > 0.75, raise resonance" |
+| Relationships between controls | macro knob drives three parameters |
+| Dynamic appearance | "turn the arc red while value is hot" |
+| Computed values | "format this value as a note name", checksum calculation |
+| Cross-component communication | component emits `noteOn`, panel reacts |
+| Reacting to incoming data | parse a SysEx dump into controls |
+| Timing | debounce, animate, repeat |
+| Stateful logic | mode toggles, preset initialization sequences |
+
+A script is a reaction. It runs only when an event fires.
+
+### The grey zone, resolved
+
+Some cases look like they could go either way. Resolve them with a consistent test: **can it be expressed as a fixed fact, or does it require evaluating a condition or event?**
+
+- *A control's range is 20–20000 Hz* → **setting** (a fixed fact).
+- *A control's range shrinks when "eco mode" is on* → **script** (depends on state).
+- *A dial maps to CC#74* → **setting** (a fixed declarative binding).
+- *A dial maps to CC#74 only above value 64, otherwise CC#75* → **script** (conditional).
+- *Min cannot exceed max* → **borderline.** Prefer a **declarative constraint in settings** (`constraint: "min <= max"`) when it is a simple invariant the runtime can enforce generically; fall back to a script only when the relationship is non-trivial (e.g. a minimum gap that varies by mode).
+
+The principle: **push everything you can into declarative settings, including a small vocabulary of declarative constraints, and reach for scripts only when behavior is genuinely conditional or event-driven.** This keeps the scripting surface small, which keeps it approachable.
+
+### Enforcement
+
+The boundary is not a documentation suggestion. Enforce it:
+
+- Settings schemas reject expressions and command references. A setting field accepts literals and enum choices only.
+- The runtime context exposes settings as **read-only** to scripts by default. A script reads `component.minValue` but cannot *redefine* the min; it can only set the current value within the declared min/max. Changing the *definition* of min is a settings edit, not a script action.
+- Declarative constraints (the small vocabulary above) are evaluated by the runtime as guardrails *around* script output, so even a script cannot push a value outside its declared bounds.
+- Validation flags any script that tries to mutate a settings-owned field and suggests the equivalent settings change.
+
+---
+
 ## Scripting Scopes
 
 Scripting should exist at multiple levels. These scopes share the same command model, but each has different available events, targets, and permissions.
 
-## 1. Component Scripts
+### 1. Component Scripts
 
 Component scripts live inside a custom component package.
 
 They handle local behavior such as:
 
-- Value constraints.
+- Value constraints beyond simple declarative invariants.
 - Min, max, and current-value relationships.
 - Internal state changes.
 - Hit-zone responses.
-- Part visibility.
-- Part styling.
-- Animations.
+- Part visibility, styling, and animation.
 - Local variables.
 - Component output events.
 
 Example use cases:
 
-- A range dial where min cannot pass max.
+- A range dial where min cannot pass max, with a mode-dependent gap.
 - A waveform selector where hover starts animation.
 - A button that changes internal state but exposes only one output value.
 - An ADSR component that keeps points in legal order.
 - A custom piano keyboard that maps clicks to note values.
 
-## 2. Panel Scripts
+### 2. Panel Scripts
 
 Panel scripts live on the panel document.
 
@@ -106,7 +182,7 @@ Example use cases:
 - When a custom component emits `noteOn`, update another visual component.
 - When a preset loads, initialize several controls.
 
-## 3. Device Scripts
+### 3. Device Scripts
 
 Device scripts live on device/profile definitions.
 
@@ -118,7 +194,7 @@ They handle MIDI, SysEx, NRPN, checksums, and device state synchronization:
 - NRPN/RPN message sequences.
 - Checksum calculation.
 - Request/response handling.
-- Device capability mapping.
+- Device capability mapping (the *declaration* of capabilities is a setting; the *logic* that uses them is a script).
 
 Example use cases:
 
@@ -127,7 +203,7 @@ Example use cases:
 - Parse incoming SysEx into panel parameters.
 - Request a patch dump and update controls from the response.
 
-## 4. Global Or Project Scripts
+### 4. Global Or Project Scripts
 
 Global scripts should be added later and kept more restricted.
 
@@ -140,6 +216,36 @@ They could support:
 - Project-wide script libraries.
 
 These should not have broad access to the app or filesystem. They should still use the same command library and official context API.
+
+---
+
+## Designing For Both Beginners And Hardcore Coders
+
+The single biggest risk to this feature is tone. A block-only editor signals "this isn't for serious work." A code-only editor signals "go away unless you already program." The resolution is **one model, four authoring surfaces, and free movement between them** — what is sometimes called progressive disclosure.
+
+The non-negotiable invariant: **every authoring surface reads and writes the same command graph.** A beginner builds with forms; an expert opens the same script as text; both edits land in the same IR. Nobody is locked into a "beginner format" they later have to abandon.
+
+### What makes it approachable (not scary for beginners)
+
+- **You can ship without scripting at all.** Settings alone produce a working panel.
+- **Simple Mode** handles the 80% case ("when this changes, set that") as plain-language forms with dropdowns and target pickers. No syntax.
+- **Live trace built in.** Every event shows what fired and what changed (see Preview Debugger). Beginners learn by watching, not by reading docs.
+- **Inline validation with fixes.** Errors are phrased as guidance ("`rangeArc` isn't a part on this component — did you mean `rangeArc2`?"), not stack traces.
+- **No blank page.** The action picker is categorized and searchable; you assemble behavior by choosing, not by remembering.
+
+### What keeps it credible (not kiddy for experts)
+
+- **Real text, both directions.** The CE Script text view is editable, not just a read-only preview. Experts type; the editor parses back to the graph.
+- **Raw language escape hatches.** Raw JS/Lua/C++ blocks exist for people who want them (added last, sandboxed, clearly marked non-portable).
+- **Keyboard-first, copy-pasteable, diff-friendly.** Scripts serialize to readable text that survives version control.
+- **No dumbing-down of capability.** Anything achievable in code is achievable in the graph; the visual layer never caps what experts can express.
+- **Honest portability badges.** Experts are told exactly what will and won't survive export, so they can make informed trade-offs rather than discovering them later.
+
+### The four surfaces
+
+They are presented later in "Script Authoring Levels." The key cultural rule: **the editor never forces a level.** A user can drop a complex panel down to text, hand-edit a tricky branch, and pop back up to forms — the graph stays the source of truth throughout.
+
+---
 
 ## Command Library
 
@@ -187,192 +293,49 @@ Example command metadata:
 }
 ```
 
-## Command Categories
+### Command Categories
 
-## Values
+**Values** — `getValue`, `setValue`, `changeValue`, `clamp`, `normalize`, `scale`, `snap`, `round`, `formatValue`
 
-Commands for reading and writing values.
+**Component** — `setState`, `toggleState`, `setPartVisible`, `setPartColor`, `setPartText`, `setPartPosition`, `setPartRotation`, `setPartOpacity`, `animatePart`
 
-- `getValue(target)`
-- `setValue(target, value)`
-- `changeValue(target, delta)`
-- `clamp(value, min, max)`
-- `normalize(value, min, max)`
-- `scale(value, fromMin, fromMax, toMin, toMax)`
-- `snap(value, step)`
-- `round(value, decimals)`
-- `formatValue(value, format)`
+**Panel** — `findControl`, `setControlValue`, `setControlEnabled`, `setControlVisible`, `setPanelState`, `broadcast`, `route`, `setPresetValue`
 
-## Component
+**MIDI And Device** — `sendCC`, `sendNRPN`, `sendRPN`, `sendSysex`, `requestParameter`, `parseSysex`, `checksum`, `pack7bit`, `unpack7bit`, `split14bit`, `combine14bit`
 
-Commands for modifying a custom component at runtime.
+**Logic** — `if`, `else`, `switch`, `and`, `or`, `not`, `equals`, `greaterThan`, `lessThan`, `between`, `changed`, `risingEdge`, `fallingEdge`
 
-- `setState(component, state)`
-- `toggleState(component, state)`
-- `setPartVisible(part, visible)`
-- `setPartColor(part, color)`
-- `setPartText(part, text)`
-- `setPartPosition(part, x, y)`
-- `setPartRotation(part, degrees)`
-- `setPartOpacity(part, opacity)`
-- `animatePart(part, property, to, duration, easing)`
+**Math** (must be portable) — `add`, `subtract`, `multiply`, `divide`, `mod`, `min`, `max`, `abs`, `sin`, `cos`, `tan`, `lerp`, `curve`, `random`, `smooth`
 
-## Panel
+**Timing** — `delay`, `debounce`, `throttle`, `repeat`, `stopTimer`, `onTick`, `after`, `animate`. These need special care; they can create runaway behavior if not controlled.
 
-Commands for panel-level behavior.
+**Events** — `emit`, `listen`, `stopPropagation`, `preventDefault`, `onValueChanged`, `onPointerDown`, `onPointerMove`, `onPointerUp`, `onHoverStart`, `onHoverEnd`, `onLoad`, `onPresetChanged`, `onDeviceMessage`
 
-- `findControl(id)`
-- `setControlValue(id, value)`
-- `setControlEnabled(id, enabled)`
-- `setControlVisible(id, visible)`
-- `setPanelState(state)`
-- `broadcast(eventName, payload)`
-- `route(source, destination)`
-- `setPresetValue(target, value)`
+**Storage** — `setLocal`, `getLocal`, `setComponentVariable`, `getComponentVariable`, `setPanelVariable`, `getPanelVariable`, `setPresetValue`, `getPresetValue`
 
-## MIDI And Device
+**Debug** — `log`, `warn`, `traceValue`, `breakpoint`, `inspectEvent`, `showOverlay`
 
-Commands for device communication.
-
-- `sendCC(channel, cc, value)`
-- `sendNRPN(channel, msb, lsb, value)`
-- `sendRPN(channel, msb, lsb, value)`
-- `sendSysex(bytes)`
-- `requestParameter(parameterId)`
-- `parseSysex(pattern)`
-- `checksum(type, bytes)`
-- `pack7bit(value)`
-- `unpack7bit(bytes)`
-- `split14bit(value)`
-- `combine14bit(msb, lsb)`
-
-## Logic
-
-Commands for branching and conditions.
-
-- `if`
-- `else`
-- `switch`
-- `and`
-- `or`
-- `not`
-- `equals`
-- `greaterThan`
-- `lessThan`
-- `between`
-- `changed`
-- `risingEdge`
-- `fallingEdge`
-
-## Math
-
-Math commands must be portable.
-
-- `add`
-- `subtract`
-- `multiply`
-- `divide`
-- `mod`
-- `min`
-- `max`
-- `abs`
-- `sin`
-- `cos`
-- `tan`
-- `lerp`
-- `curve`
-- `random`
-- `smooth`
-
-## Timing
-
-Commands for delayed or repeated behavior.
-
-- `delay`
-- `debounce`
-- `throttle`
-- `repeat`
-- `stopTimer`
-- `onTick`
-- `after`
-- `animate`
-
-Timing commands need special care because they can create runaway behavior if not controlled.
-
-## Events
-
-Commands for emitting and responding to events.
-
-- `emit`
-- `listen`
-- `stopPropagation`
-- `preventDefault`
-- `onValueChanged`
-- `onPointerDown`
-- `onPointerMove`
-- `onPointerUp`
-- `onHoverStart`
-- `onHoverEnd`
-- `onLoad`
-- `onPresetChanged`
-- `onDeviceMessage`
-
-## Storage
-
-Commands for script-level variables and persistent values.
-
-- `setLocal`
-- `getLocal`
-- `setComponentVariable`
-- `getComponentVariable`
-- `setPanelVariable`
-- `getPanelVariable`
-- `setPresetValue`
-- `getPresetValue`
-
-## Debug
-
-Commands for understanding script behavior.
-
-- `log`
-- `warn`
-- `traceValue`
-- `breakpoint`
-- `inspectEvent`
-- `showOverlay`
+---
 
 ## Script Authoring Levels
 
-Users should not be forced to start with raw code. The scripting system should have multiple authoring levels that all produce the same command graph.
+Users should not be forced to start with raw code. The scripting system should have multiple authoring levels that all produce the same command graph, and the user should be free to move between them at any time.
 
-## 1. Simple Mode
+### 1. Simple Mode
 
-Form-based editing for common tasks.
-
-Examples:
+Form-based editing for common tasks. No syntax.
 
 - When this value changes, set that value.
 - When clicked, switch panel state.
 - When MIDI message arrives, update parameter.
 
-## 2. Command Mode
+### 2. Command Mode
 
-A categorized command builder.
+A categorized command builder. The user chooses an event, optional conditions, one or more actions, and optional debug output. This is the main mode for most users.
 
-The user chooses:
+### 3. Script Text Mode
 
-1. Event.
-2. Optional conditions.
-3. One or more actions.
-4. Optional debug output.
-
-This is the main mode for most users.
-
-## 3. Script Text Mode
-
-Readable script generated from the command graph.
-
-Example:
+Readable script generated from the command graph — and editable back into it.
 
 ```text
 on cutoff.changed:
@@ -381,22 +344,17 @@ on cutoff.changed:
     panel.state = "hot"
 ```
 
-This text is not JavaScript or Lua. It is CE Script: a readable projection of the command graph.
+This text is CE Script: a readable projection of the command graph, not JavaScript or Lua.
 
-## 4. Advanced Export Mode
+### 4. Advanced Export Mode
 
-Language views:
+Language views: JavaScript, Lua, C++, JSON command graph. Only portable commands export cleanly to all targets; non-portable commands show warnings.
 
-- JavaScript.
-- Lua.
-- C++.
-- JSON command graph.
-
-Only portable commands should export cleanly to all targets. Non-portable commands should show warnings.
+---
 
 ## Script Storage Model
 
-Scripts should be added as structured sections.
+Scripts should be added as structured sections, stored alongside but clearly separate from settings.
 
 For custom components:
 
@@ -440,67 +398,54 @@ For panels:
 }
 ```
 
-The command graph should be the source of truth. Text code can be cached or generated, but should not be the only stored representation.
+The command graph is the source of truth. Text code can be cached or generated, but should not be the only stored representation.
+
+---
 
 ## Expression System
 
-Expressions should also be language-neutral.
+Expressions should be language-neutral.
 
-Examples:
+Examples: `event.value`, `component.minValue`, `panel.controls.cutoff.value`, `device.parameters.filterCutoff.value`, `time.now`, `math.scale(value, 0, 127, 20, 20000)`.
 
-- `event.value`
-- `component.minValue`
-- `panel.controls.cutoff.value`
-- `device.parameters.filterCutoff.value`
-- `time.now`
-- `math.scale(value, 0, 127, 20, 20000)`
-
-Internally, expressions should be trees:
+Internally, expressions are trees:
 
 ```json
 {
   "op": "scale",
-  "args": [
-    { "ref": "event.value" },
-    0,
-    127,
-    20,
-    20000
-  ]
+  "args": [ { "ref": "event.value" }, 0, 127, 20, 20000 ]
 }
 ```
 
-This can export to JavaScript:
+This exports identically across targets:
 
 ```js
-scale(event.value, 0, 127, 20, 20000)
+scale(event.value, 0, 127, 20, 20000)   // JavaScript
 ```
-
-Lua:
-
 ```lua
-scale(event.value, 0, 127, 20, 20000)
+scale(event.value, 0, 127, 20, 20000)   -- Lua
 ```
-
-C++:
-
 ```cpp
-scale(event.value, 0, 127, 20, 20000)
+scale(event.value, 0, 127, 20, 20000)   // C++
 ```
+
+Note that read-only access to settings-owned fields (`component.minValue`) is allowed in expressions; *writing* them is not — that is enforced at the command and context level, not the expression level.
+
+---
 
 ## Runtime Architecture
 
-The script pipeline should be:
+The script pipeline:
 
 1. Author script.
-2. Validate script.
+2. Validate script (including the settings-boundary check).
 3. Compile command graph.
 4. Execute against a controlled context.
 5. Return patches, emitted events, debug traces, and device messages.
 6. Apply patches through existing editor/runtime update systems.
 7. Show trace output in preview/debug tools.
 
-Scripts should not mutate the editor or control tree directly.
+Scripts must not mutate the editor or control tree directly.
 
 Good:
 
@@ -514,7 +459,7 @@ Bad:
 ctx.panel.controls[4]._children.Value.value = 9600
 ```
 
-The executor should return structured effects:
+The executor returns structured effects:
 
 ```json
 {
@@ -529,28 +474,17 @@ The executor should return structured effects:
 }
 ```
 
+Because effects are structured and applied through the existing update system, the runtime can enforce declarative constraints from settings *as it applies patches* — a patch that would violate a declared min/max is clamped or rejected before it reaches the document.
+
+---
+
 ## Script Context
 
 Every script receives a controlled context.
 
-Conceptual API:
+Conceptual surface: `ctx.event`, `ctx.component`, `ctx.panel`, `ctx.device`, `ctx.values`, `ctx.states`, `ctx.parts`, `ctx.variables`, `ctx.time`, `ctx.math`, `ctx.midi`, `ctx.debug`.
 
-```js
-ctx.event
-ctx.component
-ctx.panel
-ctx.device
-ctx.values
-ctx.states
-ctx.parts
-ctx.variables
-ctx.time
-ctx.math
-ctx.midi
-ctx.debug
-```
-
-The actual API should be function-based, not raw object mutation:
+The API is function-based, not raw object mutation:
 
 ```js
 ctx.value("cutoff")
@@ -559,56 +493,25 @@ ctx.part("rangeArc").setColor("#00ffaa")
 ctx.emit("changed", { value: 9600 })
 ```
 
+Settings-owned fields are reachable through the context as **reads only**. There is deliberately no `ctx.setMin(...)` that redefines a control's range — that is a settings operation, performed in the settings UI, not from a script.
+
+---
+
 ## Event Model
 
 Events must be standardized.
 
-## Lifecycle Events
+**Lifecycle** — `onInit`, `onLoad`, `onUnload`, `onPresetLoad`, `onPresetSave`
 
-- `onInit`
-- `onLoad`
-- `onUnload`
-- `onPresetLoad`
-- `onPresetSave`
+**Interaction** — `onPointerDown`, `onPointerMove`, `onPointerUp`, `onClick`, `onDoubleClick`, `onHoverStart`, `onHoverEnd`, `onWheel`, `onKeyDown`, `onKeyUp`
 
-## Interaction Events
+**Value** — `onValueChanging`, `onValueChanged`, `onValueCommitted`, `onMinChanged`, `onMaxChanged`, `onStateChanged`. The distinction between changing, changed, and committed matters: dragging a dial updates preview continuously, while committed is the right time to send final MIDI output.
 
-- `onPointerDown`
-- `onPointerMove`
-- `onPointerUp`
-- `onClick`
-- `onDoubleClick`
-- `onHoverStart`
-- `onHoverEnd`
-- `onWheel`
-- `onKeyDown`
-- `onKeyUp`
+**Device** — `onMidiIn`, `onSysexIn`, `onParameterReceived`, `onDeviceConnected`, `onDeviceDisconnected`
 
-## Value Events
+**Panel** — `onControlChanged`, `onPanelStateChanged`, `onRouteMessage`, `onTimer`
 
-- `onValueChanging`
-- `onValueChanged`
-- `onValueCommitted`
-- `onMinChanged`
-- `onMaxChanged`
-- `onStateChanged`
-
-The distinction between changing, changed, and committed is important. Dragging a dial may update the preview continuously, while committed may be the right time to send final MIDI output.
-
-## Device Events
-
-- `onMidiIn`
-- `onSysexIn`
-- `onParameterReceived`
-- `onDeviceConnected`
-- `onDeviceDisconnected`
-
-## Panel Events
-
-- `onControlChanged`
-- `onPanelStateChanged`
-- `onRouteMessage`
-- `onTimer`
+---
 
 ## Validation
 
@@ -620,6 +523,7 @@ Validation should detect:
 - Invalid types.
 - Commands not allowed in the current scope.
 - Events not supported by the target.
+- **Scripts attempting to write settings-owned fields** (with a suggested settings edit).
 - Circular updates.
 - Infinite recursion risk.
 - Excessive MIDI output.
@@ -628,60 +532,41 @@ Validation should detect:
 - Non-portable commands.
 - Raw-code blocks that cannot export.
 
-Example warning:
+Validation messages should read as guidance, not errors:
 
 ```text
 setPartColor("rangeArc") references a part that does not exist.
+This component has parts: rangeArc2, dialFace, indicator.
 ```
+
+```text
+This script sets "minValue" definition, which is a setting.
+To change the allowed range, edit the control's settings instead.
+This script may only set the current value within that range.
+```
+
+---
 
 ## Preventing Infinite Loops
 
-The runtime needs loop protection.
+The runtime needs loop protection. Risk example: Script A changes value B; Script B changes value A; Script A runs again; the system loops forever.
 
-Risk example:
-
-1. Script A changes value B.
-2. Script B changes value A.
-3. Script A runs again.
-4. The system loops forever.
-
-Mitigations:
-
-- Transaction IDs.
-- Event origin tracking.
-- Maximum script depth.
-- Maximum commands per event.
-- Silent updates.
-- Commit vs preview updates.
-- Loop detection.
-
-Command example:
+Mitigations: transaction IDs, event-origin tracking, maximum script depth, maximum commands per event, silent updates, commit-vs-preview updates, loop detection.
 
 ```text
 setValue(cutoff, 9000, emit: false)
-```
-
-or:
-
-```text
 setValue(cutoff, 9000, silent: true)
 ```
 
+All of this risk lives in the scripting layer by design — settings cannot loop, which is one more reason to keep as much as possible declarative.
+
+---
+
 ## Preview Debugger
 
-The preview debugger should become a major feature.
+The preview debugger should be a headline feature, because it is what makes scripting *learnable* for beginners and *trustworthy* for experts.
 
-It should show:
-
-- Event fired.
-- Script name.
-- Input values.
-- Commands executed.
-- Values changed.
-- Device messages produced.
-- Time taken.
-- Warnings.
-- Errors.
+It should show: event fired, script name, input values, commands executed, values changed, device messages produced, time taken, warnings, errors.
 
 Example trace:
 
@@ -693,70 +578,31 @@ onValueChanged: macro
   sendCC ch1 cc74 value91
 ```
 
-This makes scripting learnable and testable.
+For experts, add a toggle to show the same trace as generated JS/Lua/C++ alongside the CE Script view, so they can verify exactly what each target will emit.
+
+---
 
 ## Script Editor UI
 
-The script editor should have four main areas.
+Four main areas.
 
-## Script List
+**Script List** — columns: enabled, name, event, target, scope, portability, warning count.
 
-Shows all scripts in the current scope.
+**Event And Condition Builder** — event type, target, optional condition, run policy, debounce/throttle options.
 
-Columns:
+**Action Builder** — categorized, searchable command picker (Values, Component, Panel, MIDI, Logic, Math, Timing, Debug). Each command shows required arguments and target pickers.
 
-- Enabled.
-- Name.
-- Event.
-- Target.
-- Scope.
-- Portability.
-- Warning count.
+**Code View** — editable CE Script text, with a mode switch to view (or export) JS, Lua, or C++.
 
-## Event And Condition Builder
+The UI should make the current authoring level obvious and switching between levels a single click, reinforcing that no level is a trap.
 
-Lets users choose:
-
-- Event type.
-- Target.
-- Optional condition.
-- Run policy.
-- Debounce/throttle options.
-
-## Action Builder
-
-Categorized command picker.
-
-Examples:
-
-- Values.
-- Component.
-- Panel.
-- MIDI.
-- Logic.
-- Math.
-- Timing.
-- Debug.
-
-Each command should show required arguments and target pickers.
-
-## Code View
-
-Generated CE Script text view.
-
-Later, this can become editable with parser support.
+---
 
 ## Language Export Strategy
 
-Support levels:
+Support levels: portable command graph → CE Script → JavaScript → Lua → C++.
 
-1. Portable command graph.
-2. CE Script.
-3. JavaScript.
-4. Lua.
-5. C++.
-
-Each command can have emitters:
+Each command can carry emitters:
 
 ```js
 emitJS(command)
@@ -764,61 +610,35 @@ emitLua(command)
 emitCpp(command)
 ```
 
-Commands should carry portability badges:
+Commands carry portability badges: Portable, Preview only, JS only, Device only, Export safe, Advanced. These badges are shown in the editor so experts always know the export consequences of a choice before they make it.
 
-- Portable.
-- Preview only.
-- JS only.
-- Device only.
-- Export safe.
-- Advanced.
+---
 
 ## Raw Code Blocks
 
 Raw code should be added last, not first.
 
-Raw JavaScript is tempting because it is easy, but it creates problems:
+Raw JavaScript is tempting because it is easy, but it creates problems: hard to translate to Lua or C++, hard to validate, hard to visualize, hard to migrate, hard to sandbox, hard for non-programmers to understand.
 
-- Hard to translate to Lua or C++.
-- Hard to validate.
-- Hard to visualize.
-- Hard to migrate.
-- Hard to sandbox.
-- Hard for non-programmers to understand.
+Recommended model: command graph first, JS runtime execution second, CE Script text view third, Lua/C++ export fourth, raw code blocks last.
 
-The recommended model:
-
-- Command graph first.
-- JS runtime execution second.
-- CE Script text view third.
-- Lua/C++ export fourth.
-- Raw code blocks last.
-
-If raw code is added, it should be explicit:
+If raw code is added, it must be explicit:
 
 ```text
 Raw JS block. This may not export to Lua/C++.
 ```
 
-Raw code must be sandboxed and only access official APIs.
+Raw code must be sandboxed and only access official APIs. No direct access to: filesystem, network, DOM, native bridge, arbitrary `eval`, or internal control-tree mutation. The settings boundary still applies — a raw block reads settings but cannot redefine them.
 
-No direct access to:
+---
 
-- Filesystem.
-- Network.
-- DOM.
-- Native bridge.
-- Arbitrary `eval`.
-- Internal control tree mutation.
+## Worked Examples
 
-## Example: Component Range Rules
+### Example: Component Range Rules
 
-The macro range arc needs these rules:
+The macro range arc needs: min cannot exceed max; max cannot go below min; value cannot leave min/max; optional minimum gap.
 
-- Min cannot exceed max.
-- Max cannot go below min.
-- Value cannot leave min/max.
-- Optional minimum gap.
+Where the boundary falls: the *existence* of min/max/value and their absolute 0–1 bounds are **settings**. The dynamic relationship (the gap, the cross-clamping on change) is a **script**, because it reacts to change events.
 
 CE Script view:
 
@@ -850,11 +670,7 @@ Command graph fragment:
         "args": [
           { "ref": "event.value" },
           0,
-          {
-            "op": "-",
-            "left": { "ref": "maxValue" },
-            "right": { "ref": "minGap" }
-          }
+          { "op": "-", "left": { "ref": "maxValue" }, "right": { "ref": "minGap" } }
         ]
       }
     },
@@ -863,28 +679,22 @@ Command graph fragment:
       "target": "value",
       "value": {
         "op": "clamp",
-        "args": [
-          { "ref": "value" },
-          { "ref": "minValue" },
-          { "ref": "maxValue" }
-        ]
+        "args": [ { "ref": "value" }, { "ref": "minValue" }, { "ref": "maxValue" } ]
       }
     }
   ]
 }
 ```
 
-## Example: Panel Macro Routing
+### Example: Panel Macro Routing
 
-Panel-level macro script:
+A macro knob's *range* is a setting; the *routing* of its value to three parameters is a script.
 
 ```text
 on macro.changed:
   cutoff.value = scale(event.value, 0, 1, 80, 12000)
   resonance.value = scale(event.value, 0, 1, 0.1, 0.85)
 ```
-
-Command graph:
 
 ```json
 {
@@ -894,26 +704,20 @@ Command graph:
     {
       "command": "setValue",
       "target": "cutoff",
-      "value": {
-        "op": "scale",
-        "args": [{ "ref": "event.value" }, 0, 1, 80, 12000]
-      }
+      "value": { "op": "scale", "args": [ { "ref": "event.value" }, 0, 1, 80, 12000 ] }
     },
     {
       "command": "setValue",
       "target": "resonance",
-      "value": {
-        "op": "scale",
-        "args": [{ "ref": "event.value" }, 0, 1, 0.1, 0.85]
-      }
+      "value": { "op": "scale", "args": [ { "ref": "event.value" }, 0, 1, 0.1, 0.85 ] }
     }
   ]
 }
 ```
 
-## Example: Device SysEx Helper
+### Example: Device SysEx Helper
 
-CE Script view:
+The device's id, model id, and SysEx address map are **settings** (declared facts about the device). The byte construction and checksum logic are a **script**.
 
 ```text
 on cutoff.committed:
@@ -928,13 +732,13 @@ on cutoff.committed:
   sendSysex(bytes)
 ```
 
-This should be command-based internally, not a raw text script.
+This is command-based internally, not a raw text script.
+
+---
 
 ## Data Model Proposal
 
-Add a `Scripts` section to controls, custom components, panels, and device profiles.
-
-Example structure:
+Add a `Scripts` section to controls, custom components, panels, and device profiles — kept structurally separate from the settings sections it sits beside.
 
 ```json
 {
@@ -946,10 +750,7 @@ Example structure:
         "label": "Script Name",
         "enabled": true,
         "scope": "component",
-        "event": {
-          "name": "onValueChanged",
-          "target": "value"
-        },
+        "event": { "name": "onValueChanged", "target": "value" },
         "conditions": [],
         "steps": [],
         "variables": {},
@@ -964,195 +765,35 @@ Example structure:
 }
 ```
 
+---
+
 ## Implementation Phases
 
-## Phase 1: Script Data Model
+**Phase 0: Settings/Scripting Boundary Spec.** Before any runtime work, write the field-ownership table for each scope (which fields are settings, which are scriptable). Add the small declarative-constraint vocabulary to settings schemas. This phase produces no code beyond schema annotations but prevents the most expensive class of future refactors.
 
-Add script storage to:
+**Phase 1: Script Data Model.** Add script storage to custom components and panels (devices later). Deliverables: `Scripts` section defaults, normalization/migration, package export/import support, validation placeholder, and the settings-boundary validation hook.
 
-- Custom components.
-- Panels.
-- Device profiles later.
+**Phase 2: Command Registry.** Create a registry for built-in commands at `CE/web/src/CE_Application/scripting/scriptCommandRegistry.js`. Start with a small but real library: `getValue`, `setValue`, `clamp`, `scale`, `if`, `and`, `or`, `not`, `emit`, `log`, `setState`, `sendCC`. Each command includes schema and validation metadata.
 
-Deliverables:
+**Phase 3: Expression Evaluator.** `scriptExpressions.js`: resolve references (read-only for settings fields), evaluate math, clamp/convert types, report readable errors, avoid arbitrary JS execution.
 
-- `Scripts` section defaults.
-- Normalization/migration.
-- Package export/import support.
-- Validation placeholder.
+**Phase 4: Runtime Executor.** `scriptRuntime.js`: execute steps, return patches, emit events, emit device messages, collect trace output, detect recursion, enforce scope permissions, and enforce declarative settings constraints when applying patches.
 
-## Phase 2: Command Registry
+**Phase 5: Component Scripting Integration.** Value constraints, state changes, hit-zone output, part visibility, debug trace. Connect to existing custom-component value channels, behaviors, links, and interaction preview.
 
-Create a registry for built-in commands.
+**Phase 6: Panel Scripting Integration.** Control value routing, macro routing, panel states, custom-component public API routes, device output hooks. Reuse the same runtime executor.
 
-Suggested file:
+**Phase 7: Script Editor UI.** Script list, event picker, target picker, condition builder, action builder, command docs, trace output, generated CE Script view, and a visible authoring-level switch.
 
-```text
-CE/web/src/CE_Application/scripting/scriptCommandRegistry.js
-```
+**Phase 8: CE Script Text View.** Readable generation from graphs first; later a parser from text to graph, syntax highlighting, inline validation. The parser is not mandatory for phase 1 — the graph comes first.
 
-Start with a small but real library:
+**Phase 9: Exporters.** JS, Lua, C++ emitters. Only portable commands export at first; non-portable blocks show warnings.
 
-- `getValue`
-- `setValue`
-- `clamp`
-- `scale`
-- `if`
-- `and`
-- `or`
-- `not`
-- `emit`
-- `log`
-- `setState`
-- `sendCC`
+**Phase 10: Script Libraries.** Built-in, project, component, and device libraries (e.g. `clampRange`, `sendRolandChecksumSysex`, `smoothParameter`, `toggleStateGroup`, `scaleMidi14`). Versioned.
 
-Each command must include schema and validation metadata.
+**Phase 11: Raw Code Blocks.** Added only after the graph system is strong. Raw JS/Lua/C++, explicitly non-portable unless mirrored, sandboxed in preview, never mutating internal app structures or settings definitions.
 
-## Phase 3: Expression Evaluator
-
-Create a portable expression evaluator.
-
-Suggested file:
-
-```text
-CE/web/src/CE_Application/scripting/scriptExpressions.js
-```
-
-Responsibilities:
-
-- Resolve references.
-- Evaluate math operations.
-- Clamp and convert types.
-- Report readable errors.
-- Avoid arbitrary JS execution.
-
-## Phase 4: Runtime Executor
-
-Create the command graph executor.
-
-Suggested file:
-
-```text
-CE/web/src/CE_Application/scripting/scriptRuntime.js
-```
-
-Responsibilities:
-
-- Execute steps.
-- Return patches.
-- Emit events.
-- Emit device messages.
-- Collect trace output.
-- Detect recursion.
-- Enforce scope permissions.
-
-## Phase 5: Component Scripting Integration
-
-Integrate scripts into custom component preview and runtime.
-
-Initial use cases:
-
-- Value constraints.
-- State changes.
-- Hit-zone output.
-- Part visibility.
-- Debug trace.
-
-This phase should connect to existing custom component value channels, behaviors, links, and interaction preview.
-
-## Phase 6: Panel Scripting Integration
-
-Integrate scripts at panel level.
-
-Initial use cases:
-
-- Control value routing.
-- Macro control routing.
-- Panel states.
-- Custom component public API routes.
-- Device output hooks.
-
-This should reuse the same runtime executor.
-
-## Phase 7: Script Editor UI
-
-Create a dedicated script editor.
-
-Possible sections:
-
-- Component script editor.
-- Panel script editor.
-- Device script editor.
-
-UI should include:
-
-- Script list.
-- Event picker.
-- Target picker.
-- Condition builder.
-- Action builder.
-- Command docs.
-- Trace output.
-- Generated CE Script view.
-
-## Phase 8: CE Script Text View
-
-Add readable script generation from command graphs.
-
-Later:
-
-- Parser from text to graph.
-- Syntax highlighting.
-- Inline validation.
-
-Do not make the parser mandatory for phase 1. The graph can come first.
-
-## Phase 9: Exporters
-
-Add emitters:
-
-- JavaScript.
-- Lua.
-- C++.
-
-Only portable commands export at first.
-
-Non-portable blocks should show warnings.
-
-## Phase 10: Script Libraries
-
-Support reusable libraries:
-
-- Built-in library.
-- Project library.
-- Component library.
-- Device library.
-
-Examples:
-
-- `clampRange(min, max, gap)`
-- `sendRolandChecksumSysex(...)`
-- `smoothParameter(...)`
-- `toggleStateGroup(...)`
-- `scaleMidi14(...)`
-
-Libraries should be versioned.
-
-## Phase 11: Raw Code Blocks
-
-Add raw code only after the command graph system is strong.
-
-Possible raw block types:
-
-- Raw JavaScript.
-- Raw Lua.
-- Raw C++.
-
-Rules:
-
-- Must be explicitly marked as non-portable unless mirrored.
-- Must be sandboxed in preview.
-- Must not mutate internal app structures directly.
+---
 
 ## Suggested Folder Structure
 
@@ -1171,58 +812,54 @@ CE/web/src/CE_Application/scripting/
   scriptLibrary/
     builtInCommands.js
     builtInFunctions.js
-```
 
-UI:
-
-```text
 CE/web/src/CE_Application/sections/
   ScriptEditor.svelte
   ScriptCommandBuilder.svelte
   ScriptEventPicker.svelte
   ScriptTracePanel.svelte
+
+CE/web/test/
+  scriptExpressions.test.js
+  scriptRuntime.test.js
+  scriptValidation.test.js
+  scriptEmitters.test.js
 ```
 
-Tests:
-
-```text
-CE/web/test/scriptExpressions.test.js
-CE/web/test/scriptRuntime.test.js
-CE/web/test/scriptValidation.test.js
-CE/web/test/scriptEmitters.test.js
-```
+---
 
 ## Recommended Build Order
 
-The safest implementation order is:
+1. Settings/scripting boundary spec.
+2. Command graph data model.
+3. Command registry.
+4. Expression evaluator.
+5. Runtime executor returning patches.
+6. Component value constraint scripts.
+7. Preview trace/debug output.
+8. Panel scripts.
+9. Script editor UI.
+10. CE Script text view.
+11. Exporters.
+12. Script libraries.
+13. Raw code blocks.
 
-1. Command graph data model.
-2. Command registry.
-3. Expression evaluator.
-4. Runtime executor returning patches.
-5. Component value constraint scripts.
-6. Preview trace/debug output.
-7. Panel scripts.
-8. Script editor UI.
-9. CE Script text view.
-10. Exporters.
-11. Script libraries.
-12. Raw code blocks.
+---
 
 ## Summary
 
-CEditor scripting should be universal, expandable, and easy to understand. The way to get there is to avoid making JavaScript the core model.
+CEditor scripting should be universal, expandable, and easy to understand. The way to get there is to avoid making JavaScript the core model, and to draw a hard line between what is configured and what is scripted.
 
 The core should be:
 
-- Structured command graph.
-- Portable expression tree.
-- Versioned command library.
-- Controlled script context.
-- Strong validation.
-- Preview trace/debugging.
-- Optional generated text views.
-- Optional exporters to JavaScript, Lua, C++, and other targets.
+- A clear settings/scripting boundary, enforced in schema and runtime.
+- A structured command graph as the single source of truth.
+- A portable expression tree.
+- A versioned command library with portability badges.
+- A controlled, function-based script context (settings read-only).
+- Strong, guidance-style validation.
+- A first-class preview debugger.
+- Progressive disclosure: one model, four authoring surfaces, free movement between them.
+- Optional generated text views and exporters to JavaScript, Lua, C++, and other targets.
 
-This keeps the system useful for beginners, powerful for advanced users, and portable for future runtimes.
-
+This keeps the system inviting for beginners, credible for hardcore coders, predictable through the settings boundary, and portable for future runtimes.

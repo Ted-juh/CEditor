@@ -8,6 +8,7 @@
   import { editorZoom, editorZoomIncrement, activePanel, updatePanel } from '../stores/panels.js';
   import { requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
+  import { createScriptWorkspaceDocument, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
 
@@ -29,6 +30,11 @@
   function newDeviceProfile() {
     const profile = createDeviceProfileDraft();
     openStandaloneDeviceProfileTab(profile);
+  }
+
+  function newScriptWorkspace() {
+    const document = createScriptWorkspaceDocument();
+    if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
   function openDeviceProfile() {
@@ -55,8 +61,19 @@
       { label: 'Open Device Profile', action: () => openDeviceProfile() },
       { label: 'Import Device Profile...', action: () => importDeviceProfile() },
       { type: 'separator' },
-      { label: 'Save',       shortcut: 'Ctrl+S', action: () => saveActivePanel() },
-      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => saveActivePanelAs() },
+      { label: 'New Script Workspace', action: () => newScriptWorkspace() },
+      { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
+      { type: 'separator' },
+      { label: 'Save',       shortcut: 'Ctrl+S', action: () => {
+        const tab = get(activeEditorTab);
+        if (tab?.type === 'script') saveActiveScriptWorkspace();
+        else saveActivePanel();
+      } },
+      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', action: () => {
+        const tab = get(activeEditorTab);
+        if (tab?.type === 'script') saveActiveScriptWorkspaceAs();
+        else saveActivePanelAs();
+      } },
       { type: 'separator' },
       { label: 'Close Panel', shortcut: 'Ctrl+W', action: () => {
         const tab = get(activeEditorTab);
@@ -121,6 +138,11 @@
       { label: 'Build Standalone',  action: () => {} },
       { type: 'separator' },
       { label: 'Build Settings...', action: () => {} },
+    ],
+    Debug: [
+      { label: 'New Script Workspace', action: () => newScriptWorkspace() },
+      { label: 'Open Diehard Coder Mode', action: () => newScriptWorkspace() },
+      { label: 'Validate Active Script', action: () => {} },
     ],
     Help: [
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {

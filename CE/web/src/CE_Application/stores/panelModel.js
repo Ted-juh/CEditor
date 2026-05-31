@@ -100,6 +100,12 @@ export function createPanel(name = null) {
     },
     requiredProfiles: [],
     parameterSnapshots: {},
+    scripts: [],
+    scripting: {
+      enabled: true,
+      runInPreview: true,
+      runOnExport: true,
+    },
     modified: false,
     controls: [],
   };

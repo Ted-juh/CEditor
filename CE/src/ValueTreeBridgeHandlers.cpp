@@ -203,6 +203,129 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                + " emitCall=" + juce::String (juce::Time::getMillisecondCounterHiRes() - emitStartMs, 1) + "ms");
             });
         })
+        .withEventListener ("saveScriptWorkspaceAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto documentId = payloadObj->getProperty ("documentId").toString();
+                auto jsonData = payloadObj->getProperty ("data").toString();
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Save Script Workspace As",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cescript.json");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [this, documentId, jsonData] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File())
+                            return;
+
+                        auto file = result.withFileExtension ("cescript.json");
+                        file.replaceWithText (jsonData);
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("documentId", documentId);
+                        obj->setProperty ("filePath", file.getFullPathName());
+                        obj->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
+
+                        browser->emitEventIfBrowserIsVisible ("scriptWorkspaceSaved", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("saveScriptWorkspace", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* obj = payload.getDynamicObject();
+                if (obj == nullptr)
+                    return;
+
+                auto documentId = obj->getProperty ("documentId").toString();
+                auto filePath = obj->getProperty ("filePath").toString();
+                auto jsonData = obj->getProperty ("data").toString();
+
+                juce::File file (filePath);
+                file.replaceWithText (jsonData);
+
+                auto* resp = new juce::DynamicObject();
+                resp->setProperty ("documentId", documentId);
+                resp->setProperty ("filePath", filePath);
+                resp->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
+
+                browser->emitEventIfBrowserIsVisible ("scriptWorkspaceSaved", juce::var (resp));
+            });
+        })
+        .withEventListener ("openScriptWorkspace", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Open Script Workspace",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cescript.json;*.json");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+
+                        if (result == juce::File() || ! result.existsAsFile())
+                            return;
+
+                        auto* obj = new juce::DynamicObject();
+                        obj->setProperty ("filePath", result.getFullPathName());
+                        obj->setProperty ("name", result.getFileNameWithoutExtension().replace (".cescript", ""));
+                        obj->setProperty ("byteSize", (juce::int64) result.getSize());
+                        obj->setProperty ("data", result.loadFileAsString());
+
+                        browser->emitEventIfBrowserIsVisible ("scriptWorkspaceOpened", juce::var (obj));
+                    });
+            });
+        })
+        .withEventListener ("openScriptWorkspaceFile", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto filePath = payloadObj->getProperty ("filePath").toString();
+                juce::File file (filePath);
+
+                if (! file.existsAsFile())
+                    return;
+
+                auto* obj = new juce::DynamicObject();
+                obj->setProperty ("filePath", filePath);
+                obj->setProperty ("name", file.getFileNameWithoutExtension().replace (".cescript", ""));
+                obj->setProperty ("byteSize", (juce::int64) file.getSize());
+                obj->setProperty ("data", file.loadFileAsString());
+
+                browser->emitEventIfBrowserIsVisible ("scriptWorkspaceOpened", juce::var (obj));
+            });
+        })
         .withEventListener ("requestFileInfo", [this] (const juce::var& payload)
         {
             juce::MessageManager::callAsync ([this, payload]()
@@ -428,6 +551,40 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 }
 
                 appSettings->setOpenPanelPaths (paths);
+            });
+        })
+        .withEventListener ("loadOpenScriptWorkspaces", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr || appSettings == nullptr)
+                    return;
+
+                auto paths = appSettings->getOpenScriptWorkspacePaths();
+                juce::Array<juce::var> arr;
+
+                for (const auto& path : paths)
+                    arr.add (path);
+
+                browser->emitEventIfBrowserIsVisible ("openScriptWorkspacePaths", arr);
+            });
+        })
+        .withEventListener ("updateOpenScriptWorkspaces", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (appSettings == nullptr)
+                    return;
+
+                juce::StringArray paths;
+
+                if (auto* arr = payload.getArray())
+                {
+                    for (const auto& item : *arr)
+                        paths.add (item.toString());
+                }
+
+                appSettings->setOpenScriptWorkspacePaths (paths);
             });
         })
         .withEventListener ("loadAppSettings", [this] (const juce::var&)

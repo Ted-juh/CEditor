@@ -17,6 +17,7 @@
   import DeviceProfileDesigner from './DeviceProfileDesigner.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
+  import ScriptWorkspace from './ScriptWorkspace.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
@@ -26,6 +27,7 @@
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
+  import { createScriptWorkspaceDocument } from '../stores/scriptWorkspace.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
@@ -381,6 +383,11 @@
     const profile = createDeviceProfileDraft();
     openStandaloneDeviceProfileTab(profile);
   }
+
+  function createStandaloneScriptWorkspace() {
+    const document = createScriptWorkspaceDocument();
+    if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -531,6 +538,8 @@
         <SettingsView />
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesigner profileId={$activeEditorTab.id} />
+      {:else if $activeEditorTab?.type === 'script'}
+        <ScriptWorkspace documentId={$activeEditorTab.id} />
       {:else if canvasPanel}
         {#if selectedIsCustomComponent && !$previewModeEnabled}
           <div class="component-workspace-launcher" aria-label="Custom component workspace launcher">
@@ -611,6 +620,7 @@
             <button type="button" onclick={openPanelFromFile}>Open Panel</button>
             <button type="button" onclick={createStandaloneComponent}>New Custom Component</button>
             <button type="button" onclick={createStandaloneDeviceProfile}>New Device Profile</button>
+            <button type="button" onclick={createStandaloneScriptWorkspace}>New Script Workspace</button>
             <button type="button" onclick={importDeviceProfile}>Import Device Profile</button>
           </div>
         </div>

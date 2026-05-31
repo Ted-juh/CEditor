@@ -34,6 +34,12 @@ import {
   openComponentSurfaceWorkspace,
   setActiveComponentDocument,
 } from './componentWorkspace.js';
+import {
+  activeScriptDocumentId,
+  closeScriptWorkspaceDocument,
+  scriptDocuments,
+  setActiveScriptDocument,
+} from './scriptWorkspace.js';
 
 export { createPanel };
 
@@ -320,7 +326,7 @@ export const settingsTabOpen = writable(false);
 /** Open device profile editor tabs */
 export const deviceProfileTabs = writable([]);
 
-/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component', id } */
+/** Active editor tab descriptor: { type: 'panel'|'settings'|'deviceProfile'|'component'|'script', id } */
 export const activeEditorTab = writable({ type: 'panel', id: null });
 
 /** Editor split layout. Primary and secondary pin the two tabs shown in the split workspace. */
@@ -351,8 +357,8 @@ export const resolvedActivePanelId = derived(
 
 /** All editor tabs shown in the top tab bar */
 export const editorTabs = derived(
-  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments],
-  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments]) => {
+  [panels, settingsTabOpen, deviceProfileTabs, componentDocuments, scriptDocuments],
+  ([$panels, $settingsTabOpen, $deviceProfileTabs, $componentDocuments, $scriptDocuments]) => {
     const tabs = $panels.map(panel => ({
       id: panel.id,
       tabType: 'panel',
@@ -387,6 +393,15 @@ export const editorTabs = derived(
       });
     }
 
+    for (const scriptDocument of $scriptDocuments) {
+      tabs.push({
+        id: scriptDocument.id,
+        tabType: 'script',
+        name: scriptDocument.name || 'Untitled Script Workspace',
+        modified: scriptDocument.modified === true,
+      });
+    }
+
     return tabs;
   }
 );
@@ -396,6 +411,7 @@ function resolvePanelSelection(list, activeId, tab) {
   if (tab?.type === 'settings') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
+  if (tab?.type === 'script') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -775,6 +791,14 @@ export function setActiveEditorTab(tab) {
     return;
   }
 
+  if (tab.tabType === 'script' || tab.type === 'script') {
+    const nextTab = { type: 'script', id: tab.id };
+    activeEditorTab.set(nextTab);
+    setActiveScriptDocument(tab.id);
+    clearSelection();
+    return;
+  }
+
   const panelId = tab.id ?? null;
   if (panelId != null) {
     setActivePanel(panelId);
@@ -804,6 +828,19 @@ export function closeActiveEditorTab() {
     const nextComponentId = get(activeComponentDocumentId);
     if (nextComponentId) {
       activeEditorTab.set({ type: 'component', id: nextComponentId });
+    } else if (get(activePanelId) != null) {
+      activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
+    } else {
+      activeEditorTab.set({ type: 'panel', id: null });
+    }
+    return;
+  }
+
+  if (tab.type === 'script') {
+    closeScriptWorkspaceDocument(tab.id);
+    const nextScriptId = get(activeScriptDocumentId);
+    if (nextScriptId) {
+      activeEditorTab.set({ type: 'script', id: nextScriptId });
     } else if (get(activePanelId) != null) {
       activeEditorTab.set({ type: 'panel', id: get(activePanelId) });
     } else {
@@ -869,7 +906,7 @@ function persistOpenPanelPaths() {
 
 function syncPanelSelection() {
   const tab = get(activeEditorTab);
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
 
   const list = get(panels);
   const activeId = get(activePanelId);
@@ -914,7 +951,7 @@ activePanelId.subscribe(() => {
 });
 
 activeEditorTab.subscribe((tab) => {
-  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component') return;
+  if (tab?.type === 'settings' || tab?.type === 'deviceProfile' || tab?.type === 'component' || tab?.type === 'script') return;
   syncPanelSelection();
 });
 

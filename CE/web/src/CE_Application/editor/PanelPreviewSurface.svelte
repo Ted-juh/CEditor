@@ -63,6 +63,7 @@
     seedCustomValues,
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
+  import { runPanelPreviewScriptsForPatch } from '../scripting/scriptBindings.js';
 
   let {
     panel,
@@ -481,9 +482,19 @@
   }
 
   function patchControlSession(controlId, patch = {}) {
-    updatePanelPreviewSession(controlId, patch);
     const control = orderedControls.find((entry) => getControlId(entry) === controlId) ?? null;
-    if (control) emitDeviceBindingsForPatch(control, patch);
+    const previousSession = control ? sessionFor(control) : {};
+    updatePanelPreviewSession(controlId, patch);
+    if (control) {
+      emitDeviceBindingsForPatch(control, patch);
+      runPanelPreviewScriptsForPatch({
+        panel,
+        controls: orderedControls,
+        sourceControl: control,
+        patch,
+        previousSession,
+      });
+    }
   }
 
   function customSessionValues(control) {

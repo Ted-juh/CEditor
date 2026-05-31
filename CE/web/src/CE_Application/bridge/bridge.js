@@ -123,6 +123,47 @@ export function updateOpenPanels(paths) {
   window.__JUCE__.backend.emitEvent('updateOpenPanels', paths);
 }
 
+// --- Script workspace file operations ---
+
+export function saveScriptWorkspaceAs(documentId, data) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — saveScriptWorkspaceAs ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('saveScriptWorkspaceAs', { documentId: String(documentId), data });
+}
+
+export function saveScriptWorkspace(documentId, filePath, data) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — saveScriptWorkspace ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('saveScriptWorkspace', { documentId: String(documentId), filePath, data });
+}
+
+export function openScriptWorkspace() {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — openScriptWorkspace ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('openScriptWorkspace', {});
+}
+
+export function openScriptWorkspaceFile(filePath) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('openScriptWorkspaceFile', { filePath });
+}
+
+export function loadOpenScriptWorkspaces() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('loadOpenScriptWorkspaces', {});
+}
+
+export function updateOpenScriptWorkspaces(paths) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('updateOpenScriptWorkspaces', paths);
+}
+
 /** Request persisted app settings. C++ emits 'appSettingsLoaded'. */
 export function loadAppSettings() {
   if (!isJuceAvailable()) return;
@@ -447,6 +488,24 @@ export function onPanelOpened(callback) {
 export function onOpenPanelPaths(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('openPanelPaths', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onScriptWorkspaceSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('scriptWorkspaceSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onScriptWorkspaceOpened(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('scriptWorkspaceOpened', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onOpenScriptWorkspacePaths(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('openScriptWorkspacePaths', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 

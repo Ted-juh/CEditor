@@ -12,6 +12,7 @@
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
+  import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
@@ -30,6 +31,7 @@
 
   if (!isCutoutDebug) {
     initPanelBridge();
+    initScriptWorkspaceBridge();
     initConsoleBridge();
     syncPerfDebugToNative();
     initAppSettingsBridge();
@@ -105,9 +107,11 @@
   let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, false));
   let showPropertiesPanel = $state(readStoredBool(UI_STORAGE_KEYS.showPropertiesPanel, true));
   let componentDesignerWorkspaceActive = $derived($componentWorkspaceMode === 'surface');
-  let effectiveShowPropertiesPanel = $derived(showPropertiesPanel);
-  let effectiveShowTreePanel = $derived(showTreePanel);
-  let effectiveShowDisplayPanel = $derived(showDisplayPanel);
+  let scriptWorkspaceActive = $derived($activeEditorTab?.type === 'script');
+  let chromeWorkspaceActive = $derived(componentDesignerWorkspaceActive || scriptWorkspaceActive);
+  let effectiveShowPropertiesPanel = $derived(!scriptWorkspaceActive && showPropertiesPanel);
+  let effectiveShowTreePanel = $derived(!scriptWorkspaceActive && showTreePanel);
+  let effectiveShowDisplayPanel = $derived(!scriptWorkspaceActive && showDisplayPanel);
   let displayPanelBasis = $derived(`${Math.min(displayPanelHeight, maxDisplayPanelHeight())}px`);
 
   $effect(() => {
@@ -232,9 +236,10 @@
 {#if isCutoutDebug}
   <CutoutDebugPage />
 {:else}
-  <div
-    class="app"
+    <div
+      class="app"
     class:component-workspace-active={componentDesignerWorkspaceActive}
+    class:script-workspace-active={scriptWorkspaceActive}
     style="--props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
   >
     <div class="menubar-area">
@@ -264,7 +269,7 @@
           <div class="editor-canvas-area">
             <EditorCanvas />
           </div>
-          {#if !isSettingsTab && !componentDesignerWorkspaceActive}
+          {#if !isSettingsTab && !chromeWorkspaceActive}
             <div class="common-bar-area">
               <CommonPropertyBar />
             </div>

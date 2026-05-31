@@ -664,9 +664,12 @@ export const SECTION_DEFAULTS = {
     _children: {},
   },
 
-  /** Scripts — Lua code per event trigger. Starts empty. */
+  /** Scripts — portable command graph scripts per event trigger. Starts empty. */
   Scripts: {
     _type: 'Scripts',
+    enabled: true,
+    runInPreview: true,
+    scripts: [],
   },
 
   /** Animations — named animation definitions. Starts empty. */

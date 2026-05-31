@@ -61,6 +61,25 @@ public:
         propertiesFile->save();
     }
 
+    /** Get the list of script workspace file paths that were open last session */
+    juce::StringArray getOpenScriptWorkspacePaths() const
+    {
+        juce::StringArray paths;
+        auto stored = propertiesFile->getValue ("openScriptWorkspacePaths", "");
+
+        if (stored.isNotEmpty())
+            paths.addTokens (stored, "|", "");
+
+        return paths;
+    }
+
+    /** Store the list of currently open script workspace file paths */
+    void setOpenScriptWorkspacePaths (const juce::StringArray& paths)
+    {
+        propertiesFile->setValue ("openScriptWorkspacePaths", paths.joinIntoString ("|"));
+        propertiesFile->save();
+    }
+
     /** Get persisted app-level UI settings as a JSON-like var object */
     juce::var getAppSettingsData() const
     {

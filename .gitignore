@@ -1,5 +1,6 @@
 /build/
 /CE/web/dist/
+/CE/web/node_modules/
 /CE/web/vite*.log
 /CE/web/node_modules/.vite/
 /CE/web/node_modules/.vite-temp/

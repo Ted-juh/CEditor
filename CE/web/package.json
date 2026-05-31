@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test"
+    "test": "node --test",
+    "test:script-exports": "node scripts/validate-script-exports.mjs",
+    "test:all": "npm test && npm run test:script-exports"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "svelte": "^5.0.0",
+    "typescript": "^6.0.3",
     "vite": "^6.0.0"
   },
   "dependencies": {

@@ -1,6 +1,7 @@
 <script>
   import { editorTabs, activeEditorTab, activePanelDesignerSplit, addPanel, closePanel, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
+  import { closeScriptWorkspaceDocument, createScriptWorkspaceDocument } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
 
@@ -41,6 +42,11 @@
       if (activeTab?.type === 'component' && activeTab?.id === tab.id) {
         setActiveEditorTab(nextId ? { type: 'component', id: nextId } : { type: 'panel', id: null });
       }
+    } else if (tab.tabType === 'script') {
+      const nextId = closeScriptWorkspaceDocument(tab.id);
+      if (activeTab?.type === 'script' && activeTab?.id === tab.id) {
+        setActiveEditorTab(nextId ? { type: 'script', id: nextId } : { type: 'panel', id: null });
+      }
     } else {
       closePanel(tab.id);
     }
@@ -54,6 +60,11 @@
   function createDeviceProfileTab() {
     const profile = createDeviceProfileDraft();
     openStandaloneDeviceProfileTab(profile);
+  }
+
+  function createScriptTab() {
+    const document = createScriptWorkspaceDocument();
+    if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
   function closePicker() {
@@ -154,22 +165,27 @@
       class="new-mode-btn"
       class:active={createMode}
       title={createMode ? 'New mode is on' : 'Click to create new Panel, Component, or Device'}
+      aria-label="Toggle new workspace mode"
       aria-pressed={createMode}
       onclick={() => { createMode = !createMode; closePicker(); }}
     >
       New
     </button>
-    <button class="new-tab-btn" title={createMode ? 'New Panel' : 'Open Panel'} onclick={handlePanelTarget}>
+    <button class="new-tab-btn" aria-label={createMode ? 'Create new panel' : 'Open existing panel'} title={createMode ? 'New Panel' : 'Open Panel'} onclick={handlePanelTarget}>
       {#if createMode}<span class="plus-mark">+</span>{/if}
       <span>Panel</span>
     </button>
-    <button class="new-tab-btn" class:open={picker === 'component'} title={createMode ? 'New Custom Component' : 'Open Saved Custom Component'} onclick={handleComponentTarget}>
+    <button class="new-tab-btn" class:open={picker === 'component'} aria-label={createMode ? 'Create new custom component' : 'Open saved custom component'} title={createMode ? 'New Custom Component' : 'Open Saved Custom Component'} onclick={handleComponentTarget}>
       {#if createMode}<span class="plus-mark">+</span>{/if}
       <span>Component</span>
     </button>
-    <button class="new-tab-btn" class:open={picker === 'device'} title={createMode ? 'New Device Profile Designer' : 'Open Device Profile Designer'} onclick={handleDeviceTarget}>
+    <button class="new-tab-btn" class:open={picker === 'device'} aria-label={createMode ? 'Create new device profile' : 'Open device profile'} title={createMode ? 'New Device Profile Designer' : 'Open Device Profile Designer'} onclick={handleDeviceTarget}>
       {#if createMode}<span class="plus-mark">+</span>{/if}
       <span>Device</span>
+    </button>
+    <button class="new-tab-btn script-btn" aria-label="Create new script workspace" title="New Script Workspace" onclick={createScriptTab}>
+      <span class="plus-mark">+</span>
+      <span>Script</span>
     </button>
 
     {#if picker === 'component'}

@@ -1,0 +1,363 @@
+export const SCRIPT_TARGETS = [
+  { id: 'ce', label: 'CE Script', family: 'portable', extension: 'ce' },
+  { id: 'json', label: 'JSON Graph', family: 'portable', extension: 'json' },
+  { id: 'javascript', label: 'JavaScript', family: 'web', extension: 'js' },
+  { id: 'typescript', label: 'TypeScript', family: 'web', extension: 'ts' },
+  { id: 'lua', label: 'Lua', family: 'embedded', extension: 'lua' },
+  { id: 'cpp', label: 'C++', family: 'native', extension: 'cpp' },
+  { id: 'python', label: 'Python', family: 'automation', extension: 'py' },
+  { id: 'csharp', label: 'C#', family: 'native', extension: 'cs' },
+  { id: 'swift', label: 'Swift', family: 'native', extension: 'swift' },
+  { id: 'go', label: 'Golang', family: 'native', extension: 'go' },
+  { id: 'kotlin', label: 'Kotlin', family: 'native', extension: 'kt' },
+  { id: 'rust', label: 'Rust', family: 'native', extension: 'rs' },
+  { id: 'html', label: 'HTML', family: 'web', extension: 'html' },
+  { id: 'css', label: 'CSS', family: 'web', extension: 'css' },
+];
+
+export const SCRIPT_COMMANDS = [
+  {
+    id: 'getValue',
+    label: 'getValue',
+    category: 'Values',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'target', type: 'targetRef', required: true },
+    ],
+    description: 'Read a value from the current script context.',
+  },
+  {
+    id: 'setValue',
+    label: 'setValue',
+    category: 'Values',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'value', type: 'expression', required: true },
+      { name: 'emit', type: 'boolean', default: true },
+    ],
+    description: 'Queue a value patch. The runtime applies patches through the editor, never by raw mutation.',
+  },
+  {
+    id: 'clamp',
+    label: 'clamp',
+    category: 'Values',
+    portable: true,
+    exportSafe: true,
+    expression: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'value', type: 'expression', required: true },
+      { name: 'min', type: 'number', required: true },
+      { name: 'max', type: 'number', required: true },
+    ],
+    description: 'Constrain a number to a range.',
+  },
+  {
+    id: 'scale',
+    label: 'scale',
+    category: 'Values',
+    portable: true,
+    exportSafe: true,
+    expression: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'value', type: 'expression', required: true },
+      { name: 'fromMin', type: 'number', required: true },
+      { name: 'fromMax', type: 'number', required: true },
+      { name: 'toMin', type: 'number', required: true },
+      { name: 'toMax', type: 'number', required: true },
+    ],
+    description: 'Map a value from one range to another.',
+  },
+  {
+    id: 'round',
+    label: 'round',
+    category: 'Math',
+    portable: true,
+    exportSafe: true,
+    expression: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [{ name: 'value', type: 'expression', required: true }],
+    description: 'Round to the nearest integer.',
+  },
+  {
+    id: 'curve',
+    label: 'curve',
+    category: 'Math',
+    portable: true,
+    exportSafe: true,
+    expression: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'value', type: 'expression', required: true },
+      { name: 'from', type: 'number', required: true },
+      { name: 'to', type: 'number', required: true },
+      { name: 'shape', type: 'string', default: 'linear' },
+    ],
+    description: 'Apply a named response curve.',
+  },
+  {
+    id: 'if',
+    label: 'if',
+    category: 'Logic',
+    portable: true,
+    exportSafe: true,
+    controlFlow: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [{ name: 'condition', type: 'expression', required: true }],
+    description: 'Run nested steps only when the condition is true.',
+  },
+  {
+    id: 'setState',
+    label: 'setState',
+    category: 'Component',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel'],
+    args: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'state', type: 'string', required: true },
+    ],
+    description: 'Queue a state change for a component or panel.',
+  },
+  {
+    id: 'setPartColor',
+    label: 'setPartColor',
+    category: 'Component',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel'],
+    args: [
+      { name: 'part', type: 'targetRef', required: true },
+      { name: 'color', type: 'color', required: true },
+    ],
+    description: 'Queue a visual part colour patch.',
+  },
+  {
+    id: 'setVisible',
+    label: 'setVisible',
+    category: 'Component',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel'],
+    args: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'visible', type: 'boolean', required: true },
+    ],
+    description: 'Show or hide a component, layer, or group.',
+  },
+  {
+    id: 'showGroup',
+    label: 'showGroup',
+    category: 'Panel',
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel'],
+    args: [{ name: 'group', type: 'targetRef', required: true }],
+    description: 'Show a named panel group.',
+  },
+  {
+    id: 'hideGroup',
+    label: 'hideGroup',
+    category: 'Panel',
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel'],
+    args: [{ name: 'group', type: 'targetRef', required: true }],
+    description: 'Hide a named panel group.',
+  },
+  {
+    id: 'setPanelState',
+    label: 'setPanelState',
+    category: 'Panel',
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel', 'project'],
+    args: [{ name: 'state', type: 'string', required: true }],
+    description: 'Switch the panel to a named state.',
+  },
+  {
+    id: 'routeValue',
+    label: 'routeValue',
+    category: 'Values',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'from', type: 'targetRef', required: true },
+      { name: 'to', type: 'targetRef', required: true },
+      { name: 'transform', type: 'expression', required: false },
+    ],
+    description: 'Route one value channel to another, optionally through an expression.',
+  },
+  {
+    id: 'setAnimation',
+    label: 'setAnimation',
+    category: 'Animation',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel'],
+    args: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'animation', type: 'string', required: true },
+      { name: 'enabled', type: 'boolean', default: true },
+    ],
+    description: 'Start or stop a named animation trigger on a component part.',
+  },
+  {
+    id: 'startTimer',
+    label: 'startTimer',
+    category: 'Timers',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'project'],
+    args: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'ms', type: 'number', required: true },
+    ],
+    description: 'Start a named timer that emits an event when it fires.',
+  },
+  {
+    id: 'stopTimer',
+    label: 'stopTimer',
+    category: 'Timers',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'project'],
+    args: [{ name: 'id', type: 'string', required: true }],
+    description: 'Stop a named timer.',
+  },
+  {
+    id: 'emitEvent',
+    label: 'emitEvent',
+    category: 'Events',
+    portable: true,
+    exportSafe: true,
+    scopes: ['component', 'panel', 'project'],
+    args: [
+      { name: 'event', type: 'string', required: true },
+      { name: 'target', type: 'targetRef', required: false },
+      { name: 'value', type: 'expression', required: false },
+    ],
+    description: 'Emit an internal event for another script route.',
+  },
+  {
+    id: 'sendCC',
+    label: 'sendCC',
+    category: 'MIDI / Device',
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel', 'device'],
+    args: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'cc', type: 'number', required: true },
+      { name: 'value', type: 'expression', required: true },
+      { name: 'phase', type: 'string', default: 'commit' },
+    ],
+    description: 'Queue a MIDI CC message.',
+  },
+  {
+    id: 'sendNRPN',
+    label: 'sendNRPN',
+    category: 'MIDI / Device',
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel', 'device'],
+    args: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'parameterMsb', type: 'number', required: true },
+      { name: 'parameterLsb', type: 'number', required: true },
+      { name: 'value', type: 'expression', required: true },
+      { name: 'phase', type: 'string', default: 'commit' },
+    ],
+    description: 'Queue an NRPN message using a 14-bit value path.',
+  },
+  {
+    id: 'sendSysex',
+    label: 'sendSysex',
+    category: 'MIDI / Device',
+    portable: false,
+    exportSafe: false,
+    scopes: ['device'],
+    args: [{ name: 'bytes', type: 'byteArray', required: true }],
+    description: 'Queue a SysEx message. This is device-specific by design.',
+  },
+  {
+    id: 'buildSysex',
+    label: 'buildSysex',
+    category: 'MIDI / Device',
+    portable: false,
+    exportSafe: false,
+    scopes: ['device'],
+    args: [{ name: 'bytes', type: 'byteArray', required: true }],
+    description: 'Build a SysEx byte array from literal bytes and expressions.',
+  },
+  {
+    id: 'checksum',
+    label: 'checksum',
+    category: 'MIDI / Device',
+    portable: false,
+    exportSafe: false,
+    scopes: ['device'],
+    args: [
+      { name: 'type', type: 'string', required: true },
+      { name: 'bytes', type: 'byteArray', required: true },
+    ],
+    description: 'Calculate a device-specific checksum.',
+  },
+  {
+    id: 'to14Bit',
+    label: 'to14Bit',
+    category: 'MIDI / Device',
+    portable: true,
+    exportSafe: true,
+    expression: true,
+    scopes: ['panel', 'device'],
+    args: [{ name: 'value', type: 'expression', required: true }],
+    description: 'Split a normalized value into MIDI 14-bit MSB/LSB form.',
+  },
+  {
+    id: 'log',
+    label: 'log',
+    category: 'Debug',
+    portable: true,
+    exportSafe: false,
+    scopes: ['component', 'panel', 'device', 'project'],
+    args: [
+      { name: 'message', type: 'string', required: true },
+      { name: 'value', type: 'expression', required: false },
+    ],
+    description: 'Append a trace entry without changing runtime state.',
+  },
+];
+
+export const SCRIPT_COMMAND_BY_ID = Object.fromEntries(SCRIPT_COMMANDS.map((command) => [command.id, command]));
+
+export function commandsByCategory() {
+  const categories = new Map();
+  for (const command of SCRIPT_COMMANDS) {
+    const list = categories.get(command.category) ?? [];
+    list.push(command);
+    categories.set(command.category, list);
+  }
+  return [...categories.entries()].map(([category, commands]) => ({ category, commands }));
+}
+
+export function commandDescriptor(id) {
+  return SCRIPT_COMMAND_BY_ID[String(id ?? '')] ?? null;
+}
+
+export function portabilityForScript(script) {
+  const steps = Array.isArray(script?.steps) ? script.steps : [];
+  const descriptors = steps.map((step) => commandDescriptor(step.command ?? step.cmd)).filter(Boolean);
+  const portable = descriptors.every((descriptor) => descriptor.portable !== false);
+  const exportSafe = descriptors.every((descriptor) => descriptor.exportSafe !== false);
+  if (!portable) return { label: 'Device / raw only', portable: false, exportSafe: false, tone: 'warn' };
+  if (!exportSafe) return { label: 'Portable preview', portable: true, exportSafe: false, tone: 'warn' };
+  return { label: 'Portable + export safe', portable: true, exportSafe: true, tone: 'ok' };
+}
