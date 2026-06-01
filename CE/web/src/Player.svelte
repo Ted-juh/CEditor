@@ -62,14 +62,28 @@
     : '');
 
   onMount(() => {
-    // Expose a loader the host (C++ WebView / B3 player bridge) can call at any time.
+    // Expose a loader the host can call directly (and for browser testing).
     window.__CE_LOAD_PANEL__ = (doc, filePath) => loadPanelDocument(doc, filePath);
-    // Boot from a pre-injected document if present.
-    if (window.__CE_PANEL__ != null) loadPanelDocument(window.__CE_PANEL__);
+
+    // Native player host (B3): announce readiness, then receive the panel via "loadPanel".
+    const backend = typeof window !== 'undefined' && window.__JUCE__ && window.__JUCE__.backend;
+    let loadToken = null;
+    if (backend) {
+      loadToken = backend.addEventListener('loadPanel', (payload) => {
+        loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
+      });
+      backend.emitEvent('playerReady', {});
+    } else if (window.__CE_PANEL__ != null) {
+      // Browser/dev fallback: boot from a pre-injected document.
+      loadPanelDocument(window.__CE_PANEL__);
+    }
 
     const onResize = () => { vw = window.innerWidth; vh = window.innerHeight; };
     window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      if (backend && loadToken != null) backend.removeEventListener(loadToken);
+    };
   });
 </script>
 

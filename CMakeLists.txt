@@ -70,6 +70,46 @@ target_link_libraries(CEditor PRIVATE
     CEditorData
 )
 
+# --- Standalone player (Phase B4): runs an exported panel, no editor ---
+juce_add_gui_app(CEditorPlayer
+    PRODUCT_NAME "CEditor Player"
+    COMPANY_NAME "Tedjuh-inc"
+)
+
+target_sources(CEditorPlayer PRIVATE
+    "${CE_ROOT}/src/Player/PlayerMain.cpp"
+    "${CE_ROOT}/src/Player/PlayerHost.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
+)
+
+target_compile_definitions(CEditorPlayer PRIVATE
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_WIN_WEBVIEW2=1
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+)
+
+target_include_directories(CEditorPlayer PRIVATE
+    "${WEBVIEW2_INCLUDE}"
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorPlayer PRIVATE
+    juce::juce_core
+    juce::juce_audio_basics
+    juce::juce_audio_devices
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_gui_extra
+    "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+    dwmapi
+)
+
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"

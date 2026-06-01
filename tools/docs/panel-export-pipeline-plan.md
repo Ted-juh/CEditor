@@ -248,15 +248,27 @@ This is the same code the generator will later template.
       GAIA panel in-browser → renders correctly, no editor chrome. **Fix:** `panel` must be
       `$state.raw` — a deep `$state` proxy makes `PanelPreviewSurface`'s `structuredClone`
       throw `DataCloneError` (the editor sidesteps this via a `$derived`, non-proxied panel).
-- [ ] B3. **Player bridge.** A trimmed bridge: `loadPanel`, `setParameter` (→ engine
-      compile + send), MIDI-in → parameter updates, port selection, `getState`/`setState`.
-      No undo, no file dialogs.
-- [ ] B4. **Player target #1 (standalone GUI app).** Add `juce_add_gui_app(CEditorPlayer)`
-      that links the device engine and reuses the `WebViewHost` pattern to load the player
-      bundle. Hardcode/load the Phase A panel for now.
+- [~] B3. **Player bridge.** `PlayerHost` wires the shared `withDeviceRuntimeEvents(service,
+      emit)` seam (so `setParameter`/compile/etc. reach the player's own `DeviceProfileService`)
+      plus a panel-load handshake: JS `Player.svelte` emits `playerReady` → C++ emits the panel.
+      No undo/file dialogs. **JS→C++ verified** (the `playerReady` handler runs). MIDI-in →
+      param updates / `getState` deferred.
+      - ⚠️ **Known issue:** the native C++→JS *event* channel (`emitEventIfBrowserIsVisible`)
+        does NOT deliver in this standalone WebView2 config (verified: `isVisible()` true,
+        `evaluateJavascript` works, but events don't arrive). Panel load was switched to
+        `evaluateJavascript` as a workaround. Device *echoes* (midiPreview/monitor/runtime)
+        won't reach the player UI until this is root-caused — but control→C++ send (JS→C++)
+        works, so MIDI output is unaffected; only UI feedback is missing. **Follow-up.**
+- [x] B4. **Player target (standalone GUI app).** Added `juce_add_gui_app(CEditorPlayer)`
+      (`CE/src/Player/PlayerMain.cpp`, `PlayerHost.{h,cpp}`) linking the device engine +
+      `DeviceRuntimeBridge`, hosting a WebView2 that serves `player.html` from dist (or
+      localhost in dev). Loads a `.cepanel` passed as argv[1]. Builds + runs; **verified**:
+      `CEditor Player.exe <gaia.cepanel>` launches, auto-loads, and renders the 12-slider
+      GAIA filter panel in its own window with no editor chrome.
 
-**Exit proof:** run `CEditorPlayer.exe`, pick the GAIA's MIDI port, move a control → the
-GAIA changes. The artifact runs and controls real hardware outside the editor.
+**Exit proof:** `CEditorPlayer.exe` runs a panel outside the editor ✓. Remaining for full
+proof: device-echo channel fix (B3 follow-up), then pick a MIDI port + confirm a control
+move reaches the GAIA (JS→C++ send path is in place; needs the echo fix or a real-port test).
 
 ### Phase C — Wrap the same runtime as a hand-built VST3, load it in a DAW
 
