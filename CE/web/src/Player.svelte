@@ -9,12 +9,31 @@
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
+  import { midiDestinations, mapDeviceRole, initDeviceProfileBridge } from './CE_Application/stores/deviceProfiles.js';
+  import { listMidiDestinations } from './CE_Application/bridge/bridge.js';
 
   // $state.raw: the panel is replaced wholesale, never deep-mutated here. A deep $state
   // proxy would make PanelPreviewSurface's structuredClone() throw DataCloneError, and
   // mirrors how the editor feeds a non-proxied panel (via $derived) to the same surface.
   let panel = $state.raw(null);
   let surfaceRef = $state(null);
+
+  // --- Live device output (step 1): pick a MIDI port and send for real ---
+  let hasBridge = $state(false);
+  let ports = $state([{ type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' }]);
+  let selectedOut = $state('previewOnly');
+  let profileId = $state('roland-gaia');
+
+  function mapRole() {
+    const dest = ports.find((p) => p.id === selectedOut)
+      ?? { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' };
+    // Updates the role mapping AND tells C++ to open the MIDI output (setDeviceRoleMapping).
+    mapDeviceRole('mainSynth', profileId, { midiDestination: dest });
+  }
+  function selectPort(id) {
+    selectedOut = id;
+    mapRole();
+  }
 
   // Accepts a panel object, a JSON string, or a saved .cepanel document.
   function loadPanelDocument(input, filePath = null) {
@@ -27,10 +46,17 @@
       next = deserializePanel(JSON.stringify(input), input.filePath ?? filePath, input.name ?? null);
     }
     if (!next) return null;
+    // Player is a runtime: make bound controls SEND (not dry-run). Safe — the engine still
+    // only transmits when the role's output is a real hardware port (else it's a no-op).
+    for (const c of next.controls ?? [])
+      for (const b of c?._children?.DeviceBindings?.bindings ?? [])
+        if (b && typeof b === 'object') b.dryRun = false;
+    profileId = next.deviceSession?.mainSynth?.profileId || 'roland-gaia';
     panel = next;
     syncPanelPreviewSessions(panel.controls ?? []);
     if (panel?.bgImageEnabled && panel?.bgImage) loadFile(panel.bgImage);
     if (panel?.bgTextureEnabled && panel?.bgTexture) loadFile(panel.bgTexture);
+    if (hasBridge) mapRole();
     return panel;
   }
 
@@ -67,8 +93,13 @@
 
     // Native player host (B3): announce readiness, then receive the panel via "loadPanel".
     const backend = typeof window !== 'undefined' && window.__JUCE__ && window.__JUCE__.backend;
+    hasBridge = !!backend;
     let loadToken = null;
+    let portsUnsub = null;
     if (backend) {
+      initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
+      listMidiDestinations();      // ask C++ for available MIDI outputs -> fills midiDestinations
+      portsUnsub = midiDestinations.subscribe((d) => { if (Array.isArray(d) && d.length) ports = d; });
       loadToken = backend.addEventListener('loadPanel', (payload) => {
         loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
       });
@@ -83,28 +114,66 @@
     return () => {
       window.removeEventListener('resize', onResize);
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
+      if (portsUnsub) portsUnsub();
     };
   });
 </script>
 
-<div class="player-viewport">
-  {#if panel}
-    <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
-      <PanelPreviewSurface bind:surfaceRef {panel} {scale} {bgLayers} {gridStyle} />
+<div class="player-root">
+  {#if hasBridge}
+    <div class="device-bar">
+      <label>MIDI Out
+        <select value={selectedOut} onchange={(e) => selectPort(e.target.value)}>
+          {#each ports as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+        </select>
+      </label>
     </div>
-  {:else}
-    <div class="placeholder">No panel loaded.</div>
   {/if}
+  <div class="player-viewport">
+    {#if panel}
+      <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
+        <PanelPreviewSurface bind:surfaceRef {panel} {scale} {bgLayers} {gridStyle} />
+      </div>
+    {:else}
+      <div class="placeholder">No panel loaded.</div>
+    {/if}
+  </div>
 </div>
 
 <style>
-  .player-viewport {
+  .player-root {
     width: 100%;
     height: 100%;
     display: flex;
+    flex-direction: column;
+    background: #1E1E1E;
+  }
+  .device-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #252525;
+    border-bottom: 1px solid #333;
+    color: #AAA;
+    font-size: 11px;
+  }
+  .device-bar label { display: flex; align-items: center; gap: 6px; }
+  .device-bar select {
+    background: #1A1A1A;
+    color: #DDD;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    font-size: 11px;
+    padding: 2px 6px;
+    outline: none;
+  }
+  .player-viewport {
+    flex: 1 1 auto;
+    display: flex;
     align-items: center;
     justify-content: center;
-    background: #1E1E1E;
     overflow: auto;
   }
   .player-stage { position: relative; }
