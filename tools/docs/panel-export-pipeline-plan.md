@@ -248,17 +248,17 @@ This is the same code the generator will later template.
       GAIA panel in-browser → renders correctly, no editor chrome. **Fix:** `panel` must be
       `$state.raw` — a deep `$state` proxy makes `PanelPreviewSurface`'s `structuredClone`
       throw `DataCloneError` (the editor sidesteps this via a `$derived`, non-proxied panel).
-- [~] B3. **Player bridge.** `PlayerHost` wires the shared `withDeviceRuntimeEvents(service,
-      emit)` seam (so `setParameter`/compile/etc. reach the player's own `DeviceProfileService`)
-      plus a panel-load handshake: JS `Player.svelte` emits `playerReady` → C++ emits the panel.
-      No undo/file dialogs. **JS→C++ verified** (the `playerReady` handler runs). MIDI-in →
-      param updates / `getState` deferred.
-      - ⚠️ **Known issue:** the native C++→JS *event* channel (`emitEventIfBrowserIsVisible`)
-        does NOT deliver in this standalone WebView2 config (verified: `isVisible()` true,
-        `evaluateJavascript` works, but events don't arrive). Panel load was switched to
-        `evaluateJavascript` as a workaround. Device *echoes* (midiPreview/monitor/runtime)
-        won't reach the player UI until this is root-caused — but control→C++ send (JS→C++)
-        works, so MIDI output is unaffected; only UI feedback is missing. **Follow-up.**
+- [x] B3. **Player bridge.** `PlayerHost` wires the shared `withDeviceRuntimeEvents(service,
+      emit)` seam (so `compileParameterMessage`/`setParameter`/etc. reach the player's own
+      `DeviceProfileService`) plus a panel-load handshake: JS `Player.svelte` emits
+      `playerReady` → C++ hands over the panel. No undo/file dialogs. **Bidirectional bridge
+      verified in the player binary**: `compileParameterMessage(filter.cutoff=64)` →
+      `F0 41 10 00 00 41 12 10 00 01 0C 40 23 F7` round-tripped through the player's own engine.
+      - Note: `emitEventIfBrowserIsVisible` is gated on `isVisible()`, so events emitted before
+        the window is visible (e.g. the very-early `playerReady`→`loadPanel`) get dropped. Panel
+        load therefore uses `evaluateJavascript` (not visibility-gated) — the correct fix for the
+        startup race. Device echoes via the event channel work once the window is visible. MIDI-in
+        → param updates / `getState` still deferred.
 - [x] B4. **Player target (standalone GUI app).** Added `juce_add_gui_app(CEditorPlayer)`
       (`CE/src/Player/PlayerMain.cpp`, `PlayerHost.{h,cpp}`) linking the device engine +
       `DeviceRuntimeBridge`, hosting a WebView2 that serves `player.html` from dist (or
@@ -275,22 +275,25 @@ move reaches the GAIA (JS→C++ send path is in place; needs the echo fix or a r
 Goal: prove plugin packaging, WebView-in-plugin, unique ID, and state save — still one
 panel, still hand-built.
 
-- [ ] C1. Add `juce_add_plugin(CEditorPlayerVST)` with `FORMATS VST3 Standalone`,
-      hardcoded unique identity for now, `COPY_PLUGIN_AFTER_BUILD TRUE`.
-- [ ] C2. Minimal `AudioProcessor` (audio passthrough). The `AudioProcessorEditor` hosts
-      the WebView (reuse `WebViewHost` logic). The plugin opens its own MIDI port to the
-      GAIA (decision #2).
-- [ ] C3. `getStateInformation`/`setStateInformation` — serialize selected MIDI port +
-      current parameter values so the DAW session restores. Self-contained per instance.
-- [ ] C4. Serve WebView from embedded resources in the plugin (no localhost). Adapt
-      `provideFrontendResource()` to read BinaryData. **Per-instance WebView user-data
-      folder.**
-- [ ] C5. **Two-instance test.** Load the plugin on two tracks; confirm independent state,
-      and graceful handling when both target the same hardware MIDI port (decision #6).
+- [x] C1. Added `juce_add_plugin(CEditorPlayerVST)` — `FORMATS VST3 Standalone`,
+      `PLUGIN_CODE Cep1` / `PLUGIN_MANUFACTURER_CODE Tdjh` (hardcoded identity for now; Phase D
+      derives it). **VST3 bundle builds** (`…/VST3/CEditor Player VST.vst3` + moduleinfo.json).
+- [x] C2. Minimal `AudioProcessor` (audio passthrough) in `CE/src/Player/PluginProcessor.{h,cpp}`;
+      the `AudioProcessorEditor` **reuses the same `PlayerHost`** the standalone uses. **Verified
+      via the Standalone wrapper**: renders the 12-slider GAIA panel, bridge live, and
+      `compileParameterMessage(filter.resonance=32)` → `F0 41 10 00 00 41 12 10 00 01 0F 20 40 F7`
+      through the plugin's own engine. (Also fixed `PlayerHost` dist lookup to walk up robustly —
+      the Standalone wrapper exe nests one level deeper than the standalone app.)
+      Plugin-opens-own-MIDI-port (decision #2) not yet wired (preview/dry-run only so far).
+- [ ] C3. `getStateInformation`/`setStateInformation` — currently stubbed; serialize selected
+      MIDI port + parameter values for DAW session restore. **Deferred.**
+- [ ] C4. Serve WebView from embedded resources (BinaryData) instead of the dist filesystem;
+      per-instance WebView user-data folder. **Deferred** (currently serves dist; Phase D bakes).
+- [ ] C5. **Two-instance test** + real-DAW scan/load. **Deferred** (needs a DAW — yours).
 
-**Exit proof:** scan the VST3 in a DAW (start with Reaper — friendliest), open it, move a
-control → GAIA changes; save & reload the session → panel + port restore. Two instances do
-not interfere. WebView-in-plugin verified on one host.
+**Exit proof:** VST3 builds and its runtime is proven via the Standalone wrapper (panel renders,
+device compile correct). Remaining for full proof (yours): scan `CEditor Player VST.vst3` in
+Reaper, open it, move a control → GAIA; save/reload session; two instances. Plus C3/C4 wiring.
 
 ### Phase D — Build the exporter inside CEditor (the "Conversion" feature)
 

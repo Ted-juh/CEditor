@@ -110,6 +110,56 @@ target_link_libraries(CEditorPlayer PRIVATE
     dwmapi
 )
 
+# --- Player as a plugin (Phase C): VST3 wrapping the same PlayerHost runtime ---
+juce_add_plugin(CEditorPlayerVST
+    PRODUCT_NAME "CEditor Player VST"
+    COMPANY_NAME "Tedjuh-inc"
+    PLUGIN_MANUFACTURER_CODE Tdjh
+    PLUGIN_CODE Cep1
+    FORMATS VST3 Standalone
+    IS_SYNTH FALSE
+    NEEDS_MIDI_INPUT TRUE
+    NEEDS_MIDI_OUTPUT TRUE
+    VST3_CATEGORIES Fx
+    COPY_PLUGIN_AFTER_BUILD FALSE
+)
+
+target_sources(CEditorPlayerVST PRIVATE
+    "${CE_ROOT}/src/Player/PluginProcessor.cpp"
+    "${CE_ROOT}/src/Player/PlayerHost.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
+)
+
+target_compile_definitions(CEditorPlayerVST PUBLIC
+    JUCE_WEB_BROWSER=1
+    JUCE_USE_WIN_WEBVIEW2=1
+    JUCE_USE_WIN_WEBVIEW2_WITH_STATIC_LINKING=1
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
+    CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
+    CEDITOR_PLAYER_PANEL_PATH="C:/tmp/gaia-filter.cepanel"
+)
+
+target_include_directories(CEditorPlayerVST PRIVATE
+    "${WEBVIEW2_INCLUDE}"
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorPlayerVST PRIVATE
+    juce::juce_audio_utils
+    juce::juce_audio_devices
+    juce::juce_core
+    juce::juce_data_structures
+    juce::juce_events
+    juce::juce_graphics
+    juce::juce_gui_basics
+    juce::juce_gui_extra
+    "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
+    dwmapi
+)
+
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"

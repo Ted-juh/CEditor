@@ -14,22 +14,28 @@ juce::File getInstalledDistFolder()
         .getChildFile ("dist");
 }
 
-juce::File getBuildTreeDistFolder()
-{
-    auto dir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
-    for (int i = 0; i < 4; ++i)
-        dir = dir.getParentDirectory();
-    return dir.getChildFile ("CE").getChildFile ("web").getChildFile ("dist");
-}
-
 juce::File getDistFolder()
 {
+    // Installed layout: web/dist next to the exe.
     auto installed = getInstalledDistFolder();
     if (installed.getChildFile ("player.html").existsAsFile())
         return installed;
-    auto buildTree = getBuildTreeDistFolder();
-    if (buildTree.getChildFile ("player.html").existsAsFile())
-        return buildTree;
+
+    // Build tree: walk up looking for CE/web/dist (or web/dist). The depth differs between
+    // the standalone app and the plugin's Standalone wrapper (which nests one level deeper),
+    // so don't assume a fixed number of parents.
+    auto dir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    for (int i = 0; i < 8 && dir.getFullPathName().isNotEmpty(); ++i)
+    {
+        for (auto candidate : { dir.getChildFile ("CE").getChildFile ("web").getChildFile ("dist"),
+                                dir.getChildFile ("web").getChildFile ("dist") })
+            if (candidate.getChildFile ("player.html").existsAsFile())
+                return candidate;
+
+        auto parent = dir.getParentDirectory();
+        if (parent == dir) break;
+        dir = parent;
+    }
     return installed;
 }
 
