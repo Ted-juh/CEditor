@@ -206,8 +206,12 @@ Goal: the smallest real target to aim at.
       whole suite passes**. The engine itself compiles the bytes + checksum and matches the
       expected hex. Cross-check: `filter.envRelease=64` @ `10 00 01 13` → `…13 40 1C F7`,
       identical to the SH-201's existing passing test at the same address.
-- [ ] A4. Build a 3–4 control panel in the editor bound to those parameters; save the
-      `.cepanel`. *(GUI task — yours; everything the panel binds to is now verified.)*
+- [x] A4. Built the test-bed panel by driving the real Release app via CDP: 12 sliders in
+      a 4×3 grid, each bound to a GAIA filter-section parameter (mode, slope, cutoff,
+      keyfollow, env-vel-sens, resonance, env A/D/S/R, env depth, amp level). Verified the
+      bound params compile correct MIDI through the live C++ engine (`compileParameterMessage`
+      → `midiPreview`), e.g. cutoff=64 → `F0 41 10 00 00 41 12 10 00 01 0C 40 23 F7`.
+      *(Not yet saved to a `.cepanel` file — first save needs the native dialog.)*
 
 **Exit proof:** in the existing editor, moving the controls previews correct bytes, and
 (with a real MIDI port selected) the GAIA responds. Validates the profile before any new
@@ -263,10 +267,14 @@ not interfere. WebView-in-plugin verified on one host.
 Goal: automate Phases B–C into one button, behind a backend-agnostic contract, with **zero
 user toolchain by default**. Unique-binary-per-panel + the identity policy become real.
 
-- [ ] D1. **Identity block + policy in `.cepanel`.** On first export, mint a 128-bit random
-      GUID; derive component/controller FUIDs, product name, `PLUGIN_CODE`, AU subtype, CLAP
-      id, bundle filename. Re-export offers **Update this plugin** (reuse GUID) vs **Export
-      as new independent plugin** (fresh GUID). Keep a registry of issued GUIDs (decision #1).
+- [~] D1. **Identity block + policy in `.cepanel`.**
+      - [x] Derivation core implemented + verified: `CE/src/Export/PanelExportIdentity.h`
+        (`deriveIdentity(guid, name, vendor, mfrCode, version)` → unique `pluginCode`,
+        `auSubtype`, `clapId`, productName). Deterministic per GUID, unique across panels
+        even with identical names, valid 4-char codes (JUCE-safe). Test:
+        `CE/tests/PanelExportIdentityTests.cpp` (target `CEditorExportIdentityTests`, all pass).
+      - [ ] Mint a random GUID on first export, persist it in the `.cepanel`, keep a registry
+        of issued GUIDs, and wire the **Update vs New-copy** policy. *(needs generator + file I/O)*
 - [ ] D2. **Export contract.** Define the backend-agnostic interface: input = panel +
       profile(s) + resolved identity + format + output dir; output = a validated, uniquely-
       identified self-contained artifact.

@@ -89,6 +89,19 @@ target_link_libraries(CEditorDeviceProfileTests PRIVATE
     juce::juce_audio_devices
 )
 
+# --- Export pipeline: compile-per-panel identity (Phase D1) ---
+add_executable(CEditorExportIdentityTests
+    "${CE_ROOT}/tests/PanelExportIdentityTests.cpp"
+)
+
+target_include_directories(CEditorExportIdentityTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorExportIdentityTests PRIVATE
+    juce::juce_core
+)
+
 install(TARGETS CEditor
     RUNTIME DESTINATION "."
 )
