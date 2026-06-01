@@ -2,6 +2,7 @@
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 #include "BinaryData.h" // PlayerWebData — the embedded web bundle (player.html + assets)
 
+#include <atomic>
 #include <cstring>
 #include <optional>
 
@@ -123,11 +124,19 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad)
         juce::MessageManager::callAsync ([this, eventName, payload]() { emitToWebView (eventName, payload); });
     });
 
+    // Unique WebView2 user-data folder PER INSTANCE. WebView2 cannot share a folder across
+    // processes/instances, so a fixed folder makes a second user (e.g. a plugin loaded while a
+    // standalone runs, or two plugin instances) fail to create its WebView -> blank panel.
+    static std::atomic<int> instanceCounter { 0 };
+    auto userDataFolder = juce::File::getSpecialLocation (juce::File::tempDirectory)
+        .getChildFile ("CEditorPlayer_WebView2")
+        .getChildFile (juce::String::toHexString (juce::Time::getHighResolutionTicks())
+                       + "_" + juce::String (++instanceCounter));
+
     auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
         .withBackgroundColour (juce::Colour (0xFF1E1E1E))
         .withStatusBarDisabled()
-        .withUserDataFolder (juce::File::getSpecialLocation (juce::File::tempDirectory)
-                                 .getChildFile ("CEditorPlayer_WebView2"));
+        .withUserDataFolder (userDataFolder);
 
     auto options = juce::WebBrowserComponent::Options()
         .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
