@@ -233,8 +233,12 @@ This is the same code the generator will later template.
         builder, driving a `DeviceProfileService` and reporting via an `emit` callback.
         Omits editor/authoring events (file-chooser import, profile-source editing). Compiles
         + links into the CEditor target.
-      - [ ] Migrate `ValueTreeBridge::buildOptions` to call `withDeviceRuntimeEvents` (remove
-        the inline runtime handlers, keep editor-only ones) — bounded follow-up.
+      - [x] Migrated `ValueTreeBridge::buildOptions` to call `withDeviceRuntimeEvents`:
+        removed ~333 lines of inline runtime handlers (kept editor-only authoring events
+        inline). Builds clean; functionally verified via CDP on the running editor —
+        `listDeviceProfiles` returns all 5 profiles incl. `roland-gaia`, and
+        `compileParameterMessage` (filter.cutoff=64) returns the correct DT1 bytes through
+        the seam. **B1 complete.**
       - [ ] The player bridge (B3) consumes `withDeviceRuntimeEvents` with its own emit.
 - [ ] B2. **Player web mode.** Add a second Vite entry (`player.html` + bootstrap) that
       mounts the panel using the existing interaction/preview runtime — no MenuBar /

@@ -1,5 +1,6 @@
 #include "ValueTreeBridge.h"
 #include "AppSettings.h"
+#include "DeviceProfile/DeviceRuntimeBridge.h"
 
 namespace
 {
@@ -625,18 +626,6 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 emitPerfDebug (juce::String ("native perf logging ") + (perfDebugEnabled ? "enabled" : "disabled"));
             });
         })
-        .withEventListener ("listDeviceProfiles", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto* obj = new juce::DynamicObject();
-                obj->setProperty ("profiles", deviceProfileService.listProfiles());
-                browser->emitEventIfBrowserIsVisible ("deviceProfilesListed", juce::var (obj));
-            });
-        })
         .withEventListener ("importDeviceProfile", [this] (const juce::var&)
         {
             juce::MessageManager::callAsync ([this]()
@@ -710,45 +699,6 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                                       deviceProfileService.getDiagnostics());
             });
         })
-        .withEventListener ("setDeviceRoleMapping", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.setDeviceRoleMapping (payload);
-                browser->emitEventIfBrowserIsVisible ("deviceRoleMappingSet", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-                browser->emitEventIfBrowserIsVisible ("deviceTransportCapabilities",
-                                                      deviceProfileService.getTransportCapabilities());
-                browser->emitEventIfBrowserIsVisible ("deviceDiagnostics",
-                                                      deviceProfileService.getDiagnostics());
-            });
-        })
-        .withEventListener ("listProfileParameters", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("profileParametersListed",
-                                                       deviceProfileService.listProfileParameters (payload));
-            });
-        })
-        .withEventListener ("getProfileParameterDetail", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("profileParameterDetail",
-                                                      deviceProfileService.getProfileParameterDetail (payload));
-            });
-        })
         .withEventListener ("saveProfileParameterDetail", [this] (const juce::var& payload)
         {
             juce::MessageManager::callAsync ([this, payload]()
@@ -758,288 +708,6 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 browser->emitEventIfBrowserIsVisible ("profileParameterDetailSaved",
                                                       deviceProfileService.saveProfileParameterDetail (payload));
-            });
-        })
-        .withEventListener ("listMidiDestinations", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto* obj = new juce::DynamicObject();
-                obj->setProperty ("destinations", deviceProfileService.listMidiDestinations());
-                browser->emitEventIfBrowserIsVisible ("midiDestinationsListed", juce::var (obj));
-            });
-        })
-        .withEventListener ("listMidiInputs", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto* obj = new juce::DynamicObject();
-                obj->setProperty ("inputs", deviceProfileService.listMidiInputs());
-                browser->emitEventIfBrowserIsVisible ("midiInputsListed", juce::var (obj));
-            });
-        })
-        .withEventListener ("getDeviceTransportCapabilities", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("deviceTransportCapabilities",
-                                                      deviceProfileService.getTransportCapabilities());
-            });
-        })
-        .withEventListener ("getDeviceSessionState", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("overrideDeviceIdentityMismatch", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.overrideDeviceIdentityMismatch (payload);
-                browser->emitEventIfBrowserIsVisible ("deviceIdentityOverride", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-            });
-        })
-        .withEventListener ("startDeviceSync", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.startDeviceSync (payload);
-                browser->emitEventIfBrowserIsVisible ("deviceSyncStarted", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-            });
-        })
-        .withEventListener ("startPresetListScan", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.startPresetListScan (payload);
-                browser->emitEventIfBrowserIsVisible ("presetListScanStarted", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-            });
-        })
-        .withEventListener ("cancelPresetListScan", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.cancelPresetListScan (payload);
-                browser->emitEventIfBrowserIsVisible ("presetListScanUpdated", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("getPresetListScans", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("presetListScans",
-                                                      deviceProfileService.getPresetListScans());
-            });
-        })
-        .withEventListener ("startBulkDumpSend", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.startBulkDumpSend (payload);
-                browser->emitEventIfBrowserIsVisible ("bulkDumpSendStarted", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-            });
-        })
-        .withEventListener ("cancelBulkDumpSend", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.cancelBulkDumpSend (payload);
-                browser->emitEventIfBrowserIsVisible ("bulkDumpSendUpdated", result);
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("getBulkDumpSends", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("bulkDumpSends",
-                                                      deviceProfileService.getBulkDumpSends());
-            });
-        })
-        .withEventListener ("compileParameterMessage", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("midiPreview",
-                                                      deviceProfileService.compileParameterMessage (payload, false));
-            });
-        })
-        .withEventListener ("setDeviceParameter", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.compileParameterMessage (payload, true);
-                browser->emitEventIfBrowserIsVisible ("deviceParameterSet", result);
-                browser->emitEventIfBrowserIsVisible ("midiPreview", result);
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents", deviceProfileService.getMonitorEvents());
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState", deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("compileRawMidiAction", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("rawMidiPreview",
-                                                      deviceProfileService.compileRawMidiAction (payload, false));
-            });
-        })
-        .withEventListener ("triggerRawMidiAction", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                auto result = deviceProfileService.compileRawMidiAction (payload, true);
-                browser->emitEventIfBrowserIsVisible ("rawMidiActionTriggered", result);
-                browser->emitEventIfBrowserIsVisible ("rawMidiPreview", result);
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents", deviceProfileService.getMonitorEvents());
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState", deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("parseDumpMessage", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("dumpMessageParsed",
-                                                      deviceProfileService.parseDumpMessage (payload, true));
-                browser->emitEventIfBrowserIsVisible ("deviceRuntimeState",
-                                                      deviceProfileService.getRuntimeState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("ingestIncomingMidiMessage", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("incomingMidiIngested",
-                                                      deviceProfileService.ingestIncomingMidiMessage (payload));
-                browser->emitEventIfBrowserIsVisible ("deviceRuntimeState",
-                                                      deviceProfileService.getRuntimeState());
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-                browser->emitEventIfBrowserIsVisible ("deviceSessionState",
-                                                      deviceProfileService.getSessionState());
-            });
-        })
-        .withEventListener ("runDeviceProfileTests", [this] (const juce::var& payload)
-        {
-            juce::MessageManager::callAsync ([this, payload]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("deviceProfileTestsFinished",
-                                                      deviceProfileService.runProfileTests (payload));
-            });
-        })
-        .withEventListener ("getDeviceRuntimeState", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("deviceRuntimeState",
-                                                      deviceProfileService.getRuntimeState());
-            });
-        })
-        .withEventListener ("getMidiMonitorEvents", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("midiMonitorEvents",
-                                                      deviceProfileService.getMonitorEvents());
-            });
-        })
-        .withEventListener ("getDeviceDiagnostics", [this] (const juce::var&)
-        {
-            juce::MessageManager::callAsync ([this]()
-            {
-                if (browser == nullptr)
-                    return;
-
-                browser->emitEventIfBrowserIsVisible ("deviceDiagnostics",
-                                                      deviceProfileService.getDiagnostics());
             });
         })
         .withEventListener ("importFonts", [this] (const juce::var&)
@@ -1090,6 +758,13 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                                                                   juce::var (importedFonts));
                     });
             });
+        });
+
+    options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,
+        [this] (const juce::String& eventName, const juce::var& payload)
+        {
+            if (browser != nullptr)
+                browser->emitEventIfBrowserIsVisible (eventName, payload);
         });
 
     return options;
