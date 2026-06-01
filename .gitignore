@@ -11,6 +11,8 @@
 /out/
 # Scratch: QA screenshots, harness scripts, logs, mockups.
 /tmp/
+# Per-panel export output (generated VST3s).
+/export-out/
 
 /.claude/
 *.cache

@@ -110,12 +110,18 @@ target_link_libraries(CEditorPlayer PRIVATE
     dwmapi
 )
 
-# --- Player as a plugin (Phase C): VST3 wrapping the same PlayerHost runtime ---
+# --- Player as a plugin (Phase C/D): VST3 wrapping the same PlayerHost runtime ---
+# Phase D parameterizes the per-panel identity + panel via cache vars so the generator can
+# stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
+set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
+set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
+set(CE_VST_PANEL_PATH   "C:/tmp/gaia-filter.cepanel" CACHE STRING "Panel document the plugin loads")
+
 juce_add_plugin(CEditorPlayerVST
-    PRODUCT_NAME "CEditor Player VST"
+    PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
     COMPANY_NAME "Tedjuh-inc"
     PLUGIN_MANUFACTURER_CODE Tdjh
-    PLUGIN_CODE Cep1
+    PLUGIN_CODE "${CE_VST_PLUGIN_CODE}"
     FORMATS VST3 Standalone
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
@@ -139,7 +145,7 @@ target_compile_definitions(CEditorPlayerVST PUBLIC
     JUCE_VST3_CAN_REPLACE_VST2=0
     CEDITOR_SOURCE_ROOT="${CMAKE_SOURCE_DIR}"
     CEDITOR_DEV_MODE=$<IF:$<BOOL:${CEDITOR_DEV_MODE}>,1,0>
-    CEDITOR_PLAYER_PANEL_PATH="C:/tmp/gaia-filter.cepanel"
+    CEDITOR_PLAYER_PANEL_PATH="${CE_VST_PANEL_PATH}"
 )
 
 target_include_directories(CEditorPlayerVST PRIVATE

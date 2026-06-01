@@ -308,9 +308,18 @@ user toolchain by default**. Unique-binary-per-panel + the identity policy becom
         `CE/tests/PanelExportIdentityTests.cpp` (target `CEditorExportIdentityTests`, all pass).
       - [ ] Mint a random GUID on first export, persist it in the `.cepanel`, keep a registry
         of issued GUIDs, and wire the **Update vs New-copy** policy. *(needs generator + file I/O)*
-- [ ] D2. **Export contract.** Define the backend-agnostic interface: input = panel +
-      profile(s) + resolved identity + format + output dir; output = a validated, uniquely-
-      identified self-contained artifact.
+- [~] D2/D4. **Export contract + compile backend — PROVEN end-to-end.**
+      `tools/scripts/export-panel-vst3.mjs`: given a panel + GUID, derives the identity
+      (JS port of `PanelExportIdentity`, **self-checks `pluginCode`/`auSubtype` against the
+      C++** so they can't diverge), then builds a uniquely-identified VST3 from the shared
+      `CEditorPlayerVST` template via CMake cache vars (`CE_VST_PLUGIN_CODE` /
+      `CE_VST_PRODUCT_NAME` / `CE_VST_PANEL_PATH`) and copies it to `export-out/`.
+      **Verified the Ctrlr fix:** three builds → three distinct VST3 FUIDs
+      (`…43657031`=Cep1, `…47663262`=Gf2b, `…4A6D6C45`=JmlE from GUID `panel-guid-7c3e-demo`).
+      The FUID encodes mfr+pluginCode, so a GUID-derived `pluginCode` ⇒ a unique plugin per panel.
+      Remaining: bake the panel via `juce_add_binary_data` (vs the current fixed path),
+      persist the GUID in the `.cepanel` (D1 second half), bundle a toolchain for end users
+      (currently uses the dev MSVC), and the **Update vs New-copy** policy.
 - [ ] D3. **Fast backend (D — default).** Ship a prebuilt template artifact. Differentiate
       per export by (a) embedding the panel/profile data blob and (b) applying the identity.
       Two flavors to prototype in order:
