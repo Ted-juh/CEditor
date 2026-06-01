@@ -222,10 +222,20 @@ binary exists.
 Goal: prove rendering-outside-the-editor + device engine + real hardware. No code-gen yet.
 This is the same code the generator will later template.
 
-- [ ] B1. **Decouple the device runtime.** Extract `DeviceProfileService` instantiation
-      out of `ValueTreeBridge` (`ValueTreeBridge.h:92`) into a shared object that both the
-      editor and the player construct. **Audit for `static`/singleton state** while doing
-      this — the runtime must be per-instance (decision #6).
+- [~] B1. **Decouple the device runtime.**
+      - [x] Audit: `DeviceProfileService.cpp` has **no static/singleton mutable state** — all
+        state is instance members; fully per-instance (decision #6 met). The service already
+        builds & runs standalone (proven by `CEditorDeviceProfileTests`, which constructs one
+        without `ValueTreeBridge`), so the runtime is already editor-independent.
+      - [x] Shared seam created: `CE/src/DeviceProfile/DeviceRuntimeBridge.{h,cpp}` —
+        `withDeviceRuntimeEvents(options, service, emit)` wires the ~26 runtime device events
+        (list/map/compile/sync/scan/bulk/parse/ingest/runtime queries) onto a WebView Options
+        builder, driving a `DeviceProfileService` and reporting via an `emit` callback.
+        Omits editor/authoring events (file-chooser import, profile-source editing). Compiles
+        + links into the CEditor target.
+      - [ ] Migrate `ValueTreeBridge::buildOptions` to call `withDeviceRuntimeEvents` (remove
+        the inline runtime handlers, keep editor-only ones) — bounded follow-up.
+      - [ ] The player bridge (B3) consumes `withDeviceRuntimeEvents` with its own emit.
 - [ ] B2. **Player web mode.** Add a second Vite entry (`player.html` + bootstrap) that
       mounts the panel using the existing interaction/preview runtime — no MenuBar /
       IconPanel / PropertiesPanel. Boots from a panel document injected by C++

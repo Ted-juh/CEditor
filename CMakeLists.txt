@@ -34,6 +34,7 @@ target_sources(CEditor PRIVATE
     "${CE_ROOT}/src/Main.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     "${CE_ROOT}/src/WebViewHost.cpp"
     "${CE_ROOT}/src/ValueTreeBridge.cpp"
     "${CE_ROOT}/src/ValueTreeBridgeHandlers.cpp"
