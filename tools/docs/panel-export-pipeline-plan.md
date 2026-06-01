@@ -240,10 +240,14 @@ This is the same code the generator will later template.
         `compileParameterMessage` (filter.cutoff=64) returns the correct DT1 bytes through
         the seam. **B1 complete.**
       - [ ] The player bridge (B3) consumes `withDeviceRuntimeEvents` with its own emit.
-- [ ] B2. **Player web mode.** Add a second Vite entry (`player.html` + bootstrap) that
-      mounts the panel using the existing interaction/preview runtime — no MenuBar /
-      IconPanel / PropertiesPanel. Boots from a panel document injected by C++
-      (`window.__CE_PANEL__` or a `loadPanel` bridge event).
+- [x] B2. **Player web mode.** Added multi-entry Vite (`index.html` + `player.html`),
+      `src/player.js`, `src/Player.svelte` — renders ONE panel read-only/interactive via the
+      existing `PanelPreviewSurface` (no editor chrome), reusing the real bg/grid helpers +
+      `syncPanelPreviewSessions`. Boots from `window.__CE_PANEL__` or `window.__CE_LOAD_PANEL__(doc)`.
+      Verified: `npm run build` emits `dist/player.html` + bundle; loaded the real 12-slider
+      GAIA panel in-browser → renders correctly, no editor chrome. **Fix:** `panel` must be
+      `$state.raw` — a deep `$state` proxy makes `PanelPreviewSurface`'s `structuredClone`
+      throw `DataCloneError` (the editor sidesteps this via a `$derived`, non-proxied panel).
 - [ ] B3. **Player bridge.** A trimmed bridge: `loadPanel`, `setParameter` (→ engine
       compile + send), MIDI-in → parameter updates, port selection, `getState`/`setState`.
       No undo, no file dialogs.
