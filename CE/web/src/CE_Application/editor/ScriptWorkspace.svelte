@@ -37,6 +37,7 @@
     updateScriptInDocument,
     updateScriptStep,
   } from '../stores/scriptWorkspace.js';
+  import { normalizeScriptWorkspaceMode } from '../scripting/scriptDocumentModel.js';
 
   let { documentId = '' } = $props();
 
@@ -50,10 +51,10 @@
     { id: 'device', label: 'Device', title: '7. Device Scripting Workbench', detail: 'Specialized device script surface for MIDI, SysEx, NRPN, checksums, parsers, and tests' },
     { id: 'preview', label: 'Preview Debugger', title: '8. Preview-First Debugger Layout', detail: 'Live preview plus event injector, trace, selected command step, patches, MIDI out, and generated code view' },
     { id: 'export', label: 'Export Review', title: '9. Advanced Export / Source Review', detail: 'Review CE Script, JSON graph, JavaScript, TypeScript, Lua, C++, Python, C#, Swift, Go, Kotlin, Rust, HTML, and CSS projections' },
-    { id: 'diehard', label: 'Diehard Coder', title: 'Scripting / Diehard Coder Mode', detail: 'Code-first workspace: CE Script, generated IR, runtime trace, tests, breakpoints, and export targets in one shell' },
+    { id: 'expert', label: 'Expert', title: 'Scripting / Expert Mode', detail: 'Code-first workspace: CE Script, generated IR, runtime trace, tests, breakpoints, and export targets in one shell' },
   ];
 
-  let mode = $state('diehard');
+  let mode = $state('command');
   let selectedScriptId = $state('macroRouting');
   let exportTarget = $state('javascript');
   let codeTarget = $state('ce');
@@ -91,7 +92,7 @@
   let validationIssues = $derived(selectedScript ? validateScriptForProject(selectedScript, { panel: $activePanel }) : []);
   let exportWarnings = $derived(selectedScript ? exportWarningsForScript(selectedScript) : []);
   let portability = $derived(selectedScript ? portabilityForScript(selectedScript) : null);
-  let activeTarget = $derived(mode === 'export' ? exportTarget : mode === 'diehard' ? codeTarget : 'ce');
+  let activeTarget = $derived(mode === 'export' ? exportTarget : mode === 'expert' ? codeTarget : 'ce');
   let generatedCode = $derived(selectedScript ? emitScript(selectedScript, activeTarget) : '');
   let categories = $derived(commandsByCategory());
   let filteredCategories = $derived(filterCommandCategories(categories, commandSearch));
@@ -113,7 +114,9 @@
   });
 
   $effect(() => {
-    if (document?.mode && document.mode !== mode) mode = document.mode;
+    const normalizedMode = normalizeScriptWorkspaceMode(document?.mode);
+    if (document?.mode && normalizedMode !== mode) mode = normalizedMode;
+    if (document?.id && document.mode === 'diehard') updateScriptDocument(document.id, { mode: normalizedMode });
   });
 
   function groupScripts(items) {
@@ -757,8 +760,9 @@
   }
 
   function setMode(nextMode) {
-    mode = nextMode;
-    if (document?.id) updateScriptDocument(document.id, { mode: nextMode });
+    const normalizedMode = normalizeScriptWorkspaceMode(nextMode);
+    mode = normalizedMode;
+    if (document?.id) updateScriptDocument(document.id, { mode: normalizedMode });
   }
 
   function formatNumber(value) {
@@ -772,12 +776,13 @@
     if (step.command === 'setValue') return `${args.target} = ${emitScript({ target: 'x', event: 'x', steps: [step] }, 'ce').split('=').slice(1).join('=').trim()}`;
     if (step.command === 'sendCC') return `ch${args.channel} cc${args.cc} value ${emitScript({ target: 'x', event: 'x', steps: [step] }, 'ce').match(/value=(.*)$/)?.[1] ?? ''}`;
     if (step.command === 'sendSysex') return (args.bytes ?? []).map((byte) => Number(byte).toString(16).padStart(2, '0').toUpperCase()).join(' ');
+    if (step.command === 'requestDeviceDump') return `request ${args.request ?? ''}`;
     if (step.command === 'setState') return `${args.target} -> ${args.state}`;
     return JSON.stringify(args);
   }
 
   function actionTone(command) {
-    if (command === 'sendCC' || command === 'sendSysex') return 'midi';
+    if (command === 'sendCC' || command === 'sendSysex' || command === 'requestDeviceDump') return 'midi';
     if (command === 'setValue' || command === 'setPartColor' || command === 'setState') return 'patch';
     if (command === 'scale' || command === 'clamp' || command === 'round') return 'math';
     return 'normal';
@@ -789,11 +794,12 @@
     if (step.command === 'sendCC') return `sendCC ch${args.channel} cc${args.cc}`;
     if (step.command === 'setState') return `setState ${args.target}`;
     if (step.command === 'sendSysex') return 'sendSysex bytes';
+    if (step.command === 'requestDeviceDump') return `requestDeviceDump ${args.request ?? ''}`;
     return step.command;
   }
 </script>
 
-<section class="script-workspace" class:diehard={mode === 'diehard'}>
+<section class="script-workspace" class:expert={mode === 'expert'}>
   <header class="script-header">
     <div>
       <h1>{activeMode.title}</h1>
@@ -817,8 +823,8 @@
 
   {#if !document || !selectedScript}
     <div class="script-empty">No script workspace is open.</div>
-  {:else if mode === 'diehard'}
-    <div class="diehard-shell">
+  {:else if mode === 'expert'}
+    <div class="expert-shell">
       <aside class="project-tree panel-box">
         <div class="panel-title">Script Project</div>
         <input aria-label="Search symbols" placeholder="Search symbols, scripts, commands..." />
@@ -1012,11 +1018,13 @@
                     <option value="">Portable command graph</option>
                     <option value="javascript">Raw JavaScript (blocked)</option>
                     <option value="lua">Raw Lua (blocked)</option>
-                    <option value="cpp">Raw C++ (export-only)</option>
+                    <option value="cpp">Raw C++ (blocked preview, export review only)</option>
                   </select>
                 </label>
                 {#if selectedScript.rawLanguage}
-                  <span class="policy-warning">Raw {selectedScript.rawLanguage} is marked non-portable and blocked by default sandbox guardrails.</span>
+                  <span class="policy-warning">
+                    Raw {selectedScript.rawLanguage} is non-portable and blocked by default sandbox guardrails{selectedScript.rawLanguage === 'cpp' ? '; use generated C++ export review unless an export-only raw scope is explicitly enabled.' : '.'}
+                  </span>
                 {:else}
                   <span class="policy-ok">Portable graph: export-safe where commands allow it.</span>
                 {/if}
@@ -1248,6 +1256,7 @@
             <button type="button" onclick={() => addAction('checksum')}>+ Checksum</button>
             <button type="button" onclick={() => addAction('sendCC')}>+ CC</button>
             <button type="button" onclick={() => addAction('sendNRPN')}>+ NRPN</button>
+            <button type="button" onclick={() => addAction('requestDeviceDump')}>+ Dump Request</button>
             <button type="button" onclick={runDevicePreview}>Preview Bytes</button>
             <button type="button" onclick={() => runTestsForProfile($selectedDeviceProfileId)}>Run Profile Tests</button>
           </div>
@@ -1281,6 +1290,8 @@
           <strong>{selectedDeviceProfile?.name ?? 'Selected device profile'}</strong>
           {#if $latestMidiPreview?.message?.bytes}
             <div class="bytes">{#each $latestMidiPreview.message.bytes as byte}<span>{Number(byte).toString(16).padStart(2, '0').toUpperCase()}</span>{/each}</div>
+          {:else if $latestMidiPreview?.message?.type === 'deviceRequest'}
+            <span class="empty-hint">{$latestMidiPreview.message.request}</span>
           {:else if $latestMidiPreview?.bytes}
             <div class="bytes">{#each $latestMidiPreview.bytes as byte}<span>{Number(byte).toString(16).padStart(2, '0').toUpperCase()}</span>{/each}</div>
           {:else}
@@ -1352,7 +1363,7 @@
               {/each}
               <div class="panel-title spaced">MIDI Out</div>
               {#each debuggerSession?.deviceMessages ?? [] as message}
-                <span class="patch-line">{message.type} ch{message.channel ?? '-'}<strong>value {message.value ?? formatNumber(message.bytes?.length ?? 0)}</strong></span>
+                <span class="patch-line">{message.type} ch{message.channel ?? '-'}<strong>{message.request ? `request ${message.request}` : `value ${message.value ?? formatNumber(message.bytes?.length ?? 0)}`}</strong></span>
               {/each}
               <div class="panel-title spaced">Watch Values</div>
               <div class="watch-editor">
@@ -1415,7 +1426,7 @@
         </main>
       {/if}
 
-      {#if mode !== 'preview' && mode !== 'export' && mode !== 'diehard'}
+      {#if mode !== 'preview' && mode !== 'export' && mode !== 'expert'}
         {@render TraceFooter(traceResult, validationIssues)}
       {/if}
     </div>
@@ -1711,6 +1722,56 @@
   .workspace-grid.export-grid {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
+  }
+
+  @media (max-width: 1280px) {
+    .script-header {
+      flex: 0 0 auto;
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+      gap: 8px;
+    }
+
+    .header-actions {
+      justify-items: stretch;
+    }
+
+    .file-actions,
+    .script-header nav {
+      justify-content: flex-start;
+      max-width: none;
+    }
+
+    .workspace-grid,
+    .workspace-grid.flow-grid {
+      grid-template-columns: minmax(210px, 0.36fr) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(120px, auto);
+    }
+
+    .workspace-grid.preview-grid,
+    .workspace-grid.export-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  @media (max-width: 820px) {
+    .file-actions,
+    .mini-toolbar,
+    .debugger-toolbar,
+    .script-header nav {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      scrollbar-width: thin;
+    }
+
+    .workspace-grid,
+    .workspace-grid.flow-grid,
+    .workspace-grid.preview-grid {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+      align-content: start;
+      overflow: auto;
+    }
   }
 
   .script-list,
@@ -2629,7 +2690,7 @@
     font-size: 12px;
   }
 
-  .diehard-shell {
+  .expert-shell {
     flex: 1;
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 460px;
@@ -2639,6 +2700,29 @@
     min-height: 0;
     box-sizing: border-box;
     background: #050B11;
+  }
+
+  @media (max-width: 1280px) {
+    .expert-shell {
+      grid-template-columns: minmax(220px, 0.35fr) minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) minmax(180px, auto);
+      overflow: auto;
+    }
+
+    .api-panel {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 820px) {
+    .expert-shell {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: repeat(4, minmax(180px, auto));
+    }
+
+    .debug-bottom {
+      grid-template-columns: minmax(0, 1fr);
+    }
   }
 
   .code-shell {
@@ -2764,5 +2848,51 @@
     place-items: center;
     flex: 1;
     color: #91A4B1;
+  }
+
+  @media (max-width: 1280px) {
+    .command-library,
+    .flow-grid .node-inspector {
+      grid-column: 1 / -1;
+      grid-row: auto;
+    }
+
+    .flow-grid .flow-canvas {
+      grid-column: 2;
+    }
+  }
+
+  @media (max-width: 820px) {
+    .script-list,
+    .command-builder,
+    .command-library,
+    .trace-footer,
+    .flow-grid .palette,
+    .flow-grid .flow-canvas,
+    .flow-grid .node-inspector {
+      grid-column: 1 / -1;
+      grid-row: auto;
+    }
+
+    .builder-layout,
+    .recipe-builder {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .script-list {
+      min-height: 220px;
+    }
+
+    .command-builder {
+      min-height: 460px;
+    }
+
+    .command-library {
+      min-height: 220px;
+    }
+
+    .trace-footer {
+      min-height: 120px;
+    }
   }
 </style>

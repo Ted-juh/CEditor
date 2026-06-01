@@ -70,6 +70,33 @@ function targetExists(target, knownTargets) {
   return !base || base === '*' || base === 'any' || base === 'panel' || knownTargets.has(base);
 }
 
+function addParameterTargetAliases(targets, parameter) {
+  const id = String(parameter?.id ?? '').trim();
+  if (!id) return;
+  targets.add(id);
+  const parts = id.split('.').filter(Boolean);
+  if (parts[0]) targets.add(parts[0]);
+  if (parts.length > 1) targets.add(parts[parts.length - 1]);
+}
+
+function addDeviceProfileTargets(targets, context = {}) {
+  const profiles = [
+    context.deviceProfile,
+    ...(Array.isArray(context.deviceProfiles) ? context.deviceProfiles : []),
+  ].filter(Boolean);
+  const directParameters = Array.isArray(context.deviceParameters) ? context.deviceParameters : [];
+  for (const parameter of directParameters) addParameterTargetAliases(targets, parameter);
+  for (const profile of profiles) {
+    for (const parameter of profile?.parameters ?? []) addParameterTargetAliases(targets, parameter);
+  }
+}
+
+function addFallbackDeviceTargets(targets) {
+  for (const target of ['cutoff', 'resonance', 'drive', 'filter', 'mode', 'preset', 'ccSwitch']) {
+    targets.add(target);
+  }
+}
+
 function commandTarget(step) {
   const args = step?.args ?? {};
   if (step?.command === 'setValue' || step?.command === 'setState') return args.target;
@@ -137,6 +164,8 @@ export function collectProjectScriptTargets({ panel = null, controls = [] } = {}
 export function validateScriptForProject(script, context = {}) {
   const issues = [...validateScript(script)];
   const knownTargets = collectProjectScriptTargets(context);
+  addDeviceProfileTargets(knownTargets, context);
+  if (script?.scope === 'device') addFallbackDeviceTargets(knownTargets);
   const permissions = {
     allowRawCode: false,
     allowDeviceCommandsInPanel: true,
@@ -174,12 +203,15 @@ export function validateScriptForProject(script, context = {}) {
   }
 
   if (script?.rawLanguage && permissions.allowRawCode !== true) {
+    const rawLanguage = String(script.rawLanguage ?? '').toLowerCase();
     pushIssue(issues, {
       level: 'error',
       code: 'raw-code-blocked',
       path: 'rawLanguage',
       message: 'Raw code is blocked by the current sandbox policy.',
-      quickFix: 'Convert this to command graph steps or explicitly allow raw code for this scope.',
+      quickFix: rawLanguage === 'cpp'
+        ? 'Use the generated C++ export review, or explicitly enable raw C++ for an export-only build scope.'
+        : 'Convert this to command graph steps or explicitly allow raw code for this scope.',
     });
   }
 
@@ -262,7 +294,7 @@ export function validateScriptForProject(script, context = {}) {
       }
     }
 
-    if (command === 'sendSysex' || command === 'buildSysex') {
+    if (command === 'sendSysex' || command === 'buildSysex' || command === 'requestDeviceDump') {
       if (script?.scope !== 'device') {
         pushIssue(issues, {
           level: permissions.allowDeviceCommandsInPanel ? 'warning' : 'error',
@@ -272,6 +304,21 @@ export function validateScriptForProject(script, context = {}) {
           quickFix: 'Move this script to Device scope or attach a device profile.',
         });
       }
+    }
+
+    if (command === 'requestDeviceDump') {
+      if (!String(step?.args?.request ?? '').trim()) {
+        pushIssue(issues, {
+          level: 'error',
+          code: 'missing-device-request',
+          path: `${path}.args.request`,
+          message: 'Device dump request needs a profile request id.',
+          quickFix: 'Pick a request from the active device profile.',
+        });
+      }
+    }
+
+    if (command === 'sendSysex' || command === 'buildSysex') {
       const bytes = step?.args?.bytes;
       if (!Array.isArray(bytes) || bytes.length === 0) {
         pushIssue(issues, {

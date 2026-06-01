@@ -50,6 +50,35 @@ struct CompileResult
     MidiTransaction transaction;
 };
 
+struct DeviceRequestResult
+{
+    bool ok = false;
+    juce::String error;
+    juce::String requestId;
+    juce::String name;
+    juce::String expectedResponseKind = "dump";
+    juce::String expectedDumpId;
+    juce::String nextStartupRequestId;
+    juce::String continueRequestId;
+    int timeoutMs = 2000;
+    int retries = 0;
+    MidiTransaction transaction;
+};
+
+struct IdentityMatchResult
+{
+    bool ok = false;
+    bool isIdentityReply = false;
+    bool matched = false;
+    juce::String error;
+    juce::String deviceIdHex;
+    juce::String manufacturerIdHex;
+    juce::String familyCodeHex;
+    juce::String modelNumberHex;
+    juce::String revisionHex;
+    juce::var values;
+};
+
 struct ProfileTestResult
 {
     juce::String name;
@@ -70,6 +99,36 @@ struct DumpParseResult
     juce::String dumpName;
     juce::String checksumStatus = "none";
     juce::var values;
+    juce::String matchStatus = "unknown";
+    bool complete = false;
+    int expectedMessageCount = 1;
+    int receivedMessageCount = 1;
+    int expectedBytes = 0;
+    int receivedBytes = 0;
+    juce::var completion;
+    juce::var diagnostics;
+    juce::var partialFailures;
+};
+
+struct DumpCollectionResult
+{
+    bool ok = false;
+    bool complete = false;
+    juce::String status = "empty";
+    juce::String error;
+    juce::String collectionId;
+    int expectedMessageCount = 0;
+    int receivedMessageCount = 0;
+    int parsedMessageCount = 0;
+    int failedMessageCount = 0;
+    int expectedBytes = 0;
+    int receivedBytes = 0;
+    juce::var values;
+    juce::var messages;
+    juce::var receivedRanges;
+    juce::var missingRanges;
+    juce::var duplicateRanges;
+    juce::var diagnostics;
 };
 
 class DeviceProfileEngine
@@ -80,6 +139,7 @@ public:
 
     [[nodiscard]] juce::String getProfileId() const;
     [[nodiscard]] juce::String getProfileName() const;
+    [[nodiscard]] juce::String getDefaultSyncDirection() const;
     [[nodiscard]] const juce::Array<ValidationMessage>& getValidationMessages() const { return validationMessages; }
     [[nodiscard]] bool hasErrors() const;
 
@@ -88,9 +148,18 @@ public:
                                        const juce::var& value,
                                        bool dryRun = true) const;
 
+    DeviceRequestResult compileDeviceRequest (const juce::String& deviceRole,
+                                              const juce::String& requestId = {},
+                                              const juce::var& variables = {}) const;
+
+    DeviceRequestResult compileIdentityRequest (const juce::String& deviceRole) const;
+    IdentityMatchResult matchIdentityReply (const juce::String& hex) const;
     DumpParseResult parseDumpMessage (const juce::String& hex) const;
+    DumpCollectionResult collectDumpMessages (const juce::StringArray& hexMessages) const;
 
     juce::var listParameterDescriptors() const;
+    juce::var getPresetBrowser() const;
+    juce::var getTiming() const;
     juce::Array<ProfileTestResult> runTests() const;
 
     static juce::String bytesToHex (const juce::Array<int>& bytes);
@@ -108,14 +177,18 @@ private:
     [[nodiscard]] const juce::DynamicObject* profileObject() const;
     [[nodiscard]] const juce::DynamicObject* findParameter (const juce::String& parameterId) const;
     [[nodiscard]] const juce::DynamicObject* findMessageRecipe (const juce::String& recipeId) const;
+    [[nodiscard]] const juce::DynamicObject* findDeviceRequest (const juce::String& requestId) const;
     [[nodiscard]] const juce::DynamicObject* findDumpDefinition (const juce::String& dumpId) const;
     [[nodiscard]] juce::var resolveVariable (const juce::String& name) const;
+    [[nodiscard]] juce::String defaultStartupRequestId() const;
+    [[nodiscard]] juce::String nextStartupRequestId (const juce::String& requestId) const;
 
     DumpParseResult parseDumpWithDefinition (const juce::DynamicObject& dump, const juce::Array<int>& bytes) const;
     juce::Result decodeDumpParameterValue (const juce::DynamicObject& parameter,
                                            const juce::Array<int>& bytes,
                                            int offset,
-                                           juce::var& semanticValue) const;
+                                           juce::var& semanticValue,
+                                           const juce::var& codecOverride = {}) const;
 
     CompileResult compileWithParameter (const juce::String& deviceRole,
                                         const juce::DynamicObject& parameter,

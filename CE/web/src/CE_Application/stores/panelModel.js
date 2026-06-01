@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
+import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
 
 let nextId = 1;
 
@@ -125,14 +126,21 @@ export function uniquePanelPaths(paths) {
   return unique;
 }
 
-export function serializePanel(panel) {
+export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
+  const deviceSession = options.deviceSession ?? data.deviceSession;
+  if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
+  else delete data.deviceSession;
+
   return JSON.stringify(data, null, 2);
 }
 
 export function deserializePanel(json, filePath, name) {
   const data = JSON.parse(json);
   const id = nextId++;
+  if (data.deviceSession) {
+    data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
+  }
 
   return {
     ...createPanel(),

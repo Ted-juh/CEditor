@@ -79,6 +79,7 @@
       "parameterLsb": 32,
       "valueResolution": 7,
       "value": "$encodedValue",
+      "messageDelayAfterMs": 5,
       "nullAfterSend": false
     },
     {

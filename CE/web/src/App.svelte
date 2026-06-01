@@ -25,6 +25,7 @@
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
   import { syncPerfDebugToNative } from './CE_Application/utils/perfDebug.js';
   import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
+  import { resolveWorkspaceChrome } from './CE_Application/utils/workspaceChrome.js';
 
   const isCutoutDebug = typeof window !== 'undefined'
     && new URLSearchParams(window.location.search).get('debug') === 'cutout';
@@ -90,6 +91,7 @@
 
   function handleWindowResize() {
     viewportHeight = window.innerHeight;
+    viewportWidth = window.innerWidth;
     displayPanelHeight = Math.min(displayPanelHeight, maxDisplayPanelHeight());
   }
 
@@ -106,12 +108,22 @@
   let isResizingDisplay = $state(false);
   let showDisplayPanel = $state(readStoredBool(UI_STORAGE_KEYS.showDisplayPanel, false));
   let showPropertiesPanel = $state(readStoredBool(UI_STORAGE_KEYS.showPropertiesPanel, true));
-  let componentDesignerWorkspaceActive = $derived($componentWorkspaceMode === 'surface');
-  let scriptWorkspaceActive = $derived($activeEditorTab?.type === 'script');
-  let chromeWorkspaceActive = $derived(componentDesignerWorkspaceActive || scriptWorkspaceActive);
-  let effectiveShowPropertiesPanel = $derived(!scriptWorkspaceActive && showPropertiesPanel);
-  let effectiveShowTreePanel = $derived(!scriptWorkspaceActive && showTreePanel);
-  let effectiveShowDisplayPanel = $derived(!scriptWorkspaceActive && showDisplayPanel);
+  let viewportWidth = $state(typeof window === 'undefined' ? 1280 : window.innerWidth);
+  let workspaceChrome = $derived(resolveWorkspaceChrome({
+    activeTab: $activeEditorTab,
+    componentWorkspaceMode: $componentWorkspaceMode,
+    viewportWidth,
+    showTreePanel,
+    showDisplayPanel,
+    showPropertiesPanel,
+  }));
+  let componentDesignerWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'component');
+  let scriptWorkspaceActive = $derived(workspaceChrome.workspaceKind === 'script');
+  let chromeWorkspaceActive = $derived(workspaceChrome.chromeWorkspaceActive);
+  let workspaceOwnsChrome = $derived(workspaceChrome.ownsChrome);
+  let effectiveShowPropertiesPanel = $derived(workspaceChrome.showPropertiesPanel);
+  let effectiveShowTreePanel = $derived(workspaceChrome.showTreePanel);
+  let effectiveShowDisplayPanel = $derived(workspaceChrome.showDisplayPanel);
   let displayPanelBasis = $derived(`${Math.min(displayPanelHeight, maxDisplayPanelHeight())}px`);
 
   $effect(() => {
@@ -237,30 +249,33 @@
   <CutoutDebugPage />
 {:else}
     <div
-      class="app"
+    class="app"
     class:component-workspace-active={componentDesignerWorkspaceActive}
     class:script-workspace-active={scriptWorkspaceActive}
-    style="--props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
+    class:compact-panel-workspace={workspaceChrome.compactPanel}
+    style="--icon-width: {workspaceChrome.iconWidth + 'px'}; --props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
   >
     <div class="menubar-area">
       <MenuBar />
     </div>
 
     <div class="icon-panel-area">
-      <IconPanel
-        {showDisplayPanel}
-        {showPropertiesPanel}
-        {showTreePanel}
-        onToggleDisplay={() => {
-          showDisplayPanel = !showDisplayPanel;
-        }}
-        onToggleProperties={() => {
-          showPropertiesPanel = !showPropertiesPanel;
-        }}
-        onToggleTree={() => {
-          showTreePanel = !showTreePanel;
-        }}
-      />
+      {#if !workspaceOwnsChrome && !workspaceChrome.compactPanel}
+        <IconPanel
+          {showDisplayPanel}
+          {showPropertiesPanel}
+          {showTreePanel}
+          onToggleDisplay={() => {
+            showDisplayPanel = !showDisplayPanel;
+          }}
+          onToggleProperties={() => {
+            showPropertiesPanel = !showPropertiesPanel;
+          }}
+          onToggleTree={() => {
+            showTreePanel = !showTreePanel;
+          }}
+        />
+      {/if}
     </div>
 
     <div class="center-area">
@@ -317,7 +332,7 @@
     width: 100vw;
     height: 100vh;
     display: grid;
-    grid-template-columns: 48px 1fr var(--resize-width) var(--props-width);
+    grid-template-columns: var(--icon-width) 1fr var(--resize-width) var(--props-width);
     grid-template-rows: 28px 1fr 24px;
     grid-template-areas:
       "icon    menu    menu    menu"

@@ -11,6 +11,97 @@ function valueText(value, target) {
   return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
+function quoted(value) {
+  return JSON.stringify(String(value ?? ''));
+}
+
+function luaBool(value) {
+  return value ? 'true' : 'false';
+}
+
+function luaBytes(bytes = []) {
+  return `{${(bytes ?? []).map((byte) => Number(byte) || 0).join(', ')}}`;
+}
+
+function luaExpression(value) {
+  if (value == null) return 'nil';
+  if (typeof value === 'number') return String(value);
+  if (typeof value === 'boolean') return luaBool(value);
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return luaBytes(value);
+  if (typeof value !== 'object') return String(value);
+  if (value.ref) {
+    const ref = String(value.ref);
+    if (ref === 'event.value') return 'event.value';
+    return `getValue(${quoted(ref)})`;
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'literal')) {
+    return typeof value.literal === 'string' ? quoted(value.literal) : luaExpression(value.literal);
+  }
+
+  const op = String(value.op ?? '');
+  const args = Array.isArray(value.args) ? value.args.map(luaExpression) : [];
+  if (['*', '+', '-', '/'].includes(op)) return `(${args.join(` ${op} `)})`;
+  if (['>', '>=', '<', '<=', '=='].includes(op)) return `(${args.join(` ${op} `)})`;
+  if (op === '!=') return `(${args.join(' ~= ')})`;
+  if (op === 'equals') return `(${args[0] ?? 'nil'} == ${args[1] ?? 'nil'})`;
+  if (op === 'notEquals') return `(${args[0] ?? 'nil'} ~= ${args[1] ?? 'nil'})`;
+  if (op === 'and') return `(${args.join(' and ')})`;
+  if (op === 'or') return `(${args.join(' or ')})`;
+  if (op === 'not') return `(not ${args[0] ?? 'false'})`;
+  if (op === 'round') return `round(${args[0] ?? '0'})`;
+  if (op === 'scale') return `scale(${args.join(', ')})`;
+  if (op === 'clamp') return `clamp(${args.join(', ')})`;
+  if (op === 'curve') return `curve(${args[0] ?? '0'}, ${value.from ?? args[1] ?? 0}, ${value.to ?? args[2] ?? 1}, ${quoted(value.shape ?? 'linear')})`;
+  if (op === 'to14Bit' || op === 'split14bit') return `to14Bit(${args.join(', ')})`;
+  return valueText(value, 'lua');
+}
+
+function luaCondition(condition) {
+  if (condition == null || condition === '') return 'true';
+  if (typeof condition === 'boolean') return luaBool(condition);
+  if (typeof condition === 'string') {
+    const text = condition.trim();
+    if (!text || text.toLowerCase() === 'always') return 'true';
+    if (text.toLowerCase() === 'never') return 'false';
+    return text;
+  }
+  return luaExpression(condition);
+}
+
+function emitLuaStep(step, lines) {
+  const command = step.command ?? step.cmd;
+  const args = step.args ?? {};
+  if (command === 'setValue') lines.push(`  setValue(${quoted(args.target)}, ${luaExpression(args.value)})`);
+  else if (command === 'routeValue') lines.push(`  setValue(${quoted(args.to)}, ${args.transform ? luaExpression(args.transform) : `getValue(${quoted(args.from)})`})`);
+  else if (command === 'setState') lines.push(`  setState(${quoted(args.target)}, ${quoted(args.state)})`);
+  else if (command === 'setPartColor') lines.push(`  setPartColor(${quoted(args.part)}, ${quoted(args.color)})`);
+  else if (command === 'setVisible') lines.push(`  setVisible(${quoted(args.target)}, ${luaBool(args.visible !== false)})`);
+  else if (command === 'showGroup') lines.push(`  showGroup(${quoted(args.group)})`);
+  else if (command === 'hideGroup') lines.push(`  hideGroup(${quoted(args.group)})`);
+  else if (command === 'setPanelState') lines.push(`  setPanelState(${quoted(args.state)})`);
+  else if (command === 'setAnimation') lines.push(`  setAnimation(${quoted(args.target)}, ${quoted(args.animation)}, ${luaBool(args.enabled !== false)})`);
+  else if (command === 'startTimer') lines.push(`  startTimer(${quoted(args.id)}, ${Number(args.ms) || 0})`);
+  else if (command === 'stopTimer') lines.push(`  stopTimer(${quoted(args.id)})`);
+  else if (command === 'emitEvent') lines.push(`  emitEvent(${quoted(args.event)}, ${quoted(args.target ?? '')}, ${luaExpression(args.value ?? { ref: 'event.value' })})`);
+  else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
+  else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
+  else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
+  else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump(${quoted(args.request)}, ${quoted(args.profileId ?? '')}, ${quoted(args.deviceRole ?? 'mainSynth')})`);
+  else if (command === 'buildSysex') {
+    const expression = `buildSysex(${luaBytes(args.bytes)})`;
+    lines.push(args.target ? `  setValue(${quoted(args.target)}, ${expression})` : `  local sysexBytes = ${expression}`);
+  } else if (command === 'checksum') {
+    const expression = `checksumBytes(${quoted(args.type)}, ${luaBytes(args.bytes)})`;
+    lines.push(args.target ? `  setValue(${quoted(args.target)}, ${expression})` : `  local checksum = ${expression}`);
+  } else if (command === 'to14Bit') {
+    const expression = `to14Bit(${luaExpression(args.value)})`;
+    lines.push(args.target ? `  setValue(${quoted(args.target)}, ${expression})` : `  local value14 = ${expression}`);
+  } else if (command === 'log') lines.push(`  trace(${quoted(args.message ?? 'log')}, ${luaExpression(args.value ?? { literal: '' })})`);
+  else if (command === 'if') lines.push(`  if not (${luaCondition(args.condition)}) then return end`);
+  else lines.push(`  -- ${ceStep(step)}`);
+}
+
 function ceStep(step) {
   const command = step.command ?? step.cmd;
   const args = step.args ?? {};
@@ -29,6 +120,7 @@ function ceStep(step) {
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
+  if (command === 'requestDeviceDump') return `requestDeviceDump request=${args.request} profile=${args.profileId ?? ''} role=${args.deviceRole ?? 'mainSynth'}`;
   if (command === 'buildSysex') return `buildSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
   if (command === 'checksum') return `checksum ${args.type} bytes=[${(args.bytes ?? []).join(', ')}]`;
   if (command === 'to14Bit') return `to14Bit ${valueText(args.value, 'ce')}`;
@@ -48,6 +140,7 @@ function emitJsLike(script, target) {
     ? `function ${script.event ?? 'onEvent'}(target: string, event: { value: number; phase?: string }) {`
     : `function ${script.event ?? 'onEvent'}(${script.target ?? 'target'}, event) {`;
   const lines = [jsName, '  const v = event.value;'];
+  if (script.condition) lines.push(`  if (!(${valueText(script.condition, target)})) return;`);
   for (const step of script.steps ?? []) {
     const command = step.command ?? step.cmd;
     const args = step.args ?? {};
@@ -66,10 +159,12 @@ function emitJsLike(script, target) {
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);
+    else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump({ request: "${args.request ?? ''}", profileId: "${args.profileId ?? ''}", deviceRole: "${args.deviceRole ?? 'mainSynth'}" });`);
     else if (command === 'buildSysex') lines.push(`  const sysexBytes = buildSysex([${(args.bytes ?? []).join(', ')}]);`);
     else if (command === 'checksum') lines.push(`  const checksum = checksumBytes("${args.type}", [${(args.bytes ?? []).join(', ')}]);`);
     else if (command === 'to14Bit') lines.push(`  const value14 = split14Bit(${valueText(args.value, target)});`);
     else if (command === 'log') lines.push(`  trace(${JSON.stringify(args.message ?? 'log')});`);
+    else if (command === 'if') lines.push(`  if (!(${valueText(args.condition, target)})) return;`);
     else lines.push(`  // ${command} is not emitted yet`);
   }
   lines.push('}');
@@ -78,20 +173,8 @@ function emitJsLike(script, target) {
 
 function emitLua(script) {
   const lines = [`function ${script.event ?? 'on_event'}(event)`, '  local v = event.value'];
-  for (const step of script.steps ?? []) {
-    const command = step.command ?? step.cmd;
-    const args = step.args ?? {};
-    if (command === 'setValue') lines.push(`  setValue("${args.target}", ${valueText(args.value, 'lua')})`);
-    else if (command === 'routeValue') lines.push(`  setValue("${args.to}", ${args.transform ? valueText(args.transform, 'lua') : `getValue("${args.from}")`})`);
-    else if (command === 'setVisible') lines.push(`  setVisible("${args.target}", ${args.visible !== false})`);
-    else if (command === 'showGroup') lines.push(`  showGroup("${args.group}")`);
-    else if (command === 'hideGroup') lines.push(`  hideGroup("${args.group}")`);
-    else if (command === 'setPanelState') lines.push(`  setPanelState("${args.state}")`);
-    else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${valueText(args.value, 'lua')})`);
-    else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${valueText(args.value, 'lua')})`);
-    else if (command === 'sendSysex') lines.push(`  sendSysex({${(args.bytes ?? []).join(', ')}})`);
-    else lines.push(`  -- ${ceStep(step)}`);
-  }
+  if (script.condition) lines.push(`  if not (${luaCondition(script.condition)}) then return end`);
+  for (const step of script.steps ?? []) emitLuaStep(step, lines);
   lines.push('end');
   return lines.join('\n');
 }
@@ -110,6 +193,7 @@ function emitPython(script) {
     else if (step.command === 'sendCC') lines.push(`    send_cc(channel=${args.channel}, cc=${args.cc}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendNRPN') lines.push(`    send_nrpn(channel=${args.channel}, parameter_msb=${args.parameterMsb}, parameter_lsb=${args.parameterLsb}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendSysex') lines.push(`    send_sysex([${(args.bytes ?? []).join(', ')}])`);
+    else if (step.command === 'requestDeviceDump') lines.push(`    request_device_dump(request="${args.request ?? ''}", profile_id="${args.profileId ?? ''}", device_role="${args.deviceRole ?? 'mainSynth'}")`);
     else lines.push(`    # ${ceStep(step)}`);
   }
   return lines.join('\n');
@@ -153,6 +237,7 @@ function nativeConfig(target, script) {
       sendCC: 'ctx.midi().sendCC',
       sendNRPN: 'ctx.midi().sendNRPN',
       sendSysex: 'ctx.midi().sendSysex',
+      requestDeviceDump: 'ctx.device().requestDump',
       buildSysex: 'ctx.midi().buildSysex',
       checksum: 'ctx.midi().checksum',
       to14Bit: 'ctx.midi().to14Bit',
@@ -185,6 +270,7 @@ function nativeConfig(target, script) {
       sendCC: 'SendCC',
       sendNRPN: 'SendNRPN',
       sendSysex: 'SendSysex',
+      requestDeviceDump: 'RequestDeviceDump',
       buildSysex: 'BuildSysex',
       checksum: 'Checksum',
       to14Bit: 'To14Bit',
@@ -217,6 +303,7 @@ function nativeConfig(target, script) {
       sendCC: 'sendCC',
       sendNRPN: 'sendNRPN',
       sendSysex: 'sendSysex',
+      requestDeviceDump: 'requestDeviceDump',
       buildSysex: 'buildSysex',
       checksum: 'checksum',
       to14Bit: 'to14Bit',
@@ -249,6 +336,7 @@ function nativeConfig(target, script) {
       sendCC: 'midi.SendCC',
       sendNRPN: 'midi.SendNRPN',
       sendSysex: 'midi.SendSysex',
+      requestDeviceDump: 'device.RequestDump',
       buildSysex: 'midi.BuildSysex',
       checksum: 'midi.Checksum',
       to14Bit: 'midi.To14Bit',
@@ -281,6 +369,7 @@ function nativeConfig(target, script) {
       sendCC: 'sendCC',
       sendNRPN: 'sendNRPN',
       sendSysex: 'sendSysex',
+      requestDeviceDump: 'requestDeviceDump',
       buildSysex: 'buildSysex',
       checksum: 'checksum',
       to14Bit: 'to14Bit',
@@ -313,6 +402,7 @@ function nativeConfig(target, script) {
       sendCC: 'ctx.midi().send_cc',
       sendNRPN: 'ctx.midi().send_nrpn',
       sendSysex: 'ctx.midi().send_sysex',
+      requestDeviceDump: 'ctx.device().request_dump',
       buildSysex: 'ctx.midi().build_sysex',
       checksum: 'ctx.midi().checksum',
       to14Bit: 'ctx.midi().to_14_bit',
@@ -348,6 +438,12 @@ function nativeExpression(value, cfg, target) {
   const op = String(value.op ?? '');
   const args = Array.isArray(value.args) ? value.args.map((arg) => nativeExpression(arg, cfg, target)) : [];
   if (['*', '+', '-', '/'].includes(op)) return `(${args.join(` ${op} `)})`;
+  if (['>', '>=', '<', '<=', '==', '!='].includes(op)) return `(${args.join(` ${op} `)})`;
+  if (op === 'equals') return `(${args[0] ?? '0'} == ${args[1] ?? '0'})`;
+  if (op === 'notEquals') return `(${args[0] ?? '0'} != ${args[1] ?? '0'})`;
+  if (op === 'and') return `(${args.join(' && ')})`;
+  if (op === 'or') return `(${args.join(' || ')})`;
+  if (op === 'not') return `(!${args[0] ?? 'false'})`;
   if (op === 'round') return cfg.round(args[0] ?? '0');
   if (op === 'scale') return `${cfg.scale}(${args.join(', ')})`;
   if (op === 'clamp') return `${cfg.clamp}(${args.join(', ')})`;
@@ -359,6 +455,7 @@ function nativeExpression(value, cfg, target) {
 function emitNative(script, target) {
   const cfg = nativeConfig(target, script);
   const lines = [`${cfg.signature} {`, `  ${cfg.valueDecl(cfg.eventValue)}`];
+  if (script.condition) lines.push(`  if (!(${nativeExpression(script.condition, cfg, target)})) return${cfg.lineEnd}`);
   for (const step of script.steps ?? []) {
     const args = step.args ?? {};
     if (step.command === 'setValue') lines.push(`  ${cfg.setValue}(${cfg.string(args.target)}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
@@ -375,10 +472,12 @@ function emitNative(script, target) {
     else if (step.command === 'sendCC') lines.push(`  ${cfg.sendCC}(${Number(args.channel) || 1}, ${Number(args.cc) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendNRPN') lines.push(`  ${cfg.sendNRPN}(${Number(args.channel) || 1}, ${Number(args.parameterMsb) || 0}, ${Number(args.parameterLsb) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendSysex') lines.push(`  ${cfg.sendSysex}(${cfg.bytes(args.bytes ?? [])})${cfg.lineEnd}`);
+    else if (step.command === 'requestDeviceDump') lines.push(`  ${cfg.requestDeviceDump}(${cfg.string(args.request ?? '')}, ${cfg.string(args.profileId ?? '')}, ${cfg.string(args.deviceRole ?? 'mainSynth')})${cfg.lineEnd}`);
     else if (step.command === 'buildSysex') lines.push(`  ${cfg.declare('sysexBytes', `${cfg.buildSysex}(${cfg.bytes(args.bytes ?? [])})`)}`);
     else if (step.command === 'checksum') lines.push(`  ${cfg.declare('checksum', `${cfg.checksum}(${cfg.string(args.type)}, ${cfg.bytes(args.bytes ?? [])})`)}`);
     else if (step.command === 'to14Bit') lines.push(`  ${cfg.declare('value14', `${cfg.to14Bit}(${nativeExpression(args.value, cfg, target)})`)}`);
     else if (step.command === 'log') lines.push(`  ${cfg.log}(${cfg.string(args.message ?? 'log')}, ${nativeExpression(args.value ?? { ref: 'event.value' }, cfg, target)})${cfg.lineEnd}`);
+    else if (step.command === 'if') lines.push(`  if (!(${nativeExpression(args.condition, cfg, target)})) return${cfg.lineEnd}`);
     else lines.push(`  // ${ceStep(step)}`);
   }
   lines.push('}');
@@ -395,11 +494,17 @@ function emitCss(script) {
 
 export function exportWarningsForScript(script) {
   const warnings = [];
+  const seen = new Set();
+  const addWarning = (message) => {
+    if (seen.has(message)) return;
+    seen.add(message);
+    warnings.push(message);
+  };
   for (const step of script?.steps ?? []) {
     const descriptor = commandDescriptor(step.command ?? step.cmd);
-    if (!descriptor) warnings.push(`${step.command ?? step.cmd} is unknown and cannot be exported safely.`);
-    else if (descriptor.portable === false) warnings.push(`${descriptor.label} uses device-specific behavior.`);
-    else if (descriptor.exportSafe === false) warnings.push(`${descriptor.label} is runtime-only and may not export cleanly.`);
+    if (!descriptor) addWarning(`${step.command ?? step.cmd} is unknown and cannot be exported safely.`);
+    else if (descriptor.portable === false) addWarning(`${descriptor.label} uses device-specific behavior.`);
+    else if (descriptor.exportSafe === false) addWarning(`${descriptor.label} is runtime-only and may not export cleanly.`);
   }
   return warnings;
 }

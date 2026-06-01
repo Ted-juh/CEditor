@@ -234,6 +234,61 @@ export function listMidiDestinations() {
   window.__JUCE__.backend.emitEvent('listMidiDestinations', {});
 }
 
+export function listMidiInputs() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('listMidiInputs', {});
+}
+
+export function getDeviceTransportCapabilities() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getDeviceTransportCapabilities', {});
+}
+
+export function getDeviceSessionState() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getDeviceSessionState', {});
+}
+
+export function overrideDeviceIdentityMismatch(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('overrideDeviceIdentityMismatch', payload ?? {});
+}
+
+export function startDeviceSync(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('startDeviceSync', payload ?? {});
+}
+
+export function startPresetListScan(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('startPresetListScan', payload ?? {});
+}
+
+export function cancelPresetListScan(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('cancelPresetListScan', payload ?? {});
+}
+
+export function getPresetListScans() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getPresetListScans', {});
+}
+
+export function startBulkDumpSend(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('startBulkDumpSend', payload ?? {});
+}
+
+export function cancelBulkDumpSend(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('cancelBulkDumpSend', payload ?? {});
+}
+
+export function getBulkDumpSends() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('getBulkDumpSends', {});
+}
+
 export function compileParameterMessage(payload) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('compileParameterMessage', payload ?? {});
@@ -257,6 +312,11 @@ export function triggerRawMidiAction(payload) {
 export function parseDumpMessage(payload) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('parseDumpMessage', payload ?? {});
+}
+
+export function ingestIncomingMidiMessage(payload) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('ingestIncomingMidiMessage', payload ?? {});
 }
 
 export function runDeviceProfileTests(payload) {
@@ -339,6 +399,114 @@ export function onMidiDestinationsListed(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function onMidiInputsListed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiInputsListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceTransportCapabilities(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceTransportCapabilities', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceSessionState(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceSessionState', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onMidiInputMessage(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiInputMessage', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onSysexInputMessage(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('sysexInputMessage', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceSyncStarted(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceSyncStarted', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceRequestResolved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceRequestResolved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceRequestTimedOut(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceRequestTimedOut', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceRequestContinued(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceRequestContinued', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceIdentityReply(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceIdentityReply', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceIdentityMismatch(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceIdentityMismatch', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDeviceIdentityOverride(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('deviceIdentityOverride', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onPresetListScanStarted(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('presetListScanStarted', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onPresetListScanUpdated(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('presetListScanUpdated', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onPresetListScans(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('presetListScans', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onBulkDumpSendStarted(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('bulkDumpSendStarted', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onBulkDumpSendUpdated(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('bulkDumpSendUpdated', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onBulkDumpSends(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('bulkDumpSends', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onMidiPreview(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('midiPreview', callback);
@@ -366,6 +534,18 @@ export function onRawMidiActionTriggered(callback) {
 export function onDumpMessageParsed(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('dumpMessageParsed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onDumpCollectionUpdated(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('dumpCollectionUpdated', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onIncomingMidiIngested(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('incomingMidiIngested', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 

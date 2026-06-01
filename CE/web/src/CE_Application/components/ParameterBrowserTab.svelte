@@ -7,12 +7,19 @@
     deviceProfiles,
     deviceDiagnostics,
     deviceRoleMappings,
+    deviceRuntimeConflicts,
     importDeviceProfile,
+    latestBulkDumpSend,
+    latestDeviceIdentityMismatch,
     latestMidiPreview,
+    latestDumpCollectionResult,
+    deviceSessionState,
     latestProfileImport,
     latestProfileTestResult,
+    latestPresetListScan,
     mapDeviceRole,
     midiDestinations,
+    midiInputs,
     midiMonitorEvents,
     profileParameters,
     refreshDeviceProfiles,
@@ -20,6 +27,15 @@
     runTestsForProfile,
     selectedDeviceProfileId,
     selectedMidiDestinationId,
+    selectedMidiInputId,
+    selectedSyncDirection,
+    overrideDeviceIdentityMismatch,
+    startDeviceSync,
+    startPresetListScan,
+    cancelPresetListScan,
+    cancelBulkDumpSend,
+    clearDeviceRuntimeConflict,
+    latestDeviceSyncResult,
   } from '../stores/deviceProfiles.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
 
@@ -30,6 +46,17 @@
   let monitorCopyStatus = $state('');
   let selectedProfileId = $derived($selectedDeviceProfileId);
   let selectedDestinationId = $derived($selectedMidiDestinationId);
+  let selectedInputId = $derived($selectedMidiInputId);
+  let selectedDirection = $derived($selectedSyncDirection);
+  let roleSession = $derived($deviceSessionState?.mainSynth ?? {});
+  let identityMismatch = $derived(getCurrentIdentityMismatch($latestDeviceIdentityMismatch, roleSession, selectedProfileId));
+  let bulkStatus = $derived(getRelevantBulkSend($latestBulkDumpSend, selectedProfileId));
+  let dumpCollectionStatus = $derived(
+    $latestDumpCollectionResult?.profileId && $latestDumpCollectionResult.profileId !== selectedProfileId
+      ? null
+      : $latestDumpCollectionResult
+  );
+  let liveConflicts = $derived(Object.values($deviceRuntimeConflicts?.mainSynth ?? {}));
 
   let selectedProfileLoaded = $derived(
     ($deviceProfiles ?? []).some((profile) => profile.id === selectedProfileId)
@@ -129,6 +156,8 @@
     refreshProfileParameters(profileId);
     mapDeviceRole('mainSynth', profileId, {
       midiDestination: findDestination(selectedDestinationId),
+      midiInput: findInput(selectedInputId),
+      syncDirection: selectedDirection,
     });
     const profile = $deviceProfiles.find((item) => item.id === profileId);
     syncOpenDeviceProfileDesigner({
@@ -140,11 +169,66 @@
   function handleDestinationChange(destinationId) {
     mapDeviceRole('mainSynth', selectedProfileId, {
       midiDestination: findDestination(destinationId),
+      midiInput: findInput(selectedInputId),
+      syncDirection: selectedDirection,
+    });
+  }
+
+  function handleInputChange(inputId) {
+    mapDeviceRole('mainSynth', selectedProfileId, {
+      midiDestination: findDestination(selectedDestinationId),
+      midiInput: findInput(inputId),
+      syncDirection: selectedDirection,
+    });
+  }
+
+  function handleSyncDirectionChange(syncDirection) {
+    mapDeviceRole('mainSynth', selectedProfileId, {
+      midiDestination: findDestination(selectedDestinationId),
+      midiInput: findInput(selectedInputId),
+      syncDirection,
     });
   }
 
   function handleRunTests() {
     runTestsForProfile(selectedProfileId);
+  }
+
+  function handleAcceptIdentityMismatch() {
+    overrideDeviceIdentityMismatch({
+      deviceRole: 'mainSynth',
+      profileId: selectedProfileId,
+      reason: `Accepted for panel role mainSynth with profile ${selectedProfileId}`,
+    });
+  }
+
+  function handlePullFromSynth() {
+    startDeviceSync({
+      profileId: selectedProfileId,
+      deviceRole: 'mainSynth',
+      syncDirection: selectedDirection,
+      dryRun: false,
+    });
+  }
+
+  function handleScanPresets() {
+    startPresetListScan({
+      profileId: selectedProfileId,
+      deviceRole: 'mainSynth',
+      dryRun: false,
+    });
+  }
+
+  function handleCancelPresetScan() {
+    cancelPresetListScan({
+      scanId: $latestPresetListScan?.scanId,
+    });
+  }
+
+  function handleCancelBulkSend() {
+    cancelBulkDumpSend({
+      bulkSendId: bulkStatus?.bulkSendId,
+    });
   }
 
   function handleOpenDesigner() {
@@ -404,6 +488,71 @@
     if (warnings > 0) return { level: 'warning', label: `${warnings} warnings` };
     if (info > 0) return { level: 'info', label: `${info} notes` };
     return { level: 'ok', label: 'Ready' };
+  }
+
+  function getCurrentIdentityMismatch(mismatch, session, profileId) {
+    if (session?.identityStatus === 'mismatch') {
+      return {
+        deviceRole: 'mainSynth',
+        profileId,
+        message: session.identityMessage || session.message || 'Identity reply did not match this profile.',
+      };
+    }
+
+    if (!mismatch) return null;
+    const mismatchRole = String(mismatch.deviceRole ?? 'mainSynth');
+    const mismatchProfile = String(mismatch.profileId ?? '');
+    if (mismatchRole !== 'mainSynth') return null;
+    if (mismatchProfile && profileId && mismatchProfile !== profileId) return null;
+
+    return {
+      ...mismatch,
+      message: mismatch.error || mismatch.message || 'Identity reply did not match this profile.',
+    };
+  }
+
+  function getRelevantBulkSend(job, profileId) {
+    if (!job) return null;
+    if (job.profileId && profileId && job.profileId !== profileId) return null;
+    return job;
+  }
+
+  function formatProtocolStatus(job) {
+    if (!job) return 'No bulk send';
+    return [
+      job.status ?? 'unknown',
+      job.ackStatus && job.ackStatus !== 'none' ? `ACK ${job.ackStatus}` : '',
+      job.verificationStatus && job.verificationStatus !== 'none' ? `verify ${job.verificationStatus}` : '',
+      Number(job.retryCount ?? 0) > 0 ? `retry ${job.retryCount}` : '',
+    ].filter(Boolean).join(' / ');
+  }
+
+  function formatCollectionStatus(collection) {
+    if (!collection) return 'No collection';
+    return [
+      collection.status ?? 'unknown',
+      `${collection.receivedMessageCount ?? 0}/${collection.expectedMessageCount ?? 0} messages`,
+      `${collection.receivedBytes ?? 0}/${collection.expectedBytes ?? 0} bytes`,
+    ].join(' / ');
+  }
+
+  function formatRanges(ranges) {
+    const list = Array.isArray(ranges) ? ranges : [];
+    if (list.length === 0) return 'none';
+    return list.map((range) => {
+      const start = range?.start ?? range?.index ?? '?';
+      const end = range?.end ?? start;
+      return start === end ? String(start) : `${start}-${end}`;
+    }).join(', ');
+  }
+
+  function conflictTitle(conflict) {
+    return [
+      conflict?.parameterId,
+      `panel ${conflict?.panelValue}`,
+      `device ${conflict?.deviceValue}`,
+      conflict?.source,
+    ].filter(Boolean).join('  ');
   }
 
   function buildAuthorMilestones({ qualityChecks, qualitySummary, profileStats: stats, profileLinkStatus: linkStatus }) {
@@ -699,6 +848,11 @@
       ?? { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' };
   }
 
+  function findInput(inputId) {
+    return get(midiInputs).find((input) => input.id === inputId)
+      ?? { type: 'none', id: 'none', name: 'No MIDI Input' };
+  }
+
   function bindParameter(parameter) {
     if (parameter?.snapshotOnly) return;
 
@@ -854,16 +1008,53 @@
         <option value={destination.id}>{destination.name || destination.id}</option>
       {/each}
     </select>
+    <select value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
+      {#each $midiInputs as input}
+        <option value={input.id}>{input.name || input.id}</option>
+      {/each}
+    </select>
+    <select value={selectedDirection} onchange={(e) => handleSyncDirectionChange(e.target.value)}>
+      <option value="pull">Pull</option>
+      <option value="push">Push</option>
+      <option value="live">Live</option>
+    </select>
     <input value={query} placeholder="Search parameters" oninput={(e) => query = e.target.value} />
     <button onclick={handleOpenDesigner}>Designer</button>
+    <button onclick={handlePullFromSynth}>Sync</button>
+    <button onclick={handleScanPresets}>Scan Presets</button>
+    {#if $latestPresetListScan?.running}
+      <button onclick={handleCancelPresetScan}>Cancel Scan</button>
+    {/if}
     <button onclick={handleRunTests}>Run Tests</button>
     <button onclick={() => refreshDeviceProfiles()}>Refresh</button>
     <button onclick={() => importDeviceProfile()}>Import</button>
   </div>
 
   <div class="target">
-    Target: {selectedControlType || 'select a component'} / {$deviceRoleMappings.mainSynth?.midiDestination?.name || 'Preview Only'}
+    Target: {selectedControlType || 'select a component'} / {$deviceRoleMappings.mainSynth?.midiDestination?.name || 'Preview Only'} / {$deviceRoleMappings.mainSynth?.midiInput?.name || 'No MIDI Input'} / {selectedDirection} / {roleSession.state || 'preview'}
+    {#if roleSession.identityStatus && roleSession.identityStatus !== 'unknown'}
+      / Identity {roleSession.identityStatus}
+    {/if}
+    {#if $latestDeviceSyncResult?.status}
+      / {$latestDeviceSyncResult.status}
+    {/if}
+    {#if $latestPresetListScan?.total}
+      / Presets {$latestPresetListScan.completed ?? 0}/{$latestPresetListScan.total} {$latestPresetListScan.status ?? ''}
+    {/if}
   </div>
+
+  {#if identityMismatch}
+    <div class="profile-link warning">
+      <div class="profile-link-main">
+        <span class="profile-link-label">Identity Mismatch</span>
+        <span class="profile-link-message">{identityMismatch.message}</span>
+      </div>
+      <div class="profile-link-meta">
+        <button onclick={handleAcceptIdentityMismatch}>Use Anyway</button>
+        <button onclick={handlePullFromSynth}>Retry</button>
+      </div>
+    </div>
+  {/if}
 
   <div class={['profile-link', profileLinkStatus.level]}>
     <div class="profile-link-main">
@@ -998,6 +1189,53 @@
           Not run
         {/if}
       </div>
+    </div>
+    <div class="diagnostic-panel protocol">
+      <div class="diagnostic-header">
+        <div class="diagnostic-title">Bulk Send</div>
+        {#if bulkStatus?.running}
+          <button class="diagnostic-action" onclick={handleCancelBulkSend}>Cancel</button>
+        {/if}
+      </div>
+      <div class="hex" title={formatProtocolStatus(bulkStatus)}>{formatProtocolStatus(bulkStatus)}</div>
+      {#if bulkStatus}
+        <div class="policy">
+          {bulkStatus.sentChunks ?? 0}/{bulkStatus.totalChunks ?? 0} chunks / {bulkStatus.sentBytes ?? 0}/{bulkStatus.totalBytes ?? 0} bytes
+        </div>
+        {#if bulkStatus.retriesRemaining != null}
+          <div class="policy">Retries left {bulkStatus.retriesRemaining}</div>
+        {/if}
+        {#if bulkStatus.error}
+          <div class="error">{bulkStatus.error}</div>
+        {/if}
+      {/if}
+    </div>
+    <div class="diagnostic-panel protocol">
+      <div class="diagnostic-title">Dump Collection</div>
+      <div class="hex" title={formatCollectionStatus(dumpCollectionStatus ?? bulkStatus?.dumpCollection)}>
+        {formatCollectionStatus(dumpCollectionStatus ?? bulkStatus?.dumpCollection)}
+      </div>
+      {#if dumpCollectionStatus ?? bulkStatus?.dumpCollection}
+        {@const collection = dumpCollectionStatus ?? bulkStatus?.dumpCollection}
+        <div class="policy">Missing {formatRanges(collection.missingRanges)}</div>
+        <div class="policy">Duplicate {formatRanges(collection.duplicateRanges)}</div>
+        {#if collection.diagnostics?.length}
+          <div class="error">{collection.diagnostics[0]?.message ?? collection.diagnostics[0]}</div>
+        {/if}
+      {/if}
+    </div>
+    <div class="diagnostic-panel conflicts">
+      <div class="diagnostic-title">Live Conflicts</div>
+      {#each liveConflicts.slice(0, 3) as conflict}
+        <div class="conflict-row" title={conflictTitle(conflict)}>
+          <span>{conflict.parameterId}</span>
+          <span>{conflict.panelValue}</span>
+          <span>{conflict.deviceValue}</span>
+          <button class="diagnostic-action" onclick={() => clearDeviceRuntimeConflict(conflict.deviceRole, conflict.parameterId)}>Clear</button>
+        </div>
+      {:else}
+        <div class="hex">No live conflicts</div>
+      {/each}
     </div>
     <div class="diagnostic-panel monitor">
       <div class="diagnostic-header">
@@ -1364,7 +1602,7 @@
 
   .diagnostics {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) 150px minmax(190px, 1.4fr) minmax(190px, 1.4fr);
+    grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
     gap: 6px;
     padding: 6px 8px 4px;
     border-top: 1px solid #333;
@@ -1486,7 +1724,8 @@
   }
 
   .monitor-row,
-  .issue-row {
+  .issue-row,
+  .conflict-row {
     display: grid;
     grid-template-columns: 54px minmax(120px, 1fr) minmax(90px, 0.7fr) minmax(92px, 0.55fr);
     gap: 5px;
@@ -1496,7 +1735,8 @@
   }
 
   .monitor-row span,
-  .issue-row span {
+  .issue-row span,
+  .conflict-row span {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1508,6 +1748,16 @@
 
   .issue-row {
     grid-template-columns: 54px minmax(70px, 0.6fr) minmax(100px, 1fr) minmax(84px, 0.5fr);
+  }
+
+  .conflict-row {
+    grid-template-columns: minmax(70px, 1fr) minmax(40px, 0.5fr) minmax(40px, 0.5fr) 44px;
+    align-items: center;
+    color: #D5B45B;
+  }
+
+  .conflict-row .diagnostic-action {
+    padding: 1px 4px;
   }
 
   .issue-row.error {

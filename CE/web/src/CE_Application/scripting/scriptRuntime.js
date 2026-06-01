@@ -1,5 +1,5 @@
 import { commandDescriptor } from './scriptCommandRegistry.js';
-import { evaluateExpression } from './scriptExpressions.js';
+import { evaluateExpression, readPath } from './scriptExpressions.js';
 
 const DEFAULT_GUARDRAILS = {
   maxCommandsPerEvent: 512,
@@ -60,6 +60,74 @@ function rolandChecksum(bytes = []) {
   return (128 - (sum % 128)) & 0x7F;
 }
 
+function contextValue(path, context) {
+  const key = String(path ?? '').trim();
+  if (!key) return undefined;
+  if (key === 'value') return context?.event?.value;
+  const direct = readPath(context, key, undefined);
+  if (direct !== undefined) return direct;
+  const valuePath = readPath(context?.values ?? {}, key, undefined);
+  if (valuePath !== undefined) return valuePath;
+  const nestedValue = readPath(context?.values ?? {}, `${key}.value`, undefined);
+  return nestedValue;
+}
+
+function parseConditionToken(token, context) {
+  const raw = String(token ?? '').trim();
+  if (!raw) return '';
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    return raw.slice(1, -1);
+  }
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return numeric;
+  const resolved = contextValue(raw, context);
+  return resolved === undefined ? raw : resolved;
+}
+
+function compareCondition(left, operator, right) {
+  if (operator === '==') return left === right;
+  if (operator === '!=') return left !== right;
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  if (!Number.isFinite(leftNumber) || !Number.isFinite(rightNumber)) return false;
+  if (operator === '>') return leftNumber > rightNumber;
+  if (operator === '>=') return leftNumber >= rightNumber;
+  if (operator === '<') return leftNumber < rightNumber;
+  if (operator === '<=') return leftNumber <= rightNumber;
+  return false;
+}
+
+function evaluateStringCondition(condition, context) {
+  const text = String(condition ?? '').trim();
+  if (!text) return true;
+  const lower = text.toLowerCase();
+  if (lower === 'true' || lower === 'always') return true;
+  if (lower === 'false' || lower === 'never') return false;
+
+  if (text.includes('||')) return text.split('||').some((part) => evaluateStringCondition(part, context));
+  if (text.includes('&&')) return text.split('&&').every((part) => evaluateStringCondition(part, context));
+
+  const comparison = text.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+  if (comparison) {
+    return compareCondition(
+      parseConditionToken(comparison[1], context),
+      comparison[2],
+      parseConditionToken(comparison[3], context)
+    );
+  }
+
+  return Boolean(parseConditionToken(text, context));
+}
+
+function conditionMatches(condition, context) {
+  if (condition == null || condition === '') return true;
+  if (typeof condition === 'boolean') return condition;
+  if (typeof condition === 'object') return Boolean(evaluateExpression(condition, context));
+  return evaluateStringCondition(condition, context);
+}
+
 function runStep(step, context, output, index) {
   const command = String(step?.command ?? step?.cmd ?? '');
   const descriptor = commandDescriptor(command);
@@ -77,12 +145,18 @@ function runStep(step, context, output, index) {
   const phase = args.phase ?? step.phase ?? 'preview';
   const shouldEmit = phase !== 'commit' || context.event.phase === 'commit';
 
+  if (command === 'if') {
+    const passed = conditionMatches(args.condition, context);
+    output.trace.push({ time: nowStamp(index), type: 'IF', message: passed ? 'condition passed' : 'condition failed; remaining steps skipped' });
+    return passed ? { continue: true } : { stop: true };
+  }
+
   if (command === 'setValue') {
     const target = String(args.target ?? '');
     const value = evaluateExpression(args.value, context);
     output.patches.push({ target, value, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${target} -> ${formatValue(value)}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'routeValue') {
@@ -93,7 +167,7 @@ function runStep(step, context, output, index) {
       : evaluateExpression(args.transform, context);
     output.patches.push({ target, value, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${source} -> ${target} = ${formatValue(value)}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'setPartColor') {
@@ -101,7 +175,7 @@ function runStep(step, context, output, index) {
     const color = String(args.color ?? '#FFFFFF');
     output.patches.push({ target: `${part}.color`, value: color, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${part}.color -> ${color}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'setState') {
@@ -109,14 +183,14 @@ function runStep(step, context, output, index) {
     const state = String(args.state ?? '');
     output.patches.push({ target: `${target}.state`, value: state, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'STATE', message: `${target} -> ${state}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'setPanelState') {
     const state = String(args.state ?? '');
     output.patches.push({ target: 'panel.state', value: state, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'STATE', message: `panel -> ${state}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'setVisible' || command === 'showGroup' || command === 'hideGroup') {
@@ -124,7 +198,7 @@ function runStep(step, context, output, index) {
     const visible = command === 'hideGroup' ? false : command === 'showGroup' ? true : args.visible !== false;
     output.patches.push({ target: `${target}.visible`, value: visible, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${target}.visible -> ${visible}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'setAnimation') {
@@ -133,7 +207,7 @@ function runStep(step, context, output, index) {
     const enabled = args.enabled !== false;
     output.patches.push({ target: `${target}.animation`, value: { animation, enabled }, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'ANIM', message: `${target} ${enabled ? 'start' : 'stop'} ${animation}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'startTimer' || command === 'stopTimer') {
@@ -141,7 +215,7 @@ function runStep(step, context, output, index) {
     const timer = { id, ms: Number(args.ms ?? 0), running: command === 'startTimer' };
     output.timers.push(timer);
     output.trace.push({ time: nowStamp(index), type: 'TIMER', message: `${command} ${id}${timer.ms ? ` ${timer.ms}ms` : ''}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'emitEvent') {
@@ -153,7 +227,7 @@ function runStep(step, context, output, index) {
     };
     output.events.push(event);
     output.trace.push({ time: nowStamp(index), type: 'EVENT', message: `emit ${event.name} ${event.target} value=${formatValue(event.value)}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'sendCC') {
@@ -168,7 +242,7 @@ function runStep(step, context, output, index) {
     };
     output.deviceMessages.push(message);
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `CC ch${message.channel} cc${message.cc} value${message.value}${message.queued ? ' queued until commit' : ''}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'sendNRPN') {
@@ -186,21 +260,21 @@ function runStep(step, context, output, index) {
     };
     output.deviceMessages.push(message);
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `NRPN ch${message.channel} ${message.parameterMsb}/${message.parameterLsb} value${message.value}${message.queued ? ' queued until commit' : ''}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'to14Bit') {
     const split = to14Bit(evaluateExpression(args.value, context));
     output.patches.push({ target: args.target ?? 'midi.14bit', value: split, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `14bit ${split.value} msb=${split.msb} lsb=${split.lsb}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'buildSysex') {
     const bytes = Array.isArray(args.bytes) ? args.bytes.map((byte) => Number(evaluateExpression(byte, context)) & 0xFF) : [];
     output.patches.push({ target: args.target ?? 'device.sysex.bytes', value: bytes, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `buildSysEx ${formatValue(bytes)}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'checksum') {
@@ -208,23 +282,39 @@ function runStep(step, context, output, index) {
     const checksum = String(args.type ?? '').toLowerCase().includes('roland') ? rolandChecksum(bytes) : midiValue(bytes.reduce((sum, byte) => sum + Number(byte), 0));
     output.patches.push({ target: args.target ?? 'device.sysex.checksum', value: checksum, command, phase: context.event.phase });
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `checksum ${formatValue(checksum)}` });
-    return;
+    return { continue: true };
   }
 
   if (command === 'sendSysex') {
     const bytes = Array.isArray(args.bytes) ? args.bytes.map((byte) => Number(byte) & 0xFF) : [];
     output.deviceMessages.push({ type: 'sysex', bytes, phase, queued: !shouldEmit });
     output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `SysEx ${formatValue(bytes)}` });
-    return;
+    return { continue: true };
+  }
+
+  if (command === 'requestDeviceDump') {
+    const request = String(args.request ?? '').trim();
+    const message = {
+      type: 'deviceRequest',
+      request,
+      profileId: String(args.profileId ?? context.device?.profileId ?? ''),
+      deviceRole: String(args.deviceRole ?? context.device?.role ?? 'mainSynth'),
+      phase,
+      queued: !shouldEmit,
+    };
+    output.deviceMessages.push(message);
+    output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `Device request ${message.deviceRole}.${request}${message.queued ? ' queued until commit' : ''}` });
+    return { continue: true };
   }
 
   if (command === 'log') {
     const value = args.value == null ? '' : ` ${formatValue(evaluateExpression(args.value, context))}`;
     output.trace.push({ time: nowStamp(index), type: 'LOG', message: `${args.message ?? 'log'}${value}` });
-    return;
+    return { continue: true };
   }
 
   output.trace.push({ time: nowStamp(index), type: 'STEP', message: descriptor.label });
+  return { continue: true };
 }
 
 export function executeScript(script, context = createScriptContext()) {
@@ -255,6 +345,11 @@ export function executeScript(script, context = createScriptContext()) {
     return output;
   }
 
+  if (!conditionMatches(script?.condition, context)) {
+    output.trace.push({ time: nowStamp(1), type: 'SKIP', message: `Condition did not match: ${script?.condition ?? ''}` });
+    return output;
+  }
+
   const maxCommands = Math.max(1, Number(guardrails.maxCommandsPerEvent) || DEFAULT_GUARDRAILS.maxCommandsPerEvent);
   if (steps.length > maxCommands) {
     output.blocked.push({ reason: 'max-commands', maxCommands, actual: steps.length });
@@ -262,7 +357,10 @@ export function executeScript(script, context = createScriptContext()) {
     return output;
   }
 
-  steps.forEach((step, index) => runStep(step, { ...context, guardrails }, output, index + 1));
+  for (const [index, step] of steps.entries()) {
+    const result = runStep(step, { ...context, guardrails }, output, index + 1);
+    if (result?.stop) break;
+  }
   return output;
 }
 

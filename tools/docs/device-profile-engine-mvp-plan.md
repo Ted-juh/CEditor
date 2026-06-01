@@ -73,38 +73,221 @@ Implemented:
 
 - Declarative `.ceditor-device` JSON profiles for internal CC, SysEx, and NRPN test devices.
 - Backend Device Profile Engine with semantic parameter compilation, value encoding, checksum support, validation messages, and test vectors.
+- Device requests, startup sync declarations, dump parse tests, and a preset browser declaration for the internal SysEx test profile.
+- Profile identity declarations, Universal SysEx identity request compilation, identity reply matching, mismatch detection, and session-state surfacing.
+- Explicit sync direction policy for pull, push, and live roles. Pull runs the startup request chain; push compiles known runtime/panel values through the paced MIDI transaction path; live preserves the bidirectional echo-safe runtime model.
 - First-class MIDI transactions with message bytes, policy metadata, and monitor-friendly fields.
-- Device Runtime service with role-to-profile mapping, runtime state cache, dry-run preview, JUCE MIDI destination discovery, opt-in hardware sending, and queue/rate-limit coalescing.
-- Bridge APIs for profile listing, parameter listing, destination listing, preview, set-parameter, runtime state, monitor events, diagnostics, raw MIDI preview/actions, and profile tests.
-- Frontend Device tab with profile/destination selection, parameter compatibility checks, binding creation, metadata adoption, transaction preview, test summary, monitor, and diagnostics.
+- Device Runtime service with role-to-profile mapping, runtime state cache, dry-run preview, JUCE MIDI input/output discovery, opt-in hardware sending, rate-limit coalescing, and per-message delayed queue resume.
+- Standalone transport capability reporting, including MIDI input/output selection, SysEx support, timestamp support, chunked inbound SysEx assembly, and scheduled message support.
+- Transport capabilities now expose supported endpoint types plus a VST3/AU/AUv3/CLAP plugin transport scaffold marked as planned/host-dependent, so frontend/runtime code can degrade explicitly before those transports are implemented.
+- Async request/response plumbing for startup sync and preset scans: pending requests, timeouts, dump matching/parsing, runtime-state updates, and progress events.
+- Outbound bulk dump send jobs with profile-timing-aware chunk previews, paced runtime progress, bridge/store APIs, and cancellation of unsent chunks.
+- Bulk/librarian jobs can declare an expected verification collection and surface partial/verified multi-message dump summaries on the job.
+- Bulk send jobs include first-pass ACK/NAK policy metadata with retry counters, ACK state, NAK retry reset, and terminal rejection status.
+- The Device tab surfaces bulk send progress, ACK/NAK state, verification status, retry counts, dump collection progress, missing/duplicate ranges, and live conflict summaries.
+- Device requests can declare a `response.continueRequest`, and partial multi-message collections trigger the declared continue request once while keeping the original pending request open.
+- Dump completion metadata for expected message/byte counts, partial failure diagnostics, checksum-failure classification, unsupported-codec classification, and declarative fixed ASCII / nibbled ASCII name codecs.
+- A first dump collection model that groups parsed messages by collection id, merges semantic values, tracks received/missing/duplicate address ranges, and reports partial versus complete transfer state.
+- Runtime integration for incoming multi-message dump collections, including collection progress events, runtime-state merging, and delayed pending-request resolution until the declared collection is complete.
+- Preset-scan entries can surface partial and complete multi-message dump collection summaries while a request is still pending.
+- Echo/feedback-loop protection in the web runtime through outbound origin tracking, short echo suppression windows, device-origin state fan-out, and active live-conflict detection when device feedback disagrees with a recent panel edit.
+- Bridge APIs for profile listing, parameter listing, destination/input listing, transport capabilities, session state, preview, set-parameter, runtime state, monitor events, diagnostics, raw MIDI preview/actions, sync requests, preset scans, bulk sends, incoming MIDI ingest, and profile tests.
+- Frontend Device tab with profile/destination/input selection, parameter compatibility checks, binding creation, metadata adoption, transaction preview, test summary, monitor, diagnostics, pull-sync, and preset-scan controls.
+- Local Device Profile Designer validation, save, dry-run preview, and test execution for draft profiles when the native bridge is unavailable.
+- External profile import through the native file chooser can load `.ceditor-device`, `.ceditor-device.json`, and `.json` files outside the bundled internal profile folder.
+- Identity mismatch override is available from the Device tab and native bridge, marking the session ready with `identityStatus: "overridden"` after the user explicitly accepts a legitimate profile/device mismatch.
+- Portable project/panel device-session serialization for role/profile/input/output mappings, with diagnostics for missing profiles and missing ports on restore.
 - Device Bindings section on components, including default-safe dry-run behavior.
 - Interaction preview emits semantic set-parameter intents for bound control ports.
 
 Still incomplete:
 
-- Backend-originated state fan-out to all controls bound to the same parameter.
-- Incoming MIDI parsing, echo suppression, dump request/response handling, and feedback-loop testing.
-- Persistent project-level role/destination/profile mapping.
-- External profile import/loading outside bundled internal test profiles.
-- Full async queue worker with delayed message spacing per individual message.
-- Device Profile Designer authoring UI.
+- Plugin transports for VST3, AU, AUv3, and CLAP. The current implementation is standalone/preview oriented and must degrade per host capability, especially for SysEx.
+- Device-specific retry/continue policies beyond the first ACK/NAK and single-step continue scaffolds.
+- Full librarian workflows for devices that expose dedicated name-list dumps, slot-by-slot patch requests, write-confirmation messages, and device-specific retry/continue handshakes.
+- Hardware-in-loop tests against at least one real synth protocol. Real captures are not available in the current work session, so this remains deferred.
+
+## Device Sync Engine Plan
+
+The next architectural layer is the Device Sync Engine. It sits between panel/script intents and the MIDI transport. Its job is to turn "a port exists" into "this panel and this synth agree about state."
+
+```text
+Panel / Scripts
+    |
+    v
+Device Sync Engine
+    |-- transport capabilities
+    |-- lifecycle state machine
+    |-- request/response correlation
+    |-- send queue and pacing
+    |-- state mirror and origin tracking
+    |-- dump/preset scan jobs
+    v
+MidiTransport
+```
+
+### 1. Transport Capability Layer
+
+Scripts and profiles should call one runtime surface. They should not know whether MIDI is standalone hardware, host-routed VST3 events, AU callbacks, CLAP events, preview logs, or a future virtual transport.
+
+Minimum capability descriptor:
+
+```json
+{
+  "transport": "standalone",
+  "canSendMidi": true,
+  "canReceiveMidi": true,
+  "canSendSysex": true,
+  "canReceiveSysex": true,
+  "ownsPorts": true,
+  "supportsTimestamps": true,
+  "supportsInputSelection": true,
+  "supportsOutputSelection": true,
+  "supportsChunkedSysex": true,
+  "supportsScheduledMessages": true,
+  "maxSysexBytes": 1048576
+}
+```
+
+Standalone can own ports. Plugin formats usually cannot. VST3 must be treated as capability-dependent because many hosts do not pass SysEx reliably. AU/AUv3 and CLAP need their own transport implementations and tests.
+
+### 2. Lifecycle State Machine
+
+"Connected" is not enough. A device instance needs a state machine:
+
+```text
+disconnected
+  -> linked          transport exists, identity unknown
+  -> identifying     identity request sent
+  -> mismatch        identity reply does not match the profile
+  -> syncing         startup requests or preset scans running
+  -> ready           state is current enough for normal editing
+  -> desynced        incoming data or timeout invalidated the mirror
+  -> error           transport or protocol failure
+```
+
+Startup behavior belongs to this state machine, not to a random UI button. The profile declares startup sync steps, and the runtime owns correlation, timeout, retry, progress, and final ready/error state.
+
+### 3. Async Request/Response Correlation
+
+MIDI has no reliable request id. The runtime must correlate by profile-declared matchers:
+
+```json
+{
+  "requests": [
+    {
+      "id": "requestCurrentPatchDump",
+      "template": ["F0", "7D", "$deviceId", "00", "01", "F7"],
+      "response": { "dump": "currentPatchDump" },
+      "timeoutMs": 2000,
+      "retries": 1
+    }
+  ]
+}
+```
+
+The runtime parks pending requests, matches incoming SysEx against the expected dump declaration, resolves state when parsing succeeds, and emits timeout events when it fails. Scripts should eventually see this as `ctx.device.request(...)` or `await`-style helpers, but the backend must remain the owner of matching and failure handling.
+
+### 4. Send Queue And Pacing
+
+Every outbound transaction must go through a pacing queue. This includes:
+
+```text
+single CC/NRPN edits
+multi-message NRPN/RPN sequences
+request messages
+bulk dump chunks
+slot-by-slot preset scans
+raw MIDI actions
+```
+
+Profile timing should support:
+
+```json
+{
+  "timing": {
+    "interMessageDelayMs": 20,
+    "bulkChunkBytes": 256,
+    "bulkChunkDelayMs": 50,
+    "handshakeTimeoutMs": 1000,
+    "dumpTimeoutMs": 5000
+  }
+}
+```
+
+The current queue supports rate limiting, coalescing, and per-message delayed resume. The next step is outbound bulk chunking with cancellation and progress.
+
+### 5. Device State Mirror And Echo Suppression
+
+Two-way sync needs a backend mirror of device state and an origin model:
+
+```text
+origin=user      panel edit, may send out
+origin=device    inbound MIDI, must not echo back out
+origin=preset    loaded from stored preset/project
+origin=script    generated by automation
+```
+
+The runtime should track last outbound parameter/value pairs and suppress identical inbound echoes for a short window. It should also mark dirty/clean state per parameter so the UI can show conflicts and offer pull/push choices.
+
+### 6. Bulk Dumps, Preset Names, And Librarian Jobs
+
+Bulk receive is:
+
+```text
+request -> response stream -> reassembly -> checksum/shape validation -> parse -> state update
+```
+
+Bulk send is:
+
+```text
+serialize state/preset -> chunk -> pace -> monitor progress -> verify or report timeout
+```
+
+Preset names require per-profile codecs. Some devices return a name list, some include names in patch dumps, and some require scanning every slot. The runtime should treat preset scanning as a cancellable background job with per-slot status, not as a blocking script.
+
+### 7. Settings, Scripting, And Runtime Boundary
+
+Keep the ownership lines clear:
+
+```text
+Device profile/settings:
+  identity bytes, parameters, address maps, dump shapes, timing, capabilities, name field layout, sync defaults.
+
+Scripts:
+  behavior and orchestration: when to request, how to react, custom name codecs/checksums when declarative rules are insufficient.
+
+Runtime:
+  lifecycle state, transport selection, queueing, request correlation, timeouts, retries, state mirror, echo suppression, progress events.
+```
+
+### 8. Build Order From Here
+
+Recommended next phases:
+
+```text
+1. Promote session role mappings into project serialization. Implemented through the project-device-session schema and panel document path; the dedicated `.ceditor-project` wrapper remains future work.
+2. Add outbound bulk-send chunking and progress/cancel APIs. Implemented for raw/SysEx bulk jobs with profile timing defaults, native bridge events, and web store helpers.
+3. Expand dump-shape declarations and name codecs against documented protocol examples or synthetic fixtures until real captures are available.
+4. Add hardware-in-loop test fixtures once a real synth/capture setup is available.
+5. Add plugin transport capability detection for VST3/AU/CLAP.
+6. Expose stable script APIs over the runtime primitives once the backend contracts are proven.
+```
 
 ## Explicitly Deferred
 
 These features are important, but not MVP:
 
 ```text
-Full Device Profile Designer UI
-Patch/bank dump parsing
+Full librarian workflows
 Community profile library
 Profile marketplace
 PDF/manual import
 Learn-from-MIDI capture assistant
 Generic panel remapping
 Macros
-Arbitrary profile scripting
-Bank librarian workflows
 Firmware-specific profile switching UI
+Arbitrary unsafe profile scripting
 ```
 
 ## File Boundaries
@@ -1116,7 +1299,13 @@ Recommended order:
 The next implementation step after this plan is:
 
 ```text
-Create internal fake profile fixtures and implement a backend-only Device Profile Engine compiler that can load a profile, validate it, compile a setParameter intent into a MIDI transaction, and run test vectors without sending MIDI.
+Move from generic bulk verification to device-specific librarian protocols:
+
+1. Pick one documented protocol fixture as the reference target while real captures are unavailable.
+2. Add checksum/name-codec round-trip tests from documented or synthetic dumps, then replace/augment them with captured hardware dumps later.
+3. Expand explicit continue/next-block policies beyond the current single-step `response.continueRequest` scaffold.
+4. Add librarian job orchestration for name-list dumps, slot-by-slot patch requests, write confirmation, and continue handshakes.
+5. Add hardware-in-loop validation notes/results when a capture device is available.
 ```
 
-No MIDI hardware access is required for that first implementation step.
+This should reuse the current dump parser, completion metadata, name codecs, and preset scan job surfaces, but move beyond single-message happy paths.

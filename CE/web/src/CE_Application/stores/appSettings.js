@@ -50,6 +50,7 @@ import {
   isSupportedFontFileName,
   isSupportedIconFileName,
 } from './appSettingsImportBuilders.js';
+import { setProjectDeviceSession } from './projectDeviceSession.js';
 
 export { WEIGHT_OPTIONS } from './appSettingsSchema.js';
 
@@ -803,6 +804,7 @@ export function initAppSettingsBridge() {
   if (!isJuceAvailable()) {
     const normalized = normalizeSettings(createDefaultSettings());
     appSettings.set(normalized);
+    setProjectDeviceSession(normalized.deviceSession);
     applyGeneralSettingsToRuntime(normalized.general);
     settingsLoaded = true;
     restoreSessionFromPreferences();
@@ -814,6 +816,7 @@ export function initAppSettingsBridge() {
     const stopTimer = createPerfDebugTimer('bridge app settings load');
     const normalized = normalizeSettings(payload ?? createDefaultSettings());
     appSettings.set(normalized);
+    setProjectDeviceSession(normalized.deviceSession);
     applyGeneralSettingsToRuntime(normalized.general);
     settingsLoaded = true;
     restoreSessionFromPreferences();
@@ -881,6 +884,19 @@ export function updateDeviceSessionSettings(updates) {
     }),
   }));
 
+  setProjectDeviceSession(get(appSettings).deviceSession);
+  persistSettings();
+}
+
+export function replaceDeviceSessionSettings(session) {
+  if (!session || typeof session !== 'object') return;
+
+  appSettings.update((current) => ({
+    ...current,
+    deviceSession: normalizeDeviceSession(session),
+  }));
+
+  setProjectDeviceSession(get(appSettings).deviceSession);
   persistSettings();
 }
 

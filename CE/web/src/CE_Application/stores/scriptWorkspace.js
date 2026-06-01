@@ -236,6 +236,7 @@ export function addScriptStep(documentId, scriptId, command = 'setValue') {
     checksum: { type: 'Roland', bytes: [0x10, 0x00, 0x15, 0x12, 0x34, 0x56] },
     to14Bit: { value: { op: 'round', args: [{ op: '*', args: [{ ref: 'event.value' }, 16383] }] } },
     sendSysex: { bytes: [0xF0, 0x41, 0x10, 0x00, 0x15, 0x12, 0x34, 0x56, 0xF7] },
+    requestDeviceDump: { profileId: 'roland-sh-201', deviceRole: 'mainSynth', request: 'requestTemporaryPatchBulk', phase: 'commit' },
     log: { message: 'trace', value: { ref: 'event.value' } },
   };
   const step = {

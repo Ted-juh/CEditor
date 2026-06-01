@@ -207,11 +207,30 @@ function normalizeMidiDestination(destination) {
   };
 }
 
+function normalizeMidiInput(input) {
+  const type = String(input?.type ?? 'none');
+  const id = String(input?.id ?? (type === 'none' ? 'none' : ''));
+  const name = String(input?.name ?? (id === 'none' ? 'No MIDI Input' : id));
+
+  return {
+    type: type || 'none',
+    id: id || 'none',
+    name: name || 'No MIDI Input',
+  };
+}
+
+function normalizeSyncDirection(value) {
+  const direction = String(value ?? '').trim().toLowerCase();
+  return ['pull', 'push', 'live'].includes(direction) ? direction : 'pull';
+}
+
 function normalizeDeviceRoleMapping(mapping, role = 'mainSynth') {
   return {
     role: String(mapping?.role ?? role),
     profileId: String(mapping?.profileId ?? 'test-cc-synth'),
     midiDestination: normalizeMidiDestination(mapping?.midiDestination),
+    midiInput: normalizeMidiInput(mapping?.midiInput),
+    syncDirection: normalizeSyncDirection(mapping?.syncDirection ?? mapping?.syncPolicy ?? mapping?.startupPolicy),
     variables: mapping?.variables && typeof mapping.variables === 'object' ? { ...mapping.variables } : {},
     timingOverrides: mapping?.timingOverrides && typeof mapping.timingOverrides === 'object'
       ? { ...mapping.timingOverrides }
@@ -225,6 +244,8 @@ export function createDefaultDeviceSession() {
   return {
     selectedProfileId: mainSynth.profileId,
     selectedDestinationId: mainSynth.midiDestination.id,
+    selectedInputId: mainSynth.midiInput.id,
+    selectedSyncDirection: mainSynth.syncDirection,
     roleMappings: {
       mainSynth,
     },
@@ -256,10 +277,22 @@ export function normalizeDeviceSession(session) {
     ?? roleMappings.mainSynth?.midiDestination?.id
     ?? fallback.selectedDestinationId
   );
+  const selectedInputId = String(
+    session?.selectedInputId
+    ?? roleMappings.mainSynth?.midiInput?.id
+    ?? fallback.selectedInputId
+  );
+  const selectedSyncDirection = normalizeSyncDirection(
+    session?.selectedSyncDirection
+    ?? roleMappings.mainSynth?.syncDirection
+    ?? fallback.selectedSyncDirection
+  );
 
   return {
     selectedProfileId,
     selectedDestinationId,
+    selectedInputId,
+    selectedSyncDirection,
     roleMappings,
   };
 }

@@ -50,7 +50,7 @@ export function createScriptDocument(options = {}) {
     name: options.name ?? 'Untitled Script Workspace',
     modified: true,
     activeScriptId: macroRouting.id,
-    mode: options.mode ?? 'diehard',
+    mode: options.mode ?? 'command',
     scripts: [
       macroRouting,
       {

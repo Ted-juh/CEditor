@@ -141,7 +141,7 @@
     ],
     Debug: [
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
-      { label: 'Open Diehard Coder Mode', action: () => newScriptWorkspace() },
+      { label: 'Open Expert Script Mode', action: () => newScriptWorkspace() },
       { label: 'Validate Active Script', action: () => {} },
     ],
     Help: [

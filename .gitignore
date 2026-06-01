@@ -9,6 +9,8 @@
 # JUCE is vendored with this repository and should be tracked.
 /Docs/
 /out/
+# Scratch: QA screenshots, harness scripts, logs, mockups.
+/tmp/
 
 /.claude/
 *.cache

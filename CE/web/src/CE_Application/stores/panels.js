@@ -22,6 +22,10 @@ import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
 import { createPanel, deserializePanel, serializePanel, uniquePanelPaths } from './panelModel.js';
 import {
+  getProjectDeviceSessionSnapshot,
+  requestProjectDeviceSessionRestore,
+} from './projectDeviceSession.js';
+import {
   clearUnsavedSessionSnapshot,
   persistUnsavedSessionSnapshot as persistSessionSnapshot,
   readUnsavedActiveEditorTab,
@@ -190,6 +194,21 @@ function schedulePanelOpenHousekeeping(label) {
     flushUnsavedSessionSnapshot();
     stopTimer();
   }, 0);
+}
+
+function serializePanelDocument(panel) {
+  return serializePanel(panel, {
+    deviceSession: getProjectDeviceSessionSnapshot(),
+  });
+}
+
+function restorePanelDeviceSession(panel, label) {
+  if (!panel?.deviceSession) return;
+
+  requestProjectDeviceSessionRestore(panel.deviceSession, {
+    source: 'panel',
+    label,
+  });
 }
 
 function persistUnsavedSessionSnapshot() {
@@ -411,7 +430,6 @@ function resolvePanelSelection(list, activeId, tab) {
   if (tab?.type === 'settings') return null;
   if (tab?.type === 'component') return null;
   if (tab?.type === 'deviceProfile') return null;
-  if (tab?.type === 'script') return null;
 
   const panelFromTab = tab?.type === 'panel'
     ? list.find((panel) => panel.id === tab.id) ?? null
@@ -875,7 +893,7 @@ export function saveActivePanel() {
   if (!panel) return;
 
   if (panel.filePath) {
-    bridgeSavePanel(String(panel.id), panel.filePath, serializePanel(panel));
+    bridgeSavePanel(String(panel.id), panel.filePath, serializePanelDocument(panel));
   } else {
     saveActivePanelAs();
   }
@@ -886,7 +904,7 @@ export function saveActivePanelAs() {
   const panel = get(activePanel);
   if (!panel) return;
 
-  bridgeSavePanelAs(String(panel.id), serializePanel(panel));
+  bridgeSavePanelAs(String(panel.id), serializePanelDocument(panel));
 }
 
 /** Open a panel from a file dialog. */
@@ -1027,6 +1045,7 @@ export function initPanelBridge() {
     const openTimer = createPerfDebugTimer(`panel open ${label}`);
     const deserializeTimer = createPerfDebugTimer(`panel deserialize ${label}`);
     const panel = deserializePanel(panelData, filePath, payload.name);
+    restorePanelDeviceSession(panel, label);
     const controlCount = Array.isArray(panel?.controls) ? panel.controls.length : 0;
     deserializeTimer(
       `controls=${controlCount} bytes=${formatBytes(payloadSizeBytes)}${Number.isFinite(nativeReadMs) ? ` nativeRead=${nativeReadMs.toFixed(1)}ms` : ''}`

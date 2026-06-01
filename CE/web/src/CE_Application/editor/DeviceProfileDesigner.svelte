@@ -28,11 +28,13 @@
   let { profileId = '' } = $props();
 
   let query = $state('');
-  let activeView = $state('parameters');
+  let activeView = $state('overview');
   let groupFilter = $state('all');
   let typeFilter = $state('all');
   let accessFilter = $state('all');
   let parameterOrderMode = $state('implementation');
+  let parameterLayoutMode = $state('cards');
+  let parameterEditorMode = $state('compact');
   let dumpOrderMode = $state('dump');
   let selectedParameterId = $state('');
   let previewValue = $state('');
@@ -45,7 +47,7 @@
   let loadedSourceText = $state('');
   let loadedSourceProfileId = $state('');
   let sourceLoadRequested = $state(false);
-  let inspectorOpen = $state(true);
+  let inspectorOpen = $state(false);
   let refreshStatus = $state(null);
   let dumpParseHex = $state('');
   let refreshStatusTimer = null;
@@ -111,7 +113,7 @@
   );
   let profileStats = $derived(buildProfileStats(parameters, profileTestResult, usingEditableSource ? null : backendParameterPage));
   let profileQualityChecks = $derived(buildProfileQualityChecks(selectedProfile, parameters, profileTestResult));
-  let qualitySummary = $derived(summarizeQuality(profileQualityChecks));
+  let qualitySummary = $derived(summarizeQuality(profileQualityChecks, parameters.length));
   let visibleParameters = $derived(orderedParameters.slice(0, parameterVisibleLimit));
   let groupedParameters = $derived(groupParameters(visibleParameters, parameterOrderMode));
   let orderedDumpDefinitions = $derived(orderDumps(dumpDefinitions, dumpOrderMode));
@@ -194,6 +196,25 @@
       && (!currentSaveProfileId(sourceTextProfile, sourceProfile) || currentSaveProfileId(sourceTextProfile, sourceProfile) === profileId)
       && sourceSave?.running !== true
   );
+  let showInspectorPanel = $derived((activeView === 'parameters' || activeView === 'compatibility') && !!selectedParameter);
+  let sourceLocationLabel = $derived(
+    profileSource?.filePath
+      || selectedProfile?.filePath
+      || (sourceText || editableProfileDoc ? 'Local draft source' : 'No source loaded')
+  );
+  let guidedSteps = $derived(buildGuidedSteps({
+    activeView,
+    sourceProfile,
+    selectedProfile,
+    parameters,
+    messageRecipes,
+    profileTests,
+    profileTestResult,
+    sourceValidation,
+    sourceSave,
+    sourceDirty,
+    parameterDirty,
+  }));
 
   $effect(() => {
     if (!profileId) return;
@@ -1018,9 +1039,9 @@
     const hasFailures = Number(testResult?.failed ?? 0) > 0;
 
     checks.push({
-      level: parametersList.length > 0 ? 'ok' : 'error',
+      level: parametersList.length > 0 ? 'ok' : 'warning',
       title: 'Parameters',
-      detail: parametersList.length > 0 ? `${parametersList.length} descriptors exposed` : 'No parameters are exposed by this profile.',
+      detail: parametersList.length > 0 ? `${parametersList.length} descriptors exposed` : 'Add parameters or a starter spine to make this profile usable.',
     });
     checks.push({
       level: hasTests ? (hasFailures ? 'error' : 'ok') : 'warning',
@@ -1050,10 +1071,71 @@
     return checks;
   }
 
-  function summarizeQuality(checks) {
+  function buildGuidedSteps(context) {
+    const profile = context.sourceProfile ?? context.selectedProfile ?? {};
+    const profileHasIdentity = !!String(profile?.name ?? '').trim()
+      && !!String(profile?.manufacturer ?? '').trim()
+      && !!String(profile?.family ?? '').trim();
+    const hasRecipes = (context.messageRecipes?.length ?? 0) > 0;
+    const hasParameters = (context.parameters?.length ?? 0) > 0;
+    const hasTests = (context.profileTests?.length ?? 0) > 0;
+    const testsRunning = context.profileTestResult?.running === true;
+    const testTotal = Number(context.profileTestResult?.total ?? 0);
+    const testPassed = Number(context.profileTestResult?.passed ?? 0);
+    const testsPassed = testTotal > 0 && testPassed === testTotal;
+    const testsFailed = testTotal > 0 && testPassed !== testTotal;
+    const validationPassed = context.sourceValidation?.ok === true;
+    const validationFailed = context.sourceValidation?.ok === false;
+    const dirty = context.sourceDirty || context.parameterDirty;
+    const saved = !dirty && context.sourceSave?.ok === true;
+
+    return [
+      {
+        id: 'overview',
+        number: 1,
+        label: 'Identity',
+        detail: profileHasIdentity ? 'Named and classified' : 'Name the device and maker',
+        status: profileHasIdentity ? 'ok' : 'attention',
+      },
+      {
+        id: 'recipes',
+        number: 2,
+        label: 'Recipes',
+        detail: hasRecipes ? `${context.messageRecipes.length} message recipe${context.messageRecipes.length === 1 ? '' : 's'}` : 'Start with CC, NRPN, or SysEx',
+        status: hasRecipes ? 'ok' : 'attention',
+      },
+      {
+        id: 'parameters',
+        number: 3,
+        label: 'Parameters',
+        detail: hasParameters ? `${context.parameters.length} parameter${context.parameters.length === 1 ? '' : 's'}` : 'Expose something bindable',
+        status: hasParameters ? 'ok' : 'attention',
+      },
+      {
+        id: 'tests',
+        number: 4,
+        label: 'Tests',
+        detail: testsRunning ? 'Running...' : testsPassed ? `${testPassed}/${testTotal} passed` : hasTests ? `${context.profileTests.length} authored` : 'Add proof vectors',
+        status: testsFailed ? 'error' : testsPassed ? 'ok' : hasTests ? 'info' : 'attention',
+      },
+      {
+        id: 'finish',
+        number: 5,
+        label: 'Save',
+        detail: saved ? 'Saved' : validationPassed ? 'Validated, ready to save' : validationFailed ? 'Validation needs attention' : dirty ? 'Validate changes' : 'Validate before trusting',
+        status: saved || validationPassed ? 'ok' : validationFailed ? 'error' : 'attention',
+      },
+    ].map((step) => ({
+      ...step,
+      active: context.activeView === step.id,
+    }));
+  }
+
+  function summarizeQuality(checks, parameterCount = 0) {
     const counts = { error: 0, warning: 0, info: 0, ok: 0 };
     for (const check of checks ?? []) counts[check.level] = (counts[check.level] ?? 0) + 1;
     if (counts.error > 0) return { status: 'error', label: `${counts.error} errors` };
+    if (Number(parameterCount) === 0) return { status: 'warning', label: 'Setup needed' };
     if (counts.warning > 0) return { status: 'warning', label: `${counts.warning} warnings` };
     return { status: 'ok', label: 'Ready' };
   }
@@ -1254,6 +1336,67 @@
 
   function issueCount(value) {
     return Object.values(value ?? {}).filter(Boolean).length;
+  }
+
+  function pluralize(count, singular, plural = `${singular}s`) {
+    return `${count} ${count === 1 ? singular : plural}`;
+  }
+
+  function parameterCardStatus(parameter) {
+    if (!parameter) return { level: 'info', label: 'No parameter', detail: 'Select a parameter to inspect it.' };
+    if (!String(parameter?.messageRecipe ?? '').trim() && parameter?.type !== 'dumpRequest') {
+      return { level: 'warning', label: 'Needs recipe', detail: 'No message recipe is assigned yet.' };
+    }
+    if (parameter?.access?.canWrite === false) {
+      return { level: 'info', label: 'Read-only', detail: 'This parameter is not writable from a panel.' };
+    }
+    if (parameter?.access?.realtimeSafe === false) {
+      return { level: 'warning', label: 'Guarded', detail: 'Realtime sends need care.' };
+    }
+    return { level: 'ok', label: 'Bindable', detail: 'Ready for panel binding.' };
+  }
+
+  function parameterRangeLabel(parameter) {
+    if (parameter?.range && (parameter.range.min !== undefined || parameter.range.max !== undefined)) {
+      return `${parameter.range.min ?? '?'} to ${parameter.range.max ?? '?'}`;
+    }
+    if (parameter?.type === 'boolean') return `${parameter.falseValue ?? 0} / ${parameter.trueValue ?? 127}`;
+    if (parameter?.type === 'choice' || parameter?.type === 'enum') {
+      return pluralize(parameter?.choices?.length ?? 0, 'choice');
+    }
+    return 'No range';
+  }
+
+  function recipeSummary(recipe) {
+    const kind = String(recipe?.kind || 'cc').toLowerCase();
+    if (kind === 'cc') return `CC ${recipe?.controller ?? '?'} on ${recipe?.channel || '$channel'} -> ${recipe?.value ?? '$encodedValue'}`;
+    if (kind === 'nrpn') return `NRPN ${recipe?.parameterMsb ?? '?'}:${recipe?.parameterLsb ?? '?'} on ${recipe?.channel || '$channel'}`;
+    if (kind === 'sysex') return `SysEx ${pluralize(recipeTemplateTokens(recipe).length, 'token')}`;
+    return kind || 'Recipe';
+  }
+
+  function recipeIssueLabel(issues) {
+    const count = issueCount(issues);
+    return count > 0 ? pluralize(count, 'issue') : 'Ready';
+  }
+
+  function testProofStatus(result, issues) {
+    const count = issueCount(issues);
+    if (result) {
+      return result.passed
+        ? { level: 'ok', label: 'Passed', detail: result.actualHex || 'Matches expected output' }
+        : { level: 'error', label: 'Failed', detail: result.error || result.actualHex || 'Output did not match' };
+    }
+    if (count > 0) return { level: 'error', label: recipeIssueLabel(issues), detail: 'Fix fields before this can prove anything.' };
+    return { level: 'info', label: 'Not run', detail: 'Run tests to capture actual output.' };
+  }
+
+  function sourceProofSteps() {
+    return [
+      { label: 'Tests', status: testActionStatus.className || 'info', value: testActionStatus.text },
+      { label: 'Validation', status: validationActionStatus.className || 'info', value: validationActionStatus.text },
+      { label: 'Save', status: saveActionStatus.className || 'info', value: saveActionStatus.text },
+    ];
   }
 
   function findTestsForParameter(parameter, tests, results) {
@@ -1516,6 +1659,7 @@
       profileId,
       parameterId: selectedParameter.id,
       value: parsePreviewValue(selectedParameter, previewValue),
+      source: currentProfileSourceText(),
     });
   }
 
@@ -1562,7 +1706,7 @@
   }
 
   function runTests() {
-    runTestsForProfile(profileId);
+    runTestsForProfile(profileId, { source: currentProfileSourceText() });
   }
 
   function parseDumpHex() {
@@ -1690,18 +1834,28 @@
     <div><span>Tests</span><strong>{profileStats.tests}</strong></div>
   </section>
 
-  <nav class="designer-tabs" aria-label="Device profile designer sections">
-    <button class:active={activeView === 'overview'} onclick={() => setActiveView('overview')}>Overview</button>
-    <button class:active={activeView === 'parameters'} onclick={() => setActiveView('parameters')}>Parameters</button>
-    <button class:active={activeView === 'recipes'} onclick={() => setActiveView('recipes')}>Recipes</button>
-    <button class:active={activeView === 'dumps'} onclick={() => setActiveView('dumps')}>Dumps</button>
-    <button class:active={activeView === 'tests'} onclick={() => setActiveView('tests')}>Tests</button>
-    <button class:active={activeView === 'compatibility'} onclick={() => setActiveView('compatibility')}>Compatibility</button>
-    <button class:active={activeView === 'source'} onclick={() => setActiveView('source')}>Advanced Source</button>
+  <nav class="guided-flow" aria-label="Device profile authoring flow">
+    {#each guidedSteps as step}
+      <button
+        class:active={step.active}
+        class={['flow-step', step.status]}
+        onclick={() => setActiveView(step.id)}
+      >
+        <span>{step.number}</span>
+        <strong>{step.label}</strong>
+        <small>{step.detail}</small>
+      </button>
+    {/each}
     <span class={['quality-pill', qualitySummary.status]}>{qualitySummary.label}</span>
   </nav>
 
-  <main class="designer-body">
+  <nav class="designer-tabs secondary" aria-label="Advanced device profile sections">
+    <button class:active={activeView === 'dumps'} onclick={() => setActiveView('dumps')}>Dumps</button>
+    <button class:active={activeView === 'compatibility'} onclick={() => setActiveView('compatibility')}>Compatibility</button>
+    <button class:active={activeView === 'source'} onclick={() => setActiveView('source')}>Advanced Source</button>
+  </nav>
+
+  <main class="designer-body" class:without-inspector={!showInspectorPanel}>
     <section class="workspace">
       {#if activeView === 'overview'}
         <div class="overview-grid">
@@ -1824,6 +1978,80 @@
             </div>
           </section>
         </div>
+      {:else if activeView === 'finish'}
+        <div class="finish-workspace">
+          <section class="panel-section finish-primary">
+            <div class="section-header">
+              <div>
+                <span class="section-title">Validate and Save</span>
+                <h2>{qualitySummary.label}</h2>
+              </div>
+              {#if sourceDirty || parameterDirty}<span class="dirty-label">Modified</span>{/if}
+            </div>
+            <div class="finish-actions">
+              <button onclick={runTests}>Run Tests</button>
+              <button onclick={validateSource}>Validate Source</button>
+              <button disabled={!sourceCanSave} onclick={saveSource}>Save Profile</button>
+              <button onclick={() => setActiveView('source')}>Review Source</button>
+            </div>
+            <div class="finish-status-grid">
+              <div>
+                <span class="section-title">Tests</span>
+                <strong class={testActionStatus.className}>{testActionStatus.text}</strong>
+              </div>
+              <div>
+                <span class="section-title">Validation</span>
+                <strong class={validationActionStatus.className}>{validationActionStatus.text}</strong>
+              </div>
+              <div>
+                <span class="section-title">Save</span>
+                <strong class={saveActionStatus.className}>{saveActionStatus.text}</strong>
+              </div>
+              <div>
+                <span class="section-title">Source</span>
+                <strong>{sourceLocationLabel}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel-section workflow-card">
+            <span class="section-title">Authoring Checklist</span>
+            <div class="workflow-list">
+              {#each workflowChecks as check}
+                <div class={['workflow-row', check.level]}>
+                  <strong>{check.label}</strong>
+                  <span>{check.detail}</span>
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <section class="panel-section workflow-card">
+            <span class="section-title">Persistence</span>
+            <div class="workflow-list">
+              {#each persistenceChecks as check}
+                <div class={['workflow-row', check.level]}>
+                  <strong>{check.label}</strong>
+                  <span>{check.detail}</span>
+                </div>
+              {/each}
+            </div>
+          </section>
+
+          <section class="panel-section workflow-card">
+            <span class="section-title">Validation Messages</span>
+            <div class="quality-list compact">
+              {#each sourceValidationItems as item}
+                <div class={['quality-row', item.level]}>
+                  <strong>{item.path || '$'}</strong>
+                  <span>{item.message}</span>
+                </div>
+              {:else}
+                <div class="empty small">Validate to see schema messages from the Device Profile Engine.</div>
+              {/each}
+            </div>
+          </section>
+        </div>
       {:else if activeView === 'dumps'}
         <section class="panel-section full-height">
             <div class="section-header">
@@ -1939,33 +2167,58 @@
             {#each profileTests as test, index}
               {@const result = testResults.find((item) => item.name === test.name)}
               {@const issues = testInlineIssues[index] ?? {}}
-              <div class={['authored-test-row', result ? (result.passed ? 'ok' : 'error') : '']}>
-                <label>
-                  <input class:error={fieldIssue(issues, 'name')} value={test.name || ''} placeholder="Name" oninput={(event) => updateTestVector(index, 'name', event.target.value)} />
-                  {#if fieldIssue(issues, 'name')}<small class="field-issue">{fieldIssue(issues, 'name')}</small>{/if}
-                </label>
-                <label>
-                <select class:error={fieldIssue(issues, 'parameter')} value={test.parameter || ''} oninput={(event) => updateTestVector(index, 'parameter', event.target.value)}>
-                  <option value="">Parameter</option>
-                  {#each parameters as parameter}<option value={parameter.id}>{parameter.name || parameter.id}</option>{/each}
-                </select>
-                  {#if fieldIssue(issues, 'parameter')}<small class="field-issue">{fieldIssue(issues, 'parameter')}</small>{/if}
-                </label>
-                <label>
-                  <input class:error={fieldIssue(issues, 'value')} value={test.value ?? ''} placeholder="Value" oninput={(event) => updateTestVector(index, 'value', event.target.value)} />
-                  {#if fieldIssue(issues, 'value')}<small class="field-issue">{fieldIssue(issues, 'value')}</small>{/if}
-                </label>
-                <label>
-                  <input class:error={fieldIssue(issues, 'expectedHex')} value={test.expectedHex || ''} placeholder="Expected hex" oninput={(event) => updateTestVector(index, 'expectedHex', event.target.value)} />
-                  {#if fieldIssue(issues, 'expectedHex')}<small class="field-issue">{fieldIssue(issues, 'expectedHex')}</small>{/if}
-                </label>
-                <button onclick={() => removeTestVector(index)}>Remove</button>
-                {#if result}
-                  <code>{result.actualHex || result.error || 'no output'}</code>
-                {/if}
+              {@const proof = testProofStatus(result, issues)}
+              <div class={['test-proof-card', proof.level]}>
+                <div class="proof-card-header">
+                  <div>
+                    <span class={['proof-badge', proof.level]}>{proof.label}</span>
+                    <strong>{test.name || 'Unnamed test'}</strong>
+                    <small>{proof.detail}</small>
+                  </div>
+                  <button onclick={() => removeTestVector(index)}>Remove</button>
+                </div>
+                <div class="test-proof-grid">
+                  <label>
+                    <span>Name</span>
+                    <input class:error={fieldIssue(issues, 'name')} value={test.name || ''} placeholder="Name" oninput={(event) => updateTestVector(index, 'name', event.target.value)} />
+                    {#if fieldIssue(issues, 'name')}<small class="field-issue">{fieldIssue(issues, 'name')}</small>{/if}
+                  </label>
+                  <label>
+                    <span>Parameter</span>
+                    <select class:error={fieldIssue(issues, 'parameter')} value={test.parameter || ''} oninput={(event) => updateTestVector(index, 'parameter', event.target.value)}>
+                      <option value="">Parameter</option>
+                      {#each parameters as parameter}<option value={parameter.id}>{parameter.name || parameter.id}</option>{/each}
+                    </select>
+                    {#if fieldIssue(issues, 'parameter')}<small class="field-issue">{fieldIssue(issues, 'parameter')}</small>{/if}
+                  </label>
+                  <label>
+                    <span>Input value</span>
+                    <input class:error={fieldIssue(issues, 'value')} value={test.value ?? ''} placeholder="Value" oninput={(event) => updateTestVector(index, 'value', event.target.value)} />
+                    {#if fieldIssue(issues, 'value')}<small class="field-issue">{fieldIssue(issues, 'value')}</small>{/if}
+                  </label>
+                  <label>
+                    <span>Expected MIDI</span>
+                    <input class:error={fieldIssue(issues, 'expectedHex')} value={test.expectedHex || ''} placeholder="Expected hex" oninput={(event) => updateTestVector(index, 'expectedHex', event.target.value)} />
+                    {#if fieldIssue(issues, 'expectedHex')}<small class="field-issue">{fieldIssue(issues, 'expectedHex')}</small>{/if}
+                  </label>
+                </div>
+                <div class="proof-output">
+                  <span>Expected</span>
+                  <code>{test.expectedHex || 'missing expected hex'}</code>
+                  <span>Actual</span>
+                  <code>{result?.actualHex || result?.error || 'not run yet'}</code>
+                </div>
               </div>
             {:else}
-              <div class="empty">No test vectors yet.</div>
+              <div class="empty empty-action-card">
+                <strong>No test vectors yet</strong>
+                <span>Add one proof vector for the selected parameter, or use the starter spine to create a working CC example.</span>
+                <div class="empty-actions">
+                  <button onclick={addTestVector}>Add Test</button>
+                  <button onclick={addStarterCcSpine}>Add Starter CC Spine</button>
+                  <button onclick={() => setActiveView('finish')}>Go to Save</button>
+                </div>
+              </div>
             {/each}
           </div>
         </section>
@@ -1983,9 +2236,31 @@
             </div>
           </div>
           <div class="recipe-list">
+            <div class="recipe-starter-strip" aria-label="Recipe quick starts">
+              <button class="recipe-type-card" onclick={addCcRecipe}>
+                <span>CC</span>
+                <strong>Single controller</strong>
+                <small>Best for common 0-127 panel controls.</small>
+              </button>
+              <button class="recipe-type-card" onclick={addNrpnRecipe}>
+                <span>NRPN</span>
+                <strong>14-bit parameter pair</strong>
+                <small>Use when the device expects MSB/LSB parameter numbers.</small>
+              </button>
+              <button class="recipe-type-card" onclick={addSysexRecipe}>
+                <span>SysEx</span>
+                <strong>Token template</strong>
+                <small>Build proofable byte templates with palette tokens.</small>
+              </button>
+            </div>
             {#each messageRecipes as recipe, index}
               {@const issues = recipeInlineIssues[index] ?? {}}
               <div class="recipe-row" class:sysex={recipe.kind === 'sysex'}>
+                <div class="recipe-proof-header">
+                  <span class={['proof-badge', issueCount(issues) ? 'warning' : 'ok']}>{recipeIssueLabel(issues)}</span>
+                  <strong>{recipe.id || `Recipe ${index + 1}`}</strong>
+                  <small>{recipeSummary(recipe)}</small>
+                </div>
                 <label><span>Id</span><input class:error={fieldIssue(issues, 'id')} value={recipe.id || ''} placeholder="id" oninput={(event) => updateRecipe(index, 'id', event.target.value)} />
                   {#if fieldIssue(issues, 'id')}<small class="field-issue">{fieldIssue(issues, 'id')}</small>{/if}
                 </label>
@@ -2059,7 +2334,16 @@
                 <button onclick={() => removeRecipe(index)}>Remove</button>
               </div>
             {:else}
-              <div class="empty">No message recipes in this profile source.</div>
+              <div class="empty empty-action-card">
+                <strong>No message recipes yet</strong>
+                <span>Start from a complete CC spine, or add the exact message type this device needs.</span>
+                <div class="empty-actions">
+                  <button onclick={addStarterCcSpine}>Add Starter CC Spine</button>
+                  <button onclick={addCcRecipe}>Add CC</button>
+                  <button onclick={addNrpnRecipe}>Add NRPN</button>
+                  <button onclick={addSysexRecipe}>Add SysEx</button>
+                </div>
+              </div>
             {/each}
           </div>
         </section>
@@ -2068,13 +2352,23 @@
           <div class="source-toolbar">
             <div>
               <span class="section-title">Advanced Source</span>
-              <strong>{profileSource?.filePath || selectedProfile?.filePath || 'No source loaded'}</strong>
+              <strong>{sourceLocationLabel}</strong>
             </div>
             <div class="source-actions">
               {#if sourceDirty}<span class="dirty-label">Modified</span>{/if}
+              <button onclick={runTests}>Run Tests</button>
               <button onclick={validateSource}>Validate</button>
               <button disabled={!sourceCanSave} onclick={saveSource}>Save</button>
             </div>
+          </div>
+          <div class="source-proof-strip" aria-label="Source proof status">
+            {#each sourceProofSteps() as step}
+              <div class={['source-proof-step', step.status]}>
+                <span>{step.label}</span>
+                <strong>{step.value}</strong>
+              </div>
+            {/each}
+            <button onclick={() => setActiveView('finish')}>Review Save Flow</button>
           </div>
           <textarea
             spellcheck="false"
@@ -2138,17 +2432,25 @@
                 <option value="grouped-alpha">Grouped alphabetically</option>
                 <option value="parameter-alpha">Parameter alphabetically</option>
               </select>
+              {#if activeView !== 'compatibility'}
+                <div class="view-toggle" aria-label="Parameter layout">
+                  <button class:active={parameterLayoutMode === 'cards'} onclick={() => parameterLayoutMode = 'cards'}>Cards</button>
+                  <button class:active={parameterLayoutMode === 'table'} onclick={() => parameterLayoutMode = 'table'}>Table</button>
+                </div>
+              {/if}
               <button onclick={resetFilters}>Reset</button>
               <button onclick={addParameter}>Add</button>
               <span class="parameter-count">{parameterCountLabel}</span>
             </div>
-            <div class="table-head">
-              <span>Name</span>
-              <span>Id</span>
-              <span>Type</span>
-              <span>Access</span>
-              <span>Preferred</span>
-            </div>
+            {#if activeView === 'compatibility' || parameterLayoutMode === 'table'}
+              <div class="table-head">
+                <span>Name</span>
+                <span>Id</span>
+                <span>Type</span>
+                <span>Access</span>
+                <span>Preferred</span>
+              </div>
+            {/if}
             <div class="table-scroll">
               {#if activeView === 'compatibility'}
                 {#each visibleParameters as parameter}
@@ -2171,7 +2473,38 @@
                   <div class="empty">No parameters match the current filters.</div>
                 {/each}
               {:else}
-                {#if parameterOrderMode === 'grouped-alpha'}
+                {#if parameterLayoutMode === 'cards'}
+                  <div class="parameter-card-grid">
+                    {#each visibleParameters as parameter}
+                      {@const cardStatus = parameterCardStatus(parameter)}
+                      <button
+                        class:selected={selectedParameter?.id === parameter.id}
+                        class={['parameter-card', cardStatus.level]}
+                        draggable="true"
+                        ondragstart={(event) => startParameterDrag(event, parameter)}
+                        ondragend={endParameterDrag}
+                        onclick={() => selectedParameterId = parameter.id}
+                        title="Drag onto a panel component to bind"
+                      >
+                        <span class="parameter-card-top">
+                          <strong>{parameter.name || parameter.id}</strong>
+                          <em>{accessLabel(parameter)}</em>
+                        </span>
+                        <code>{parameter.id}</code>
+                        <span class="parameter-chip-row">
+                          <span>{parameter.group || 'Ungrouped'}</span>
+                          <span>{parameter.type || 'unknown'}</span>
+                          <span>{parameterRangeLabel(parameter)}</span>
+                          <span>{parameter?.ui?.preferredComponent || 'Any UI'}</span>
+                        </span>
+                        <span class={['parameter-card-status', cardStatus.level]}>
+                          <strong>{cardStatus.label}</strong>
+                          <small>{cardStatus.detail}</small>
+                        </span>
+                      </button>
+                    {/each}
+                  </div>
+                {:else if parameterOrderMode === 'grouped-alpha'}
                   {#each groupedParameters as group}
                     <div class="group-heading">{group.name}</div>
                     {#each group.items as parameter}
@@ -2212,7 +2545,15 @@
                   {/each}
                 {/if}
                 {#if visibleParameters.length === 0}
-                  <div class="empty">No parameters exposed for this profile.</div>
+                  <div class="empty empty-action-card">
+                    <strong>No parameters yet</strong>
+                    <span>Add a single parameter, generate a small CC starter spine, or edit the source directly.</span>
+                    <div class="empty-actions">
+                      <button onclick={addParameter}>Add Parameter</button>
+                      <button onclick={addStarterCcSpine}>Add Starter CC Spine</button>
+                      <button disabled={!!editableProfileDoc || sourceLoadRequested} onclick={loadEditableSourceForEdit}>Edit Source</button>
+                    </div>
+                  </div>
                 {/if}
               {/if}
               {#if hasMoreParameters || hasMoreBackendParameters}
@@ -2234,6 +2575,10 @@
                   <h2>{selectedParameter.name || selectedParameter.id}</h2>
                 </div>
                 <div class="mini-actions">
+                  <div class="view-toggle" aria-label="Parameter editor density">
+                    <button class:active={parameterEditorMode === 'compact'} onclick={() => parameterEditorMode = 'compact'}>Compact</button>
+                    <button class:active={parameterEditorMode === 'expanded'} onclick={() => parameterEditorMode = 'expanded'}>Expanded</button>
+                  </div>
                   <button title="Duplicate parameter" onclick={duplicateSelectedParameter}>Duplicate</button>
                   <button title="Delete parameter" onclick={deleteSelectedParameter}>Delete</button>
                 </div>
@@ -2248,6 +2593,15 @@
                   <button disabled={sourceLoadRequested} onclick={loadEditableSourceForEdit}>
                     {sourceLoadRequested ? 'Loading full source...' : 'Load Full Source'}
                   </button>
+                </div>
+              {/if}
+              {#if parameterEditorMode === 'compact'}
+                <div class="parameter-setup-summary">
+                  <span><strong>Recipe</strong>{selectedParameter.messageRecipe || 'Choose recipe'}</span>
+                  <span><strong>Range</strong>{parameterRangeLabel(selectedParameter)}</span>
+                  <span><strong>UI</strong>{selectedParameter?.ui?.preferredComponent || 'Any'}</span>
+                  <span><strong>Send</strong>{selectedParameter?.sendPolicy?.mode || 'continuous'}</span>
+                  <span><strong>Status</strong>{parameterCardStatus(selectedParameter).label}</span>
                 </div>
               {/if}
               <div class="parameter-form">
@@ -2326,45 +2680,47 @@
                   </div>
                 </section>
 
-                <section class="setup-group ui">
-                  <span class="section-title">Display and UI</span>
-                  <div class="setup-grid ui-grid">
-                    <label><span>Short Label</span><input value={selectedParameter?.display?.shortLabel || ''} oninput={(event) => updateSelectedParameterDisplay('shortLabel', event.target.value)} /></label>
-                    <label><span>Unit</span><input value={selectedParameter?.display?.unit || ''} placeholder="Hz, %, dB..." oninput={(event) => updateSelectedParameterDisplay('unit', event.target.value)} /></label>
-                    <label><span>Preferred UI</span>
-                      <select value={selectedParameter?.ui?.preferredComponent || ''} oninput={(event) => updateSelectedParameterUi('preferredComponent', event.target.value)}>
-                        <option value="">Any</option>
-                        <option value="Slider">Slider</option>
-                        <option value="Range">Range</option>
-                        <option value="Combobox">Combobox</option>
-                        <option value="RadioButtonGroup">Radio group</option>
-                        <option value="CyclicButton">Cyclic button</option>
-                        <option value="ToggleButton">Toggle button</option>
-                        <option value="Button">Button</option>
-                        <option value="MomentaryButton">Momentary button</option>
-                        <option value="TimedButton">Timed button</option>
-                      </select>
-                    </label>
-                  </div>
-                </section>
+                {#if parameterEditorMode === 'expanded'}
+                  <section class="setup-group ui">
+                    <span class="section-title">Display and UI</span>
+                    <div class="setup-grid ui-grid">
+                      <label><span>Short Label</span><input value={selectedParameter?.display?.shortLabel || ''} oninput={(event) => updateSelectedParameterDisplay('shortLabel', event.target.value)} /></label>
+                      <label><span>Unit</span><input value={selectedParameter?.display?.unit || ''} placeholder="Hz, %, dB..." oninput={(event) => updateSelectedParameterDisplay('unit', event.target.value)} /></label>
+                      <label><span>Preferred UI</span>
+                        <select value={selectedParameter?.ui?.preferredComponent || ''} oninput={(event) => updateSelectedParameterUi('preferredComponent', event.target.value)}>
+                          <option value="">Any</option>
+                          <option value="Slider">Slider</option>
+                          <option value="Range">Range</option>
+                          <option value="Combobox">Combobox</option>
+                          <option value="RadioButtonGroup">Radio group</option>
+                          <option value="CyclicButton">Cyclic button</option>
+                          <option value="ToggleButton">Toggle button</option>
+                          <option value="Button">Button</option>
+                          <option value="MomentaryButton">Momentary button</option>
+                          <option value="TimedButton">Timed button</option>
+                        </select>
+                      </label>
+                    </div>
+                  </section>
 
-                <section class="setup-group policy">
-                  <span class="section-title">Send Policy and Access</span>
-                  <div class="setup-grid policy-grid">
-                    <label><span>Send Mode</span>
-                      <select value={selectedParameter?.sendPolicy?.mode || 'continuous'} oninput={(event) => updateSelectedParameterSendPolicy('mode', event.target.value)}>
-                        <option value="continuous">Continuous</option>
-                        <option value="onCommit">On commit</option>
-                        <option value="momentary">Momentary</option>
-                        <option value="explicitAction">Explicit action</option>
-                      </select>
-                    </label>
-                    <label><span>Min Interval Ms</span><input value={selectedParameter?.sendPolicy?.minIntervalMs ?? ''} oninput={(event) => updateSelectedParameterSendPolicy('minIntervalMs', numberOrString(event.target.value))} /></label>
-                    <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.canWrite !== false} onchange={(event) => updateSelectedParameterAccess('canWrite', event.target.checked)} /><span>Writable</span></label>
-                    <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.canRead === true} onchange={(event) => updateSelectedParameterAccess('canRead', event.target.checked)} /><span>Readable</span></label>
-                    <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.realtimeSafe !== false} onchange={(event) => updateSelectedParameterAccess('realtimeSafe', event.target.checked)} /><span>Realtime safe</span></label>
-                  </div>
-                </section>
+                  <section class="setup-group policy">
+                    <span class="section-title">Send Policy and Access</span>
+                    <div class="setup-grid policy-grid">
+                      <label><span>Send Mode</span>
+                        <select value={selectedParameter?.sendPolicy?.mode || 'continuous'} oninput={(event) => updateSelectedParameterSendPolicy('mode', event.target.value)}>
+                          <option value="continuous">Continuous</option>
+                          <option value="onCommit">On commit</option>
+                          <option value="momentary">Momentary</option>
+                          <option value="explicitAction">Explicit action</option>
+                        </select>
+                      </label>
+                      <label><span>Min Interval Ms</span><input value={selectedParameter?.sendPolicy?.minIntervalMs ?? ''} oninput={(event) => updateSelectedParameterSendPolicy('minIntervalMs', numberOrString(event.target.value))} /></label>
+                      <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.canWrite !== false} onchange={(event) => updateSelectedParameterAccess('canWrite', event.target.checked)} /><span>Writable</span></label>
+                      <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.canRead === true} onchange={(event) => updateSelectedParameterAccess('canRead', event.target.checked)} /><span>Readable</span></label>
+                      <label class="check-row"><input type="checkbox" checked={selectedParameter?.access?.realtimeSafe !== false} onchange={(event) => updateSelectedParameterAccess('realtimeSafe', event.target.checked)} /><span>Realtime safe</span></label>
+                    </div>
+                  </section>
+                {/if}
               </div>
 
               {#if selectedParameter.type === 'choice' || selectedParameter.type === 'enum'}
@@ -2399,6 +2755,7 @@
       {/if}
     </section>
 
+    {#if showInspectorPanel}
     <aside class:collapsed={!inspectorOpen} class="inspector">
       <button
         class="inspector-toggle"
@@ -2519,6 +2876,7 @@
       {/if}
       {/if}
     </aside>
+    {/if}
   </main>
 </div>
 
@@ -2643,6 +3001,83 @@
     color: #EEE;
   }
 
+  .guided-flow {
+    flex: 0 0 auto;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(120px, 1fr)) auto;
+    gap: 6px;
+    align-items: stretch;
+    padding: 8px;
+    border-bottom: 1px solid #303030;
+    background: #181818;
+  }
+
+  .flow-step {
+    display: grid;
+    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 8px;
+    row-gap: 1px;
+    align-items: center;
+    min-height: 46px;
+    padding: 7px 8px;
+    text-align: left;
+    border-color: #343A3F;
+    background: #202326;
+  }
+
+  .flow-step span {
+    grid-row: 1 / span 2;
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border: 1px solid #3F4B55;
+    border-radius: 50%;
+    color: #D7E7F5;
+    font-size: 11px;
+    font-weight: 800;
+  }
+
+  .flow-step strong,
+  .flow-step small {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .flow-step strong {
+    color: #EEF3F7;
+    font-size: 12px;
+  }
+
+  .flow-step small {
+    color: #9BA8B3;
+    font-size: 10px;
+  }
+
+  .flow-step.active {
+    border-color: #5B9BD5;
+    background: #243140;
+  }
+
+  .flow-step.ok span {
+    border-color: rgba(124, 193, 141, 0.6);
+    color: #B8E3C0;
+  }
+
+  .flow-step.attention span,
+  .flow-step.info span {
+    border-color: rgba(213, 180, 91, 0.65);
+    color: #E0C879;
+  }
+
+  .flow-step.error span {
+    border-color: rgba(213, 107, 107, 0.7);
+    color: #EAA0A0;
+  }
+
   .designer-tabs {
     flex: 0 0 auto;
     display: flex;
@@ -2651,6 +3086,12 @@
     padding: 7px 8px;
     border-bottom: 1px solid #303030;
     background: #1A1A1A;
+  }
+
+  .designer-tabs.secondary {
+    justify-content: flex-end;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
   .designer-tabs button {
@@ -2666,6 +3107,7 @@
 
   .quality-pill {
     margin-left: auto;
+    align-self: center;
     padding: 5px 8px;
     border: 1px solid #3A3A3A;
     border-radius: 3px;
@@ -2692,6 +3134,10 @@
     flex: 1;
     display: grid;
     grid-template-columns: minmax(360px, 1fr) minmax(300px, 360px);
+  }
+
+  .designer-body.without-inspector {
+    grid-template-columns: minmax(360px, 1fr);
   }
 
   .designer-body:has(.inspector.collapsed) {
@@ -2877,6 +3323,34 @@
     font-size: 11px;
   }
 
+  .parameter-setup-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .parameter-setup-summary span {
+    display: grid;
+    gap: 2px;
+    min-width: 112px;
+    flex: 1 1 112px;
+    padding: 7px 8px;
+    border: 1px solid #30363B;
+    border-radius: 3px;
+    background: #1A1A1A;
+    color: #C7D0D7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parameter-setup-summary strong {
+    color: #8CA7BA;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
   .setup-group {
     min-width: 0;
     max-width: 100%;
@@ -2954,7 +3428,76 @@
     font-size: 10px;
   }
 
+  @media (max-width: 1280px) {
+    .designer-header {
+      align-items: stretch;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .header-actions {
+      flex-wrap: wrap;
+    }
+
+    .header-action {
+      min-width: 112px;
+    }
+
+    .summary {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .guided-flow {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .guided-flow .quality-pill {
+      justify-self: start;
+      margin-left: 0;
+    }
+
+    .parameter-workspace {
+      grid-template-rows: minmax(160px, 0.8fr) minmax(400px, 1fr);
+    }
+
+    .table-tools {
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+    }
+
+    .table-tools > input {
+      grid-column: 1 / -1;
+    }
+
+    .test-proof-grid,
+    .source-proof-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .source-proof-strip > button {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
   @media (max-width: 980px) {
+    .guided-flow {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .guided-flow .quality-pill {
+      grid-column: 1 / -1;
+      justify-self: start;
+      margin-left: 0;
+    }
+
+    .finish-workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .summary {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     .parameter-workspace {
       grid-template-rows: minmax(110px, 1fr) minmax(370px, 420px);
     }
@@ -2971,6 +3514,21 @@
     .setup-group > .section-title {
       padding: 7px 8px;
       font-size: 9px;
+    }
+
+    .mini-actions {
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .recipe-starter-strip,
+    .test-proof-grid,
+    .source-proof-strip {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .proof-output {
+      grid-template-columns: auto minmax(0, 1fr);
     }
   }
 
@@ -3000,12 +3558,37 @@
   .table-tools {
     flex: 0 0 auto;
     display: grid;
-    grid-template-columns: minmax(160px, 1fr) repeat(4, minmax(108px, auto)) auto auto auto;
+    grid-template-columns: minmax(180px, 1fr) repeat(4, minmax(108px, auto)) auto auto auto auto;
     gap: 8px;
     align-items: center;
     padding: 8px;
     border-bottom: 1px solid #2B2B2B;
     color: #888;
+  }
+
+  .view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    background: #181818;
+  }
+
+  .view-toggle button {
+    min-height: 22px;
+    padding: 2px 8px;
+    border-color: transparent;
+    background: transparent;
+    color: #AAA;
+    font-size: 10px;
+  }
+
+  .view-toggle button.active {
+    border-color: #4E86B8;
+    background: #26384A;
+    color: #E9F4FF;
   }
 
   .parameter-count {
@@ -3060,6 +3643,112 @@
     width: 100%;
     margin-bottom: 3px;
     text-align: left;
+  }
+
+  .parameter-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+    gap: 8px;
+    align-content: start;
+    padding: 4px;
+  }
+
+  .parameter-card {
+    min-width: 0;
+    min-height: 132px;
+    display: grid;
+    align-content: start;
+    gap: 8px;
+    padding: 10px;
+    text-align: left;
+    border-color: #30363B;
+    background: #1B1E21;
+  }
+
+  .parameter-card.selected {
+    border-color: #5B9BD5;
+    background: #233141;
+  }
+
+  .parameter-card.warning {
+    border-color: rgba(213, 180, 91, 0.42);
+  }
+
+  .parameter-card.info {
+    border-color: rgba(91, 155, 213, 0.38);
+  }
+
+  .parameter-card.ok {
+    border-color: rgba(124, 193, 141, 0.36);
+  }
+
+  .parameter-card-top {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .parameter-card-top strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #EEF3F7;
+  }
+
+  .parameter-card-top em {
+    flex: 0 0 auto;
+    color: #94BFD8;
+    font-style: normal;
+    font-size: 10px;
+  }
+
+  .parameter-card code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #AAC7DA;
+    font: 11px Consolas, monospace;
+  }
+
+  .parameter-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .parameter-chip-row span {
+    min-width: 0;
+    max-width: 100%;
+    padding: 3px 6px;
+    border: 1px solid #343A3F;
+    border-radius: 3px;
+    background: #20252A;
+    color: #AEB8C2;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parameter-card-status {
+    display: grid;
+    gap: 2px;
+    padding-top: 6px;
+    border-top: 1px solid #30363B;
+  }
+
+  .parameter-card-status strong {
+    color: #EEE;
+    font-size: 11px;
+  }
+
+  .parameter-card-status small {
+    color: #9DA9B4;
+    font-size: 10px;
   }
 
   .compatibility-parameter-row {
@@ -3173,9 +3862,58 @@
     overflow: auto;
     padding: 12px;
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
     align-content: start;
     gap: 12px;
+  }
+
+  .finish-workspace {
+    height: 100%;
+    overflow: auto;
+    padding: 12px;
+    display: grid;
+    grid-template-columns: minmax(420px, 1.1fr) minmax(320px, 0.9fr);
+    align-content: start;
+    gap: 12px;
+  }
+
+  .finish-primary {
+    grid-column: 1 / -1;
+  }
+
+  .finish-actions,
+  .finish-status-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .finish-actions {
+    margin-top: 10px;
+  }
+
+  .finish-status-grid {
+    margin-top: 12px;
+  }
+
+  .finish-status-grid div {
+    min-width: 160px;
+    flex: 1 1 160px;
+    padding: 10px;
+    border: 1px solid #303030;
+    border-radius: 3px;
+    background: #1A1A1A;
+  }
+
+  .finish-status-grid strong {
+    display: block;
+    min-width: 0;
+    margin-top: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #EEE;
   }
 
   .profile-setup-card {
@@ -3434,6 +4172,167 @@
     font: 11px Consolas, monospace;
   }
 
+  .test-proof-card {
+    display: grid;
+    gap: 10px;
+    padding: 10px;
+    background: #1A1A1A;
+    border: 1px solid #303030;
+    border-radius: 4px;
+  }
+
+  .test-proof-card.ok {
+    border-color: rgba(124, 193, 141, 0.45);
+  }
+
+  .test-proof-card.error {
+    border-color: rgba(213, 107, 107, 0.55);
+  }
+
+  .test-proof-card.info {
+    border-color: rgba(91, 155, 213, 0.35);
+  }
+
+  .proof-card-header,
+  .recipe-proof-header {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .proof-card-header > div,
+  .recipe-proof-header {
+    min-width: 0;
+  }
+
+  .proof-card-header strong,
+  .recipe-proof-header strong {
+    display: block;
+    margin-top: 4px;
+    color: #EEF3F7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .proof-card-header small,
+  .recipe-proof-header small {
+    display: block;
+    margin-top: 2px;
+    color: #A4AFB8;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .proof-badge {
+    display: inline-block;
+    width: fit-content;
+    padding: 3px 6px;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    background: #20252A;
+    color: #C8D0D8;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .proof-badge.ok {
+    border-color: rgba(124, 193, 141, 0.48);
+    color: #B8E3C0;
+  }
+
+  .proof-badge.warning,
+  .proof-badge.info {
+    border-color: rgba(213, 180, 91, 0.52);
+    color: #E0C879;
+  }
+
+  .proof-badge.error {
+    border-color: rgba(213, 107, 107, 0.58);
+    color: #EAA0A0;
+  }
+
+  .test-proof-grid {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.1fr) minmax(170px, 1.2fr) 90px minmax(150px, 1fr);
+    gap: 8px;
+  }
+
+  .test-proof-grid label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .test-proof-grid label > span {
+    color: #888;
+    text-transform: uppercase;
+    font-size: 10px;
+  }
+
+  .proof-output {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
+    gap: 6px;
+    align-items: center;
+    padding: 7px;
+    border: 1px solid #2C343A;
+    border-radius: 3px;
+    background: #15191C;
+  }
+
+  .proof-output span {
+    color: #8DA4B6;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .proof-output code {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #D8E5EE;
+    font: 11px Consolas, monospace;
+  }
+
+  .recipe-starter-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(150px, 1fr));
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+
+  .recipe-type-card {
+    display: grid;
+    gap: 3px;
+    min-height: 72px;
+    padding: 9px;
+    text-align: left;
+    border-color: rgba(91, 155, 213, 0.32);
+    background: #1B242C;
+  }
+
+  .recipe-type-card span {
+    color: #94BFD8;
+    font-size: 10px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .recipe-type-card strong {
+    color: #EEF3F7;
+  }
+
+  .recipe-type-card small {
+    color: #9FAAB4;
+    line-height: 1.3;
+  }
+
   .recipe-row {
     display: grid;
     grid-template-columns: minmax(130px, 1.1fr) 92px repeat(5, minmax(90px, 1fr)) auto;
@@ -3448,6 +4347,13 @@
   .recipe-row.sysex {
     grid-template-columns: minmax(130px, 0.8fr) 92px minmax(420px, 2.4fr) repeat(4, minmax(96px, 0.8fr)) auto;
     align-items: start;
+  }
+
+  .recipe-proof-header {
+    grid-column: 1 / -1;
+    display: block;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #303030;
   }
 
   .recipe-row label,
@@ -3576,7 +4482,7 @@
     min-width: 0;
     min-height: 0;
     display: grid;
-    grid-template-rows: auto minmax(220px, 1fr) auto minmax(90px, 0.35fr);
+    grid-template-rows: auto auto minmax(220px, 1fr) auto minmax(90px, 0.35fr);
     border-right: 1px solid #303030;
   }
 
@@ -3606,6 +4512,56 @@
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+  }
+
+  .source-proof-strip {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(120px, 1fr)) auto;
+    gap: 8px;
+    align-items: stretch;
+    padding: 8px 10px;
+    border-bottom: 1px solid #2B2B2B;
+    background: #181B1E;
+  }
+
+  .source-proof-step {
+    min-width: 0;
+    padding: 7px 8px;
+    border: 1px solid #30363B;
+    border-radius: 3px;
+    background: #202326;
+  }
+
+  .source-proof-step span {
+    display: block;
+    color: #8CA7BA;
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+
+  .source-proof-step strong {
+    display: block;
+    min-width: 0;
+    margin-top: 3px;
+    color: #EEE;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .source-proof-step.ok,
+  .source-proof-step.ok-text {
+    border-color: rgba(124, 193, 141, 0.42);
+  }
+
+  .source-proof-step.error,
+  .source-proof-step.error-text {
+    border-color: rgba(213, 107, 107, 0.5);
+  }
+
+  .source-proof-step.muted-status,
+  .source-proof-step.info {
+    border-color: rgba(91, 155, 213, 0.35);
   }
 
   .dirty-label {
@@ -3737,8 +4693,74 @@
     font: 11px Consolas, monospace;
   }
 
+  @media (max-width: 1280px) {
+    .table-tools {
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+    }
+
+    .table-tools > input {
+      grid-column: 1 / -1;
+    }
+
+    .test-proof-grid,
+    .source-proof-strip {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .source-proof-strip > button {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
+  @media (max-width: 980px) {
+    .recipe-starter-strip,
+    .test-proof-grid,
+    .source-proof-strip,
+    .parameter-card-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .proof-output {
+      grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .source-toolbar,
+    .source-status {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+  }
+
   .empty {
     padding: 16px;
     color: #777;
+  }
+
+  .empty-action-card {
+    display: grid;
+    justify-items: start;
+    gap: 8px;
+    margin: 10px;
+    padding: 14px;
+    border: 1px solid rgba(91, 155, 213, 0.32);
+    border-radius: 5px;
+    background: #202832;
+    color: #AEBCC8;
+  }
+
+  .empty-action-card strong {
+    color: #EEF3F7;
+    font-size: 13px;
+  }
+
+  .empty-action-card span {
+    color: #AEBCC8;
+  }
+
+  .empty-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
   }
 </style>

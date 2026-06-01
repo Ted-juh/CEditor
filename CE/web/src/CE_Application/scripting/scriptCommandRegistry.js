@@ -288,6 +288,21 @@ export const SCRIPT_COMMANDS = [
     description: 'Queue a SysEx message. This is device-specific by design.',
   },
   {
+    id: 'requestDeviceDump',
+    label: 'requestDeviceDump',
+    category: 'MIDI / Device',
+    portable: false,
+    exportSafe: false,
+    scopes: ['device'],
+    args: [
+      { name: 'request', type: 'string', required: true },
+      { name: 'profileId', type: 'string', default: '' },
+      { name: 'deviceRole', type: 'string', default: 'mainSynth' },
+      { name: 'phase', type: 'string', default: 'commit' },
+    ],
+    description: 'Trigger a named device-profile dump request, such as an SH-201 RQ1 bulk request.',
+  },
+  {
     id: 'buildSysex',
     label: 'buildSysex',
     category: 'MIDI / Device',

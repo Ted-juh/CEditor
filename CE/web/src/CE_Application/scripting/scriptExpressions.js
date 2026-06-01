@@ -95,6 +95,17 @@ export function evaluateExpression(expression, context = {}) {
     case 'equals':
     case '==':
       return args[0] === args[1];
+    case '!=':
+    case 'notEquals':
+      return args[0] !== args[1];
+    case '>':
+      return asNumber(args[0]) > asNumber(args[1]);
+    case '>=':
+      return asNumber(args[0]) >= asNumber(args[1]);
+    case '<':
+      return asNumber(args[0]) < asNumber(args[1]);
+    case '<=':
+      return asNumber(args[0]) <= asNumber(args[1]);
     case 'and':
       return args.every(Boolean);
     case 'or':
@@ -117,6 +128,12 @@ export function expressionToText(expression, target = 'ce') {
   const op = String(expression.op ?? '');
   const args = Array.isArray(expression.args) ? expression.args.map((arg) => expressionToText(arg, target)) : [];
   if (op === '*' || op === '+' || op === '-' || op === '/') return `(${args.join(` ${op} `)})`;
+  if (['>', '>=', '<', '<=', '==', '!='].includes(op)) return `(${args.join(` ${op} `)})`;
+  if (op === 'equals') return `(${args[0] ?? 'null'} == ${args[1] ?? 'null'})`;
+  if (op === 'notEquals') return `(${args[0] ?? 'null'} != ${args[1] ?? 'null'})`;
+  if (op === 'and') return `(${args.join(' && ')})`;
+  if (op === 'or') return `(${args.join(' || ')})`;
+  if (op === 'not') return `(!${args[0] ?? 'false'})`;
   if (op === 'curve') {
     return `curve(${args[0] ?? '0'}, from: ${expression.from ?? args[1] ?? 0}, to: ${expression.to ?? args[2] ?? 1}, shape: ${JSON.stringify(expression.shape ?? 'linear')})`;
   }

@@ -2,6 +2,9 @@ import { createScriptDocument } from './scriptSamples.js';
 
 export const SCRIPT_WORKSPACE_FILE_VERSION = 1;
 export const SCRIPT_WORKSPACE_EXTENSION = 'cescript.json';
+export const LEGACY_SCRIPT_WORKSPACE_MODES = {
+  diehard: 'expert',
+};
 
 function stableId(prefix = 'script') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`;
@@ -9,6 +12,11 @@ function stableId(prefix = 'script') {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+export function normalizeScriptWorkspaceMode(mode = 'command') {
+  const value = String(mode ?? 'command').trim() || 'command';
+  return LEGACY_SCRIPT_WORKSPACE_MODES[value] ?? value;
 }
 
 function normalizeStep(step, index = 0) {
@@ -82,7 +90,7 @@ export function sanitizeScriptDocument(document) {
     activeScriptId: scripts.some((script) => script.id === activeScriptId)
       ? activeScriptId
       : (scripts[0]?.id ?? ''),
-    mode: String(document.mode ?? 'diehard'),
+    mode: normalizeScriptWorkspaceMode(document.mode),
     recentFiles: asArray(document.recentFiles).map(String).filter(Boolean),
     rawCodePolicy: {
       defaultAllowRaw: document.rawCodePolicy?.defaultAllowRaw === true,
