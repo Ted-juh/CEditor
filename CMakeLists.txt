@@ -22,6 +22,16 @@ juce_add_binary_data(CEditorData
         "${CE_ROOT}/include/MainApplication/logo.png"
 )
 
+# --- Player web bundle embedded into the player/plugin (self-contained, host-path-independent) ---
+# The player and the VST3 serve player.html + assets from this BinaryData, so the WebView paints
+# regardless of where the host loads the binary from (fixes blank UI in a DAW).
+file(GLOB_RECURSE PLAYER_WEB_DIST CONFIGURE_DEPENDS "${CE_ROOT}/web/dist/*")
+juce_add_binary_data(PlayerWebData
+    NAMESPACE PlayerWebData
+    HEADER_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/PlayerWebData"
+    SOURCES ${PLAYER_WEB_DIST}
+)
+
 # --- Standalone GUI app ---
 juce_add_gui_app(CEditor
     PRODUCT_NAME "CEditor"
@@ -95,6 +105,7 @@ target_compile_definitions(CEditorPlayer PRIVATE
 target_include_directories(CEditorPlayer PRIVATE
     "${WEBVIEW2_INCLUDE}"
     "${CE_ROOT}/src"
+    "${CMAKE_BINARY_DIR}/PlayerWebData"
 )
 
 target_link_libraries(CEditorPlayer PRIVATE
@@ -108,6 +119,7 @@ target_link_libraries(CEditorPlayer PRIVATE
     juce::juce_gui_extra
     "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
     dwmapi
+    PlayerWebData
 )
 
 # --- Player as a plugin (Phase C/D): VST3 wrapping the same PlayerHost runtime ---
@@ -151,6 +163,7 @@ target_compile_definitions(CEditorPlayerVST PUBLIC
 target_include_directories(CEditorPlayerVST PRIVATE
     "${WEBVIEW2_INCLUDE}"
     "${CE_ROOT}/src"
+    "${CMAKE_BINARY_DIR}/PlayerWebData"
 )
 
 target_link_libraries(CEditorPlayerVST PRIVATE
@@ -164,6 +177,7 @@ target_link_libraries(CEditorPlayerVST PRIVATE
     juce::juce_gui_extra
     "${WEBVIEW2_LIB_DIR}/WebView2LoaderStatic.lib"
     dwmapi
+    PlayerWebData
 )
 
 add_executable(CEditorDeviceProfileTests

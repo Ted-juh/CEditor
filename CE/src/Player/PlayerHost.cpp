@@ -1,5 +1,6 @@
 #include "PlayerHost.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
+#include "BinaryData.h" // PlayerWebData — the embedded web bundle (player.html + assets)
 
 #include <cstring>
 #include <optional>
@@ -65,21 +66,35 @@ juce::WebBrowserComponent::Resource makeResource (const void* data, size_t size,
 
 std::optional<juce::WebBrowserComponent::Resource> providePlayerResource (const juce::String& rawPath)
 {
-    auto dist = getDistFolder();
     auto path = rawPath.upToFirstOccurrenceOf ("?", false, false)
                        .upToFirstOccurrenceOf ("#", false, false);
     if (path.isEmpty() || path == "/") path = "/player.html";
-    auto relative = path.fromFirstOccurrenceOf ("/", false, false);
-    if (relative.contains ("..")) return std::nullopt;
+    if (path.contains ("..")) return std::nullopt;
+    auto basename = path.fromLastOccurrenceOf ("/", false, false);
+    if (basename.isEmpty()) basename = "player.html";
+    auto mimeFile = juce::File::getSpecialLocation (juce::File::tempDirectory).getChildFile (basename);
 
-    auto file = dist.getChildFile (relative);
-    if (! file.existsAsFile() && file.getFileExtension().isEmpty())
-        file = dist.getChildFile ("player.html");
-    if (! file.existsAsFile()) return std::nullopt;
+    // Primary: the embedded web bundle. Vite emits unique asset basenames, so a basename
+    // lookup is unambiguous. This is host-path-independent — it paints inside any DAW.
+    for (int i = 0; i < PlayerWebData::namedResourceListSize; ++i)
+    {
+        if (juce::String (PlayerWebData::originalFilenames[i]) == basename)
+        {
+            int size = 0;
+            if (auto* data = PlayerWebData::getNamedResource (PlayerWebData::namedResourceList[i], size))
+                return makeResource (data, (size_t) size, mimeFor (mimeFile));
+        }
+    }
 
-    juce::MemoryBlock data;
-    if (! file.loadFileAsData (data)) return std::nullopt;
-    return makeResource (data.getData(), data.getSize(), mimeFor (file));
+    // Fallback: filesystem dist (dev / build tree) if the bundle wasn't embedded.
+    auto file = getDistFolder().getChildFile (basename);
+    if (file.existsAsFile())
+    {
+        juce::MemoryBlock blk;
+        if (file.loadFileAsData (blk))
+            return makeResource (blk.getData(), blk.getSize(), mimeFor (file));
+    }
+    return std::nullopt;
 }
 
 class PlayerWebBrowserComponent final : public juce::WebBrowserComponent
