@@ -296,9 +296,13 @@ panel, still hand-built.
       TODO for the two-instance case.)*
 - [ ] C5. **Two-instance test** + real-DAW scan/load. **Deferred** (needs a DAW — yours).
 
-**Exit proof:** VST3 builds and its runtime is proven via the Standalone wrapper (panel renders,
-device compile correct). Remaining for full proof (yours): scan `CEditor Player VST.vst3` in
-Reaper, open it, move a control → GAIA; save/reload session; two instances. Plus C3/C4 wiring.
+**Exit proof:** ✅ **VST3 builds, loads in Reaper, and its panel UI PAINTS inside the host**
+(the WebView-in-plugin milestone — the riskiest part of the pipeline). The blank-panel blocker
+was a WebView2 user-data-folder conflict (fixed: unique folder per instance) + the embedded-bundle
+asset fix (C4). Remaining for a *functional* plugin: live MIDI to the synth via the plugin's own
+port (decision #2 — currently dry-run), hide JUCE's stock MIDI-CC params, C3 state save, C5
+two-instance test. **Housekeeping:** the unique-folder build is in `build/native`; swap into
+`export-out` (close the host first — it locks the DLL) to make it permanent.
 
 ### Phase D — Build the exporter inside CEditor (the "Conversion" feature)
 
