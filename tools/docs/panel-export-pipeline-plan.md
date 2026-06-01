@@ -287,8 +287,13 @@ panel, still hand-built.
       Plugin-opens-own-MIDI-port (decision #2) not yet wired (preview/dry-run only so far).
 - [ ] C3. `getStateInformation`/`setStateInformation` — currently stubbed; serialize selected
       MIDI port + parameter values for DAW session restore. **Deferred.**
-- [ ] C4. Serve WebView from embedded resources (BinaryData) instead of the dist filesystem;
-      per-instance WebView user-data folder. **Deferred** (currently serves dist; Phase D bakes).
+- [x] C4. **Serve WebView from embedded resources (BinaryData).** `juce_add_binary_data(PlayerWebData)`
+      embeds the built web bundle into the player + plugin; `PlayerHost` serves `player.html` +
+      assets from it by basename (filesystem dist kept as dev fallback). **Self-contained &
+      host-path-independent — fixes the blank panel in a DAW** (the old filesystem path resolved
+      to the host, not the plugin). Verified: VST Standalone built with the embedded bundle renders
+      the 12-slider GAIA panel with no `dist` on disk. *(Per-instance WebView user-data folder still
+      TODO for the two-instance case.)*
 - [ ] C5. **Two-instance test** + real-DAW scan/load. **Deferred** (needs a DAW — yours).
 
 **Exit proof:** VST3 builds and its runtime is proven via the Standalone wrapper (panel renders,
