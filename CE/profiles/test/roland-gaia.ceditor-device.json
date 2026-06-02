@@ -9,7 +9,7 @@
   "status": "experimental",
   "trust": "local",
   "variables": {
-    "deviceId": 16,
+    "deviceId": 127,
     "channel": 1
   },
   "identity": {
@@ -293,7 +293,7 @@
     {
       "name": "Universal Identity Request",
       "kind": "identityRequest",
-      "expectedHex": "F0 7E 10 06 01 F7"
+      "expectedHex": "F0 7E 7F 06 01 F7"
     },
     {
       "name": "Identity Reply (GAIA SH-01)",
@@ -311,73 +311,73 @@
       "name": "Filter Mode LPF",
       "parameter": "filter.mode",
       "value": "lpf",
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0A 01 64 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0A 01 64 F7"
     },
     {
       "name": "Filter Slope -24 dB",
       "parameter": "filter.slope",
       "value": "db24",
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0B 01 63 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0B 01 63 F7"
     },
     {
       "name": "Filter Cutoff 64",
       "parameter": "filter.cutoff",
       "value": 64,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0C 40 23 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0C 40 23 F7"
     },
     {
       "name": "Filter Cutoff Keyfollow 64",
       "parameter": "filter.cutoffKeyfollow",
       "value": 64,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0D 40 22 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0D 40 22 F7"
     },
     {
       "name": "Filter Env Velocity Sens 64",
       "parameter": "filter.envVelocitySens",
       "value": 64,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0E 40 21 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0E 40 21 F7"
     },
     {
       "name": "Filter Resonance 32",
       "parameter": "filter.resonance",
       "value": 32,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 0F 20 40 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 0F 20 40 F7"
     },
     {
       "name": "Filter Env Attack 0",
       "parameter": "filter.envAttack",
       "value": 0,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 10 00 5F F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 10 00 5F F7"
     },
     {
       "name": "Filter Env Decay 127",
       "parameter": "filter.envDecay",
       "value": 127,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 11 7F 5F F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 11 7F 5F F7"
     },
     {
       "name": "Filter Env Sustain 100",
       "parameter": "filter.envSustain",
       "value": 100,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 12 64 79 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 12 64 79 F7"
     },
     {
       "name": "Filter Env Release 64",
       "parameter": "filter.envRelease",
       "value": 64,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 13 40 1C F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 13 40 1C F7"
     },
     {
       "name": "Filter Env Depth 64",
       "parameter": "filter.envDepth",
       "value": 64,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 14 40 1B F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 14 40 1B F7"
     },
     {
       "name": "Amp Level 100",
       "parameter": "amp.level",
       "value": 100,
-      "expectedHex": "F0 41 10 00 00 41 12 10 00 01 15 64 76 F7"
+      "expectedHex": "F0 41 7F 00 00 41 12 10 00 01 15 64 76 F7"
     },
     {
       "name": "Master Volume CC7 100",
