@@ -10,7 +10,7 @@
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, mapDeviceRole, initDeviceProfileBridge } from './CE_Application/stores/deviceProfiles.js';
-  import { listMidiDestinations } from './CE_Application/bridge/bridge.js';
+  import { listMidiDestinations, listDeviceProfiles, listProfileParameters } from './CE_Application/bridge/bridge.js';
 
   // $state.raw: the panel is replaced wholesale, never deep-mutated here. A deep $state
   // proxy would make PanelPreviewSurface's structuredClone() throw DataCloneError, and
@@ -29,6 +29,8 @@
       ?? { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' };
     // Updates the role mapping AND tells C++ to open the MIDI output (setDeviceRoleMapping).
     mapDeviceRole('mainSynth', profileId, { midiDestination: dest });
+    // Load this profile's parameter list so resolveParameterSend recognizes the bound params.
+    if (profileId) listProfileParameters({ profileId, deviceRole: 'mainSynth' });
   }
   function selectPort(id) {
     selectedOut = id;
@@ -98,6 +100,7 @@
     let portsUnsub = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
+      listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
       listMidiDestinations();      // ask C++ for available MIDI outputs -> fills midiDestinations
       portsUnsub = midiDestinations.subscribe((d) => { if (Array.isArray(d) && d.length) ports = d; });
       loadToken = backend.addEventListener('loadPanel', (payload) => {
