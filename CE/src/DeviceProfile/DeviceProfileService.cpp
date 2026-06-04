@@ -2935,8 +2935,18 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
         updateRoleSessionState (role, "linked", "Incoming MIDI received");
     }
 
-    emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
-    emitDeviceEvent ("deviceSessionState", getSessionState());
+    // Throttle the heavy bridge emits (full monitor log + full session state) for high-rate
+    // incoming MIDI: a knob streaming CC fires these hundreds of times/sec, each serializing the
+    // whole monitor array across the WebView bridge -> UI lag. midiInputMessage already went out
+    // per-message above (so panel-follow stays responsive); low-rate SysEx/dumps still emit now.
+    const auto heavyNow = nowMs();
+    const bool highRate = messageType != "sysex";
+    if (! highRate || heavyNow - lastInboundHeavyEmitMs >= 40.0)
+    {
+        lastInboundHeavyEmitMs = heavyNow;
+        emitDeviceEvent ("midiMonitorEvents", getMonitorEvents());
+        emitDeviceEvent ("deviceSessionState", getSessionState());
+    }
 }
 
 void DeviceProfileService::emitDeviceEvent (const juce::String& eventName, const juce::var& payload)

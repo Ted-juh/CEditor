@@ -217,6 +217,7 @@ private:
     std::map<juce::String, DumpCollectionState> dumpCollections;
     std::map<juce::String, std::map<juce::String, juce::var>> runtimeState;
     juce::Array<juce::var> monitorEvents;
+    double lastInboundHeavyEmitMs = 0.0;  // throttles per-incoming heavy bridge emits (CC streams)
     EventCallback eventCallback;
     mutable juce::CriticalSection midiInputLock;
 
