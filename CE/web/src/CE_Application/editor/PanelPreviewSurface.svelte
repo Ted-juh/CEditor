@@ -467,6 +467,12 @@
     }
 
     if (requestedValue !== undefined && requestedValue !== '') {
+      // Player fallback: commitPanelPreviewSelectAction resolves the control via the editor's
+      // active-panel store, which is empty in the standalone/plugin player — so it returns null
+      // and the session is never updated (the send still fires below, which is why SysEx worked
+      // but the on-screen selection didn't move). Update the session directly here (we have the
+      // control), so radio/combobox selection reflects the click — matching the slider's behaviour.
+      updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: requestedValue });
       emitDeviceBindingsForPatch(control, {
         valueOverride: requestedValue,
       });
