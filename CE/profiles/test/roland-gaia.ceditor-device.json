@@ -246,6 +246,53 @@
       "sendPolicy": { "mode": "continuous", "coalesce": true, "minIntervalMs": 20, "sendFinalOnRelease": true },
       "messageRecipe": "volumeCc",
       "ui": { "preferredComponent": "Slider" }
+    },
+    {
+      "id": "osc.wave",
+      "name": "OSC Wave",
+      "group": "OSC",
+      "type": "choice",
+      "default": "saw",
+      "address": "10 00 01 00",
+      "choices": [
+        { "id": "saw", "label": "Saw", "value": 0 },
+        { "id": "square", "label": "Square", "value": 1 },
+        { "id": "pulse", "label": "Pulse", "value": 2 },
+        { "id": "triangle", "label": "Triangle", "value": 3 },
+        { "id": "sine", "label": "Sine", "value": 4 },
+        { "id": "noise", "label": "Noise", "value": 5 },
+        { "id": "supersaw", "label": "Super Saw", "value": 6 }
+      ],
+      "display": { "mode": "choice", "shortLabel": "OSC" },
+      "normalization": { "mode": "choiceIndex" },
+      "encoding": { "type": "enum" },
+      "access": { "canRead": true, "canWrite": true, "realtimeSafe": true, "source": "singleParameter" },
+      "sendPolicy": { "mode": "onCommit", "coalesce": true },
+      "messageRecipe": "dt1",
+      "ui": { "preferredComponent": "RadioButtonGroup" }
+    },
+    {
+      "id": "lfo.shape",
+      "name": "LFO Shape",
+      "group": "LFO",
+      "type": "choice",
+      "default": "triangle",
+      "address": "10 00 01 1C",
+      "choices": [
+        { "id": "triangle", "label": "Triangle", "value": 0 },
+        { "id": "sine", "label": "Sine", "value": 1 },
+        { "id": "saw", "label": "Saw", "value": 2 },
+        { "id": "square", "label": "Square", "value": 3 },
+        { "id": "sh", "label": "S&H", "value": 4 },
+        { "id": "random", "label": "Random", "value": 5 }
+      ],
+      "display": { "mode": "choice", "shortLabel": "LFO" },
+      "normalization": { "mode": "choiceIndex" },
+      "encoding": { "type": "enum" },
+      "access": { "canRead": true, "canWrite": true, "realtimeSafe": true, "source": "singleParameter" },
+      "sendPolicy": { "mode": "onCommit", "coalesce": true },
+      "messageRecipe": "dt1",
+      "ui": { "preferredComponent": "RadioButtonGroup" }
     }
   ],
   "messageRecipes": [
