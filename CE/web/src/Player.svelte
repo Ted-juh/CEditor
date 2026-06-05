@@ -11,6 +11,8 @@
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge } from './CE_Application/stores/deviceProfiles.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
+  // Inbound decode maps are generated from the DPD device profile (CE/dpd), not hardcoded.
+  import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
 
   // $state.raw: the panel is replaced wholesale, never deep-mutated here. A deep $state
   // proxy would make PanelPreviewSurface's structuredClone() throw DataCloneError, and
@@ -28,15 +30,13 @@
   // --- Incoming MIDI (bidirectional): the panel follows the synth ---
   // The GAIA's filter knob transmits CC 102/103/104 (Tone 1/2/3 cutoff). Map the CCs we
   // mirror on-screen to device parameters. First pass — later sourced from the device profile.
-  const INBOUND_CC = { 102: 'filter.cutoff' };
-  // Incoming DT1 SysEx: address (4 bytes, space-hex) -> parameterId. Used when the GAIA's
-  // "Tx Edit Data" is ON (knob edits transmit as SysEx) and for RQ1 reply data.
-  const INBOUND_SYSEX = {
-    '10 00 01 0C': 'filter.cutoff',
-    '10 00 01 0F': 'filter.resonance',
-    '10 00 01 00': 'osc.wave',   // Tone 1 OSC Wave (the GAIA also emits Tone 2/3 at 10 00 02/03 00)
-    '10 00 01 1C': 'lfo.shape',  // Tone 1 LFO Shape
-  };
+  // INBOUND_CC (cc -> paramId) and INBOUND_SYSEX (DT1 address -> paramId) are DERIVED from the
+  // DPD runtime map (CE/dpd/tools/emit-runtime.mjs) — the "maps -> profile" generalization, no
+  // hardcoding. This slim panel binds Tone 1 with flat ids ('filter.cutoff'), so resolved
+  // 'tone1.*' ids map back to flat; 'tone2/3.*' entries stay scoped (unbound here -> ignored).
+  const flatId = (rid) => rid.replace(/^tone1\./, '');
+  const INBOUND_CC = Object.fromEntries(Object.entries(deviceRuntime.ccIn ?? {}).map(([cc, rid]) => [Number(cc), flatId(rid)]));
+  const INBOUND_SYSEX = Object.fromEntries(Object.entries(deviceRuntime.sysexIn ?? {}).map(([addr, rid]) => [addr, flatId(rid)]));
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
 

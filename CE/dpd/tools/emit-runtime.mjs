@@ -36,10 +36,17 @@ for (const p of params) {
   if (p.wires.read?.msg === 'rq1' && p.wires.read.address) out.sysexIn[p.wires.read.address] = p.resolvedId;
 }
 
-const dir = join(dirname(fileURLToPath(import.meta.url)), '..', 'build');
+const HERE = dirname(fileURLToPath(import.meta.url));
+const dir = join(HERE, '..', 'build');
 mkdirSync(dir, { recursive: true });
 const file = join(dir, `${id}.runtime.json`);
 writeFileSync(file, JSON.stringify(out, null, 2));
 console.log(`wrote ${file}`);
+// Also emit into the web app so the player consumes it instead of hardcoded maps.
+const webDir = join(HERE, '..', '..', 'web', 'src', 'CE_Application', 'generated');
+mkdirSync(webDir, { recursive: true });
+const webFile = join(webDir, `${id}.runtime.json`);
+writeFileSync(webFile, JSON.stringify(out, null, 2));
+console.log(`wrote ${webFile}`);
 console.log(`  sysexIn: ${Object.keys(out.sysexIn).length} addresses, ccIn: ${Object.keys(out.ccIn).length} CCs, params: ${Object.keys(out.params).length}`);
 console.log(`  sample — CC ${Object.keys(out.ccIn).join('/')} -> cutoff; 10 00 01 00 -> ${out.sysexIn['10 00 01 00']}; 10 00 01 0C -> ${out.sysexIn['10 00 01 0C']}`);

@@ -1,0 +1,406 @@
+{
+  "profileId": "roland.gaia",
+  "version": "1.0.0",
+  "deviceId": "7F",
+  "modelId": "00 00 41",
+  "sysexIn": {
+    "10 00 01 00": "tone1.osc.wave",
+    "10 00 01 0A": "tone1.filter.mode",
+    "10 00 01 0B": "tone1.filter.slope",
+    "10 00 01 0C": "tone1.filter.cutoff",
+    "10 00 01 0D": "tone1.filter.cutoffKeyfollow",
+    "10 00 01 0E": "tone1.filter.envVelocitySens",
+    "10 00 01 0F": "tone1.filter.resonance",
+    "10 00 01 10": "tone1.filter.envAttack",
+    "10 00 01 11": "tone1.filter.envDecay",
+    "10 00 01 12": "tone1.filter.envSustain",
+    "10 00 01 13": "tone1.filter.envRelease",
+    "10 00 01 14": "tone1.filter.envDepth",
+    "10 00 01 1C": "tone1.lfo.shape",
+    "10 00 02 00": "tone2.osc.wave",
+    "10 00 02 0A": "tone2.filter.mode",
+    "10 00 02 0B": "tone2.filter.slope",
+    "10 00 02 0C": "tone2.filter.cutoff",
+    "10 00 02 0D": "tone2.filter.cutoffKeyfollow",
+    "10 00 02 0E": "tone2.filter.envVelocitySens",
+    "10 00 02 0F": "tone2.filter.resonance",
+    "10 00 02 10": "tone2.filter.envAttack",
+    "10 00 02 11": "tone2.filter.envDecay",
+    "10 00 02 12": "tone2.filter.envSustain",
+    "10 00 02 13": "tone2.filter.envRelease",
+    "10 00 02 14": "tone2.filter.envDepth",
+    "10 00 02 1C": "tone2.lfo.shape",
+    "10 00 03 00": "tone3.osc.wave",
+    "10 00 03 0A": "tone3.filter.mode",
+    "10 00 03 0B": "tone3.filter.slope",
+    "10 00 03 0C": "tone3.filter.cutoff",
+    "10 00 03 0D": "tone3.filter.cutoffKeyfollow",
+    "10 00 03 0E": "tone3.filter.envVelocitySens",
+    "10 00 03 0F": "tone3.filter.resonance",
+    "10 00 03 10": "tone3.filter.envAttack",
+    "10 00 03 11": "tone3.filter.envDecay",
+    "10 00 03 12": "tone3.filter.envSustain",
+    "10 00 03 13": "tone3.filter.envRelease",
+    "10 00 03 14": "tone3.filter.envDepth",
+    "10 00 03 1C": "tone3.lfo.shape"
+  },
+  "ccIn": {
+    "102": "tone1.filter.cutoff",
+    "103": "tone2.filter.cutoff",
+    "104": "tone3.filter.cutoff"
+  },
+  "params": {
+    "tone1.osc.wave": {
+      "valueType": "enum",
+      "outAddress": "10 00 01 00",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "saw": 0,
+        "square": 1,
+        "pulse": 2,
+        "triangle": 3,
+        "sine": 4,
+        "noise": 5,
+        "supersaw": 6
+      }
+    },
+    "tone1.filter.mode": {
+      "valueType": "enum",
+      "outAddress": "10 00 01 0A",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "bypass": 0,
+        "lpf": 1,
+        "hpf": 2,
+        "bpf": 3,
+        "pkg": 4
+      }
+    },
+    "tone1.filter.slope": {
+      "valueType": "enum",
+      "outAddress": "10 00 01 0B",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "db12": 0,
+        "db24": 1
+      }
+    },
+    "tone1.filter.cutoff": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 0C",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.cutoffKeyfollow": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 0D",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envVelocitySens": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 0E",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.resonance": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 0F",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envAttack": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 10",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envDecay": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 11",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envSustain": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 12",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envRelease": {
+      "valueType": "continuous",
+      "outAddress": "10 00 01 13",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.filter.envDepth": {
+      "valueType": "signed",
+      "outAddress": "10 00 01 14",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone1.lfo.shape": {
+      "valueType": "enum",
+      "outAddress": "10 00 01 1C",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "triangle": 0,
+        "sine": 1,
+        "saw": 2,
+        "square": 3,
+        "sh": 4,
+        "random": 5
+      }
+    },
+    "tone2.osc.wave": {
+      "valueType": "enum",
+      "outAddress": "10 00 02 00",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "saw": 0,
+        "square": 1,
+        "pulse": 2,
+        "triangle": 3,
+        "sine": 4,
+        "noise": 5,
+        "supersaw": 6
+      }
+    },
+    "tone2.filter.mode": {
+      "valueType": "enum",
+      "outAddress": "10 00 02 0A",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "bypass": 0,
+        "lpf": 1,
+        "hpf": 2,
+        "bpf": 3,
+        "pkg": 4
+      }
+    },
+    "tone2.filter.slope": {
+      "valueType": "enum",
+      "outAddress": "10 00 02 0B",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "db12": 0,
+        "db24": 1
+      }
+    },
+    "tone2.filter.cutoff": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 0C",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.cutoffKeyfollow": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 0D",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envVelocitySens": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 0E",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.resonance": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 0F",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envAttack": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 10",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envDecay": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 11",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envSustain": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 12",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envRelease": {
+      "valueType": "continuous",
+      "outAddress": "10 00 02 13",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.filter.envDepth": {
+      "valueType": "signed",
+      "outAddress": "10 00 02 14",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone2.lfo.shape": {
+      "valueType": "enum",
+      "outAddress": "10 00 02 1C",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "triangle": 0,
+        "sine": 1,
+        "saw": 2,
+        "square": 3,
+        "sh": 4,
+        "random": 5
+      }
+    },
+    "tone3.osc.wave": {
+      "valueType": "enum",
+      "outAddress": "10 00 03 00",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "saw": 0,
+        "square": 1,
+        "pulse": 2,
+        "triangle": 3,
+        "sine": 4,
+        "noise": 5,
+        "supersaw": 6
+      }
+    },
+    "tone3.filter.mode": {
+      "valueType": "enum",
+      "outAddress": "10 00 03 0A",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "bypass": 0,
+        "lpf": 1,
+        "hpf": 2,
+        "bpf": 3,
+        "pkg": 4
+      }
+    },
+    "tone3.filter.slope": {
+      "valueType": "enum",
+      "outAddress": "10 00 03 0B",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "db12": 0,
+        "db24": 1
+      }
+    },
+    "tone3.filter.cutoff": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 0C",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.cutoffKeyfollow": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 0D",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envVelocitySens": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 0E",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.resonance": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 0F",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envAttack": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 10",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envDecay": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 11",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envSustain": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 12",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envRelease": {
+      "valueType": "continuous",
+      "outAddress": "10 00 03 13",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.filter.envDepth": {
+      "valueType": "signed",
+      "outAddress": "10 00 03 14",
+      "outCc": null,
+      "size": 1,
+      "enum": null
+    },
+    "tone3.lfo.shape": {
+      "valueType": "enum",
+      "outAddress": "10 00 03 1C",
+      "outCc": null,
+      "size": 1,
+      "enum": {
+        "triangle": 0,
+        "sine": 1,
+        "saw": 2,
+        "square": 3,
+        "sh": 4,
+        "random": 5
+      }
+    },
+    "global.master.volume": {
+      "valueType": "continuous",
+      "outAddress": null,
+      "outCc": 7,
+      "size": 1,
+      "enum": null
+    }
+  }
+}
