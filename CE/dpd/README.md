@@ -15,6 +15,7 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `tools/dpd.mjs` | Node entry: file loading + inheritance orchestration + message builder. Re-exports `codecs.mjs` + `resolve.mjs` so existing importers are unchanged. |
 | `codecs.mjs` | **Browser-safe** pure codecs (no Node deps): hex↔bytes, address resolve, `roland-7bit` checksum, value encode/decode, bitslice, Korg 8↔7 packing. Shared by the Node tools and the browser UIs. |
 | `resolve.mjs` | **Browser-safe** pure resolution: scope→flat-param expansion with absolute addresses + directional wires, override algebra, mixin composition. Imports only `codecs.mjs`. |
+| `merge.mjs` | **Browser-safe** merge-on-drop translation (doc §Integration): a resolved param → (a) a legacy **descriptor** the existing fit/adopt logic consumes, and (b) a **self-contained value-tree section** carrying address/CC + enum wire values + packing + the required `source:"id@version"` stamp. |
 | `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 48 checks, all pass. |
 | `tools/emit-runtime.mjs` | Emits the player's inbound maps **derived from the profile** (`build/<id>.runtime.json` + into the web app) — the "maps → profile" generalization (inbound consumption). |
 | `tools/emit-legacy.mjs` | Emits the C++ engine's legacy `.ceditor-device.json` **from** the DPD (`roland-gaia-dpd`) so OUTBOUND is DPD-sourced without rewriting the engine. |
@@ -60,8 +61,12 @@ and broken merge-on-drop.
 - **Layer 4 (matching):** Universal Device Inquiry build + Identity-Reply parse + id resolution with
   graceful degradation; optional `identity` codes on a profile select model/variant. ✅ logic
   (live MIDI inquiry + fingerprint need hardware).
-- **Integration seam:** the resolved profile (flat params + wires + enum wires + packing) is exactly
-  what merge-on-drop copies into the value tree; `emit-runtime.mjs` shows that slice. ✅ data shape.
+- **Integration seam (merge-on-drop):** `merge.mjs` translates a resolved param into the
+  self-contained value-tree section the doc specifies — its address/CC, range, **enum entries with
+  their wire values**, **bit-slice/packing detail**, and the **`source:"id@version"` stamp** (doc
+  lines 425/437/439) — plus a legacy descriptor so the *existing* red/orange/green fit and
+  metadata-adopt keep working unchanged (doc: "provided the translation carries the value-type
+  across"). 32 tests against the real GAIA + a packed param. ✅ data + translation.
 
 ## What remains (per the doc's build order)
 
