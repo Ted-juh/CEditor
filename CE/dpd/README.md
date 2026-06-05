@@ -16,6 +16,9 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 43 checks, all pass. |
 | `tools/emit-runtime.mjs` | Emits the player's inbound maps **derived from the profile** (`build/<id>.runtime.json` + into the web app) — the "maps → profile" generalization (inbound consumption). |
 | `tools/emit-legacy.mjs` | Emits the C++ engine's legacy `.ceditor-device.json` **from** the DPD (`roland-gaia-dpd`) so OUTBOUND is DPD-sourced without rewriting the engine. |
+| `tools/import-midici.mjs` | **MIDI-CI Property Exchange** importer — a captured PE resource → native JSON (names + CCs + identity), `partial`. |
+| `tools/library.mjs` + `library.test.mjs` | **Layer 3 flywheel** curation core — round-trip gate, confirm-vs-fork, partial-accrete, conflict→version/variant, versioning/revert/pin, reputation, downloader caution. |
+| `tools/designer-view.mjs` | Designer **resolved-view** surface — renders a real profile as the mockup's parameter table (incl. the multi-wire *Receives* column) to `build/designer.html`. |
 | `tools/validate.mjs` | Shared dependency-free structural validator (the formal contract is `dpd.schema.json`). |
 | `tools/import-ins.mjs` | **Layer 2 importer** — Cakewalk `.ins` → native JSON, marked `structural-only`, with a "what came through / what needs you" summary. |
 | `tools/match.mjs` | **Layer 4 matcher** — builds the Universal Device Inquiry, parses the Identity Reply, resolves to a profile id with graceful degradation (model → manufacturer → none). |
@@ -64,19 +67,28 @@ and broken merge-on-drop.
    the DPD-generated profile byte-identically, and injected MIDI drives the controls. Follow-ups: a
    generic loader (any panel/profile, no per-device wiring) and the C++ engine reading the new schema
    natively (instead of via the generated legacy file).
-2. **MIDI-CI Property Exchange importer** — live auto-population for modern gear (the `.ins`
-   importer is in; adapters share the validate + collision model).
-3. **Layer 4 hardware path** — wire inquiry/fingerprint to real MIDI in, and capture the GAIA's
-   `identity` (family/member) codes (the matcher logic is in; codes need a hardware inquiry).
-4. **Layer 3 flywheel** — canonical profiles, confirmation/reputation, subscriptions, curation
-   (needs a backend; the trust/provenance fields are already in the schema).
-5. **Designer + Packing Studio UI** — the two mockups, built against this data model.
+The **computational + logic core of every layer is now built and verified.** What's left is the
+interactive-app, server, and live-hardware integration that can't be built and verified headlessly:
+
+2. **Full interactive Designer + Packing Studio UI** — the editing experience (drag-to-bind, the
+   bit-grid packing editor). The resolved **view** (`designer-view.mjs` → `build/designer.html`) and
+   the packing **logic** (`dpd.mjs` + full-range round-trip) are done; the Svelte editor surfaces
+   need the app + visual QA.
+3. **Community backend for the flywheel** — the curation **logic** (`library.mjs`, 21 tests) is done;
+   running it at scale needs a server + auth.
+4. **Live MIDI 2.0 hardware** — the CI Discovery handshake + capturing the GAIA's real `identity`
+   codes. The PE parse (`import-midici.mjs`) and inquiry/match (`match.mjs`) **logic** are done.
+5. **Engine reads the new schema natively** — today it consumes a generated legacy profile
+   (`emit-legacy.mjs`), which works and is byte-identical; native C++ parsing is a follow-up.
 
 ## Verify
 
 ```
 node CE/dpd/tools/verify.mjs          # 48 checks — schema, resolution, exact GAIA bytes, round-trips, overrides/mixins
 node CE/dpd/tools/match.mjs           # 12 checks — inquiry build, identity parse, match + graceful degradation
-node CE/dpd/tools/import-ins.mjs      # imports samples/sample.ins -> validated structural-only profile
-node CE/dpd/tools/emit-runtime.mjs roland.gaia
+node CE/dpd/tools/library.test.mjs    # 21 checks — round-trip gate, confirm/merge/conflict, versioning, reputation
+node CE/dpd/tools/import-ins.mjs      # .ins -> validated structural-only profile
+node CE/dpd/tools/import-midici.mjs   # MIDI-CI PE -> validated partial profile (8 checks)
+node CE/dpd/tools/emit-runtime.mjs roland.gaia    # inbound map (player) ; emit-legacy.mjs -> engine profile (outbound)
+node CE/dpd/tools/designer-view.mjs roland.gaia   # resolved-view HTML
 ```
