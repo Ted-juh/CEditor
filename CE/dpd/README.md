@@ -14,7 +14,8 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `library/roland.gaia.json` | **Model** profile (the spec's "data port") — `inherits: roland`, model id `00 00 41`, a `tone` scope instanced ×3 (filter section + osc.wave + lfo.shape) and a `global` scope (master volume). The working GAIA, ported. |
 | `tools/dpd.mjs` | Resolver + codecs + message builder (pure JS, no deps): inheritance merge, scope→flat-param resolution with absolute addresses + directional wires, value encode/decode, Korg 8→7 packing, checksum, template→bytes. |
 | `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 43 checks, all pass. |
-| `tools/emit-runtime.mjs` | Emits the player's inbound/outbound maps **derived from the profile** (`build/<id>.runtime.json`) — the "maps → profile" generalization. |
+| `tools/emit-runtime.mjs` | Emits the player's inbound maps **derived from the profile** (`build/<id>.runtime.json` + into the web app) — the "maps → profile" generalization (inbound consumption). |
+| `tools/emit-legacy.mjs` | Emits the C++ engine's legacy `.ceditor-device.json` **from** the DPD (`roland-gaia-dpd`) so OUTBOUND is DPD-sourced without rewriting the engine. |
 | `tools/validate.mjs` | Shared dependency-free structural validator (the formal contract is `dpd.schema.json`). |
 | `tools/import-ins.mjs` | **Layer 2 importer** — Cakewalk `.ins` → native JSON, marked `structural-only`, with a "what came through / what needs you" summary. |
 | `tools/match.mjs` | **Layer 4 matcher** — builds the Universal Device Inquiry, parses the Identity Reply, resolves to a profile id with graceful degradation (model → manufacturer → none). |
@@ -56,11 +57,13 @@ and broken merge-on-drop.
 
 ## What remains (per the doc's build order)
 
-1. **Runtime consumption** — point the engine/player at the new schema (or consume
-   `*.runtime.json`) so the hardcoded `INBOUND_*` maps in `Player.svelte` are deleted and synth↔panel
-   works for any profiled device. The data is proven equivalent (`emit-runtime.mjs`); this is the
-   live wiring + a hardware re-verify of the GAIA bidirectional panel (the acceptance gate). Best
-   done with the editor + hardware in the loop.
+1. **Runtime consumption — DONE for the GAIA panel (both directions DPD-sourced).** Inbound: the
+   player derives its decode maps from the generated `roland.gaia.runtime.json` (hardcoded `INBOUND_*`
+   deleted). Outbound: `emit-legacy.mjs` generates the engine profile `roland-gaia-dpd` from the DPD,
+   and the slim panel's `deviceSession` points at it. Verified headlessly: the C++ engine compiles
+   the DPD-generated profile byte-identically, and injected MIDI drives the controls. Follow-ups: a
+   generic loader (any panel/profile, no per-device wiring) and the C++ engine reading the new schema
+   natively (instead of via the generated legacy file).
 2. **MIDI-CI Property Exchange importer** — live auto-population for modern gear (the `.ins`
    importer is in; adapters share the validate + collision model).
 3. **Layer 4 hardware path** — wire inquiry/fingerprint to real MIDI in, and capture the GAIA's
