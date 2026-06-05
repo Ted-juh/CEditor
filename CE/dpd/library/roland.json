@@ -6,6 +6,7 @@
   "label": "Roland",
   "manufacturerId": "41",
   "deviceId": "7F",
+  "identity": { "manufacturerId": "41" },
   "byteOrder": "msb-first",
   "checksum": { "type": "roland-7bit", "from": "$address", "to": "$encodedValue" },
   "messageShapes": [

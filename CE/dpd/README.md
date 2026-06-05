@@ -15,6 +15,10 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `tools/dpd.mjs` | Resolver + codecs + message builder (pure JS, no deps): inheritance merge, scope→flat-param resolution with absolute addresses + directional wires, value encode/decode, Korg 8→7 packing, checksum, template→bytes. |
 | `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 43 checks, all pass. |
 | `tools/emit-runtime.mjs` | Emits the player's inbound/outbound maps **derived from the profile** (`build/<id>.runtime.json`) — the "maps → profile" generalization. |
+| `tools/validate.mjs` | Shared dependency-free structural validator (the formal contract is `dpd.schema.json`). |
+| `tools/import-ins.mjs` | **Layer 2 importer** — Cakewalk `.ins` → native JSON, marked `structural-only`, with a "what came through / what needs you" summary. |
+| `tools/match.mjs` | **Layer 4 matcher** — builds the Universal Device Inquiry, parses the Identity Reply, resolves to a profile id with graceful degradation (model → manufacturer → none). |
+| `samples/sample.ins` | Sample Cakewalk definition for the importer. |
 | `build/roland.gaia.runtime.json` | Generated: SysEx-address→param, CC→param, enum wires, out addresses — for all 3 tones (39 addresses + CC 102/103/104), replacing the player's hardcoded 4-entry map. |
 
 ## The one schema change beyond the doc: multi-wire parameters
@@ -41,8 +45,12 @@ and broken merge-on-drop.
 - **Parameter / packing model:** `encoding` covers u7/s7/nibbles/**bitslice**/**packed8to7** — the
   one unifying "bits from places, assembled" primitive; round-trip verified across the **full**
   range incl. the Korg footgun (both MSB orders). ✅
-- **Layer 2 (provenance):** `provenance` + `completeness` on every profile. ✅ schema (the
-  importer/adapters are remaining).
+- **Layer 2 (sources/provenance):** `provenance` + `completeness` on every profile; the `.ins`
+  **importer** lands names + CC maps as `structural-only` with a what-came-through/what-needs-you
+  summary. ✅ schema + one importer (MIDI-CI + more adapters remaining).
+- **Layer 4 (matching):** Universal Device Inquiry build + Identity-Reply parse + id resolution with
+  graceful degradation; optional `identity` codes on a profile select model/variant. ✅ logic
+  (live MIDI inquiry + fingerprint need hardware).
 - **Integration seam:** the resolved profile (flat params + wires + enum wires + packing) is exactly
   what merge-on-drop copies into the value tree; `emit-runtime.mjs` shows that slice. ✅ data shape.
 
@@ -50,17 +58,22 @@ and broken merge-on-drop.
 
 1. **Runtime consumption** — point the engine/player at the new schema (or consume
    `*.runtime.json`) so the hardcoded `INBOUND_*` maps in `Player.svelte` are deleted and synth↔panel
-   works for any profiled device. The data is proven equivalent; this is the live wiring + a
-   hardware re-verify of the GAIA bidirectional panel (the acceptance gate).
-2. **Layer 2 importer** — `.ins` / MIDI-CI Property Exchange adapters → native JSON, landing as
-   `partial`/`structural-only` with a "what came through / what needs you" summary.
-3. **Layer 4 matching** — manual pick + Universal Device Inquiry → id+variant; fingerprint fallback.
-4. **Layer 3 flywheel** — canonical profiles, confirmation/reputation, subscriptions, curation.
+   works for any profiled device. The data is proven equivalent (`emit-runtime.mjs`); this is the
+   live wiring + a hardware re-verify of the GAIA bidirectional panel (the acceptance gate). Best
+   done with the editor + hardware in the loop.
+2. **MIDI-CI Property Exchange importer** — live auto-population for modern gear (the `.ins`
+   importer is in; adapters share the validate + collision model).
+3. **Layer 4 hardware path** — wire inquiry/fingerprint to real MIDI in, and capture the GAIA's
+   `identity` (family/member) codes (the matcher logic is in; codes need a hardware inquiry).
+4. **Layer 3 flywheel** — canonical profiles, confirmation/reputation, subscriptions, curation
+   (needs a backend; the trust/provenance fields are already in the schema).
 5. **Designer + Packing Studio UI** — the two mockups, built against this data model.
 
 ## Verify
 
 ```
-node CE/dpd/tools/verify.mjs          # 43 checks — schema, resolution, exact GAIA bytes, round-trips
+node CE/dpd/tools/verify.mjs          # 48 checks — schema, resolution, exact GAIA bytes, round-trips, overrides/mixins
+node CE/dpd/tools/match.mjs           # 12 checks — inquiry build, identity parse, match + graceful degradation
+node CE/dpd/tools/import-ins.mjs      # imports samples/sample.ins -> validated structural-only profile
 node CE/dpd/tools/emit-runtime.mjs roland.gaia
 ```

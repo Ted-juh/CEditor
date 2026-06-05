@@ -1,0 +1,35 @@
+; Sample Cakewalk instrument definition (.ins) — for importer testing.
+; .ins encodes ONLY names + CC maps + bank-select; no SysEx/packing/checksums/dumps.
+
+.Patch Names
+
+[GAIA Patches]
+0=Init Patch
+1=Super Saw Lead
+2=Warm Pad
+3=Acid Bass
+
+.Note Names
+
+[GAIA Drums]
+36=Kick
+38=Snare
+
+.Controller Names
+
+[GAIA Controllers]
+1=Modulation
+7=Volume
+10=Pan
+102=Tone 1 Cutoff
+103=Tone 2 Cutoff
+104=Tone 3 Cutoff
+105=Tone 1 Resonance
+
+.Instrument Definitions
+
+[Roland GAIA SH-01]
+Control=GAIA Controllers
+Patch[*]=GAIA Patches
+Key[*]=GAIA Drums
+BankSelMethod=2

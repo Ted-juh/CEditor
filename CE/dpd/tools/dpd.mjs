@@ -136,21 +136,75 @@ export function loadProfile(id, libDir = LIB_DIR) {
   return JSON.parse(readFileSync(join(libDir, `${id}.json`), 'utf8'));
 }
 
-// Merge manufacturer (inherited) under the model (own). Own wins; conventions inherited.
+// Resolve a profile: inherit parent conventions, compose includes (mixins), apply overrides.
+// Resolution order on collision: own > included (declared order) > inherited.
 export function resolveProfile(id, libDir = LIB_DIR) {
   const profile = loadProfile(id, libDir);
-  if (!profile.inherits) return profile;
-  const parent = resolveProfile(profile.inherits, libDir);
-  return {
-    ...parent,
-    ...profile,
-    manufacturerId: profile.manufacturerId ?? parent.manufacturerId,
-    deviceId: profile.deviceId ?? parent.deviceId,
-    checksum: profile.checksum ?? parent.checksum,
-    byteOrder: profile.byteOrder ?? parent.byteOrder,
-    messageShapes: profile.messageShapes ?? parent.messageShapes,
-    provenance: profile.provenance ?? parent.provenance,
-  };
+  let merged = profile;
+  if (profile.inherits) {
+    const parent = resolveProfile(profile.inherits, libDir);
+    merged = {
+      ...parent,
+      ...profile,
+      manufacturerId: profile.manufacturerId ?? parent.manufacturerId,
+      deviceId: profile.deviceId ?? parent.deviceId,
+      identity: profile.identity ?? parent.identity,
+      checksum: profile.checksum ?? parent.checksum,
+      byteOrder: profile.byteOrder ?? parent.byteOrder,
+      messageShapes: profile.messageShapes ?? parent.messageShapes,
+      provenance: profile.provenance ?? parent.provenance,
+      // a variant has no own scopes -> inherit the model's; deep-clone so overrides don't mutate cache.
+      scopes: profile.scopes ?? structuredClone(parent.scopes),
+    };
+  }
+  if (Array.isArray(merged.includes) && merged.includes.length) {
+    const comps = merged.includes.map((ref) => resolveProfile(ref.split('@')[0], libDir));
+    merged = mergeIncludes(merged, comps);
+  }
+  if (Array.isArray(merged.overrides) && merged.overrides.length) {
+    merged = applyOverrides(merged, merged.overrides);
+  }
+  return merged;
+}
+
+// Override algebra: ordered set/add/remove/reorder ops against scopes.<scope>.parameters[.<id>].
+export function applyOverrides(resolved, ops) {
+  const out = structuredClone(resolved);
+  for (const op of ops) {
+    const path = (op.target ?? '').split('.');
+    if (path[0] !== 'scopes' || path[2] !== 'parameters') continue;
+    const scope = out.scopes?.[path[1]];
+    if (!scope) continue;
+    const params = scope.parameters ?? (scope.parameters = []);
+    const paramId = path[3];
+    if (op.op === 'set' && paramId) {
+      const p = params.find((x) => x.id === paramId);
+      if (p) Object.assign(p, op.value ?? {});
+    } else if (op.op === 'add' && op.value) {
+      params.push(op.value);
+    } else if (op.op === 'remove' && paramId) {
+      scope.parameters = params.filter((x) => x.id !== paramId); // tombstone (suppressed on resolve)
+    } else if (op.op === 'reorder' && Array.isArray(op.order)) {
+      const byId = Object.fromEntries(params.map((x) => [x.id, x]));
+      scope.parameters = op.order.map((id) => byId[id]).filter(Boolean)
+        .concat(params.filter((x) => !op.order.includes(x.id)));
+    }
+  }
+  return out;
+}
+
+// Mixin composition: included component scopes/params fill in; own (already present) wins on id.
+export function mergeIncludes(resolved, components) {
+  const out = structuredClone(resolved);
+  out.scopes = out.scopes ?? {};
+  for (const comp of components) {
+    for (const [sk, sc] of Object.entries(comp.scopes ?? {})) {
+      if (!out.scopes[sk]) { out.scopes[sk] = structuredClone(sc); continue; }
+      const have = new Set((out.scopes[sk].parameters ?? []).map((p) => p.id));
+      for (const p of sc.parameters ?? []) if (!have.has(p.id)) out.scopes[sk].parameters.push(structuredClone(p));
+    }
+  }
+  return out;
 }
 
 // Resolve scopes -> flat parameters with absolute addresses + directional wires.

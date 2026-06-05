@@ -4,7 +4,9 @@
 import {
   LIB_DIR, loadProfile, resolveProfile, resolveParams, buildMessage,
   encodeValue, decodeValue, pack8to7, unpack8to7, bitsliceEncode, bitsliceDecode,
+  applyOverrides, mergeIncludes,
 } from './dpd.mjs';
+import { validateProfile } from './validate.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.log('  ✗ FAIL: ' + msg); } };
@@ -14,26 +16,9 @@ const section = (t) => console.log('\n— ' + t);
 // ---------------------------------------------------------------- structural validation
 section('Structural validation');
 function validate(profile, id) {
-  const errs = [];
-  if (profile.schemaVersion !== 1) errs.push('schemaVersion must be 1');
-  if (!/^[a-z0-9]+([._-][a-z0-9]+)*$/.test(profile.id ?? '')) errs.push('bad id');
-  if (!/^\d+\.\d+\.\d+$/.test(profile.version ?? '')) errs.push('bad version');
-  if (!['manufacturer', 'model', 'variant', 'component'].includes(profile.kind)) errs.push('bad kind');
-  if (profile.kind === 'model' && !profile.scopes) errs.push('model needs scopes');
-  for (const [sk, sc] of Object.entries(profile.scopes ?? {})) {
-    for (const p of sc.parameters ?? []) {
-      if (!p.id) errs.push(`${sk}: param missing id`);
-      if (!['continuous', 'signed', 'enum', 'toggle', 'trigger'].includes(p.valueType)) errs.push(`${sk}.${p.id}: bad valueType`);
-      if (p.valueType === 'enum' && !Array.isArray(p.enum)) errs.push(`${sk}.${p.id}: enum needs entries`);
-      if (p.address && !/^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/.test(p.address)) errs.push(`${sk}.${p.id}: bad address`);
-      for (const w of [p.rxLive, ...(p.wires ?? [])].filter(Boolean)) {
-        if (!['write', 'read', 'rxLive'].includes(w.dir)) errs.push(`${sk}.${p.id}: bad wire dir ${w.dir}`);
-        if (!['dt1', 'rq1', 'cc', 'nrpn', 'raw'].includes(w.msg)) errs.push(`${sk}.${p.id}: bad wire msg ${w.msg}`);
-      }
-    }
-  }
-  ok(errs.length === 0, `${id} validates` + (errs.length ? ' :: ' + errs.join('; ') : ''));
-  return errs.length === 0;
+  const { ok: good, errors } = validateProfile(profile);
+  ok(good, `${id} validates` + (errors.length ? ' :: ' + errors.join('; ') : ''));
+  return good;
 }
 validate(loadProfile('roland'), 'roland (manufacturer)');
 validate(loadProfile('roland.gaia'), 'roland.gaia (model)');
@@ -134,6 +119,29 @@ for (const order of ['msb-high-first', 'msb-low-first']) {
     if (unpack8to7(pack8to7(internal, order), order).join(',') !== internal.join(',')) good = false;
   }
   ok(good, `packed8to7 ${order} round-trips full range`);
+}
+
+// ---------------------------------------------------------------- override algebra + mixins
+section('Override algebra + mixins (Layer 1)');
+{
+  const base = { scopes: { tone: { parameters: [
+    { id: 'a', valueType: 'continuous', range: { min: 0, max: 127 } },
+    { id: 'b', valueType: 'continuous' },
+  ] } } };
+  const over = applyOverrides(base, [
+    { op: 'set', target: 'scopes.tone.parameters.a', value: { range: { min: 0, max: 64 } } },
+    { op: 'add', target: 'scopes.tone.parameters', value: { id: 'c', valueType: 'continuous' } },
+    { op: 'remove', target: 'scopes.tone.parameters.b' },
+    { op: 'reorder', target: 'scopes.tone.parameters', order: ['c', 'a'] },
+  ]);
+  eq(over.scopes.tone.parameters.map((p) => p.id).join(','), 'c,a', 'override: add c, remove b, reorder -> [c,a]');
+  eq(over.scopes.tone.parameters.find((p) => p.id === 'a').range.max, 64, 'override set: a.range.max = 64');
+  eq(base.scopes.tone.parameters.length, 2, 'override does not mutate the base');
+
+  const comp = { scopes: { tone: { parameters: [{ id: 'a', valueType: 'enum' }, { id: 'x', valueType: 'continuous' }] } } };
+  const inc = mergeIncludes(base, [comp]);
+  eq(inc.scopes.tone.parameters.map((p) => p.id).join(','), 'a,b,x', 'include: own a/b kept, x added');
+  eq(inc.scopes.tone.parameters.find((p) => p.id === 'a').valueType, 'continuous', 'include: own a wins over component a');
 }
 
 // ---------------------------------------------------------------- report

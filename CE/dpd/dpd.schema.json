@@ -49,6 +49,17 @@
       "type": "string",
       "description": "Default device-id byte, space-hex. '7F' = broadcast (received by any unit ID)."
     },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "MIDI Universal Device Inquiry (Identity Reply) codes for Layer 4 matching. manufacturerId lives at the manufacturer level; family/member at the model level; firmware selects a variant. Absent => the profile can still be reached by manual pick or manufacturer-level degradation.",
+      "properties": {
+        "manufacturerId": { "type": "string", "description": "Identity-Reply manufacturer id, space-hex (1 or 3 bytes)." },
+        "family": { "type": "string", "description": "Device family code (2 bytes LSB MSB), space-hex." },
+        "member": { "type": "string", "description": "Device family member code (2 bytes LSB MSB), space-hex." },
+        "firmware": { "type": "string", "description": "Firmware/version match for variant resolution." }
+      }
+    },
     "checksum": { "$ref": "#/$defs/checksum" },
     "byteOrder": {
       "enum": ["msb-first", "lsb-first"],
