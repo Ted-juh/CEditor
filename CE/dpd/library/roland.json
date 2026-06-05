@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "roland",
+  "version": "1.0.0",
+  "kind": "manufacturer",
+  "label": "Roland",
+  "manufacturerId": "41",
+  "deviceId": "7F",
+  "byteOrder": "msb-first",
+  "checksum": { "type": "roland-7bit", "from": "$address", "to": "$encodedValue" },
+  "messageShapes": [
+    {
+      "id": "dt1",
+      "kind": "sysex",
+      "template": ["F0", "41", "$deviceId", "$modelId", "12", "$address", "$encodedValue", "$checksum", "F7"],
+      "checksum": { "type": "roland-7bit", "from": "$address", "to": "$encodedValue" },
+      "delayAfterMs": 20
+    },
+    {
+      "id": "rq1",
+      "kind": "sysex",
+      "template": ["F0", "41", "$deviceId", "$modelId", "11", "$address", "$size", "$checksum", "F7"],
+      "checksum": { "type": "roland-7bit", "from": "$address", "to": "$size" }
+    }
+  ],
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedFullDump": false,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "importedFrom": null
+  },
+  "completeness": "structural-only"
+}

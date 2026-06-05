@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ceditor.dev/dpd/dpd.schema.json",
+  "title": "CEditor Device Profile (DPD)",
+  "description": "Native, open, versioned schema for a CEditor device profile. Implements Layer 0 (versioning), Layer 1 (identity / inheritance / scopes / override algebra) and the parameter/packing + provenance models from device-library-architecture.md. A profile is a manufacturer, model, variant, or reusable component. The resolved (inheritance- and scope-expanded) profile is what the panel/value-tree consumes via merge-on-drop.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "version", "kind"],
+  "additionalProperties": true,
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "const": 1,
+      "description": "Format version of THIS schema. Bumped only on a breaking schema change (migration, not mutation)."
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*$",
+      "description": "Immutable dotted id, e.g. 'roland' (mfr), 'roland.gaia' (model), 'roland.gaia.eu' (variant), 'roland.fx.chorus' (component)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of this profile. Any change produces a new version; old versions stay resolvable (Layer 0)."
+    },
+    "kind": {
+      "enum": ["manufacturer", "model", "variant", "component"],
+      "description": "manufacturer = SysEx/checksum/byte-order conventions; model = parameter list + scopes + dumps; variant = deltas over a model; component = reusable fragment (mixin)."
+    },
+    "label": { "type": "string", "description": "Human-facing name shown in the UI." },
+    "inherits": {
+      "type": "string",
+      "description": "Parent profile id this one inherits (model inherits its manufacturer; variant inherits its model). Resolution order: own > included > inherited."
+    },
+    "includes": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9]+([._-][a-z0-9]+)*(@\\d+\\.\\d+\\.\\d+)?$" },
+      "description": "Mixin component refs ('id@version'). Composed after inheritance, before own. UI-tier: ordinary authors never see these; they appear as resolved parameters."
+    },
+
+    "manufacturerId": {
+      "type": "string",
+      "description": "SysEx manufacturer id byte(s), space-hex. Manufacturer-level. e.g. '41' (Roland)."
+    },
+    "modelId": {
+      "type": "string",
+      "description": "Model id bytes, space-hex. e.g. '00 00 41' (GAIA SH-01)."
+    },
+    "deviceId": {
+      "type": "string",
+      "description": "Default device-id byte, space-hex. '7F' = broadcast (received by any unit ID)."
+    },
+    "checksum": { "$ref": "#/$defs/checksum" },
+    "byteOrder": {
+      "enum": ["msb-first", "lsb-first"],
+      "description": "Default multi-byte value byte order for this maker/model."
+    },
+
+    "messageShapes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/messageShape" },
+      "description": "Reusable wire-message templates (DT1, RQ1, etc.) referenced by parameter wires."
+    },
+
+    "deviceStructure": { "$ref": "#/$defs/deviceStructure" },
+
+    "scopes": {
+      "type": "object",
+      "description": "Named parameter spaces. A mono-timbral synth has one scope (not surfaced as a concept). A workstation has global + N parts, etc. Scope names use the device's own language in the UI (Part 1-16, Global, FX).",
+      "additionalProperties": { "$ref": "#/$defs/scope" }
+    },
+
+    "dumps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/dump" },
+      "description": "Bulk transfer definitions (patch/performance/bank). Reference scopes; tracked by verifiedFullDump separately from per-parameter round-trip."
+    },
+
+    "overrides": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/overrideOp" },
+      "description": "Variant/model delta operations against the inherited+resolved parent. Applied in order. Removal is a tombstone."
+    },
+
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "completeness": {
+      "enum": ["full", "partial", "structural-only"],
+      "description": "How finished the profile is. Imported profiles that lack bit-level detail land as partial/structural-only."
+    }
+  },
+
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "model" } } },
+      "then": { "required": ["scopes"], "description": "A model must declare at least one scope (its parameter space)." }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "variant" } } },
+      "then": { "required": ["inherits"], "description": "A variant must inherit a model." }
+    }
+  ],
+
+  "$defs": {
+    "hexBytes": {
+      "type": "string",
+      "pattern": "^([0-9A-Fa-f]{2})(\\s[0-9A-Fa-f]{2})*$",
+      "description": "Space-separated hex bytes, e.g. '10 00 01 0C'."
+    },
+
+    "checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["roland-7bit", "sum-7bit", "xor", "none"],
+          "description": "roland-7bit = (128 - (sum & 0x7F)) & 0x7F over [from..to]. sum-7bit = plain additive 7-bit. Distinct algorithms - do not confuse."
+        },
+        "from": { "type": "string", "description": "Start marker of the checksum range, e.g. '$address'." },
+        "to": { "type": "string", "description": "End marker of the checksum range, e.g. '$encodedValue' or '$size'." }
+      }
+    },
+
+    "messageShape": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "template"],
+      "properties": {
+        "id": { "type": "string", "description": "e.g. 'dt1', 'rq1'." },
+        "kind": { "enum": ["sysex", "cc", "nrpn", "raw"] },
+        "template": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered tokens: literal hex bytes or placeholders ($deviceId, $address, $encodedValue, $size, $checksum)."
+        },
+        "checksum": { "$ref": "#/$defs/checksum" },
+        "delayAfterMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+
+    "deviceStructure": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Counts that drive scope instancing (e.g. number of tones/parts). Layer 4 may refine these from device inquiry.",
+      "properties": {
+        "tones": { "type": "integer", "minimum": 1 },
+        "parts": { "type": "integer", "minimum": 1 }
+      }
+    },
+
+    "scope": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["parameters"],
+      "properties": {
+        "kind": {
+          "enum": ["global", "tone", "part", "effect", "drumMap", "patch"],
+          "description": "Role of this scope. 'global' = one instance. 'tone'/'part' = instantiated N times."
+        },
+        "label": { "type": "string", "description": "Device's own name for the scope (UI), e.g. 'Tone', 'Part'." },
+        "base": { "$ref": "#/$defs/hexBytes", "description": "Base address of instance 0 (parameters address relative to this)." },
+        "stride": { "$ref": "#/$defs/hexBytes", "description": "Address increment between consecutive instances (added per instance index)." },
+        "instances": { "type": "integer", "minimum": 1, "description": "Instance count. May be supplied by deviceStructure instead." },
+        "instancesFrom": { "type": "string", "description": "deviceStructure field to read the instance count from, e.g. 'tones'." },
+        "parameters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/parameter" }
+        }
+      }
+    },
+
+    "parameter": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "valueType"],
+      "properties": {
+        "id": { "type": "string", "description": "Scope-unique id, e.g. 'filter.cutoff'. Resolved id is '<scopeInstance>.<id>'." },
+        "name": { "type": "string" },
+        "group": { "type": "string", "description": "UI grouping, e.g. 'Filter'." },
+        "valueType": {
+          "enum": ["continuous", "signed", "enum", "toggle", "trigger"],
+          "description": "Drives the panel red/orange/green drag-fit check and the value codec."
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "min": { "type": "number" }, "max": { "type": "number" } }
+        },
+        "default": {},
+        "encoding": { "$ref": "#/$defs/encoding" },
+        "access": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "read": { "type": "boolean" },
+            "write": { "type": "boolean" }
+          },
+          "description": "Whether the device can be read from / written to for this parameter (e.g. Master Volume may be write-only)."
+        },
+        "address": {
+          "$ref": "#/$defs/hexBytes",
+          "description": "Default wire address, RELATIVE to the scope/instance base. Used for the DT1 write, RQ1 read, and (unless rxLive overrides) the DT1 the device emits on edit."
+        },
+        "size": { "type": "integer", "minimum": 1, "description": "Number of wire data bytes for this parameter (default 1)." },
+        "rxLive": {
+          "$ref": "#/$defs/wire",
+          "description": "Override for what the device TRANSMITS on a live edit, when it differs from the write wire. The GAIA case: cutoff is written via DT1 at 'address' but the panel knob transmits CC -> {dir:rxLive, msg:cc, cc:102, ccStride:1}."
+        },
+        "wires": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/wire" },
+          "description": "Explicit full wire list (advanced). If absent, wires are derived from address/size (write DT1 + read RQ1 + rxLive DT1) plus any rxLive override."
+        },
+        "enum": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/enumEntry" },
+          "description": "Choice entries with their on-the-wire numeric value. Required for valueType enum."
+        },
+        "ui": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": { "preferredComponent": { "type": "string" } }
+        },
+        "provenance": { "$ref": "#/$defs/provenance" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "valueType": { "const": "enum" } } },
+          "then": { "required": ["enum"] }
+        }
+      ]
+    },
+
+    "wire": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dir", "msg"],
+      "description": "One directional wire binding for a parameter. dir=write (panel->synth), read (request value), rxLive (synth->panel on edit). msg picks the transport.",
+      "properties": {
+        "dir": { "enum": ["write", "read", "rxLive"] },
+        "msg": { "enum": ["dt1", "rq1", "cc", "nrpn", "raw"] },
+        "address": { "$ref": "#/$defs/hexBytes", "description": "Relative address for sysex msgs (dt1/rq1)." },
+        "size": { "type": "integer", "minimum": 1 },
+        "cc": { "type": "integer", "minimum": 0, "maximum": 127, "description": "Controller number for msg=cc." },
+        "ccStride": { "type": "integer", "description": "Per-instance increment added to cc (GAIA: tone1 CC102, tone2 103, tone3 104 -> ccStride 1)." },
+        "nrpn": { "type": "string", "description": "NRPN MSB/LSB, space-hex, for msg=nrpn." },
+        "channelRelative": { "type": "boolean", "description": "If true, the CC/NRPN channel follows the part/instance channel rather than a fixed one." }
+      }
+    },
+
+    "enumEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "wire"],
+      "properties": {
+        "id": { "type": "string", "description": "Stable choice id, e.g. 'pulse'. The bound control keys on this." },
+        "label": { "type": "string" },
+        "wire": { "type": "integer", "description": "The numeric value sent/received on the wire for this choice." }
+      }
+    },
+
+    "encoding": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type"],
+      "description": "How a logical value maps to/from wire bytes. The same primitive expresses simple u7 through Korg 8->7 block packing; round-trip (encode then decode) must be identity across the full range.",
+      "properties": {
+        "type": {
+          "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice"],
+          "description": "u7=1 byte 0-127. s7=signed centered. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices."
+        },
+        "bytes": { "type": "integer", "minimum": 1, "description": "Wire byte count for nibbles/u8." },
+        "signedOffset": { "type": "integer", "description": "For s7: wire = value + signedOffset (e.g. 64)." },
+        "packOrder": {
+          "enum": ["msb-high-first", "msb-low-first"],
+          "description": "For packed8to7: bit order of the leading MSB byte. Korg 01/W,X3 = high-first; Electribe ES1 = low-first. INDISTINGUISHABLE by inspection - must be round-trip verified across boundary values (0,127,128,255)."
+        },
+        "groupSize": { "type": "integer", "description": "For packed8to7: internal bytes per packed group (Korg = 7)." },
+        "slices": {
+          "type": "array",
+          "description": "For bitslice: ordered list of bit ranges that assemble the value.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["byte", "fromBit", "toBit", "valueShift"],
+            "properties": {
+              "byte": { "type": "integer", "minimum": 0, "description": "Wire byte index." },
+              "fromBit": { "type": "integer", "minimum": 0, "maximum": 7 },
+              "toBit": { "type": "integer", "minimum": 0, "maximum": 7 },
+              "valueShift": { "type": "integer", "minimum": 0, "description": "Bit position in the assembled value where this slice lands." }
+            }
+          }
+        }
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Trust/quality record surfaced before a user relies on a profile (Layer 2).",
+      "properties": {
+        "source": { "enum": ["official", "community", "imported", "learn"] },
+        "verifiedRoundTrip": { "type": "boolean", "description": "Every parameter packs/unpacks correctly (mechanical; hard prerequisite for library entry)." },
+        "verifiedFullDump": { "type": "boolean", "description": "Patch save/load confirmed (independent of round-trip)." },
+        "verifiedOnHardware": { "type": ["string", "null"], "description": "ISO date confirmed against a real device, or null." },
+        "confirmations": { "type": "integer", "minimum": 0 },
+        "contributors": { "type": "array", "items": { "type": "string" } },
+        "importedFrom": { "type": ["string", "null"], "description": "Foreign format this was imported from (.ins, midi-ci), or null." }
+      }
+    },
+
+    "overrideOp": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "target"],
+      "description": "An id-keyed override operation (variant/model delta). Resolution: start from resolved parent, apply in order.",
+      "properties": {
+        "op": { "enum": ["set", "add", "remove", "reorder"] },
+        "target": { "type": "string", "description": "Dotted path to the inherited element, e.g. 'scopes.tone.parameters.filter.cutoff'." },
+        "value": { "description": "Fields to merge (set) or the new element (add)." },
+        "order": { "type": "array", "items": { "type": "string" }, "description": "New child order (reorder)." }
+      }
+    },
+
+    "dump": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "kind"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "kind": { "enum": ["patch", "performance", "bank"] },
+        "spans": { "type": "array", "items": { "type": "string" }, "description": "Scope ids this dump covers (a performance spans global + all parts)." },
+        "requestShape": { "type": "string", "description": "messageShape id used to request this dump." }
+      }
+    }
+  }
+}

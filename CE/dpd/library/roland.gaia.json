@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "id": "roland.gaia",
+  "version": "1.0.0",
+  "kind": "model",
+  "label": "Roland GAIA SH-01",
+  "inherits": "roland",
+  "modelId": "00 00 41",
+  "deviceStructure": { "tones": 3 },
+
+  "scopes": {
+    "tone": {
+      "kind": "tone",
+      "label": "Tone",
+      "base": "10 00 01 00",
+      "stride": "00 00 01 00",
+      "instancesFrom": "tones",
+      "parameters": [
+        {
+          "id": "osc.wave", "name": "OSC Wave", "group": "OSC", "valueType": "enum",
+          "address": "00 00 00 00", "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "enum": [
+            { "id": "saw", "label": "Saw", "wire": 0 },
+            { "id": "square", "label": "Square", "wire": 1 },
+            { "id": "pulse", "label": "Pulse", "wire": 2 },
+            { "id": "triangle", "label": "Triangle", "wire": 3 },
+            { "id": "sine", "label": "Sine", "wire": 4 },
+            { "id": "noise", "label": "Noise", "wire": 5 },
+            { "id": "supersaw", "label": "Super Saw", "wire": 6 }
+          ],
+          "ui": { "preferredComponent": "RadioButtonGroup" }
+        },
+        {
+          "id": "filter.mode", "name": "Filter Mode", "group": "Filter", "valueType": "enum",
+          "address": "00 00 00 0A", "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "enum": [
+            { "id": "bypass", "label": "Bypass", "wire": 0 },
+            { "id": "lpf", "label": "LPF", "wire": 1 },
+            { "id": "hpf", "label": "HPF", "wire": 2 },
+            { "id": "bpf", "label": "BPF", "wire": 3 },
+            { "id": "pkg", "label": "PKG", "wire": 4 }
+          ],
+          "ui": { "preferredComponent": "RadioButtonGroup" }
+        },
+        {
+          "id": "filter.slope", "name": "Filter Slope", "group": "Filter", "valueType": "enum",
+          "address": "00 00 00 0B", "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "enum": [
+            { "id": "db12", "label": "-12 dB", "wire": 0 },
+            { "id": "db24", "label": "-24 dB", "wire": 1 }
+          ],
+          "ui": { "preferredComponent": "RadioButtonGroup" }
+        },
+        {
+          "id": "filter.cutoff", "name": "Cutoff", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 0C", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "rxLive": { "dir": "rxLive", "msg": "cc", "cc": 102, "ccStride": 1 },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.cutoffKeyfollow", "name": "Cutoff Keyfollow", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 0D", "range": { "min": 54, "max": 74 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envVelocitySens", "name": "Env Velocity Sens", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 0E", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.resonance", "name": "Resonance", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 0F", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envAttack", "name": "Env Attack", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 10", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envDecay", "name": "Env Decay", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 11", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envSustain", "name": "Env Sustain", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 12", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envRelease", "name": "Env Release", "group": "Filter", "valueType": "continuous",
+          "address": "00 00 00 13", "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "filter.envDepth", "name": "Env Depth", "group": "Filter", "valueType": "signed",
+          "address": "00 00 00 14", "range": { "min": -63, "max": 63 },
+          "encoding": { "type": "s7", "signedOffset": 64 },
+          "access": { "read": true, "write": true },
+          "ui": { "preferredComponent": "Slider" }
+        },
+        {
+          "id": "lfo.shape", "name": "LFO Shape", "group": "LFO", "valueType": "enum",
+          "address": "00 00 00 1C", "encoding": { "type": "u7" },
+          "access": { "read": true, "write": true },
+          "enum": [
+            { "id": "triangle", "label": "Triangle", "wire": 0 },
+            { "id": "sine", "label": "Sine", "wire": 1 },
+            { "id": "saw", "label": "Saw", "wire": 2 },
+            { "id": "square", "label": "Square", "wire": 3 },
+            { "id": "sh", "label": "S&H", "wire": 4 },
+            { "id": "random", "label": "Random", "wire": 5 }
+          ],
+          "ui": { "preferredComponent": "RadioButtonGroup" }
+        }
+      ]
+    },
+
+    "global": {
+      "kind": "global",
+      "label": "Global",
+      "base": "01 00 00 00",
+      "instances": 1,
+      "parameters": [
+        {
+          "id": "master.volume", "name": "Master Volume", "group": "Global", "valueType": "continuous",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" },
+          "access": { "read": false, "write": true },
+          "wires": [ { "dir": "write", "msg": "cc", "cc": 7 } ],
+          "ui": { "preferredComponent": "Slider" }
+        }
+      ]
+    }
+  },
+
+  "dumps": [
+    { "id": "patch", "name": "Temporary Patch", "kind": "patch", "spans": ["tone"], "requestShape": "rq1" }
+  ],
+
+  "provenance": {
+    "source": "community",
+    "verifiedRoundTrip": true,
+    "verifiedFullDump": false,
+    "verifiedOnHardware": "2026-06-05",
+    "confirmations": 1,
+    "contributors": ["@tedjuh"],
+    "importedFrom": null
+  },
+  "completeness": "partial"
+}
