@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Packing Studio — DPD</title>
+<style>
+  :root{--bg:#181a1b;--panel:#1e2426;--line:#2a3133;--txt:#e6e6e6;--dim:#8a8f93;--green:#4dd6a0;--red:#e0625e;--blue:#5a9bf0;--violet:#a98cf0;--amber:#e0a23c;--mono:'JetBrains Mono',Consolas,monospace}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 'Segoe UI',system-ui,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:26px}
+  h1{font-size:20px;margin:0 0 2px} .sub{color:var(--dim);font-size:12.5px;margin-bottom:18px}
+  .tabs{display:flex;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+  .tab{padding:6px 13px;border:1px solid var(--line);border-radius:7px;background:var(--panel);color:var(--dim);cursor:pointer;font-size:12.5px}
+  .tab.on{color:var(--txt);border-color:var(--violet);background:#241f30}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;margin-bottom:16px}
+  .lbl{font-size:10.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim);margin-bottom:9px}
+  .bytes{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
+  .byte{width:46px}
+  .byte input{width:100%;box-sizing:border-box;background:var(--bg);border:1px solid var(--line);color:var(--txt);font-family:var(--mono);font-size:13px;text-align:center;padding:7px 0;border-radius:6px;outline:none}
+  .byte input:focus{border-color:var(--violet)}
+  .byte.msb input{border-color:rgba(224,162,60,.5);color:var(--amber)}
+  .byte .cap{font-size:9px;color:var(--dim);text-align:center;margin-top:3px;font-family:var(--mono)}
+  .flow{color:var(--dim);font-size:22px;margin:0 6px}
+  .arrow{text-align:center;color:var(--dim);margin:12px 0;font-size:18px}
+  .msbgrid{display:flex;gap:7px;margin-top:12px;flex-wrap:wrap}
+  .bit{width:46px;text-align:center;font-family:var(--mono);font-size:11px}
+  .bit .b{padding:5px 0;border:1px solid var(--line);border-radius:5px;background:var(--bg)}
+  .bit .b.one{color:var(--amber);border-color:rgba(224,162,60,.4)}
+  .bit .src{color:var(--dim);font-size:9px;margin-top:3px}
+  .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;font-weight:600;font-size:13px}
+  .badge.ok{background:rgba(77,214,160,.12);color:var(--green);border:1px solid rgba(77,214,160,.3)}
+  .badge.bad{background:rgba(224,98,94,.12);color:var(--red);border:1px solid rgba(224,98,94,.3)}
+  .row{display:flex;align-items:center;gap:14px;margin:14px 0}
+  .val input{background:var(--bg);border:1px solid var(--line);color:var(--txt);font-family:var(--mono);font-size:15px;padding:8px 12px;border-radius:7px;width:120px;outline:none}
+  .out{font-family:var(--mono);color:var(--blue);font-size:14px}
+  button.verify{background:#241f30;border:1px solid var(--violet);color:var(--violet);padding:9px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600}
+  .note{color:var(--dim);font-size:12px;margin-top:14px;line-height:1.6}
+  select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:13px}
+</style></head>
+<body><div class="wrap">
+  <h1>Packing Studio</h1>
+  <div class="sub">Declare a packing scheme; every change is packed and unpacked live — green if it returns identical, red if not. Zero hand-written bit-math.</div>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+  <div class="note" id="note"></div>
+</div>
+
+<script type="module">
+import { encodeValue, decodeValue, pack8to7, unpack8to7 } from '../codecs.mjs';
+
+const hex = (b) => b.toString(16).padStart(2,'0').toUpperCase();
+const tabsEl = document.getElementById('tabs');
+const viewEl = document.getElementById('view');
+const noteEl = document.getElementById('note');
+
+const schemes = {
+  'korg-8to7': { label: 'Korg 8→7', note: 'MIDI bytes carry 7 bits, so 7 internal 8-bit bytes pack into 8 transmitted bytes: a leading MSB byte holds the top bit of each byte, then the 7 low-7 bytes. The MSB bit order differs by device (high-first vs low-first) and is indistinguishable by inspection — only a full-range round-trip catches it. Edit the internal bytes (0–255).' },
+  'u7':       { label: 'u7 (0–127)', note: 'One 7-bit byte. The simplest case — shown for contrast.' },
+  's7':       { label: 's7 (signed)', note: 'Signed value centered by an offset (e.g. 64). −63…+63 → 1…127 on the wire.' },
+  'nibbles':  { label: 'Nibbles (×2)', note: 'A value split high-nibble-first across 2 bytes (e.g. a 0–255 value as two 4-bit nibbles).' },
+};
+let active = 'korg-8to7';
+let order = 'msb-high-first';
+let internal = [0x80, 0x01, 0xFF, 0x7F, 0x00, 0xAA, 0x55];
+let value = 100;
+
+function renderTabs(){
+  tabsEl.innerHTML = '';
+  for (const [id, s] of Object.entries(schemes)){
+    const t = document.createElement('div'); t.className = 'tab'+(id===active?' on':''); t.textContent = s.label;
+    t.onclick = () => { active = id; render(); }; tabsEl.appendChild(t);
+  }
+}
+
+function badge(okFlag, text){ return `<span class="badge ${okFlag?'ok':'bad'}">${okFlag?'✓':'✗'} ${text}</span>`; }
+
+function renderKorg(){
+  const wire = pack8to7(internal, order);
+  const back = unpack8to7(wire, order);
+  const rt = back.join(',') === internal.join(',');
+  const msbBits = internal.map((b,i)=>({ bit:(b>>7)&1, pos: order==='msb-high-first' ? 6-i : i }));
+  viewEl.innerHTML = `
+    <div class="card">
+      <div class="row"><div class="lbl" style="margin:0">MSB order</div>
+        <select id="order">
+          <option value="msb-high-first"${order==='msb-high-first'?' selected':''}>high-first (01/W, X3)</option>
+          <option value="msb-low-first"${order==='msb-low-first'?' selected':''}>low-first (Electribe ES1)</option>
+        </select>
+        ${badge(rt, rt?'round-trips':'SCRAMBLED — wrong order')}
+      </div>
+      <div class="lbl">Internal bytes (8-bit)</div>
+      <div class="bytes" id="internal">${internal.map((b,i)=>`<div class="byte"><input data-i="${i}" value="${hex(b)}"><div class="cap">b${i}</div></div>`).join('')}</div>
+      <div class="arrow">▼ pack</div>
+      <div class="lbl">Transmitted bytes (7-bit) — first is the MSB byte</div>
+      <div class="bytes">${wire.map((b,i)=>`<div class="byte${i===0?' msb':''}"><input value="${hex(b)}" readonly><div class="cap">${i===0?'MSB':'b'+(i-1)}</div></div>`).join('')}</div>
+      <div class="lbl" style="margin-top:14px">MSB byte breakdown — which data byte each bit came from</div>
+      <div class="msbgrid">${msbBits.map((m,i)=>`<div class="bit"><div class="b ${m.bit?'one':''}">${m.bit}</div><div class="src">b${i}→bit${m.pos}</div></div>`).join('')}</div>
+      <div class="arrow">▼ unpack</div>
+      <div class="bytes">${back.map((b,i)=>`<div class="byte"><input value="${hex(b)}" readonly><div class="cap">b${i}</div></div>`).join('')}</div>
+    </div>`;
+  document.getElementById('order').onchange = (e)=>{ order = e.target.value; render(); };
+  viewEl.querySelectorAll('#internal input').forEach(inp => inp.oninput = (e)=>{
+    const v = parseInt(e.target.value,16); if(!isNaN(v)) internal[+e.target.dataset.i] = v & 0xff; renderKorg();
+  });
+}
+
+function renderValue(enc, min, max){
+  const wire = encodeValue(enc, value);
+  const back = decodeValue(enc, wire);
+  const rt = back === value;
+  viewEl.innerHTML = `
+    <div class="card">
+      <div class="row"><div class="lbl" style="margin:0">Value</div>
+        <div class="val"><input id="v" type="number" value="${value}" min="${min}" max="${max}"></div>
+        <span class="flow">→</span><div class="out">wire: ${wire.map(hex).join(' ')}</div>
+        <span class="flow">→</span><div class="out">decoded: ${back}</div>
+        ${badge(rt, rt?'round-trips':'mismatch')}
+      </div>
+      <button class="verify" id="vfull">Verify full range (${min}…${max})</button>
+      <span id="vres" style="margin-left:12px"></span>
+    </div>`;
+  document.getElementById('v').oninput = (e)=>{ const n=parseInt(e.target.value,10); if(!isNaN(n)){ value=n; renderValue(enc,min,max);} };
+  document.getElementById('vfull').onclick = ()=>{
+    let fails=0; for(let x=min;x<=max;x++){ try{ if(decodeValue(enc,encodeValue(enc,x))!==x) fails++; }catch{ fails++; } }
+    document.getElementById('vres').innerHTML = badge(fails===0, fails===0 ? `all ${max-min+1} values round-trip` : `${fails} fail`);
+  };
+}
+
+function render(){
+  renderTabs();
+  noteEl.textContent = schemes[active].note;
+  if (active==='korg-8to7') renderKorg();
+  else if (active==='u7') renderValue({type:'u7'},0,127);
+  else if (active==='s7') renderValue({type:'s7',signedOffset:64},-63,63);
+  else if (active==='nibbles') renderValue({type:'nibbles',bytes:2},0,255);
+}
+render();
+window.__packingReady = true; // for headless verification
+</script>
+</body></html>
