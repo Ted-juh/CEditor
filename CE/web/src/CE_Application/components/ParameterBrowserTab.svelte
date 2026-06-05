@@ -38,6 +38,9 @@
     latestDeviceSyncResult,
   } from '../stores/deviceProfiles.js';
   import { getBindingCompatibility } from '../models/componentPorts.js';
+  import { enrichBindingWithDpd } from '../utils/dpdMergeOnDrop.js';
+  import dpdRuntime from '../generated/roland.gaia.runtime.json';
+  import dpdProfileMap from '../generated/dpdProfileMap.json';
 
   let query = $state('');
   let showAllIssues = $state(false);
@@ -866,7 +869,10 @@
     const existing = control?._children?.DeviceBindings?.bindings;
     const nextBindings = Array.isArray(existing) ? [...existing] : [];
     const bindingIndex = nextBindings.findIndex((binding) => binding.port === compatibility.port.id);
-    const nextBinding = {
+    // Merge-on-drop (architecture doc §Integration): enrich the binding so the dropped section is
+    // self-contained — source:"id@version" stamp + the parameter's own address/CC + enum wire values
+    // + packing — for DPD-backed profiles. Non-DPD profiles get just the stamp (graceful, additive).
+    const nextBinding = enrichBindingWithDpd({
       kind: 'deviceParameter',
       port: compatibility.port.id,
       deviceRole: 'mainSynth',
@@ -879,7 +885,7 @@
         ignoreOwnEchoes: true,
         echoWindowMs: 250,
       },
-    };
+    }, { parameter, profile: selectedProfile, runtime: dpdRuntime, dpdProfileMap, port: compatibility.port.id });
 
     if (bindingIndex >= 0) nextBindings[bindingIndex] = nextBinding;
     else nextBindings.push(nextBinding);

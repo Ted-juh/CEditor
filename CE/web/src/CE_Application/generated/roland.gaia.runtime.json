@@ -402,5 +402,1792 @@
       "size": 1,
       "enum": null
     }
+  },
+  "mergeParams": {
+    "tone1.osc.wave": {
+      "resolvedId": "tone1.osc.wave",
+      "paramId": "osc.wave",
+      "name": "OSC Wave",
+      "group": "OSC",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 0
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 1
+        },
+        {
+          "id": "pulse",
+          "label": "Pulse",
+          "wire": 2
+        },
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 3
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 4
+        },
+        {
+          "id": "noise",
+          "label": "Noise",
+          "wire": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "Super Saw",
+          "wire": 6
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 00",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 00",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 00",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 00",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.mode": {
+      "resolvedId": "tone1.filter.mode",
+      "paramId": "filter.mode",
+      "name": "Filter Mode",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "bypass",
+          "label": "Bypass",
+          "wire": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "wire": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "wire": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "wire": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "wire": 4
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0A",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0A",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0A",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 0A",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.slope": {
+      "resolvedId": "tone1.filter.slope",
+      "paramId": "filter.slope",
+      "name": "Filter Slope",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "db12",
+          "label": "-12 dB",
+          "wire": 0
+        },
+        {
+          "id": "db24",
+          "label": "-24 dB",
+          "wire": 1
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0B",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0B",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0B",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 0B",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.cutoff": {
+      "resolvedId": "tone1.filter.cutoff",
+      "paramId": "filter.cutoff",
+      "name": "Cutoff",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 102
+        }
+      }
+    },
+    "tone1.filter.cutoffKeyfollow": {
+      "resolvedId": "tone1.filter.cutoffKeyfollow",
+      "paramId": "filter.cutoffKeyfollow",
+      "name": "Cutoff Keyfollow",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0D",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0D",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0D",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 0D",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envVelocitySens": {
+      "resolvedId": "tone1.filter.envVelocitySens",
+      "paramId": "filter.envVelocitySens",
+      "name": "Env Velocity Sens",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0E",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0E",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0E",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 0E",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.resonance": {
+      "resolvedId": "tone1.filter.resonance",
+      "paramId": "filter.resonance",
+      "name": "Resonance",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 0F",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 0F",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 0F",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 0F",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envAttack": {
+      "resolvedId": "tone1.filter.envAttack",
+      "paramId": "filter.envAttack",
+      "name": "Env Attack",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 10",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 10",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 10",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 10",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envDecay": {
+      "resolvedId": "tone1.filter.envDecay",
+      "paramId": "filter.envDecay",
+      "name": "Env Decay",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 11",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 11",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 11",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 11",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envSustain": {
+      "resolvedId": "tone1.filter.envSustain",
+      "paramId": "filter.envSustain",
+      "name": "Env Sustain",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 12",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 12",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 12",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 12",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envRelease": {
+      "resolvedId": "tone1.filter.envRelease",
+      "paramId": "filter.envRelease",
+      "name": "Env Release",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 13",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 13",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 13",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 13",
+          "size": 1
+        }
+      }
+    },
+    "tone1.filter.envDepth": {
+      "resolvedId": "tone1.filter.envDepth",
+      "paramId": "filter.envDepth",
+      "name": "Env Depth",
+      "group": "Filter",
+      "valueType": "signed",
+      "range": {
+        "min": -63,
+        "max": 63
+      },
+      "enum": null,
+      "encoding": {
+        "type": "s7",
+        "signedOffset": 64
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 14",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 14",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 14",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 14",
+          "size": 1
+        }
+      }
+    },
+    "tone1.lfo.shape": {
+      "resolvedId": "tone1.lfo.shape",
+      "paramId": "lfo.shape",
+      "name": "LFO Shape",
+      "group": "LFO",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 0
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 1
+        },
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 2
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "wire": 4
+        },
+        {
+          "id": "random",
+          "label": "Random",
+          "wire": 5
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 01 1C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 01 1C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 01 1C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 01 1C",
+          "size": 1
+        }
+      }
+    },
+    "tone2.osc.wave": {
+      "resolvedId": "tone2.osc.wave",
+      "paramId": "osc.wave",
+      "name": "OSC Wave",
+      "group": "OSC",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 0
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 1
+        },
+        {
+          "id": "pulse",
+          "label": "Pulse",
+          "wire": 2
+        },
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 3
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 4
+        },
+        {
+          "id": "noise",
+          "label": "Noise",
+          "wire": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "Super Saw",
+          "wire": 6
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 00",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 00",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 00",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 00",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.mode": {
+      "resolvedId": "tone2.filter.mode",
+      "paramId": "filter.mode",
+      "name": "Filter Mode",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "bypass",
+          "label": "Bypass",
+          "wire": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "wire": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "wire": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "wire": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "wire": 4
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0A",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0A",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0A",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 0A",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.slope": {
+      "resolvedId": "tone2.filter.slope",
+      "paramId": "filter.slope",
+      "name": "Filter Slope",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "db12",
+          "label": "-12 dB",
+          "wire": 0
+        },
+        {
+          "id": "db24",
+          "label": "-24 dB",
+          "wire": 1
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0B",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0B",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0B",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 0B",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.cutoff": {
+      "resolvedId": "tone2.filter.cutoff",
+      "paramId": "filter.cutoff",
+      "name": "Cutoff",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 103
+        }
+      }
+    },
+    "tone2.filter.cutoffKeyfollow": {
+      "resolvedId": "tone2.filter.cutoffKeyfollow",
+      "paramId": "filter.cutoffKeyfollow",
+      "name": "Cutoff Keyfollow",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0D",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0D",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0D",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 0D",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envVelocitySens": {
+      "resolvedId": "tone2.filter.envVelocitySens",
+      "paramId": "filter.envVelocitySens",
+      "name": "Env Velocity Sens",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0E",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0E",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0E",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 0E",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.resonance": {
+      "resolvedId": "tone2.filter.resonance",
+      "paramId": "filter.resonance",
+      "name": "Resonance",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 0F",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 0F",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 0F",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 0F",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envAttack": {
+      "resolvedId": "tone2.filter.envAttack",
+      "paramId": "filter.envAttack",
+      "name": "Env Attack",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 10",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 10",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 10",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 10",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envDecay": {
+      "resolvedId": "tone2.filter.envDecay",
+      "paramId": "filter.envDecay",
+      "name": "Env Decay",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 11",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 11",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 11",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 11",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envSustain": {
+      "resolvedId": "tone2.filter.envSustain",
+      "paramId": "filter.envSustain",
+      "name": "Env Sustain",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 12",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 12",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 12",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 12",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envRelease": {
+      "resolvedId": "tone2.filter.envRelease",
+      "paramId": "filter.envRelease",
+      "name": "Env Release",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 13",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 13",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 13",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 13",
+          "size": 1
+        }
+      }
+    },
+    "tone2.filter.envDepth": {
+      "resolvedId": "tone2.filter.envDepth",
+      "paramId": "filter.envDepth",
+      "name": "Env Depth",
+      "group": "Filter",
+      "valueType": "signed",
+      "range": {
+        "min": -63,
+        "max": 63
+      },
+      "enum": null,
+      "encoding": {
+        "type": "s7",
+        "signedOffset": 64
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 14",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 14",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 14",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 14",
+          "size": 1
+        }
+      }
+    },
+    "tone2.lfo.shape": {
+      "resolvedId": "tone2.lfo.shape",
+      "paramId": "lfo.shape",
+      "name": "LFO Shape",
+      "group": "LFO",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 0
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 1
+        },
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 2
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "wire": 4
+        },
+        {
+          "id": "random",
+          "label": "Random",
+          "wire": 5
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 02 1C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 02 1C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 02 1C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 02 1C",
+          "size": 1
+        }
+      }
+    },
+    "tone3.osc.wave": {
+      "resolvedId": "tone3.osc.wave",
+      "paramId": "osc.wave",
+      "name": "OSC Wave",
+      "group": "OSC",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 0
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 1
+        },
+        {
+          "id": "pulse",
+          "label": "Pulse",
+          "wire": 2
+        },
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 3
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 4
+        },
+        {
+          "id": "noise",
+          "label": "Noise",
+          "wire": 5
+        },
+        {
+          "id": "supersaw",
+          "label": "Super Saw",
+          "wire": 6
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 00",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 00",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 00",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 00",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.mode": {
+      "resolvedId": "tone3.filter.mode",
+      "paramId": "filter.mode",
+      "name": "Filter Mode",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "bypass",
+          "label": "Bypass",
+          "wire": 0
+        },
+        {
+          "id": "lpf",
+          "label": "LPF",
+          "wire": 1
+        },
+        {
+          "id": "hpf",
+          "label": "HPF",
+          "wire": 2
+        },
+        {
+          "id": "bpf",
+          "label": "BPF",
+          "wire": 3
+        },
+        {
+          "id": "pkg",
+          "label": "PKG",
+          "wire": 4
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0A",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0A",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0A",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 0A",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.slope": {
+      "resolvedId": "tone3.filter.slope",
+      "paramId": "filter.slope",
+      "name": "Filter Slope",
+      "group": "Filter",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "db12",
+          "label": "-12 dB",
+          "wire": 0
+        },
+        {
+          "id": "db24",
+          "label": "-24 dB",
+          "wire": 1
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0B",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0B",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0B",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 0B",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.cutoff": {
+      "resolvedId": "tone3.filter.cutoff",
+      "paramId": "filter.cutoff",
+      "name": "Cutoff",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "cc",
+          "cc": 104
+        }
+      }
+    },
+    "tone3.filter.cutoffKeyfollow": {
+      "resolvedId": "tone3.filter.cutoffKeyfollow",
+      "paramId": "filter.cutoffKeyfollow",
+      "name": "Cutoff Keyfollow",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 54,
+        "max": 74
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0D",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0D",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0D",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 0D",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envVelocitySens": {
+      "resolvedId": "tone3.filter.envVelocitySens",
+      "paramId": "filter.envVelocitySens",
+      "name": "Env Velocity Sens",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0E",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0E",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0E",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 0E",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.resonance": {
+      "resolvedId": "tone3.filter.resonance",
+      "paramId": "filter.resonance",
+      "name": "Resonance",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 0F",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 0F",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 0F",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 0F",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envAttack": {
+      "resolvedId": "tone3.filter.envAttack",
+      "paramId": "filter.envAttack",
+      "name": "Env Attack",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 10",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 10",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 10",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 10",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envDecay": {
+      "resolvedId": "tone3.filter.envDecay",
+      "paramId": "filter.envDecay",
+      "name": "Env Decay",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 11",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 11",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 11",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 11",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envSustain": {
+      "resolvedId": "tone3.filter.envSustain",
+      "paramId": "filter.envSustain",
+      "name": "Env Sustain",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 12",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 12",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 12",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 12",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envRelease": {
+      "resolvedId": "tone3.filter.envRelease",
+      "paramId": "filter.envRelease",
+      "name": "Env Release",
+      "group": "Filter",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 13",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 13",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 13",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 13",
+          "size": 1
+        }
+      }
+    },
+    "tone3.filter.envDepth": {
+      "resolvedId": "tone3.filter.envDepth",
+      "paramId": "filter.envDepth",
+      "name": "Env Depth",
+      "group": "Filter",
+      "valueType": "signed",
+      "range": {
+        "min": -63,
+        "max": 63
+      },
+      "enum": null,
+      "encoding": {
+        "type": "s7",
+        "signedOffset": 64
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 14",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 14",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 14",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 14",
+          "size": 1
+        }
+      }
+    },
+    "tone3.lfo.shape": {
+      "resolvedId": "tone3.lfo.shape",
+      "paramId": "lfo.shape",
+      "name": "LFO Shape",
+      "group": "LFO",
+      "valueType": "enum",
+      "range": null,
+      "enum": [
+        {
+          "id": "triangle",
+          "label": "Triangle",
+          "wire": 0
+        },
+        {
+          "id": "sine",
+          "label": "Sine",
+          "wire": 1
+        },
+        {
+          "id": "saw",
+          "label": "Saw",
+          "wire": 2
+        },
+        {
+          "id": "square",
+          "label": "Square",
+          "wire": 3
+        },
+        {
+          "id": "sh",
+          "label": "S&H",
+          "wire": 4
+        },
+        {
+          "id": "random",
+          "label": "Random",
+          "wire": 5
+        }
+      ],
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": true,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": "10 00 03 1C",
+      "wires": {
+        "write": {
+          "msg": "dt1",
+          "address": "10 00 03 1C",
+          "size": 1
+        },
+        "read": {
+          "msg": "rq1",
+          "address": "10 00 03 1C",
+          "size": 1
+        },
+        "rxLive": {
+          "msg": "dt1",
+          "address": "10 00 03 1C",
+          "size": 1
+        }
+      }
+    },
+    "global.master.volume": {
+      "resolvedId": "global.master.volume",
+      "paramId": "master.volume",
+      "name": "Master Volume",
+      "group": "Global",
+      "valueType": "continuous",
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "enum": null,
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "read": false,
+        "write": true
+      },
+      "size": 1,
+      "absAddress": null,
+      "wires": {
+        "write": {
+          "msg": "cc",
+          "cc": 7
+        }
+      }
+    }
   }
 }

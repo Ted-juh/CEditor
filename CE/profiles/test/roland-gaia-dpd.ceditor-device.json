@@ -4,6 +4,7 @@
   "minCEditorVersion": "0.9.0",
   "id": "roland-gaia-dpd",
   "name": "Roland GAIA SH-01 (from DPD)",
+  "dpdSource": "roland.gaia",
   "manufacturer": "Roland",
   "family": "SH",
   "status": "experimental",
