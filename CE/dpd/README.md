@@ -70,38 +70,52 @@ and broken merge-on-drop.
 
 ## What remains (per the doc's build order)
 
-1. **Runtime consumption — DONE for the GAIA panel (both directions DPD-sourced).** Inbound: the
-   player derives its decode maps from the generated `roland.gaia.runtime.json` (hardcoded `INBOUND_*`
-   deleted). Outbound: `emit-legacy.mjs` generates the engine profile `roland-gaia-dpd` from the DPD,
-   and the slim panel's `deviceSession` points at it. Verified headlessly: the C++ engine compiles
-   the DPD-generated profile byte-identically, and injected MIDI drives the controls. Follow-ups: a
-   generic loader (any panel/profile, no per-device wiring) and the C++ engine reading the new schema
-   natively (instead of via the generated legacy file).
-The **computational + logic core of every layer is now built and verified.** What's left is the
-interactive-app, server, and live-hardware integration that can't be built and verified headlessly:
+**The computational + logic core of every layer, plus the editor integration seam, are built and
+verified.** The DONE items below are headlessly proven; what genuinely remains is hardware- or
+infrastructure-gated, or explicitly deferred by the doc itself.
 
-2. **Interactive Designer + Packing Studio UI — DONE (headlessly verified).** `web/designer.html`
+1. **Runtime consumption — DONE (both directions DPD-sourced).** Inbound: the player derives its
+   decode maps from the generated `roland.gaia.runtime.json` (hardcoded `INBOUND_*` deleted).
+   Outbound: `emit-legacy.mjs` generates the engine profile `roland-gaia-dpd` from the DPD, and the
+   slim panel's `deviceSession` points at it. Verified headlessly: the C++ engine compiles the
+   DPD-generated profile byte-identically, and injected MIDI drives the controls.
+2. **Editor integration (merge-on-drop) — DONE (headlessly verified).** Binding a parameter now
+   writes a self-contained section: a `source:"id@version"` stamp plus the parameter's own
+   address/CC + enum wire values + packing (`utils/dpdMergeOnDrop.js` via the generated `dpdMerge.js`
+   + `mergeParams` + `dpdProfileMap.json`). 6 web unit tests against the real artifacts; full web
+   suite 161/161; Vite build clean. This is the doc's specified integration (lines 425/437/439),
+   which it states is **data, not a C++ architectural change** (line 441).
+3. **Interactive Designer + Packing Studio UI — DONE (headlessly verified).** `web/designer.html`
    is a live editable parameter table (edit name/type/address, add/remove) with instant
    resolved-address recompute + schema validation + the multi-wire *Receives* column;
-   `web/packing-studio.html` is the live bit-level 8→7 editor. Both verified via Claude_Preview
-   (edit→re-resolve, invalid→flagged, full-range round-trip green). Follow-ups: drag-to-bind and
-   folding these surfaces into the main Svelte app (currently standalone, served from `CE/dpd/`).
-3. **Community backend for the flywheel — DONE (logic + service).** The curation **logic**
+   `web/packing-studio.html` is the live bit-level 8→7 editor. Both verified via Claude_Preview.
+   Follow-ups: drag-to-bind and folding these surfaces into the main Svelte app (today standalone).
+4. **Community backend for the flywheel — DONE (logic + service).** The curation **logic**
    (`library.mjs`, 21 tests) runs behind an HTTP service (`server.mjs`, 13 integration tests).
-   Running it at public scale still needs hosting + auth.
-4. **Live MIDI 2.0 hardware** — the CI Discovery handshake + capturing the GAIA's real `identity`
-   codes. The PE parse (`import-midici.mjs`) and inquiry/match (`match.mjs`) **logic** are done.
-5. **Engine reads the new schema natively** — today it consumes a generated legacy profile
-   (`emit-legacy.mjs`), which works and is byte-identical; native C++ parsing is a follow-up.
+
+Hardware- / infrastructure-gated (cannot be built or verified headlessly):
+
+5. **Live MIDI 2.0 hardware** — the CI Discovery handshake + capturing the GAIA's real `identity`
+   codes. The PE parse (`import-midici.mjs`), inquiry/match (`match.mjs`) and the full recognition
+   **cascade** (`connect.mjs`, 10 simulated-device tests) are done; only the live MIDI I/O against a
+   responding MIDI-2.0 device remains — and the GAIA is MIDI 1.0, which "will never answer" (doc §Import).
+6. **Public hosting + auth** for the community service (the service itself is done, item 4).
+7. **Engine reads the new schema natively** — **explicitly a follow-up per the doc.** Today it
+   consumes the generated legacy profile (`emit-legacy.mjs`), which is byte-identical and works; the
+   doc's specified integration is merge-on-drop (item 2, done), not a native C++ re-parse.
 
 ## Verify
 
 ```
 node CE/dpd/tools/verify.mjs          # 48 checks — schema, resolution, exact GAIA bytes, round-trips, overrides/mixins
 node CE/dpd/tools/match.mjs           # 12 checks — inquiry build, identity parse, match + graceful degradation
+node CE/dpd/tools/connect.mjs         # 10 checks — Layer 4 recognition cascade (simulated devices)
 node CE/dpd/tools/library.test.mjs    # 21 checks — round-trip gate, confirm/merge/conflict, versioning, reputation
+node CE/dpd/server.test.mjs           # 13 checks — library HTTP service (ephemeral port)
 node CE/dpd/tools/import-ins.mjs      # .ins -> validated structural-only profile
-node CE/dpd/tools/import-midici.mjs   # MIDI-CI PE -> validated partial profile (8 checks)
-node CE/dpd/tools/emit-runtime.mjs roland.gaia    # inbound map (player) ; emit-legacy.mjs -> engine profile (outbound)
-node CE/dpd/tools/designer-view.mjs roland.gaia   # resolved-view HTML
+node CE/dpd/tools/import-midici.mjs   # 8 checks  — MIDI-CI PE -> validated partial profile
+node CE/dpd/tools/merge.test.mjs      # 32 checks — merge-on-drop translation (real GAIA + packed param)
+node CE/dpd/tools/emit-runtime.mjs roland.gaia    # inbound map + mergeParams + dpdMerge.js ; emit-legacy.mjs -> engine profile + dpdProfileMap
+node CE/dpd/tools/designer-view.mjs roland.gaia   # resolved-view HTML  (web/designer.html = interactive editor)
+cd CE/web && node --test                          # 161 web tests incl. test/dpdMergeOnDrop.test.js (merge-on-drop wiring)
 ```
