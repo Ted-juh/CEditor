@@ -31,8 +31,14 @@
   const INBOUND_CC = { 102: 'filter.cutoff' };
   // Incoming DT1 SysEx: address (4 bytes, space-hex) -> parameterId. Used when the GAIA's
   // "Tx Edit Data" is ON (knob edits transmit as SysEx) and for RQ1 reply data.
-  const INBOUND_SYSEX = { '10 00 01 0C': 'filter.cutoff', '10 00 01 0F': 'filter.resonance' };
+  const INBOUND_SYSEX = {
+    '10 00 01 0C': 'filter.cutoff',
+    '10 00 01 0F': 'filter.resonance',
+    '10 00 01 00': 'osc.wave',   // Tone 1 OSC Wave (the GAIA also emits Tone 2/3 at 10 00 02/03 00)
+    '10 00 01 1C': 'lfo.shape',  // Tone 1 LFO Shape
+  };
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
+  let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
 
   // Coalesce high-rate incoming CC to ONE DOM update per animation frame. The GAIA streams
   // CC 102/103/104 on every knob tick (hundreds/sec); applying each immediately floods
@@ -43,13 +49,19 @@
 
   function rebuildParamControlMap(controls) {
     const map = {};
+    const rows = {};
     for (const c of controls ?? []) {
       const id = c?._children?.Core?.id;
       if (!id) continue;
+      const valueRows = c?._children?.Value?.rows;
       for (const b of c?._children?.DeviceBindings?.bindings ?? [])
-        if (b?.kind === 'deviceParameter' && b?.parameterId) map[b.parameterId] = id;
+        if (b?.kind === 'deviceParameter' && b?.parameterId) {
+          map[b.parameterId] = id;
+          if (Array.isArray(valueRows) && valueRows.length) rows[b.parameterId] = valueRows;
+        }
     }
     paramControlMap = map;
+    paramRows = rows;
     lastAppliedValue = {};
   }
 
@@ -69,10 +81,23 @@
   }
 
   // Queue a decoded device value for the next frame (shared by the CC and SysEx decoders).
+  // For choice controls (radio/combobox) the device sends a NUMERIC value, but the control keys
+  // on the row's id — so map number -> row.internalValue here; sliders keep the numeric value.
   function queueControlValue(parameterId, value) {
     const controlId = paramControlMap[parameterId];
-    if (!controlId || !Number.isFinite(value)) return;
-    (pendingIncoming ??= {})[controlId] = value;
+    if (!controlId) return;
+    const rows = paramRows[parameterId];
+    let v;
+    if (rows && rows.length) {
+      const row = rows.find((r) => Number(r.sendValue) === Number(value))
+        ?? rows.find((r) => String(r.receiveValue) === String(value));
+      if (!row) return;                       // unknown choice value -> ignore
+      v = row.internalValue ?? row.id;
+    } else {
+      if (!Number.isFinite(value)) return;    // sliders: numeric only
+      v = value;
+    }
+    (pendingIncoming ??= {})[controlId] = v;
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 
