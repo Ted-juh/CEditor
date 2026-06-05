@@ -12,13 +12,18 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `dpd.schema.json` | The published, open **JSON Schema** for a profile (the doc's mandated schema). Manufacturer / model / variant / component; scopes; multi-wire parameters; enum wire values; encoding/packing; provenance; override algebra. |
 | `library/roland.json` | **Manufacturer** profile — SysEx mfr id `41`, broadcast device id `7F`, `roland-7bit` checksum, `dt1`/`rq1` message shapes. Conventions inherited by every Roland model. |
 | `library/roland.gaia.json` | **Model** profile (the spec's "data port") — `inherits: roland`, model id `00 00 41`, a `tone` scope instanced ×3 (filter section + osc.wave + lfo.shape) and a `global` scope (master volume). The working GAIA, ported. |
-| `tools/dpd.mjs` | Resolver + codecs + message builder (pure JS, no deps): inheritance merge, scope→flat-param resolution with absolute addresses + directional wires, value encode/decode, Korg 8→7 packing, checksum, template→bytes. |
-| `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 43 checks, all pass. |
+| `tools/dpd.mjs` | Node entry: file loading + inheritance orchestration + message builder. Re-exports `codecs.mjs` + `resolve.mjs` so existing importers are unchanged. |
+| `codecs.mjs` | **Browser-safe** pure codecs (no Node deps): hex↔bytes, address resolve, `roland-7bit` checksum, value encode/decode, bitslice, Korg 8↔7 packing. Shared by the Node tools and the browser UIs. |
+| `resolve.mjs` | **Browser-safe** pure resolution: scope→flat-param expansion with absolute addresses + directional wires, override algebra, mixin composition. Imports only `codecs.mjs`. |
+| `tools/verify.mjs` | Verification harness — `node CE/dpd/tools/verify.mjs`. Validates the profiles, resolves the GAIA, rebuilds the **exact bytes captured from the real GAIA**, and round-trips every codec across full range. 48 checks, all pass. |
 | `tools/emit-runtime.mjs` | Emits the player's inbound maps **derived from the profile** (`build/<id>.runtime.json` + into the web app) — the "maps → profile" generalization (inbound consumption). |
 | `tools/emit-legacy.mjs` | Emits the C++ engine's legacy `.ceditor-device.json` **from** the DPD (`roland-gaia-dpd`) so OUTBOUND is DPD-sourced without rewriting the engine. |
 | `tools/import-midici.mjs` | **MIDI-CI Property Exchange** importer — a captured PE resource → native JSON (names + CCs + identity), `partial`. |
 | `tools/library.mjs` + `library.test.mjs` | **Layer 3 flywheel** curation core — round-trip gate, confirm-vs-fork, partial-accrete, conflict→version/variant, versioning/revert/pin, reputation, downloader caution. |
 | `tools/designer-view.mjs` | Designer **resolved-view** surface — renders a real profile as the mockup's parameter table (incl. the multi-wire *Receives* column) to `build/designer.html`. |
+| `web/designer.html` | **Interactive Designer editor** — fetches a real profile, renders an **editable** parameter table (name / value-type / address, add/remove), with **live** resolved-address recompute + schema validation + the multi-wire *Receives* column. Imports `resolve.mjs` + `validate.mjs` directly. |
+| `web/packing-studio.html` | **Interactive Packing Studio** — the bit-level 8→7 packing editor; live byte breakdown, MSB-order toggle, full-range round-trip verify. Imports `codecs.mjs`. |
+| `server.mjs` + `server.test.mjs` | **Layer 3 community backend** — HTTP service over `library.mjs` (GET/POST `/profiles`, versions, caution, pin, reputation); file-persisted. 13 integration tests. |
 | `tools/validate.mjs` | Shared dependency-free structural validator (the formal contract is `dpd.schema.json`). |
 | `tools/import-ins.mjs` | **Layer 2 importer** — Cakewalk `.ins` → native JSON, marked `structural-only`, with a "what came through / what needs you" summary. |
 | `tools/match.mjs` | **Layer 4 matcher** — builds the Universal Device Inquiry, parses the Identity Reply, resolves to a profile id with graceful degradation (model → manufacturer → none). |
@@ -70,12 +75,15 @@ and broken merge-on-drop.
 The **computational + logic core of every layer is now built and verified.** What's left is the
 interactive-app, server, and live-hardware integration that can't be built and verified headlessly:
 
-2. **Full interactive Designer + Packing Studio UI** — the editing experience (drag-to-bind, the
-   bit-grid packing editor). The resolved **view** (`designer-view.mjs` → `build/designer.html`) and
-   the packing **logic** (`dpd.mjs` + full-range round-trip) are done; the Svelte editor surfaces
-   need the app + visual QA.
-3. **Community backend for the flywheel** — the curation **logic** (`library.mjs`, 21 tests) is done;
-   running it at scale needs a server + auth.
+2. **Interactive Designer + Packing Studio UI — DONE (headlessly verified).** `web/designer.html`
+   is a live editable parameter table (edit name/type/address, add/remove) with instant
+   resolved-address recompute + schema validation + the multi-wire *Receives* column;
+   `web/packing-studio.html` is the live bit-level 8→7 editor. Both verified via Claude_Preview
+   (edit→re-resolve, invalid→flagged, full-range round-trip green). Follow-ups: drag-to-bind and
+   folding these surfaces into the main Svelte app (currently standalone, served from `CE/dpd/`).
+3. **Community backend for the flywheel — DONE (logic + service).** The curation **logic**
+   (`library.mjs`, 21 tests) runs behind an HTTP service (`server.mjs`, 13 integration tests).
+   Running it at public scale still needs hosting + auth.
 4. **Live MIDI 2.0 hardware** — the CI Discovery handshake + capturing the GAIA's real `identity`
    codes. The PE parse (`import-midici.mjs`) and inquiry/match (`match.mjs`) **logic** are done.
 5. **Engine reads the new schema natively** — today it consumes a generated legacy profile

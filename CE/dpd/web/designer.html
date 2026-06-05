@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Device Profile Designer</title>
+<style>
+  :root{--bg:#181a1b;--panel:#1e2426;--line:#2a3133;--txt:#e6e6e6;--dim:#8a8f93;--green:#4dd6a0;--red:#e0625e;--blue:#5a9bf0;--violet:#a98cf0;--amber:#e0a23c;--mono:'JetBrains Mono',Consolas,monospace}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 'Segoe UI',system-ui,sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:26px}
+  h1{font-size:20px;margin:0 0 2px} .based{color:var(--dim);font-size:12.5px;margin-bottom:12px}
+  .bar{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .badge{padding:7px 13px;border-radius:8px;font-weight:600;font-size:12.5px}
+  .badge.ok{background:rgba(77,214,160,.12);color:var(--green);border:1px solid rgba(77,214,160,.3)}
+  .badge.bad{background:rgba(224,98,94,.12);color:var(--red);border:1px solid rgba(224,98,94,.3)}
+  button{background:#241f30;border:1px solid var(--violet);color:var(--violet);padding:7px 13px;border-radius:7px;cursor:pointer;font-size:12.5px}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:left;color:var(--dim);font-size:10px;letter-spacing:.6px;text-transform:uppercase;padding:0 8px 8px;border-bottom:1px solid var(--line)}
+  td{padding:6px 8px;border-bottom:1px solid #23282a;vertical-align:middle}
+  input,select{background:var(--bg);border:1px solid var(--line);color:var(--txt);font-size:12.5px;padding:5px 7px;border-radius:5px;outline:none;width:100%;box-sizing:border-box}
+  input.mono{font-family:var(--mono)} input:focus,select:focus{border-color:var(--violet)}
+  td.resolved{font-family:var(--mono);color:var(--blue)} td.rx{font-family:var(--mono);color:var(--dim)} td.rx.cc{color:var(--blue)}
+  td.err input{border-color:var(--red)}
+  .del{color:var(--dim);cursor:pointer;text-align:center} .del:hover{color:var(--red)}
+  .errs{color:var(--red);font-size:12px;margin-top:10px;font-family:var(--mono)}
+  .hint{color:var(--dim);font-size:12px;margin-top:14px;line-height:1.6}
+</style></head>
+<body><div class="wrap">
+  <h1 id="title">Device Profile Designer</h1>
+  <div class="based" id="based"></div>
+  <div class="bar"><span id="vbadge" class="badge ok">valid</span><button id="add">+ Add parameter</button><span class="based" id="count"></span></div>
+  <table><thead><tr>
+    <th style="width:20%">Parameter</th><th style="width:13%">Value type</th><th style="width:16%">Address (rel)</th>
+    <th style="width:16%">Resolved (Tone 1)</th><th style="width:11%">Receives</th><th style="width:20%">Range / Choices</th><th style="width:4%"></th>
+  </tr></thead><tbody id="rows"></tbody></table>
+  <div class="errs" id="errs"></div>
+  <div class="hint">Edits update the live <b>resolved address</b> (Tone 1 of ×<span id="tones"></span>) and re-validate against the schema instantly. Cutoff's <b>Receives</b> shows the multi-wire CC. This is the resolved-edit surface; the bit-level Packing Studio is the sibling tool.</div>
+</div>
+
+<script type="module">
+import { resolveParams } from '../resolve.mjs';
+import { validateProfile } from '../tools/validate.mjs';
+
+let model;
+const $ = (id) => document.getElementById(id);
+
+async function boot(){
+  model = await (await fetch('/library/roland.gaia.json')).json();
+  $('title').textContent = model.label + ' — Designer';
+  $('based').textContent = 'Based on: ' + (model.inherits ?? '—') + ' family template (resolved-edit view)';
+  $('tones').textContent = model.deviceStructure?.tones ?? 1;
+  render();
+}
+
+function scope(){ return model.scopes.tone; }
+function render(){
+  const resolved = resolveParams(model);
+  const tone1 = Object.fromEntries(resolved.filter(p => p.instance === 0 && p.scope === 'tone').map(p => [p.paramId, p]));
+  const params = scope().parameters;
+  $('count').textContent = `${params.length} tone parameters`;
+  $('rows').innerHTML = params.map((p, i) => {
+    const r = tone1[p.id];
+    const rx = r?.wires?.rxLive;
+    const rxTxt = rx ? (rx.msg === 'cc' ? `CC ${rx.cc}` : 'DT1') : '—';
+    const choices = p.valueType === 'enum' ? (p.enum ?? []).map(e => e.label).join(' / ') : `${p.range?.min ?? 0} – ${p.range?.max ?? 127}`;
+    return `<tr>
+      <td><input data-i="${i}" data-k="name" value="${p.name ?? ''}"></td>
+      <td><select data-i="${i}" data-k="valueType">${['continuous','signed','enum','toggle'].map(t=>`<option${t===p.valueType?' selected':''}>${t}</option>`).join('')}</select></td>
+      <td><input class="mono" data-i="${i}" data-k="address" value="${p.address ?? ''}"></td>
+      <td class="resolved">${r?.absAddress ?? '—'}</td>
+      <td class="rx ${rx?.msg==='cc'?'cc':''}">${rxTxt}</td>
+      <td>${choices}</td>
+      <td class="del" data-del="${i}">✕</td>
+    </tr>`;
+  }).join('');
+  // wire up edits
+  $('rows').querySelectorAll('input,select').forEach(el => el.oninput = (e) => {
+    const { i, k } = e.target.dataset; scope().parameters[+i][k] = e.target.value; revalidateAndResolve();
+  });
+  $('rows').querySelectorAll('.del').forEach(el => el.onclick = (e) => { scope().parameters.splice(+e.target.dataset.del, 1); render(); });
+  validate();
+}
+function revalidateAndResolve(){
+  // re-render resolved column + validation without losing focus: update resolved cells + badge
+  const resolved = resolveParams(model);
+  const tone1 = Object.fromEntries(resolved.filter(p => p.instance === 0 && p.scope === 'tone').map(p => [p.paramId, p]));
+  $('rows').querySelectorAll('tr').forEach((tr, i) => {
+    const p = scope().parameters[i]; const r = tone1[p.id];
+    tr.querySelector('.resolved').textContent = r?.absAddress ?? '—';
+  });
+  validate();
+}
+function validate(){
+  const { ok, errors } = validateProfile(model);
+  $('vbadge').className = 'badge ' + (ok ? 'ok' : 'bad');
+  $('vbadge').textContent = ok ? '✓ valid' : `✗ ${errors.length} error${errors.length>1?'s':''}`;
+  $('errs').textContent = ok ? '' : errors.join(' · ');
+}
+$('add').onclick = () => {
+  scope().parameters.push({ id: 'param.' + (scope().parameters.length + 1), name: 'New Param', valueType: 'continuous', address: '00 00 00 00', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, access: { read: true, write: true } });
+  render();
+};
+boot().then(() => { window.__designerReady = true; });
+</script>
+</body></html>
