@@ -1,0 +1,133 @@
+<script>
+  // Device Profile Designer V2 — the in-program GUI rebuilt to match dpd-mockup-v2.html.
+  // Stage 1: shell (titlebar + nav rail + stage + footer) and the hero Parameters screen,
+  // backed by the new-DPD data layer bundled into the app. Other screens are placeholders.
+  import './dpd/dpdDesigner.css';
+  import DpdParametersScreen from './dpd/DpdParametersScreen.svelte';
+  import dpdLibrary from '../generated/dpd/dpdLibrary.json';
+  import dpdProfileMap from '../generated/dpdProfileMap.json';
+  import { resolveParams } from '../generated/dpd/resolve.mjs';
+  import { validateProfile } from '../generated/dpd/validate.mjs';
+
+  let { profileId = '' } = $props();
+
+  // Map an engine profileId to a new-DPD model: direct id, or via the legacy->dpd backlink map.
+  function resolveDpdId(pid) {
+    if (!pid) return null;
+    if (dpdLibrary[pid]) return pid;
+    const backing = dpdProfileMap[pid];
+    if (backing?.dpdSource && dpdLibrary[backing.dpdSource]) return backing.dpdSource;
+    return null;
+  }
+
+  // Editable working copy of the model, reset whenever the target profile changes.
+  let model = $state(null);
+  let loadedFor = '__none__';
+  $effect(() => {
+    const pid = profileId;
+    if (pid === loadedFor) return;
+    loadedFor = pid;
+    const id = resolveDpdId(pid);
+    model = id ? structuredClone(dpdLibrary[id]) : null;
+  });
+
+  let resolved = $derived(model ? resolveParams(model) : []);
+  let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
+
+  let activeScreen = $state('params');
+
+  let paramCount = $derived(resolved.length);
+  let dumpCount = $derived(model?.dumps?.length ?? 0);
+  let familyLabel = $derived(
+    model?.inherits ? model.inherits.charAt(0).toUpperCase() + model.inherits.slice(1) : (model?.manufacturer ?? 'Custom')
+  );
+
+  let nav = $derived([
+    { group: 'Profile', items: [
+      { id: 'detect', icon: '◉', label: 'Detect devices' },
+      { id: 'overview', icon: '◉', label: 'Overview' },
+      { id: 'params', icon: '▦', label: 'Parameters', count: paramCount },
+      { id: 'dumps', icon: '⬓', label: 'Bulk dumps', count: dumpCount || undefined },
+      { id: 'device', icon: '⚙', label: 'Device structure' },
+      { id: 'messages', icon: '⬡', label: 'Message shapes', count: model?.messageShapes?.length || 2 },
+      { id: 'packing', icon: '◆', label: 'Packing Studio' },
+    ] },
+    { group: 'Library', items: [
+      { id: 'share', icon: '↗', label: 'Share & impact' },
+      { id: 'import', icon: '⇪', label: 'Import result' },
+      { id: 'presets', icon: '◈', label: 'Presets' },
+      { id: 'assign', icon: '⊞', label: 'Assignable list', count: paramCount },
+    ] },
+  ]);
+
+  const realScreens = new Set(['params']);
+</script>
+
+<div class="dpd-app">
+  <div class="titlebar">
+    <div class="dots"><i></i><i></i><i></i></div>
+    <div class="name">CEditor</div>
+    <div class="crumb">Device Profile Designer · <b>{model?.label ?? profileId ?? 'No profile'}</b></div>
+    <div class="spacer"></div>
+    {#if model}
+      <div class="device-chip"><span class="led"></span>{model.label} · <b>v{model.version}</b></div>
+    {/if}
+  </div>
+
+  <div class="body">
+    <div class="side">
+      <div class="profilecard">
+        <div class="pn"><span class="led"></span>{model?.label ?? 'No new-DPD profile'}</div>
+        <div class="pm">{familyLabel} family · {paramCount} params · {dumpCount} dumps</div>
+      </div>
+
+      {#each nav as section (section.group)}
+        <div class="treelbl">{section.group}</div>
+        {#each section.items as item (item.id)}
+          <div
+            class={['tnode', activeScreen === item.id && 'active']}
+            role="button" tabindex="0"
+            onclick={() => activeScreen = item.id}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (activeScreen = item.id)}
+          >
+            <span class="ti">{item.icon}</span> {item.label}
+            {#if item.count != null}<span class="ct">{item.count}</span>{/if}
+          </div>
+        {/each}
+      {/each}
+
+      <div class="addprofile">Drag any parameter onto a component to auto-assign it — enums fill comboboxes, ranges set min/max.</div>
+    </div>
+
+    <div class="stage">
+      {#if !model}
+        <div class="screen active">
+          <div class="shead"><h1>{profileId || 'Device Profile'}</h1></div>
+          <p class="sub">This profile has no new-DPD source yet.</p>
+          <div class="placeholder">No new-DPD model is bundled for <b>{profileId || 'this profile'}</b>.<br/>The new Designer edits the new schema; legacy-only profiles will be handled in a later stage.</div>
+        </div>
+      {:else}
+        <!-- Parameters (hero) — always mounted; visibility via .active per project tab convention -->
+        <div class={['screen', activeScreen === 'params' && 'active']}>
+          <DpdParametersScreen {model} {resolved} {validation} />
+        </div>
+
+        <!-- Placeholder screens (Stage 3) -->
+        {#each nav.flatMap((s) => s.items).filter((i) => !realScreens.has(i.id)) as item (item.id)}
+          <div class={['screen', activeScreen === item.id && 'active']}>
+            <div class="shead"><h1>{item.label}</h1></div>
+            <p class="sub">Coming next — this screen is part of a later stage of the Designer rebuild.</p>
+            <div class="placeholder">{item.label} — not built yet.</div>
+          </div>
+        {/each}
+      {/if}
+    </div>
+  </div>
+
+  {#if model}
+    <div class="stagefoot">
+      <div class="ft">Editing the new-DPD model for <b>{model.id}</b>. Saving lands in a later stage.</div>
+      <button class="btn primary">Export portable profile ⇩</button>
+    </div>
+  {/if}
+</div>
