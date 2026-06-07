@@ -6,8 +6,10 @@
   import DpdParametersScreen from './dpd/DpdParametersScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
-  import { resolveParams } from '../generated/dpd/resolve.mjs';
+  import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
   import { validateProfile } from '../generated/dpd/validate.mjs';
+  import { buildLegacyProfile } from '../generated/dpd/emit-legacy-core.mjs';
+  import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources } from '../stores/deviceProfiles.js';
 
   let { profileId = '' } = $props();
 
@@ -20,19 +22,58 @@
     return null;
   }
 
-  // Editable working copy of the model, reset whenever the target profile changes.
+  // Editable working copy of the model, reset whenever the target profile changes. Seeded from the
+  // bundled library; if the engine's saved profile carries an embedded dpdModel (from a prior save),
+  // that edited source is adopted instead (see the effect below).
   let model = $state(null);
   let loadedFor = '__none__';
+  let appliedSavedFor = null;
   $effect(() => {
     const pid = profileId;
     if (pid === loadedFor) return;
     loadedFor = pid;
+    appliedSavedFor = null;
+    saveStatus = '';
     const id = resolveDpdId(pid);
     model = id ? structuredClone(dpdLibrary[id]) : null;
+    if (pid) requestProfileSource(pid); // ask the engine for the saved source (no-op without the bridge)
+  });
+
+  // When the engine returns a saved source that embeds a dpdModel, adopt it once (round-trips edits).
+  $effect(() => {
+    const pid = profileId;
+    const entry = $profileSources?.[pid];
+    if (!entry?.source || appliedSavedFor === pid) return;
+    appliedSavedFor = pid;
+    try {
+      const parsed = JSON.parse(entry.source);
+      if (parsed?.dpdModel?.scopes) model = structuredClone(parsed.dpdModel);
+    } catch { /* keep the bundled model */ }
   });
 
   let resolved = $derived(model ? resolveParams(model) : []);
   let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
+
+  // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
+  let saveStatus = $state('');
+  function save() {
+    if (!model || !profileId) return;
+    saveStatus = 'saving';
+    try {
+      // $state.snapshot -> a plain (non-proxy) deep copy; the resolver/clone can't handle the $state proxy.
+      const plain = $state.snapshot(model);
+      const merged = resolveModel(plain, dpdLibrary);
+      const legacy = buildLegacyProfile(merged, { legacyId: profileId, embedDpdModel: plain });
+      saveProfileSource(profileId, JSON.stringify(legacy, null, 2));
+    } catch (e) {
+      saveStatus = 'error: ' + (e?.message ?? 'build failed');
+    }
+  }
+  $effect(() => {
+    const s = $latestProfileSourceSave;
+    if (!s || s.profileId !== profileId) return;
+    saveStatus = s.running ? 'saving…' : s.ok ? 'Saved ✓' : ('error: ' + (s.error ?? 'save failed'));
+  });
 
   let activeScreen = $state('params');
 
@@ -126,7 +167,8 @@
 
   {#if model}
     <div class="stagefoot">
-      <div class="ft">Editing the new-DPD model for <b>{model.id}</b>. Saving lands in a later stage.</div>
+      <div class="ft">Editing the new-DPD model for <b>{model.id}</b>{#if saveStatus} · <b style="color:var(--accent)">{saveStatus}</b>{/if}</div>
+      <button class="btn" onclick={() => save()}>Save to engine</button>
       <button class="btn primary">Export portable profile ⇩</button>
     </div>
   {/if}

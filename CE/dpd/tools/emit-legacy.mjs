@@ -6,63 +6,14 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveProfile, resolveParams, hexToBytes } from './dpd.mjs';
+import { resolveProfile } from './dpd.mjs';
+import { buildLegacyProfile } from '../emit-legacy-core.mjs';
 
 const id = process.argv[2] ?? 'roland.gaia';
 const resolved = resolveProfile(id);
-const params = resolveParams(resolved).filter((p) => p.instance === 0); // tone 1 + global
-const flat = (rid) => rid.replace(/^[^.]+\./, '');
-
-function legacyParam(p) {
-  const out = {
-    id: flat(p.resolvedId),
-    name: p.name, group: p.group,
-    type: p.valueType === 'enum' ? 'choice' : 'integer',
-  };
-  if (p.valueType === 'enum') {
-    out.default = p.enum[0].id;
-    out.choices = p.enum.map((e) => ({ id: e.id, label: e.label, value: e.wire }));
-  } else {
-    out.default = p.range?.min ?? 0;
-    out.range = p.range ?? { min: 0, max: 127 };
-  }
-  if (p.absAddress) out.address = p.absAddress;
-  out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: p.name };
-  out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
-  out.encoding = { type: p.valueType === 'enum' ? 'enum' : (p.encoding?.type === 's7' ? 'u7' : (p.encoding?.type ?? 'u7')) };
-  out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
-  out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
-  out.messageRecipe = p.wires.write?.msg === 'cc' ? 'volumeCc' : 'dt1';
-  out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
-  return out;
-}
-
-const legacy = {
-  schemaVersion: 1,
-  profileVersion: resolved.version,
-  minCEditorVersion: '0.9.0',
-  id: 'roland-gaia-dpd',
-  name: (resolved.label ?? 'Device') + ' (from DPD)',
-  // Backlink to the DPD this legacy profile was generated from, so the editor's merge-on-drop can
-  // find the self-contained slice (mergeParams in <dpdSource>.runtime.json) and stamp source=id@version.
-  dpdSource: id,
-  manufacturer: 'Roland',
-  family: 'SH',
-  status: 'experimental',
-  trust: 'local',
-  variables: { deviceId: hexToBytes(resolved.deviceId)[0], channel: 1 },
-  identity: {
-    requestDeviceId: '$deviceId', manufacturerId: ['41'], familyCode: ['41', '02'],
-    modelNumber: ['00', '00'], revision: ['00', '03', '00', '00'], timeoutMs: 1000, retries: 0,
-  },
-  timing: { minDelayBetweenMessagesMs: 20 },
-  parameters: params.map(legacyParam),
-  messageRecipes: [
-    { id: 'dt1', kind: 'sysex', template: ['F0', '41', '$deviceId', '00', '00', '41', '12', '$address', '$encodedValue', '$checksum', 'F7'], checksum: { type: 'roland-7bit', from: '$address', to: '$encodedValue' }, delayAfterMs: 20 },
-    { id: 'rq1', kind: 'sysex', template: ['F0', '41', '$deviceId', '00', '00', '41', '11', '$address', '$size', '$checksum', 'F7'], checksum: { type: 'roland-7bit', from: '$address', to: '$size' }, delayAfterMs: 20 },
-    { id: 'volumeCc', kind: 'cc', channel: '$channel', controller: 7, value: '$encodedValue' },
-  ],
-};
+// Byte-identical to the previous inline construction; the conversion now lives in the browser-safe
+// core so the in-app Designer can produce the same legacy profile on save.
+const legacy = buildLegacyProfile(resolved, { legacyId: 'roland-gaia-dpd' });
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const out = join(HERE, '..', '..', 'profiles', 'test', 'roland-gaia-dpd.ceditor-device.json');

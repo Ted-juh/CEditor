@@ -75,3 +75,32 @@ export function resolveWires(p, absAddr, idx) {
   else if (absAddr) w.rxLive = { msg: 'dt1', address: absAddr, size: p.size ?? 1 };
   return w;
 }
+
+// Browser-safe inheritance merge — mirrors tools/dpd.mjs resolveProfile, but over an in-memory
+// library map (id -> profile) instead of the filesystem. Lets the in-app Designer produce a
+// fully-resolved profile (deviceId, message shapes, checksum from the manufacturer) for emit.
+export function resolveModel(model, library = {}) {
+  let merged = model;
+  if (model?.inherits && library[model.inherits]) {
+    const parent = resolveModel(library[model.inherits], library);
+    merged = {
+      ...parent, ...model,
+      manufacturerId: model.manufacturerId ?? parent.manufacturerId,
+      deviceId: model.deviceId ?? parent.deviceId,
+      identity: model.identity ?? parent.identity,
+      checksum: model.checksum ?? parent.checksum,
+      byteOrder: model.byteOrder ?? parent.byteOrder,
+      messageShapes: model.messageShapes ?? parent.messageShapes,
+      provenance: model.provenance ?? parent.provenance,
+      scopes: model.scopes ?? structuredClone(parent.scopes),
+    };
+  }
+  if (Array.isArray(merged.includes) && merged.includes.length) {
+    merged = mergeIncludes(merged, merged.includes
+      .map((ref) => library[ref.split('@')[0]]).filter(Boolean).map((c) => resolveModel(c, library)));
+  }
+  if (Array.isArray(merged.overrides) && merged.overrides.length) {
+    merged = applyOverrides(merged, merged.overrides);
+  }
+  return merged;
+}
