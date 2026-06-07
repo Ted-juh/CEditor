@@ -9,6 +9,7 @@
   import DpdDeviceStructureScreen from './dpd/DpdDeviceStructureScreen.svelte';
   import DpdMessageShapesScreen from './dpd/DpdMessageShapesScreen.svelte';
   import DpdBulkDumpsScreen from './dpd/DpdBulkDumpsScreen.svelte';
+  import DpdAdvancedScreen from './dpd/DpdAdvancedScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -98,6 +99,7 @@
       { id: 'device', icon: '⚙', label: 'Device structure' },
       { id: 'messages', icon: '⬡', label: 'Message shapes', count: model?.messageShapes?.length || 2 },
       { id: 'packing', icon: '◆', label: 'Packing Studio' },
+      { id: 'advanced', icon: '⌬', label: 'Advanced' },
     ] },
     { group: 'Library', items: [
       { id: 'share', icon: '↗', label: 'Share & impact' },
@@ -107,7 +109,7 @@
     ] },
   ]);
 
-  const realScreens = new Set(['params', 'overview', 'device', 'messages', 'dumps']);
+  const realScreens = new Set(['params', 'overview', 'device', 'messages', 'dumps', 'advanced']);
 </script>
 
 <div class="dpd-app">
@@ -169,6 +171,9 @@
         </div>
         <div class={['screen', activeScreen === 'dumps' && 'active']}>
           <DpdBulkDumpsScreen {model} />
+        </div>
+        <div class={['screen', activeScreen === 'advanced' && 'active']}>
+          <DpdAdvancedScreen {model} {profileId} onApplyModel={(m) => { model = m; appliedSavedFor = profileId; }} />
         </div>
 
         <!-- Placeholder screens (Detect / Share / Import / Presets / Packing — later) -->

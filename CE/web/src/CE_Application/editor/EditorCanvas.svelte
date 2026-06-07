@@ -14,8 +14,8 @@
   import PanelSurface from './PanelSurface.svelte';
   import PanelPreviewSurface from './PanelPreviewSurface.svelte';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
-  // V2 = the mockup-faithful in-program Device Profile Designer. The legacy DeviceProfileDesigner.svelte
-  // is parked (still in the repo) until its power-user features (raw JSON / tests / dump parse) are re-housed.
+  // The in-program Device Profile Designer (mockup-faithful). The legacy DeviceProfileDesigner.svelte
+  // was removed once its power-user features (raw JSON / tests / dump parse) moved to V2's Advanced screen.
   import DeviceProfileDesigner from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
