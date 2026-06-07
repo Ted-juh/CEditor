@@ -1,16 +1,14 @@
 <script>
   // Overview — the resolved view (doc "Layer 1 invisibility"): based-on inheritance card,
   // completeness meter (from provenance), and a settings table tagging each value inherited-vs-yours.
+  import { familyLabel as familyLabelOf, byteOrderLabel, checksumLabel, shapeById } from './dpdLabels.js';
   let { model, merged } = $props();
 
-  let familyLabel = $derived(
-    model?.inherits ? model.inherits.charAt(0).toUpperCase() + model.inherits.slice(1) : (model?.manufacturer ?? 'Custom')
-  );
+  let family = $derived(familyLabelOf(model));
   let showInherited = $state(true);
 
-  function byteOrderLabel(b) { return b === 'msb-first' ? 'MSB first' : b === 'lsb-first' ? 'LSB first' : (b ?? '—'); }
   function header(m) {
-    const dt1 = (m?.messageShapes ?? []).find((s) => s.id === 'dt1');
+    const dt1 = shapeById(m, 'dt1');
     if (!dt1) return '—';
     const toks = dt1.template ?? [];
     const i = toks.indexOf('12');
@@ -31,10 +29,10 @@
   let settings = $derived.by(() => {
     if (!model || !merged) return [];
     const own = (k) => model[k] !== undefined;
-    const fam = familyLabel + ' family';
+    const fam = family + ' family';
     return [
       { name: 'SysEx header', value: header(merged), own: own('messageShapes'), src: own('messageShapes') ? 'This model' : fam, addr: true },
-      { name: 'Checksum', value: merged.checksum?.type === 'roland-7bit' ? 'Roland · (128 − Σ) mod 128' : (merged.checksum?.type ?? '—'), own: own('checksum'), src: own('checksum') ? 'This model' : fam },
+      { name: 'Checksum', value: checksumLabel(merged.checksum), own: own('checksum'), src: own('checksum') ? 'This model' : fam },
       { name: 'Value byte order', value: byteOrderLabel(merged.byteOrder), own: own('byteOrder'), src: own('byteOrder') ? 'This model' : fam },
       { name: 'Device ID', value: merged.deviceId ?? '—', addr: true, own: own('deviceId'), src: own('deviceId') ? 'You changed this' : fam },
       { name: 'Model ID', value: model.modelId ?? '—', addr: true, own: true, src: 'This model' },
@@ -49,7 +47,7 @@
 <div class="basedon">
   <div class="bi">🎚️</div>
   <div class="bt">
-    <div class="b1">Based on: <b>{familyLabel} family template</b></div>
+    <div class="b1">Based on: <b>{family} family template</b></div>
     <div class="b2">Checksum, byte order &amp; SysEx header come from here — override any of it.</div>
   </div>
   <div class={['toggleview', showInherited && 'on']} role="switch" aria-checked={showInherited} tabindex="0"

@@ -16,7 +16,7 @@
   import CanvasContextMenu from './CanvasContextMenu.svelte';
   // The in-program Device Profile Designer (mockup-faithful). The legacy DeviceProfileDesigner.svelte
   // was removed once its power-user features (raw JSON / tests / dump parse) moved to V2's Advanced screen.
-  import DeviceProfileDesigner from './DeviceProfileDesignerV2.svelte';
+  import DeviceProfileDesignerV2 from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
   import ScriptWorkspace from './ScriptWorkspace.svelte';
@@ -468,7 +468,7 @@
           {#if splitDeviceOnLeft}
             <div class="designer-pane" title={splitDeviceProfileName}>
               {#key splitDeviceProfileId}
-                <DeviceProfileDesigner profileId={splitDeviceProfileId} />
+                <DeviceProfileDesignerV2 profileId={splitDeviceProfileId} />
               {/key}
             </div>
           {/if}
@@ -532,7 +532,7 @@
           {#if !splitDeviceOnLeft}
             <div class="designer-pane" title={splitDeviceProfileName}>
               {#key splitDeviceProfileId}
-                <DeviceProfileDesigner profileId={splitDeviceProfileId} />
+                <DeviceProfileDesignerV2 profileId={splitDeviceProfileId} />
               {/key}
             </div>
           {/if}
@@ -540,7 +540,7 @@
       {:else if $activeEditorTab?.type === 'settings'}
         <SettingsView />
       {:else if $activeEditorTab?.type === 'deviceProfile'}
-        <DeviceProfileDesigner profileId={$activeEditorTab.id} />
+        <DeviceProfileDesignerV2 profileId={$activeEditorTab.id} />
       {:else if $activeEditorTab?.type === 'script'}
         <ScriptWorkspace documentId={$activeEditorTab.id} />
       {:else if canvasPanel}

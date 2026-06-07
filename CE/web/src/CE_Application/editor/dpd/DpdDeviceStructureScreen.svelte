@@ -1,17 +1,11 @@
 <script>
   // Device structure — how the device organizes memory (scopes/stride/device id) + the message shapes.
+  import { shapeById, shapeTemplate } from './dpdLabels.js';
   let { model, merged } = $props();
   let tones = $derived(model?.deviceStructure?.tones ?? null);
   let tone = $derived(model?.scopes?.tone ?? null);
-
-  function tpl(id) {
-    const s = (merged?.messageShapes ?? []).find((x) => x.id === id);
-    if (!s) return '—';
-    return (s.template ?? []).map((t) =>
-      t === '$deviceId' ? merged.deviceId : t === '$modelId' ? merged.modelId
-      : t === '$address' ? '[addr]' : t === '$encodedValue' ? '[value]' : t === '$size' ? '[size]' : t === '$checksum' ? '[sum]' : t
-    ).join(' ');
-  }
+  let dt1 = $derived(shapeTemplate(shapeById(merged, 'dt1'), merged));
+  let rq1 = $derived(shapeTemplate(shapeById(merged, 'rq1'), merged));
 </script>
 
 <div class="shead"><h1>Device structure</h1></div>
@@ -26,6 +20,6 @@
 
 <div class="reqbox">
   <div class="rl">Message shapes</div>
-  <div class="reqfield"><div class="rname">Set parameter (DT1)</div><div class="rmsg">{tpl('dt1')}</div></div>
-  <div class="reqfield"><div class="rname">Request parameter (RQ1)</div><div class="rmsg">{tpl('rq1')}</div></div>
+  <div class="reqfield"><div class="rname">Set parameter (DT1)</div><div class="rmsg">{dt1}</div></div>
+  <div class="reqfield"><div class="rname">Request parameter (RQ1)</div><div class="rmsg">{rq1}</div></div>
 </div>

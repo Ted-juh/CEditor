@@ -15,25 +15,32 @@
   });
 
   let isEnum = $derived(param?.valueType === 'enum');
-  let entries = $derived(isEnum ? (param.enum ?? (param.enum = [])) : []);
+  let entries = $derived(isEnum ? (param?.enum ?? []) : []); // read-only view; mutate via enumArr()
 
+  // Lazily ensure the source enum array exists, then mutate it (never inside a $derived).
+  function enumArr() {
+    if (param && !Array.isArray(param.enum)) param.enum = [];
+    return param?.enum ?? [];
+  }
   function hex(w) { return Number(w ?? 0).toString(16).toUpperCase().padStart(2, '0'); }
   function setWire(entry, raw) {
     const n = parseInt(String(raw).replace(/[^0-9a-fA-F]/g, ''), 16);
     entry.wire = Number.isFinite(n) ? n : 0;
   }
   function move(i, dir) {
+    const arr = enumArr();
     const j = i + dir;
-    if (j < 0 || j >= entries.length) return;
-    const [e] = entries.splice(i, 1);
-    entries.splice(j, 0, e);
+    if (j < 0 || j >= arr.length) return;
+    const [e] = arr.splice(i, 1);
+    arr.splice(j, 0, e);
   }
-  function remove(i) { entries.splice(i, 1); }
+  function remove(i) { enumArr().splice(i, 1); }
   function add() {
-    const nextWire = entries.reduce((m, e) => Math.max(m, Number(e.wire ?? 0)), -1) + 1;
-    let id = `opt${entries.length + 1}`, n = entries.length + 1;
-    while (entries.some((e) => e.id === id)) id = `opt${++n}`;
-    entries.push({ id, label: 'New value', wire: nextWire });
+    const arr = enumArr();
+    const nextWire = arr.reduce((m, e) => Math.max(m, Number(e.wire ?? 0)), -1) + 1;
+    let id = `opt${arr.length + 1}`, n = arr.length + 1;
+    while (arr.some((e) => e.id === id)) id = `opt${++n}`;
+    arr.push({ id, label: 'New value', wire: nextWire });
   }
 
   let vtypeLabel = $derived(
@@ -73,7 +80,7 @@
         <div class="enumrow">
           <span class="grip">⠿</span>
           <span class="idx">{i}</span>
-          <input class="lbl" bind:value={entry.label} />
+          <input class="lbl" bind:value={entry.label} onfocus={(e) => e.target.select()} />
           <span class="valwrap"><input value={hex(entry.wire)} oninput={(e) => setWire(entry, e.target.value)} onfocus={(e) => e.target.select()} /></span>
           <span class="arrows"><span class="up" role="button" tabindex="-1" onclick={() => move(i, -1)} onkeydown={() => {}}>▲</span><span class="dn" role="button" tabindex="-1" onclick={() => move(i, 1)} onkeydown={() => {}}>▼</span></span>
           <span class="del" role="button" tabindex="-1" onclick={() => remove(i)} onkeydown={() => {}}>✕</span>

@@ -77,8 +77,8 @@
 
 <div class="toolbar">
   <button class="btn primary" onclick={() => addParam()}>+ Add parameter</button>
-  <button class="btn">⇪ Import CSV</button>
-  <button class="btn">◉ MIDI learn</button>
+  <button class="btn" disabled title="Coming soon">⇪ Import CSV</button>
+  <button class="btn" disabled title="Coming soon">◉ MIDI learn</button>
   <div class="spacer"></div>
   <div class={['status-pill', !allClean && 'warn']}>
     <span class={['chk', allClean ? 'ok' : 'warn']}>{allClean ? '✓' : '!'}</span>
@@ -115,7 +115,7 @@
             </tr>
           {/each}
           <tr class="emptyrow">
-            <td><div class="cell"><input placeholder="Type a parameter name…" bind:value={newName} onkeydown={(e) => e.key === 'Enter' && addParam()} /></div></td>
+            <td><div class="cell"><input placeholder="Type a parameter name…" bind:value={newName} onfocus={(e) => e.target.select()} onkeydown={(e) => e.key === 'Enter' && addParam()} /></div></td>
             <td><div class="cell"><span class="ptype">—</span></div></td>
             <td><div class="cell"><span class="vtype">—</span></div></td>
             <td><div class="cell">—</div></td>

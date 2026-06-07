@@ -37,11 +37,8 @@
 .dpd-app .src.own{color:var(--accent);background:var(--accent-dim)}
 .dpd-app tr.inherited td .cell{color:var(--txt-dim)}
 .dpd-app tr.inherited td .cell .pname{color:var(--txt-dim);font-weight:500}
-.dpd-app tr.hiddenrow{opacity:.4}
-.dpd-app tr.hiddenrow td .cell .pname{text-decoration:line-through}
 .dpd-app .rowmenu{margin-left:auto;color:var(--txt-faint);font-size:15px;opacity:0;transition:.12s;padding:0 4px}
 .dpd-app tr:hover .rowmenu{opacity:1}
-.dpd-app .hidetag{font-size:10.5px;color:var(--txt-faint);font-style:italic}
 .dpd-app .viewend{margin-top:14px;font-size:11.5px;color:var(--txt-faint);display:flex;align-items:center;gap:8px}
 .dpd-app .viewend b{color:var(--txt-dim)}
 
@@ -61,7 +58,6 @@
 .dpd-app .reqfield .rname{width:160px;flex-shrink:0;font-size:13px;color:var(--txt-dim)}
 .dpd-app .reqfield .rmsg{flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
   border:1px solid var(--line-2);border-radius:7px;padding:9px 12px;color:var(--txt)}
-.dpd-app .reqfield .rmsg .v{color:var(--accent)}
 
 /* ---- Message shapes / Bulk dumps: note + layout box + dump cards ---- */
 .dpd-app .note{display:flex;gap:12px;align-items:flex-start;background:rgba(90,155,240,.06);

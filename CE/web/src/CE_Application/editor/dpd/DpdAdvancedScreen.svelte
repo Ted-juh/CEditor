@@ -60,7 +60,7 @@
     <span class="advh">Engine test vectors</span>
     <div class="advspacer"></div>
     <button class="btn sm" onclick={() => runTests()}>Run tests</button>
-    {#if testResult}<span class="advstatus">{testResult.running ? 'running…' : `${testResult.passed ?? 0}/${testResult.total ?? 0} passed`}</span>{/if}
+    {#if testResult}<span class="advstatus">{testResult.running ? 'running…' : (testResult.total ?? 0) === 0 ? 'no test vectors in this profile' : `${testResult.passed ?? 0}/${testResult.total} passed`}</span>{/if}
   </div>
   {#if testResult?.results?.length}
     <div class="layoutbox">

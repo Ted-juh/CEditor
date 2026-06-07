@@ -7,9 +7,9 @@
 //
 // This is the thin wiring: given the legacy descriptor being dropped + the profile + the generated
 // runtime (which carries `mergeParams`, the resolved slices), produce the enriched binding. The
-// actual translation lives in the generated dpdMerge.js (a regenerated copy of CE/dpd/merge.mjs),
-// keeping one source of truth. Pure + dependency-light so it unit-tests under `node --test`.
-import { dpdParamToBindingSection } from '../generated/dpdMerge.js';
+// actual translation lives in the generated dpd/merge.mjs (a regenerated copy of CE/dpd/merge.mjs,
+// emitted by emit-library.mjs), keeping one source of truth. Pure so it unit-tests under `node --test`.
+import { dpdParamToBindingSection } from '../generated/dpd/merge.mjs';
 
 // The C++ profile *summary* carries only id/name/filePath, so a DPD-backed legacy profile is
 // recognised via the generated map (legacy id -> { dpdSource, version }) rather than a field on

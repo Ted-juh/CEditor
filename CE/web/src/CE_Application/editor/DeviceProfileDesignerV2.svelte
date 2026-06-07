@@ -16,6 +16,7 @@
   import { validateProfile } from '../generated/dpd/validate.mjs';
   import { buildLegacyProfile } from '../generated/dpd/emit-legacy-core.mjs';
   import { saveProfileSource, requestProfileSource, latestProfileSourceSave, profileSources } from '../stores/deviceProfiles.js';
+  import { familyLabel as familyLabelOf } from './dpd/dpdLabels.js';
 
   let { profileId = '' } = $props();
 
@@ -59,7 +60,8 @@
 
   let resolved = $derived(model ? resolveParams(model) : []);
   let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
-  let merged = $derived(model ? resolveModel(model, dpdLibrary) : null); // model + manufacturer (deviceId, shapes, checksum)
+  // $state.snapshot before resolve — resolveModel's internal structuredClone can't process the $state proxy.
+  let merged = $derived(model ? resolveModel($state.snapshot(model), dpdLibrary) : null);
 
   // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
   let saveStatus = $state('');
@@ -84,11 +86,23 @@
 
   let activeScreen = $state('params');
 
+  // Export the new-DPD model as a portable JSON file.
+  function exportProfile() {
+    if (!model) return;
+    const blob = new Blob([JSON.stringify($state.snapshot(model), null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${model.id ?? 'profile'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   let paramCount = $derived(resolved.length);
   let dumpCount = $derived(model?.dumps?.length ?? 0);
-  let familyLabel = $derived(
-    model?.inherits ? model.inherits.charAt(0).toUpperCase() + model.inherits.slice(1) : (model?.manufacturer ?? 'Custom')
-  );
+  let familyLabel = $derived(familyLabelOf(model));
 
   let nav = $derived([
     { group: 'Profile', items: [
@@ -97,7 +111,7 @@
       { id: 'params', icon: '▦', label: 'Parameters', count: paramCount },
       { id: 'dumps', icon: '⬓', label: 'Bulk dumps', count: dumpCount || undefined },
       { id: 'device', icon: '⚙', label: 'Device structure' },
-      { id: 'messages', icon: '⬡', label: 'Message shapes', count: model?.messageShapes?.length || 2 },
+      { id: 'messages', icon: '⬡', label: 'Message shapes', count: merged?.messageShapes?.length || undefined },
       { id: 'packing', icon: '◆', label: 'Packing Studio' },
       { id: 'advanced', icon: '⌬', label: 'Advanced' },
     ] },
@@ -192,7 +206,7 @@
     <div class="stagefoot">
       <div class="ft">Editing the new-DPD model for <b>{model.id}</b>{#if saveStatus} · <b style="color:var(--accent)">{saveStatus}</b>{/if}</div>
       <button class="btn" onclick={() => save()}>Save to engine</button>
-      <button class="btn primary">Export portable profile ⇩</button>
+      <button class="btn primary" onclick={() => exportProfile()}>Export portable profile ⇩</button>
     </div>
   {/if}
 </div>

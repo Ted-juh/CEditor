@@ -2,7 +2,7 @@
 // This is the "maps -> profile" generalization: the player's previously-hardcoded
 // INBOUND_CC / INBOUND_SYSEX / paramRows become generated data, valid for ANY profiled
 // device, not just the GAIA. Run: node CE/dpd/tools/emit-runtime.mjs roland.gaia
-import { writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveProfile, resolveParams } from './dpd.mjs';
@@ -65,11 +65,6 @@ mkdirSync(webDir, { recursive: true });
 const webFile = join(webDir, `${id}.runtime.json`);
 writeFileSync(webFile, JSON.stringify(out, null, 2));
 console.log(`wrote ${webFile}`);
-// Ship the pure merge-on-drop translation into the app as a regenerated artifact
-// (single source of truth = CE/dpd/merge.mjs), so the binder imports it without crossing the Vite root.
-const mergeSrc = join(HERE, '..', 'merge.mjs');
-const mergeDst = join(webDir, 'dpdMerge.js');
-copyFileSync(mergeSrc, mergeDst);
-console.log(`wrote ${mergeDst} (copy of merge.mjs)`);
+// (the merge-on-drop translation module is bundled into generated/dpd/ by emit-library.mjs — single source of truth.)
 console.log(`  sysexIn: ${Object.keys(out.sysexIn).length} addresses, ccIn: ${Object.keys(out.ccIn).length} CCs, params: ${Object.keys(out.params).length}, mergeParams: ${Object.keys(out.mergeParams).length}`);
 console.log(`  sample — CC ${Object.keys(out.ccIn).join('/')} -> cutoff; 10 00 01 00 -> ${out.sysexIn['10 00 01 00']}; 10 00 01 0C -> ${out.sysexIn['10 00 01 0C']}`);
