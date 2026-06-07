@@ -21,9 +21,8 @@ the parameter/packing/provenance models, and a resolver that proves it against r
 | `tools/emit-legacy.mjs` (+ browser-safe `emit-legacy-core.mjs`) | Emits the C++ engine's legacy `.ceditor-device.json` **from any** resolved DPD profile — manufacturer / family / identity / message-recipes / per-controller CC are all **derived from the profile** (no device special-cased). OUTBOUND is DPD-sourced without rewriting the engine. |
 | `tools/import-midici.mjs` | **MIDI-CI Property Exchange** importer — a captured PE resource → native JSON (names + CCs + identity), `partial`. |
 | `tools/library.mjs` + `library.test.mjs` | **Layer 3 flywheel** curation core — round-trip gate, confirm-vs-fork, partial-accrete, conflict→version/variant, versioning/revert/pin, reputation, downloader caution. |
-| `tools/designer-view.mjs` | Designer **resolved-view** surface — renders a real profile as the mockup's parameter table (incl. the multi-wire *Receives* column) to `build/designer.html`. |
-| `web/designer.html` | **Interactive Designer editor** — fetches a real profile, renders an **editable** parameter table (name / value-type / address, add/remove), with **live** resolved-address recompute + schema validation + the multi-wire *Receives* column. Imports `resolve.mjs` + `validate.mjs` directly. |
-| `web/packing-studio.html` | **Interactive Packing Studio** — the bit-level 8→7 packing editor; live byte breakdown, MSB-order toggle, full-range round-trip verify. Imports `codecs.mjs`. |
+| _(in-program Designer)_ | The mockup-faithful editor now lives IN the app: `CE/web/src/CE_Application/editor/DeviceProfileDesignerV2.svelte` + `editor/dpd/`. The old standalone `web/designer.html` and `tools/designer-view.mjs` were **retired** (superseded). |
+| `web/packing-studio.html` | **Interactive Packing Studio** — the bit-level 8→7 packing editor; live byte breakdown, MSB-order toggle, full-range round-trip verify. Imports `codecs.mjs`. (Its in-app screen is still a placeholder.) |
 | `server.mjs` + `server.test.mjs` | **Layer 3 community backend** — HTTP service over `library.mjs` (GET/POST `/profiles`, versions, caution, pin, reputation); file-persisted. 13 integration tests. |
 | `tools/validate.mjs` | Shared dependency-free structural validator (the formal contract is `dpd.schema.json`). |
 | `tools/import-ins.mjs` | **Layer 2 importer** — Cakewalk `.ins` → native JSON, marked `structural-only`, with a "what came through / what needs you" summary. |
@@ -85,11 +84,11 @@ infrastructure-gated, or explicitly deferred by the doc itself.
    + `mergeParams` + `dpdProfileMap.json`). 6 web unit tests against the real artifacts; full web
    suite 161/161; Vite build clean. This is the doc's specified integration (lines 425/437/439),
    which it states is **data, not a C++ architectural change** (line 441).
-3. **Interactive Designer + Packing Studio UI — DONE (headlessly verified).** `web/designer.html`
-   is a live editable parameter table (edit name/type/address, add/remove) with instant
-   resolved-address recompute + schema validation + the multi-wire *Receives* column;
-   `web/packing-studio.html` is the live bit-level 8→7 editor. Both verified via Claude_Preview.
-   Follow-ups: drag-to-bind and folding these surfaces into the main Svelte app (today standalone).
+3. **Interactive Designer — DONE, now IN the app.** Rebuilt mockup-faithful as
+   `CE/web/src/CE_Application/editor/DeviceProfileDesignerV2.svelte` (+ `editor/dpd/`): shell +
+   Parameters / Overview / Device-structure / Message-shapes / Bulk-dumps / Advanced screens, with
+   Save→engine, verified in the running CEditor.exe. The standalone `web/designer.html` it replaced
+   was removed. `web/packing-studio.html` remains (its in-app screen is still a placeholder).
 4. **Community backend for the flywheel — DONE (logic + service).** The curation **logic**
    (`library.mjs`, 21 tests) runs behind an HTTP service (`server.mjs`, 13 integration tests).
 
@@ -107,15 +106,15 @@ Hardware- / infrastructure-gated (cannot be built or verified headlessly):
 ## Verify
 
 ```
-node CE/dpd/tools/verify.mjs          # 48 checks — schema, resolution, exact GAIA bytes, round-trips, overrides/mixins
+node CE/dpd/tools/verify.mjs          # 75 checks — schema + strict-validator gates, resolution, exact GAIA bytes, round-trips (incl. packed8to7), per-wire address, device-agnostic legacy emit
 node CE/dpd/tools/match.mjs           # 12 checks — inquiry build, identity parse, match + graceful degradation
 node CE/dpd/tools/connect.mjs         # 10 checks — Layer 4 recognition cascade (simulated devices)
-node CE/dpd/tools/library.test.mjs    # 21 checks — round-trip gate, confirm/merge/conflict, versioning, reputation
+node CE/dpd/tools/library.test.mjs    # 22 checks — round-trip gate (incl. Korg packed), confirm/merge/conflict, versioning, reputation
 node CE/dpd/server.test.mjs           # 13 checks — library HTTP service (ephemeral port)
 node CE/dpd/tools/import-ins.mjs      # .ins -> validated structural-only profile
 node CE/dpd/tools/import-midici.mjs   # 8 checks  — MIDI-CI PE -> validated partial profile
 node CE/dpd/tools/merge.test.mjs      # 32 checks — merge-on-drop translation (real GAIA + packed param)
-node CE/dpd/tools/emit-runtime.mjs roland.gaia    # inbound map + mergeParams + dpdMerge.js ; emit-legacy.mjs -> engine profile + dpdProfileMap
-node CE/dpd/tools/designer-view.mjs roland.gaia   # resolved-view HTML  (web/designer.html = interactive editor)
+node CE/dpd/tools/emit-library.mjs                # bundle browser-safe modules + dpdLibrary into the app
+node CE/dpd/tools/emit-runtime.mjs roland.gaia    # inbound map + mergeParams ; emit-legacy.mjs -> device-agnostic engine profile + dpdProfileMap
 cd CE/web && node --test                          # 161 web tests incl. test/dpdMergeOnDrop.test.js (merge-on-drop wiring)
 ```
