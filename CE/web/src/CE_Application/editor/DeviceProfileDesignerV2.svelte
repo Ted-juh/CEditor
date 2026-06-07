@@ -3,7 +3,12 @@
   // Stage 1: shell (titlebar + nav rail + stage + footer) and the hero Parameters screen,
   // backed by the new-DPD data layer bundled into the app. Other screens are placeholders.
   import './dpd/dpdDesigner.css';
+  import './dpd/dpdScreens.css';
   import DpdParametersScreen from './dpd/DpdParametersScreen.svelte';
+  import DpdOverviewScreen from './dpd/DpdOverviewScreen.svelte';
+  import DpdDeviceStructureScreen from './dpd/DpdDeviceStructureScreen.svelte';
+  import DpdMessageShapesScreen from './dpd/DpdMessageShapesScreen.svelte';
+  import DpdBulkDumpsScreen from './dpd/DpdBulkDumpsScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -53,6 +58,7 @@
 
   let resolved = $derived(model ? resolveParams(model) : []);
   let validation = $derived(model ? validateProfile(model) : { ok: true, errors: [] });
+  let merged = $derived(model ? resolveModel(model, dpdLibrary) : null); // model + manufacturer (deviceId, shapes, checksum)
 
   // --- Save: resolve the new-schema model -> legacy engine profile -> persist via the bridge. ---
   let saveStatus = $state('');
@@ -101,7 +107,7 @@
     ] },
   ]);
 
-  const realScreens = new Set(['params']);
+  const realScreens = new Set(['params', 'overview', 'device', 'messages', 'dumps']);
 </script>
 
 <div class="dpd-app">
@@ -148,12 +154,24 @@
           <div class="placeholder">No new-DPD model is bundled for <b>{profileId || 'this profile'}</b>.<br/>The new Designer edits the new schema; legacy-only profiles will be handled in a later stage.</div>
         </div>
       {:else}
-        <!-- Parameters (hero) — always mounted; visibility via .active per project tab convention -->
+        <!-- Real screens — always mounted; visibility via .active per project tab convention -->
         <div class={['screen', activeScreen === 'params' && 'active']}>
           <DpdParametersScreen {model} {resolved} {validation} />
         </div>
+        <div class={['screen', activeScreen === 'overview' && 'active']}>
+          <DpdOverviewScreen {model} {merged} />
+        </div>
+        <div class={['screen', activeScreen === 'device' && 'active']}>
+          <DpdDeviceStructureScreen {model} {merged} />
+        </div>
+        <div class={['screen', activeScreen === 'messages' && 'active']}>
+          <DpdMessageShapesScreen {merged} />
+        </div>
+        <div class={['screen', activeScreen === 'dumps' && 'active']}>
+          <DpdBulkDumpsScreen {model} />
+        </div>
 
-        <!-- Placeholder screens (Stage 3) -->
+        <!-- Placeholder screens (Detect / Share / Import / Presets / Packing — later) -->
         {#each nav.flatMap((s) => s.items).filter((i) => !realScreens.has(i.id)) as item (item.id)}
           <div class={['screen', activeScreen === item.id && 'active']}>
             <div class="shead"><h1>{item.label}</h1></div>

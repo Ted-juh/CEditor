@@ -1,0 +1,94 @@
+/* Device Profile Designer V2 — Stage 3 screen styles (Overview / Device structure / Message shapes /
+   Bulk dumps), ported from dpd-mockup-v2.html. Every selector prefixed with `.dpd-app`. */
+
+/* ---- Overview: based-on + completeness meter + inherited/own source tags ---- */
+.dpd-app .basedon{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:14px 18px;margin-bottom:18px;max-width:880px}
+.dpd-app .basedon .bi{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;flex-shrink:0;
+  background:linear-gradient(135deg,rgba(224,162,60,.15),rgba(224,162,60,.05));border:1px solid var(--amber-dim);font-size:17px}
+.dpd-app .basedon .bt{flex:1}
+.dpd-app .basedon .bt .b1{font-size:13.5px;font-weight:600}
+.dpd-app .basedon .bt .b1 b{color:var(--amber)}
+.dpd-app .basedon .bt .b2{font-size:11.5px;color:var(--txt-faint);margin-top:2px}
+.dpd-app .toggleview{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--txt-dim);cursor:pointer;
+  background:var(--bg);border:1px solid var(--line-2);border-radius:7px;padding:7px 12px;user-select:none}
+.dpd-app .toggleview .sw{width:30px;height:17px;border-radius:9px;background:var(--line-2);position:relative;transition:.15s}
+.dpd-app .toggleview .sw::after{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--txt-faint);transition:.15s}
+.dpd-app .toggleview.on .sw{background:var(--blue-dim)}
+.dpd-app .toggleview.on .sw::after{left:15px;background:var(--blue)}
+
+.dpd-app .meter{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:22px;max-width:880px}
+.dpd-app .meter .mh{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+.dpd-app .meter .mh .mt{font-weight:700;font-size:13.5px}
+.dpd-app .meter .mh .mpct{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--accent)}
+.dpd-app .meter .bar{height:7px;border-radius:5px;background:var(--bg);overflow:hidden;margin-bottom:14px}
+.dpd-app .meter .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--accent-dim),var(--accent));border-radius:5px}
+.dpd-app .meter .checks{display:flex;flex-wrap:wrap;gap:9px}
+.dpd-app .mcheck{display:flex;align-items:center;gap:8px;font-size:12px;background:var(--bg);border:1px solid var(--line);
+  border-radius:20px;padding:6px 13px;color:var(--txt-dim)}
+.dpd-app .mcheck.done b{color:var(--accent);font-weight:600}
+.dpd-app .mcheck.todo{color:var(--txt-faint)}
+.dpd-app .mcheck .d{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dpd-app .mcheck.done .d{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+.dpd-app .mcheck.todo .d{background:var(--line-2)}
+
+.dpd-app .src{font-size:10px;font-weight:600;letter-spacing:.3px;padding:2px 7px;border-radius:5px;
+  color:var(--amber);background:var(--amber-dim);white-space:nowrap}
+.dpd-app .src.own{color:var(--accent);background:var(--accent-dim)}
+.dpd-app tr.inherited td .cell{color:var(--txt-dim)}
+.dpd-app tr.inherited td .cell .pname{color:var(--txt-dim);font-weight:500}
+.dpd-app tr.hiddenrow{opacity:.4}
+.dpd-app tr.hiddenrow td .cell .pname{text-decoration:line-through}
+.dpd-app .rowmenu{margin-left:auto;color:var(--txt-faint);font-size:15px;opacity:0;transition:.12s;padding:0 4px}
+.dpd-app tr:hover .rowmenu{opacity:1}
+.dpd-app .hidetag{font-size:10.5px;color:var(--txt-faint);font-style:italic}
+.dpd-app .viewend{margin-top:14px;font-size:11.5px;color:var(--txt-faint);display:flex;align-items:center;gap:8px}
+.dpd-app .viewend b{color:var(--txt-dim)}
+
+/* ---- Device structure: field grid + request commands ---- */
+.dpd-app .fieldgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;max-width:760px;margin-bottom:26px}
+.dpd-app .field{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px}
+.dpd-app .field .fl{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--txt-faint);margin-bottom:9px}
+.dpd-app .field .fin{display:flex;align-items:center;justify-content:space-between;background:var(--bg);
+  border:1px solid var(--line-2);border-radius:8px;padding:10px 13px}
+.dpd-app .field .fin input{background:none;border:none;outline:none;color:var(--txt);font-family:'JetBrains Mono',monospace;font-size:14px;width:100%}
+.dpd-app .field .fin .unit{font-size:11px;color:var(--txt-faint);white-space:nowrap;margin-left:8px}
+.dpd-app .field .fhint{font-size:11px;color:var(--txt-faint);margin-top:8px;line-height:1.45}
+.dpd-app .reqbox{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:18px;max-width:760px}
+.dpd-app .reqbox .rl{font-size:11px;letter-spacing:.6px;text-transform:uppercase;color:var(--txt-faint);margin-bottom:12px}
+.dpd-app .reqfield{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+.dpd-app .reqfield:last-child{margin-bottom:0}
+.dpd-app .reqfield .rname{width:160px;flex-shrink:0;font-size:13px;color:var(--txt-dim)}
+.dpd-app .reqfield .rmsg{flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;background:var(--bg);
+  border:1px solid var(--line-2);border-radius:7px;padding:9px 12px;color:var(--txt)}
+.dpd-app .reqfield .rmsg .v{color:var(--accent)}
+
+/* ---- Message shapes / Bulk dumps: note + layout box + dump cards ---- */
+.dpd-app .note{display:flex;gap:12px;align-items:flex-start;background:rgba(90,155,240,.06);
+  border:1px solid rgba(90,155,240,.2);border-radius:10px;padding:13px 16px;margin-bottom:22px;
+  font-size:12.5px;color:var(--txt-dim);line-height:1.55;max-width:760px}
+.dpd-app .note b{color:var(--blue)}
+.dpd-app .layoutbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:880px}
+.dpd-app .layoutbox .lh{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--bg-2)}
+.dpd-app .layoutbox .lh .lt{font-weight:700}
+.dpd-app .layoutbox .lh .lm{font-size:11.5px;color:var(--txt-faint);font-family:'JetBrains Mono',monospace}
+.dpd-app .offsetrow{display:flex;align-items:center;gap:0;border-bottom:1px solid var(--line);transition:.12s}
+.dpd-app .offsetrow:hover{background:var(--panel-2)}
+.dpd-app .offsetrow:last-child{border-bottom:none}
+.dpd-app .offsetrow .off{width:96px;flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--blue);
+  padding:11px 18px;border-right:1px solid var(--line)}
+.dpd-app .offsetrow .pp{flex:1;padding:11px 16px;font-size:13px;font-weight:600}
+.dpd-app .offsetrow .enc{width:150px;flex-shrink:0;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--txt-faint);padding:11px 16px}
+.dpd-app .offsetrow .ck{width:46px;flex-shrink:0;padding:11px 16px}
+.dpd-app .dumpgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:26px;max-width:880px}
+.dpd-app .dumpcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;cursor:pointer;transition:.15s}
+.dpd-app .dumpcard:hover{border-color:var(--line-2);background:var(--panel-2)}
+.dpd-app .dumpcard.sel{border-color:var(--accent-dim);background:var(--panel-2)}
+.dpd-app .dumpcard .dt{font-weight:700;font-size:15px;display:flex;align-items:center;gap:9px;margin-bottom:6px}
+.dpd-app .dumpcard .dm{font-size:11.5px;color:var(--txt-faint);line-height:1.5}
+.dpd-app .dumpcard .dstat{margin-top:12px;display:flex;gap:14px;font-size:11px;align-items:center}
+.dpd-app .dumpcard .dstat span{color:var(--txt-dim)}
+.dpd-app .dumpcard .dstat b{color:var(--txt);font-weight:600}
+.dpd-app .dumpcard .pill{font-size:9.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;
+  padding:3px 8px;border-radius:14px;background:var(--accent-dim);color:var(--accent);margin-left:auto}
+.dpd-app .addslot{display:flex;align-items:center;gap:10px;padding:12px 18px;color:var(--txt-faint);font-size:12.5px}
