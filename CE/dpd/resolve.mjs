@@ -54,7 +54,7 @@ export function resolveParams(resolved) {
           name: p.name, group: p.group, valueType: p.valueType, range: p.range,
           encoding: p.encoding ?? { type: 'u7' }, access: p.access ?? { read: true, write: true },
           enum: p.enum, ui: p.ui, size: p.size ?? 1, absAddress: absAddr,
-          wires: resolveWires(p, absAddr, idx),
+          wires: resolveWires(p, absAddr, idx, (rel) => bytesToHex(resolveAddress(base, stride, idx, hexToBytes(rel)))),
         });
       }
     }
@@ -62,16 +62,25 @@ export function resolveParams(resolved) {
   return out;
 }
 
-export function resolveWires(p, absAddr, idx) {
+// resolveAddr (optional) resolves a wire's OWN relative address to absolute (base+stride+offset);
+// without it, or for wires with no `address`, the param's resolved address is used (back-compat).
+export function resolveWires(p, absAddr, idx, resolveAddr) {
+  const addrOf = (wire) => (wire.address && resolveAddr ? resolveAddr(wire.address) : absAddr);
   if (Array.isArray(p.wires)) {
     const w = {};
-    for (const wire of p.wires) w[wire.dir] = wire.msg === 'cc' ? { msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx } : { msg: wire.msg, address: absAddr, size: p.size ?? 1 };
+    for (const wire of p.wires) {
+      w[wire.dir] = wire.msg === 'cc'
+        ? { msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx }
+        : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1 };
+    }
     return w;
   }
   const w = {};
   if (p.access?.write !== false && absAddr) w.write = { msg: 'dt1', address: absAddr, size: p.size ?? 1 };
   if (p.access?.read !== false && absAddr) w.read = { msg: 'rq1', address: absAddr, size: p.size ?? 1 };
-  if (p.rxLive) w.rxLive = p.rxLive.msg === 'cc' ? { msg: 'cc', cc: p.rxLive.cc + (p.rxLive.ccStride ?? 0) * idx } : { msg: p.rxLive.msg, address: absAddr, size: p.size ?? 1 };
+  if (p.rxLive) w.rxLive = p.rxLive.msg === 'cc'
+    ? { msg: 'cc', cc: p.rxLive.cc + (p.rxLive.ccStride ?? 0) * idx }
+    : { msg: p.rxLive.msg, address: addrOf(p.rxLive), size: p.size ?? 1 };
   else if (absAddr) w.rxLive = { msg: 'dt1', address: absAddr, size: p.size ?? 1 };
   return w;
 }

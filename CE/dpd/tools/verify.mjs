@@ -200,6 +200,17 @@ section('legacy emit — device-agnostic');
   ok(k.identity === undefined, 'synthetic no identity (no codes)');
 }
 
+// ---------------------------------------------------------------- per-wire address (B4)
+section('per-wire address resolution');
+{
+  const prof = { scopes: { tone: { base: '10 00 01 00', stride: '00 00 01 00', instances: 2, parameters: [
+    { id: 'p', valueType: 'continuous', address: '00 00 00 0C', wires: [{ dir: 'write', msg: 'dt1' }, { dir: 'read', msg: 'rq1', address: '00 00 00 0D' }] }] } } };
+  const r = resolveParams(prof);
+  eq(r.find((x) => x.resolvedId === 'tone1.p').wires.write.address, '10 00 01 0C', 'write wire at the param address');
+  eq(r.find((x) => x.resolvedId === 'tone1.p').wires.read.address, '10 00 01 0D', 'read wire at ITS OWN address (distinct from write)');
+  eq(r.find((x) => x.resolvedId === 'tone2.p').wires.read.address, '10 00 02 0D', 'per-wire address strides per instance');
+}
+
 // ---------------------------------------------------------------- report
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
