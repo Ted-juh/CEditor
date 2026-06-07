@@ -24,6 +24,17 @@ function validate(profile, id) {
 validate(loadProfile('roland'), 'roland (manufacturer)');
 validate(loadProfile('roland.gaia'), 'roland.gaia (model)');
 
+// the validator must mirror the schema's enums/required-fields (was previously too lax — C4)
+const ok0 = { schemaVersion: 1, id: 'x.y', version: '1.0.0', kind: 'model', scopes: { s: { parameters: [{ id: 'a', valueType: 'continuous' }] } } };
+validate(ok0, 'minimal valid model');
+const rejects = (p, why) => ok(!validateProfile(p).ok, `rejects: ${why}`);
+rejects({ ...ok0, byteOrder: 'middle-out' }, 'bad byteOrder');
+rejects({ ...ok0, checksum: { type: 'crc32' } }, 'bad checksum.type');
+rejects({ ...ok0, scopes: { s: { parameters: [{ id: 'a', valueType: 'enum', enum: [{ label: 'X' }] }] } } }, 'enum entry missing id/wire');
+rejects({ ...ok0, scopes: { s: { parameters: [{ id: 'a', valueType: 'continuous', encoding: { type: 'bitslice' } }] } } }, 'bitslice without slices');
+rejects({ ...ok0, scopes: { s: { parameters: [{ id: 'a', valueType: 'continuous', encoding: { type: 'wat' } }] } } }, 'bad encoding.type');
+rejects({ ...ok0, dumps: [{ id: 'd', kind: 'megadump' }] }, 'bad dump.kind');
+
 // ---------------------------------------------------------------- resolution
 section('Inheritance + scope resolution');
 const gaia = resolveProfile('roland.gaia');
