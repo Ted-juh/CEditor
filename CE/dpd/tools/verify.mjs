@@ -4,9 +4,10 @@
 import {
   LIB_DIR, loadProfile, resolveProfile, resolveParams, buildMessage,
   encodeValue, decodeValue, pack8to7, unpack8to7, bitsliceEncode, bitsliceDecode,
-  applyOverrides, mergeIncludes,
+  applyOverrides, mergeIncludes, resolveModel,
 } from './dpd.mjs';
 import { validateProfile } from './validate.mjs';
+import { buildLegacyProfile } from '../emit-legacy-core.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.log('  ✗ FAIL: ' + msg); } };
@@ -142,6 +143,43 @@ section('Override algebra + mixins (Layer 1)');
   const inc = mergeIncludes(base, [comp]);
   eq(inc.scopes.tone.parameters.map((p) => p.id).join(','), 'a,b,x', 'include: own a/b kept, x added');
   eq(inc.scopes.tone.parameters.find((p) => p.id === 'a').valueType, 'continuous', 'include: own a wins over component a');
+}
+
+// ---------------------------------------------------------------- legacy emit (device-agnostic)
+section('legacy emit — device-agnostic');
+{
+  // GAIA: functional fields preserved; identity omitted (no captured codes); per-controller CC recipe.
+  const gaia = buildLegacyProfile(resolveProfile('roland.gaia'), { legacyId: 'roland-gaia-dpd' });
+  eq(gaia.manufacturer, 'Roland', 'GAIA manufacturer derived from inherits');
+  eq(gaia.family, 'SH', 'GAIA family from model');
+  ok(gaia.identity === undefined, 'GAIA identity omitted (no captured codes)');
+  eq(JSON.stringify(gaia.messageRecipes.find((r) => r.id === 'dt1').template),
+    JSON.stringify(['F0', '41', '$deviceId', '00', '00', '41', '12', '$address', '$encodedValue', '$checksum', 'F7']),
+    'GAIA dt1 recipe byte-identical (modelId expanded)');
+  ok(gaia.messageRecipes.some((r) => r.id === 'cc7' && r.controller === 7), 'GAIA cc7 recipe (per-controller)');
+  eq(gaia.parameters.find((p) => p.id === 'master.volume').messageRecipe, 'cc7', 'master.volume -> cc7 recipe');
+  eq(gaia.parameters.find((p) => p.id === 'filter.cutoff').address, '10 00 01 0C', 'GAIA cutoff address unchanged');
+
+  // A synthetic non-Roland device must derive EVERYTHING from its own profile — nothing GAIA-specific.
+  const lib = {
+    acme: { id: 'acme', kind: 'manufacturer', version: '1.0.0', label: 'Acme', manufacturerId: '42', deviceId: '30',
+      byteOrder: 'msb-first', checksum: { type: 'sum-7bit', from: '$address', to: '$encodedValue' },
+      messageShapes: [{ id: 'dt1', kind: 'sysex', template: ['F0', '42', '$deviceId', '$modelId', '40', '$address', '$encodedValue', '$checksum', 'F7'], checksum: { type: 'sum-7bit', from: '$address', to: '$encodedValue' } }] },
+    'acme.x': { id: 'acme.x', kind: 'model', version: '2.0.0', inherits: 'acme', modelId: '01 02', family: 'X',
+      scopes: { part: { base: '00 00 00 00', parameters: [
+        { id: 'cutoff', name: 'Cutoff', valueType: 'continuous', address: '00 00 00 10', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, wires: [{ dir: 'write', msg: 'cc', cc: 74 }] },
+        { id: 'reso', name: 'Reso', valueType: 'continuous', address: '00 00 00 11', range: { min: 0, max: 127 }, encoding: { type: 'u7' } } ] } } },
+  };
+  const k = buildLegacyProfile(resolveModel(lib['acme.x'], lib), {});
+  eq(k.manufacturer, 'Acme', 'synthetic manufacturer derived (not Roland)');
+  eq(k.family, 'X', 'synthetic family from model');
+  eq(k.id, 'acme.x-dpd', 'synthetic default legacyId = <id>-dpd');
+  eq(k.variables.deviceId, 0x30, 'synthetic deviceId from manufacturer');
+  eq(k.messageRecipes.find((r) => r.id === 'dt1').template[1], '42', 'synthetic dt1 carries ITS manufacturer id (42)');
+  eq(JSON.stringify(k.messageRecipes.find((r) => r.id === 'dt1').template.slice(3, 5)), JSON.stringify(['01', '02']), 'synthetic dt1 expands ITS modelId');
+  ok(k.messageRecipes.some((r) => r.id === 'cc74' && r.controller === 74), 'synthetic cc74 recipe (per-controller, not cc7)');
+  eq(k.parameters.find((p) => p.id === 'cutoff').messageRecipe, 'cc74', 'synthetic cutoff -> cc74');
+  ok(k.identity === undefined, 'synthetic no identity (no codes)');
 }
 
 // ---------------------------------------------------------------- report

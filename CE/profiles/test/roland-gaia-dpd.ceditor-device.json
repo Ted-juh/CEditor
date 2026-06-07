@@ -13,28 +13,6 @@
     "deviceId": 127,
     "channel": 1
   },
-  "identity": {
-    "requestDeviceId": "$deviceId",
-    "manufacturerId": [
-      "41"
-    ],
-    "familyCode": [
-      "41",
-      "02"
-    ],
-    "modelNumber": [
-      "00",
-      "00"
-    ],
-    "revision": [
-      "00",
-      "03",
-      "00",
-      "00"
-    ],
-    "timeoutMs": 1000,
-    "retries": 0
-  },
   "timing": {
     "minDelayBetweenMessagesMs": 20
   },
@@ -657,7 +635,7 @@
         "minIntervalMs": 20,
         "sendFinalOnRelease": true
       },
-      "messageRecipe": "volumeCc",
+      "messageRecipe": "cc7",
       "ui": {
         "preferredComponent": "Slider"
       }
@@ -711,7 +689,7 @@
       "delayAfterMs": 20
     },
     {
-      "id": "volumeCc",
+      "id": "cc7",
       "kind": "cc",
       "channel": "$channel",
       "controller": 7,

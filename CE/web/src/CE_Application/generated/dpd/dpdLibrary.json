@@ -6,6 +6,7 @@
     "kind": "model",
     "label": "Roland GAIA SH-01",
     "inherits": "roland",
+    "family": "SH",
     "modelId": "00 00 41",
     "deviceStructure": {
       "tones": 3
