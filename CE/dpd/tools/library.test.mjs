@@ -13,6 +13,8 @@ const reso = { id: 'reso', valueType: 'continuous', address: '00 00 00 0F', rang
 // round-trip gate
 ok(roundTripCheck(mk('t', [cutoff])).ok, 'good profile round-trips');
 ok(!roundTripCheck(mk('t', [{ ...cutoff, range: { min: 0, max: 200 } }])).ok, 'out-of-range u7 fails round-trip (gate)');
+const packed = { id: 'pitch', valueType: 'continuous', address: '00 00 00 20', range: { min: 0, max: 65535 }, encoding: { type: 'packed8to7', bytes: 2, packOrder: 'msb-high-first' }, access: { read: true, write: true } };
+ok(roundTripCheck(mk('k', [packed])).ok, 'packed8to7 (Korg) profile passes the round-trip gate — was blocked (C1)');
 
 const lib = new Library();
 eq(lib.submit(mk('x.bad', [{ ...cutoff, range: { min: 0, max: 200 } }]), '@a').status, 'rejected', 'broken profile rejected by gate');

@@ -112,6 +112,13 @@ ok(rt, 'nibbles(2) round-trips 0..255');
 const slice = { type: 'bitslice', slices: [{ byte: 0, fromBit: 0, toBit: 6, valueShift: 0 }, { byte: 1, fromBit: 0, toBit: 2, valueShift: 7 }] };
 rt = true; for (let v = 0; v <= 1023; v++) if (bitsliceDecode(slice, bitsliceEncode(slice, v)) !== v) rt = false;
 ok(rt, 'bitslice(10-bit) round-trips 0..1023');
+// packed8to7 at the VALUE level (C1: previously unwired in encodeValue/decodeValue — would throw)
+rt = true;
+for (const order of ['msb-high-first', 'msb-low-first']) {
+  for (let v = 0; v <= 255; v++) { const e = { type: 'packed8to7', bytes: 1, packOrder: order }; if (decodeValue(e, encodeValue(e, v)) !== v) rt = false; }
+  for (let v = 0; v <= 65535; v += 257) { const e = { type: 'packed8to7', bytes: 2, packOrder: order }; if (decodeValue(e, encodeValue(e, v)) !== v) rt = false; }
+}
+ok(rt, 'packed8to7 value round-trips (1+2 bytes, both orders)');
 
 // Korg 8->7 packing — the doc's footgun. Full 0..255 sweep per byte, both MSB orders, boundary combos.
 section('Korg 8→7 block packing (all 256 values per byte, both orders)');

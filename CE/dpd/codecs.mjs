@@ -49,6 +49,12 @@ export function encodeValue(encoding, value) {
     return out;
   }
   if (t === 'bitslice') return bitsliceEncode(encoding, value);
+  if (t === 'packed8to7') {
+    const n = encoding.bytes ?? 1;
+    const raw = [];
+    for (let i = 0; i < n; i++) raw.push((value >> (8 * (n - 1 - i))) & 0xff); // value -> n big-endian 8-bit bytes
+    return pack8to7(raw, encoding.packOrder ?? 'msb-high-first', 7);
+  }
   throw new Error(`encodeValue: unsupported type ${t}`);
 }
 export function decodeValue(encoding, bytes) {
@@ -61,6 +67,13 @@ export function decodeValue(encoding, bytes) {
     return v;
   }
   if (t === 'bitslice') return bitsliceDecode(encoding, bytes);
+  if (t === 'packed8to7') {
+    const n = encoding.bytes ?? 1;
+    const raw = unpack8to7(bytes, encoding.packOrder ?? 'msb-high-first', 7);
+    let v = 0;
+    for (let i = 0; i < n; i++) v = (v << 8) | (raw[i] & 0xff);
+    return v;
+  }
   throw new Error(`decodeValue: unsupported type ${t}`);
 }
 
