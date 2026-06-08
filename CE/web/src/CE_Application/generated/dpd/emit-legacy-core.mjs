@@ -30,7 +30,9 @@ function legacyParam(p) {
   out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
   out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.
-  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc) : (p.wires?.write?.msg ?? 'dt1');
+  out.messageRecipe = p.wires?.write?.msg === 'cc' ? ('cc' + p.wires.write.cc)
+    : p.wires?.write?.msg === 'nrpn' ? ('nrpn' + String(p.wires.write.nrpn ?? '').replace(/\s+/g, ''))
+    : (p.wires?.write?.msg ?? 'dt1');
   out.ui = p.ui ?? { preferredComponent: p.valueType === 'enum' ? 'RadioButtonGroup' : 'Slider' };
   return out;
 }
@@ -60,6 +62,15 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel } =
   )].sort((a, b) => a - b);
   for (const cc of ccControllers) {
     messageRecipes.push({ id: `cc${cc}`, kind: 'cc', channel: '$channel', controller: cc, value: '$encodedValue' });
+  }
+  // one NRPN recipe per distinct NRPN parameter number (the engine handles legacy nrpn recipes).
+  const nrpnSeen = new Set();
+  for (const p of params) {
+    const wr = p.wires?.write;
+    if (wr?.msg !== 'nrpn' || !wr.nrpn || nrpnSeen.has(wr.nrpn)) continue;
+    nrpnSeen.add(wr.nrpn);
+    const [msb, lsb] = wr.nrpn.trim().split(/\s+/).map((h) => parseInt(h, 16));
+    messageRecipes.push({ id: 'nrpn' + wr.nrpn.replace(/\s+/g, ''), kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: (wr.size ?? 1) >= 2 ? 14 : 7, value: '$encodedValue' });
   }
 
   const legacy = {

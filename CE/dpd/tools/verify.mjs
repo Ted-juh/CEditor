@@ -186,7 +186,8 @@ section('legacy emit — device-agnostic');
     'acme.x': { id: 'acme.x', kind: 'model', version: '2.0.0', inherits: 'acme', modelId: '01 02', family: 'X',
       scopes: { part: { base: '00 00 00 00', parameters: [
         { id: 'cutoff', name: 'Cutoff', valueType: 'continuous', address: '00 00 00 10', range: { min: 0, max: 127 }, encoding: { type: 'u7' }, wires: [{ dir: 'write', msg: 'cc', cc: 74 }] },
-        { id: 'reso', name: 'Reso', valueType: 'continuous', address: '00 00 00 11', range: { min: 0, max: 127 }, encoding: { type: 'u7' } } ] } } },
+        { id: 'reso', name: 'Reso', valueType: 'continuous', address: '00 00 00 11', range: { min: 0, max: 127 }, encoding: { type: 'u7' } },
+        { id: 'pitch', name: 'Pitch', valueType: 'continuous', range: { min: 0, max: 16383 }, size: 2, encoding: { type: 'u7' }, wires: [{ dir: 'write', msg: 'nrpn', nrpn: '01 20' }] } ] } } },
   };
   const k = buildLegacyProfile(resolveModel(lib['acme.x'], lib), {});
   eq(k.manufacturer, 'Acme', 'synthetic manufacturer derived (not Roland)');
@@ -198,6 +199,12 @@ section('legacy emit — device-agnostic');
   ok(k.messageRecipes.some((r) => r.id === 'cc74' && r.controller === 74), 'synthetic cc74 recipe (per-controller, not cc7)');
   eq(k.parameters.find((p) => p.id === 'cutoff').messageRecipe, 'cc74', 'synthetic cutoff -> cc74');
   ok(k.identity === undefined, 'synthetic no identity (no codes)');
+  // NRPN (C3): the nrpn wire carries its parameter number and emits a legacy nrpn recipe
+  const pitch = resolveParams(resolveModel(lib['acme.x'], lib)).find((x) => x.paramId === 'pitch');
+  eq(pitch.wires.write.nrpn, '01 20', 'nrpn wire carries the MSB/LSB (was dropped to address:null)');
+  const nr = k.messageRecipes.find((r) => r.id === 'nrpn0120');
+  ok(nr && nr.kind === 'nrpn' && nr.parameterMsb === 1 && nr.parameterLsb === 0x20 && nr.valueResolution === 14, 'NRPN recipe msb1/lsb32/14-bit (from size 2)');
+  eq(k.parameters.find((p) => p.id === 'pitch').messageRecipe, 'nrpn0120', 'nrpn param -> nrpn0120 recipe');
 }
 
 // ---------------------------------------------------------------- per-wire address (B4)

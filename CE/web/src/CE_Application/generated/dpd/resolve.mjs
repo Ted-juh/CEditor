@@ -66,21 +66,22 @@ export function resolveParams(resolved) {
 // without it, or for wires with no `address`, the param's resolved address is used (back-compat).
 export function resolveWires(p, absAddr, idx, resolveAddr) {
   const addrOf = (wire) => (wire.address && resolveAddr ? resolveAddr(wire.address) : absAddr);
+  // one wire -> its resolved form. cc strides per instance; nrpn carries its MSB/LSB; sysex its address.
+  const wireOut = (wire) => wire.msg === 'cc'
+    ? { msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx }
+    : wire.msg === 'nrpn'
+      ? { msg: 'nrpn', nrpn: wire.nrpn, size: wire.size ?? p.size ?? 1 }
+      : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1 };
+
   if (Array.isArray(p.wires)) {
     const w = {};
-    for (const wire of p.wires) {
-      w[wire.dir] = wire.msg === 'cc'
-        ? { msg: 'cc', cc: wire.cc + (wire.ccStride ?? 0) * idx }
-        : { msg: wire.msg, address: addrOf(wire), size: wire.size ?? p.size ?? 1 };
-    }
+    for (const wire of p.wires) w[wire.dir] = wireOut(wire);
     return w;
   }
   const w = {};
   if (p.access?.write !== false && absAddr) w.write = { msg: 'dt1', address: absAddr, size: p.size ?? 1 };
   if (p.access?.read !== false && absAddr) w.read = { msg: 'rq1', address: absAddr, size: p.size ?? 1 };
-  if (p.rxLive) w.rxLive = p.rxLive.msg === 'cc'
-    ? { msg: 'cc', cc: p.rxLive.cc + (p.rxLive.ccStride ?? 0) * idx }
-    : { msg: p.rxLive.msg, address: addrOf(p.rxLive), size: p.size ?? 1 };
+  if (p.rxLive) w.rxLive = wireOut(p.rxLive);
   else if (absAddr) w.rxLive = { msg: 'dt1', address: absAddr, size: p.size ?? 1 };
   return w;
 }
