@@ -52,6 +52,35 @@ export function midiCiToProfile(pe) {
   return { profile, summary };
 }
 
+// Normalise the RAW MIDI-CI Property Exchange resources (as the C++ MidiCiSession surfaces them) into
+// the input shape midiCiToProfile() expects. The PE "DeviceInfo" common resource uses byte-array ids
+// `manufacturerId`/`familyId`/`modelId`/`versionId` plus display-name strings `manufacturer`/`family`/
+// `model`; the controller map is "AllCtrlList" (or per-channel "ChCtrlList") and presets are
+// "ProgramList". This bridges those spec names to the importer's fields.
+export function peToImporterInput({ deviceInfo = {}, allCtrlList, chCtrlList, programList, channelList } = {}) {
+  const di = deviceInfo ?? {};
+  const nameParts = [di.manufacturer, di.model].filter((s) => typeof s === 'string' && s.length);
+  return {
+    name: nameParts.length ? nameParts.join(' ') : (typeof di.model === 'string' ? di.model : 'MIDI-CI device'),
+    deviceInfo: {
+      // byte-array ids; tolerate both spec (`familyId`) and already-normalised (`family`) inputs
+      manufacturerId: di.manufacturerId,
+      family: di.familyId ?? (Array.isArray(di.family) ? di.family : undefined),
+      model: di.modelId ?? (Array.isArray(di.model) ? di.model : undefined),
+      version: di.versionId ?? (Array.isArray(di.version) ? di.version : undefined),
+    },
+    channelControllers: Array.isArray(allCtrlList) ? allCtrlList
+      : Array.isArray(chCtrlList) ? chCtrlList : [],
+    programList: Array.isArray(programList) ? programList : [],
+    channelList, // carried through for future use (channels/programs); importer ignores it for now
+  };
+}
+
+// One-call convenience for the live path: raw PE resources -> { profile, summary }.
+export function midiCiPropertiesToProfile(rawPe) {
+  return midiCiToProfile(peToImporterInput(rawPe));
+}
+
 // ---- self-test ----
 if (process.argv[1]?.endsWith('import-midici.mjs')) {
   let pass = 0, fail = 0;
@@ -80,6 +109,29 @@ if (process.argv[1]?.endsWith('import-midici.mjs')) {
   eq(profile.imported.presets.length, 2, '2 presets imported');
   eq(profile.completeness, 'partial', 'completeness = partial');
   eq(profile.provenance.importedFrom, 'midi-ci', 'source = midi-ci');
+
+  // ---- raw MIDI-CI PE resources (spec field names, as the C++ MidiCiSession surfaces them) ----
+  const rawPe = {
+    deviceInfo: { manufacturerId: [0, 33, 9], familyId: [2, 1], modelId: [0, 0], versionId: [1, 0, 0, 0], manufacturer: 'Acme', model: 'Polysynth' },
+    allCtrlList: [
+      { title: 'Volume', ctrlType: 'cc', ctrlIndex: [7] },
+      { title: 'Filter Cutoff', ctrlType: 'cc', ctrlIndex: [74] },
+    ],
+    programList: [{ title: 'Init', bankPC: [0, 0, 0] }],
+    channelList: { channelList: [{ title: 'Main', channel: 1 }] },
+  };
+  const mapped = peToImporterInput(rawPe);
+  eq(mapped.deviceInfo.family, [2, 1], 'mapper: spec familyId -> importer family bytes');
+  eq(mapped.deviceInfo.model, [0, 0], 'mapper: spec modelId -> importer model bytes');
+  eq(mapped.channelControllers.length, 2, 'mapper: AllCtrlList -> channelControllers');
+  eq(mapped.name, 'Acme Polysynth', 'mapper: name from manufacturer + model name strings');
+
+  const { profile: rawProfile } = midiCiPropertiesToProfile(rawPe);
+  const { ok: rawValid, errors: rawErrors } = validateProfile(rawProfile);
+  ok(rawValid, 'raw-PE import validates' + (rawErrors.length ? ' :: ' + rawErrors.join('; ') : ''));
+  eq(rawProfile.identity.family, '02 01', 'raw-PE identity family from familyId bytes');
+  eq(rawProfile.scopes.global.parameters.length, 2, 'raw-PE imports 2 CC controllers');
+  eq(rawProfile.scopes.global.parameters.find((p) => p.id === 'filter-cutoff').wires[0].cc, 74, 'raw-PE Filter Cutoff -> CC 74');
 
   console.log('  came through: ' + summary.cameThrough.join(' · '));
   console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed`);
