@@ -159,4 +159,61 @@ juce::var MidiCiSession::getFetchedProperty (uint32_t muid, const juce::String& 
     return byResource == byMuid->second.end() ? juce::var {} : byResource->second;
 }
 
+// ---- MIDI-CI Profile Configuration (M2) ----
+namespace
+{
+juce::String profileToHex (const ci::Profile& p)
+{
+    juce::String s;
+    for (const auto b : p)
+        s << juce::String::toHexString (static_cast<int> (static_cast<uint8_t> (b))).paddedLeft ('0', 2).toUpperCase() << ' ';
+    return s.trim();
+}
+
+ci::Profile hexToProfile (const juce::String& hex)
+{
+    ci::Profile p {};
+    const auto toks = juce::StringArray::fromTokens (hex, " ", "");
+    for (int i = 0; i < (int) p.size() && i < toks.size(); ++i)
+        p[(size_t) i] = static_cast<std::byte> (toks[i].getHexValue32() & 0xff);
+    return p;
+}
+
+ci::ChannelAddress blockAddress() { return ci::ChannelAddress {}.withChannel (ci::ChannelInGroup::wholeBlock); }
+}
+
+void MidiCiSession::inquireProfiles (uint32_t muid)
+{
+    if (impl->device.has_value())
+        impl->device->sendProfileInquiry (ci::MUID::makeUnchecked (muid), ci::ChannelInGroup::wholeBlock);
+}
+
+juce::var MidiCiSession::getProfiles (uint32_t muid) const
+{
+    juce::Array<juce::var> out;
+    if (impl->device.has_value())
+    {
+        if (auto* states = impl->device->getProfileStateForMuid (ci::MUID::makeUnchecked (muid), blockAddress()))
+        {
+            const auto add = [&out] (const ci::Profile& p, bool active)
+            {
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("id", profileToHex (p));
+                o->setProperty ("active", active);
+                out.add (juce::var (o));
+            };
+            for (const auto& p : states->getActive())   add (p, true);
+            for (const auto& p : states->getInactive()) add (p, false);
+        }
+    }
+    return out;
+}
+
+void MidiCiSession::setProfileEnabled (uint32_t muid, const juce::String& profileHex, bool enabled)
+{
+    if (impl->device.has_value())
+        impl->device->sendProfileEnablement (ci::MUID::makeUnchecked (muid), ci::ChannelInGroup::wholeBlock,
+                                             hexToProfile (profileHex), enabled ? 1 : 0);
+}
+
 } // namespace ceditor::device

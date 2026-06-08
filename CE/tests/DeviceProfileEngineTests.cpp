@@ -748,17 +748,20 @@ int runServiceRequestTests()
 // against our delegate-less initiator (which would NAK + retry-storm). Test-only.
 struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
                          juce::midi_ci::DeviceListener,
-                         juce::midi_ci::PropertyDelegate
+                         juce::midi_ci::PropertyDelegate,
+                         juce::midi_ci::ProfileDelegate
 {
     std::function<void (const juce::MidiMessage&)> send;
     std::optional<juce::midi_ci::Device> device;
+    // A block-level profile the responder hosts + activates, for the M2 profile-inquiry test.
+    static constexpr juce::midi_ci::Profile kProfile { std::byte { 0x7E }, std::byte { 0x21 }, std::byte { 0x09 }, std::byte { 0x01 }, std::byte { 0x00 } };
 
     explicit TestCiResponder (std::function<void (const juce::MidiMessage&)> s) : send (std::move (s))
     {
         namespace ci = juce::midi_ci;
         juce::Random r;
         r.setSeedRandomly();
-        const auto features = ci::DeviceFeatures().withPropertyExchangeSupported (true);
+        const auto features = ci::DeviceFeatures().withPropertyExchangeSupported (true).withProfileConfigurationSupported (true);
         const juce::ump::DeviceInfo info {
             { std::byte { 0x42 }, std::byte { 0x00 }, std::byte { 0x00 } },
             { std::byte { 0x01 }, std::byte { 0x00 } },
@@ -769,9 +772,18 @@ struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
                                  .withDeviceInfo (info)
                                  .withFeatures (features)
                                  .withProductInstanceId (ci::DeviceOptions::makeProductInstanceId (r))
-                                 .withPropertyDelegate (this);
+                                 .withPropertyDelegate (this)
+                                 .withProfileDelegate (this);
         device.emplace (options);
         device->addListener (*this);
+
+        // Host one block-wide profile and activate it, so the initiator's inquiry sees an active profile.
+        if (auto* host = device->getProfileHost())
+        {
+            const ci::ProfileAtAddress paa { kProfile, ci::ChannelAddress {}.withChannel (ci::ChannelInGroup::wholeBlock) };
+            host->addProfile (paa, 1);
+            host->setProfileEnablement (paa, 1);
+        }
     }
 
     ~TestCiResponder() override { if (device.has_value()) device->removeListener (*this); }
@@ -806,6 +818,13 @@ struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
     bool subscriptionStartRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertySubscriptionHeader&) override { return false; }
     void subscriptionDidStart (juce::midi_ci::MUID, const juce::String&, const juce::midi_ci::PropertySubscriptionHeader&) override {}
     void subscriptionWillEnd (juce::midi_ci::MUID, const juce::midi_ci::Subscription&) override {}
+
+    // ProfileDelegate: honour enable/disable requests by updating our ProfileHost state.
+    void profileEnablementRequested (juce::midi_ci::MUID, juce::midi_ci::ProfileAtAddress paa, int numChannels, bool enabled) override
+    {
+        if (auto* host = device.has_value() ? device->getProfileHost() : nullptr)
+            host->setProfileEnablement (paa, enabled ? juce::jmax (1, numChannels) : 0);
+    }
 };
 
 // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). No hardware: two MidiCiSessions are wired output ->
@@ -940,6 +959,76 @@ int runMidiCiTests()
     std::cout << "[PASS] MIDI-CI :: property exchange extracts DeviceInfo + ChannelList + AllCtrlList + ProgramList"
               << " (manufacturer=\"" << infoObj->getProperty ("manufacturer").toString() << "\", "
               << ctrlArray->size() << " controllers, " << progArray->size() << " presets)\n";
+
+    // ---- Part 3: Profile Configuration (M2) — inquire the responder's block profiles ----
+    // The responder hosts one active block-level profile; the initiator inquires and should see it,
+    // marked active. Fresh session pair so the inbox flow is independent of the parts above.
+    std::deque<juce::MidiMessage> toInit3, toResp3;
+    auto init3 = std::make_unique<MidiCiSession> ([&toResp3] (const juce::MidiMessage& m) { toResp3.push_back (m); });
+    TestCiResponder responder3 ([&toInit3] (const juce::MidiMessage& m) { toInit3.push_back (m); });
+
+    init3->startDiscovery();
+    init3->pump();
+    responder3.pump();
+
+    const juce::String kProfileHex = "7E 21 09 01 00";
+    const auto profileSeen = [&] (bool wantActive)
+    {
+        const auto profiles = init3->getProfiles (responder3.muid());
+        auto* arr = profiles.getArray();
+        return arr != nullptr && std::any_of (arr->begin(), arr->end(), [&] (const juce::var& p)
+        {
+            return p.getProperty ("id", {}).toString() == kProfileHex
+                   && (! wantActive || static_cast<bool> (p.getProperty ("active", false)));
+        });
+    };
+
+    bool inquired = false, supported = false, enabled = false, active = false;
+    for (int round = 0; round < 64; ++round)
+    {
+        std::deque<juce::MidiMessage> di, dr;
+        std::swap (di, toInit3);
+        std::swap (dr, toResp3);
+        for (const auto& m : di) init3->handleIncomingSysex (m);
+        for (const auto& m : dr) responder3.feed (m);
+        init3->pump();
+        responder3.pump();
+
+        const auto seen = init3->getDiscoveredMuids();
+        if (! inquired && std::find (seen.begin(), seen.end(), responder3.muid()) != seen.end())
+        {
+            init3->inquireProfiles (responder3.muid());
+            inquired = true;
+            continue;
+        }
+        if (inquired && ! supported && profileSeen (false))
+            supported = true;                                   // the device reported the profile
+        if (supported && ! enabled)
+        {
+            init3->setProfileEnabled (responder3.muid(), kProfileHex, true);
+            enabled = true;                                     // ask the device to activate it
+            continue;
+        }
+        if (enabled && profileSeen (true))
+        {
+            active = true;                                      // device reported it active
+            break;
+        }
+    }
+
+    if (! supported)
+    {
+        std::cerr << "[FAIL] MIDI-CI :: profile inquiry did not report the responder's block profile\n";
+        return 1;
+    }
+    if (! active)
+    {
+        std::cerr << "[FAIL] MIDI-CI :: enabling the profile did not make it active in the initiator's view"
+                  << " (got " << juce::JSON::toString (init3->getProfiles (responder3.muid())) << ")\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] MIDI-CI :: profile configuration (inquired " << kProfileHex << ", enabled it, saw it go active)\n";
     return 0;
 }
 }

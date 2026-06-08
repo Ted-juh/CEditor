@@ -68,6 +68,14 @@ public:
     void fetchProperty (uint32_t muid, const juce::String& resource);
     juce::var getFetchedProperty (uint32_t muid, const juce::String& resource) const;
 
+    // MIDI-CI Profile Configuration (MIDI 2.0 plan, phase M2). Inquire a device's function-block
+    // profiles, read their state, and enable/disable one. Profiles are addressed at the whole block
+    // (the common device-wide case); per-channel/group profiles are a later extension.
+    void inquireProfiles (uint32_t muid);
+    // [{ id: "7E 21 09 01 00", active: true|false }, ...] — empty until the inquiry replies.
+    juce::var getProfiles (uint32_t muid) const;
+    void setProfileEnabled (uint32_t muid, const juce::String& profileHex, bool enabled);
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;
