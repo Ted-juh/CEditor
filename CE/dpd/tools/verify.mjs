@@ -327,8 +327,8 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   eq(mp.pitch.codec?.type, 'u14-msb-lsb', 'emit: u14 -> engine u14-msb-lsb');
   ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.bytes === 2, 'emit: nibbles -> engine nibbled(bytes:2)');
   ok(mp.patchName.codec?.type === 'text-ascii' && mp.patchName.codec.length === 1 && mp.patchName.codec.pad === 32, 'emit: text-ascii name mapping');
-  ok(!mp.tune.codec, 'emit: s7 degrades to u7 (engine has no signed dump codec)');
-  ok(emit.notes.some((n) => /s7 -> u7/.test(n)), 'emit: s7 degrade is flagged in notes');
+  ok(mp.tune.codec?.type === 's7' && mp.tune.codec.signedOffset === 64, 'emit: s7 ships a signed dump codec (engine decodes the sign)');
+  ok(!emit.notes.some((n) => /s7/.test(n)), 'emit: no s7 degrade note (engine supports it)');
 
   // emitted into a full legacy profile; the Korg payload-pack is now SHIPPED (the C++ engine unpacks it)
   const legacy = buildLegacyProfile({ ...dev, label: 'Syn', dumps: [dump] }, {});
@@ -346,6 +346,7 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
     scopes: { patch: { kind: 'global', instances: 1, parameters: [
       { id: 'cutoff', name: 'Cutoff', valueType: 'continuous', range: { min: 0, max: 127 }, encoding: { type: 'u7' } },
       { id: 'depth', name: 'Depth', valueType: 'continuous', range: { min: 0, max: 255 }, encoding: { type: 'u8' } },
+      { id: 'pan', name: 'Pan', valueType: 'signed', range: { min: -64, max: 63 }, encoding: { type: 's7' } },
       { id: 'waveform', name: 'Wave', valueType: 'enum', enum: [{ id: 'saw', label: 'Saw', wire: 0 }, { id: 'square', label: 'Square', wire: 1 }, { id: 'triangle', label: 'Triangle', wire: 2 }] },
     ] } },
   };
@@ -357,7 +358,11 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
     layout: [{ param: 'patch.cutoff', offset: 0, codec: { type: 'u7' } }, { param: 'patch.waveform', offset: 1, codec: { type: 'u7' } }] };
   eq(bytesToHex(assembleDump(packedDump, { 'patch.cutoff': 100, 'patch.depth': 200 }, eng)), 'F0 7D 10 08 20 64 48 F7', 'parity: packed dump assembles to the exact bytes the C++ engine unpacks');
   eq(bytesToHex(assembleDump(xorDump, { 'patch.cutoff': 100, 'patch.waveform': 'triangle' }, eng)), 'F0 7D 10 09 64 02 6F F7', 'parity: XOR dump assembles to the exact bytes the C++ engine verifies');
-  ok(dumpRoundTrip(packedDump, eng).ok && dumpRoundTrip(xorDump, eng).ok, 'parity: both engine-parity dumps self-round-trip');
+  const s7Dump = { id: 's7PatchDump', kind: 'patch', spans: ['patch'],
+    message: { matcher: { prefix: ['F0', '7D', '$deviceId', '0A'], suffix: ['F7'] }, payload: { offset: 4, size: 1 } },
+    layout: [{ param: 'patch.pan', offset: 0, codec: { type: 's7' } }] };
+  eq(bytesToHex(assembleDump(s7Dump, { 'patch.pan': -10 }, eng)), 'F0 7D 10 0A 36 F7', 'parity: signed s7 dump assembles to the exact byte the C++ engine decodes (-10 -> 0x36)');
+  ok(dumpRoundTrip(packedDump, eng).ok && dumpRoundTrip(xorDump, eng).ok && dumpRoundTrip(s7Dump, eng).ok, 'parity: packed + XOR + s7 engine-parity dumps self-round-trip');
 }
 
 // ---------------------------------------------------------------- report

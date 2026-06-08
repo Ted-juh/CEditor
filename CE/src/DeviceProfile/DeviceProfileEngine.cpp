@@ -1653,6 +1653,17 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
         for (int index = 0; index < nibbles; ++index)
             numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
+    else if (encodingType == "s7")
+    {
+        // signed 7-bit: stored value minus a bias (default 64). Mirrors codecs.mjs decodeValue('s7'),
+        // so a dump field can carry bipolar parameters (pan, tune, env depth) with their real sign.
+        auto signedOffset = encoding != nullptr ? propInt (*encoding, "signedOffset", 64) : 64;
+        numeric = (bytes[offset] & 0x7f) - signedOffset;
+    }
+    else if (encodingType == "u8")
+    {
+        numeric = bytes[offset] & 0xff; // full 8-bit byte (e.g. recovered from an unpacked payload)
+    }
 
     if (type == "choice" || type == "enum")
     {

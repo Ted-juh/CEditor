@@ -12,18 +12,18 @@ const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
 
 // DPD per-offset dump codec -> the C++ engine's legacy dump codec vocabulary
-// (u7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / enum). Types the engine's dump
-// decoder does NOT implement (s7 signed, u8, packed8to7, bitslice) degrade to u7 best-effort + a note,
-// mirroring the param-level s7->u7 policy — the DPD's own assemble/parse still handles them faithfully.
+// (u7 / u8 / s7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / enum). The engine's dump
+// decoder handles u7/u8/s7 directly; the two that remain unsupported there (per-field packed8to7,
+// bitslice) degrade to u7 best-effort + a note — the DPD's own assemble/parse still handles them.
 function legacyDumpCodec(codec, note) {
   switch (codec?.type) {
     case undefined: case 'u7': return undefined; // default; engine reads the parameter's own type
+    case 'u8': return { type: 'u8' };
+    case 's7': return { type: 's7', signedOffset: codec.signedOffset ?? 64 };
     case 'u14': return { type: 'u14-msb-lsb' };
     case 'nibbles': return { type: 'nibbled', bytes: codec.bytes ?? 2 };
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
-    case 's7': note?.(`s7 -> u7 (engine dump decoder has no signed codec; offset lost on the live C++ path)`); return undefined;
-    case 'u8': note?.(`u8 -> u7 (engine dump codec is 7-bit)`); return undefined;
     case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
     case 'bitslice': note?.(`bitslice unsupported by the engine dump decoder`); return undefined;
     default: return undefined;

@@ -114,6 +114,33 @@
       "ui": { "preferredComponent": "Slider" }
     },
     {
+      "id": "lfo.pan",
+      "name": "LFO Pan",
+      "group": "LFO",
+      "type": "integer",
+      "range": { "min": -64, "max": 63 },
+      "default": 0,
+      "address": "23",
+      "display": { "mode": "number", "unit": "", "shortLabel": "Pan" },
+      "normalization": { "mode": "linear" },
+      "encoding": { "type": "s7", "signedOffset": 64 },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter",
+        "dumpReadable": true
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "singleParameterWrite",
+      "ui": { "preferredComponent": "Slider" }
+    },
+    {
       "id": "preset.name",
       "name": "Preset Name",
       "group": "Preset",
@@ -422,6 +449,26 @@
       "mappings": [
         { "parameter": "filter.cutoff", "offset": 0 },
         { "parameter": "osc.waveform", "offset": 1 }
+      ]
+    },
+    {
+      "id": "s7PatchDump",
+      "name": "Signed (s7) Patch Dump",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": ["F0", "7D", "$deviceId", "0A"],
+        "suffix": ["F7"]
+      },
+      "payload": {
+        "offset": 4,
+        "size": 1
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 6
+      },
+      "mappings": [
+        { "parameter": "lfo.pan", "offset": 0, "codec": { "type": "s7", "signedOffset": 64 } }
       ]
     }
   ],

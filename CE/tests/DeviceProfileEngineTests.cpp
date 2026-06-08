@@ -198,6 +198,18 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
+    // Signed 7-bit (s7) dump field: wire byte 0x36 (54) with bias 64 -> -10 (a real negative value).
+    auto signedDump = engine.parseDumpMessage ("F0 7D 10 0A 36 F7");
+    auto* signedValues = signedDump.values.getDynamicObject();
+    if (! signedDump.ok
+        || signedDump.matchStatus != "ok"
+        || signedValues == nullptr
+        || (int) signedValues->getProperty ("lfo.pan") != -10)
+    {
+        std::cerr << "[FAIL] dump shape s7 dump field did not decode to the signed value -10\n";
+        return 1;
+    }
+
     juce::StringArray onePart;
     onePart.add ("F0 7D 10 06 00 40 F7");
     auto partialCollection = engine.collectDumpMessages (onePart);
@@ -231,7 +243,7 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
-    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata, name codecs, 8->7 packing + XOR checksum\n";
+    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata, name codecs, 8->7 packing, XOR checksum + s7 signed\n";
     return 0;
 }
 
