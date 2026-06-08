@@ -87,6 +87,33 @@
       "ui": { "preferredComponent": "Combobox" }
     },
     {
+      "id": "mod.depth",
+      "name": "Mod Depth",
+      "group": "Modulation",
+      "type": "integer",
+      "range": { "min": 0, "max": 255 },
+      "default": 0,
+      "address": "22",
+      "display": { "mode": "number", "unit": "", "shortLabel": "Depth" },
+      "normalization": { "mode": "linear" },
+      "encoding": { "type": "u7" },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter",
+        "dumpReadable": true
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "singleParameterWrite",
+      "ui": { "preferredComponent": "Slider" }
+    },
+    {
       "id": "preset.name",
       "name": "Preset Name",
       "group": "Preset",
@@ -346,6 +373,55 @@
       },
       "mappings": [
         { "parameter": "osc.waveform", "offset": 0 }
+      ]
+    },
+    {
+      "id": "packedPayloadDump",
+      "name": "Packed Payload Dump",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": ["F0", "7D", "$deviceId", "08"],
+        "suffix": ["F7"]
+      },
+      "payload": {
+        "offset": 4,
+        "size": 2,
+        "pack": { "type": "packed8to7", "packOrder": "msb-high-first", "groupSize": 7 }
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 8
+      },
+      "mappings": [
+        { "parameter": "filter.cutoff", "offset": 0 },
+        { "parameter": "mod.depth", "offset": 1 }
+      ]
+    },
+    {
+      "id": "xorPatchDump",
+      "name": "XOR Patch Dump",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": ["F0", "7D", "$deviceId", "09"],
+        "suffix": ["F7"]
+      },
+      "payload": {
+        "offset": 4,
+        "size": 2
+      },
+      "checksum": {
+        "type": "xor",
+        "fromOffset": 3,
+        "toOffset": 5,
+        "byteOffset": 6
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 8
+      },
+      "mappings": [
+        { "parameter": "filter.cutoff", "offset": 0 },
+        { "parameter": "osc.waveform", "offset": 1 }
       ]
     }
   ],

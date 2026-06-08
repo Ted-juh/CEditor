@@ -161,6 +161,43 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
+    // Whole-payload 8->7 block unpack (universal Korg case): wire 20 64 48 -> unpacked [100, 200].
+    // depth=200 (>127) proves the high bit rode in the packing MSB byte and survived the round trip.
+    auto packed = engine.parseDumpMessage ("F0 7D 10 08 20 64 48 F7");
+    auto* packedPayloadValues = packed.values.getDynamicObject();
+    if (! packed.ok
+        || packed.matchStatus != "ok"
+        || ! packed.complete
+        || packedPayloadValues == nullptr
+        || (int) packedPayloadValues->getProperty ("filter.cutoff") != 100
+        || (int) packedPayloadValues->getProperty ("mod.depth") != 200)
+    {
+        std::cerr << "[FAIL] dump shape packed payload (8->7) did not unpack to cutoff=100 depth=200\n";
+        return 1;
+    }
+
+    // XOR dump checksum verifies + decodes (0x6F = 09 ^ 64 ^ 02).
+    auto xorDump = engine.parseDumpMessage ("F0 7D 10 09 64 02 6F F7");
+    auto* xorValues = xorDump.values.getDynamicObject();
+    if (! xorDump.ok
+        || xorDump.matchStatus != "ok"
+        || xorDump.checksumStatus != "ok"
+        || xorValues == nullptr
+        || (int) xorValues->getProperty ("filter.cutoff") != 100
+        || xorValues->getProperty ("osc.waveform").toString() != "triangle")
+    {
+        std::cerr << "[FAIL] dump shape XOR checksum dump did not verify + decode\n";
+        return 1;
+    }
+
+    // A wrong XOR checksum byte (0x6E) must be rejected, not silently accepted.
+    auto xorBad = engine.parseDumpMessage ("F0 7D 10 09 64 02 6E F7");
+    if (xorBad.ok || xorBad.matchStatus != "checksumFailed" || xorBad.checksumStatus != "error")
+    {
+        std::cerr << "[FAIL] dump shape XOR checksum did not reject a bad checksum\n";
+        return 1;
+    }
+
     juce::StringArray onePart;
     onePart.add ("F0 7D 10 06 00 40 F7");
     auto partialCollection = engine.collectDumpMessages (onePart);
@@ -194,7 +231,7 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
-    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata and name codecs\n";
+    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata, name codecs, 8->7 packing + XOR checksum\n";
     return 0;
 }
 

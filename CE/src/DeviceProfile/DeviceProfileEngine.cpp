@@ -210,6 +210,29 @@ juce::Array<juce::var> missingRangesForCoverage (int expectedBytes, const std::s
     return ranges;
 }
 
+// Korg-style 8->7 block UNPACK: the inverse of CE/dpd/codecs.mjs pack8to7. Each group of (groupSize+1)
+// wire bytes is one MSB byte followed by up to groupSize 7-bit low bytes; the MSB byte supplies each low
+// byte's high bit. Kept byte-for-byte in step with codecs.mjs so the engine decodes exactly what the DPD
+// (dumps.mjs) assembles. Lets a whole packed payload (the universal Korg dump case) be unpacked before
+// per-offset mapping.
+juce::Array<int> dumpUnpack8to7 (const juce::Array<int>& wire, const juce::String& order, int groupSize)
+{
+    juce::Array<int> out;
+    const bool highFirst = order != "msb-low-first"; // default msb-high-first
+    for (int g = 0; g < wire.size(); g += groupSize + 1)
+    {
+        const auto msb = wire[g];
+        const auto lowCount = juce::jmin (groupSize, wire.size() - (g + 1));
+        for (int i = 0; i < lowCount; ++i)
+        {
+            const auto lo = wire[g + 1 + i] & 0x7f;
+            const auto bit = (msb >> (highFirst ? (groupSize - 1 - i) : i)) & 1;
+            out.add (lo | (bit << 7));
+        }
+    }
+    return out;
+}
+
 juce::String normalisedTextCodec (const juce::String& codec)
 {
     if (codec == "ascii" || codec == "fixed-ascii")
@@ -1369,6 +1392,15 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
     auto* completion = asObject (dump.getProperty ("completion"));
     auto payloadOffset = payload != nullptr ? propInt (*payload, "offset", prefix.size()) : prefix.size();
     auto payloadSize = payload != nullptr ? propInt (*payload, "size", 0) : 0;
+    // Optional whole-payload 8->7 block packing (Korg). When present the mapped data lives in the
+    // UNPACKED payload; the wire carries one extra MSB byte per group, so its length is larger.
+    auto* payloadPack = payload != nullptr ? asObject (payload->getProperty ("pack")) : nullptr;
+    const bool payloadPacked = payloadPack != nullptr && propString (*payloadPack, "type") == "packed8to7";
+    const auto packGroupSize = payloadPacked ? juce::jmax (1, propInt (*payloadPack, "groupSize", 7)) : 7;
+    const auto packOrder = payloadPacked ? propString (*payloadPack, "packOrder") : juce::String();
+    const auto wirePayloadLen = (payloadPacked && payloadSize > 0)
+        ? payloadSize + (payloadSize + packGroupSize - 1) / packGroupSize
+        : payloadSize;
     auto expectedMessageCount = completion != nullptr
         ? propInt (*completion, "expectedMessages", propInt (*completion, "expectedMessageCount", 1))
         : 1;
@@ -1407,7 +1439,7 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
     auto* checksum = asObject (dump.getProperty ("checksum"));
     if (payloadSize > 0 && expectedBytes <= 0)
     {
-        auto requiredDataEnd = payloadOffset + payloadSize;
+        auto requiredDataEnd = payloadOffset + wirePayloadLen;
         if (checksum != nullptr)
             requiredDataEnd = juce::jmax (requiredDataEnd, propInt (*checksum, "byteOffset", requiredDataEnd) + 1);
         expectedBytes = requiredDataEnd + suffix.size();
@@ -1453,13 +1485,22 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
             return failForMatchedDump ("partial", "Dump checksum range is outside message", "error");
 
         auto expected = 0;
-        for (int index = fromOffset; index <= toOffset; ++index)
-            expected = (expected + bytes[index]) & 0x7f;
+        if (type == "xor")
+        {
+            for (int index = fromOffset; index <= toOffset; ++index)
+                expected ^= bytes[index];
+            expected &= 0x7f;
+        }
+        else
+        {
+            for (int index = fromOffset; index <= toOffset; ++index)
+                expected = (expected + bytes[index]) & 0x7f;
 
-        if (type == "roland-7bit")
-            expected = (128 - expected) & 0x7f;
-        else if (type != "sum-7bit")
-            return failForMatchedDump ("unsupportedChecksum", "Unsupported dump checksum type: " + type, "error");
+            if (type == "roland-7bit")
+                expected = (128 - expected) & 0x7f;
+            else if (type != "sum-7bit")
+                return failForMatchedDump ("unsupportedChecksum", "Unsupported dump checksum type: " + type, "error");
+        }
 
         if (bytes[byteOffset] != expected)
             return failForMatchedDump ("checksumFailed",
@@ -1473,6 +1514,24 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
     auto* mappings = asArray (dump.getProperty ("mappings"));
     if (mappings == nullptr || mappings->isEmpty())
         return failForMatchedDump ("invalidDefinition", "Dump definition has no mappings: " + dumpId, checksumStatus);
+
+    // Resolve the buffer that mappings decode against. A block-packed payload (Korg 8->7) is unpacked
+    // here so mapping offsets address the UNPACKED bytes; otherwise mappings decode in place from the
+    // framed message. The checksum above is always verified over the raw wire bytes (unchanged).
+    const juce::Array<int>* decodeBytes = &bytes;
+    int decodeBase = payloadOffset;
+    juce::Array<int> unpackedPayload;
+    if (payloadPacked)
+    {
+        if (wirePayloadLen <= 0 || payloadOffset + wirePayloadLen > bytes.size())
+            return failForMatchedDump ("partial", "Packed dump payload is outside message: " + dumpId, checksumStatus);
+        juce::Array<int> wirePayload;
+        for (int index = 0; index < wirePayloadLen; ++index)
+            wirePayload.add (bytes[payloadOffset + index]);
+        unpackedPayload = dumpUnpack8to7 (wirePayload, packOrder, packGroupSize);
+        decodeBytes = &unpackedPayload;
+        decodeBase = 0;
+    }
 
     auto* values = new juce::DynamicObject();
     for (const auto& mappingValue : *mappings)
@@ -1492,8 +1551,8 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
             codecOverride = mapping->getProperty ("nameCodec");
 
         auto decoded = decodeDumpParameterValue (*parameter,
-                                                 bytes,
-                                                 payloadOffset + propInt (*mapping, "offset"),
+                                                 *decodeBytes,
+                                                 decodeBase + propInt (*mapping, "offset"),
                                                  semanticValue,
                                                  codecOverride);
         if (decoded.failed())

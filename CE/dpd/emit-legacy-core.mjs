@@ -66,13 +66,13 @@ export function buildDumpDefinitions(resolved) {
       payload: {
         ...(m.payload?.offset != null ? { offset: m.payload.offset } : {}),
         ...(m.payload?.size != null ? { size: m.payload.size } : {}),
+        // Whole-payload 8->7 block packing (Korg) — the C++ engine unpacks it before per-offset mapping.
+        ...(m.payload?.pack ? { pack: m.payload.pack } : {}),
       },
     };
-    if (m.payload?.pack) { def.engineSupported = false; note(`payload block-packing (${m.payload.pack.type}) — C++ engine has no payload-level unpack; live get/send deferred to a C++ follow-up`); }
-    if (m.checksum && m.checksum.type !== 'none') {
+    // roland-7bit / sum-7bit / xor are all computed by the engine's dump decoder.
+    if (m.checksum && m.checksum.type !== 'none')
       def.checksum = { type: m.checksum.type, fromOffset: m.checksum.fromOffset, toOffset: m.checksum.toOffset, byteOffset: m.checksum.byteOffset };
-      if (m.checksum.type === 'xor') note(`XOR dump checksum — confirm the C++ engine computes it (flagged)`);
-    }
     def.completion = {
       expectedMessages: m.completion?.messages ?? 1,
       expectedBytes: m.completion?.bytes ?? assembleDump(d, {}, resolved).length,

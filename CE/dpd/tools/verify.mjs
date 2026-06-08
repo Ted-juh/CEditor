@@ -330,11 +330,34 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
   ok(!mp.tune.codec, 'emit: s7 degrades to u7 (engine has no signed dump codec)');
   ok(emit.notes.some((n) => /s7 -> u7/.test(n)), 'emit: s7 degrade is flagged in notes');
 
-  // emitted into a full legacy profile + Korg pack gap is flagged (not silently dropped)
+  // emitted into a full legacy profile; the Korg payload-pack is now SHIPPED (the C++ engine unpacks it)
   const legacy = buildLegacyProfile({ ...dev, label: 'Syn', dumps: [dump] }, {});
   ok(Array.isArray(legacy.dumpDefinitions) && legacy.dumpDefinitions.length === 1, 'buildLegacyProfile carries dumpDefinitions');
   const kEmit = buildDumpDefinitions({ ...korg, dumps: [korgDump] });
-  ok(kEmit.dumpDefinitions[0].engineSupported === false && kEmit.notes.some((n) => /block-packing/.test(n)), 'emit: Korg payload-pack flagged as a C++ engine gap');
+  ok(kEmit.dumpDefinitions[0].payload?.pack?.type === 'packed8to7' && kEmit.dumpDefinitions[0].engineSupported !== false, 'emit: Korg payload-pack shipped (engine unpacks it, no longer flagged)');
+  ok(!kEmit.notes.some((n) => /block-packing/.test(n)), 'emit: no block-packing gap note (engine supports it)');
+
+  // ── Engine parity: the bytes dumps.mjs assembles are EXACTLY what the C++ engine parses ──
+  // These vectors are mirrored in CE/profiles/test/test-sysex-synth.ceditor-device.json +
+  // CE/tests/DeviceProfileEngineTests.cpp (packedPayloadDump / xorPatchDump) — one source of truth for
+  // the wire, so the JS assembler and the C++ decoder can never silently drift.
+  const eng = {
+    schemaVersion: 1, id: 'syn.eng', version: '1.0.0', kind: 'model', deviceId: '10',
+    scopes: { patch: { kind: 'global', instances: 1, parameters: [
+      { id: 'cutoff', name: 'Cutoff', valueType: 'continuous', range: { min: 0, max: 127 }, encoding: { type: 'u7' } },
+      { id: 'depth', name: 'Depth', valueType: 'continuous', range: { min: 0, max: 255 }, encoding: { type: 'u8' } },
+      { id: 'waveform', name: 'Wave', valueType: 'enum', enum: [{ id: 'saw', label: 'Saw', wire: 0 }, { id: 'square', label: 'Square', wire: 1 }, { id: 'triangle', label: 'Triangle', wire: 2 }] },
+    ] } },
+  };
+  const packedDump = { id: 'packedPayloadDump', kind: 'patch', spans: ['patch'],
+    message: { matcher: { prefix: ['F0', '7D', '$deviceId', '08'], suffix: ['F7'] }, payload: { offset: 4, size: 2, pack: { type: 'packed8to7', packOrder: 'msb-high-first' } } },
+    layout: [{ param: 'patch.cutoff', offset: 0, codec: { type: 'u7' } }, { param: 'patch.depth', offset: 1, codec: { type: 'u8' } }] };
+  const xorDump = { id: 'xorPatchDump', kind: 'patch', spans: ['patch'],
+    message: { matcher: { prefix: ['F0', '7D', '$deviceId', '09'], suffix: ['F7'] }, payload: { offset: 4, size: 2 }, checksum: { type: 'xor', fromOffset: 3, toOffset: 5, byteOffset: 6 } },
+    layout: [{ param: 'patch.cutoff', offset: 0, codec: { type: 'u7' } }, { param: 'patch.waveform', offset: 1, codec: { type: 'u7' } }] };
+  eq(bytesToHex(assembleDump(packedDump, { 'patch.cutoff': 100, 'patch.depth': 200 }, eng)), 'F0 7D 10 08 20 64 48 F7', 'parity: packed dump assembles to the exact bytes the C++ engine unpacks');
+  eq(bytesToHex(assembleDump(xorDump, { 'patch.cutoff': 100, 'patch.waveform': 'triangle' }, eng)), 'F0 7D 10 09 64 02 6F F7', 'parity: XOR dump assembles to the exact bytes the C++ engine verifies');
+  ok(dumpRoundTrip(packedDump, eng).ok && dumpRoundTrip(xorDump, eng).ok, 'parity: both engine-parity dumps self-round-trip');
 }
 
 // ---------------------------------------------------------------- report
