@@ -6,5 +6,9 @@
   "generic-cc-dpd": {
     "dpdSource": "generic.cc",
     "version": "1.0.0"
+  },
+  "yamaha-an1x-dpd": {
+    "dpdSource": "yamaha.an1x",
+    "version": "1.0.0"
   }
 }

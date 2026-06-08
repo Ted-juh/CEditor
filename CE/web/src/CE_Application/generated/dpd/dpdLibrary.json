@@ -868,5 +868,2458 @@
       "importedFrom": null
     },
     "completeness": "structural-only"
+  },
+  "yamaha.an1x": {
+    "schemaVersion": 1,
+    "id": "yamaha.an1x",
+    "version": "1.0.0",
+    "kind": "model",
+    "label": "Yamaha AN1x",
+    "inherits": "yamaha",
+    "family": "AN",
+    "modelId": "5C",
+    "deviceId": "10",
+    "messageShapes": [
+      {
+        "id": "paramChange",
+        "kind": "sysex",
+        "template": [
+          "F0",
+          "43",
+          "$deviceId",
+          "$modelId",
+          "$address",
+          "$encodedValue",
+          "F7"
+        ]
+      }
+    ],
+    "scopes": {
+      "global": {
+        "kind": "global",
+        "label": "AN1x (MODE2 CC)",
+        "instances": 1,
+        "parameters": [
+          {
+            "id": "modulation",
+            "name": "Modulation",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 1
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 1
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "scene-select",
+            "name": "Scene Select",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 3
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 3
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "foot-controller",
+            "name": "Foot Controller",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 4
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 4
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "portamento-time",
+            "name": "Portamento Time",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 5
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 5
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "main-volume",
+            "name": "Main Volume",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 7
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 7
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "layer-mode",
+            "name": "Layer Mode",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 8
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 8
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "poly-mono-mode",
+            "name": "Poly/Mono Mode",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 9
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 9
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "panpot",
+            "name": "Panpot",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 10
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 10
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "expression",
+            "name": "Expression",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 11
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 11
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "ribbon-z-controller",
+            "name": "Ribbon Z Controller",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 12
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 12
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "ribbon-x-controller",
+            "name": "Ribbon X Controller",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 13
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 13
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "sustain-switch",
+            "name": "Sustain Switch",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 55
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 55
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "portamento-switch",
+            "name": "Portamento Switch",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 56
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 56
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "portamento-mode",
+            "name": "Portamento Mode",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 75
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 75
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "arpeggio-step-seq-switch",
+            "name": "Arpeggio/Step Seq Switch",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 79
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 79
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "assignable-controller",
+            "name": "Assignable Controller",
+            "group": "Performance",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 87
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 87
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pitch-coarse-tune",
+            "name": "VCO1 Pitch Coarse Tune",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 21
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 21
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pitch-fine-tune",
+            "name": "VCO1 Pitch Fine Tune",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 67
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 67
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-wave-type",
+            "name": "VCO1 Wave Type",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 41
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 41
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-edge",
+            "name": "VCO1 Edge",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 66
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 66
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pulse-width",
+            "name": "VCO1 Pulse Width",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 68
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 68
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pwm-depth",
+            "name": "VCO1 PWM Depth",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 69
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 69
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pwm-source",
+            "name": "VCO1 PWM Source",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 76
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 76
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco1-pitch-mod-depth",
+            "name": "VCO1 Pitch Mod Depth",
+            "group": "VCO1",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 18
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 18
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pitch-coarse-tune",
+            "name": "VCO2 Pitch Coarse Tune",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 43
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 43
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pitch-fine-tune",
+            "name": "VCO2 Pitch Fine Tune",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 44
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 44
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-wave-type",
+            "name": "VCO2 Wave Type",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 42
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 42
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-edge",
+            "name": "VCO2 Edge",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 45
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 45
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pulse-width",
+            "name": "VCO2 Pulse Width",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 46
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 46
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pwm-depth",
+            "name": "VCO2 PWM Depth",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 47
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 47
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pwm-source",
+            "name": "VCO2 PWM Source",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 77
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 77
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco2-pitch-mod-depth",
+            "name": "VCO2 Pitch Mod Depth",
+            "group": "VCO2",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 48
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 48
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "mixer-vco1-level",
+            "name": "Mixer VCO1 Level",
+            "group": "Mixer",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 58
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 58
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "mixer-vco2-level",
+            "name": "Mixer VCO2 Level",
+            "group": "Mixer",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 59
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 59
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "mixer-noise-level",
+            "name": "Mixer Noise Level",
+            "group": "Mixer",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 39
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 39
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "ring-modulator-level",
+            "name": "Ring Modulator Level",
+            "group": "Mixer",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 60
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 60
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco-sync-pitch",
+            "name": "VCO Sync Pitch",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 22
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 22
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco-sync-pitch-depth",
+            "name": "VCO Sync Pitch Depth",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 23
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 23
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco-sync-pitch-source",
+            "name": "VCO Sync Pitch Source",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 24
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 24
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco-sync-pitch-mod-switch",
+            "name": "VCO Sync Pitch Mod Switch",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 34
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 34
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vco-algorithm",
+            "name": "VCO Algorithm",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 33
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 33
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "fm-depth",
+            "name": "FM Depth",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 35
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 35
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "fm-source1",
+            "name": "FM Source1",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 36
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 36
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "fm-source2",
+            "name": "FM Source2",
+            "group": "Sync/FM",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 37
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 37
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "brightness-vcf-cutoff",
+            "name": "Brightness (VCF Cutoff)",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 64
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 64
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "harmonic-content-vcf-resonance",
+            "name": "Harmonic Content (VCF Resonance)",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 61
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 61
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vcf-filter-type",
+            "name": "VCF Filter Type",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 50
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 50
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vcf-hpf-cutoff",
+            "name": "VCF HPF Cutoff",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 49
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 49
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vcf-cutoff-keyboard-track",
+            "name": "VCF Cutoff Keyboard Track",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 30
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 30
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vcf-filter-mod-depth",
+            "name": "VCF Filter Mod Depth",
+            "group": "VCF",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 19
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 19
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "filter-eg-depth",
+            "name": "Filter EG Depth",
+            "group": "Filter EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 71
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 71
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "filter-eg-attack",
+            "name": "Filter EG Attack",
+            "group": "Filter EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 72
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 72
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "filter-eg-decay",
+            "name": "Filter EG Decay",
+            "group": "Filter EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 73
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 73
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "filter-eg-release",
+            "name": "Filter EG Release",
+            "group": "Filter EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 29
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 29
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "filter-eg-velocity-sens",
+            "name": "Filter EG Velocity Sens",
+            "group": "Filter EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 51
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 51
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "attack-time-amp-eg-attack",
+            "name": "Attack Time (Amp EG Attack)",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 63
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 63
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "decay-time-amp-eg-decay",
+            "name": "Decay Time (Amp EG Decay)",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 65
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 65
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "amp-eg-sustain-level",
+            "name": "Amp EG Sustain Level",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 31
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 31
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "release-time-amp-eg-release",
+            "name": "Release Time (Amp EG Release)",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 62
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 62
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "amp-eg-velocity-sens",
+            "name": "Amp EG Velocity Sens",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 52
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 52
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vca-volume",
+            "name": "VCA Volume",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 53
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 53
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vca-feedback-level",
+            "name": "VCA Feedback Level",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 54
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 54
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "vca-amp-mod-depth",
+            "name": "VCA Amp Mod Depth",
+            "group": "Amp EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 70
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 70
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "lfo-reset-mode",
+            "name": "LFO Reset Mode",
+            "group": "LFO",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 14
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 14
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "lfo1-wave",
+            "name": "LFO1 Wave",
+            "group": "LFO",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 15
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 15
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "lfo1-speed",
+            "name": "LFO1 Speed",
+            "group": "LFO",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 16
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 16
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "lfo1-delay",
+            "name": "LFO1 Delay",
+            "group": "LFO",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 20
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 20
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "lfo2-speed",
+            "name": "LFO2 Speed",
+            "group": "LFO",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 17
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 17
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "peg-depth",
+            "name": "PEG Depth",
+            "group": "Pitch EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 25
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 25
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "peg-switch",
+            "name": "PEG Switch",
+            "group": "Pitch EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 26
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 26
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "peg-decay",
+            "name": "PEG Decay",
+            "group": "Pitch EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 27
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 27
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "peg-sustain-level",
+            "name": "PEG Sustain Level",
+            "group": "Pitch EG",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 28
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 28
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "reverb-depth",
+            "name": "Reverb Depth",
+            "group": "Effects",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 80
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 80
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "chorus-variation-depth",
+            "name": "Chorus (Variation) Depth",
+            "group": "Effects",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 82
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 82
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "delay-depth",
+            "name": "Delay Depth",
+            "group": "Effects",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 83
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 83
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          }
+        ]
+      }
+    },
+    "provenance": {
+      "source": "official",
+      "verifiedRoundTrip": true,
+      "verifiedOnHardware": null,
+      "confirmations": 0,
+      "contributors": [],
+      "note": "From the official Yamaha AN1x Data List (MIDI Data Format). Control via MODE2 CC assignments — set the AN1x MIDI Control Mode to 2. SysEx parameter-change framing documented (F0 43 1n 5C addr3 data F7, model 5C); per-parameter SysEx addresses + enum value tables not yet transcribed from the Data List."
+    },
+    "completeness": "partial"
+  },
+  "yamaha": {
+    "schemaVersion": 1,
+    "id": "yamaha",
+    "version": "1.0.0",
+    "kind": "manufacturer",
+    "label": "Yamaha",
+    "manufacturerId": "43",
+    "byteOrder": "msb-first"
   }
 }

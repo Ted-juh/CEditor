@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "yamaha",
+  "version": "1.0.0",
+  "kind": "manufacturer",
+  "label": "Yamaha",
+  "manufacturerId": "43",
+  "byteOrder": "msb-first"
+}

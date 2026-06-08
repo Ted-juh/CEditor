@@ -1,0 +1,3337 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.9.0",
+  "id": "yamaha-an1x-dpd",
+  "name": "Yamaha AN1x (from DPD)",
+  "dpdSource": "yamaha.an1x",
+  "manufacturer": "Yamaha",
+  "family": "AN",
+  "status": "experimental",
+  "trust": "local",
+  "variables": {
+    "deviceId": 16,
+    "channel": 1
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 20
+  },
+  "parameters": [
+    {
+      "id": "modulation",
+      "name": "Modulation",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Modulation"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "scene-select",
+      "name": "Scene Select",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Scene Select"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc3",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "foot-controller",
+      "name": "Foot Controller",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Foot Controller"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc4",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "portamento-time",
+      "name": "Portamento Time",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Portamento Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc5",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "main-volume",
+      "name": "Main Volume",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Main Volume"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc7",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "layer-mode",
+      "name": "Layer Mode",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Layer Mode"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc8",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "poly-mono-mode",
+      "name": "Poly/Mono Mode",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Poly/Mono Mode"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc9",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "panpot",
+      "name": "Panpot",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Panpot"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc10",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "expression",
+      "name": "Expression",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Expression"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc11",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "ribbon-z-controller",
+      "name": "Ribbon Z Controller",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ribbon Z Controller"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc12",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "ribbon-x-controller",
+      "name": "Ribbon X Controller",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ribbon X Controller"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc13",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "sustain-switch",
+      "name": "Sustain Switch",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Sustain Switch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc55",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "portamento-switch",
+      "name": "Portamento Switch",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Portamento Switch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc56",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "portamento-mode",
+      "name": "Portamento Mode",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Portamento Mode"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc75",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "arpeggio-step-seq-switch",
+      "name": "Arpeggio/Step Seq Switch",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Arpeggio/Step Seq Switch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc79",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "assignable-controller",
+      "name": "Assignable Controller",
+      "group": "Performance",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Assignable Controller"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc87",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pitch-coarse-tune",
+      "name": "VCO1 Pitch Coarse Tune",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Coarse Tune"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc21",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pitch-fine-tune",
+      "name": "VCO1 Pitch Fine Tune",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Fine Tune"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc67",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-wave-type",
+      "name": "VCO1 Wave Type",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Wave Type"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc41",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-edge",
+      "name": "VCO1 Edge",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Edge"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc66",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pulse-width",
+      "name": "VCO1 Pulse Width",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pulse Width"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc68",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pwm-depth",
+      "name": "VCO1 PWM Depth",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 PWM Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc69",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pwm-source",
+      "name": "VCO1 PWM Source",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 PWM Source"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc76",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco1-pitch-mod-depth",
+      "name": "VCO1 Pitch Mod Depth",
+      "group": "VCO1",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO1 Pitch Mod Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc18",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pitch-coarse-tune",
+      "name": "VCO2 Pitch Coarse Tune",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Coarse Tune"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc43",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pitch-fine-tune",
+      "name": "VCO2 Pitch Fine Tune",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Fine Tune"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc44",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-wave-type",
+      "name": "VCO2 Wave Type",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Wave Type"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc42",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-edge",
+      "name": "VCO2 Edge",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Edge"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc45",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pulse-width",
+      "name": "VCO2 Pulse Width",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pulse Width"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc46",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pwm-depth",
+      "name": "VCO2 PWM Depth",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 PWM Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc47",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pwm-source",
+      "name": "VCO2 PWM Source",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 PWM Source"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc77",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco2-pitch-mod-depth",
+      "name": "VCO2 Pitch Mod Depth",
+      "group": "VCO2",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO2 Pitch Mod Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc48",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "mixer-vco1-level",
+      "name": "Mixer VCO1 Level",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer VCO1 Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc58",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "mixer-vco2-level",
+      "name": "Mixer VCO2 Level",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer VCO2 Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc59",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "mixer-noise-level",
+      "name": "Mixer Noise Level",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Mixer Noise Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc39",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "ring-modulator-level",
+      "name": "Ring Modulator Level",
+      "group": "Mixer",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Ring Modulator Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc60",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco-sync-pitch",
+      "name": "VCO Sync Pitch",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO Sync Pitch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc22",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco-sync-pitch-depth",
+      "name": "VCO Sync Pitch Depth",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO Sync Pitch Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc23",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco-sync-pitch-source",
+      "name": "VCO Sync Pitch Source",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO Sync Pitch Source"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc24",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco-sync-pitch-mod-switch",
+      "name": "VCO Sync Pitch Mod Switch",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO Sync Pitch Mod Switch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc34",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vco-algorithm",
+      "name": "VCO Algorithm",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCO Algorithm"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc33",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "fm-depth",
+      "name": "FM Depth",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "FM Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc35",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "fm-source1",
+      "name": "FM Source1",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "FM Source1"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc36",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "fm-source2",
+      "name": "FM Source2",
+      "group": "Sync/FM",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "FM Source2"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc37",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "brightness-vcf-cutoff",
+      "name": "Brightness (VCF Cutoff)",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Brightness (VCF Cutoff)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc64",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "harmonic-content-vcf-resonance",
+      "name": "Harmonic Content (VCF Resonance)",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Harmonic Content (VCF Resonance)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc61",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcf-filter-type",
+      "name": "VCF Filter Type",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Filter Type"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc50",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcf-hpf-cutoff",
+      "name": "VCF HPF Cutoff",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF HPF Cutoff"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc49",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcf-cutoff-keyboard-track",
+      "name": "VCF Cutoff Keyboard Track",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Cutoff Keyboard Track"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc30",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vcf-filter-mod-depth",
+      "name": "VCF Filter Mod Depth",
+      "group": "VCF",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCF Filter Mod Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc19",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter-eg-depth",
+      "name": "Filter EG Depth",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc71",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter-eg-attack",
+      "name": "Filter EG Attack",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Attack"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc72",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter-eg-decay",
+      "name": "Filter EG Decay",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Decay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc73",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter-eg-release",
+      "name": "Filter EG Release",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Release"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc29",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "filter-eg-velocity-sens",
+      "name": "Filter EG Velocity Sens",
+      "group": "Filter EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Filter EG Velocity Sens"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc51",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "attack-time-amp-eg-attack",
+      "name": "Attack Time (Amp EG Attack)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Attack Time (Amp EG Attack)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc63",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "decay-time-amp-eg-decay",
+      "name": "Decay Time (Amp EG Decay)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Decay Time (Amp EG Decay)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc65",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "amp-eg-sustain-level",
+      "name": "Amp EG Sustain Level",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Sustain Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc31",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "release-time-amp-eg-release",
+      "name": "Release Time (Amp EG Release)",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Release Time (Amp EG Release)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc62",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "amp-eg-velocity-sens",
+      "name": "Amp EG Velocity Sens",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Amp EG Velocity Sens"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc52",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vca-volume",
+      "name": "VCA Volume",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Volume"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc53",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vca-feedback-level",
+      "name": "VCA Feedback Level",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Feedback Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc54",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "vca-amp-mod-depth",
+      "name": "VCA Amp Mod Depth",
+      "group": "Amp EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "VCA Amp Mod Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc70",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "lfo-reset-mode",
+      "name": "LFO Reset Mode",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO Reset Mode"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc14",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "lfo1-wave",
+      "name": "LFO1 Wave",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Wave"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc15",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "lfo1-speed",
+      "name": "LFO1 Speed",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Speed"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc16",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "lfo1-delay",
+      "name": "LFO1 Delay",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO1 Delay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc20",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "lfo2-speed",
+      "name": "LFO2 Speed",
+      "group": "LFO",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "LFO2 Speed"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc17",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "peg-depth",
+      "name": "PEG Depth",
+      "group": "Pitch EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc25",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "peg-switch",
+      "name": "PEG Switch",
+      "group": "Pitch EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Switch"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc26",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "peg-decay",
+      "name": "PEG Decay",
+      "group": "Pitch EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Decay"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc27",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "peg-sustain-level",
+      "name": "PEG Sustain Level",
+      "group": "Pitch EG",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "PEG Sustain Level"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc28",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "reverb-depth",
+      "name": "Reverb Depth",
+      "group": "Effects",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Reverb Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc80",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "chorus-variation-depth",
+      "name": "Chorus (Variation) Depth",
+      "group": "Effects",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Chorus (Variation) Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc82",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "delay-depth",
+      "name": "Delay Depth",
+      "group": "Effects",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Delay Depth"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc83",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    }
+  ],
+  "messageRecipes": [
+    {
+      "id": "paramChange",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "43",
+        "$deviceId",
+        "5C",
+        "$address",
+        "$encodedValue",
+        "F7"
+      ],
+      "delayAfterMs": 20
+    },
+    {
+      "id": "cc1",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 1,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc3",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 3,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc4",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 4,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc5",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 5,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc7",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 7,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc8",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 8,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc9",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 9,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc10",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 10,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc11",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 11,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc12",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 12,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc13",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 13,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc14",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 14,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc15",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 15,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc16",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 16,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc17",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 17,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc18",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 18,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc19",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 19,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc20",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 20,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc21",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 21,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc22",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 22,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc23",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 23,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc24",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 24,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc25",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 25,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc26",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 26,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc27",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 27,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc28",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 28,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc29",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 29,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc30",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 30,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc31",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 31,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc33",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 33,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc34",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 34,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc35",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 35,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc36",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 36,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc37",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 37,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc39",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 39,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc41",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 41,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc42",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 42,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc43",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 43,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc44",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 44,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc45",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 45,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc46",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 46,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc47",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 47,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc48",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 48,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc49",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 49,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc50",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 50,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc51",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 51,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc52",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 52,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc53",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 53,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc54",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 54,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc55",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 55,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc56",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 56,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc58",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 58,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc59",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 59,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc60",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 60,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc61",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 61,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc62",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 62,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc63",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 63,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc64",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 64,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc65",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 65,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc66",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 66,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc67",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 67,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc68",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 68,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc69",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 69,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc70",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 70,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc71",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 71,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc72",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 72,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc73",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 73,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc75",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 75,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc76",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 76,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc77",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 77,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc79",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 79,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc80",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 80,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc82",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 82,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc83",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 83,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc87",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 87,
+      "value": "$encodedValue"
+    }
+  ]
+}
