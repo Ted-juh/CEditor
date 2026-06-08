@@ -2,10 +2,14 @@
 #include "../src/DeviceProfile/DeviceProfileService.h"
 #include "../src/DeviceProfile/MidiCiSession.h"
 
+#include <juce_midi_ci/juce_midi_ci.h>
+
 #include <algorithm>
 #include <deque>
 #include <iostream>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace
 {
@@ -738,6 +742,70 @@ int runServiceRequestTests()
     return 0;
 }
 
+// A pure MIDI-CI *responder* for the loopback (stands in for a hardware synth). It answers Discovery
+// + Property Exchange and serves ResourceList / DeviceInfo / ChannelList via a PropertyDelegate, but —
+// crucially — does NOT initiate anything itself (its deviceAdded is a no-op), so it never starts a PE
+// against our delegate-less initiator (which would NAK + retry-storm). Test-only.
+struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
+                         juce::midi_ci::DeviceListener,
+                         juce::midi_ci::PropertyDelegate
+{
+    std::function<void (const juce::MidiMessage&)> send;
+    std::optional<juce::midi_ci::Device> device;
+
+    explicit TestCiResponder (std::function<void (const juce::MidiMessage&)> s) : send (std::move (s))
+    {
+        namespace ci = juce::midi_ci;
+        juce::Random r;
+        r.setSeedRandomly();
+        const auto features = ci::DeviceFeatures().withPropertyExchangeSupported (true);
+        const juce::ump::DeviceInfo info {
+            { std::byte { 0x42 }, std::byte { 0x00 }, std::byte { 0x00 } },
+            { std::byte { 0x01 }, std::byte { 0x00 } },
+            { std::byte { 0x02 }, std::byte { 0x00 } },
+            { std::byte { 0x01 }, std::byte { 0x00 }, std::byte { 0x00 }, std::byte { 0x00 } } };
+        const auto options = ci::DeviceOptions()
+                                 .withOutputs ({ this })
+                                 .withDeviceInfo (info)
+                                 .withFeatures (features)
+                                 .withProductInstanceId (ci::DeviceOptions::makeProductInstanceId (r))
+                                 .withPropertyDelegate (this);
+        device.emplace (options);
+        device->addListener (*this);
+    }
+
+    ~TestCiResponder() override { if (device.has_value()) device->removeListener (*this); }
+
+    void processMessage (juce::ump::BytesOnGroup msg) override
+    {
+        if (send) send (juce::MidiMessage::createSysExMessage (msg.bytes));
+    }
+    void feed (const juce::MidiMessage& m) { if (device.has_value() && m.isSysEx()) device->processMessage ({ 0, m.getSysExDataSpan() }); }
+    void pump() { if (device.has_value()) device->sendPendingMessages(); }
+    uint32_t muid() const { return device.has_value() ? device->getMuid().get() : 0; }
+
+    static juce::midi_ci::PropertyReplyData jsonReply (const juce::String& s)
+    {
+        juce::midi_ci::PropertyReplyData d; // header defaults: status 200, ascii, application/json
+        for (const auto c : s) d.body.push_back (static_cast<std::byte> (static_cast<uint8_t> (c)));
+        return d;
+    }
+    juce::midi_ci::PropertyReplyData propertyGetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestHeader& h) override
+    {
+        if (h.resource == "ResourceList") return jsonReply (R"([{"resource":"DeviceInfo"},{"resource":"ChannelList"}])");
+        if (h.resource == "DeviceInfo")   return jsonReply (R"({"manufacturer":"CEditor Test","family":"SynthFam","model":"TestSynth","version":"1.0"})");
+        if (h.resource == "ChannelList")  return jsonReply (R"({"channelList":[{"title":"Main","channel":1}]})");
+        juce::midi_ci::PropertyReplyData d; d.header.status = 404; d.header.message = "Unknown resource"; return d;
+    }
+    juce::midi_ci::PropertyReplyHeader propertySetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestData&) override
+    {
+        juce::midi_ci::PropertyReplyHeader h; h.status = 405; h.message = "Read only"; return h;
+    }
+    bool subscriptionStartRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertySubscriptionHeader&) override { return false; }
+    void subscriptionDidStart (juce::midi_ci::MUID, const juce::String&, const juce::midi_ci::PropertySubscriptionHeader&) override {}
+    void subscriptionWillEnd (juce::midi_ci::MUID, const juce::midi_ci::Subscription&) override {}
+};
+
 // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). No hardware: two MidiCiSessions are wired output ->
 // input to each other (a software loopback, the JUCE-sanctioned way to exercise juce::midi_ci::Device).
 // The send callbacks only enqueue, so delivery is single-threaded and non-reentrant. Proves the whole
@@ -749,14 +817,13 @@ int runMidiCiTests()
 
     std::deque<juce::MidiMessage> inboxA, inboxB; // inboxX holds messages destined for session X
     bool peHandshakeForB = false;
-    juce::var infoForB;
 
     std::unique_ptr<MidiCiSession> a, b;
     a = std::make_unique<MidiCiSession> (
         [&inboxB] (const juce::MidiMessage& m) { inboxB.push_back (m); },
-        [&] (uint32_t muid, const juce::var& info, const juce::var&)
+        [&] (uint32_t muid, const juce::var&, const juce::var&)
         {
-            if (b != nullptr && muid == b->getMuid()) { peHandshakeForB = true; infoForB = info; }
+            if (b != nullptr && muid == b->getMuid()) peHandshakeForB = true;
         });
     b = std::make_unique<MidiCiSession> (
         [&inboxA] (const juce::MidiMessage& m) { inboxA.push_back (m); });
@@ -800,8 +867,52 @@ int runMidiCiTests()
     }
 
     std::cout << "[PASS] MIDI-CI :: loopback discovery (initiator <-> responder MUIDs exchanged)"
-              << (peHandshakeForB ? " + PE capabilities handshake" : "")
-              << (infoForB != juce::var{} ? " + DeviceInfo JSON" : "") << "\n";
+              << (peHandshakeForB ? " + PE capabilities handshake" : "") << "\n";
+
+    // ---- Part 2: Property Exchange extracts DeviceInfo + ChannelList JSON ----
+    // Initiator (our MidiCiSession) against a property-serving responder. getDeviceInfoForMuid populates
+    // only after the auto ResourceList -> DeviceInfo/ChannelList fetch round-trips, so we pump + poll.
+    std::deque<juce::MidiMessage> toInit, toResp;
+    auto init = std::make_unique<MidiCiSession> ([&toResp] (const juce::MidiMessage& m) { toResp.push_back (m); });
+    TestCiResponder responder ([&toInit] (const juce::MidiMessage& m) { toInit.push_back (m); });
+
+    init->startDiscovery();
+    init->pump();
+    responder.pump();
+
+    juce::var deviceInfo, channelList;
+    for (int round = 0; round < 48; ++round)
+    {
+        std::deque<juce::MidiMessage> di, dr;
+        std::swap (di, toInit);
+        std::swap (dr, toResp);
+        for (const auto& m : di) init->handleIncomingSysex (m);
+        for (const auto& m : dr) responder.feed (m);
+        init->pump();
+        responder.pump();
+
+        deviceInfo = init->getDeviceInfo (responder.muid());
+        channelList = init->getChannelList (responder.muid());
+        // DeviceInfo and ChannelList are auto-fetched sequentially, so wait for both before stopping.
+        if (deviceInfo != juce::var{} && channelList != juce::var{})
+            break;
+    }
+
+    auto* infoObj = deviceInfo.getDynamicObject();
+    if (infoObj == nullptr || infoObj->getProperty ("manufacturer").toString() != "CEditor Test")
+    {
+        std::cerr << "[FAIL] MIDI-CI :: Property Exchange did not return the responder's DeviceInfo JSON"
+                  << " (got " << juce::JSON::toString (deviceInfo) << ")\n";
+        return 1;
+    }
+    if (channelList == juce::var{})
+    {
+        std::cerr << "[FAIL] MIDI-CI :: Property Exchange did not return the responder's ChannelList JSON\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] MIDI-CI :: property exchange extracts DeviceInfo + ChannelList JSON"
+              << " (manufacturer=\"" << infoObj->getProperty ("manufacturer").toString() << "\")\n";
     return 0;
 }
 }

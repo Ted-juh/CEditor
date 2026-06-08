@@ -113,4 +113,14 @@ std::vector<uint32_t> MidiCiSession::getDiscoveredMuids() const
     return out;
 }
 
+juce::var MidiCiSession::getDeviceInfo (uint32_t muid) const
+{
+    return impl->device.has_value() ? impl->device->getDeviceInfoForMuid (ci::MUID::makeUnchecked (muid)) : juce::var {};
+}
+
+juce::var MidiCiSession::getChannelList (uint32_t muid) const
+{
+    return impl->device.has_value() ? impl->device->getChannelListForMuid (ci::MUID::makeUnchecked (muid)) : juce::var {};
+}
+
 } // namespace ceditor::device

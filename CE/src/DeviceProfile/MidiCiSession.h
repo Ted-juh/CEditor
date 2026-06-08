@@ -54,6 +54,11 @@ public:
     // The MUIDs of all devices discovered so far.
     std::vector<uint32_t> getDiscoveredMuids() const;
 
+    // The DeviceInfo / ChannelList of a discovered device as JSON (null var until Property Exchange
+    // has fetched them — poll after discovery). These are what gets handed to import-midici.mjs.
+    juce::var getDeviceInfo (uint32_t muid) const;
+    juce::var getChannelList (uint32_t muid) const;
+
 private:
     struct Impl;
     std::unique_ptr<Impl> impl;
