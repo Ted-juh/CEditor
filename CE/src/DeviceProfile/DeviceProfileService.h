@@ -50,6 +50,7 @@ public:
     juce::var compileRawMidiAction (const juce::var& payload, bool appendToMonitor);
     juce::var ingestIncomingMidiMessage (const juce::var& payload);
     juce::var startMidiCiDiscovery (const juce::var& payload);
+    juce::var setMidiCiProfile (const juce::var& payload);
     juce::var parseDumpMessage (const juce::var& payload, bool updateState);
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;

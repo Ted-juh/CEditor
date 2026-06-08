@@ -3,7 +3,7 @@
   // mapped output; the C++ session runs Property Exchange and the bundled importer drafts a partial
   // profile from what the device reports (controllers, presets, identity). Picking one seeds the
   // Designer's model. The SysEx/dump layer is added afterwards from the manual or a capture.
-  import { discoveredMidiCiProfiles, requestMidiCiDiscovery } from '../../stores/deviceProfiles.js';
+  import { discoveredMidiCiProfiles, requestMidiCiDiscovery, setMidiCiProfile } from '../../stores/deviceProfiles.js';
   import { isJuceAvailable } from '../../bridge/bridge.js';
 
   let { onPick } = $props();
@@ -50,6 +50,19 @@
           <div class="dm">{idLabel(entry)}</div>
           <div class="dstat"><span><b>{ctrlCount(entry)}</b> controllers</span><span><b>{presetCount(entry)}</b> presets</span></div>
           {#if entry.summary?.needsYou?.length}<div class="dm" style="margin-top:8px">Needs you: {entry.summary.needsYou[0]}</div>{/if}
+          {#if entry.profiles?.length}
+            <div class="ciprofiles">
+              <div class="cplabel">MIDI-CI profiles</div>
+              {#each entry.profiles as p (p.id)}
+                <div class="cprow">
+                  <span class="cpid">{p.id}</span>
+                  <button class={['cptoggle', p.active && 'on']} onclick={() => setMidiCiProfile(entry.muid, p.id, !p.active)}>
+                    {p.active ? 'On' : 'Off'}
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {/if}
           <button class="asbtn" style="margin:12px 0 0" onclick={() => onPick?.(structuredClone($state.snapshot(entry.profile)))}>Open in Designer →</button>
         {/if}
       </div>

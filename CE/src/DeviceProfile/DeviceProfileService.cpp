@@ -2672,6 +2672,7 @@ juce::var DeviceProfileService::startMidiCiDiscovery (const juce::var& payload)
             {
                 midiCiSession->fetchProperty (muid, "AllCtrlList");
                 midiCiSession->fetchProperty (muid, "ProgramList");
+                midiCiSession->inquireProfiles (muid); // MIDI-CI Profile Configuration (M2)
             }
         });
 
@@ -2738,6 +2739,7 @@ void DeviceProfileService::pollMidiCiDiscovery()
         o->setProperty ("channelList", midiCiSession->getChannelList (muid));
         o->setProperty ("allCtrlList", allCtrlList);
         o->setProperty ("programList", midiCiSession->getFetchedProperty (muid, "ProgramList"));
+        o->setProperty ("profiles", midiCiSession->getProfiles (muid)); // MIDI-CI block profiles (M2)
         emitDeviceEvent ("midiCiDiscovered", juce::var (o));
         appendMonitorEvent ("sync", midiCiRole, "sysex", "MIDI-CI device discovered", {}, "DeviceInfo received");
     }
@@ -2751,6 +2753,38 @@ void DeviceProfileService::pollMidiCiDiscovery()
         done->setProperty ("discovered", (int) midiCiReported.size());
         emitDeviceEvent ("midiCiDiscoveryComplete", juce::var (done));
     }
+}
+
+juce::var DeviceProfileService::setMidiCiProfile (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    if (obj == nullptr || midiCiSession == nullptr)
+        return errorResponse ({}, "No active MIDI-CI session — run discovery first");
+
+    const auto muid = (uint32_t) static_cast<juce::int64> (obj->getProperty ("muid"));
+    const auto profileId = objectString (obj, "profileId");
+    const auto enabled = static_cast<bool> (obj->getProperty ("enabled"));
+    if (profileId.isEmpty())
+        return errorResponse ({}, "setMidiCiProfile needs a profileId");
+
+    midiCiSession->setProfileEnabled (muid, profileId, enabled);
+
+    // Re-open a short window so the enablement is pumped out and the device's report is processed +
+    // re-emitted (clearing the reported flag lets pollMidiCiDiscovery surface the updated profile state).
+    midiCiReported.erase (muid);
+    midiCiActive = true;
+    midiCiDeadlineMs = nowMs() + 3000.0;
+    midiCiSession->pump();
+    startTimerHz (60);
+
+    appendMonitorEvent ("out", midiCiRole, "sysex", "MIDI-CI profile " + juce::String (enabled ? "enable" : "disable"), {}, profileId);
+
+    auto* result = new juce::DynamicObject();
+    result->setProperty ("ok", true);
+    result->setProperty ("muid", (juce::int64) muid);
+    result->setProperty ("profileId", profileId);
+    result->setProperty ("enabled", enabled);
+    return juce::var (result);
 }
 
 void DeviceProfileService::timerCallback()

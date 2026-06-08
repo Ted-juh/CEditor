@@ -350,6 +350,11 @@ export function onMidiCiDiscovered(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+export function setMidiCiProfile(muid, profileId, enabled) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('setMidiCiProfile', { muid, profileId, enabled: !!enabled });
+}
+
 export function onDeviceProfilesListed(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('deviceProfilesListed', callback);

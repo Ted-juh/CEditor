@@ -67,6 +67,7 @@ import {
   onBulkDumpSends,
   onMidiCiDiscovered,
   requestMidiCiDiscovery as requestMidiCiDiscoveryBridge,
+  setMidiCiProfile as setMidiCiProfileBridge,
 } from '../bridge/bridge.js';
 import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
@@ -93,6 +94,12 @@ export const discoveredMidiCiProfiles = writable([]);
 export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
   discoveredMidiCiProfiles.set([]);
   requestMidiCiDiscoveryBridge(deviceRole);
+}
+
+// Enable/disable a MIDI-CI profile on a discovered device (MIDI 2.0 plan, phase M2). The device's
+// report comes back via a re-emitted midiCiDiscovered, refreshing the entry's profiles.
+export function setMidiCiProfile(muid, profileId, enabled) {
+  setMidiCiProfileBridge(muid, profileId, enabled);
 }
 export const selectedDeviceProfileId = writable('test-cc-synth');
 export const selectedMidiDestinationId = writable('previewOnly');
@@ -1621,9 +1628,9 @@ export function initDeviceProfileBridge() {
         channelList: payload.channelList,
         programList: payload.programList,
       });
-      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', profile, summary };
+      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', profile, summary, profiles: Array.isArray(payload.profiles) ? payload.profiles : [] };
     } catch (err) {
-      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', error: String(err?.message ?? err) };
+      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', error: String(err?.message ?? err), profiles: Array.isArray(payload.profiles) ? payload.profiles : [] };
     }
     discoveredMidiCiProfiles.update((list) => [...list.filter((e) => e.muid !== entry.muid), entry]);
   });
