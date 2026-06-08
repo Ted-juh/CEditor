@@ -184,6 +184,7 @@ target_link_libraries(CEditorPlayerVST PRIVATE
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/tests/DeviceProfileEngineTests.cpp"
 )
 
@@ -199,6 +200,7 @@ target_link_libraries(CEditorDeviceProfileTests PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_devices
+    juce::juce_midi_ci
 )
 
 # --- Export pipeline: compile-per-panel identity (Phase D1) ---

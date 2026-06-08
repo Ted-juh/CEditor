@@ -1,7 +1,11 @@
 #include "../src/DeviceProfile/DeviceProfileEngine.h"
 #include "../src/DeviceProfile/DeviceProfileService.h"
+#include "../src/DeviceProfile/MidiCiSession.h"
 
+#include <algorithm>
+#include <deque>
 #include <iostream>
+#include <memory>
 
 namespace
 {
@@ -733,6 +737,73 @@ int runServiceRequestTests()
     std::cout << "[PASS] DeviceProfileService :: runtime dump collection assembly\n";
     return 0;
 }
+
+// MIDI-CI live discovery (MIDI 2.0 plan, phase M1). No hardware: two MidiCiSessions are wired output ->
+// input to each other (a software loopback, the JUCE-sanctioned way to exercise juce::midi_ci::Device).
+// The send callbacks only enqueue, so delivery is single-threaded and non-reentrant. Proves the whole
+// initiator path end-to-end: Device construction, Discovery broadcast, bytestream SysEx framing
+// (createSysExMessage / getSysExDataSpan), incoming dispatch, and the discovery listener callback.
+int runMidiCiTests()
+{
+    using ceditor::device::MidiCiSession;
+
+    std::deque<juce::MidiMessage> inboxA, inboxB; // inboxX holds messages destined for session X
+    bool peHandshakeForB = false;
+    juce::var infoForB;
+
+    std::unique_ptr<MidiCiSession> a, b;
+    a = std::make_unique<MidiCiSession> (
+        [&inboxB] (const juce::MidiMessage& m) { inboxB.push_back (m); },
+        [&] (uint32_t muid, const juce::var& info, const juce::var&)
+        {
+            if (b != nullptr && muid == b->getMuid()) { peHandshakeForB = true; infoForB = info; }
+        });
+    b = std::make_unique<MidiCiSession> (
+        [&inboxA] (const juce::MidiMessage& m) { inboxA.push_back (m); });
+
+    const auto hasDiscovered = [] (const MidiCiSession& s, uint32_t muid)
+    {
+        const auto v = s.getDiscoveredMuids();
+        return std::find (v.begin(), v.end(), muid) != v.end();
+    };
+
+    // Drive the exchange one batch at a time. We only need Discovery for this slice, so we stop the
+    // moment both sides know each other — before the auto Property-Exchange traffic (which the
+    // delegate-less responder NAKs + re-queues) can amplify across rounds. Each round processes only
+    // the messages already queued, so a single round can't explode.
+    a->startDiscovery();
+    a->pump();
+    b->pump();
+
+    bool discoveredBothWays = false;
+    for (int round = 0; round < 16 && ! discoveredBothWays; ++round)
+    {
+        std::deque<juce::MidiMessage> da, db;
+        std::swap (da, inboxA);
+        std::swap (db, inboxB);
+        for (const auto& m : da) a->handleIncomingSysex (m);
+        for (const auto& m : db) b->handleIncomingSysex (m);
+        a->pump();
+        b->pump();
+        discoveredBothWays = hasDiscovered (*a, b->getMuid()) && hasDiscovered (*b, a->getMuid());
+    }
+
+    if (! hasDiscovered (*a, b->getMuid()))
+    {
+        std::cerr << "[FAIL] MIDI-CI :: initiator did not discover the responder over the loopback\n";
+        return 1;
+    }
+    if (! hasDiscovered (*b, a->getMuid()))
+    {
+        std::cerr << "[FAIL] MIDI-CI :: responder did not see the initiator (Discovery is not bidirectional)\n";
+        return 1;
+    }
+
+    std::cout << "[PASS] MIDI-CI :: loopback discovery (initiator <-> responder MUIDs exchanged)"
+              << (peHandshakeForB ? " + PE capabilities handshake" : "")
+              << (infoForB != juce::var{} ? " + DeviceInfo JSON" : "") << "\n";
+    return 0;
+}
 }
 
 int main()
@@ -754,6 +825,7 @@ int main()
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runServiceRequestTests();
+    failures += runMidiCiTests();
 
     if (failures == 0)
     {
