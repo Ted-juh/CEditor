@@ -9,6 +9,7 @@ import { applyOverrides, mergeIncludes } from '../resolve.mjs';
 
 export * from '../codecs.mjs';
 export * from '../resolve.mjs';
+export * from '../dumps.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const LIB_DIR = join(HERE, '..', 'library');

@@ -64,5 +64,23 @@ const af = lib3.canonical('m.scope').profile;
 ok(af.scopes.partB.parameters.some((p) => p.id === 'reso'), 'reso accreted into partB (its own scope)');
 ok(!af.scopes.partA.parameters.some((p) => p.id === 'reso'), 'reso did NOT land in partA (the first scope)');
 
+// verifiedFullDump (C2): earned via dumps.mjs round-trip, recorded on the canonical version
+const reso100 = { id: 'reso', valueType: 'continuous', address: '00 00 00 10', range: { min: 0, max: 100 }, encoding: { type: 'u7' }, access: { read: true, write: true } };
+const dumpDev = (good) => ({ schemaVersion: 1, id: 'd.syn', version: '1.0.0', kind: 'model', deviceId: '10',
+  scopes: { patch: { kind: 'global', instances: 1, parameters: [cutoff, reso100] } },
+  dumps: [{ id: 'p', kind: 'patch', spans: ['patch'],
+    message: { matcher: { prefix: ['F0', '7D', '$deviceId'], suffix: ['F7'] }, payload: { offset: 3, size: good ? 2 : 1 } },
+    // good: distinct offsets; broken: cutoff & reso collide at offset 0 (different max values expose it)
+    layout: [{ param: 'patch.cutoff', offset: 0 }, { param: 'patch.reso', offset: good ? 1 : 0 }] }] });
+const libD = new Library();
+eq(libD.submit(dumpDev(true), '@a').status, 'created', 'dumped profile submits');
+eq(libD.canonical('d.syn').verifiedFullDump, true, 'good dump -> verifiedFullDump true');
+const libD2 = new Library();
+libD2.submit(dumpDev(false), '@a');
+eq(libD2.canonical('d.syn').verifiedFullDump, false, 'colliding dump layout -> verifiedFullDump false');
+const libD3 = new Library();
+libD3.submit(mk('nd.syn', [cutoff]), '@a');
+eq(libD3.canonical('nd.syn').verifiedFullDump, null, 'no dumps -> verifiedFullDump null (nothing to verify)');
+
 console.log(`\n${fail === 0 ? '✓ ALL PASS' : '✗ FAILURES'} — ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

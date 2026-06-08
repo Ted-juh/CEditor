@@ -22,6 +22,7 @@ const modules = [
   [join(DPD, 'codecs.mjs'), 'codecs.mjs'],
   [join(DPD, 'resolve.mjs'), 'resolve.mjs'],
   [join(DPD, 'merge.mjs'), 'merge.mjs'],
+  [join(DPD, 'dumps.mjs'), 'dumps.mjs'],
   [join(DPD, 'emit-legacy-core.mjs'), 'emit-legacy-core.mjs'],
   [join(DPD, 'tools', 'validate.mjs'), 'validate.mjs'],
 ];

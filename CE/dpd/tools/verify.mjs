@@ -4,10 +4,11 @@
 import {
   LIB_DIR, loadProfile, resolveProfile, resolveParams, buildMessage,
   encodeValue, decodeValue, pack8to7, unpack8to7, bitsliceEncode, bitsliceDecode,
-  applyOverrides, mergeIncludes, resolveModel,
+  applyOverrides, mergeIncludes, resolveModel, bytesToHex,
+  assembleDump, parseDump, dumpRoundTrip, dumpByteMap,
 } from './dpd.mjs';
 import { validateProfile } from './validate.mjs';
-import { buildLegacyProfile } from '../emit-legacy-core.mjs';
+import { buildLegacyProfile, buildDumpDefinitions } from '../emit-legacy-core.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.log('  ✗ FAIL: ' + msg); } };
@@ -216,6 +217,124 @@ section('per-wire address resolution');
   eq(r.find((x) => x.resolvedId === 'tone1.p').wires.write.address, '10 00 01 0C', 'write wire at the param address');
   eq(r.find((x) => x.resolvedId === 'tone1.p').wires.read.address, '10 00 01 0D', 'read wire at ITS OWN address (distinct from write)');
   eq(r.find((x) => x.resolvedId === 'tone2.p').wires.read.address, '10 00 02 0D', 'per-wire address strides per instance');
+}
+
+// ---------------------------------------------------------------- universal bulk dumps (C2)
+// A dump is the whole-patch SysEx. The model + dumps.mjs must express ANY machine — Roland address
+// blocks, Yamaha nibbled, Korg 8->7 block-packed, ASCII patch names, every checksum — no device
+// special-cased. Proven on synthetic dumps (a real device's byte map comes from its manual).
+section('Universal bulk dumps (assemble / parse / round-trip)');
+{
+  // synthetic device exercising u14, s7, enum, nibbled, AND an ASCII patch name + a sum-7bit checksum
+  const dev = {
+    schemaVersion: 1, id: 'syn.dump', version: '1.0.0', kind: 'model',
+    deviceId: '10', modelId: '00 41', manufacturerId: '7D',
+    scopes: { patch: { kind: 'global', instances: 1, parameters: [
+      { id: 'cutoff', name: 'Cutoff', valueType: 'continuous', address: '00', range: { min: 0, max: 127 }, encoding: { type: 'u7' } },
+      { id: 'pitch',  name: 'Pitch',  valueType: 'continuous', range: { min: 0, max: 16383 }, encoding: { type: 'u7' } }, // dump overrides to u14
+      { id: 'tune',   name: 'Tune',   valueType: 'signed', range: { min: -64, max: 63 }, encoding: { type: 's7' } },
+      { id: 'wave',   name: 'Wave',   valueType: 'enum', enum: [{ id: 'saw', label: 'Saw', wire: 0 }, { id: 'sqr', label: 'Square', wire: 1 }, { id: 'tri', label: 'Tri', wire: 2 }] },
+      { id: 'level',  name: 'Level',  valueType: 'continuous', range: { min: 0, max: 255 }, encoding: { type: 'nibbles', bytes: 2 } },
+    ] } },
+  };
+  const dump = {
+    id: 'patchDump', kind: 'patch', spans: ['patch'],
+    message: {
+      matcher: { prefix: ['F0', '7D', '$deviceId', '$modelId', '12'], suffix: ['F7'] },
+      payload: { offset: 6, size: 8 },
+      checksum: { type: 'sum-7bit', fromOffset: 5, toOffset: 13, byteOffset: 14 },
+    },
+    layout: [
+      { param: 'patch.cutoff', offset: 0, codec: { type: 'u7' } },
+      { param: 'patch.pitch',  offset: 1, codec: { type: 'u14' } },          // per-dump codec OVERRIDES the param's u7
+      { param: 'patch.tune',   offset: 3, codec: { type: 's7' } },
+      { param: 'patch.wave',   offset: 4, codec: { type: 'u7' } },
+      { param: 'patch.level',  offset: 5, codec: { type: 'nibbles', bytes: 2 } },
+      { param: 'patchName',    offset: 7, codec: { type: 'text-ascii', length: 1 } }, // virtual id (no param) + text codec
+    ],
+  };
+
+  // byte-exact assemble for a known vector (proves framing, $token substitution, every codec + checksum)
+  const vals = { 'patch.cutoff': 100, 'patch.pitch': 12345, 'patch.tune': -10, 'patch.wave': 'tri', 'patch.level': 200, patchName: 'A' };
+  eq(bytesToHex(assembleDump(dump, vals, dev)), 'F0 7D 10 00 41 12 64 60 39 36 02 0C 08 41 1C F7', 'byte-exact assemble (u14+s7+enum+nibbles+text+checksum)');
+
+  const back = parseDump(dump, assembleDump(dump, vals, dev), dev);
+  ok(back.prefixOk && back.suffixOk, 'parse matches prefix + suffix');
+  eq(back.checksumStatus, 'ok', 'parse verifies the checksum');
+  eq(back.valuesById['patch.pitch'], 12345, 'u14 value recovered (two-byte)');
+  eq(back.valuesById['patch.tune'], -10, 'signed s7 value recovered');
+  eq(back.valuesById['patch.wave'], 'tri', 'enum recovered as id');
+  eq(back.valuesById['patch.level'], 200, 'nibbled value recovered');
+  eq(back.valuesById.patchName, 'A', 'ASCII patch name recovered');
+
+  // checksum tamper is detected
+  const tampered = assembleDump(dump, vals, dev); tampered[6] = (tampered[6] + 1) & 0x7f;
+  eq(parseDump(dump, tampered, dev).checksumStatus, 'bad', 'corrupted payload -> checksum bad');
+
+  // dumpRoundTrip across min/mid/max + enum cycle + sample name  => provenance.verifiedFullDump
+  ok(dumpRoundTrip(dump, dev).ok, 'full round-trip ok (verifiedFullDump = true)');
+
+  // a broken layout (two params share offset 0) must NOT verify
+  const broken = { ...dump, layout: [...dump.layout, { param: 'patch.level', offset: 0, codec: { type: 'nibbles', bytes: 2 } }] };
+  ok(!dumpRoundTrip(broken, dev).ok, 'overlapping layout fails round-trip (verifiedFullDump = false)');
+
+  // byte map for the UI: one field per layout entry, sorted by offset
+  const map = dumpByteMap(dump, dev);
+  eq(map.fields.length, 6, 'byteMap exposes every layout field');
+  ok(map.fields[0].offset === 0 && map.fields[map.fields.length - 1].offset === 7, 'byteMap fields sorted by offset');
+  ok(map.checksum && map.checksum.type === 'sum-7bit', 'byteMap carries the checksum descriptor');
+
+  // Korg 8->7 block-packed payload (the universal Korg case): u8 values > 127 survive because the
+  // high bits ride in the packing MSB byte — and the wire stays legal 7-bit SysEx.
+  const korg = {
+    schemaVersion: 1, id: 'syn.korg', version: '1.0.0', kind: 'model', deviceId: '00',
+    scopes: { patch: { kind: 'global', instances: 1, parameters: [
+      { id: 'a', name: 'A', valueType: 'continuous', range: { min: 0, max: 255 }, encoding: { type: 'u8' } },
+      { id: 'b', name: 'B', valueType: 'continuous', range: { min: 0, max: 255 }, encoding: { type: 'u8' } },
+    ] } },
+  };
+  const korgDump = {
+    id: 'kPatch', kind: 'patch', spans: ['patch'],
+    message: {
+      matcher: { prefix: ['F0', '42', '$deviceId'], suffix: ['F7'] },
+      payload: { offset: 3, size: 2, pack: { type: 'packed8to7', packOrder: 'msb-high-first' } },
+    },
+    layout: [{ param: 'patch.a', offset: 0, codec: { type: 'u8' } }, { param: 'patch.b', offset: 1, codec: { type: 'u8' } }],
+  };
+  const kWire = assembleDump(korgDump, { 'patch.a': 200, 'patch.b': 250 }, korg);
+  ok(kWire.slice(1, -1).every((x) => x <= 0x7f), 'packed payload is legal 7-bit on the wire (no byte > 0x7F)');
+  const kBack = parseDump(korgDump, kWire, korg);
+  ok(kBack.valuesById['patch.a'] === 200 && kBack.valuesById['patch.b'] === 250, 'Korg 8->7 block-packed payload round-trips (values > 127 preserved)');
+  ok(dumpRoundTrip(korgDump, korg).ok, 'Korg block-packed dump full round-trip ok');
+
+  // validator gates the dump model
+  const base = { schemaVersion: 1, id: 'x.y', version: '1.0.0', kind: 'model', scopes: { s: { parameters: [{ id: 'a', valueType: 'continuous' }] } } };
+  ok(validateProfile({ ...base, dumps: [dump] }).ok, 'validator accepts a well-formed dump');
+  ok(!validateProfile({ ...base, dumps: [{ id: 'd', kind: 'patch', layout: [{ param: 'p', offset: 0, codec: { type: 'crc' } }] }] }).ok, 'validator rejects bad layout codec');
+  ok(!validateProfile({ ...base, dumps: [{ id: 'd', kind: 'patch', message: { checksum: { type: 'fletcher' } } }] }).ok, 'validator rejects bad dump checksum');
+  ok(!validateProfile({ ...base, dumps: [{ id: 'd', kind: 'patch', layout: [{ param: 'p' }] }] }).ok, 'validator rejects layout entry missing offset');
+
+  // ── Stage B: emit to the engine's legacy `dumpDefinitions` (get-patch / send-patch) ──
+  const emit = buildDumpDefinitions({ ...dev, dumps: [dump] });
+  const ld = emit.dumpDefinitions[0];
+  eq(JSON.stringify(ld.matcher.prefix), JSON.stringify(['F0', '7D', '$deviceId', '00', '41', '12']), 'emit: $modelId expanded, $deviceId left for the engine');
+  eq(JSON.stringify(ld.payload), JSON.stringify({ offset: 6, size: 8 }), 'emit: payload window');
+  eq(JSON.stringify(ld.checksum), JSON.stringify({ type: 'sum-7bit', fromOffset: 5, toOffset: 13, byteOffset: 14 }), 'emit: checksum span');
+  eq(ld.completion.expectedMessages, 1, 'emit: single-message completion');
+  eq(ld.completion.expectedBytes, 16, 'emit: expectedBytes = exact framed length');
+  const mp = Object.fromEntries(ld.mappings.map((m) => [m.parameter, m]));
+  ok(!mp.cutoff.codec, 'emit: u7 mapping carries no codec (engine default)');
+  eq(mp.pitch.codec?.type, 'u14-msb-lsb', 'emit: u14 -> engine u14-msb-lsb');
+  ok(mp.level.codec?.type === 'nibbled' && mp.level.codec.bytes === 2, 'emit: nibbles -> engine nibbled(bytes:2)');
+  ok(mp.patchName.codec?.type === 'text-ascii' && mp.patchName.codec.length === 1 && mp.patchName.codec.pad === 32, 'emit: text-ascii name mapping');
+  ok(!mp.tune.codec, 'emit: s7 degrades to u7 (engine has no signed dump codec)');
+  ok(emit.notes.some((n) => /s7 -> u7/.test(n)), 'emit: s7 degrade is flagged in notes');
+
+  // emitted into a full legacy profile + Korg pack gap is flagged (not silently dropped)
+  const legacy = buildLegacyProfile({ ...dev, label: 'Syn', dumps: [dump] }, {});
+  ok(Array.isArray(legacy.dumpDefinitions) && legacy.dumpDefinitions.length === 1, 'buildLegacyProfile carries dumpDefinitions');
+  const kEmit = buildDumpDefinitions({ ...korg, dumps: [korgDump] });
+  ok(kEmit.dumpDefinitions[0].engineSupported === false && kEmit.notes.some((n) => /block-packing/.test(n)), 'emit: Korg payload-pack flagged as a C++ engine gap');
 }
 
 // ---------------------------------------------------------------- report

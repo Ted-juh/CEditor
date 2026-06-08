@@ -10,6 +10,8 @@ const ENCODING_TYPES = ['u7', 'u8', 's7', 'nibbles', 'packed8to7', 'bitslice'];
 const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
+// per-offset dump codecs: the value-encoding set plus u14 + the two text (patch-name) codecs.
+const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'u14', 'text-ascii', 'text-nibbled-ascii'];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
 
 export function validateProfile(profile) {
@@ -62,6 +64,20 @@ export function validateProfile(profile) {
   for (const d of profile.dumps ?? []) {
     if (!d.id || !d.kind) E(`dump ${d.id ?? '?'}: needs id + kind`);
     else if (!DUMP_KINDS.includes(d.kind)) E(`dump ${d.id}: bad kind ${d.kind}`);
+    const m = d.message;
+    if (m) {
+      if (m.checksum) {
+        if (!CHECKSUM_TYPES.includes(m.checksum.type)) E(`dump ${d.id}: bad message.checksum.type ${m.checksum.type}`);
+        else if (m.checksum.type !== 'none' && (m.checksum.fromOffset == null || m.checksum.toOffset == null || m.checksum.byteOffset == null))
+          E(`dump ${d.id}: message.checksum needs fromOffset/toOffset/byteOffset`);
+      }
+      if (m.payload?.pack && !ENCODING_TYPES.includes(m.payload.pack.type)) E(`dump ${d.id}: bad payload.pack.type ${m.payload.pack.type}`);
+    }
+    (d.layout ?? []).forEach((e, i) => {
+      if (!e.param || typeof e.param !== 'string') E(`dump ${d.id}: layout[${i}] needs a param ref`);
+      if (!Number.isInteger(e.offset) || e.offset < 0) E(`dump ${d.id}: layout[${i}] needs an integer offset >= 0`);
+      if (e.codec && !DUMP_CODEC_TYPES.includes(e.codec.type)) E(`dump ${d.id}: layout[${i}] bad codec.type ${e.codec.type}`);
+    });
   }
 
   if (profile.provenance && !['official', 'community', 'imported', 'learn'].includes(profile.provenance.source))

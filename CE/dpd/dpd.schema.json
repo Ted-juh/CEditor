@@ -332,6 +332,29 @@
       }
     },
 
+    "dumpLayoutEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["param", "offset"],
+      "description": "One parameter's place in a dump's byte payload. Explicit - a device's dump byte order is NOT derivable from scope addresses.",
+      "properties": {
+        "param": { "type": "string", "description": "Parameter reference: a resolved id (e.g. 'tone1.filter.cutoff') or scope-relative 'scopeId.paramId'." },
+        "offset": { "type": "integer", "minimum": 0, "description": "Byte offset within the (unpacked) payload." },
+        "size": { "type": "integer", "minimum": 1, "description": "Byte count; defaults to the codec's natural size." },
+        "codec": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["type"],
+          "description": "Per-dump codec; defaults to the parameter's own encoding. Superset of $defs.encoding: also u14 (two-byte MSB-first) and text (patch names).",
+          "properties": {
+            "type": { "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice", "u14", "text-ascii", "text-nibbled-ascii"] },
+            "length": { "type": "integer", "minimum": 1, "description": "For text codecs: character count." },
+            "pad": { "type": "integer", "description": "For text codecs: pad byte (default 32 = space)." }
+          }
+        }
+      }
+    },
+
     "dump": {
       "type": "object",
       "additionalProperties": true,
@@ -341,7 +364,56 @@
         "name": { "type": "string" },
         "kind": { "enum": ["patch", "performance", "bank"] },
         "spans": { "type": "array", "items": { "type": "string" }, "description": "Scope ids this dump covers (a performance spans global + all parts)." },
-        "requestShape": { "type": "string", "description": "messageShape id used to request this dump." }
+        "requestShape": { "type": "string", "description": "messageShape id used to request this dump." },
+        "message": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Wire framing + payload + integrity of the dump. Universal across vendors.",
+          "properties": {
+            "matcher": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "prefix": { "type": "array", "items": { "type": "string" }, "description": "Leading bytes that identify the dump (hex or $deviceId/$modelId)." },
+                "suffix": { "type": "array", "items": { "type": "string" }, "description": "Trailing bytes (e.g. F7)." }
+              }
+            },
+            "payload": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "offset": { "type": "integer", "minimum": 0, "description": "Byte index where parameter data begins (after the header)." },
+                "size": { "type": "integer", "minimum": 0, "description": "Unpacked payload byte count." },
+                "pack": { "$ref": "#/$defs/encoding", "description": "Optional block packing of the WHOLE payload before per-offset mapping (e.g. Korg packed8to7)." }
+              }
+            },
+            "checksum": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["type"],
+              "description": "Dump integrity. Offsets are absolute in the framed message.",
+              "properties": {
+                "type": { "enum": ["roland-7bit", "sum-7bit", "xor", "none"] },
+                "fromOffset": { "type": "integer", "minimum": 0 },
+                "toOffset": { "type": "integer", "minimum": 0 },
+                "byteOffset": { "type": "integer", "minimum": 0 }
+              }
+            },
+            "completion": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "messages": { "type": "integer", "minimum": 1, "description": "SysEx messages forming a complete dump (banks)." },
+                "bytes": { "type": "integer", "minimum": 0, "description": "Total bytes across all messages." }
+              }
+            }
+          }
+        },
+        "layout": {
+          "type": "array",
+          "description": "The device's real byte map - each parameter's offset within the payload.",
+          "items": { "$ref": "#/$defs/dumpLayoutEntry" }
+        }
       }
     }
   }

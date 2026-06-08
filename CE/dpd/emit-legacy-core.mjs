@@ -5,10 +5,88 @@
 // derived from the resolved profile — no device is special-cased. Imports only browser-safe siblings.
 import { resolveParams } from './resolve.mjs';
 import { hexToBytes } from './codecs.mjs';
+import { assembleDump } from './dumps.mjs';
 
 const flat = (rid) => rid.replace(/^[^.]+\./, '');
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : undefined);
 const toBytes = (hex) => (hex ? String(hex).trim().split(/\s+/) : []);
+
+// DPD per-offset dump codec -> the C++ engine's legacy dump codec vocabulary
+// (u7 / u14-msb-lsb / nibbled / text-ascii / text-nibbled-ascii / enum). Types the engine's dump
+// decoder does NOT implement (s7 signed, u8, packed8to7, bitslice) degrade to u7 best-effort + a note,
+// mirroring the param-level s7->u7 policy — the DPD's own assemble/parse still handles them faithfully.
+function legacyDumpCodec(codec, note) {
+  switch (codec?.type) {
+    case undefined: case 'u7': return undefined; // default; engine reads the parameter's own type
+    case 'u14': return { type: 'u14-msb-lsb' };
+    case 'nibbles': return { type: 'nibbled', bytes: codec.bytes ?? 2 };
+    case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
+    case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };
+    case 's7': note?.(`s7 -> u7 (engine dump decoder has no signed codec; offset lost on the live C++ path)`); return undefined;
+    case 'u8': note?.(`u8 -> u7 (engine dump codec is 7-bit)`); return undefined;
+    case 'packed8to7': note?.(`packed8to7 per-field unsupported by the engine dump decoder`); return undefined;
+    case 'bitslice': note?.(`bitslice unsupported by the engine dump decoder`); return undefined;
+    default: return undefined;
+  }
+}
+
+// A resolved DPD dump model -> the engine's legacy `dumpDefinitions` entry. UNIVERSAL: matcher framing,
+// payload window, checksum span and per-offset mappings translate directly from the schema's dump.
+// Returns { dumpDefinitions, notes } — notes flag the two cases the C++ engine path can't do yet
+// (payload-level block packing, and any per-field codec it lacks); the Designer still authors + verifies
+// them via dumps.mjs. `$modelId` is expanded to literal bytes (engine resolves $deviceId, not $modelId).
+export function buildDumpDefinitions(resolved) {
+  const all = resolved.dumps ?? [];
+  const notes = [];
+  // Only dumps with real byte framing (a matcher + a layout) become engine dumpDefinitions. A dump
+  // declared with just spans/requestShape is an unmapped placeholder (e.g. the GAIA, whose layout needs
+  // its manual) — emit nothing for it so the legacy file stays clean, and flag it.
+  const dumps = all.filter((d) => d.message?.matcher && (d.layout?.length));
+  for (const d of all) if (!(d.message?.matcher && d.layout?.length))
+    notes.push(`dump ${d.id}: declared without a byte layout (message.matcher + layout) — no engine dumpDefinition emitted; supply its byte map from the device manual/capture`);
+  if (!dumps.length) return { dumpDefinitions: undefined, notes };
+
+  const paramMap = {};
+  for (const p of resolveParams(resolved)) {
+    paramMap[p.resolvedId] = p;
+    const alias = `${p.scope}.${p.paramId}`;
+    if (p.instance === 0 && !(alias in paramMap)) paramMap[alias] = p;
+  }
+  const modelBytes = toBytes(resolved.modelId);
+
+  const dumpDefinitions = dumps.map((d) => {
+    const m = d.message ?? {};
+    const note = (msg) => notes.push(`dump ${d.id}: ${msg}`);
+    const def = {
+      id: d.id, name: d.name ?? d.id, kind: 'sysex',
+      matcher: {
+        prefix: (m.matcher?.prefix ?? []).flatMap((t) => (t === '$modelId' ? modelBytes : [t])),
+        suffix: m.matcher?.suffix ?? ['F7'],
+      },
+      payload: {
+        ...(m.payload?.offset != null ? { offset: m.payload.offset } : {}),
+        ...(m.payload?.size != null ? { size: m.payload.size } : {}),
+      },
+    };
+    if (m.payload?.pack) { def.engineSupported = false; note(`payload block-packing (${m.payload.pack.type}) — C++ engine has no payload-level unpack; live get/send deferred to a C++ follow-up`); }
+    if (m.checksum && m.checksum.type !== 'none') {
+      def.checksum = { type: m.checksum.type, fromOffset: m.checksum.fromOffset, toOffset: m.checksum.toOffset, byteOffset: m.checksum.byteOffset };
+      if (m.checksum.type === 'xor') note(`XOR dump checksum — confirm the C++ engine computes it (flagged)`);
+    }
+    def.completion = {
+      expectedMessages: m.completion?.messages ?? 1,
+      expectedBytes: m.completion?.bytes ?? assembleDump(d, {}, resolved).length,
+    };
+    def.mappings = (d.layout ?? []).map((e) => {
+      const p = paramMap[e.param];
+      const codec = legacyDumpCodec(e.codec, note);
+      return { parameter: p ? flat(p.resolvedId) : e.param, offset: e.offset, ...(codec ? { codec } : {}) };
+    });
+    if (d.requestShape) def.requestRecipe = d.requestShape;
+    return def;
+  });
+  return { dumpDefinitions, notes };
+}
 
 function legacyParam(p) {
   const out = {
@@ -52,7 +130,7 @@ function shapeToRecipe(shape, resolved) {
 // `resolved` must be an inheritance-merged profile (deviceId / messageShapes etc. present) — see
 // resolveProfile (Node) / resolveModel (browser). `legacyId` defaults to `<id>-dpd`. When
 // `embedDpdModel` is given, the new-schema model is stamped in so the Designer can reload the edit.
-export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel } = {}) {
+export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, log } = {}) {
   const params = resolveParams(resolved).filter((p) => p.instance === 0); // tone 1 + global
 
   // Sysex recipes from the manufacturer's message shapes, then one CC recipe per distinct controller.
@@ -102,6 +180,11 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel } =
       timeoutMs: 1000, retries: 0,
     };
   }
+
+  // Bulk dumps -> legacy dumpDefinitions (get-patch / send-patch). Notes flag any C++ engine gaps.
+  const { dumpDefinitions, notes } = buildDumpDefinitions(resolved);
+  if (dumpDefinitions) legacy.dumpDefinitions = dumpDefinitions;
+  if (notes.length && log) for (const n of notes) log('[dump] ' + n);
 
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;

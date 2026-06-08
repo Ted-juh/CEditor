@@ -2,7 +2,16 @@
   // Overview — the resolved view (doc "Layer 1 invisibility"): based-on inheritance card,
   // completeness meter (from provenance), and a settings table tagging each value inherited-vs-yours.
   import { familyLabel as familyLabelOf, byteOrderLabel, checksumLabel, shapeById } from './dpdLabels.js';
+  import { dumpRoundTrip } from '../../generated/dpd/dumps.mjs';
   let { model, merged } = $props();
+
+  // Full-dump verification is EARNED, not declared: a dump counts only if it carries a real byte map
+  // (matcher + layout) AND its assemble→parse round-trip is lossless (dumps.mjs). Falls back to the
+  // provenance flag when the profile declares no mapped dumps.
+  let mappedDumps = $derived((merged?.dumps ?? []).filter((d) => d.message?.matcher && d.layout?.length));
+  let fullDumpOk = $derived(mappedDumps.length > 0
+    ? mappedDumps.every((d) => { try { return dumpRoundTrip(d, merged).ok; } catch { return false; } })
+    : (model?.provenance?.verifiedFullDump === true));
 
   let family = $derived(familyLabelOf(model));
   let showInherited = $state(true);
@@ -22,7 +31,7 @@
     { key: 'rt', done: prov.verifiedRoundTrip === true, label: 'Round-trip verified' },
     { key: 'hw', done: !!prov.verifiedOnHardware, label: prov.verifiedOnHardware ? `Hardware-confirmed ${prov.verifiedOnHardware}` : 'Hardware-confirmed' },
     { key: 'cc', done: (prov.confirmations ?? 0) > 0, label: `Community-confirmed (${prov.confirmations ?? 0})` },
-    { key: 'fd', done: prov.verifiedFullDump === true, label: 'Full dump verified' },
+    { key: 'fd', done: fullDumpOk, label: mappedDumps.length ? `Full dump verified (${mappedDumps.length})` : 'Full dump verified' },
   ]);
   let pct = $derived(checks.length ? Math.round(checks.filter((c) => c.done).length / checks.length * 100) : 0);
 

@@ -2,7 +2,7 @@
 // The community backend needs a server; this is the pure, testable curation core: one canonical
 // profile per id, submissions as proposed changes, round-trip as a hard gate, confirmation vs.
 // fork, partial-accrete, conflict -> new version / variant, versioning + revert + pin, reputation.
-import { resolveParams, encodeValue, decodeValue } from './dpd.mjs';
+import { resolveParams, encodeValue, decodeValue, dumpRoundTrip } from './dpd.mjs';
 
 // ---- structured, id-keyed diff of two model profiles (domain language, not byte noise) ----
 const paramKey = (p) => JSON.stringify({ a: p.address ?? null, t: p.valueType, e: p.enum ?? null, r: p.range ?? null, w: p.wires ?? null, rx: p.rxLive ?? null });
@@ -39,6 +39,16 @@ export function roundTripCheck(profile) {
   return { ok: failures.length === 0, failures };
 }
 
+// ---- dump round-trip: provenance.verifiedFullDump is earned, not declared ----
+// A profile's bulk dumps must each assemble->parse losslessly (dumps.mjs) for the dump to count as
+// verified. `verifiedFullDump` is null when the profile declares no dumps (nothing to verify).
+export function dumpCheck(profile) {
+  const dumps = profile.dumps ?? [];
+  if (!dumps.length) return { hasDumps: false, verifiedFullDump: null, results: [] };
+  const results = dumps.map((d) => { const r = dumpRoundTrip(d, profile); return { id: d.id, ok: r.ok, failures: r.failures }; });
+  return { hasDumps: true, verifiedFullDump: results.every((r) => r.ok), results };
+}
+
 const bump = (v, part = 'minor') => {
   const [maj, min, pat] = v.split('.').map(Number);
   return part === 'major' ? `${maj + 1}.0.0` : part === 'patch' ? `${maj}.${min}.${pat + 1}` : `${maj}.${min + 1}.0`;
@@ -57,11 +67,12 @@ export class Library {
   submit(profile, user, { hardwareVerified = false } = {}) {
     const rt = roundTripCheck(profile);
     if (!rt.ok) return { status: 'rejected', reason: 'round-trip failed', failures: rt.failures };
+    const verifiedFullDump = dumpCheck(profile).verifiedFullDump; // earned from dumps.mjs, null if no dumps
 
     const id = profile.id;
     const e = this.entries.get(id);
     if (!e) {
-      this.entries.set(id, { versions: [{ version: profile.version, profile, contributors: [user], confirmations: 1, hardwareVerified }] });
+      this.entries.set(id, { versions: [{ version: profile.version, profile, contributors: [user], confirmations: 1, hardwareVerified, verifiedFullDump }] });
       this._addRep(user, 1);
       return { status: 'created', id, version: profile.version };
     }
@@ -86,7 +97,7 @@ export class Library {
         (sc.parameters ??= []).push(structuredClone(param));
       }
       const version = bump(cur.version, 'minor');
-      e.versions.push({ version, profile: { ...merged, version }, contributors: [...new Set([...cur.contributors, user])], confirmations: 1, hardwareVerified });
+      e.versions.push({ version, profile: { ...merged, version }, contributors: [...new Set([...cur.contributors, user])], confirmations: 1, hardwareVerified, verifiedFullDump });
       this._addRep(user, 1);
       return { status: 'merged', id, version, addedParams: diff.added };
     }
@@ -95,7 +106,7 @@ export class Library {
     // otherwise held as a proposal against the safe baseline (never a live mutation).
     if (hardwareVerified || this.rep(user) >= 5) {
       const version = bump(cur.version, 'patch');
-      e.versions.push({ version, profile: { ...profile, version }, contributors: [user], confirmations: 1, hardwareVerified });
+      e.versions.push({ version, profile: { ...profile, version }, contributors: [user], confirmations: 1, hardwareVerified, verifiedFullDump });
       this._addRep(user, 2);
       return { status: 'new-version', id, version, resolved: 'corrected', diff };
     }

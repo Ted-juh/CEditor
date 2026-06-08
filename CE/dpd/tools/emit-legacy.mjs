@@ -12,8 +12,10 @@ import { buildLegacyProfile } from '../emit-legacy-core.mjs';
 const id = process.argv[2] ?? 'roland.gaia';
 const resolved = resolveProfile(id);
 // Byte-identical to the previous inline construction; the conversion now lives in the browser-safe
-// core so the in-app Designer can produce the same legacy profile on save.
-const legacy = buildLegacyProfile(resolved, { legacyId: 'roland-gaia-dpd' });
+// core so the in-app Designer can produce the same legacy profile on save. legacyId derives from the
+// id (roland.gaia -> roland-gaia-dpd, unchanged) so the CLI works for any profile, not just the GAIA.
+const legacyId = id.replace(/\./g, '-') + '-dpd';
+const legacy = buildLegacyProfile(resolved, { legacyId, log: (m) => console.log('  ' + m) });
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const out = join(HERE, '..', '..', 'profiles', 'test', 'roland-gaia-dpd.ceditor-device.json');
