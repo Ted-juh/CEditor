@@ -63,7 +63,7 @@ function substituteTokens(tokens, resolved) {
 function naturalSize(codec, param) {
   const t = codec?.type ?? 'u7';
   switch (t) {
-    case 'u14': return 2;
+    case 'u14': case 'u14-lsb': return 2;
     case 'nibbles': return codec.bytes ?? 2;
     case 'bitslice': return Math.max(...codec.slices.map((s) => s.byte)) + 1;
     case 'packed8to7': return pack8to7(new Array(codec.bytes ?? 1).fill(0), codec.packOrder, codec.groupSize ?? 7).length;
@@ -103,7 +103,8 @@ function encodeField(codec, value, param) {
     }
     return out;
   }
-  if (t === 'u14') { const v = value | 0; return [(v >> 7) & 0x7f, v & 0x7f]; }
+  if (t === 'u14') { const v = value | 0; return [(v >> 7) & 0x7f, v & 0x7f]; }       // MSB first
+  if (t === 'u14-lsb') { const v = value | 0; return [v & 0x7f, (v >> 7) & 0x7f]; }   // LSB first
   if (param?.valueType === 'enum') return encodeValue(valueCodec(codec), enumWire(param, value));
   return encodeValue(codec, value | 0);
 }
@@ -121,7 +122,8 @@ function decodeField(codec, bytes, param) {
     for (let i = 0; i + 1 < bytes.length; i += 2) s += String.fromCharCode(((bytes[i] & 0x0f) << 4) | (bytes[i + 1] & 0x0f));
     return s.replace(/[\s\0]+$/, '');
   }
-  if (t === 'u14') return ((bytes[0] & 0x7f) << 7) | (bytes[1] & 0x7f);
+  if (t === 'u14') return ((bytes[0] & 0x7f) << 7) | (bytes[1] & 0x7f);       // MSB first
+  if (t === 'u14-lsb') return ((bytes[1] & 0x7f) << 7) | (bytes[0] & 0x7f);   // LSB first
   if (param?.valueType === 'enum') return enumId(param, decodeValue(valueCodec(codec), bytes));
   return decodeValue(codec, bytes);
 }
@@ -201,7 +203,7 @@ function codecRange(codec, param) {
   const t = codec?.type ?? 'u7';
   if (t === 'u8') hi = 255;
   else if (t === 's7') { const off = codec.signedOffset ?? 64; lo = -off; hi = 127 - off; }
-  else if (t === 'u14') hi = 16383;
+  else if (t === 'u14' || t === 'u14-lsb') hi = 16383;
   else if (t === 'nibbles') hi = (1 << (4 * (codec.bytes ?? 2))) - 1;
   else if (t === 'packed8to7') hi = Math.pow(2, 8 * (codec.bytes ?? 1)) - 1;
   if (param?.range) { lo = Math.max(lo, param.range.min); hi = Math.min(hi, param.range.max); }

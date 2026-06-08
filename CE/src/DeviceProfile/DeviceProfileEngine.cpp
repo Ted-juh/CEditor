@@ -1643,6 +1643,13 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
     }
+    else if (encodingType == "u14-lsb-msb")
+    {
+        // 14-bit, least-significant byte first (byteOrder lsb-first).
+        if (offset + 1 >= bytes.size())
+            return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
+        numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+    }
     else if (encodingType == "nibbled")
     {
         auto nibbles = encoding != nullptr ? propInt (*encoding, "nibbles", 2) : 2;

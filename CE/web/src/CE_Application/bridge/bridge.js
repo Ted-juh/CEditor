@@ -355,6 +355,18 @@ export function setMidiCiProfile(muid, profileId, enabled) {
   window.__JUCE__.backend.emitEvent('setMidiCiProfile', { muid, profileId, enabled: !!enabled });
 }
 
+export function onMidiCiDiscoveryStarted(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiCiDiscoveryStarted', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onMidiCiDiscoveryComplete(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiCiDiscoveryComplete', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onDeviceProfilesListed(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('deviceProfilesListed', callback);

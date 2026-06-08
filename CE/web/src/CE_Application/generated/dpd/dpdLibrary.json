@@ -1,4 +1,349 @@
 {
+  "generic.cc": {
+    "schemaVersion": 1,
+    "id": "generic.cc",
+    "version": "1.0.0",
+    "kind": "model",
+    "label": "Generic MIDI CC",
+    "scopes": {
+      "global": {
+        "kind": "global",
+        "label": "Controllers",
+        "instances": 1,
+        "parameters": [
+          {
+            "id": "modulation",
+            "name": "Modulation",
+            "group": "MIDI CC",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 1
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 1
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "volume",
+            "name": "Volume",
+            "group": "MIDI CC",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 7
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 7
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "pan",
+            "name": "Pan",
+            "group": "MIDI CC",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 10
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 10
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "expression",
+            "name": "Expression",
+            "group": "MIDI CC",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 11
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 11
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "resonance",
+            "name": "Resonance",
+            "group": "Filter",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 71
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 71
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "release",
+            "name": "Release Time",
+            "group": "Envelope",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 72
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 72
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "attack",
+            "name": "Attack Time",
+            "group": "Envelope",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 73
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 73
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "cutoff",
+            "name": "Cutoff (Brightness)",
+            "group": "Filter",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 74
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 74
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "reverb",
+            "name": "Reverb Send",
+            "group": "Effects",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 91
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 91
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          },
+          {
+            "id": "chorus",
+            "name": "Chorus Send",
+            "group": "Effects",
+            "valueType": "continuous",
+            "range": {
+              "min": 0,
+              "max": 127
+            },
+            "encoding": {
+              "type": "u7"
+            },
+            "access": {
+              "read": true,
+              "write": true
+            },
+            "wires": [
+              {
+                "dir": "write",
+                "msg": "cc",
+                "cc": 93
+              },
+              {
+                "dir": "rxLive",
+                "msg": "cc",
+                "cc": 93
+              }
+            ],
+            "ui": {
+              "preferredComponent": "Slider"
+            }
+          }
+        ]
+      }
+    },
+    "provenance": {
+      "source": "official",
+      "verifiedRoundTrip": true,
+      "verifiedOnHardware": null,
+      "confirmations": 0,
+      "contributors": [],
+      "note": "Standard MIDI Control Change assignments (MIDI spec) — universal CC layer, no device SysEx."
+    },
+    "completeness": "partial"
+  },
   "roland.gaia": {
     "schemaVersion": 1,
     "id": "roland.gaia",

@@ -1,0 +1,462 @@
+{
+  "schemaVersion": 1,
+  "profileVersion": "1.0.0",
+  "minCEditorVersion": "0.9.0",
+  "id": "generic-cc-dpd",
+  "name": "Generic MIDI CC (from DPD)",
+  "dpdSource": "generic.cc",
+  "manufacturer": "Generic",
+  "family": "",
+  "status": "experimental",
+  "trust": "local",
+  "variables": {
+    "channel": 1
+  },
+  "timing": {
+    "minDelayBetweenMessagesMs": 20
+  },
+  "parameters": [
+    {
+      "id": "modulation",
+      "name": "Modulation",
+      "group": "MIDI CC",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Modulation"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc1",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "volume",
+      "name": "Volume",
+      "group": "MIDI CC",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Volume"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc7",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "pan",
+      "name": "Pan",
+      "group": "MIDI CC",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Pan"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc10",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "expression",
+      "name": "Expression",
+      "group": "MIDI CC",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Expression"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc11",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "resonance",
+      "name": "Resonance",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Resonance"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc71",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "release",
+      "name": "Release Time",
+      "group": "Envelope",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Release Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc72",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "attack",
+      "name": "Attack Time",
+      "group": "Envelope",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Attack Time"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc73",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "cutoff",
+      "name": "Cutoff (Brightness)",
+      "group": "Filter",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Cutoff (Brightness)"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc74",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "reverb",
+      "name": "Reverb Send",
+      "group": "Effects",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Reverb Send"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc91",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    },
+    {
+      "id": "chorus",
+      "name": "Chorus Send",
+      "group": "Effects",
+      "type": "integer",
+      "default": 0,
+      "range": {
+        "min": 0,
+        "max": 127
+      },
+      "display": {
+        "mode": "number",
+        "shortLabel": "Chorus Send"
+      },
+      "normalization": {
+        "mode": "linear"
+      },
+      "encoding": {
+        "type": "u7"
+      },
+      "access": {
+        "canRead": true,
+        "canWrite": true,
+        "realtimeSafe": true,
+        "source": "singleParameter"
+      },
+      "sendPolicy": {
+        "mode": "continuous",
+        "coalesce": true,
+        "minIntervalMs": 20,
+        "sendFinalOnRelease": true
+      },
+      "messageRecipe": "cc93",
+      "ui": {
+        "preferredComponent": "Slider"
+      }
+    }
+  ],
+  "messageRecipes": [
+    {
+      "id": "cc1",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 1,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc7",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 7,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc10",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 10,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc11",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 11,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc71",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 71,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc72",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 72,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc73",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 73,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc74",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 74,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc91",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 91,
+      "value": "$encodedValue"
+    },
+    {
+      "id": "cc93",
+      "kind": "cc",
+      "channel": "$channel",
+      "controller": 93,
+      "value": "$encodedValue"
+    }
+  ]
+}

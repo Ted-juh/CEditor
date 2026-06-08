@@ -21,6 +21,7 @@ function legacyDumpCodec(codec, note) {
     case 'u8': return { type: 'u8' };
     case 's7': return { type: 's7', signedOffset: codec.signedOffset ?? 64 };
     case 'u14': return { type: 'u14-msb-lsb' };
+    case 'u14-lsb': return { type: 'u14-lsb-msb' };
     case 'nibbles': return { type: 'nibbled', bytes: codec.bytes ?? 2 };
     case 'text-ascii': return { type: 'text-ascii', length: codec.length, pad: codec.pad ?? 32 };
     case 'text-nibbled-ascii': return { type: 'text-nibbled-ascii', length: codec.length, pad: codec.pad ?? 32 };

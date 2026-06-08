@@ -66,6 +66,8 @@ import {
   onBulkDumpSendUpdated,
   onBulkDumpSends,
   onMidiCiDiscovered,
+  onMidiCiDiscoveryStarted,
+  onMidiCiDiscoveryComplete,
   requestMidiCiDiscovery as requestMidiCiDiscoveryBridge,
   setMidiCiProfile as setMidiCiProfileBridge,
 } from '../bridge/bridge.js';
@@ -88,11 +90,14 @@ export const midiDestinations = writable([{ type: 'previewOnly', id: 'previewOnl
 export const midiInputs = writable([{ type: 'none', id: 'none', name: 'No MIDI Input' }]);
 // Profiles drafted live from MIDI-CI discovery: [{ muid, profile, summary }] (MIDI 2.0 plan, phase M1).
 export const discoveredMidiCiProfiles = writable([]);
+// Discovery lifecycle for the UI: { state: 'idle'|'scanning'|'done'|'error', message }.
+export const midiCiStatus = writable({ state: 'idle', message: '' });
 
 // Broadcast a MIDI-CI Discovery on the role's hardware output; results arrive via the midiCiDiscovered
 // bridge event and are converted to draft profiles in discoveredMidiCiProfiles. Needs MIDI-CI hardware.
 export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
   discoveredMidiCiProfiles.set([]);
+  midiCiStatus.set({ state: 'scanning', message: 'Broadcasting MIDI-CI Discovery…' });
   requestMidiCiDiscoveryBridge(deviceRole);
 }
 
@@ -1633,6 +1638,17 @@ export function initDeviceProfileBridge() {
       entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', error: String(err?.message ?? err), profiles: Array.isArray(payload.profiles) ? payload.profiles : [] };
     }
     discoveredMidiCiProfiles.update((list) => [...list.filter((e) => e.muid !== entry.muid), entry]);
+  });
+
+  onMidiCiDiscoveryStarted((payload) => {
+    // The C++ start result: ok -> scanning continues; otherwise surface the reason (e.g. no output).
+    if (payload?.ok === false || payload?.error) {
+      midiCiStatus.set({ state: 'error', message: payload?.error || 'MIDI-CI discovery could not start' });
+    }
+  });
+
+  onMidiCiDiscoveryComplete(() => {
+    midiCiStatus.update((s) => (s.state === 'error' ? s : { state: 'done', message: '' }));
   });
 
   onDeviceProfileSource((payload) => {

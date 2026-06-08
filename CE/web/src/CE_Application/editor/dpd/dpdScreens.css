@@ -64,6 +64,8 @@
   border:1px solid rgba(90,155,240,.2);border-radius:10px;padding:13px 16px;margin-bottom:22px;
   font-size:12.5px;color:var(--txt-dim);line-height:1.55;max-width:760px}
 .dpd-app .note b{color:var(--blue)}
+.dpd-app .note.warn{background:var(--amber-dim);border-color:var(--amber)}
+.dpd-app .note.warn b{color:var(--amber)}
 .dpd-app .layoutbox{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;max-width:880px}
 .dpd-app .layoutbox .lh{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--bg-2)}
 .dpd-app .layoutbox .lh .lt{font-weight:700}

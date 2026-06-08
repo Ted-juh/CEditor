@@ -470,6 +470,26 @@
       "mappings": [
         { "parameter": "lfo.pan", "offset": 0, "codec": { "type": "s7", "signedOffset": 64 } }
       ]
+    },
+    {
+      "id": "u14LsbDump",
+      "name": "14-bit LSB-first Dump",
+      "kind": "sysex",
+      "matcher": {
+        "prefix": ["F0", "7D", "$deviceId", "0B"],
+        "suffix": ["F7"]
+      },
+      "payload": {
+        "offset": 4,
+        "size": 2
+      },
+      "completion": {
+        "expectedMessages": 1,
+        "expectedBytes": 7
+      },
+      "mappings": [
+        { "parameter": "mod.depth", "offset": 0, "codec": { "type": "u14-lsb-msb" } }
+      ]
     }
   ],
   "tests": [

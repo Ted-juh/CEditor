@@ -18,7 +18,7 @@ const legacyId = id.replace(/\./g, '-') + '-dpd';
 const legacy = buildLegacyProfile(resolved, { legacyId, log: (m) => console.log('  ' + m) });
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const out = join(HERE, '..', '..', 'profiles', 'test', 'roland-gaia-dpd.ceditor-device.json');
+const out = join(HERE, '..', '..', 'profiles', 'test', legacyId + '.ceditor-device.json');
 writeFileSync(out, JSON.stringify(legacy, null, 2));
 console.log(`wrote ${out}`);
 console.log(`  ${legacy.parameters.length} params; sample addresses: ` +

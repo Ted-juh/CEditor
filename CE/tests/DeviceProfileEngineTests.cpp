@@ -218,6 +218,18 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
+    // 14-bit LSB-first (byteOrder lsb-first): wire 39 60 -> 12345 (LSB 0x39 first, MSB 0x60 second).
+    auto lsbDump = engine.parseDumpMessage ("F0 7D 10 0B 39 60 F7");
+    auto* lsbValues = lsbDump.values.getDynamicObject();
+    if (! lsbDump.ok
+        || lsbDump.matchStatus != "ok"
+        || lsbValues == nullptr
+        || (int) lsbValues->getProperty ("mod.depth") != 12345)
+    {
+        std::cerr << "[FAIL] dump shape u14-lsb-msb did not decode LSB-first to 12345\n";
+        return 1;
+    }
+
     juce::StringArray onePart;
     onePart.add ("F0 7D 10 06 00 40 F7");
     auto partialCollection = engine.collectDumpMessages (onePart);
@@ -251,7 +263,7 @@ int runDumpShapeAndCodecTests (const juce::File& file)
         return 1;
     }
 
-    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata, name codecs, 8->7 packing, XOR checksum + s7 signed\n";
+    std::cout << "[PASS] test-sysex-synth :: Dump shape metadata, name codecs, 8->7 packing, XOR, s7 + u14 lsb-first\n";
     return 0;
 }
 

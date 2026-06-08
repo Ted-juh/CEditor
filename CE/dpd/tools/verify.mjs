@@ -9,6 +9,7 @@ import {
 } from './dpd.mjs';
 import { validateProfile } from './validate.mjs';
 import { buildLegacyProfile, buildDumpDefinitions } from '../emit-legacy-core.mjs';
+import { midiCiToProfile } from './import-midici.mjs';
 
 let pass = 0, fail = 0;
 const ok = (cond, msg) => { if (cond) { pass++; } else { fail++; console.log('  ✗ FAIL: ' + msg); } };
@@ -362,7 +363,38 @@ section('Universal bulk dumps (assemble / parse / round-trip)');
     message: { matcher: { prefix: ['F0', '7D', '$deviceId', '0A'], suffix: ['F7'] }, payload: { offset: 4, size: 1 } },
     layout: [{ param: 'patch.pan', offset: 0, codec: { type: 's7' } }] };
   eq(bytesToHex(assembleDump(s7Dump, { 'patch.pan': -10 }, eng)), 'F0 7D 10 0A 36 F7', 'parity: signed s7 dump assembles to the exact byte the C++ engine decodes (-10 -> 0x36)');
-  ok(dumpRoundTrip(packedDump, eng).ok && dumpRoundTrip(xorDump, eng).ok && dumpRoundTrip(s7Dump, eng).ok, 'parity: packed + XOR + s7 engine-parity dumps self-round-trip');
+  const u14lsbDump = { id: 'u14lsbDump', kind: 'patch', spans: ['patch'],
+    message: { matcher: { prefix: ['F0', '7D', '$deviceId', '0B'], suffix: ['F7'] }, payload: { offset: 4, size: 2 } },
+    layout: [{ param: 'patch.depth', offset: 0, codec: { type: 'u14-lsb' } }] };
+  eq(bytesToHex(assembleDump(u14lsbDump, { 'patch.depth': 12345 }, eng)), 'F0 7D 10 0B 39 60 F7', 'parity: u14 lsb-first dump assembles LSB-first (12345 -> 39 60, vs MSB 60 39)');
+  ok(buildDumpDefinitions({ ...eng, dumps: [u14lsbDump] }).dumpDefinitions[0].mappings[0].codec?.type === 'u14-lsb-msb', 'emit: u14-lsb -> engine u14-lsb-msb');
+  ok(dumpRoundTrip(packedDump, eng).ok && dumpRoundTrip(xorDump, eng).ok && dumpRoundTrip(s7Dump, eng).ok && dumpRoundTrip(u14lsbDump, eng).ok, 'parity: packed + XOR + s7 + u14-lsb engine-parity dumps self-round-trip');
+}
+
+// ---------------------------------------------------------------- MIDI-CI import -> engine (H1)
+// A profile discovered over MIDI-CI must survive the Designer's Save path: resolveModel ->
+// buildLegacyProfile. Proves the "Open in Designer -> Save" backend for a CC-only imported device.
+section('MIDI-CI import -> legacy emit (discovery Save path)');
+{
+  const { profile } = midiCiToProfile({
+    name: 'CI Synth',
+    deviceInfo: { manufacturerId: [0, 33, 9], family: [2, 1], model: [0, 0], version: [1, 0, 0, 0] },
+    channelControllers: [
+      { title: 'Volume', ctrlType: 'cc', ctrlIndex: [7] },
+      { title: 'Filter Cutoff', ctrlType: 'cc', ctrlIndex: [74] },
+    ],
+    programList: [{ title: 'Init', bankPC: [0, 0, 0] }],
+  });
+  validate(profile, 'imported MIDI-CI profile');
+  let legacy;
+  try { legacy = buildLegacyProfile(resolveModel(profile, {}), { legacyId: profile.id, embedDpdModel: profile }); }
+  catch (e) { legacy = null; ok(false, 'imported profile emits to legacy without throwing :: ' + e.message); }
+  if (legacy) {
+    ok(legacy.parameters.length === 2, 'legacy carries the 2 imported CC params');
+    ok(legacy.messageRecipes.some((r) => r.id === 'cc74' && r.controller === 74), 'legacy has a cc74 recipe (Filter Cutoff)');
+    ok(legacy.parameters.find((p) => p.id === 'filter-cutoff')?.messageRecipe === 'cc74', 'cutoff param -> cc74 recipe');
+    ok(legacy.dpdModel?.scopes != null, 'embedded dpdModel round-trips (designer can reload the import)');
+  }
 }
 
 // ---------------------------------------------------------------- report

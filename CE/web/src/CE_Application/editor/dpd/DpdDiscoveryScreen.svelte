@@ -3,21 +3,16 @@
   // mapped output; the C++ session runs Property Exchange and the bundled importer drafts a partial
   // profile from what the device reports (controllers, presets, identity). Picking one seeds the
   // Designer's model. The SysEx/dump layer is added afterwards from the manual or a capture.
-  import { discoveredMidiCiProfiles, requestMidiCiDiscovery, setMidiCiProfile } from '../../stores/deviceProfiles.js';
+  import { discoveredMidiCiProfiles, midiCiStatus, requestMidiCiDiscovery, setMidiCiProfile } from '../../stores/deviceProfiles.js';
   import { isJuceAvailable } from '../../bridge/bridge.js';
 
   let { onPick } = $props();
-  let scanning = $state(false);
-  let scanned = $state(false);
-  let timer = null;
+  // Discovery lifecycle is owned by the service (midiCiStatus): scanning / done / error.
+  let scanning = $derived($midiCiStatus.state === 'scanning');
+  let errored = $derived($midiCiStatus.state === 'error');
+  let scanned = $derived($midiCiStatus.state === 'done' || errored);
 
-  function scan() {
-    scanning = true;
-    scanned = true;
-    requestMidiCiDiscovery('mainSynth');
-    clearTimeout(timer);
-    timer = setTimeout(() => { scanning = false; }, 7000); // matches the C++ 6s discovery window + slack
-  }
+  function scan() { requestMidiCiDiscovery('mainSynth'); }
 
   const ctrlCount = (e) => e?.profile?.scopes?.global?.parameters?.length ?? 0;
   const presetCount = (e) => e?.profile?.imported?.presets?.length ?? 0;
@@ -38,6 +33,10 @@
   </button>
   {#if !isJuceAvailable()}<span class="lm">Discovery runs inside the app (the native bridge is required).</span>{/if}
 </div>
+
+{#if errored}
+  <div class="note warn"><span>!</span><div><b>Discovery couldn’t start:</b> {$midiCiStatus.message}. Map a hardware MIDI <b>output</b> (and input) for this device under its role, then scan again.</div></div>
+{/if}
 
 {#if $discoveredMidiCiProfiles.length}
   <div class="dumpgrid">
@@ -70,6 +69,8 @@
   </div>
 {:else if scanning}
   <div class="placeholder">Listening for MIDI-CI replies…</div>
+{:else if errored}
+  <div class="placeholder">Discovery didn’t start — see the note above.</div>
 {:else if scanned}
   <div class="placeholder">No MIDI-CI devices responded. Check the MIDI output/input mapping and that the device has MIDI-CI enabled.</div>
 {:else}

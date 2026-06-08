@@ -11,7 +11,7 @@ const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
 // per-offset dump codecs: the value-encoding set plus u14 + the two text (patch-name) codecs.
-const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'u14', 'text-ascii', 'text-nibbled-ascii'];
+const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'u14', 'u14-lsb', 'text-ascii', 'text-nibbled-ascii'];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
 
 export function validateProfile(profile) {
