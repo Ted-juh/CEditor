@@ -32,6 +32,13 @@
     openStandaloneDeviceProfileTab(profile);
   }
 
+  // Open a fresh device-profile draft; with no model yet, the Designer shows its Detect screen for
+  // MIDI-CI discovery (scan -> pick a device -> its drafted profile seeds the editor).
+  function discoverDeviceProfile() {
+    const profile = createDeviceProfileDraft({ name: 'MIDI-CI Device' });
+    openStandaloneDeviceProfileTab(profile);
+  }
+
   function newScriptWorkspace() {
     const document = createScriptWorkspaceDocument();
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
@@ -60,6 +67,7 @@
       { label: 'New Device Profile', action: () => newDeviceProfile() },
       { label: 'Open Device Profile', action: () => openDeviceProfile() },
       { label: 'Import Device Profile...', action: () => importDeviceProfile() },
+      { label: 'Discover Device (MIDI-CI)...', action: () => discoverDeviceProfile() },
       { type: 'separator' },
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },

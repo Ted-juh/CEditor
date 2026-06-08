@@ -10,6 +10,7 @@
   import DpdMessageShapesScreen from './dpd/DpdMessageShapesScreen.svelte';
   import DpdBulkDumpsScreen from './dpd/DpdBulkDumpsScreen.svelte';
   import DpdAdvancedScreen from './dpd/DpdAdvancedScreen.svelte';
+  import DpdDiscoveryScreen from './dpd/DpdDiscoveryScreen.svelte';
   import dpdLibrary from '../generated/dpd/dpdLibrary.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
   import { resolveParams, resolveModel } from '../generated/dpd/resolve.mjs';
@@ -123,7 +124,15 @@
     ] },
   ]);
 
-  const realScreens = new Set(['params', 'overview', 'device', 'messages', 'dumps', 'advanced']);
+  const realScreens = new Set(['detect', 'params', 'overview', 'device', 'messages', 'dumps', 'advanced']);
+
+  // Adopt a model discovered via MIDI-CI (or any source) into the editable working copy.
+  function adoptModel(m) {
+    if (!m) return;
+    model = m;
+    appliedSavedFor = profileId; // don't let the saved-source effect clobber the adopted model
+    activeScreen = 'params';
+  }
 </script>
 
 <div class="dpd-app">
@@ -165,12 +174,13 @@
     <div class="stage">
       {#if !model}
         <div class="screen active">
-          <div class="shead"><h1>{profileId || 'Device Profile'}</h1></div>
-          <p class="sub">This profile has no new-DPD source yet.</p>
-          <div class="placeholder">No new-DPD model is bundled for <b>{profileId || 'this profile'}</b>.<br/>The new Designer edits the new schema; legacy-only profiles will be handled in a later stage.</div>
+          <DpdDiscoveryScreen onPick={adoptModel} />
         </div>
       {:else}
         <!-- Real screens — always mounted; visibility via .active per project tab convention -->
+        <div class={['screen', activeScreen === 'detect' && 'active']}>
+          <DpdDiscoveryScreen onPick={adoptModel} />
+        </div>
         <div class={['screen', activeScreen === 'params' && 'active']}>
           <DpdParametersScreen {model} {resolved} {validation} />
         </div>
