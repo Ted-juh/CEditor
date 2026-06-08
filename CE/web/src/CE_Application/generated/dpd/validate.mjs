@@ -6,12 +6,12 @@ const VALUE_TYPES = ['continuous', 'signed', 'enum', 'toggle', 'trigger'];
 const WIRE_DIRS = ['write', 'read', 'rxLive'];
 const WIRE_MSGS = ['dt1', 'rq1', 'cc', 'nrpn', 'raw'];
 const CHECKSUM_TYPES = ['roland-7bit', 'sum-7bit', 'xor', 'none'];
-const ENCODING_TYPES = ['u7', 'u8', 's7', 'nibbles', 'packed8to7', 'bitslice'];
+const ENCODING_TYPES = ['u7', 'u8', 's7', 'u14', 'u14-lsb', 'nibbles', 'packed8to7', 'bitslice'];
 const SHAPE_KINDS = ['sysex', 'cc', 'nrpn', 'raw'];
 const SCOPE_KINDS = ['global', 'tone', 'part', 'effect', 'drumMap', 'patch'];
 const DUMP_KINDS = ['patch', 'performance', 'bank'];
-// per-offset dump codecs: the value-encoding set plus u14 + the two text (patch-name) codecs.
-const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'u14', 'u14-lsb', 'text-ascii', 'text-nibbled-ascii'];
+// per-offset dump codecs: the value-encoding set plus the two text (patch-name) codecs.
+const DUMP_CODEC_TYPES = [...ENCODING_TYPES, 'text-ascii', 'text-nibbled-ascii'];
 const ADDRESS_RE = /^([0-9A-Fa-f]{2})(\s[0-9A-Fa-f]{2})*$/;
 
 export function validateProfile(profile) {

@@ -105,7 +105,15 @@ function legacyParam(p) {
   if (p.absAddress) out.address = p.absAddress;
   out.display = { mode: p.valueType === 'enum' ? 'choice' : 'number', shortLabel: p.name };
   out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
-  out.encoding = { type: p.valueType === 'enum' ? 'enum' : (p.encoding?.type === 's7' ? 'u7' : (p.encoding?.type ?? 'u7')) };
+  // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
+  // engine's send path has no signed encoder; profiles use raw wire ranges instead); u14 maps to the
+  // engine's canonical 'u14-msb-lsb' (and u14-lsb to 'u14-lsb-msb'), which it both sends and decodes.
+  const encType = p.valueType === 'enum' ? 'enum'
+    : p.encoding?.type === 's7' ? 'u7'
+    : p.encoding?.type === 'u14' ? 'u14-msb-lsb'
+    : p.encoding?.type === 'u14-lsb' ? 'u14-lsb-msb'
+    : (p.encoding?.type ?? 'u7');
+  out.encoding = { type: encType };
   out.access = { canRead: p.access?.read !== false, canWrite: p.access?.write !== false, realtimeSafe: true, source: 'singleParameter' };
   out.sendPolicy = { mode: p.valueType === 'enum' ? 'onCommit' : 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true };
   // sysex write wires reference the shape recipe by id (dt1); cc write wires reference a per-controller recipe.

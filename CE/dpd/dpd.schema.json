@@ -276,8 +276,8 @@
       "description": "How a logical value maps to/from wire bytes. The same primitive expresses simple u7 through Korg 8->7 block packing; round-trip (encode then decode) must be identity across the full range.",
       "properties": {
         "type": {
-          "enum": ["u7", "u8", "s7", "nibbles", "packed8to7", "bitslice"],
-          "description": "u7=1 byte 0-127. s7=signed centered. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices."
+          "enum": ["u7", "u8", "s7", "u14", "u14-lsb", "nibbles", "packed8to7", "bitslice"],
+          "description": "u7=1 byte 0-127. u8=1 byte 0-255. s7=signed centered. u14=14-bit value over two 7-bit bytes, MSB first (Yamaha/Roland 2-byte fields); u14-lsb=LSB first. nibbles=value split across N nibble bytes (high nibble first). packed8to7=Korg block packing. bitslice=value assembled from declared bit-slices."
         },
         "bytes": { "type": "integer", "minimum": 1, "description": "Wire byte count for nibbles/u8." },
         "signedOffset": { "type": "integer", "description": "For s7: wire = value + signedOffset (e.g. 64)." },

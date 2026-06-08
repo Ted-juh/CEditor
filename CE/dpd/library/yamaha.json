@@ -5,5 +5,19 @@
   "kind": "manufacturer",
   "label": "Yamaha",
   "manufacturerId": "43",
-  "byteOrder": "msb-first"
+  "deviceId": "10",
+  "byteOrder": "msb-first",
+  "identity": {
+    "manufacturerId": "43"
+  },
+  "provenance": {
+    "source": "official",
+    "verifiedRoundTrip": true,
+    "verifiedFullDump": null,
+    "verifiedOnHardware": null,
+    "confirmations": 0,
+    "contributors": [],
+    "importedFrom": null
+  },
+  "completeness": "structural-only"
 }

@@ -42,6 +42,11 @@ export function encodeValue(encoding, value) {
   const t = encoding?.type ?? 'u7';
   if (t === 'u7') return [value & 0x7f];
   if (t === 'u8') return [value & 0xff];
+  // u14 = a 14-bit value across two 7-bit bytes. Yamaha/MIDI's common 2-byte field. byteOrder picks
+  // which byte leads: u14 = MSB first (Yamaha/Roland default), u14-lsb = LSB first. Mirrors the dump
+  // field codec in dumps.mjs so a 2-byte parameter packs identically whether sent live or in a dump.
+  if (t === 'u14') return [(value >> 7) & 0x7f, value & 0x7f];
+  if (t === 'u14-lsb') return [value & 0x7f, (value >> 7) & 0x7f];
   if (t === 's7') return [(value + (encoding.signedOffset ?? 64)) & 0x7f];
   if (t === 'nibbles') {
     const n = encoding.bytes ?? 2; const out = [];
@@ -60,6 +65,8 @@ export function encodeValue(encoding, value) {
 export function decodeValue(encoding, bytes) {
   const t = encoding?.type ?? 'u7';
   if (t === 'u7' || t === 'u8') return bytes[0];
+  if (t === 'u14') return ((bytes[0] & 0x7f) << 7) | (bytes[1] & 0x7f);
+  if (t === 'u14-lsb') return ((bytes[1] & 0x7f) << 7) | (bytes[0] & 0x7f);
   if (t === 's7') return (bytes[0] & 0x7f) - (encoding.signedOffset ?? 64);
   if (t === 'nibbles') {
     const n = encoding.bytes ?? 2; let v = 0;
