@@ -44,6 +44,7 @@ target_sources(CEditor PRIVATE
     "${CE_ROOT}/src/Main.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     "${CE_ROOT}/src/WebViewHost.cpp"
     "${CE_ROOT}/src/ValueTreeBridge.cpp"
@@ -70,6 +71,7 @@ target_link_libraries(CEditor PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_devices
+    juce::juce_midi_ci
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics
@@ -91,6 +93,7 @@ target_sources(CEditorPlayer PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
 
@@ -112,6 +115,7 @@ target_link_libraries(CEditorPlayer PRIVATE
     juce::juce_core
     juce::juce_audio_basics
     juce::juce_audio_devices
+    juce::juce_midi_ci
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics
@@ -147,6 +151,7 @@ target_sources(CEditorPlayerVST PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
 
@@ -171,6 +176,7 @@ target_link_libraries(CEditorPlayerVST PRIVATE
     juce::juce_audio_utils
     juce::juce_audio_devices
     juce::juce_core
+    juce::juce_midi_ci
     juce::juce_data_structures
     juce::juce_events
     juce::juce_graphics

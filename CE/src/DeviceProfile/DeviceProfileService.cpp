@@ -2651,11 +2651,114 @@ void DeviceProfileService::processBulkSendJobs()
     }
 }
 
+juce::var DeviceProfileService::startMidiCiDiscovery (const juce::var& payload)
+{
+    auto* obj = payload.getDynamicObject();
+    const auto deviceRole = varToStringOr (obj != nullptr ? obj->getProperty ("deviceRole") : juce::var {}, "mainSynth");
+
+    const auto destination = resolveDestination (deviceRole);
+    if (destination.type != "hardwareOutput" || destination.id.isEmpty())
+        return errorResponse ({}, "MIDI-CI discovery needs a hardware MIDI output mapped for " + deviceRole);
+
+    // (Re)create the session bound to this role's output. onDeviceInfo (fired once PE capabilities are
+    // known) kicks off the controller-map + preset fetches that the library does not auto-request.
+    midiCiReported.clear();
+    midiCiRole = deviceRole;
+    midiCiSession = std::make_unique<MidiCiSession> (
+        [this, deviceRole] (const juce::MidiMessage& m) { sendRawMidiToRole (deviceRole, m); },
+        [this] (uint32_t muid, const juce::var&, const juce::var&)
+        {
+            if (midiCiSession != nullptr)
+            {
+                midiCiSession->fetchProperty (muid, "AllCtrlList");
+                midiCiSession->fetchProperty (muid, "ProgramList");
+            }
+        });
+
+    syncMidiInputForRole (deviceRole); // make sure we are listening for the replies
+    midiCiActive = true;
+    midiCiDeadlineMs = nowMs() + 6000.0; // discovery + property-exchange window
+    midiCiSession->startDiscovery();
+    midiCiSession->pump();
+    startTimerHz (60);
+
+    appendMonitorEvent ("out", deviceRole, "sysex", "MIDI-CI discovery", {}, "Broadcast Discovery");
+
+    auto* result = new juce::DynamicObject();
+    result->setProperty ("ok", true);
+    result->setProperty ("deviceRole", deviceRole);
+    result->setProperty ("muid", (juce::int64) midiCiSession->getMuid());
+    result->setProperty ("status", "discovering");
+    return juce::var (result);
+}
+
+void DeviceProfileService::sendRawMidiToRole (const juce::String& deviceRole, const juce::MidiMessage& message)
+{
+    const auto destination = resolveDestination (deviceRole);
+    if (destination.type != "hardwareOutput" || destination.id.isEmpty())
+        return;
+
+    auto& output = midiOutputs[destination.id];
+    if (output == nullptr)
+        output = juce::MidiOutput::openDevice (destination.id);
+    if (output != nullptr)
+        output->sendMessageNow (message);
+}
+
+void DeviceProfileService::pollMidiCiDiscovery()
+{
+    if (! midiCiActive || midiCiSession == nullptr)
+        return;
+
+    midiCiSession->pump();
+    const bool deadline = nowMs() >= midiCiDeadlineMs;
+
+    for (const auto muid : midiCiSession->getDiscoveredMuids())
+    {
+        if (midiCiReported.count (muid) != 0)
+            continue;
+
+        const auto deviceInfo = midiCiSession->getDeviceInfo (muid);
+        const auto allCtrlList = midiCiSession->getFetchedProperty (muid, "AllCtrlList");
+
+        // Emit as soon as a device is fully described (DeviceInfo + controller map). At the deadline,
+        // emit anything that at least has DeviceInfo so partial devices still surface.
+        const bool complete = deviceInfo != juce::var {} && allCtrlList != juce::var {};
+        const bool partialAtDeadline = deadline && deviceInfo != juce::var {};
+        if (! complete && ! partialAtDeadline)
+            continue;
+
+        midiCiReported.insert (muid);
+
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("ok", true);
+        o->setProperty ("deviceRole", midiCiRole);
+        o->setProperty ("muid", (juce::int64) muid);
+        o->setProperty ("deviceInfo", deviceInfo);
+        o->setProperty ("channelList", midiCiSession->getChannelList (muid));
+        o->setProperty ("allCtrlList", allCtrlList);
+        o->setProperty ("programList", midiCiSession->getFetchedProperty (muid, "ProgramList"));
+        emitDeviceEvent ("midiCiDiscovered", juce::var (o));
+        appendMonitorEvent ("sync", midiCiRole, "sysex", "MIDI-CI device discovered", {}, "DeviceInfo received");
+    }
+
+    if (deadline)
+    {
+        midiCiActive = false;
+        auto* done = new juce::DynamicObject();
+        done->setProperty ("ok", true);
+        done->setProperty ("deviceRole", midiCiRole);
+        done->setProperty ("discovered", (int) midiCiReported.size());
+        emitDeviceEvent ("midiCiDiscoveryComplete", juce::var (done));
+    }
+}
+
 void DeviceProfileService::timerCallback()
 {
     processSysexAssemblyTimeouts();
     processPendingRequestTimeouts();
     processBulkSendJobs();
+    pollMidiCiDiscovery();
 
     auto now = nowMs();
     for (auto it = queuedTransactions.begin(); it != queuedTransactions.end();)
@@ -2684,7 +2787,7 @@ void DeviceProfileService::timerCallback()
                             sent ? status + " from queue" : "Not sent from queue: " + error);
     }
 
-    if (queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs())
+    if (queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive)
         stopTimer();
 }
 
@@ -2822,6 +2925,22 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
 
     if (messageType == "sysex")
     {
+        // Feed MIDI-CI replies (Universal SysEx) to the discovery session. Additive: the session ignores
+        // non-CI SysEx and CI replies don't match the dump/identity logic below.
+        if (midiCiActive && midiCiSession != nullptr && role == midiCiRole)
+        {
+            juce::Array<int> ciBytes;
+            juce::String ciError;
+            if (parseRawMidiHex (hex, ciBytes, ciError) && ! ciBytes.isEmpty())
+            {
+                std::vector<unsigned char> raw;
+                raw.reserve (static_cast<size_t> (ciBytes.size()));
+                for (auto b : ciBytes)
+                    raw.push_back (static_cast<unsigned char> (juce::jlimit (0, 255, b)));
+                midiCiSession->handleIncomingSysex (juce::MidiMessage (raw.data(), static_cast<int> (raw.size())));
+            }
+        }
+
         emitDeviceEvent ("sysexInputMessage", cloneVar (incomingVar));
 
         if (updateBulkSendJobsForProtocolReply (role, hex))

@@ -339,6 +339,17 @@ export function getDeviceDiagnostics() {
   window.__JUCE__.backend.emitEvent('getDeviceDiagnostics', {});
 }
 
+export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('requestMidiCiDiscovery', { deviceRole });
+}
+
+export function onMidiCiDiscovered(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('midiCiDiscovered', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onDeviceProfilesListed(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('deviceProfilesListed', callback);

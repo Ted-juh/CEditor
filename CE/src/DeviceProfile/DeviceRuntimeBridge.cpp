@@ -148,6 +148,12 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
             e ("midiMonitorEvents", s.getMonitorEvents());
             e ("deviceSessionState", s.getSessionState());
         }))
+        .withEventListener ("requestMidiCiDiscovery", on ([] (S& s, E e, const juce::var& p)
+        {
+            e ("midiCiDiscoveryStarted", s.startMidiCiDiscovery (p));
+            e ("midiMonitorEvents", s.getMonitorEvents());
+            e ("deviceSessionState", s.getSessionState());
+        }))
         .withEventListener ("runDeviceProfileTests", on ([] (S& s, E e, const juce::var& p)
         {
             e ("deviceProfileTestsFinished", s.runProfileTests (p));

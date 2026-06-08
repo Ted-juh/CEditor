@@ -1,13 +1,16 @@
 #pragma once
 
 #include "DeviceProfileEngine.h"
+#include "MidiCiSession.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
+#include <cstdint>
 #include <deque>
 #include <functional>
 #include <map>
 #include <memory>
+#include <set>
 #include <vector>
 
 namespace ceditor::device
@@ -46,6 +49,7 @@ public:
     juce::var compileParameterMessage (const juce::var& payload, bool updateState);
     juce::var compileRawMidiAction (const juce::var& payload, bool appendToMonitor);
     juce::var ingestIncomingMidiMessage (const juce::var& payload);
+    juce::var startMidiCiDiscovery (const juce::var& payload);
     juce::var parseDumpMessage (const juce::var& payload, bool updateState);
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
@@ -221,6 +225,14 @@ private:
     EventCallback eventCallback;
     mutable juce::CriticalSection midiInputLock;
 
+    // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). The session is driven entirely on the message
+    // thread: pumped from timerCallback, fed incoming SysEx from processIncomingMidiMessage.
+    std::unique_ptr<MidiCiSession> midiCiSession;
+    juce::String midiCiRole;
+    double midiCiDeadlineMs = 0.0;
+    bool midiCiActive = false;
+    std::set<uint32_t> midiCiReported; // muids already emitted as midiCiDiscovered
+
     void loadInternalTestProfiles();
     bool loadProfileFile (const juce::File& file, juce::String& error);
     DeviceProfileEngine* resolveEngine (const juce::String& profileId, const juce::String& deviceRole);
@@ -285,6 +297,8 @@ private:
                                      const juce::String& messageType,
                                      double timestampSeconds);
     void emitDeviceEvent (const juce::String& eventName, const juce::var& payload);
+    void sendRawMidiToRole (const juce::String& deviceRole, const juce::MidiMessage& message);
+    void pollMidiCiDiscovery();
 
     static juce::var transactionToVar (const MidiTransaction& transaction);
     static juce::var midiDestinationToVar (const MidiDestination& destination);

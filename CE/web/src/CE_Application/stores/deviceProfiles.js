@@ -65,7 +65,10 @@ import {
   onBulkDumpSendStarted,
   onBulkDumpSendUpdated,
   onBulkDumpSends,
+  onMidiCiDiscovered,
+  requestMidiCiDiscovery as requestMidiCiDiscoveryBridge,
 } from '../bridge/bridge.js';
+import { midiCiPropertiesToProfile } from '../generated/dpd/import-midici.mjs';
 import {
   queueDeviceParameterPanelPreviewSync,
   syncDeviceRuntimeStateToPanelPreview,
@@ -82,6 +85,15 @@ import {
 export const deviceProfiles = writable([]);
 export const midiDestinations = writable([{ type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' }]);
 export const midiInputs = writable([{ type: 'none', id: 'none', name: 'No MIDI Input' }]);
+// Profiles drafted live from MIDI-CI discovery: [{ muid, profile, summary }] (MIDI 2.0 plan, phase M1).
+export const discoveredMidiCiProfiles = writable([]);
+
+// Broadcast a MIDI-CI Discovery on the role's hardware output; results arrive via the midiCiDiscovered
+// bridge event and are converted to draft profiles in discoveredMidiCiProfiles. Needs MIDI-CI hardware.
+export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
+  discoveredMidiCiProfiles.set([]);
+  requestMidiCiDiscoveryBridge(deviceRole);
+}
 export const selectedDeviceProfileId = writable('test-cc-synth');
 export const selectedMidiDestinationId = writable('previewOnly');
 export const selectedMidiInputId = writable('none');
@@ -1595,6 +1607,25 @@ export function initDeviceProfileBridge() {
 
   onDeviceProfileImported((payload) => {
     latestProfileImport.set(payload);
+  });
+
+  onMidiCiDiscovered((payload) => {
+    // C++ surfaced a discovered device's raw Property Exchange resources; turn them into a draft
+    // (partial) DPD profile via the bundled importer and collect it for the UI to open.
+    if (!payload || payload.deviceInfo == null) return;
+    let entry;
+    try {
+      const { profile, summary } = midiCiPropertiesToProfile({
+        deviceInfo: payload.deviceInfo,
+        allCtrlList: payload.allCtrlList,
+        channelList: payload.channelList,
+        programList: payload.programList,
+      });
+      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', profile, summary };
+    } catch (err) {
+      entry = { muid: payload.muid ?? null, deviceRole: payload.deviceRole ?? 'mainSynth', error: String(err?.message ?? err) };
+    }
+    discoveredMidiCiProfiles.update((list) => [...list.filter((e) => e.muid !== entry.muid), entry]);
   });
 
   onDeviceProfileSource((payload) => {
