@@ -6,17 +6,19 @@ import { resolveParams, encodeValue, decodeValue } from './dpd.mjs';
 
 // ---- structured, id-keyed diff of two model profiles (domain language, not byte noise) ----
 const paramKey = (p) => JSON.stringify({ a: p.address ?? null, t: p.valueType, e: p.enum ?? null, r: p.range ?? null, w: p.wires ?? null, rx: p.rxLive ?? null });
+// scope-aware: keyed by `scope::id` so per-part duplicate ids (e.g. each part's own cutoff) don't
+// collapse, and a contribution accretes into the correct scope.
 function paramsOf(profile) {
   const out = {};
-  for (const sc of Object.values(profile.scopes ?? {})) for (const p of sc.parameters ?? []) out[p.id] = p;
+  for (const [sk, sc] of Object.entries(profile.scopes ?? {})) for (const p of sc.parameters ?? []) out[`${sk}::${p.id}`] = { scope: sk, param: p };
   return out;
 }
 export function structuredDiff(base, next) {
   const a = paramsOf(base), b = paramsOf(next);
   const added = [], removed = [], changed = [];
-  for (const id of Object.keys(b)) if (!(id in a)) added.push(id);
-  for (const id of Object.keys(a)) if (!(id in b)) removed.push(id);
-  for (const id of Object.keys(a)) if (id in b && paramKey(a[id]) !== paramKey(b[id])) changed.push(id);
+  for (const k of Object.keys(b)) if (!(k in a)) added.push(k);
+  for (const k of Object.keys(a)) if (!(k in b)) removed.push(k);
+  for (const k of Object.keys(a)) if (k in b && paramKey(a[k].param) !== paramKey(b[k].param)) changed.push(k);
   return { added, removed, changed, identical: !added.length && !removed.length && !changed.length };
 }
 
@@ -78,8 +80,11 @@ export class Library {
     if (diff.added.length && !diff.changed.length && !diff.removed.length) { // partial accrete -> new version
       const merged = structuredClone(cur.profile);
       const incoming = paramsOf(profile);
-      const scope = Object.values(merged.scopes)[0]; // simplistic: append to first scope
-      for (const aid of diff.added) scope.parameters.push(structuredClone(incoming[aid]));
+      for (const key of diff.added) { // each added param accretes into ITS OWN scope (not the first)
+        const { scope, param } = incoming[key];
+        const sc = (merged.scopes ??= {})[scope] ?? (merged.scopes[scope] = { parameters: [] });
+        (sc.parameters ??= []).push(structuredClone(param));
+      }
       const version = bump(cur.version, 'minor');
       e.versions.push({ version, profile: { ...merged, version }, contributors: [...new Set([...cur.contributors, user])], confirmations: 1, hardwareVerified });
       this._addRep(user, 1);
