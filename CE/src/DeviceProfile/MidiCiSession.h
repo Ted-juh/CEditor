@@ -55,9 +55,18 @@ public:
     std::vector<uint32_t> getDiscoveredMuids() const;
 
     // The DeviceInfo / ChannelList of a discovered device as JSON (null var until Property Exchange
-    // has fetched them — poll after discovery). These are what gets handed to import-midici.mjs.
+    // has fetched them — poll after discovery). These are auto-fetched by the library.
     juce::var getDeviceInfo (uint32_t muid) const;
     juce::var getChannelList (uint32_t muid) const;
+
+    // The device's ResourceList (which PE resources it offers), available after PE capabilities.
+    juce::var getResourceList (uint32_t muid) const;
+
+    // Explicitly request a PE resource that the library does NOT auto-fetch (e.g. "AllCtrlList" /
+    // "ChCtrlList" for the controller map, "ProgramList" for presets — the rest of what import-midici.mjs
+    // needs). The decoded JSON lands in getFetchedProperty(muid, resource); poll it after pumping.
+    void fetchProperty (uint32_t muid, const juce::String& resource);
+    juce::var getFetchedProperty (uint32_t muid, const juce::String& resource) const;
 
 private:
     struct Impl;

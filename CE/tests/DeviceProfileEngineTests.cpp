@@ -792,9 +792,11 @@ struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
     }
     juce::midi_ci::PropertyReplyData propertyGetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestHeader& h) override
     {
-        if (h.resource == "ResourceList") return jsonReply (R"([{"resource":"DeviceInfo"},{"resource":"ChannelList"}])");
+        if (h.resource == "ResourceList") return jsonReply (R"([{"resource":"DeviceInfo"},{"resource":"ChannelList"},{"resource":"AllCtrlList"},{"resource":"ProgramList"}])");
         if (h.resource == "DeviceInfo")   return jsonReply (R"({"manufacturer":"CEditor Test","family":"SynthFam","model":"TestSynth","version":"1.0"})");
         if (h.resource == "ChannelList")  return jsonReply (R"({"channelList":[{"title":"Main","channel":1}]})");
+        if (h.resource == "AllCtrlList")  return jsonReply (R"([{"title":"Filter Cutoff","ctrlType":"cc","ctrlIndex":[74]},{"title":"Volume","ctrlType":"cc","ctrlIndex":[7]}])");
+        if (h.resource == "ProgramList")  return jsonReply (R"([{"title":"Init","bankPC":[0,0,0]},{"title":"Lead","bankPC":[0,0,1]}])");
         juce::midi_ci::PropertyReplyData d; d.header.status = 404; d.header.message = "Unknown resource"; return d;
     }
     juce::midi_ci::PropertyReplyHeader propertySetDataRequested (juce::midi_ci::MUID, const juce::midi_ci::PropertyRequestData&) override
@@ -869,19 +871,27 @@ int runMidiCiTests()
     std::cout << "[PASS] MIDI-CI :: loopback discovery (initiator <-> responder MUIDs exchanged)"
               << (peHandshakeForB ? " + PE capabilities handshake" : "") << "\n";
 
-    // ---- Part 2: Property Exchange extracts DeviceInfo + ChannelList JSON ----
-    // Initiator (our MidiCiSession) against a property-serving responder. getDeviceInfoForMuid populates
-    // only after the auto ResourceList -> DeviceInfo/ChannelList fetch round-trips, so we pump + poll.
+    // ---- Part 2: Property Exchange extracts everything import-midici.mjs needs ----
+    // Initiator (our MidiCiSession) against a property-serving responder. The library auto-fetches
+    // DeviceInfo + ChannelList; the controller map (AllCtrlList) and presets (ProgramList) are NOT
+    // auto-fetched, so on the PE-capabilities callback we explicitly fetchProperty() for them. Everything
+    // arrives over several round-trips, so we pump + poll until all four properties are present.
     std::deque<juce::MidiMessage> toInit, toResp;
-    auto init = std::make_unique<MidiCiSession> ([&toResp] (const juce::MidiMessage& m) { toResp.push_back (m); });
+    std::unique_ptr<MidiCiSession> init;
+    init = std::make_unique<MidiCiSession> (
+        [&toResp] (const juce::MidiMessage& m) { toResp.push_back (m); },
+        [&] (uint32_t muid, const juce::var&, const juce::var&)
+        {
+            if (init != nullptr) { init->fetchProperty (muid, "AllCtrlList"); init->fetchProperty (muid, "ProgramList"); }
+        });
     TestCiResponder responder ([&toInit] (const juce::MidiMessage& m) { toInit.push_back (m); });
 
     init->startDiscovery();
     init->pump();
     responder.pump();
 
-    juce::var deviceInfo, channelList;
-    for (int round = 0; round < 48; ++round)
+    juce::var deviceInfo, channelList, controllers, programs;
+    for (int round = 0; round < 64; ++round)
     {
         std::deque<juce::MidiMessage> di, dr;
         std::swap (di, toInit);
@@ -891,10 +901,11 @@ int runMidiCiTests()
         init->pump();
         responder.pump();
 
-        deviceInfo = init->getDeviceInfo (responder.muid());
+        deviceInfo  = init->getDeviceInfo (responder.muid());
         channelList = init->getChannelList (responder.muid());
-        // DeviceInfo and ChannelList are auto-fetched sequentially, so wait for both before stopping.
-        if (deviceInfo != juce::var{} && channelList != juce::var{})
+        controllers = init->getFetchedProperty (responder.muid(), "AllCtrlList");
+        programs    = init->getFetchedProperty (responder.muid(), "ProgramList");
+        if (deviceInfo != juce::var{} && channelList != juce::var{} && controllers != juce::var{} && programs != juce::var{})
             break;
     }
 
@@ -910,9 +921,25 @@ int runMidiCiTests()
         std::cerr << "[FAIL] MIDI-CI :: Property Exchange did not return the responder's ChannelList JSON\n";
         return 1;
     }
+    auto* ctrlArray = controllers.getArray();
+    if (ctrlArray == nullptr || ctrlArray->size() != 2
+        || (*ctrlArray)[0].getProperty ("title", {}).toString() != "Filter Cutoff"
+        || (int) (*ctrlArray)[0].getProperty ("ctrlIndex", {})[0] != 74)
+    {
+        std::cerr << "[FAIL] MIDI-CI :: explicit AllCtrlList fetch did not return the controller map"
+                  << " (got " << juce::JSON::toString (controllers) << ")\n";
+        return 1;
+    }
+    auto* progArray = programs.getArray();
+    if (progArray == nullptr || progArray->size() != 2)
+    {
+        std::cerr << "[FAIL] MIDI-CI :: explicit ProgramList fetch did not return the presets\n";
+        return 1;
+    }
 
-    std::cout << "[PASS] MIDI-CI :: property exchange extracts DeviceInfo + ChannelList JSON"
-              << " (manufacturer=\"" << infoObj->getProperty ("manufacturer").toString() << "\")\n";
+    std::cout << "[PASS] MIDI-CI :: property exchange extracts DeviceInfo + ChannelList + AllCtrlList + ProgramList"
+              << " (manufacturer=\"" << infoObj->getProperty ("manufacturer").toString() << "\", "
+              << ctrlArray->size() << " controllers, " << progArray->size() << " presets)\n";
     return 0;
 }
 }

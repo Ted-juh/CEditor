@@ -2,6 +2,7 @@
 
 #include <juce_midi_ci/juce_midi_ci.h>
 
+#include <map>
 #include <optional>
 
 namespace ceditor::device
@@ -17,6 +18,7 @@ struct MidiCiSession::Impl : public ci::DeviceMessageHandler,
     SendSysex send;
     OnDeviceInfo onDeviceInfo;
     std::optional<ci::Device> device;
+    std::map<uint32_t, std::map<juce::String, juce::var>> fetched; // muid -> resource -> decoded JSON
 
     Impl (SendSysex sendIn, OnDeviceInfo onInfoIn)
         : send (std::move (sendIn)), onDeviceInfo (std::move (onInfoIn))
@@ -121,6 +123,40 @@ juce::var MidiCiSession::getDeviceInfo (uint32_t muid) const
 juce::var MidiCiSession::getChannelList (uint32_t muid) const
 {
     return impl->device.has_value() ? impl->device->getChannelListForMuid (ci::MUID::makeUnchecked (muid)) : juce::var {};
+}
+
+juce::var MidiCiSession::getResourceList (uint32_t muid) const
+{
+    return impl->device.has_value() ? impl->device->getResourceListForMuid (ci::MUID::makeUnchecked (muid)) : juce::var {};
+}
+
+void MidiCiSession::fetchProperty (uint32_t muid, const juce::String& resource)
+{
+    if (! impl->device.has_value())
+        return;
+
+    ci::PropertyRequestHeader header;
+    header.resource = resource;
+
+    auto* impl = this->impl.get();
+    impl->device->sendPropertyGetInquiry (ci::MUID::makeUnchecked (muid), header,
+        [impl, muid, resource] (const ci::PropertyExchangeResult& result)
+        {
+            if (result.getError().has_value())
+                return;
+            // Decode the 7-bit-text JSON body (same idiom JUCE's CapabilityInquiry demo uses for
+            // property values) and cache it for getFetchedProperty().
+            impl->fetched[muid][resource] = ci::Encodings::jsonFrom7BitText (result.getBody());
+        });
+}
+
+juce::var MidiCiSession::getFetchedProperty (uint32_t muid, const juce::String& resource) const
+{
+    const auto byMuid = impl->fetched.find (muid);
+    if (byMuid == impl->fetched.end())
+        return {};
+    const auto byResource = byMuid->second.find (resource);
+    return byResource == byMuid->second.end() ? juce::var {} : byResource->second;
 }
 
 } // namespace ceditor::device
