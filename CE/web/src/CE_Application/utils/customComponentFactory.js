@@ -352,6 +352,7 @@ export function createHitZone(name, {
   targetValueChannelX = '',
   targetValueChannelY = '',
   action = 'dragValue',
+  cursor = null,
   bounds = {},
   // Follow mode: how the grab area is positioned (all optional; omitting them
   // reproduces today's behavior, where `bounds` are independent coordinates).
@@ -371,7 +372,7 @@ export function createHitZone(name, {
     enabled: true,
     visibleInEditor: true,
     priority: 0,
-    cursor: action === 'dragValue' ? 'pointer' : 'default',
+    cursor: cursor || (action === 'dragValue' ? 'pointer' : 'default'),
     targetBehavior,
     targetValueChannel,
     targetValueChannelX,
@@ -1988,6 +1989,135 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.tripleValueSlider') return createTripleValueSliderStarterPatch();
   if (starterId === 'starter.filmstripKnob') return createFilmstripKnobStarterPatch();
   return {};
+}
+
+// "Make Interactive" archetypes. Each describes the defaults for one common
+// control so a single action can scaffold the value channel(s) + behavior +
+// hit zone(s), pre-wired, instead of the author hand-authoring three things.
+// The hit-zone `source` defaults follow §3.5 of the redesign plan.
+export const CUSTOM_INTERACTIVE_ARCHETYPES = {
+  dial: { label: 'Dial', cursor: 'grab', shape: 'circle', geometry: 'circular', source: 'face' },
+  slider: { label: 'Slider', cursor: 'ew-resize', shape: 'rectangle', geometry: 'horizontal', source: 'part', minTouch: 44 },
+  handle: { label: 'Handle', cursor: 'grab', shape: 'rectangle', geometry: 'horizontal', source: 'part', inflate: 12, minTouch: 44, relative: true },
+  button: { label: 'Button', cursor: 'pointer', shape: 'rectangle', geometry: 'none', source: 'part', action: 'cycleValue', boolean: true },
+  toggle: { label: 'Toggle', cursor: 'pointer', shape: 'rectangle', geometry: 'none', source: 'part', action: 'toggleValue', boolean: true },
+  xy: { label: 'XY Pad', cursor: 'move', shape: 'rectangle', geometry: 'xy', source: 'face', dual: true },
+  range: { label: 'Range', cursor: 'ew-resize', shape: 'rectangle', geometry: 'horizontal', source: 'part', range: true, relative: true },
+};
+
+export function listInteractiveArchetypes() {
+  return Object.entries(CUSTOM_INTERACTIVE_ARCHETYPES).map(([id, spec]) => ({ id, label: spec.label }));
+}
+
+function floatChannel(name, label, defaultValue = 0) {
+  return createValueChannel(name, { label, type: 'float', min: 0, max: 1, step: 0.01, defaultValue });
+}
+
+/**
+ * Scaffold a fully pre-wired interactive control of the given archetype.
+ *
+ * Returns `{ valueChannels, behaviors, hitZones }` — name→object maps ready to
+ * merge into a control's section `_children`. `options` lets the caller name
+ * the set and point hit zones at the parts they should follow:
+ *   name      base name for generated channels/behaviors/zones (default = id)
+ *   partName  the part a `source:'part'` archetype should track
+ *   minPart / maxPart  handle parts for the range archetype
+ */
+export function makeInteractive(archetypeId, options = {}) {
+  const archetype = CUSTOM_INTERACTIVE_ARCHETYPES[archetypeId];
+  if (!archetype) return null;
+
+  const name = String(options.name || archetypeId).trim() || archetypeId;
+  const geometry = options.geometry || archetype.geometry;
+  const relativeDrag = archetype.relative || options.relative;
+  const dragMode = options.dragMode || (relativeDrag
+    ? (geometry === 'vertical' ? 'vertical' : 'horizontal')
+    : 'auto');
+
+  const valueChannels = {};
+  const behaviors = {};
+  const hitZones = {};
+
+  const partFor = (fallback) => options.partName || fallback;
+  const inflate = archetype.inflate ? { x: archetype.inflate, y: archetype.inflate, unit: 'px' } : {};
+  const sourceFor = (partName) => (archetype.source === 'face' ? 'face' : `part:${partName}`);
+
+  if (archetype.dual) {
+    // XY pad — one face, two channels.
+    const xName = `${name}X`;
+    const yName = `${name}Y`;
+    valueChannels[xName] = floatChannel(xName, 'X', 0.5);
+    valueChannels[yName] = floatChannel(yName, 'Y', 0.5);
+    const behaviorName = `${name}Pad`;
+    behaviors[behaviorName] = {
+      ...createBehaviorModule(behaviorName, { type: 'xy-pad', role: 'xy-pad', valueChannel: xName, geometry: 'xy', dragMode }),
+      valueChannels: [xName, yName],
+    };
+    hitZones[`${name}Zone`] = createHitZone(`${name}Zone`, {
+      shape: archetype.shape,
+      targetBehavior: behaviorName,
+      targetValueChannel: xName,
+      targetValueChannelY: yName,
+      action: 'dragValue',
+      source: 'face',
+      cursor: archetype.cursor,
+    });
+    return { valueChannels, behaviors, hitZones };
+  }
+
+  if (archetype.range) {
+    // Range — two handles, two linked channels.
+    const minName = `${name}Min`;
+    const maxName = `${name}Max`;
+    valueChannels[minName] = { ...floatChannel(minName, 'Min', 0.25), constraints: { enabled: true, normalizedMin: 0, normalizedMax: 1, pairedMax: maxName } };
+    valueChannels[maxName] = { ...floatChannel(maxName, 'Max', 0.75), constraints: { enabled: true, normalizedMin: 0, normalizedMax: 1, pairedMin: minName } };
+    const minPart = options.minPart || `${name}MinHandle`;
+    const maxPart = options.maxPart || `${name}MaxHandle`;
+    for (const [channel, part, suffix] of [[minName, minPart, 'Min'], [maxName, maxPart, 'Max']]) {
+      const behaviorName = `${name}${suffix}`;
+      behaviors[behaviorName] = createBehaviorModule(behaviorName, { type: 'slider', role: 'range', valueChannel: channel, geometry, dragMode });
+      hitZones[`${name}${suffix}Zone`] = createHitZone(`${name}${suffix}Zone`, {
+        shape: archetype.shape,
+        targetBehavior: behaviorName,
+        targetValueChannel: channel,
+        action: 'dragValue',
+        source: `part:${part}`,
+        inflate: { x: 12, y: 12, unit: 'px' },
+        minTouch: 44,
+        cursor: archetype.cursor,
+      });
+    }
+    return { valueChannels, behaviors, hitZones };
+  }
+
+  // Single-channel archetypes: dial, slider, handle, button, toggle.
+  const channelName = `${name}Value`;
+  valueChannels[channelName] = archetype.boolean
+    ? createValueChannel(channelName, { label: archetype.label, type: 'bool', min: 0, max: 1, step: 1, defaultValue: false })
+    : floatChannel(channelName, archetype.label, archetype.geometry === 'circular' ? 0.5 : 0);
+
+  const behaviorName = `${name}Behavior`;
+  behaviors[behaviorName] = createBehaviorModule(behaviorName, {
+    type: archetypeId,
+    role: archetypeId,
+    valueChannel: channelName,
+    geometry,
+    dragMode,
+  });
+
+  const partName = partFor(name);
+  hitZones[`${name}Zone`] = createHitZone(`${name}Zone`, {
+    shape: archetype.shape,
+    targetBehavior: behaviorName,
+    targetValueChannel: channelName,
+    action: archetype.action || 'dragValue',
+    source: sourceFor(partName),
+    inflate,
+    minTouch: archetype.minTouch || 0,
+    cursor: archetype.cursor,
+  });
+
+  return { valueChannels, behaviors, hitZones };
 }
 
 export function createCustomComponentSections() {
