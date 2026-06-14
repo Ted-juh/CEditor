@@ -648,6 +648,31 @@ juce::var DeviceProfileService::setDeviceRoleMapping (const juce::var& payload)
     return juce::var (response);
 }
 
+juce::var DeviceProfileService::exportRoleMappings() const
+{
+    juce::Array<juce::var> entries;
+    for (const auto& pair : roleMappings)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("role", pair.first);
+        o->setProperty ("profileId", pair.second.profileId);
+        o->setProperty ("midiDestination", midiDestinationToVar (pair.second.destination));
+        o->setProperty ("midiInput", midiInputToVar (pair.second.input));
+        o->setProperty ("syncDirection", pair.second.syncDirection);
+        entries.add (juce::var (o));
+    }
+    return entries;
+}
+
+void DeviceProfileService::importRoleMappings (const juce::var& data)
+{
+    if (auto* arr = data.getArray())
+        for (const auto& entry : *arr)
+            if (entry.getDynamicObject() != nullptr
+                && entry.getProperty ("profileId", "").toString().isNotEmpty())
+                setDeviceRoleMapping (entry);
+}
+
 juce::var DeviceProfileService::getTransportCapabilities() const
 {
     auto* capabilities = new juce::DynamicObject();

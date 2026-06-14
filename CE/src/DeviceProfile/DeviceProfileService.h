@@ -35,6 +35,10 @@ public:
     juce::var listMidiDestinations() const;
     juce::var listMidiInputs() const;
     juce::var setDeviceRoleMapping (const juce::var& payload);
+    // Serialize / restore the role→{profile, MIDI port} mappings for plugin-state persistence so a
+    // reloaded DAW project reconnects to the hardware without reopening the editor window.
+    juce::var exportRoleMappings() const;
+    void importRoleMappings (const juce::var& data);
     juce::var getTransportCapabilities() const;
     juce::var getSessionState() const;
     juce::var overrideDeviceIdentityMismatch (const juce::var& payload);

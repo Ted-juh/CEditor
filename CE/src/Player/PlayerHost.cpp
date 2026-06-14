@@ -112,16 +112,24 @@ public:
 };
 }
 
-PlayerHost::PlayerHost (juce::File panelFileToLoad)
-    : panelFile (std::move (panelFileToLoad))
+PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfileService* externalService)
+    : panelFile (std::move (panelFileToLoad)),
+      ownedService (externalService != nullptr ? nullptr
+                                               : std::make_unique<ceditor::device::DeviceProfileService>()),
+      service (externalService != nullptr ? *externalService : *ownedService)
 {
     if (panelFile.existsAsFile())
         panelFile.loadFileAsString().swapWith (panelJson);
 
     // Async device events from the service (e.g. incoming MIDI) -> WebView, on the message thread.
-    service.setEventCallback ([this] (const juce::String& eventName, const juce::var& payload)
+    // The service may now outlive this host (the processor owns it), so guard with a SafePointer.
+    service.setEventCallback ([safe = juce::Component::SafePointer<PlayerHost> (this)]
+                              (const juce::String& eventName, const juce::var& payload)
     {
-        juce::MessageManager::callAsync ([this, eventName, payload]() { emitToWebView (eventName, payload); });
+        juce::MessageManager::callAsync ([safe, eventName, payload]()
+        {
+            if (safe != nullptr) safe->emitToWebView (eventName, payload);
+        });
     });
 
     // Unique WebView2 user-data folder PER INSTANCE. WebView2 cannot share a folder across
@@ -147,12 +155,29 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad)
     // Shared device-runtime surface (Phase B1), reporting to this player's WebView.
     options = ceditor::device::withDeviceRuntimeEvents (
         std::move (options), service,
-        [this] (const juce::String& eventName, const juce::var& payload) { emitToWebView (eventName, payload); });
+        [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::String& eventName, const juce::var& payload)
+        { if (safe != nullptr) safe->emitToWebView (eventName, payload); });
 
     // Panel-load handshake: the JS player announces readiness, we push the panel document.
     options = options.withEventListener ("playerReady", [this] (const juce::var&)
     {
         juce::MessageManager::callAsync ([this]() { loadPanelIntoWebView(); });
+    });
+
+    // Host-parameter sync (M2): the user moved a control -> set the matching host parameter so the
+    // DAW records automation. Runs on the message thread.
+    options = options.withEventListener ("paramChanged", [this] (const juce::var& payload)
+    {
+        if (onUiParamChange != nullptr)
+            onUiParamChange (payload.getProperty ("id", "").toString(),
+                             (float) (double) payload.getProperty ("value", 0.0));
+    });
+
+    // The JS player finished loading the panel and wants every parameter's current value pushed
+    // (so the on-screen controls reflect a restored/automated state on open).
+    options = options.withEventListener ("requestParamSync", [this] (const juce::var&)
+    {
+        if (onResyncRequest != nullptr) onResyncRequest();
     });
 
    #if CEDITOR_DEV_MODE
@@ -187,10 +212,24 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad)
     setSize (800, 480);
 }
 
+PlayerHost::~PlayerHost()
+{
+    // Stop the (possibly processor-owned, longer-lived) service from calling back into this host.
+    service.setEventCallback (nullptr);
+}
+
 void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& payload)
 {
     if (webView != nullptr)
         webView->emitEventIfBrowserIsVisible (eventName, payload);
+}
+
+void PlayerHost::pushParamToUi (const juce::String& parameterId, float value)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("id", parameterId);
+    obj->setProperty ("value", value);
+    emitToWebView ("paramSync", juce::var (obj));
 }
 
 void PlayerHost::loadPanelIntoWebView()

@@ -5,11 +5,14 @@
   import { onMount } from 'svelte';
   import PanelPreviewSurface from './CE_Application/editor/PanelPreviewSurface.svelte';
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
-  import { syncPanelPreviewSessions, updatePanelPreviewSession } from './CE_Application/stores/interactionPreview.js';
+  import { syncPanelPreviewSessions, updatePanelPreviewSession, panelPreviewSessions, setPreviewModeEnabled } from './CE_Application/stores/interactionPreview.js';
+  import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
+  import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
-  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge } from './CE_Application/stores/deviceProfiles.js';
+  import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState } from './CE_Application/stores/deviceProfiles.js';
+  import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
   // Inbound decode maps are generated from the DPD device profile (CE/dpd), not hardcoded.
   import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
@@ -26,6 +29,11 @@
   let inPorts = $state([{ type: 'none', id: 'none', name: 'No MIDI Input' }]);
   let selectedOut = $state('previewOnly');
   let profileId = $state('roland-gaia');
+  // When the plugin reloads, the processor restores the role→port mapping into its DeviceProfileService
+  // BEFORE the window opens. On open we ADOPT that restored port (show it in the dropdown, don't
+  // re-map) so the SH-01 selection survives a project reload instead of resetting to Preview Only.
+  let mappingAdopted = false;
+  let currentSession = {};
 
   // --- Incoming MIDI (bidirectional): the panel follows the synth ---
   // The GAIA's filter knob transmits CC 102/103/104 (Tone 1/2/3 cutoff). Map the CCs we
@@ -63,6 +71,88 @@
     paramControlMap = map;
     paramRows = rows;
     lastAppliedValue = {};
+  }
+
+  // --- Host parameter sync (M2): panel control <-> DAW automation parameter (two-way) ---
+  // controlByParam: parameterId -> { controlId, leaf }. Built from the panel's baked
+  // exportParameters (the same list the C++ APVTS is built from), matched to controls by name.
+  let controlByParam = {};
+  let lastParamValue = {};   // parameterId -> last value seen (dedup, both directions, no loop)
+  let paramSyncReady = false; // skip emitting the initial seed (would clobber restored automation)
+
+  function rebuildHostParamMaps(p) {
+    controlByParam = {};
+    lastParamValue = {};
+    paramSyncReady = false;
+    const idByName = {};
+    const controlsById = {};
+    for (const c of p?.controls ?? []) {
+      const core = c?._children?.Core;
+      if (core?.id) { controlsById[core.id] = c; idByName[core.id] = core.id; }
+      if (core?.name) idByName[core.name] = core.id;
+    }
+    for (const param of p?.exportParameters ?? []) {
+      const controlId = idByName[param.controlName] ?? idByName[String(param.id).split('.')[0]];
+      if (!controlId) continue;
+      const leaf = String(param.path ?? '').split('.').slice(1).join('.') || 'value';
+      const bindings = (controlsById[controlId]?._children?.DeviceBindings?.bindings ?? [])
+        .filter((b) => b?.kind === 'deviceParameter' && b?.parameterId);
+      controlByParam[param.id] = { controlId, leaf, bindings };
+    }
+  }
+
+  // The numeric value a control currently holds in its preview session (matches the param's range).
+  function controlParamValue(session, leaf) {
+    if (!session) return undefined;
+    if (leaf && leaf !== 'value') {
+      const n = Number(session.customValues?.[leaf]);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    let v;
+    if (session.currentValueOverrideEnabled) v = session.currentValueOverride;
+    else if (session.valueOverrideEnabled) v = session.valueOverride;
+    else if (typeof session.checked === 'boolean') v = session.checked ? 1 : 0;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;  // non-numeric (e.g. select ids) -> skip for now
+  }
+
+  // DAW automation moved a parameter -> move the on-screen control AND drive the synth. We route
+  // through the surface's patchSession (the same path a user drag uses) so the device binding
+  // actually sends MIDI on playback. The lastParamValue guard stops this from echoing back into a
+  // recorded value (set BEFORE the patch, so the session watcher sees no change to re-emit).
+  function applyParamSync(parameterId, value) {
+    const m = controlByParam[parameterId];
+    const v = Number(value);
+    if (!m || !Number.isFinite(v) || lastParamValue[parameterId] === v) return;
+    lastParamValue[parameterId] = v;
+    // 1. Move the on-screen control (silent — no echo back into the recorded value).
+    updatePanelPreviewSession(m.controlId, (m.leaf && m.leaf !== 'value')
+      ? { customValues: { [m.leaf]: v } }
+      : { valueOverrideEnabled: true, valueOverride: v });
+    // 2. Send the bound device parameter(s) to the synth — the same call a user drag makes, so
+    //    automation playback drives the hardware. 'continuous' = rate-limited stream.
+    for (const b of m.bindings ?? []) {
+      commitDeviceParameter({
+        requestId: `automation_${parameterId}_${Date.now()}`,
+        deviceRole: b.deviceRole || 'mainSynth',
+        parameterId: b.parameterId,
+        value: v,
+        interactionPhase: 'continuous',
+        dryRun: false,
+      });
+    }
+  }
+
+  // The user moved a control -> tell C++ to drive the matching host parameter (records automation).
+  function emitChangedParams(sessions, backend) {
+    for (const parameterId in controlByParam) {
+      const { controlId, leaf } = controlByParam[parameterId];
+      const v = controlParamValue(sessions?.[controlId], leaf);
+      if (v === undefined || lastParamValue[parameterId] === v) continue;
+      lastParamValue[parameterId] = v;
+      if (paramSyncReady) backend.emitEvent('paramChanged', { id: parameterId, value: v });
+    }
+    paramSyncReady = true;  // first pass only seeds lastParamValue, never emits
   }
 
   function flushIncoming() {
@@ -167,6 +257,37 @@
     mapRole();
   }
 
+  // Adopt a hardware port the processor restored from plugin state: reflect it in the dropdown and
+  // load its profile params, WITHOUT calling mapRole (which would re-send the mapping and, with a
+  // stale default, clobber it). Retried as the session and the port list arrive (either order).
+  function maybeAdoptMapping(session) {
+    if (mappingAdopted || !hasBridge) return;
+    const m = session?.mainSynth;
+    const dest = m?.midiDestination;
+    if (dest?.type === 'hardwareOutput' && dest.id && ports.some((p) => p.id === dest.id)) {
+      mappingAdopted = true;
+      selectedOut = dest.id;
+      if (m.profileId) profileId = m.profileId;
+      if (profileId) listProfileParameters({ profileId, deviceRole: 'mainSynth' });
+      setTimeout(syncFromSynth, 600);
+    }
+  }
+
+  // Auto-connect: if nothing was restored, pick the hardware port that matches this panel's synth
+  // (SH-01 / GAIA / Roland), or the only REAL hardware port. Windows' built-in GS Wavetable / GM
+  // synths are ignored so they don't count as "another device". Removes the manual MIDI-out step.
+  function autoConnect() {
+    if (mappingAdopted || !hasBridge) return;
+    // Real hardware outputs only (ignore Windows' built-in GM/GS synths).
+    const hw = ports.filter((p) => p.type === 'hardwareOutput'
+      && !/microsoft|wavetable|gs synth|gm |general midi/i.test(p.name ?? ''));
+    if (hw.length === 0) return;   // nothing plugged in yet — retry when ports update
+    // Prefer a name match for this panel's synth; otherwise just take the first real port.
+    const match = hw.find((p) => /SH-?01|GAIA|Roland/i.test(p.name ?? '')) ?? hw[0];
+    mappingAdopted = true;
+    selectPort(match.id);          // opens the port + loads params + RQ1 sync
+  }
+
   // Accepts a panel object, a JSON string, or a saved .cepanel document.
   function loadPanelDocument(input, filePath = null) {
     if (input == null) return null;
@@ -186,10 +307,23 @@
     profileId = next.deviceSession?.mainSynth?.profileId || 'roland-gaia';
     panel = next;
     syncPanelPreviewSessions(panel.controls ?? []);
+    // Start (or restart) the panel script runtime for this panel — the SAME Lua/JS runtime the editor
+    // preview uses, now driving the shipped plugin. Close the previous panel's scripts (no-op on first
+    // load), install the new panel as the runtime host, then previewMode off→on fires onPanelLoad +
+    // onPanelReady so lifecycle scripts run.
+    setPreviewModeEnabled(false);
+    setRuntimeHost(createPlayerHost(panel));
+    setPreviewModeEnabled(true);
     rebuildParamControlMap(panel.controls ?? []);
+    rebuildHostParamMaps(panel);
+    // Ask the host to push current parameter values now that our maps exist (restored automation).
+    if (hasBridge && window.__JUCE__?.backend) window.__JUCE__.backend.emitEvent('requestParamSync', {});
     if (panel?.bgImageEnabled && panel?.bgImage) loadFile(panel.bgImage);
     if (panel?.bgTextureEnabled && panel?.bgTexture) loadFile(panel.bgTexture);
-    if (hasBridge) mapRole();
+    // Do NOT map to the default (previewOnly) on load — that would overwrite a port restored from
+    // plugin state. maybeAdoptMapping() picks up a restored hardware port; first-time use sets it
+    // when the user chooses a port from the dropdown.
+    if (hasBridge) { maybeAdoptMapping(currentSession); autoConnect(); }
     return panel;
   }
 
@@ -221,6 +355,7 @@
     : '');
 
   onMount(() => {
+    initPanelRuntime();   // start the panel script runtime (Lua/JS) so the loaded panel's scripts run
     // Expose a loader the host can call directly (and for browser testing).
     window.__CE_LOAD_PANEL__ = (doc, filePath) => loadPanelDocument(doc, filePath);
 
@@ -232,15 +367,30 @@
     let inputsUnsub = null;
     let inMsgUnsub = null;
     let sysexUnsub = null;
+    let sessionsUnsub = null;
+    let paramSyncToken = null;
+    let deviceUnsub = null;
     if (backend) {
       initDeviceProfileBridge();   // register device event listeners (incl. the port-list reply)
       listDeviceProfiles();        // populate the profile list — resolveParameterSend gates on it
       listMidiDestinations();      // ask C++ for available MIDI outputs -> fills midiDestinations
       listMidiInputs();            // ask C++ for available MIDI inputs -> fills midiInputs (bidirectional)
-      portsUnsub = midiDestinations.subscribe((d) => { if (Array.isArray(d) && d.length) ports = d; });
-      inputsUnsub = midiInputs.subscribe((d) => { if (Array.isArray(d) && d.length) inPorts = d; });
+      getDeviceSessionState();     // fetch any port restored from plugin state (project reload)
+      // Adopt a restored hardware port as soon as both the session state and the port list exist.
+      deviceUnsub = deviceSessionState.subscribe((s) => { currentSession = s ?? {}; maybeAdoptMapping(currentSession); autoConnect(); });
+      portsUnsub = midiDestinations.subscribe((d) => { if (Array.isArray(d) && d.length) ports = d; maybeAdoptMapping(currentSession); autoConnect(); });
+      inputsUnsub = midiInputs.subscribe((d) => {
+        if (Array.isArray(d) && d.length) inPorts = d;
+        // Auto-connect may have mapped the OUTPUT before this input list arrived, leaving no input
+        // paired (so the synth's knob couldn't move the panel). Re-pair now that inputs exist.
+        if (mappingAdopted && ports.some((p) => p.id === selectedOut && p.type === 'hardwareOutput')) mapRole();
+      });
       inMsgUnsub = onMidiInputMessage(applyIncomingMidi);   // panel follows synth: incoming CC -> control
       sysexUnsub = onSysexInputMessage(applyIncomingSysex); // panel follows synth: incoming DT1 SysEx -> control
+      // Host parameter <-> control (M2 two-way): user moves a control -> emitChangedParams records
+      // automation; DAW automation -> applyParamSync moves the control.
+      sessionsUnsub = panelPreviewSessions.subscribe((sessions) => emitChangedParams(sessions, backend));
+      paramSyncToken = backend.addEventListener('paramSync', (p) => applyParamSync(p?.id, p?.value));
       loadToken = backend.addEventListener('loadPanel', (payload) => {
         loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
       });
@@ -255,25 +405,19 @@
     return () => {
       window.removeEventListener('resize', onResize);
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
+      if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
       if (portsUnsub) portsUnsub();
       if (inputsUnsub) inputsUnsub();
       if (inMsgUnsub) inMsgUnsub();
       if (sysexUnsub) sysexUnsub();
+      if (sessionsUnsub) sessionsUnsub();
+      if (deviceUnsub) deviceUnsub();
     };
   });
 </script>
 
 <div class="player-root">
-  {#if hasBridge}
-    <div class="device-bar">
-      <label>MIDI Out
-        <select value={selectedOut} onchange={(e) => selectPort(e.target.value)}>
-          {#each ports as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
-        </select>
-      </label>
-      <button class="sync-btn" onclick={syncFromSynth} title="Request current values from the synth (SysEx RQ1)">Sync from synth</button>
-    </div>
-  {/if}
+  <!-- No MIDI-out picker: the plugin auto-connects to the synth's hardware port (see autoConnect). -->
   <div class="player-viewport">
     {#if panel}
       <div class="player-stage" style="width: {panel.width * scale}px; height: {panel.height * scale}px;">
