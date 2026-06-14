@@ -16,6 +16,7 @@
   import { stateEditScope, setStateEditScopeBase } from '../stores/stateEditScope.js';
   import { setSegmentEditScopeAll } from '../stores/segmentEditScope.js';
   import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
+  import { propertiesTabRequest } from '../stores/propertiesTab.js';
   import { openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { getComponentPorts } from '../models/componentPorts.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
@@ -235,6 +236,17 @@
       pinnedPanelMultiTabs = new Set(nextPinnedTabs);
     }
   }
+
+  // External jump-to-tab request (e.g. from the Device insight zone's "Properties" button).
+  $effect(() => {
+    const req = $propertiesTabRequest;
+    if (!req?.tabId) return;
+    if (contextMode === 'component' && componentTabs.some((tab) => tab.id === req.tabId)) {
+      if (viewMode !== 'single') viewMode = 'single';
+      singleTab = req.tabId;
+    }
+    propertiesTabRequest.set(null);
+  });
 
   $effect(() => {
     ensureValidMainTabs();

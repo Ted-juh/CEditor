@@ -89,5 +89,9 @@ private:
 
     AppSettings* appSettings = nullptr;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    // Active/last in-app VST3 build, held as its Timer base so this header needn't see the concrete
+    // VstBuildJob (it lives in the handlers .cpp). Timer has a virtual destructor, so deleting
+    // through the base correctly tears down the real job. Busy-state is read via isTimerRunning().
+    std::unique_ptr<juce::Timer> buildJob;
     ceditor::device::DeviceProfileService deviceProfileService;
 };

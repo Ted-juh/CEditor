@@ -1,15 +1,23 @@
 <script>
   /**
-   * Common Property Bar — quick-access properties for the selected component.
-   * Shows contextual quick controls for the selected component.
+   * Appearance ("Look") bar — top of the editor canvas.
+   *
+   * Shows ONE appearance facet's quick controls at a time (Text / Fill / Box),
+   * chosen by the activeFacet store. The facet auto-focuses to the first
+   * applicable facet for the selection, and can be switched manually via the
+   * facet tabs (or externally — e.g. a right-click "Edit colour" sets 'fill').
+   *
+   * Every control writes the same dot-paths the PropertiesPanel uses, so this
+   * is a faster door into the same model, not a separate one.
    */
-  import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight } from 'lucide-svelte';
+  import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, PaintBucket, Frame, Square, Sparkles, Image } from 'lucide-svelte';
   import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
-  import { availableFonts } from '../stores/appSettings.js';
+  import { availableFonts, availableIcons } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
-  import { componentWorkspaceMode } from '../stores/componentWorkspace.js';
-  import DisplayToolbar from '../components/DisplayToolbar.svelte';
+  import { activeFacet, setFacet, APPEARANCE_FACET_ORDER } from '../stores/editorFacet.js';
+  import DeviceInsight from './DeviceInsight.svelte';
+  import ScriptInsight from './ScriptInsight.svelte';
 
   let control = $derived($selectedControl);
   let core = $derived(getSection(control, 'Core'));
@@ -22,11 +30,42 @@
   let backgroundFill = $derived(background?._children?.Fill ?? null);
   let backgroundBorder = $derived(background?._children?.Border ?? null);
   let backgroundCorners = $derived(background?._children?.Corners ?? null);
-  let selectedStates = $derived(getSection(control, 'States'));
-  let behavior = $derived(getSection(control, 'Behavior'));
-  let valueSection = $derived(getSection(control, 'Value'));
-  let buttonType = $derived(String(behavior?.buttonType ?? '').trim().toLowerCase());
+  let effects = $derived(getSection(control, 'Effects'));
+  let icon = $derived(getSection(control, 'Icon'));
+
   let hasSelection = $derived($selectedComponentIds.size > 0);
+  let multiSelect = $derived($selectedComponentIds.size > 1);
+
+  // Which facets apply to the current selection, in display order.
+  const FACET_META = {
+    text: { label: 'Text', icon: Type },
+    fill: { label: 'Fill', icon: PaintBucket },
+    border: { label: 'Border', icon: Square },
+    box: { label: 'Box', icon: Frame },
+    effects: { label: 'Effects', icon: Sparkles },
+    icon: { label: 'Icon', icon: Image },
+  };
+  let facets = $derived.by(() => {
+    const list = [];
+    if (text) list.push('text');
+    if (backgroundFill) list.push('fill');
+    if (backgroundBorder || backgroundCorners) list.push('border');
+    if (transform) list.push('box');
+    if (effects) list.push('effects');
+    if (icon) list.push('icon');
+    return list;
+  });
+
+  // The facet actually shown: the user's chosen facet if it applies, otherwise
+  // the first applicable facet in priority order.
+  let shownFacet = $derived.by(() => {
+    if (facets.includes($activeFacet)) return $activeFacet;
+    for (const facet of APPEARANCE_FACET_ORDER) {
+      if (facets.includes(facet)) return facet;
+    }
+    return null;
+  });
+
   let weightedFontSelected = $derived(
     $availableFonts.find(option => option.value === (font?.family ?? 'Arial'))?.supportsWeight === true
   );
@@ -36,24 +75,19 @@
   let backgroundColour = $derived(toDisplayColour(backgroundFill?.colour ?? 'FF3A3A3A'));
   let borderColour = $derived(toDisplayColour(backgroundBorder?.colour ?? '66FFFFFF'));
   let justification = $derived(String(position?.justification ?? 'centred'));
-  let showStateToolbar = $derived(
-    String(behavior?.buttonType ?? '').trim().length > 0
-    && Object.keys(selectedStates?._children ?? {}).length > 0
-  );
-  let showSegmentToolbar = $derived(buttonType === 'radio' && Array.isArray(valueSection?.rows) && valueSection.rows.length > 0);
-  let showTextControls = $derived(!!text);
-  let showBackgroundControls = $derived(!!background);
-  let showTransformControls = $derived(!!transform);
-  let showBehaviorControls = $derived(!!behavior);
-  let hasQuickControls = $derived(showTextControls || showBackgroundControls || showTransformControls || showBehaviorControls);
-  let componentDesignerActive = $derived(
-    $componentWorkspaceMode === 'surface'
-    && String(core?.controlType ?? '') === 'CustomComponent'
-  );
+  let iconTintColour = $derived(toDisplayColour(icon?.tint ?? 'FFFFFFFF'));
+  let shadowEnabled = $derived(effects?._children?.Shadows?.items?.[0]?.enabled === true);
+  let blendMode = $derived(String(effects?._children?.Blend?.mode ?? 'normal'));
+
+  const BLEND_MODES = [
+    'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+    'color-dodge', 'color-burn', 'hard-light', 'soft-light',
+    'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+  ];
 
   function set(path, value) {
     if (!core?.id || !path) return;
-    if ($selectedComponentIds.size > 1) {
+    if (multiSelect) {
       updateSelectedProperty(path, value);
     } else {
       updateControlProperty(core.id, path, value);
@@ -79,7 +113,7 @@
   }
 
   function openColour(path, previous) {
-    if (!core?.id || $selectedComponentIds.size > 1) return;
+    if (!core?.id || multiSelect) return;
     activateColorTarget({ type: 'control', controlId: core.id, path }, String(previous ?? 'FFFFFFFF'));
   }
 
@@ -141,17 +175,41 @@
     set(path, Math.min(max, Math.max(min, next)));
   }
 
-  function hasBehaviorPath(path) {
-    return Object.prototype.hasOwnProperty.call(behavior ?? {}, path);
+  function setIconAsset(event) {
+    const assetId = String(event.target.value ?? '');
+    const asset = $availableIcons.find((option) => option.value === assetId) ?? null;
+    set('Icon.source', asset ? 'library' : 'none');
+    set('Icon.assetId', assetId);
+    set('Icon.name', asset?.name ?? '');
   }
 </script>
 
-<div class="common-bar">
-  {#if componentDesignerActive}
-    <span class="empty-state designer-state">Designer controls are active in the component workspace</span>
-  {:else if hasQuickControls}
-    {#if showTextControls}
-      <div class="section-chip">Text</div>
+<div class="look-bar">
+  <div class="look-main">
+  {#if !hasSelection}
+    <div class="look-row"><span class="empty-state">No selection</span></div>
+  {:else if facets.length === 0}
+    <div class="look-row"><span class="empty-state">No appearance controls for this selection</span></div>
+  {:else}
+    <div class="look-row facet-row">
+      <div class="facet-tabs">
+        {#each facets as facet (facet)}
+          {@const meta = FACET_META[facet]}
+          <button
+            class="facet-tab"
+            class:active={facet === shownFacet}
+            title={meta.label}
+            onclick={() => setFacet(facet)}
+          >
+            <meta.icon size={12} strokeWidth={2} />
+            <span>{meta.label}</span>
+          </button>
+        {/each}
+      </div>
+    </div>
+
+    <div class="look-row control-row">
+      {#if shownFacet === 'text'}
       <div class="prop-group">
         <input
           class="color-swatch"
@@ -177,6 +235,7 @@
           step="1"
           value={font?.size ?? 14}
           title="Font size"
+          onfocus={(event) => event.target.select()}
           onchange={(event) => setNumber('Text.Font.size', event.target.value, font?.size ?? 14, 1)}
         />
       </div>
@@ -204,14 +263,7 @@
           <AlignRight size={12} strokeWidth={2} />
         </button>
       </div>
-    {/if}
-
-    {#if showTextControls && (showBackgroundControls || showTransformControls || showBehaviorControls)}
-      <div class="divider"></div>
-    {/if}
-
-    {#if showBackgroundControls}
-      <div class="section-chip">Fill</div>
+    {:else if shownFacet === 'fill'}
       <div class="prop-group">
         <input
           class="color-swatch"
@@ -222,17 +274,11 @@
           onchange={(event) => setColour('Background.Fill.colour', event.target.value, backgroundFill?.colour)}
         />
         <button class="target-btn" title="Open fill colour in Colors panel" onclick={() => openColour('Background.Fill.colour', backgroundFill?.colour)}>...</button>
-        <span class="mini-label">R</span>
-        <input
-          class="number-field size-field"
-          type="number"
-          min="0"
-          step="1"
-          value={backgroundCorners?.radius ?? 0}
-          title="Corner radius"
-          onchange={(event) => setNumber('Background.Corners.radius', event.target.value, backgroundCorners?.radius ?? 0, 0)}
-        />
+      </div>
+    {:else if shownFacet === 'border'}
+      <div class="prop-group">
         {#if backgroundBorder}
+          <span class="mini-label">C</span>
           <input
             class="color-swatch"
             type="color"
@@ -241,83 +287,147 @@
             title="Border colour"
             onchange={(event) => setColour('Background.Border.colour', event.target.value, backgroundBorder?.colour)}
           />
+          <button class="target-btn" title="Open border colour in Colors panel" onclick={() => openColour('Background.Border.colour', backgroundBorder?.colour)}>...</button>
+        {/if}
+        {#if backgroundCorners}
+          <span class="mini-label">R</span>
+          <input
+            class="number-field size-field"
+            type="number"
+            min="0"
+            step="1"
+            value={backgroundCorners?.radius ?? 0}
+            title="Corner radius"
+            onfocus={(event) => event.target.select()}
+            onchange={(event) => setNumber('Background.Corners.radius', event.target.value, backgroundCorners?.radius ?? 0, 0)}
+          />
         {/if}
       </div>
-    {/if}
-
-    {#if showBackgroundControls && (showTransformControls || showBehaviorControls)}
-      <div class="divider"></div>
-    {/if}
-
-    {#if showTransformControls}
-      <div class="section-chip">Box</div>
+    {:else if shownFacet === 'box'}
       <div class="prop-group">
         <span class="mini-label">W</span>
-        <input class="number-field" type="number" min="1" step="1" value={transform?.width ?? 0} title="Width" onchange={(event) => setNumber('Transform.width', event.target.value, transform?.width ?? 0, 1)} />
+        <input class="number-field" type="number" min="1" step="1" value={transform?.width ?? 0} title="Width" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.width', event.target.value, transform?.width ?? 0, 1)} />
         <span class="mini-label">H</span>
-        <input class="number-field" type="number" min="1" step="1" value={transform?.height ?? 0} title="Height" onchange={(event) => setNumber('Transform.height', event.target.value, transform?.height ?? 0, 1)} />
+        <input class="number-field" type="number" min="1" step="1" value={transform?.height ?? 0} title="Height" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.height', event.target.value, transform?.height ?? 0, 1)} />
+        <span class="mini-label">R</span>
+        <input class="number-field" type="number" step="1" value={transform?.rotation ?? 0} title="Rotation (degrees)" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.rotation', event.target.value, transform?.rotation ?? 0)} />
         <span class="mini-label">O</span>
-        <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={transform?.opacity ?? 1} title="Opacity" onchange={(event) => setNumber('Transform.opacity', event.target.value, transform?.opacity ?? 1, 0, 1)} />
+        <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={transform?.opacity ?? 1} title="Opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Transform.opacity', event.target.value, transform?.opacity ?? 1, 0, 1)} />
       </div>
-    {/if}
-
-    {#if showTransformControls && showBehaviorControls}
-      <div class="divider"></div>
-    {/if}
-
-    {#if showBehaviorControls}
-      <div class="section-chip">Input</div>
+    {:else if shownFacet === 'effects'}
       <div class="prop-group toggle-group">
-        {#if hasBehaviorPath('wheelEnabled')}
-          <button class="text-toggle" class:active={behavior?.wheelEnabled === true} title="Mouse wheel input" onclick={() => set('Behavior.wheelEnabled', !(behavior?.wheelEnabled === true))}>Wheel</button>
-        {/if}
-        {#if hasBehaviorPath('reverseMouseDirection')}
-          <button class="text-toggle" class:active={behavior?.reverseMouseDirection === true} title="Reverse mouse direction" onclick={() => set('Behavior.reverseMouseDirection', !(behavior?.reverseMouseDirection === true))}>Reverse</button>
-        {/if}
-        {#if hasBehaviorPath('keyboardEnabled')}
-          <button class="text-toggle" class:active={behavior?.keyboardEnabled !== false} title="Keyboard input" onclick={() => set('Behavior.keyboardEnabled', !(behavior?.keyboardEnabled !== false))}>Keys</button>
-        {/if}
+        <button class="text-toggle" class:active={shadowEnabled} title="Drop shadow" onclick={() => set('Effects.Shadows.items.0.enabled', !shadowEnabled)}>Shadow</button>
       </div>
-    {/if}
-  {:else if hasSelection}
-    <span class="empty-state">No quick controls for this selection</span>
-  {:else}
-    <span class="empty-state">No selection</span>
-  {/if}
-
-  {#if showStateToolbar || showSegmentToolbar}
-    <div class="divider"></div>
-    <div class="toolbar-slot">
-      <DisplayToolbar />
+      <div class="prop-group">
+        <span class="mini-label">Blur</span>
+        <input class="number-field" type="number" min="0" step="0.5" value={effects?._children?.Filters?.blur ?? 0} title="Blur" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Effects.Filters.blur', event.target.value, effects?._children?.Filters?.blur ?? 0, 0)} />
+        <span class="mini-label">Brt</span>
+        <input class="number-field" type="number" min="0" step="1" value={effects?._children?.Filters?.brightness ?? 100} title="Brightness" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Effects.Filters.brightness', event.target.value, effects?._children?.Filters?.brightness ?? 100, 0)} />
+      </div>
+      <div class="prop-group">
+        <select class="font-select" value={blendMode} title="Blend mode" onchange={(event) => set('Effects.Blend.mode', event.target.value)}>
+          {#each BLEND_MODES as mode}
+            <option value={mode}>{mode}</option>
+          {/each}
+        </select>
+      </div>
+    {:else if shownFacet === 'icon'}
+      <div class="prop-group">
+        <select class="font-select" value={icon?.assetId ?? ''} title="Icon" onchange={setIconAsset}>
+          <option value="">No icon</option>
+          {#each $availableIcons as option}
+            <option value={option.value}>{option.label}</option>
+          {/each}
+        </select>
+        <span class="mini-label">Sz</span>
+        <input class="number-field size-field" type="number" min="4" step="1" value={icon?.size ?? 16} title="Icon size" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.size', event.target.value, icon?.size ?? 16, 4)} />
+      </div>
+      <div class="prop-group">
+        <input
+          class="color-swatch"
+          type="color"
+          value={iconTintColour}
+          style="background: {iconTintColour};"
+          title="Icon tint"
+          onchange={(event) => setColour('Icon.tint', event.target.value, icon?.tint)}
+        />
+        <button class="target-btn" title="Open icon tint in Colors panel" onclick={() => openColour('Icon.tint', icon?.tint)}>...</button>
+        <span class="mini-label">O</span>
+        <input class="number-field opacity-field" type="number" min="0" max="1" step="0.05" value={icon?.opacity ?? 1} title="Icon opacity" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.opacity', event.target.value, icon?.opacity ?? 1, 0, 1)} />
+        <span class="mini-label">R</span>
+        <input class="number-field" type="number" step="1" value={icon?.rotation ?? 0} title="Icon rotation" onfocus={(event) => event.target.select()} onchange={(event) => setNumber('Icon.rotation', event.target.value, icon?.rotation ?? 0)} />
+      </div>
+      {/if}
     </div>
   {/if}
+  </div>
 
-  <div class="spacer"></div>
+  <DeviceInsight />
+  <ScriptInsight />
 </div>
 
 <style>
-  .common-bar {
+  .look-bar {
     display: flex;
-    align-items: center;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
     height: 100%;
-    padding: 0 10px;
-    gap: 8px;
+    padding: 4px 10px;
     background: #272727;
     font-size: 11px;
   }
 
-  .designer-state {
-    color: #8DBFE5;
-    font-weight: 700;
+  .look-main {
+    flex: 0 0 auto;
+    width: 374px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
   }
 
-  .section-chip {
-    flex: 0 0 auto;
-    color: #8F8F8F;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0;
-    text-transform: uppercase;
+  .look-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 22px;
+  }
+
+  .facet-tabs {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .facet-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    padding: 0 9px;
+    background: #1E1E1E;
+    border: 1px solid #3A3A3A;
+    color: #9A9A9A;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .facet-tab:first-child { border-radius: 3px 0 0 3px; }
+  .facet-tab:last-child  { border-radius: 0 3px 3px 0; }
+  .facet-tab:not(:last-child) { border-right: 0; }
+
+  .facet-tab:hover {
+    background: #333;
+    color: #DDD;
+  }
+
+  .facet-tab.active {
+    background: #094771;
+    color: #FFF;
+    border-color: #0B6EB5;
   }
 
   .prop-group {
@@ -402,12 +512,6 @@
     font-weight: 700;
   }
 
-  .divider {
-    width: 1px;
-    height: 16px;
-    background: #3A3A3A;
-  }
-
   .toggle-group {
     gap: 1px;
   }
@@ -427,6 +531,21 @@
     font-weight: 600;
   }
 
+  .toggle-btn:first-child { border-radius: 3px 0 0 3px; }
+  .toggle-btn:last-child  { border-radius: 0 3px 3px 0; }
+
+  .toggle-btn:hover,
+  .target-btn:hover {
+    background: #444;
+    color: #DDD;
+  }
+
+  .toggle-btn.active {
+    background: #094771;
+    color: #FFF;
+    border-color: #0B6EB5;
+  }
+
   .text-toggle {
     height: 22px;
     min-width: 36px;
@@ -441,17 +560,11 @@
     cursor: pointer;
   }
 
-  .toggle-btn:first-child { border-radius: 3px 0 0 3px; }
-  .toggle-btn:last-child  { border-radius: 0 3px 3px 0; }
-
-  .toggle-btn:hover,
-  .target-btn:hover,
   .text-toggle:hover {
     background: #444;
     color: #DDD;
   }
 
-  .toggle-btn.active,
   .text-toggle.active {
     background: #094771;
     color: #FFF;
@@ -461,13 +574,5 @@
   .empty-state {
     color: #777;
     font-size: 11px;
-  }
-
-  .spacer { flex: 1; }
-
-  .toolbar-slot {
-    min-width: 0;
-    display: flex;
-    align-items: center;
   }
 </style>

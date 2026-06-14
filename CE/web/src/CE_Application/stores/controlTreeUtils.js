@@ -154,3 +154,81 @@ export function applyPatchObject(control, patch) {
 
   return control;
 }
+
+// Sections worth surfacing in the script Paths picker (the visually/behaviorally meaningful ones).
+// Heavy structural sections (Parts, Behaviors, HitZones, Bindings, Scripts, Animations, …) are
+// intentionally excluded — they aren't typical set()/get() targets and would drown the list.
+const PICKER_SECTIONS = ['Core', 'Transform', 'Background', 'Text', 'Border', 'Icon', 'Effects', 'Grid'];
+const PICKER_LEAF_BLOCKLIST = new Set(['Core.id', 'Core.controlType', 'Core.name']);
+
+function pushScalarLeaves(node, prefix, out) {
+  if (!node || typeof node !== 'object') return;
+  for (const [key, value] of Object.entries(node)) {
+    if (key === '_type' || key === '_children') continue;
+    const t = typeof value;
+    if (value !== null && (t === 'string' || t === 'number' || t === 'boolean')) {
+      const path = prefix ? `${prefix}.${key}` : key;
+      if (!PICKER_LEAF_BLOCKLIST.has(path)) out.push(path);
+    }
+  }
+  if (node._children && typeof node._children === 'object') {
+    for (const [key, child] of Object.entries(node._children)) {
+      pushScalarLeaves(child, prefix ? `${prefix}.${key}` : key, out);
+    }
+  }
+}
+
+// The leaf set depends on a control's STRUCTURE, not its values — so we memoize per control id on
+// a cheap structural fingerprint. This skips the deep walk during live value-change dispatch
+// (when only values move and the Script tab keeps re-deriving the picker's control list).
+const _leafCache = new Map(); // Core.id -> { fp, leaves }
+
+function structureFingerprint(kids) {
+  const parts = [];
+  for (const sec of Object.keys(kids).sort()) {
+    const node = kids[sec];
+    const sub = node && node._children ? Object.keys(node._children).sort().join('+') : '';
+    parts.push(sub ? `${sec}:${sub}` : sec);
+  }
+  return parts.join(',');
+}
+
+/**
+ * Enumerate the addressable property dot-paths for a control, for the script Paths picker.
+ * Order: value forms first (the most-used) — `value` for standard controls, each ValueChannel
+ * name for custom components (those resolve to the channel's currentValue) — then the structural
+ * leaves of the meaningful sections (Transform.x, Background.Fill.colour, …). De-duplicated.
+ */
+export function enumerateLeafPaths(control) {
+  const kids = control?._children;
+  if (!kids || typeof kids !== 'object') return [];
+
+  const id = kids.Core?.id;
+  const fp = structureFingerprint(kids);
+  if (id != null) {
+    const cached = _leafCache.get(id);
+    if (cached && cached.fp === fp) return cached.leaves;
+  }
+
+  const out = [];
+  // Value forms (most-used) up top.
+  if (kids.Value && typeof kids.Value === 'object' && 'value' in kids.Value) out.push('value');
+  const channels = kids.ValueChannels?._children;
+  if (channels && typeof channels === 'object') {
+    const sectionKeys = new Set(Object.keys(kids).map((k) => k.toLowerCase()));
+    for (const name of Object.keys(channels)) {
+      // A channel named after a section (e.g. "Core") is shadowed by that section during
+      // resolution, so qualify those few to keep them reachable; everything else stays friendly.
+      out.push(sectionKeys.has(name.toLowerCase()) ? `ValueChannels.${name}` : name);
+    }
+  }
+
+  // Structural leaves from the meaningful sections.
+  for (const section of PICKER_SECTIONS) {
+    if (kids[section] && typeof kids[section] === 'object') pushScalarLeaves(kids[section], section, out);
+  }
+
+  const leaves = [...new Set(out)];
+  if (id != null) _leafCache.set(id, { fp, leaves });
+  return leaves;
+}

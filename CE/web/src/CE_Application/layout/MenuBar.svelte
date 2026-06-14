@@ -1,6 +1,6 @@
 <script>
   import { get } from 'svelte/store';
-  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab } from '../stores/panels.js';
+  import { addPanel, closePanel, closeActiveEditorTab, openSettingsTab, activeEditorTab, saveActivePanel, saveActivePanelAs, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, buildActivePanelVst3 } from '../stores/panels.js';
   import { addControl } from '../stores/controls.js';
   import { closeApplication } from '../bridge/bridge.js';
   import { undo, redo } from '../stores/history.js';
@@ -8,7 +8,7 @@
   import { editorZoom, editorZoomIncrement, activePanel, updatePanel } from '../stores/panels.js';
   import { requestZoomToSelection } from '../stores/editorCommands.js';
   import { createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
-  import { createScriptWorkspaceDocument, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
+  import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
 
@@ -40,7 +40,8 @@
   }
 
   function newScriptWorkspace() {
-    const document = createScriptWorkspaceDocument();
+    const panel = get(activePanel);
+    const document = getOrCreateScriptDocForPanel(panel?.id, panel?.name);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
@@ -142,7 +143,7 @@
       { label: 'Export Settings...',   action: () => {} },
     ],
     Build: [
-      { label: 'Build VST3',       action: () => {} },
+      { label: 'Build VST3',       action: () => buildActivePanelVst3() },
       { label: 'Build Standalone',  action: () => {} },
       { type: 'separator' },
       { label: 'Build Settings...', action: () => {} },

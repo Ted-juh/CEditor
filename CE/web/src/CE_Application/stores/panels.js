@@ -11,7 +11,11 @@ import {
   onOpenPanelPaths,
   requestFileData,
   onFileData,
+  buildVst3 as bridgeBuildVst3,
+  onBuildProgress,
+  onBuildComplete,
 } from '../bridge/bridge.js';
+import { clog, cinfo, cwarn, cerror } from './console.js';
 import {
   reopenLastSession,
   autosaveEnabled,
@@ -20,7 +24,7 @@ import {
 } from './runtimePreferences.js';
 import { createPerfDebugTimer, logPerfDebug } from '../utils/perfDebug.js';
 import { applyPanelUpdates } from './panelDocumentHelpers.js';
-import { createPanel, deserializePanel, serializePanel, uniquePanelPaths } from './panelModel.js';
+import { createPanel, deserializePanel, serializePanel, uniquePanelPaths, makeGuid } from './panelModel.js';
 import {
   getProjectDeviceSessionSnapshot,
   requestProjectDeviceSessionRestore,
@@ -905,6 +909,56 @@ export function saveActivePanelAs() {
   if (!panel) return;
 
   bridgeSavePanelAs(String(panel.id), serializePanelDocument(panel));
+}
+
+// --- In-app VST3 build (Build menu → "Build VST3") -------------------------------------------
+// Drives the same exporter the CLI uses (tools/scripts/export-panel-vst3.mjs) from inside the
+// editor: C++ writes the serialized panel to a temp .cepanel, runs npm build + cmake, and streams
+// the log back. Output is surfaced in the global console (ConsolePanel).
+let buildListenersReady = false;
+let buildInFlight = false;
+
+function ensureBuildListeners() {
+  if (buildListenersReady) return;
+  buildListenersReady = true;
+  onBuildProgress((p) => {
+    const line = p?.line;
+    if (line != null && String(line).length) clog('[vst3]', String(line));
+  });
+  onBuildComplete((r) => {
+    buildInFlight = false;
+    if (r?.ok) cinfo('[vst3] ✓ Build complete →', r.path ?? '(see export-out/)');
+    else cerror('[vst3] ✗ Build failed:', r?.message ?? `exit ${r?.code ?? '?'}`);
+  });
+}
+
+/**
+ * Build the active panel into a VST3. Returns true if a build was started. Requires the JUCE
+ * backend (no-op in plain-browser dev). Reuses the panel's stable GUID, minting + persisting one
+ * the first time so re-exports keep the same plugin identity.
+ */
+export function buildActivePanelVst3() {
+  const panel = get(activePanel);
+  if (!panel) { cwarn('[vst3] No active panel to build.'); return false; }
+  if (buildInFlight) { cwarn('[vst3] A build is already running.'); return false; }
+
+  ensureBuildListeners();
+
+  let guid = panel.panelGuid;
+  if (!guid) {
+    guid = makeGuid();
+    updatePanel(panel.id, { panelGuid: guid }); // persist identity into the document
+  }
+
+  // Match the exporter's choice (Export settings pluginName overrides the panel name) so the
+  // streamed "Build complete → path" reflects the real output file.
+  const pluginName = panel.exportSettings?.pluginName?.trim();
+  const productName = pluginName || String(panel.name || 'CEditor Panel').trim() || 'CEditor Panel';
+  buildInFlight = true;
+  cinfo(`[vst3] Building "${productName}" — runs npm + cmake, may take a minute…`);
+  // Serialize with the GUID merged in so the temp .cepanel carries it too (harmless if unused).
+  bridgeBuildVst3(String(panel.id), serializePanelDocument({ ...panel, panelGuid: guid }), guid, productName);
+  return true;
 }
 
 /** Open a panel from a file dialog. */

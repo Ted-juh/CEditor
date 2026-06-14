@@ -1,6 +1,7 @@
 <script>
-  import { activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab } from '../stores/panels.js';
+  import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
   import { addControl, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
+  import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
   import { computeGridOrigin, buildGridStyle } from '../utils/gridCSS.js';
@@ -19,7 +20,7 @@
   import DeviceProfileDesignerV2 from './DeviceProfileDesignerV2.svelte';
   import EditorRuler from './EditorRuler.svelte';
   import SettingsView from './SettingsView.svelte';
-  import ScriptWorkspace from './ScriptWorkspace.svelte';
+  import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
@@ -29,10 +30,27 @@
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
-  import { createScriptWorkspaceDocument } from '../stores/scriptWorkspace.js';
+  import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
+  import { isSourceScript } from '../scripting/scriptModel.js';
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
+  // The script editor is bound to a specific panel via the document's panelId, so the Paths
+  // picker shows THAT panel's controls (not the ambiguous "active panel").
+  let scriptDoc = $derived(
+    $activeEditorTab?.type === 'script' ? ($scriptDocuments.find((d) => d.id === $activeEditorTab.id) ?? null) : null
+  );
+  let scriptPanel = $derived(
+    scriptDoc?.panelId ? ($panels.find((p) => String(p.id) === String(scriptDoc.panelId)) ?? null) : null
+  );
+  let behaviorControls = $derived(
+    (scriptPanel?.controls ?? [])
+      .map((c) => ({
+        name: c?._children?.Core?.name ?? c?._children?.Core?.id,
+        leaves: enumerateLeafPaths(c),
+      }))
+      .filter((c) => c.name)
+  );
   let panelDesignerSplit = $derived($activePanelDesignerSplit);
   let splitDeviceProfileId = $derived(
     $deviceRoleMappings?.mainSynth?.profileId
@@ -388,7 +406,7 @@
   }
 
   function createStandaloneScriptWorkspace() {
-    const document = createScriptWorkspaceDocument();
+    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
@@ -542,7 +560,14 @@
       {:else if $activeEditorTab?.type === 'deviceProfile'}
         <DeviceProfileDesignerV2 profileId={$activeEditorTab.id} />
       {:else if $activeEditorTab?.type === 'script'}
-        <ScriptWorkspace documentId={$activeEditorTab.id} />
+        {#key $activeEditorTab.id}
+          <BehaviorDesigner
+            panelName={scriptPanel?.name ?? 'Scripts'}
+            panelId={scriptPanel?.id ?? null}
+            controls={behaviorControls}
+            initialScripts={(scriptDoc?.scripts ?? []).filter(isSourceScript)}
+            onChange={(scripts) => updateScriptDocument($activeEditorTab.id, { scripts })} />
+        {/key}
       {:else if canvasPanel}
         {#if selectedIsCustomComponent && !$previewModeEnabled}
           <div class="component-workspace-launcher" aria-label="Custom component workspace launcher">

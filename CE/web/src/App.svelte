@@ -8,13 +8,17 @@
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
   import ShortcutsOverlay from './CE_Application/layout/ShortcutsOverlay.svelte';
-  import CommonPropertyBar from './CE_Application/layout/CommonPropertyBar.svelte';
+  import AppearanceBar from './CE_Application/layout/AppearanceBar.svelte';
+  import FunctionBar from './CE_Application/layout/FunctionBar.svelte';
   import ZoomBar from './CE_Application/layout/ZoomBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
+  import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
   import { initPanelBridge, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel } from './CE_Application/stores/panels.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
+  import { initScriptConsoleBridge } from './CE_Application/stores/scriptConsole.js';
+  import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
@@ -27,20 +31,42 @@
   import { createCustomComponentStressPanel, createCustomComponentStressTest } from './CE_Application/utils/customComponentStressTest.js';
   import { resolveWorkspaceChrome } from './CE_Application/utils/workspaceChrome.js';
 
-  const isCutoutDebug = typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('debug') === 'cutout';
+  const debugRoute = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('debug') : null;
+  const isCutoutDebug = debugRoute === 'cutout';
+  const isBehaviorDebug = debugRoute === 'behavior';
+  // Sample control tree for the standalone BehaviorDesigner debug route (?debug=behavior),
+  // so the path-picker is demonstrable without a live panel.
+  const behaviorSampleControls = [
+    { name: 'cutoff', leaves: ['value', 'normalizedValue', 'midiValue', 'background.fill.colour', 'visible'] },
+    { name: 'resonance', leaves: ['value', 'normalizedValue', 'midiValue'] },
+    { name: 'filterType', leaves: ['value', 'midiValue'] },
+    { name: 'initButton', leaves: ['background.fill.colour', 'text.text', 'visible'] },
+  ];
+  const behaviorSampleScripts = [
+    { name: 'Read synth on open', language: 'lua', scope: 'panel', event: 'onPanelReady',
+      source: 'function onPanelReady(info)\n  if info.firstTime then\n    requestDump("patch")\n  end\nend\n' },
+    { name: 'Cutoff drives resonance', language: 'lua', scope: 'component', event: 'onValueChanged',
+      source: 'function onValueChanged(value)\n  set("resonance.value", scale(value, 0, 127, 0, 80))\nend\n' },
+    { name: 'Init patch', language: 'javascript', scope: 'component', event: 'onClick',
+      source: 'function onClick(mouse) {\n  noTransmit(() => {\n    set("cutoff.value", 8000)\n    set("resonance.value", 0)\n  })\n}\n' },
+    { name: 'Save preset on close', language: 'lua', scope: 'panel', event: 'onPanelClose',
+      source: 'function onPanelClose()\n  sendDump("patch")\nend\n' },
+  ];
 
-  if (!isCutoutDebug) {
+  if (!isCutoutDebug && !isBehaviorDebug) {
     initPanelBridge();
     initScriptWorkspaceBridge();
     initConsoleBridge();
+    initScriptConsoleBridge();
+    initPanelRuntime();
     syncPerfDebugToNative();
     initAppSettingsBridge();
     initHistory();
   }
 
   function handleGlobalKeyDown(e) {
-    if (isCutoutDebug) return;
+    if (isCutoutDebug || isBehaviorDebug) return;
 
     if (e.key === 'F1') {
       e.preventDefault();
@@ -245,7 +271,9 @@
 
 <svelte:window onkeydown={handleGlobalKeyDown} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
 
-{#if isCutoutDebug}
+{#if isBehaviorDebug}
+  <BehaviorDesigner controls={behaviorSampleControls} initialScripts={behaviorSampleScripts} />
+{:else if isCutoutDebug}
   <CutoutDebugPage />
 {:else}
     <div
@@ -281,12 +309,17 @@
     <div class="center-area">
       <div class="editor-top-row">
         <div class="editor-canvas-col">
+          {#if !isSettingsTab && !chromeWorkspaceActive}
+            <div class="look-bar-area">
+              <AppearanceBar />
+            </div>
+          {/if}
           <div class="editor-canvas-area">
             <EditorCanvas />
           </div>
           {#if !isSettingsTab && !chromeWorkspaceActive}
             <div class="common-bar-area">
-              <CommonPropertyBar />
+              <FunctionBar />
             </div>
             <div class="zoom-bar-area">
               <ZoomBar />
@@ -406,8 +439,12 @@
     min-height: 0;
     overflow: hidden;
   }
+  .look-bar-area {
+    flex: 0 0 60px;
+    border-bottom: 1px solid #333;
+  }
   .common-bar-area {
-    flex: 0 0 32px;
+    flex: 0 0 56px;
     border-top: 1px solid #333;
   }
 

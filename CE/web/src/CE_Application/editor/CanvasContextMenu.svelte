@@ -1,6 +1,10 @@
 <script>
   import { selectedComponentIds } from '../stores/panels.js';
-  import { removeControl, duplicateControl, updateControlProperty } from '../stores/controls.js';
+  import { removeControl, duplicateControl, updateControlProperty, selectedControl, getSection } from '../stores/controls.js';
+  import { setFacet } from '../stores/editorFacet.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { requestPropertiesTab } from '../stores/propertiesTab.js';
+  import { getBindableComponentPorts } from '../models/componentPorts.js';
   import { cutSelection, copySelection, pasteSelection, selectAll, hasClipboardContent } from '../stores/clipboard.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
   import { displayTabRequest } from '../stores/displayTab.js';
@@ -38,6 +42,39 @@
       .filter(c => $selectedComponentIds.has(c._children?.Core?.id))
       .every(c => c._children?.Core?.locked === true);
   });
+
+  // --- Single-selection contextual edit jumps (into the Look bar facets / Colors / Properties) ---
+  let single = $derived($selectedComponentIds.size === 1);
+  let control = $derived($selectedControl);
+  let core = $derived(getSection(control, 'Core'));
+  let background = $derived(getSection(control, 'Background'));
+  let bgFill = $derived(background?._children?.Fill ?? null);
+  let textFill = $derived(getSection(control, 'Text')?._children?.Fill ?? null);
+  let hasFillColour = $derived(!!(bgFill || textFill));
+  let bindable = $derived(control ? getBindableComponentPorts(control).length > 0 : false);
+
+  let editFacets = $derived([
+    getSection(control, 'Text') && { id: 'text', label: 'Text' },
+    bgFill && { id: 'fill', label: 'Fill' },
+    (background?._children?.Border || background?._children?.Corners) && { id: 'border', label: 'Border' },
+    getSection(control, 'Transform') && { id: 'box', label: 'Box' },
+    getSection(control, 'Effects') && { id: 'effects', label: 'Effects' },
+    getSection(control, 'Icon') && { id: 'icon', label: 'Icon' },
+  ].filter(Boolean));
+
+  function editFacet(id) { setFacet(id); close(); }
+
+  function editColour() {
+    const target = bgFill
+      ? { path: 'Background.Fill.colour', colour: bgFill.colour }
+      : (textFill ? { path: 'Text.Fill.colour', colour: textFill.colour } : null);
+    if (core?.id && target) {
+      activateColorTarget({ type: 'control', controlId: core.id, path: target.path }, String(target.colour ?? 'FFFFFFFF'));
+    }
+    close();
+  }
+
+  function editBindings() { requestPropertiesTab('devicebindings'); close(); }
 </script>
 
 {#if target}
@@ -48,12 +85,30 @@
     oncontextmenu={(e) => { e.preventDefault(); close(); }}
   ></div>
   <div class="ctx-menu" style="left:{target.screenX}px; top:{target.screenY}px;">
-    {#if $selectedComponentIds.size > 0}
-      <button class="ctx-item" onclick={cut}>Cut<span class="ctx-shortcut">Ctrl+X</span></button>
-      <button class="ctx-item" onclick={copy}>Copy<span class="ctx-shortcut">Ctrl+C</span></button>
-    {/if}
-    {#if hasClipboardContent()}
-      <button class="ctx-item" onclick={paste}>Paste Here<span class="ctx-shortcut">Ctrl+V</span></button>
+    <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={cut}>Cut<span class="ctx-shortcut">Ctrl+X</span></button>
+    <button class="ctx-item" disabled={$selectedComponentIds.size === 0} onclick={copy}>Copy<span class="ctx-shortcut">Ctrl+C</span></button>
+    <button class="ctx-item" disabled={!hasClipboardContent()} onclick={paste}>Paste Here<span class="ctx-shortcut">Ctrl+V</span></button>
+    {#if single}
+      <div class="ctx-separator"></div>
+      {#if hasFillColour}
+        <button class="ctx-item" onclick={editColour}>Edit Colour&hellip;</button>
+      {/if}
+      {#if editFacets.length > 0}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="ctx-sub-wrapper" onmouseenter={() => sub = 'edit'} onmouseleave={() => sub = null}>
+          <button class="ctx-item">Edit<span class="ctx-arrow">&#9656;</span></button>
+          {#if sub === 'edit'}
+            <div class="ctx-submenu">
+              {#each editFacets as facet}
+                <button class="ctx-item" onclick={() => editFacet(facet.id)}>{facet.label}</button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      {/if}
+      {#if bindable}
+        <button class="ctx-item" onclick={editBindings}>Device Bindings&hellip;</button>
+      {/if}
     {/if}
     {#if $selectedComponentIds.size > 0}
       <div class="ctx-separator"></div>
@@ -120,9 +175,14 @@
     text-align: left;
   }
 
-  .ctx-item:hover {
+  .ctx-item:hover:not(:disabled) {
     background: #094771;
     color: #FFF;
+  }
+
+  .ctx-item:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
 
   .ctx-item.ctx-danger:hover {

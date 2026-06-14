@@ -1,7 +1,7 @@
 <script>
-  import { editorTabs, activeEditorTab, activePanelDesignerSplit, addPanel, closePanel, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, addPanel, closePanel, setActiveEditorTab, closeSettingsTab, closeDeviceProfileTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument, createComponentDocumentFromLibraryEntry } from '../stores/componentWorkspace.js';
-  import { closeScriptWorkspaceDocument, createScriptWorkspaceDocument } from '../stores/scriptWorkspace.js';
+  import { closeScriptWorkspaceDocument, createScriptWorkspaceDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
 
@@ -63,7 +63,7 @@
   }
 
   function createScriptTab() {
-    const document = createScriptWorkspaceDocument();
+    const document = getOrCreateScriptDocForPanel($activePanel?.id, $activePanel?.name);
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 

@@ -8,7 +8,115 @@ juce::String perfFileLabel (const juce::String& path)
 {
     return juce::File (path).getFileName().isNotEmpty() ? juce::File (path).getFileName() : path;
 }
+
+// Locate node.exe for the in-app VST3 build. GUI processes inherit the system PATH, so a PATH
+// scan covers the common case; fall back to the default installer location. Empty file = not found.
+juce::File findNodeExecutable()
+{
+    const auto pathVar = juce::SystemStats::getEnvironmentVariable ("PATH", {});
+    for (auto& dir : juce::StringArray::fromTokens (pathVar, ";", "\""))
+    {
+        const auto trimmed = dir.unquoted().trim();
+        if (trimmed.isEmpty() || ! juce::File::isAbsolutePath (trimmed))
+            continue;
+        const auto candidate = juce::File (trimmed).getChildFile ("node.exe");
+        if (candidate.existsAsFile())
+            return candidate;
+    }
+    for (auto* p : { "C:\\Program Files\\nodejs\\node.exe",
+                     "C:\\Program Files (x86)\\nodejs\\node.exe" })
+        if (juce::File (p).existsAsFile())
+            return juce::File (p);
+    return {};
 }
+} // namespace
+
+/**
+ * Runs the VST3 exporter (tools/scripts/export-panel-vst3.mjs) as a child process, polled on the
+ * message thread so the UI stays responsive. Each stdout/stderr line is emitted to JS as
+ * "buildProgress" { line }; a terminal "buildComplete" { ok, code, message, path } closes it out.
+ * Owned by ValueTreeBridge (replaced per build), so `browser` outlives every emit.
+ */
+class VstBuildJob : public juce::Timer   // public base so unique_ptr<juce::Timer> can own it
+{
+public:
+    VstBuildJob (juce::WebBrowserComponent* browserToUse,
+                 const juce::StringArray& command,
+                 juce::String exportPathOnSuccess)
+        : browser (browserToUse), exportPath (std::move (exportPathOnSuccess))
+    {
+        emitLine ("$ " + command.joinIntoString (" "));
+        if (! process.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
+        {
+            emitComplete (false, -1, "Failed to launch node (the build process could not start).");
+            return;   // never start the timer — isTimerRunning() stays false, so a retry is allowed
+        }
+        startTimerHz (8);
+    }
+
+private:
+    void timerCallback() override
+    {
+        char buffer[1 << 14];
+        for (;;)
+        {
+            const int n = process.readProcessOutput (buffer, (int) sizeof (buffer));
+            if (n <= 0)
+                break;
+            pending += juce::String::fromUTF8 (buffer, n);
+        }
+        flushLines (false);
+
+        if (! process.isRunning())
+        {
+            flushLines (true);
+            stopTimer();
+            const int code = process.getExitCode();
+            emitComplete (code == 0, code,
+                          code == 0 ? juce::String ("VST3 export complete.")
+                                    : ("Build failed (exit code " + juce::String (code) + ")."));
+        }
+    }
+
+    void flushLines (bool flushRemainder)
+    {
+        for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; )
+        {
+            emitLine (pending.substring (0, nl).trimEnd());
+            pending = pending.substring (nl + 1);
+        }
+        if (flushRemainder && pending.trim().isNotEmpty())
+        {
+            emitLine (pending.trimEnd());
+            pending.clear();
+        }
+    }
+
+    void emitLine (const juce::String& line)
+    {
+        if (browser == nullptr || line.isEmpty())
+            return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("line", line);
+        browser->emitEventIfBrowserIsVisible ("buildProgress", juce::var (obj));
+    }
+
+    void emitComplete (bool ok, int code, const juce::String& message)
+    {
+        if (browser == nullptr)
+            return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("ok", ok);
+        obj->setProperty ("code", code);
+        obj->setProperty ("message", message);
+        obj->setProperty ("path", ok ? exportPath : juce::String());
+        browser->emitEventIfBrowserIsVisible ("buildComplete", juce::var (obj));
+    }
+
+    juce::WebBrowserComponent* browser = nullptr;
+    juce::ChildProcess process;
+    juce::String pending, exportPath;
+};
 
 juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::WebBrowserComponent::Options& base)
 {
@@ -757,6 +865,81 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                             browser->emitEventIfBrowserIsVisible ("fontsImported",
                                                                   juce::var (importedFonts));
                     });
+            });
+        })
+        .withEventListener ("buildVst3", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* obj = payload.getDynamicObject();
+                if (obj == nullptr)
+                    return;
+
+                const auto jsonData = obj->getProperty ("data").toString();
+                const auto guid     = obj->getProperty ("guid").toString();
+                auto productName    = obj->getProperty ("productName").toString().trim();
+                if (productName.isEmpty())
+                    productName = "CEditor Panel";
+
+                auto emitFail = [this] (const juce::String& message)
+                {
+                    auto* o = new juce::DynamicObject();
+                    o->setProperty ("ok", false);
+                    o->setProperty ("code", -1);
+                    o->setProperty ("message", message);
+                    o->setProperty ("path", juce::String());
+                    browser->emitEventIfBrowserIsVisible ("buildComplete", juce::var (o));
+                };
+
+                if (buildJob != nullptr && buildJob->isTimerRunning())
+                {
+                    emitFail ("A build is already running.");
+                    return;
+                }
+
+               #if defined (CEDITOR_SOURCE_ROOT)
+                const juce::File sourceRoot (CEDITOR_SOURCE_ROOT);
+               #else
+                const auto sourceRoot = juce::File::getCurrentWorkingDirectory();
+               #endif
+
+                const auto script = sourceRoot.getChildFile ("tools")
+                                              .getChildFile ("scripts")
+                                              .getChildFile ("export-panel-vst3.mjs");
+                if (! script.existsAsFile())
+                {
+                    emitFail ("Exporter not found: " + script.getFullPathName());
+                    return;
+                }
+
+                const auto node = findNodeExecutable();
+                if (node == juce::File())
+                {
+                    emitFail ("Node.js (node.exe) was not found on PATH. Install Node.js, then relaunch CEditor.");
+                    return;
+                }
+
+                auto tempPanel = juce::File::getSpecialLocation (juce::File::tempDirectory)
+                                    .getChildFile (juce::File::createLegalFileName (productName) + ".cepanel");
+                if (! tempPanel.replaceWithText (jsonData))
+                {
+                    emitFail ("Could not write the temporary panel file: " + tempPanel.getFullPathName());
+                    return;
+                }
+
+                const auto exportPath = sourceRoot.getChildFile ("export-out")
+                                                  .getChildFile (productName + ".vst3").getFullPathName();
+
+                const juce::StringArray command { node.getFullPathName(),
+                                                  script.getFullPathName(),
+                                                  tempPanel.getFullPathName(),
+                                                  guid,
+                                                  productName };
+
+                buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });
         });
 

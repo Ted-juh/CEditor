@@ -64,6 +64,7 @@
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
   import { runPanelPreviewScriptsForPatch } from '../scripting/scriptBindings.js';
+  import { dispatchInteraction } from '../scripting/panelRuntime.js';
 
   let {
     panel,
@@ -83,6 +84,10 @@
   let draggingRange = $state(false);
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
+  // Transient interaction-event tracking (onDoubleClick timing, onPointerMove throttle).
+  let lastPointerDownAt = 0;
+  let lastPointerDownId = '';
+  let lastPointerMoveDispatchAt = 0;
   let pointerStartValue = $state(0);
   let pointerSliderHandle = $state('');
   let pointerCustomHitZone = $state(null);
@@ -922,7 +927,23 @@
     return true;
   }
 
+  // Control-local coordinates (logical px) for a pointer/wheel event — the payload for interaction scripts.
+  function controlLocalPoint(event) {
+    const rect = event?.currentTarget?.getBoundingClientRect?.() ?? pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return { x: 0, y: 0 };
+    const s = scale || 1;
+    return { x: Math.round((event.clientX - rect.left) / s), y: Math.round((event.clientY - rect.top) / s) };
+  }
+
   function handleRangeWheel(control, event) {
+    // Fire onWheel for ANY control (before the range-only built-in below returns), so a script can
+    // react to the wheel even on non-range controls. delta = +1 up / -1 down; raw deltas included.
+    dispatchInteraction(getControlId(control), 'onWheel', {
+      ...controlLocalPoint(event),
+      delta: event.deltaY < 0 ? 1 : -1,
+      deltaX: event.deltaX,
+      deltaY: event.deltaY,
+    });
     if (isCustomComponent(control)) {
       if (isDisabled(control)) return;
       event.preventDefault();
@@ -1006,6 +1027,13 @@
   }
 
   function handlePointerMove(control, event) {
+    // onPointerMove: throttled (~30fps) hover-move over a control, control-local coords. Fires for any
+    // control; the built-in custom-hit-zone hover tracking below still only runs for custom components.
+    const moveAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (moveAt - lastPointerMoveDispatchAt > 33) {
+      lastPointerMoveDispatchAt = moveAt;
+      dispatchInteraction(getControlId(control), 'onPointerMove', controlLocalPoint(event));
+    }
     if (isDisabled(control) || pointerActiveControlId) return;
     if (!isCustomComponent(control)) return;
     const controlId = getControlId(control);
@@ -1047,6 +1075,16 @@
   function handlePointerDown(control, event) {
     if (event.button !== 0) return;
     if (isDisabled(control)) return;
+
+    // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
+    const downId = getControlId(control);
+    const downAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    if (downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350) {
+      dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
+    }
+    lastPointerDownId = downId;
+    lastPointerDownAt = downAt;
+    const pointerDownLocal = controlLocalPoint(event);
 
     event.preventDefault();
     event.stopPropagation();
@@ -1128,6 +1166,10 @@
       pressed: true,
       focused: false,
       dragging: draggingRange,
+      pointerX: pointerDownLocal.x,
+      pointerY: pointerDownLocal.y,
+      pointerButton: event.button,
+      pointerModifiers: (event.shiftKey ? 1 : 0) | (event.ctrlKey ? 2 : 0) | (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0),
     });
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));

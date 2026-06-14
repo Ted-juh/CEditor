@@ -96,6 +96,21 @@ export function savePanel(panelId, filePath, data) {
   window.__JUCE__.backend.emitEvent('savePanel', { panelId: String(panelId), filePath, data });
 }
 
+/**
+ * Build a VST3 from the given panel document. C++ writes the JSON to a temp .cepanel, then runs
+ * tools/scripts/export-panel-vst3.mjs (npm build + cmake). Streams 'buildProgress' { line } and
+ * a final 'buildComplete' { ok, code, message, path }. `guid` is the panel's stable export GUID.
+ */
+export function buildVst3(panelId, data, guid, productName) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — buildVst3 ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('buildVst3', {
+    panelId: String(panelId), data, guid, productName,
+  });
+}
+
 /** Request an "Open" dialog. C++ will emit 'panelOpened' on success. */
 export function openPanel() {
   if (!isJuceAvailable()) {
@@ -682,6 +697,20 @@ export function onFontPreviewRendered(callback) {
 export function onPanelSaved(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('panelSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Listen for 'buildProgress' events during a VST3 build. Callback receives { line }. */
+export function onBuildProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('buildProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+/** Listen for the terminal 'buildComplete' event. Callback receives { ok, code, message, path }. */
+export function onBuildComplete(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('buildComplete', callback);
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
