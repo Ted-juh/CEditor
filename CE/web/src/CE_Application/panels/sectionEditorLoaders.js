@@ -37,7 +37,6 @@ const LAZY_COMPONENT_LOADERS = {
   valuechannels: () => import('../sections/CustomValueChannelsEditor.svelte'),
   behaviors: () => import('../sections/CustomBehaviorsEditor.svelte'),
   hitzones: () => import('../sections/CustomHitZonesEditor.svelte'),
-  generators: () => import('../sections/CustomGeneratorsEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
   links: () => import('../sections/CustomLinksEditor.svelte'),
   published: () => import('../sections/CustomApiEditor.svelte'),

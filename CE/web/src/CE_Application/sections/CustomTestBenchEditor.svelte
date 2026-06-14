@@ -405,7 +405,7 @@
         'Designer.selectedHitZone': '',
         'Designer.selectedBehavior': zone?.targetBehavior ?? '',
         'Designer.selectedValueChannel': zone?.targetValueChannel ?? '',
-        'Designer.focusSection': 'generators',
+        'Designer.focusSurfaceDock': 'generators',
         'Designer.preview.showHitZones': true,
       });
       return;
@@ -440,7 +440,7 @@
     if (!generatorName) return;
     focusDesigner({
       'Designer.selectedGenerator': generatorName,
-      'Designer.focusSection': 'generators',
+      'Designer.focusSurfaceDock': 'generators',
       'Designer.preview.showHitZones': true,
     });
   }
@@ -624,7 +624,7 @@
       found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'behaviors' }) });
     }
     if (generatorTypes.includes('repeated-leds') || generatorTypes.includes('meter-bars')) {
-      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSection': 'generators', 'Designer.preview.showHitZones': true }) });
+      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true }) });
     }
     if (enumGroupDiagnostics.length) {
       found.push({ id: 'segmented', label: 'Segmented Enum', detail: `${enumGroupDiagnostics.length} enum group${enumGroupDiagnostics.length === 1 ? '' : 's'} with mutual exclusion and state coverage.`, action: 'Enum Groups', focus: () => {} });
@@ -1034,7 +1034,7 @@
     <PropertyCell label="Actions" span={4} hint="Common finishing actions before saving, exporting, or sharing this component.">
       <div class="quick-actions">
         <button type="button" onclick={publishAllChannels} disabled={valueNames.length === 0}>Publish all channels</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
+        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
         <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'links' })}>Review links</button>
         <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'assets' })}>Review assets</button>
       </div>

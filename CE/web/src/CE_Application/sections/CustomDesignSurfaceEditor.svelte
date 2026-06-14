@@ -303,6 +303,16 @@
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
   let activeInteractiveMeta = $derived(INTERACTIVE_ARCHETYPES.find((a) => a.id === interactiveArchetype) ?? INTERACTIVE_ARCHETYPES[0]);
 
+  // Generators live only in this surface dock now (plan §4 de-dup). Let other
+  // surfaces (Test Bench, generated-source links) focus the generators dock by
+  // setting Designer.focusSurfaceDock; consume it one-shot.
+  $effect(() => {
+    const requested = String(designer?.focusSurfaceDock ?? '').trim();
+    if (requested !== 'generators' && requested !== 'layers') return;
+    dockTab = requested;
+    if (core?.id) updateControlProperty(core.id, 'Designer.focusSurfaceDock', '');
+  });
+
   $effect(() => {
     componentDesignerStatus.set({
       kind: activeSelectionKind === 'artboard' ? 'Artboard' : (activeSelectionKind === 'kit' ? 'Kit' : (activeSelectionKind === 'hitZone' ? 'Hit Zone' : 'Layer')),
@@ -4298,7 +4308,7 @@
                 {#if source.hasGenerator}
                   <button
                     type="button"
-                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source, 'Designer.focusSection': 'generators' }); }}
+                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
                     title={`Edit ${source.source} generator`}
                   >
                     Gen

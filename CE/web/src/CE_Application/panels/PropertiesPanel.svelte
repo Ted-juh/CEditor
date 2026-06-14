@@ -128,7 +128,6 @@
     { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
     { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
     { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },
-    { id: 'generators', icon: Grid3x3,       label: 'Generators', section: 'Generators' },
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
     { id: 'links',      icon: Workflow,      label: 'Links',      section: 'Links' },
     { id: 'published',  icon: Cable,         label: 'API',        section: 'PublishedProperties' },
