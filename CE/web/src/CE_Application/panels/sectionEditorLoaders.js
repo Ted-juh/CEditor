@@ -32,7 +32,6 @@ const LAZY_COMPONENT_LOADERS = {
   bindings: () => import('../sections/BindingsEditor.svelte'),
   devicebindings: () => import('../sections/DeviceBindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
-  custompublic: () => import('../sections/CustomPublicPropertiesEditor.svelte'),
   designer: () => import('../sections/CustomDesignerEditor.svelte'),
   customlayers: () => import('../sections/CustomLayersEditor.svelte'),
   valuechannels: () => import('../sections/CustomValueChannelsEditor.svelte'),
@@ -41,7 +40,7 @@ const LAZY_COMPONENT_LOADERS = {
   generators: () => import('../sections/CustomGeneratorsEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
   links: () => import('../sections/CustomLinksEditor.svelte'),
-  published: () => import('../sections/CustomPublishedPropertiesEditor.svelte'),
+  published: () => import('../sections/CustomApiEditor.svelte'),
   variants: () => import('../sections/CustomVariantsEditor.svelte'),
   testbench: () => import('../sections/CustomTestBenchEditor.svelte'),
 };

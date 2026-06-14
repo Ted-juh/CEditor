@@ -210,7 +210,8 @@
 
   function openPublicApiEditor() {
     if (!core?.id) return;
-    updateControlProperty(core.id, 'Designer.focusSection', 'published');
+    // Switch the merged API editor to its contract (authoring) mode.
+    updateControlProperty(core.id, 'Designer.focusApiMode', 'contract');
   }
 
   function openDesignerEditor() {
