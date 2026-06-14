@@ -68,7 +68,7 @@ When `source !== 'independent'`, the **materializer** resolves the zone's bounds
 
 Grab-area size is only half. What happens *during* the drag matters as much:
 
-1. **Pointer capture / global drag tracking.** There is no `setPointerCapture` in the custom-component runtime today, so a drag that leaves the zone can drop. Capture the pointer on drag-start (and/or track at the window level until release) so even a tiny handle stays controllable once grabbed. **Highest-impact item in this section.**
+1. **Pointer capture / global drag tracking.** ✅ *Already present* — both runtime surfaces call `setPointerCapture` on drag-start (`InteractiveTestSurface.svelte`, `PanelPreviewSurface.svelte`) and track at the window level, so a drag that leaves the zone does not drop. (The earlier draft of this plan claimed it was missing; verified otherwise during Phase 1.)
 2. **Absolute vs relative drag, per archetype.** "Jump to value" (click-to-position) vs "Relative drag" (delta from grab point). Relative drag exists for linear modes (`customComponentInteraction.js:595-605`, `dragContext` + `dragSensitivity`) but **not for circular**; extend it to dials.
 3. **Fine-drag modifier.** Shift = slow drag (scaled `dragSensitivity`), the standard plugin convention.
 4. **Double-click to reset** to the channel's default value — universal convention, currently absent.
@@ -162,8 +162,8 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 
 | Phase | Scope | Depends on | Risk |
 |---|---|---|---|
-| **0. Undo/redo** (§12.1) | Wire `stores/history.js` into the custom designer; snapshot on mutation; Cmd-Z / Cmd-Shift-Z | — | Low — store exists, just unwired |
-| **1. Interactivity model** (§3) | `source`/`inflate`/`minTouch`, follow-mode resolver, pointer capture, drag modes, "Make Interactive", halo, archetypes | — | Medium — touches factory + materializer + runtime |
+| **0. Undo/redo** (§12.1) | ✅ **Done** — context-aware `stores/history.js`; the creator's `componentDocuments` get per-document undo/redo via the existing Ctrl+Z/menu/toolbar entry points | — | Low — store exists, just unwired |
+| **1. Interactivity model** (§3) | Engine ✅ **Done** (1A follow-mode `source`/`inflate`/`minTouch` + shared resolver; 1B `makeInteractive` + archetypes; 1C relative dial drag + fine-drag + double-click reset; 1D fine-drag & dbl-click wired into surfaces). **Remaining:** Make Interactive tool/context-action UI + grab-area halo (§3.1/§3.4) — visual-QA-heavy | — | Medium — touches factory + materializer + runtime |
 | **2. Unify the surface** (§4) | Merge Public/Published, de-dup Channels/Generators, Assets dock, inspector contract | 1 (shared inspector) | Low–Medium |
 | **3. Structured logic** (§6) | Condition builder, Variants override UI | — (parallel to 2) | Low |
 | **4. Design-tool surface** (§7) | Smart guides, align/distribute, measurements, shortcut overlay | — | Low |
