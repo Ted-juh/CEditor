@@ -4217,7 +4217,6 @@
             <div class="dock-tab-row" role="tablist" aria-label="Right dock sections">
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
-              <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
@@ -4417,10 +4416,6 @@
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
               <CustomGeneratorsEditor {control} />
-            </div>
-          {:else}
-            <div class="dock-empty dock-empty-tab">
-              Assets are edited in the inspector for now.
             </div>
           {/if}
         </section>
