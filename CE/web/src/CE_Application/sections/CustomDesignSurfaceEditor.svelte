@@ -25,6 +25,7 @@
     createPartNode,
     createText,
     createValueChannel,
+    makeInteractive,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
@@ -178,6 +179,8 @@
   let activeTool = $state('select');
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
+  let interactiveFlyoutOpen = $state(false);
+  let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
   let drawNoticeTimer = null;
@@ -283,10 +286,21 @@
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
     { id: 'text', label: 'Text', key: 'T' },
+    { id: 'interactive', label: 'Interactive', key: 'I' },
   ];
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
   const SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => SHAPE_TOOL_IDS.has(tool.id));
+  // "Make Interactive" archetypes — each draws a pre-wired control set.
+  const INTERACTIVE_ARCHETYPES = [
+    { id: 'dial', label: 'Dial' },
+    { id: 'slider', label: 'Slider' },
+    { id: 'button', label: 'Button' },
+    { id: 'toggle', label: 'Toggle' },
+    { id: 'xy', label: 'XY Pad' },
+    { id: 'range', label: 'Range' },
+  ];
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
+  let activeInteractiveMeta = $derived(INTERACTIVE_ARCHETYPES.find((a) => a.id === interactiveArchetype) ?? INTERACTIVE_ARCHETYPES[0]);
 
   $effect(() => {
     componentDesignerStatus.set({
@@ -389,6 +403,7 @@
     activeTool = id;
     if (SHAPE_TOOL_IDS.has(id)) lastShapeTool = id;
     shapeFlyoutOpen = false;
+    interactiveFlyoutOpen = false;
     cancelDraw();
     if (core?.id && id !== 'select') {
       inlineTextEditLayer = '';
@@ -404,10 +419,27 @@
   function toggleShapeFlyout(event) {
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
+    interactiveFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
     }
+  }
+
+  function toggleInteractiveFlyout(event) {
+    event?.stopPropagation?.();
+    interactiveFlyoutOpen = !interactiveFlyoutOpen;
+    shapeFlyoutOpen = false;
+    if (interactiveFlyoutOpen && activeTool !== 'interactive') {
+      setActiveTool('interactive');
+      interactiveFlyoutOpen = true;
+    }
+  }
+
+  function selectInteractiveArchetype(event, id) {
+    event?.stopPropagation?.();
+    interactiveArchetype = id;
+    setActiveTool('interactive');
   }
 
   function numberOr(value, fallback = 0) {
@@ -859,6 +891,9 @@
   function defaultDrawSize(tool = activeTool) {
     if (tool === 'text') return { width: 96, height: 28 };
     if (tool === 'hitZone') return { width: 96, height: 52 };
+    if (tool === 'interactive') {
+      return ['dial', 'xy'].includes(interactiveArchetype) ? { width: 80, height: 80 } : { width: 160, height: 48 };
+    }
     if (['ellipse', 'ring', 'arcTrack'].includes(tool)) return { width: 72, height: 72 };
     return { width: 72, height: 52 };
   }
@@ -1392,8 +1427,152 @@
     return zone;
   }
 
+  function uniqueInteractiveBase(archetypeId) {
+    const safe = String(archetypeId || 'control').replace(/[^a-zA-Z0-9_]/g, '') || 'control';
+    const used = new Set([
+      ...authoredPartNames,
+      ...Object.keys(valueChannels?._children ?? {}),
+      ...Object.keys(behaviors?._children ?? {}),
+    ]);
+    let name = safe;
+    let index = 1;
+    while (used.has(name) || used.has(`${name}Value`) || used.has(`${name}Behavior`)) {
+      index += 1;
+      name = `${safe}${index}`;
+    }
+    return name;
+  }
+
+  function publishChannelPatch(channels) {
+    const patch = {};
+    for (const [name, channel] of Object.entries(channels)) {
+      const type = channel?.type ?? 'float';
+      const label = channel?.label ?? name;
+      patch[`PublishedProperties.inputs.${name}`] = { channel: name, label, type, enabled: true };
+      patch[`PublishedProperties.outputs.${name}`] = { channel: name, label, type, enabled: true };
+    }
+    return patch;
+  }
+
+  // Build the visual parts for an archetype within a drawn frame, plus the
+  // options that point makeInteractive's hit zones at those parts. When
+  // `targetPartName` is set (the context action), no new parts are created and
+  // the wiring follows the existing part instead.
+  function buildInteractiveKit(archetypeId, rect, base, targetPartName) {
+    if (targetPartName) {
+      // Context action: wire the existing part. Cover every archetype's option
+      // shape so part-based zones follow this part (dial/xy ignore it and use
+      // the face, as designed).
+      return { parts: {}, options: { name: base, partName: targetPartName, minPart: targetPartName, maxPart: targetPartName } };
+    }
+    const frame = rect ?? { left: 0, top: 0, width: 96, height: 96 };
+    const x = Math.round(frame.left);
+    const y = Math.round(frame.top);
+    const w = Math.round(Math.max(8, frame.width));
+    const h = Math.round(Math.max(8, frame.height));
+    const parts = {};
+    let zStart = authoredPartNames.length + 1;
+    const addVisual = (name, kind, box, fill = 'FF5B9BD5', radius = 6) => {
+      parts[name] = createPartNode(name, {
+        kind,
+        role: archetypeId,
+        zIndex: zStart++,
+        layout: {
+          x: box.x, y: box.y, width: box.w, height: box.h,
+          xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px',
+          anchorX: 'left', anchorY: 'top',
+        },
+        sections: {
+          Background: createBackground(fill, {
+            borderEnabled: true,
+            borderColour: '55FFFFFF',
+            borderThickness: 1,
+            radius: kind === 'circle' ? 999 : radius,
+          }),
+        },
+      });
+    };
+
+    if (archetypeId === 'dial') {
+      addVisual(base, 'circle', { x, y, w, h }, 'FF2B3742', 999);
+      return { parts, options: { name: base } };
+    }
+    if (archetypeId === 'xy') {
+      addVisual(base, 'rectangle', { x, y, w, h }, 'FF1B2128', 8);
+      return { parts, options: { name: base } };
+    }
+    if (archetypeId === 'button' || archetypeId === 'toggle') {
+      const bg = `${base}Bg`;
+      addVisual(bg, 'roundedRectangle', { x, y, w, h }, 'FF2F6FED', 8);
+      return { parts, options: { name: base, partName: bg } };
+    }
+    if (archetypeId === 'slider') {
+      const track = `${base}Track`;
+      const handle = `${base}Handle`;
+      addVisual(track, 'roundedRectangle', { x, y: y + Math.round(h / 2) - 4, w, h: 8 }, 'FF2B3742', 999);
+      addVisual(handle, 'roundedRectangle', { x: x + Math.round(w / 2) - 8, y, w: 16, h }, 'FFFFFFFF', 4);
+      return { parts, options: { name: base, partName: track } };
+    }
+    if (archetypeId === 'range') {
+      const track = `${base}Track`;
+      const minHandle = `${base}MinHandle`;
+      const maxHandle = `${base}MaxHandle`;
+      addVisual(track, 'roundedRectangle', { x, y: y + Math.round(h / 2) - 4, w, h: 8 }, 'FF2B3742', 999);
+      addVisual(minHandle, 'roundedRectangle', { x: x + Math.round(w * 0.25) - 8, y, w: 16, h }, 'FFFFD36C', 4);
+      addVisual(maxHandle, 'roundedRectangle', { x: x + Math.round(w * 0.75) - 8, y, w: 16, h }, 'FF8EFFA5', 4);
+      return { parts, options: { name: base, minPart: minHandle, maxPart: maxHandle } };
+    }
+    return null;
+  }
+
+  function applyMakeInteractive(archetypeId, rect = null, targetPartName = null) {
+    if (!core?.id) return;
+    const base = uniqueInteractiveBase(archetypeId);
+    const kit = buildInteractiveKit(archetypeId, rect, base, targetPartName);
+    if (!kit) return;
+    const wiring = makeInteractive(archetypeId, kit.options);
+    if (!wiring) return;
+
+    const patch = {};
+    for (const [name, part] of Object.entries(kit.parts)) patch[`Parts.${name}`] = part;
+    for (const [name, channel] of Object.entries(wiring.valueChannels)) patch[`ValueChannels.${name}`] = channel;
+    for (const [name, behavior] of Object.entries(wiring.behaviors)) patch[`Behaviors.${name}`] = behavior;
+    let zonePriority = hitZoneEntries.length + 1;
+    for (const [name, zone] of Object.entries(wiring.hitZones)) {
+      zone.priority = zonePriority++;
+      patch[`HitZones.${name}`] = zone;
+    }
+    Object.assign(patch, publishChannelPatch(wiring.valueChannels));
+
+    const firstZone = Object.keys(wiring.hitZones)[0] ?? '';
+    const firstPart = Object.keys(kit.parts)[0] ?? targetPartName ?? '';
+    if (firstPart) {
+      localSelectedLayerNames = [firstPart];
+      patch['Designer.selectedLayer'] = firstPart;
+      patch['Designer.selectedLayers'] = [firstPart];
+      patch['Designer.selectedSurfaceKind'] = 'layer';
+    } else {
+      patch['Designer.selectedSurfaceKind'] = 'hitZone';
+    }
+    if (firstZone) patch['Designer.selectedHitZone'] = firstZone;
+    patch['Designer.selectedBehavior'] = Object.keys(wiring.behaviors)[0] ?? '';
+    patch['Designer.selectedValueChannel'] = Object.keys(wiring.valueChannels)[0] ?? '';
+    patch['Designer.preview.showHitZones'] = true;
+
+    applyControlPatch(core.id, patch);
+    activeTool = 'select';
+    interactiveFlyoutOpen = false;
+    lastDrawCreatedAt = Date.now();
+    if (firstPart) pulseSelection(`layer:${firstPart}`);
+    else if (firstZone) pulseSelection(`zone:${firstZone}`);
+  }
+
   function commitDrawnFrame(tool, rect, event = null) {
     if (!core?.id || !rect) return;
+    if (tool === 'interactive') {
+      applyMakeInteractive(interactiveArchetype, rect);
+      return;
+    }
     if (tool === 'hitZone') {
       const zone = makeDrawnHitZone(rect, event?.shiftKey ? 'circle' : 'rectangle');
       applyControlPatch(core.id, {
@@ -3017,6 +3196,10 @@
         shapeFlyoutOpen = false;
         return;
       }
+      if (interactiveFlyoutOpen) {
+        interactiveFlyoutOpen = false;
+        return;
+      }
       if (activeTool !== 'select') {
         setActiveTool('select');
         return;
@@ -3197,6 +3380,27 @@
             onchange={renameSelectedLayer}
           />
         </label>
+        <label class="rename-field">
+          <span>Interactive</span>
+          <select
+            value={interactiveArchetype}
+            disabled={!canManageLayer}
+            onchange={(event) => { interactiveArchetype = event.currentTarget.value; }}
+          >
+            {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
+              <option value={archetype.id}>{archetype.label}</option>
+            {/each}
+          </select>
+        </label>
+        <button
+          class="action-icon"
+          type="button"
+          onclick={() => applyMakeInteractive(interactiveArchetype, null, selectedLayer)}
+          disabled={!canManageLayer}
+          title="Wire this layer as an interactive control (value channel + behavior + hit zone)"
+        >
+          <span>Make Interactive</span>
+        </button>
         {#if canDetachLayer}
           <button class="action-icon detach" type="button" onclick={detachSelectedLayer} title="Detach generated layer">
             <Scissors size={14} aria-hidden="true" />
@@ -3487,6 +3691,36 @@
           <span class="tool-icon hitZone"></span>
           <strong>Hit Zone</strong>
         </button>
+
+        <div class="tool-flyout-host">
+          <button
+            type="button"
+            class:active={activeTool === 'interactive'}
+            title={`Make Interactive: ${activeInteractiveMeta.label} (I) — draw a pre-wired control`}
+            aria-haspopup="menu"
+            aria-expanded={interactiveFlyoutOpen}
+            onclick={toggleInteractiveFlyout}
+          >
+            <span class="tool-icon interactive"></span>
+            <strong>Interactive: {activeInteractiveMeta.label}</strong>
+          </button>
+          {#if interactiveFlyoutOpen}
+            <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
+              {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
+                <button
+                  type="button"
+                  role="menuitem"
+                  class:active={activeTool === 'interactive' && interactiveArchetype === archetype.id}
+                  title={`Draw a ${archetype.label}`}
+                  onclick={(event) => selectInteractiveArchetype(event, archetype.id)}
+                >
+                  <span class="tool-icon interactive"></span>
+                  <span>{archetype.label}</span>
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
       </div>
 
       <aside class="palette-panel" aria-label="Designer quick tools">
@@ -5365,6 +5599,25 @@
   .tool-icon.arcTrack::before {
     border-left-color: transparent;
     transform: rotate(-35deg);
+  }
+
+  .tool-icon.interactive::before {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border: 2px solid #7FD0A6;
+    border-radius: 999px;
+  }
+
+  .tool-icon.interactive::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 3px;
+    width: 2px;
+    height: 6px;
+    background: #7FD0A6;
+    transform: translateX(-50%);
   }
 
   .tool-icon.text::after {
