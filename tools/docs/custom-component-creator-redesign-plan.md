@@ -163,7 +163,7 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 | Phase | Scope | Depends on | Risk |
 |---|---|---|---|
 | **0. Undo/redo** (§12.1) | ✅ **Done** — context-aware `stores/history.js`; the creator's `componentDocuments` get per-document undo/redo via the existing Ctrl+Z/menu/toolbar entry points | — | Low — store exists, just unwired |
-| **1. Interactivity model** (§3) | Engine ✅ **Done** (1A follow-mode `source`/`inflate`/`minTouch` + shared resolver; 1B `makeInteractive` + archetypes; 1C relative dial drag + fine-drag + double-click reset; 1D fine-drag & dbl-click wired into surfaces). **Remaining:** Make Interactive tool/context-action UI + grab-area halo (§3.1/§3.4) — visual-QA-heavy | — | Medium — touches factory + materializer + runtime |
+| **1. Interactivity model** (§3) | ✅ **Done** — 1A follow-mode `source`/`inflate`/`minTouch` + shared resolver; 1B `makeInteractive` + archetypes; 1C relative dial drag + fine-drag + double-click reset; 1D fine-drag & dbl-click wired into surfaces; 1E Make Interactive tool flyout + layer context action; 1F grab-area halo. **Pending user visual QA** of 1E/1F in the running app. | — | Medium — touches factory + materializer + runtime |
 | **2. Unify the surface** (§4) | Merge Public/Published, de-dup Channels/Generators, Assets dock, inspector contract | 1 (shared inspector) | Low–Medium |
 | **3. Structured logic** (§6) | Condition builder, Variants override UI | — (parallel to 2) | Low |
 | **4. Design-tool surface** (§7) | Smart guides, align/distribute, measurements, shortcut overlay | — | Low |
