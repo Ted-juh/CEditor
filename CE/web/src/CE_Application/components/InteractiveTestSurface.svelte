@@ -50,6 +50,7 @@
     getCustomValueChannels,
     isCustomMouseDirectionReversed,
     normalizeCustomChannelValue,
+    resetCustomChannelToDefault,
     resolveCustomHitZoneAtPoint,
     resolveCustomInteractionPatch,
     resolveCustomNormalizedFromPoint,
@@ -479,6 +480,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      fine: event?.shiftKey === true,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -529,6 +531,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startNormalized: normalizeCustomChannelValue(channel, pointerCustomStartValues?.[channelName] ?? customSessionValues()?.[channelName] ?? channel?.defaultValue),
+      fine: event.shiftKey === true,
     });
     const nextValue = denormalizeCustomChannelValue(channel, normalized);
     patchSession({
@@ -1263,6 +1266,28 @@
     patchSession({ hover: false, pressed: false, dragging: false });
   }
 
+  function handleDoubleClick(event) {
+    if (isDisabled || !isCustomComponent) return;
+    const targetControl = resolvedControl ?? control;
+    const rect = hitboxElement?.getBoundingClientRect?.();
+    if (!rect) return;
+    const zone = resolveCustomHitZoneAtPoint(targetControl, rect, event.clientX, event.clientY, customSessionValues())?.zone;
+    if (!zone) return;
+    const channels = [zone.targetValueChannel, zone.targetValueChannelY, zone.targetYValueChannel].filter(Boolean);
+    if (!channels.length) return;
+    const nextValues = resetCustomChannelToDefault(targetControl, channels, customSessionValues());
+    const extra = {};
+    if (channels.includes('mainValue')) {
+      const mainChannel = getCustomValueChannels(targetControl)?.mainValue;
+      if (mainChannel) {
+        extra.customNormalizedValue = normalizeCustomChannelValue(mainChannel, nextValues.mainValue);
+        extra.valueOverrideEnabled = true;
+        extra.valueOverride = nextValues.mainValue;
+      }
+    }
+    patchSession({ customValues: nextValues, ...extra });
+  }
+
   function handlePointerDown(event) {
     if (isDisabled) return;
     event.preventDefault();
@@ -1601,6 +1626,7 @@
           onpointerenter={handlePointerEnter}
           onpointerleave={handlePointerLeave}
           onpointerdown={handlePointerDown}
+          ondblclick={handleDoubleClick}
           onwheel={handleWheel}
           onfocus={handleFocus}
           onblur={handleBlur}

@@ -781,6 +781,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         startClientX: point.startClientX,
         startClientY: point.startClientY,
         startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),
+        fine: point.fine === true,
       });
     }
     nextValue = denormalizeCustomChannelValue(channel, normalized);
