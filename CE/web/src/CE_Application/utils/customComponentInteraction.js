@@ -49,6 +49,25 @@ function customChannelResetValue(channel) {
   return channel.defaultValue ?? channel.currentValue ?? (String(channel.type ?? '') === 'bool' ? false : 0);
 }
 
+/**
+ * Reset one or more value channels to their default — the universal
+ * double-click convention. Pass a single channel name or an array; returns a
+ * new, constrained values object. Unknown channels are ignored.
+ */
+export function resetCustomChannelToDefault(control, channelNames, values = {}) {
+  const channels = getCustomValueChannels(control);
+  const names = Array.isArray(channelNames) ? channelNames : [channelNames];
+  const next = { ...(values ?? {}) };
+  let changed = false;
+  for (const name of names) {
+    const channel = channels?.[name];
+    if (!channel) continue;
+    next[name] = customChannelResetValue(channel);
+    changed = true;
+  }
+  return changed ? constrainCustomValues(control, next) : (values ?? {});
+}
+
 export function seedCustomValues(control) {
   const seeded = Object.entries(getCustomValueChannels(control)).reduce((values, [name, channel]) => {
     values[name] = customChannelDefaultValue(channel);
@@ -635,16 +654,22 @@ export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, 
     ? (['vertical', 'linear-vertical'].includes(geometry) ? 'vertical'
       : (['circular', 'ring', 'dial', 'arc'].includes(geometry) ? 'circular' : 'horizontal'))
     : configuredDragMode;
+  // 'relative' is an explicit, geometry-agnostic mode (the standard DAW knob
+  // feel): pointer movement nudges the value from where it was grabbed, so it
+  // also covers dials, not just linear modes.
+  const RELATIVE_MODES = ['vertical', 'horizontal', 'both', 'free', 'relative'];
   const hasDragStart = dragContext
     && Number.isFinite(Number(dragContext.startClientX))
     && Number.isFinite(Number(dragContext.startClientY))
     && Number.isFinite(Number(dragContext.startNormalized));
 
-  if (hasDragStart && ['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
-    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1));
+  if (hasDragStart && RELATIVE_MODES.includes(dragMode)) {
+    // Fine-drag modifier (Shift): slow the drag for precise adjustment.
+    const fineScale = dragContext?.fine ? 0.25 : 1;
+    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1)) * fineScale;
     const deltaX = (clientX - dragContext.startClientX) / Math.max(1, rect.width);
     const deltaY = (dragContext.startClientY - clientY) / Math.max(1, rect.height);
-    const rawMovement = dragMode === 'vertical'
+    const rawMovement = (dragMode === 'vertical' || dragMode === 'relative')
       ? deltaY
       : (dragMode === 'horizontal'
         ? deltaX
@@ -657,7 +682,7 @@ export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, 
     return applyCustomMouseDirection(behaviorModule, 1 - (localY / Math.max(1, rect.height)));
   }
 
-  if (['circular', 'ring', 'dial', 'arc'].includes(geometry) && !['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
+  if (['circular', 'ring', 'dial', 'arc'].includes(geometry) && !RELATIVE_MODES.includes(dragMode)) {
     const centerX = rect.width * (clamp(numberOr(behaviorModule?.centerX, 50), 0, 100) / 100);
     const centerY = rect.height * (clamp(numberOr(behaviorModule?.centerY, 50), 0, 100) / 100);
     const angle = dialAngleFromPoint(localX, localY, centerX, centerY);
