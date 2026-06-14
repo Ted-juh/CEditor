@@ -162,6 +162,7 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 
 | Phase | Scope | Depends on | Risk |
 |---|---|---|---|
+| **0. Undo/redo** (§12.1) | Wire `stores/history.js` into the custom designer; snapshot on mutation; Cmd-Z / Cmd-Shift-Z | — | Low — store exists, just unwired |
 | **1. Interactivity model** (§3) | `source`/`inflate`/`minTouch`, follow-mode resolver, pointer capture, drag modes, "Make Interactive", halo, archetypes | — | Medium — touches factory + materializer + runtime |
 | **2. Unify the surface** (§4) | Merge Public/Published, de-dup Channels/Generators, Assets dock, inspector contract | 1 (shared inspector) | Low–Medium |
 | **3. Structured logic** (§6) | Condition builder, Variants override UI | — (parallel to 2) | Low |
@@ -169,7 +170,7 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 | **5. Reactive bindings** (§5) | Live binding runtime (committed, §11.1) | — | High — runtime semantics |
 | **6. Density & readiness** (§8) | Type scale, property search, inline readiness | 2 | Low |
 
-Recommended order: **1 → 2 → 3 → 4 → 6 → 5.** Phase 1 first because it is load-bearing and the highest-leverage UX win; reactive bindings (5) last because it is the riskiest and the others do not depend on it — sequencing it last de-risks the whole project, but it *is* in scope this redesign.
+Recommended order: **0 → 1 → 2 → 3 → 4 → 6 → 5.** Phase 0 (undo/redo) first because it is tiny, load-bearing, and makes every later phase safer to explore in; Phase 1 next because it is the highest-leverage UX win; reactive bindings (5) last because it is the riskiest and the others do not depend on it — sequencing it last de-risks the whole project, but it *is* in scope this redesign.
 
 ---
 
@@ -188,3 +189,47 @@ Recommended order: **1 → 2 → 3 → 4 → 6 → 5.** Phase 1 first because it
 2. **Simple/Advanced split (§2):** **Global mode toggle** for the whole creator. Guardrail: keep the current mode obvious and easy to switch.
 3. **"Make Interactive" entry point (§3):** **Both** — a surface draw tool *and* a right-click/context action on an existing part.
 4. **Variants (§6):** **Override UI plus a raw-JSON escape hatch** under "advanced."
+
+---
+
+## 12. Beyond the redesign — toward a world-class builder
+
+The §1–§11 redesign makes the *existing* builder coherent. This section captures what would make it **diverse and easy** in a deeper sense. Each item is grounded in the current code (file/line evidence noted), with a corrected risk read after digging in.
+
+### 12.1 Undo/redo — the missing table stake (promoted to Phase 0)
+`stores/history.js` exists but is **not wired into the custom designer** — the only "history" in `CustomDesignerEditor.svelte` is *saved snapshots* ("Local Saves"), not in-session undo. Direct-manipulation builders live or die on fearless exploration, which requires Cmd-Z. The store already exists, so this is a wiring + snapshot-on-mutation job, not new infrastructure. **Highest value-to-effort ratio in the whole document.**
+
+### 12.2 Component-class diversity — the real answer to "diverse"
+All 9 `CUSTOM_COMPONENT_STARTERS` are flavors of input controls (knob / slider / XY / button / piano). To be genuinely diverse the builder needs whole *classes* it does not have starters for:
+- **Display / output-only:** meters, gain-reduction, scope/spectrum, dynamic value readouts, status LEDs. **These depend on reactive bindings (§5)** — they are inert without live external value flow. Flag the dependency explicitly.
+- **Multi-point editors:** ADSR envelope, EQ curve, step sequencer, breakpoint/automation curve.
+- **Containers & repeats:** tab groups, collapsible panels, and data-driven repeats ("16 step buttons from a count").
+
+### 12.3 Multi-point data model — *corrected* risk read after digging
+My first-pass claim was "the schema can't express multi-point editors." **That was too pessimistic.** Findings:
+- `ValueChannel` (`customComponentFactory.js:264`) *is* strictly scalar (single `min/max/step/currentValue`) — it alone cannot hold breakpoints.
+- **But the runtime already carries and resolves non-scalar data in two places:** enum channels carry `values[]`/`options[]` arrays (`customComponentInteraction.js:63`), and the **arpeggiator is already a shipping multi-point editor** — an array of `{note, step, length, velocity}` blocks (`customComponentArpeggiator.js`) edited on a grid via indexed hit-testing (`cellIndex`/`keyIndex` payloads, `resolveRuntimeArpeggiatorEdit`).
+- **Corrected conclusion:** multi-point editors need **no runtime rewrite** — the pattern is proven. The real gap is **generalization**: today each multi-point type is bespoke (the arpeggiator is its own field on `Designer`, its own resolver, its own UI). The work is introducing a reusable **`PointSet` / array-channel primitive** *alongside* scalar `ValueChannel`, then re-expressing the arpeggiator on top of it as the first consumer. **Medium effort, additive — not foundational risk.**
+
+### 12.4 Data-driven repeats — half-built already
+Generators already emit N parts *and* per-instance hit zones (`customComponentMaterializer.js` `addPart`/`addHitZone` carry `generatedBy`; `mapGeneratorHitZoneBounds` positions per-instance zones). So "16 interactive step buttons" is closer than expected. The remaining gap is **indexed per-instance binding** — each generated instance targeting a *distinct* value (step 1 → channel/index 1, …) rather than all sharing one `targetValueChannel`. Medium effort; builds on the §12.3 array primitive.
+
+### 12.5 Decompose the monoliths — a velocity prerequisite, not cleanup
+`CustomDesignSurfaceEditor.svelte` is **7,809 lines**, `CustomDesignerEditor.svelte` **3,468**, `CustomTestBenchEditor.svelte` **2,415** — ~19,800 lines across the custom sections. Every phase above pays a tax against these files. Splitting them (and folding the Test Bench into a persistent live preview, §12.6) should happen *as* the phases land, not after.
+
+### 12.6 Easy-wins refinements
+- **Persistent live preview** instead of a separate Test Bench *mode* — "what you build is what runs." The 2,415-line bench has become a parallel app.
+- **Terminology pass.** HitZones / ValueChannels / Generators / Behaviors / Links / **Published vs Public Properties** is a heavy bespoke vocabulary; "Published vs Public" (two separate editors) is genuinely confusing and is already slated to merge in §4 — extend that to a glossary + rename pass.
+- **Auto-fixable readiness.** `analyzeCustomComponentReadiness` already produces a navigable step list; make steps one-click-*fix*, not just one-click-*go-there*.
+- **Copy/paste/duplicate of parts and sub-assemblies, plus component composition** (nest a saved component inside another) — the biggest diversity *multiplier*, since users compose far more than they author from scratch.
+- **Responsive anchors/constraints** and **theme tokens** — parts are pixel-locked and colors hardcoded (e.g. `FF30343A`); reflow-on-resize and host-theme inheritance make output feel professional.
+
+### 12.7 Confidence & shareability
+- **Schema migration seam.** `CUSTOM_COMPONENT_PLAN_VERSION = 1` — build the migration path *now*, while v1 is the only version, so the first bump doesn't break saved/exported components silently.
+- **Sharing beyond local JSON.** The "Homepage URL" field hints a community library is intended; a browse/fork-from-gallery flow turns the tool into an ecosystem.
+
+### 12.8 Suggested incorporation
+- **Promote now:** §12.1 (undo/redo → Phase 0, already added to §9).
+- **Fold into existing phases:** §12.6 terminology → §4; auto-fix readiness → §6/§8; persistent preview → §4/§5.
+- **New scoped phases (post-redesign):** §12.2–§12.4 component-class diversity + `PointSet` primitive + indexed repeats (sequence after §5, since the display class depends on reactive bindings); §12.5 decomposition runs continuously alongside.
+- **Track as roadmap, not this pass:** §12.7 migration seam (do the seam now, the gallery later).
