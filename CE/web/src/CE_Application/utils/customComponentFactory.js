@@ -353,6 +353,14 @@ export function createHitZone(name, {
   targetValueChannelY = '',
   action = 'dragValue',
   bounds = {},
+  // Follow mode: how the grab area is positioned (all optional; omitting them
+  // reproduces today's behavior, where `bounds` are independent coordinates).
+  //   'independent'  — use `bounds` exactly as authored (default).
+  //   'face'         — track the whole control's bounds.
+  //   'part:<name>'  — track that part's resolved layout, grown by `inflate`.
+  source = 'independent',
+  inflate = {},
+  minTouch = 0,
   payload = null,
   meta = {},
 } = {}) {
@@ -377,6 +385,14 @@ export function createHitZone(name, {
       unit: 'percent',
       ...bounds,
     },
+    source: source || 'independent',
+    inflate: {
+      x: 0,
+      y: 0,
+      unit: 'px',
+      ...inflate,
+    },
+    minTouch: Number(minTouch) || 0,
     condition: '',
     meta,
   };

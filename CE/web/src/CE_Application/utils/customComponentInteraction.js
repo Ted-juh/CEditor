@@ -3,6 +3,7 @@ import {
   resolveRuntimeArpeggiatorEdit,
   syncCustomArpeggiatorValues,
 } from './customComponentArpeggiator.js';
+import { resolvePartPixelRect } from './customComponentLayout.js';
 
 function numberOr(value, fallback = 0) {
   const numeric = Number(value);
@@ -501,7 +502,53 @@ export function applyCustomLinks(control, values = {}) {
   return { values: nextValues, targets };
 }
 
-export function customHitZoneRect(zone, rect) {
+// Resolve a follow-mode hit zone's pixel rect from its source part (or the
+// control face), grown by `inflate` and clamped up to `minTouch`. Returns null
+// for independent zones or when the source can't be resolved, so the caller
+// falls back to the authored `bounds`.
+function followModeZoneRect(zone, rect, parts) {
+  const source = String(zone?.source ?? 'independent');
+  if (source === 'independent') return null;
+
+  let base = null;
+  if (source === 'face') {
+    base = { x: 0, y: 0, width: rect.width, height: rect.height };
+  } else if (source.startsWith('part:')) {
+    const partName = source.slice('part:'.length);
+    const layout = parts?.[partName]?._children?.Layout ?? null;
+    base = layout ? resolvePartPixelRect(layout, rect.width, rect.height) : null;
+  }
+  if (!base) return null;
+
+  const inflate = zone?.inflate ?? {};
+  const percentUnit = String(inflate.unit ?? 'px') === 'percent';
+  const inflateX = percentUnit ? (numberOr(inflate.x, 0) / 100) * rect.width : numberOr(inflate.x, 0);
+  const inflateY = percentUnit ? (numberOr(inflate.y, 0) / 100) * rect.height : numberOr(inflate.y, 0);
+  let resolved = {
+    x: base.x - inflateX,
+    y: base.y - inflateY,
+    width: base.width + inflateX * 2,
+    height: base.height + inflateY * 2,
+  };
+
+  const minTouch = numberOr(zone?.minTouch, 0);
+  if (minTouch > 0) {
+    if (resolved.width < minTouch) {
+      resolved.x -= (minTouch - resolved.width) / 2;
+      resolved.width = minTouch;
+    }
+    if (resolved.height < minTouch) {
+      resolved.y -= (minTouch - resolved.height) / 2;
+      resolved.height = minTouch;
+    }
+  }
+  return resolved;
+}
+
+export function customHitZoneRect(zone, rect, parts = null) {
+  const followRect = rect ? followModeZoneRect(zone, rect, parts) : null;
+  if (followRect) return followRect;
+
   const bounds = zone?.bounds ?? {};
   const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : 'percent';
   const width = Math.max(0, numberOr(bounds.width, 100));
@@ -521,8 +568,8 @@ export function customHitZoneRect(zone, rect) {
   };
 }
 
-function isPointInZone(zone, rect, localX, localY) {
-  const zoneRect = customHitZoneRect(zone, rect);
+function isPointInZone(zone, rect, localX, localY, parts = null) {
+  const zoneRect = customHitZoneRect(zone, rect, parts);
   const insideBox = localX >= zoneRect.x
     && localX <= zoneRect.x + zoneRect.width
     && localY >= zoneRect.y
@@ -555,21 +602,22 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, val
   if (!rect) return null;
   const localX = clientX - rect.left;
   const localY = clientY - rect.top;
+  const parts = control?._children?.Parts?._children ?? null;
   const conditionValues = constrainCustomValues(control, values ?? {});
   const entries = enabledEntries(getCustomHitZones(control))
     .filter(([, zone]) => conditionMatches(zone?.condition, conditionValues))
     .sort((left, right) => {
       const priorityDelta = numberOr(right[1]?.priority, 0) - numberOr(left[1]?.priority, 0);
       if (priorityDelta !== 0) return priorityDelta;
-      const leftRect = customHitZoneRect(left[1], rect);
-      const rightRect = customHitZoneRect(right[1], rect);
+      const leftRect = customHitZoneRect(left[1], rect, parts);
+      const rightRect = customHitZoneRect(right[1], rect, parts);
       const leftArea = Math.max(0, leftRect.width) * Math.max(0, leftRect.height);
       const rightArea = Math.max(0, rightRect.width) * Math.max(0, rightRect.height);
       return leftArea - rightArea;
     });
 
   for (const [name, zone] of entries) {
-    if (isPointInZone(zone, rect, localX, localY)) {
+    if (isPointInZone(zone, rect, localX, localY, parts)) {
       return { name, zone };
     }
   }
