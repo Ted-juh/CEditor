@@ -28,6 +28,7 @@
     makeInteractive,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
+  import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
@@ -2008,6 +2009,19 @@
   }
 
   function zoneFrame(zone) {
+    // Follow-mode zones (source 'face' / 'part:<name>') derive their grab area
+    // from a part or the control face, grown by inflate/minTouch. Resolve it
+    // with the same runtime resolver so the overlay shows the true grab area —
+    // the §3.4 halo — instead of stale authored bounds.
+    const source = String(zone?.source ?? 'independent');
+    if (source !== 'independent') {
+      const resolved = customHitZoneRect(
+        zone,
+        { left: 0, top: 0, width: artboardWidth, height: artboardHeight },
+        renderControl?._children?.Parts?._children ?? null
+      );
+      if (resolved) return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
+    }
     const bounds = zone?.bounds ?? {};
     const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : '%';
     const x = numberOr(bounds.x, 0);
@@ -4109,17 +4123,20 @@
                   class:selected={activeSelectionKind === 'hitZone' && selectedHitZone === name}
                   class:dimmed={zoneDisplayMode === 'dim' && !(activeSelectionKind === 'hitZone' && selectedHitZone === name)}
                   class:locked={activeSelectionKind === 'hitZone' && selectedHitZone === name && !selectedZoneEditable}
+                  class:follow={String(zone?.source ?? 'independent') !== 'independent'}
                   class:pulse={selectionPulseTarget === `zone:${name}`}
                   type="button"
                   style={hitZoneStyle(name, zone)}
-                  title={`${name}: ${zone?.action ?? 'action'}`}
+                  title={String(zone?.source ?? 'independent') !== 'independent'
+                    ? `${name}: ${zone?.action ?? 'action'} — grab area follows ${zone.source}`
+                    : `${name}: ${zone?.action ?? 'action'}`}
                   onclick={(event) => { event.stopPropagation(); selectHitZone(name); }}
                   onpointerenter={() => setSurfaceHover('hitZone', name)}
                   onpointerleave={() => clearSurfaceHover('hitZone', name)}
                   onmousedown={(event) => beginZoneMove(name, zone, event)}
                 >
                   <span class="selection-label">{name}</span>
-                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable}
+                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable && String(zone?.source ?? 'independent') === 'independent'}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       <span
                         class="resize-handle"
@@ -7029,6 +7046,31 @@
       0 0 0 1px rgba(255, 255, 255, 0.58),
       0 0 0 4px rgba(229, 160, 41, 0.16),
       0 0 18px rgba(229, 160, 41, 0.26);
+  }
+
+  /* Follow-mode grab area (the §3.4 halo): teal + dashed to read as a derived,
+     auto-tracking area distinct from hand-placed amber zones. */
+  .hit-zone.follow {
+    border-style: dashed;
+    border-color: rgba(45, 212, 191, 0.85);
+    background: rgba(45, 212, 191, 0.12);
+    color: #C9FFF6;
+    cursor: grab;
+  }
+
+  .hit-zone.follow.selected {
+    border-width: 2px;
+    background: rgba(45, 212, 191, 0.2);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.5),
+      0 0 0 4px rgba(45, 212, 191, 0.16),
+      0 0 18px rgba(45, 212, 191, 0.26);
+  }
+
+  .hit-zone.follow > .selection-label {
+    background: rgba(8, 51, 47, 0.96);
+    border-color: rgba(45, 212, 191, 0.4);
+    color: #C9FFF6;
   }
 
   .hit-zone > .selection-label {
