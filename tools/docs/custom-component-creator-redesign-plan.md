@@ -26,7 +26,7 @@ And a cluster of polish gaps: 9px uppercase labels in a wall of property cells; 
 
 > **1. Remove bookkeeping, not abstractions.** The author should never hand-match three names to make one control. The channel/behavior/zone graph still exists — the tool maintains it.
 
-> **2. Progressive disclosure, not feature removal.** A Simple path that covers the common case, an Advanced path that exposes the full graph. Same data model underneath; nothing is hidden permanently and nothing is deleted.
+> **2. Progressive disclosure, not feature removal.** A **global Simple/Advanced toggle** (decision §11.2) flips the whole creator between a path that covers the common case and one that exposes the full graph. Same data model underneath; nothing is hidden permanently and nothing is deleted. (Guardrail: make the current mode obvious and easy to switch so an author never feels "stuck" in the wrong one.)
 
 > **3. One home per concept.** Surface = spatial/visual. Panel = logic/data. A concept lives in exactly one place.
 
@@ -42,7 +42,7 @@ This is the load-bearing change and ships first. It does **not** remove hit zone
 
 ### 3.1 One creation action instead of four
 
-A **"Make Interactive"** action — available on a selected part and as a surface draw tool — where the author picks an **archetype**: Dial / Slider / Button / Toggle / XY / Range. The single action scaffolds the value channel(s) + behavior + hit zone(s), **pre-wired**, with archetype-appropriate defaults. The resulting zone is still a real, selectable, editable object; the author just didn't author-and-name three things by hand.
+A **"Make Interactive"** action — exposed **both** as a surface draw tool (create from scratch) **and** as a right-click/context action on an existing part (decision §11.3) — where the author picks an **archetype**: Dial / Slider / Button / Toggle / XY / Range. The single action scaffolds the value channel(s) + behavior + hit zone(s), **pre-wired**, with archetype-appropriate defaults. The resulting zone is still a real, selectable, editable object; the author just didn't author-and-name three things by hand.
 
 Multi-zone archetypes scaffold coherent **sets**: a Range slider is two handles + two channels with linked constraints; a transport cluster is three buttons; XY is one face + two channels. "Make Interactive" must produce the whole set, not a single zone.
 
@@ -115,10 +115,11 @@ Files: `panels/PropertiesPanel.svelte`, `panels/sectionEditorLoaders.js`, the `C
 
 ## 5. Reactive bindings (fixes the deeper half of problem 3)
 
-Bindings are the promise "this part moves when the value changes," but they are computed once at materialize time. Two acceptable resolutions; pick one:
+Bindings are the promise "this part moves when the value changes," but they are computed once at materialize time — so a value changed from outside direct interaction (preset load, MIDI, another control) does not move the part on its own. **Decision §11.1: make bindings genuinely live in this pass — committed scope, not optional.**
 
-- **Preferred — make bindings genuinely reactive** in the runtime: a binding subscribes to its source channel and updates its target property on change, instead of being baked in once. The Test Bench stops being the only thing that looks live.
-- **Fallback — reframe honestly.** If full reactivity is out of scope for this pass, rename/relabel so the mental model matches: bindings are "materialize-time mappings," and live behavior flows through Links. This is a stopgap, not the goal.
+- A binding **subscribes to its source channel** and updates its target property whenever that channel changes, instead of being baked in once. The Test Bench stops being the only thing that looks live, and external value changes propagate immediately.
+- This is the **highest-risk** change in the redesign because it alters how the running plugin updates itself, so it is sequenced last (§9) — everything else is independent of it and ships first.
+- Keep the materialize-time path as the fallback for properties that genuinely only need to be set once, so we don't pay reactive cost where it isn't needed.
 
 Files: `utils/customComponentInteraction.js`, `utils/customComponentMaterializer.js`, the runtime renderer, `sections/CustomTestBenchEditor.svelte`.
 
@@ -129,7 +130,7 @@ Files: `utils/customComponentInteraction.js`, `utils/customComponentMaterializer
 Replace free text with structured builders. No capability removed; the unsafe/fiddly input method is.
 
 - **Condition builder.** Replace the regex condition parser (single comparison, silent `return true`) with either a small real expression evaluator or — preferred for authors — a structured builder: *channel · operator · value*, AND/OR groups. Used by Links and States.
-- **Variants override UI.** Replace the JSON-patch text editor (`CustomVariantsEditor.svelte`, 293 lines) with a real override surface: show the base value, let the author toggle/override specific properties, render the diff. JSON stays available as an "advanced" escape hatch.
+- **Variants override UI.** Replace the JSON-patch text editor (`CustomVariantsEditor.svelte`, 293 lines) with a real override surface: show the base value, let the author toggle/override specific properties, render the diff. **Decision §11.4: keep raw JSON available under an "advanced" escape hatch** for cases the visual UI doesn't cover yet.
 
 Files: `utils/customComponentInteraction.js` (condition eval), `sections/CustomLinksEditor.svelte`, `sections/CustomVariantsEditor.svelte`, a shared `ConditionBuilder.svelte`.
 
@@ -165,10 +166,10 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 | **2. Unify the surface** (§4) | Merge Public/Published, de-dup Channels/Generators, Assets dock, inspector contract | 1 (shared inspector) | Low–Medium |
 | **3. Structured logic** (§6) | Condition builder, Variants override UI | — (parallel to 2) | Low |
 | **4. Design-tool surface** (§7) | Smart guides, align/distribute, measurements, shortcut overlay | — | Low |
-| **5. Reactive bindings** (§5) | Live binding runtime (or reframe) | — | High — runtime semantics |
+| **5. Reactive bindings** (§5) | Live binding runtime (committed, §11.1) | — | High — runtime semantics |
 | **6. Density & readiness** (§8) | Type scale, property search, inline readiness | 2 | Low |
 
-Recommended order: **1 → 2 → 3 → 4 → 6 → 5.** Phase 1 first because it is load-bearing and the highest-leverage UX win; reactive bindings (5) last because it is the riskiest and the others do not depend on it.
+Recommended order: **1 → 2 → 3 → 4 → 6 → 5.** Phase 1 first because it is load-bearing and the highest-leverage UX win; reactive bindings (5) last because it is the riskiest and the others do not depend on it — sequencing it last de-risks the whole project, but it *is* in scope this redesign.
 
 ---
 
@@ -181,9 +182,9 @@ Recommended order: **1 → 2 → 3 → 4 → 6 → 5.** Phase 1 first because it
 
 ---
 
-## 11. Open questions for sign-off
+## 11. Resolved decisions (signed off 2026-06-14)
 
-1. **Reactive bindings (§5):** full runtime reactivity this pass, or reframe-and-defer?
-2. **Simple/Advanced split:** a global mode toggle, or per-section progressive disclosure?
-3. **"Make Interactive" entry point:** primarily a draw tool, a right-click/context action on a part, or both?
-4. **Variants:** is JSON kept as an advanced escape hatch, or fully replaced by the override UI?
+1. **Reactive bindings (§5):** **Make bindings fully live this pass** — committed scope. A binding updates its part whenever its value changes from anywhere (presets, MIDI, other controls), not just while dragging. Sequenced last because it is the riskiest piece.
+2. **Simple/Advanced split (§2):** **Global mode toggle** for the whole creator. Guardrail: keep the current mode obvious and easy to switch.
+3. **"Make Interactive" entry point (§3):** **Both** — a surface draw tool *and* a right-click/context action on an existing part.
+4. **Variants (§6):** **Override UI plus a raw-JSON escape hatch** under "advanced."
