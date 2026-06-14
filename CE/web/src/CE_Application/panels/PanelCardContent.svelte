@@ -1,5 +1,7 @@
 <script>
-  import { panels, activePanel, updatePanel } from '../stores/panels.js';
+  import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
+  import { makeGuid } from '../stores/panelModel.js';
+  import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
   import NumberInput from '../sections/NumberInput.svelte';
@@ -45,6 +47,43 @@
 
   function handleSwatchClick(prop, currentColor) {
     activateColorTarget({ type: 'panel', prop }, currentColor);
+  }
+
+  // --- Export / plugin identity (Export tab) ---
+  let exportSettings = $derived(panel?.exportSettings ?? {});
+  // The host-visible plugin name: explicit override, else the panel name.
+  let effectivePluginName = $derived((exportSettings.pluginName?.trim()) || panel?.name || 'CEditor Panel');
+  // Live preview of the derived codes — identical to what the exporter stamps into the build.
+  let identity = $derived(
+    deriveIdentity(
+      panel?.panelGuid ?? '',
+      effectivePluginName,
+      exportSettings.vendor ?? '',
+      exportSettings.manufacturerCode ?? '',
+      exportSettings.version ?? '',
+    )
+  );
+
+  function setExportSetting(key, value) {
+    if (!panel) return;
+    updatePanel(panel.id, { exportSettings: { ...(panel.exportSettings ?? {}), [key]: value } });
+  }
+
+  function handleExportChange(key, e) {
+    let value = e.target.value;
+    // Manufacturer code is a fixed 4-char field (JUCE requirement).
+    if (key === 'manufacturerCode') value = value.slice(0, 4);
+    setExportSetting(key, value);
+  }
+
+  function regenerateGuid() {
+    if (!panel) return;
+    const ok = window.confirm?.(
+      'Regenerate the plugin GUID?\n\n' +
+      'This changes the exported plugin\'s identity (FUID). DAW projects that already use the ' +
+      'current build will no longer recognise the rebuilt plugin and must re-add it.'
+    );
+    if (ok) updatePanel(panel.id, { panelGuid: makeGuid() });
   }
 
   const stringProps = new Set([
@@ -456,8 +495,61 @@
       </PropertyCell>
     </PropertySection>
   {:else if tabId === 'export'}
-    <PropertySection title="Export">
-      <div class="placeholder">No export settings configured</div>
+    <PropertySection title="Plugin">
+      <PropertyCell label="Plugin Name" span={2} hint="Host-visible plugin name and .vst3 filename. Blank = use the panel name.">
+        <input class="val" type="text"
+               value={panel.exportSettings?.pluginName ?? ''}
+               placeholder={panel.name}
+               onfocus={(e) => e.target.select()}
+               onchange={(e) => handleExportChange('pluginName', e)} />
+      </PropertyCell>
+      <PropertyCell label="Version" span={2} hint="Plugin version, e.g. 1.0.0">
+        <input class="val" type="text"
+               value={panel.exportSettings?.version ?? '1.0.0'}
+               onfocus={(e) => e.target.select()}
+               onchange={(e) => handleExportChange('version', e)} />
+      </PropertyCell>
+      <PropertyCell label="Vendor" span={2} hint="Company / manufacturer name shown by the host">
+        <input class="val" type="text"
+               value={panel.exportSettings?.vendor ?? ''}
+               placeholder="Vendor"
+               onfocus={(e) => e.target.select()}
+               onchange={(e) => handleExportChange('vendor', e)} />
+      </PropertyCell>
+      <PropertyCell label="Mfr Code" span={2} hint="Exactly 4 characters, at least one uppercase (JUCE / AudioUnit requirement)">
+        <input class="val val-mono" type="text" maxlength="4"
+               value={panel.exportSettings?.manufacturerCode ?? ''}
+               placeholder="Tdjh"
+               onfocus={(e) => e.target.select()}
+               onchange={(e) => handleExportChange('manufacturerCode', e)} />
+      </PropertyCell>
+    </PropertySection>
+
+    <PropertySection title="Identity">
+      <PropertyCell label="Plugin GUID" span={4} hint="Stable per-panel id — the source of the unique plugin FUID. Changing it makes hosts treat a rebuild as a different plugin.">
+        <div class="export-row">
+          <input class="val val-mono" type="text" readonly value={panel.panelGuid ?? '(none)'} />
+          <button class="export-regen" onclick={regenerateGuid} title="Generate a new GUID (changes the plugin identity)">Regenerate</button>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="Plugin Code" span={2} hint="Derived from the GUID — the VST3 plugin code (4 chars)">
+        <input class="val val-mono" type="text" readonly value={identity.pluginCode} />
+      </PropertyCell>
+      <PropertyCell label="AU Subtype" span={2} hint="Derived from the GUID — the AudioUnit subtype (4 chars)">
+        <input class="val val-mono" type="text" readonly value={identity.auSubtype} />
+      </PropertyCell>
+      <PropertyCell label="CLAP Id" span={4} hint="Derived reverse-DNS id for the CLAP format">
+        <input class="val val-mono" type="text" readonly value={identity.clapId} />
+      </PropertyCell>
+    </PropertySection>
+
+    <PropertySection title="Build">
+      <PropertyCell label="Output" span={4} hint="Builds the VST3 from this panel into export-out/. Progress streams into the Console panel.">
+        <div class="export-row">
+          <button class="export-action" onclick={() => buildActivePanelVst3()}>Build VST3</button>
+          <span class="export-build-note">→ export-out/{effectivePluginName}.vst3</span>
+        </div>
+      </PropertyCell>
     </PropertySection>
 
   {:else}
@@ -494,6 +586,26 @@
   .val-error { border-color: #C45454 !important; }
   .val-warn  { border-color: #C4A854 !important; }
   .val-ok    { border-color: #5B9B5B !important; }
+
+  /* --- Export tab --- */
+  .val-mono { font-family: 'Consolas', 'Courier New', monospace; letter-spacing: 0.3px; }
+  .val[readonly] { background: #161616; color: #9A9A9A; cursor: default; }
+  .val[readonly]:focus { border-color: #333; }
+  .export-row { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+  .export-action {
+    height: 28px; padding: 0 16px; border-radius: 3px; font-size: 11px; cursor: pointer;
+    background: #2A6EBB; color: #FFF; border: 1px solid #3279C9; white-space: nowrap;
+  }
+  .export-action:hover { background: #3279C9; }
+  .export-regen {
+    height: 26px; padding: 0 10px; border-radius: 3px; font-size: 11px; cursor: pointer;
+    background: #2A2A2A; color: #DDD; border: 1px solid #444; white-space: nowrap;
+  }
+  .export-regen:hover { background: #333; border-color: #666; }
+  .export-build-note {
+    font-size: 10px; color: #777; font-family: 'Consolas', monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+  }
 
   .validation-row {
     grid-column: span 4;

@@ -1,14 +1,41 @@
 import { get } from 'svelte/store';
 import { defaultGridSize, defaultSnapToGrid } from './runtimePreferences.js';
 import { normalizeProjectDeviceSession } from './projectDeviceSession.js';
+import { collectExportParameters } from '../utils/exportParameters.js';
 
 let nextId = 1;
+
+/**
+ * Stable, document-scoped GUID — the source of a panel's exported plugin identity (VST3 FUID /
+ * AU subtype / CLAP id, mirrored in C++ PanelExportIdentity). Persisted in the .cepanel so the
+ * same panel always exports to the same plugin slot (the Ctrlr "identical FUID" fix). Distinct
+ * from the in-memory numeric `id`, which is not stable across sessions.
+ */
+export function makeGuid() {
+  try {
+    if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  } catch { /* fall through to the manual generator */ }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
 
 export function createPanel(name = null) {
   const id = nextId++;
 
   return {
     id,
+    panelGuid: makeGuid(),
+    // VST3 / plugin export identity (surfaced in Panel Properties → Export). The exporter
+    // (tools/scripts/export-panel-vst3.mjs) reads these; defaults mirror what used to be hardcoded.
+    // pluginName '' ⇒ fall back to the panel name. Together with panelGuid these drive the unique FUID.
+    exportSettings: {
+      pluginName: '',
+      vendor: 'Tedjuh',
+      manufacturerCode: 'Tdjh',
+      version: '1.0.0',
+    },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,
     author: '',
@@ -101,6 +128,9 @@ export function createPanel(name = null) {
     },
     requiredProfiles: [],
     parameterSnapshots: {},
+    // Host-automatable parameters this panel exposes (Milestone 2 / DAW automation). Empty = derive
+    // automatically from the value-bearing controls at export time (see utils/exportParameters.js).
+    exportParameters: [],
     scripts: [],
     scripting: {
       enabled: true,
@@ -131,6 +161,12 @@ export function serializePanel(panel, options = {}) {
   const deviceSession = options.deviceSession ?? data.deviceSession;
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;
+
+  // Bake the host-automatable parameter list (M2) so the exported plugin's APVTS can read it.
+  // Author-defined `exportParameters` are kept as-is; an empty list is derived from the controls.
+  if (!Array.isArray(data.exportParameters) || data.exportParameters.length === 0) {
+    data.exportParameters = collectExportParameters(panel);
+  }
 
   return JSON.stringify(data, null, 2);
 }

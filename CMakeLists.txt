@@ -131,13 +131,17 @@ target_link_libraries(CEditorPlayer PRIVATE
 # stamp out unique-per-panel binaries (the Ctrlr fix: distinct PLUGIN_CODE/name -> distinct FUID).
 set(CE_VST_PRODUCT_NAME "CEditor Player VST" CACHE STRING "Per-panel plugin product name")
 set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plugin code")
+set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
+set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
+set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
 set(CE_VST_PANEL_PATH   "C:/tmp/gaia-filter.cepanel" CACHE STRING "Panel document the plugin loads")
 
 juce_add_plugin(CEditorPlayerVST
     PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
-    COMPANY_NAME "Tedjuh-inc"
-    PLUGIN_MANUFACTURER_CODE Tdjh
+    COMPANY_NAME "${CE_VST_COMPANY_NAME}"
+    PLUGIN_MANUFACTURER_CODE "${CE_VST_MFR_CODE}"
     PLUGIN_CODE "${CE_VST_PLUGIN_CODE}"
+    VERSION "${CE_VST_VERSION}"
     FORMATS VST3 Standalone
     IS_SYNTH FALSE
     NEEDS_MIDI_INPUT TRUE
@@ -221,6 +225,102 @@ target_include_directories(CEditorExportIdentityTests PRIVATE
 target_link_libraries(CEditorExportIdentityTests PRIVATE
     juce::juce_core
 )
+
+# --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
+# Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS
+# runtime. Build + run: cmake --build build/native --target CEditorPanelValueTests && run the exe.
+add_executable(CEditorPanelValueTests
+    "${CE_ROOT}/tests/PanelValueModelTests.cpp"
+)
+
+target_compile_features(CEditorPanelValueTests PRIVATE cxx_std_23)
+
+target_include_directories(CEditorPanelValueTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorPanelValueTests PRIVATE
+    juce::juce_core
+)
+
+# --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
+# OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
+# After enabling, add `ceditor_scripting` to the link libraries of whichever target hosts scripts
+# (CEditor for live authoring; CEditorPlayer / CEditorPlayerVST for export) and call into
+# ceditor::scripting::ScriptRuntime from the bridge / player host (see CE/src/Scripting/README.md).
+option(CEDITOR_SCRIPTING "Build the panel scripting runtime (Lua via Sol3 + JS via juce_javascript)" OFF)
+
+if (CEDITOR_SCRIPTING)
+    include(FetchContent)
+
+    # walterschell/Lua (and some deps) ship a pre-3.5 cmake_minimum_required that CMake 4+ rejects.
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+
+    # Lua 5.4 — CMake-friendly mirror (provides the `lua_static` target). Adjust tag/source as needed.
+    FetchContent_Declare(lua
+        GIT_REPOSITORY https://github.com/walterschell/Lua.git
+        GIT_TAG        v5.4.5)
+    FetchContent_MakeAvailable(lua)
+
+    # Sol3 (header-only C++ <-> Lua binding).
+    FetchContent_Declare(sol2
+        GIT_REPOSITORY https://github.com/ThePhD/sol2.git
+        GIT_TAG        v3.3.0)
+    FetchContent_MakeAvailable(sol2)
+
+    add_library(ceditor_scripting STATIC
+        "${CE_ROOT}/src/Scripting/ScriptRuntime.cpp"
+        "${CE_ROOT}/src/Scripting/LuaScriptEngine.cpp"
+        "${CE_ROOT}/src/Scripting/JsScriptEngine.cpp"
+    )
+    target_compile_features(ceditor_scripting PUBLIC cxx_std_23)
+    target_include_directories(ceditor_scripting PUBLIC "${CE_ROOT}/src")
+    target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_SCRIPTING=1 SOL_ALL_SAFETIES_ON=1)
+    target_link_libraries(ceditor_scripting PUBLIC
+        juce::juce_core
+        juce::juce_data_structures
+        juce::juce_javascript      # QuickJS-backed JS engine (JUCE 8)
+        sol2::sol2
+        lua_static                 # from walterschell/Lua; rename if your Lua provider differs
+    )
+
+    # Smoke test: verifies the runtime actually executes Lua + JS. Run ./CEditorScriptingTests
+    add_executable(CEditorScriptingTests "${CE_ROOT}/tests/ScriptRuntimeTests.cpp")
+    target_link_libraries(CEditorScriptingTests PRIVATE ceditor_scripting juce::juce_core)
+    target_include_directories(CEditorScriptingTests PRIVATE "${CE_ROOT}/src")
+
+    # Window-closed integration: panel -> gathered scripts -> runtime -> dispatch -> API callbacks.
+    add_executable(CEditorPlayerScriptTests "${CE_ROOT}/tests/PlayerScriptIntegrationTests.cpp")
+    target_link_libraries(CEditorPlayerScriptTests PRIVATE ceditor_scripting juce::juce_core)
+    target_include_directories(CEditorPlayerScriptTests PRIVATE "${CE_ROOT}/src")
+
+    # Window-closed scripts in the exported plugin: link the runtime into the VST/standalone player.
+    # Gated so the default (scripting OFF) player build is unchanged; PluginProcessor.h guards its
+    # integration with #if CEDITOR_SCRIPTING (the define is PUBLIC on ceditor_scripting).
+    if (TARGET CEditorPlayerVST)
+        target_link_libraries(CEditorPlayerVST PRIVATE ceditor_scripting)
+        message(STATUS "CEditor: scripting runtime LINKED into CEditorPlayerVST (window-closed scripts).")
+    endif()
+
+    message(STATUS "CEditor: scripting runtime ENABLED (link `ceditor_scripting` into your host target).")
+    message(STATUS "CEditor: build target CEditorScriptingTests and run it to verify the engine.")
+endif()
+
+# --- Value/parameter layer (Milestone 2): host-automatable parameters + DAW state ---------------
+# ON by default (verified to compile) so the normal CEditorPlayerVST build includes it with no extra
+# flags. CEditorPlayerVST builds a juce::AudioProcessorValueTreeState from the panel's baked
+# `exportParameters` (web .../utils/exportParameters.js), so the DAW gets automation lanes and the
+# session save/restore persists every control value (works window-closed). The panel saved to
+# CE_VST_PANEL_PATH must carry `exportParameters` (the editor bakes them on save). Next sub-steps
+# (documented in CE/src/Player/PanelParameters.h + the M2 memory note): push APVTS changes to the
+# WebView, send MIDI on parameter change window-closed, and wire ScriptRuntime get/setValue.
+# Turn it off with -DCEDITOR_VALUE_LAYER=OFF if you ever need the old parameter-less plugin.
+option(CEDITOR_VALUE_LAYER "Expose panel controls as host-automatable parameters + persist DAW state (M2)" ON)
+
+if (CEDITOR_VALUE_LAYER)
+    target_compile_definitions(CEditorPlayerVST PUBLIC CEDITOR_VALUE_LAYER=1)
+    message(STATUS "CEditor: value/parameter layer ENABLED for CEditorPlayerVST (M2 — APVTS + state).")
+endif()
 
 install(TARGETS CEditor
     RUNTIME DESTINATION "."

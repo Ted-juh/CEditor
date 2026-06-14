@@ -7,36 +7,13 @@
 //
 // Usage: node export-panel-vst3.mjs <panel.cepanel> <guid> [productName]
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import path from 'node:path';
-
-const MASK = (1n << 64n) - 1n;
-function fnv1a(str, salt) {
-  let h = (1469598103934665603n ^ salt) & MASK;
-  for (const b of Buffer.from(str, 'utf8')) {
-    h = (h ^ BigInt(b)) & MASK;
-    h = (h * 1099511628211n) & MASK;
-  }
-  return h;
-}
-function code4(h) {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const alnum = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let out = upper[Number(h % 26n)];
-  h /= 26n;
-  for (let i = 0; i < 3; i++) { out += alnum[Number(h % 62n)]; h /= 62n; }
-  return out;
-}
-function slug(s) {
-  return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-export function deriveIdentity(guid, name, vendor, mfrCode, version) {
-  const pluginCode = code4(fnv1a(guid, 0x9E3779B97F4A7C15n));
-  const auSubtype = code4(fnv1a(guid, 0xC2B2AE3D27D4EB4Fn));
-  const shortGuid = ((fnv1a(guid, 0n) >> 32n) & 0xFFFFFFFFn).toString(16).padStart(8, '0');
-  const clapId = `com.${slug(vendor || 'ceditor')}.${slug(name) ? slug(name) + '.' : ''}${shortGuid}`;
-  return { guid, productName: name || 'CEditor Panel', vendor, mfrCode, version, pluginCode, auSubtype, clapId };
-}
+// Identity derivation is shared with the editor's Export-settings UI (single source of truth), so the
+// codes shown in the editor are exactly what gets built. The self-check below still validates it
+// against the canonical C++ output (PanelExportIdentity) on every run.
+import { deriveIdentity } from '../../CE/web/src/CE_Application/utils/exportIdentity.js';
 
 // Self-check against the canonical C++ output (PanelExportIdentityTests).
 {
@@ -56,21 +33,53 @@ if (!panel || !guid) {
 }
 
 const repo = path.resolve(path.dirname(new URL(import.meta.url).pathname).replace(/^\//, ''), '../..');
-const build = path.join(repo, 'build', 'native');
-const productName = productNameArg || ('CEditor ' + path.basename(panel).replace(/\.[^.]+$/, ''));
-const id = deriveIdentity(guid, productName, 'Tedjuh', 'Tdjh', '1.0.0');
-const panelAbs = path.resolve(panel).replace(/\\/g, '/');
+const build = path.join(repo, 'build', 'native');   // reuse the configured build dir (incremental, fast)
+const outDir = path.join(repo, 'export-out');
+
+// Read the panel + its Export settings (Panel Properties → Export). These drive the plugin identity;
+// the CLI productName arg and built-in defaults are fallbacks (keeps the CLI and in-app paths aligned).
+const panelDoc = JSON.parse(readFileSync(panel, 'utf8'));
+const es = panelDoc.exportSettings ?? {};
+const productName = (es.pluginName && es.pluginName.trim())
+  || productNameArg || panelDoc.name || ('CEditor ' + path.basename(panel).replace(/\.[^.]+$/, ''));
+const vendor = (es.vendor && es.vendor.trim()) || 'Tedjuh';
+const version = (es.version && es.version.trim()) || '1.0.0';
+let mfrCode = (es.manufacturerCode ?? '').trim() || 'Tdjh';
+mfrCode = (mfrCode + 'xxxx').slice(0, 4);   // JUCE plugin manufacturer code must be exactly 4 chars
+const id = deriveIdentity(guid, productName, vendor, mfrCode, version);
 console.log('Export identity:', id);
 
-const vcvars = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat';
-const cfg = `cmake -S "${repo}" -B "${build}" -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}" "-DCE_VST_PANEL_PATH=${panelAbs}"`;
-const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
-console.log('Configuring + building...');
-execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul 2>&1 && ${bld}"`, { stdio: 'inherit' });
-
-const built = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'VST3', `${productName}.vst3`);
-const outDir = path.join(repo, 'export-out');
+// 1. Bake CURRENT exportParameters (params + device wire) into a temp copy of the panel, so the
+//    plugin is always built from up-to-date data without mutating the user's file.
 mkdirSync(outDir, { recursive: true });
-const dest = path.join(outDir, `${productName}.vst3`);
-if (existsSync(built)) { cpSync(built, dest, { recursive: true }); console.log('Exported:', dest); }
-else console.error('Build artifact not found:', built);
+const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
+panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
+const bakedPanel = path.join(outDir, `${productName}.cepanel`);
+writeFileSync(bakedPanel, JSON.stringify(panelDoc, null, 2));
+const panelAbs = bakedPanel.replace(/\\/g, '/');
+console.log(`Baked ${panelDoc.exportParameters.length} parameters into ${bakedPanel}`);
+
+// 2. Build the web bundle (the self-contained UI embedded into the plugin).
+console.log('Building web bundle...');
+execSync('npm run build', { cwd: path.join(repo, 'CE', 'web'), stdio: 'inherit' });
+
+// 3. Configure (DEV_MODE OFF -> bundled UI, not localhost) with this panel's identity, build the
+//    VST3 wrapper, copy to export-out, then restore DEV_MODE ON so the dev build dir is unchanged.
+const vcvars = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat';
+const cfg = `cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
+  + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
+  + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
+  + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
+const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+console.log('Configuring + building the plugin...');
+try {
+  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
+
+  const built = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'VST3', `${productName}.vst3`);
+  const dest = path.join(outDir, `${productName}.vst3`);
+  if (existsSync(built)) { cpSync(built, dest, { recursive: true }); console.log('EXPORTED:', dest); }
+  else console.error('Build artifact not found:', built);
+} finally {
+  // Always restore dev mode so the editor's normal build keeps loading the Vite dev server.
+  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
+}
