@@ -2,6 +2,7 @@
 
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <map>
+#include <vector>
 #include "PlayerHost.h"
 
 #ifndef CEDITOR_PLAYER_PANEL_PATH
@@ -48,6 +49,7 @@ public:
         , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
 #endif
     {
+        scriptMidiCollector.reset (44100.0);  // valid before prepareToPlay; the host resets with the real rate
 #if CEDITOR_VALUE_LAYER
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
@@ -69,9 +71,19 @@ public:
     }
 #endif
 
-    void prepareToPlay (double, int) override {}
+    void prepareToPlay (double sampleRate, int) override { scriptMidiCollector.reset (sampleRate); }
     void releaseResources() override {}
-    void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override {}
+    // The plugin PRODUCES MIDI on its output bus; the DAW routes that track to the synth's port (the
+    // standard VST3 path — no in-plugin port picker). Drain whatever the panel queued on the message
+    // thread (script sendCC/NRPN/Sysex) into the host's MIDI buffer here.
+    void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
+    {
+        scriptMidiCollector.removeNextBlockOfMessages (midi, buffer.getNumSamples());
+    }
+
+    // Script-emitted MIDI is queued here on the message thread and drained into the host's output bus
+    // in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
+    juce::MidiMessageCollector scriptMidiCollector;
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override { return true; }
@@ -236,9 +248,9 @@ private:
 #if CEDITOR_SCRIPTING
     // Window-closed script runtime (Model 2). The full-mirror value model (scriptValues) backs
     // get/set so a script behaves identically whether the GUI is open (WebView/JS) or closed (here).
-    // Stage 3 wires instantiation + lifecycle + DAW state; MIDI sends (Stage 4) and JS<->C++ value
-    // sync (Stage 5) are still TODO, so closed-window scripts compute against the mirror but don't
-    // yet transmit. Declared after deviceService and in this order so destruction is safe: the
+    // Stage 3 wires instantiation + lifecycle + DAW state; Stage 4 (script MIDI sends) now transmits
+    // via the plugin's MIDI output bus (scriptMidiCollector -> processBlock). JS<->C++ value sync for
+    // UNBOUND controls (Stage 5) is still TODO. Declared after deviceService and in this order so the
     // runtime (holds host&) tears down before the host, and scriptValues outlives both.
 
     // Script log()/errors append here, so window-closed activity is observable without a debugger
@@ -250,18 +262,31 @@ private:
     }
 
    #if CEDITOR_VALUE_LAYER
-    // Send raw MIDI from a script through the processor-owned DeviceProfileService (same engine M2
-    // uses, persists window-closed). actionId is just a monitor label.
+    // Send raw MIDI from a script by queueing it onto the plugin's MIDI OUTPUT BUS (drained in
+    // processBlock). The DAW routes that track to the synth's hardware port — the plugin never opens a
+    // port itself (that's the standalone's job; a plugin opening hardware ports fights the host and is
+    // not portable). `bytes` may be a multi-message stream (e.g. NRPN = 4 CCs); we split it.
     void scriptSendRawMidi (const juce::String& actionId, const juce::Array<int>& bytes)
     {
+        if (bytes.isEmpty()) return;
+        std::vector<juce::uint8> raw;
+        raw.reserve ((size_t) bytes.size());
+        for (const int b : bytes) raw.push_back ((juce::uint8) (b & 0xff));
+
+        int pos = 0; juce::uint8 status = 0;
+        while (pos < (int) raw.size())
+        {
+            int used = 0;
+            juce::MidiMessage m (raw.data() + pos, (int) raw.size() - pos, used, status, 0.0, false);
+            if (used <= 0) break;
+            if (raw[(size_t) pos] >= 0x80) status = raw[(size_t) pos];
+            scriptMidiCollector.addMessageToQueue (m);
+            pos += used;
+        }
+
         juce::StringArray hex;
         for (const int b : bytes) hex.add (juce::String::toHexString (b & 0xff).paddedLeft ('0', 2).toUpperCase());
-        auto* p = new juce::DynamicObject();
-        p->setProperty ("deviceRole", "mainSynth");
-        p->setProperty ("actionId", actionId);
-        p->setProperty ("message", hex.joinIntoString (" "));
-        p->setProperty ("dryRun", false);
-        deviceService.compileRawMidiAction (juce::var (p), true);
+        scriptLogLine ("midi out  [" + actionId + "]  " + hex.joinIntoString (" "));
     }
 
     // Receive device events window-CLOSED and route them to the C++ runtime. PlayerHost owns the
