@@ -14,6 +14,7 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
+  import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
 
@@ -62,6 +63,20 @@
       exportSettings.manufacturerCode ?? '',
       exportSettings.version ?? '',
     )
+  );
+
+  // --- Python runtime embedding (Export tab) ---
+  // Approximate size the native CPython runtime + full stdlib adds to the .vst3. The exporter
+  // reports the REAL measured delta after a build; this is the pre-build estimate the toggle shows.
+  const PYTHON_RUNTIME_MB = 56;
+  // Does this panel actually contain any Python scripts? (drives the 'auto' decision + the hint)
+  let panelHasPython = $derived(
+    collectPanelExportScripts(panel).some((s) => s?.language === 'python')
+  );
+  let embedPythonMode = $derived(exportSettings.embedPython ?? 'auto');
+  // What 'auto' / 'on' / 'off' actually resolves to for this panel right now.
+  let pythonWillEmbed = $derived(
+    embedPythonMode === 'on' || (embedPythonMode === 'auto' && panelHasPython)
   );
 
   function setExportSetting(key, value) {
@@ -543,11 +558,41 @@
       </PropertyCell>
     </PropertySection>
 
+    <PropertySection title="Scripting Runtime">
+      <PropertyCell label="Python" span={4}
+                    hint="Embed the REAL CPython runtime (full standard library) so Python scripts run window-closed and offline. Lua + JavaScript are always built in and add almost nothing — only Python carries a meaningful size cost. Auto = include only when this panel has Python scripts.">
+        <div class="export-row">
+          <div class="seg">
+            {#each [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']] as [mode, label] (mode)}
+              <button class={['seg-btn', embedPythonMode === mode && 'seg-active']}
+                      onclick={() => setExportSetting('embedPython', mode)}>{label}</button>
+            {/each}
+          </div>
+          <span class="export-cost" class:cost-on={pythonWillEmbed}>
+            {pythonWillEmbed ? `+~${PYTHON_RUNTIME_MB} MB` : 'no size cost'}
+          </span>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if pythonWillEmbed}
+            Python runtime will be bundled — Python scripts run window-closed + offline.
+          {:else if panelHasPython && embedPythonMode === 'off'}
+            ⚠ This panel has Python scripts but the runtime is Off — they will only run window-open (online).
+          {:else if embedPythonMode === 'auto'}
+            No Python scripts detected — runtime skipped automatically.
+          {:else}
+            Python runtime not bundled.
+          {/if}
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Build">
       <PropertyCell label="Output" span={4} hint="Builds the VST3 from this panel into export-out/. Progress streams into the Console panel.">
         <div class="export-row">
           <button class="export-action" onclick={() => buildActivePanelVst3()}>Build VST3</button>
-          <span class="export-build-note">→ export-out/{effectivePluginName}.vst3</span>
+          <span class="export-build-note">→ export-out/{effectivePluginName}.vst3{pythonWillEmbed ? ` (+~${PYTHON_RUNTIME_MB} MB Python)` : ''}</span>
         </div>
       </PropertyCell>
     </PropertySection>
@@ -606,6 +651,20 @@
     font-size: 10px; color: #777; font-family: 'Consolas', monospace;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
   }
+
+  /* Segmented Auto/On/Off toggle (no combobox for <5 options) */
+  .seg { display: inline-flex; border: 1px solid #444; border-radius: 3px; overflow: hidden; }
+  .seg-btn {
+    height: 26px; padding: 0 12px; font-size: 11px; cursor: pointer;
+    background: #222; color: #BBB; border: none; border-right: 1px solid #444;
+  }
+  .seg-btn:last-child { border-right: none; }
+  .seg-btn:hover { background: #2C2C2C; color: #DDD; }
+  .seg-active, .seg-active:hover { background: #2A6EBB; color: #FFF; }
+  .export-cost {
+    font-size: 11px; color: #777; font-family: 'Consolas', monospace; white-space: nowrap;
+  }
+  .export-cost.cost-on { color: #E0A23C; }
 
   .validation-row {
     grid-column: span 4;

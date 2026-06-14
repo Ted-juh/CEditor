@@ -250,6 +250,13 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
 # ceditor::scripting::ScriptRuntime from the bridge / player host (see CE/src/Scripting/README.md).
 option(CEDITOR_SCRIPTING "Build the panel scripting runtime (Lua via Sol3 + JS via juce_javascript)" OFF)
 
+# Optional THIRD language for the window-closed runtime: REAL embedded CPython (native, full stdlib).
+# OFF by default — it links libpython and adds ~the size of a CPython runtime + stdlib to the export,
+# so it's opt-in per the user's "show the MB cost" requirement. Requires CEDITOR_SCRIPTING.
+# Needs a Python dev install discoverable by find_package(Python3 ... Development.Embed).
+# Point at a specific interpreter with -DPython3_EXECUTABLE=... if CMake picks the wrong one.
+option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-closed script language" OFF)
+
 if (CEDITOR_SCRIPTING)
     include(FetchContent)
 
@@ -283,6 +290,22 @@ if (CEDITOR_SCRIPTING)
         sol2::sol2
         lua_static                 # from walterschell/Lua; rename if your Lua provider differs
     )
+
+    # --- Optional: native embedded CPython (third language, full stdlib) ---
+    if (CEDITOR_PYTHON)
+        # Development.Embed gives the libpython needed to embed an interpreter (vs. build a C extension).
+        find_package(Python3 COMPONENTS Development.Embed REQUIRED)
+        target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/PythonScriptEngine.cpp")
+        target_link_libraries(ceditor_scripting PUBLIC Python3::Python)
+        target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_PYTHON=1)
+        message(STATUS "CEditor: native CPython ENABLED (Python3 ${Python3_VERSION} @ ${Python3_EXECUTABLE}).")
+        message(STATUS "CEditor: libpython = ${Python3_LIBRARIES}; stdlib = ${Python3_STDLIB}.")
+
+        # Python smoke test: loads + dispatches a real python script through the embedded interpreter.
+        add_executable(CEditorPythonScriptTests "${CE_ROOT}/tests/PythonScriptEngineTests.cpp")
+        target_link_libraries(CEditorPythonScriptTests PRIVATE ceditor_scripting juce::juce_core)
+        target_include_directories(CEditorPythonScriptTests PRIVATE "${CE_ROOT}/src")
+    endif()
 
     # Smoke test: verifies the runtime actually executes Lua + JS. Run ./CEditorScriptingTests
     add_executable(CEditorScriptingTests "${CE_ROOT}/tests/ScriptRuntimeTests.cpp")

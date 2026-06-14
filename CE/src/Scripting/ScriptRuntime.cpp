@@ -29,6 +29,9 @@ ScriptRuntime::ScriptRuntime (ScriptHostApi& h) : host (h)
 {
     lua = createLuaEngine();
     js  = createJsEngine();
+   #if CEDITOR_PYTHON
+    python = createPythonEngine();   // real embedded CPython (full stdlib), window-closed only
+   #endif
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
@@ -36,6 +39,7 @@ ScriptRuntime::~ScriptRuntime() = default;
 ScriptEngine* ScriptRuntime::engineFor (const juce::String& language)
 {
     if (language == "javascript") return js.get();
+    if (language == "python")     return python.get(); // null if not built → python scripts no-op
     return lua.get(); // default + "lua"
 }
 
@@ -49,12 +53,14 @@ void ScriptRuntime::reportError (const juce::String& scriptId, const juce::Strin
 void ScriptRuntime::loadScripts (const juce::var& scriptArray)
 {
     scripts.clear();
-    if (lua) lua->reset();
-    if (js)  js->reset();
+    if (lua)    lua->reset();
+    if (js)     js->reset();
+    if (python) python->reset();
 
-    // Install the API into both engines once.
-    if (lua) lua->installApi (host);
-    if (js)  js->installApi (host);
+    // Install the API into each engine once.
+    if (lua)    lua->installApi (host);
+    if (js)     js->installApi (host);
+    if (python) python->installApi (host);
 
     const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
 
@@ -149,8 +155,9 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
 
     // 2) Explicit on(target, event, fn) listeners registered inside scripts.
     const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
-    if (lua) lua->deliverEvent (target, event, payload, onError);
-    if (js)  js->deliverEvent (target, event, payload, onError);
+    if (lua)    lua->deliverEvent (target, event, payload, onError);
+    if (js)     js->deliverEvent (target, event, payload, onError);
+    if (python) python->deliverEvent (target, event, payload, onError);
 }
 
 } // namespace ceditor::scripting

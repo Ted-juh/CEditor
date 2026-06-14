@@ -35,6 +35,10 @@ export function createPanel(name = null) {
       vendor: 'Tedjuh',
       manufacturerCode: 'Tdjh',
       version: '1.0.0',
+      // Embed the native CPython runtime (full stdlib) so Python scripts run window-closed + offline.
+      // 'auto' = include only when the panel actually has Python scripts; 'on'/'off' force it.
+      // Costs ~the size of a CPython runtime + stdlib in the exported plugin (shown in the Export tab).
+      embedPython: 'auto',
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,

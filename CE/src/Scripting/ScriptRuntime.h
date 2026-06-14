@@ -134,6 +134,7 @@ public:
 
 std::unique_ptr<ScriptEngine> createLuaEngine();
 std::unique_ptr<ScriptEngine> createJsEngine();
+std::unique_ptr<ScriptEngine> createPythonEngine();   // only linked when CEDITOR_PYTHON is built
 
 // ----------------------------------------------------------------------------------------------
 /** Owns the engines + the script set; routes lifecycle and events to the right scripts. */
@@ -189,6 +190,7 @@ private:
     ScriptHostApi& host;
     std::unique_ptr<ScriptEngine> lua;
     std::unique_ptr<ScriptEngine> js;
+    std::unique_ptr<ScriptEngine> python;   // null unless CEDITOR_PYTHON — python scripts no-op if absent
     std::vector<ScriptDefinition> scripts;
     std::function<void (const juce::String&)> errorLogger;
 
