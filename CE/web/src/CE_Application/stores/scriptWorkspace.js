@@ -85,6 +85,23 @@ export function createScriptWorkspaceDocument(options = {}) {
   return document;
 }
 
+/** Open (or create) the script editor bound to a specific panel — one editor per panel.
+ *  Binds via `panelId` so the Paths picker / controls come from THAT panel (not the ambiguous
+ *  "active panel"). */
+export function getOrCreateScriptDocForPanel(panelId, panelName = '') {
+  const id = String(panelId ?? '').trim();
+  const existing = id ? get(scriptDocuments).find((doc) => doc.panelId === id) : null;
+  if (existing) {
+    activeScriptDocumentId.set(existing.id);
+    return existing;
+  }
+  const base = createScriptDocument({ name: panelName ? `${panelName} · Scripts` : 'Scripts' });
+  const document = sanitizeDocument({ ...base, panelId: id });
+  scriptDocuments.update((documents) => [...documents, document]);
+  activeScriptDocumentId.set(document.id);
+  return document;
+}
+
 export function openScriptWorkspaceDocument(document) {
   const sanitized = sanitizeDocument(document);
   if (!sanitized) return null;

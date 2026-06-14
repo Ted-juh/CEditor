@@ -68,6 +68,11 @@ export function normalizeScript(script, index = 0) {
       selectedStepId: String(script?.debug?.selectedStepId ?? ''),
     },
     steps,
+    // Source-based model fields (coexist with the legacy command-graph) — preserved so a
+    // BehaviorDesigner script survives a round-trip through the document sanitizer on reload.
+    language: script?.language,
+    source: typeof script?.source === 'string' ? script.source : undefined,
+    group: script?.group ?? '',
   };
 }
 
@@ -85,6 +90,7 @@ export function sanitizeScriptDocument(document) {
   return {
     id,
     name: String(document.name ?? document.title ?? fallback.name),
+    panelId: String(document.panelId ?? ''), // the panel this script editor is bound to (for controls/Paths)
     filePath: String(document.filePath ?? '').trim(),
     modified: document.modified === true,
     activeScriptId: scripts.some((script) => script.id === activeScriptId)
