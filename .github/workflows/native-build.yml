@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - claude/custom-component-creator-feedback-8jlrx4
   pull_request:
   workflow_dispatch:
 
