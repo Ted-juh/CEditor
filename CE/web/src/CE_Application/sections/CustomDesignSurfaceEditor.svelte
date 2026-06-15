@@ -88,6 +88,10 @@
   let surfaceZoom = $state(1);
   let snapEnabled = $state(true);
   let snapSize = $state(10);
+  let smartGuidesEnabled = $state(true);
+  let showMeasurements = $state(true);
+  let liveSmartGuides = $state([]);
+  let shortcutSheetOpen = $state(false);
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -1368,6 +1372,195 @@
           : `top:${guide.value}px;left:0;width:${artboardWidth}px;`,
       }));
   }
+
+  // --- Object-relative smart guides + align/distribute ---
+
+  // Candidate snap lines from other parts (edges + centers) and the artboard.
+  function smartSnapCandidates(excludeNames = []) {
+    const exclude = new Set(excludeNames);
+    const xs = [0, artboardWidth / 2, artboardWidth];
+    const ys = [0, artboardHeight / 2, artboardHeight];
+    for (const [name, part] of allPartEntries) {
+      if (exclude.has(name)) continue;
+      const frame = activeLayerFrames?.[name] ?? partFrame(part);
+      if (!frame) continue;
+      xs.push(frame.left, frame.left + frame.width / 2, frame.left + frame.width);
+      ys.push(frame.top, frame.top + frame.height / 2, frame.top + frame.height);
+    }
+    return { xs, ys };
+  }
+
+  function bestSnap(anchors, candidates, threshold) {
+    let best = null;
+    for (const anchor of anchors) {
+      for (const candidate of candidates) {
+        const diff = candidate - anchor;
+        if (Math.abs(diff) <= threshold && (!best || Math.abs(diff) < Math.abs(best.diff))) {
+          best = { diff, value: candidate };
+        }
+      }
+    }
+    return best;
+  }
+
+  // Snap a moving frame to nearby object edges/centers (preferred) and fall
+  // back to grid snapping per-axis. Records the matched guide lines for display.
+  function applyMoveSnap(frame, excludeNames = [], event = null) {
+    if (event?.altKey) { liveSmartGuides = []; return frame; }
+    let { left, top } = frame;
+    const guides = [];
+    if (smartGuidesEnabled) {
+      const threshold = 6 / Math.max(0.0001, surfaceZoom);
+      const { xs, ys } = smartSnapCandidates(excludeNames);
+      const bx = bestSnap([left, left + frame.width / 2, left + frame.width], xs, threshold);
+      const by = bestSnap([top, top + frame.height / 2, top + frame.height], ys, threshold);
+      if (bx) { left += bx.diff; guides.push({ axis: 'x', value: bx.value }); }
+      if (by) { top += by.diff; guides.push({ axis: 'y', value: by.value }); }
+      if (!bx && snapEnabled) left = snapValue(left);
+      if (!by && snapEnabled) top = snapValue(top);
+    } else if (snapEnabled) {
+      left = snapValue(left);
+      top = snapValue(top);
+    }
+    liveSmartGuides = guides;
+    return { ...frame, left, top };
+  }
+
+  function alignSelectedLayers(mode) {
+    const entries = selectedEditableLayerEntries();
+    if (entries.length < 2 || !core?.id) return;
+    const items = entries.map(([name, authoredPart, renderedPart]) => ({ name, authoredPart, frame: partFrame(renderedPart) }));
+    const bounds = boundsForFrames(items.map((item) => item.frame));
+    if (!bounds) return;
+    const patch = {};
+    for (const { name, authoredPart, frame } of items) {
+      const next = { ...frame };
+      if (mode === 'left') next.left = bounds.left;
+      else if (mode === 'centerX') next.left = bounds.left + (bounds.width - frame.width) / 2;
+      else if (mode === 'right') next.left = bounds.left + bounds.width - frame.width;
+      else if (mode === 'top') next.top = bounds.top;
+      else if (mode === 'middleY') next.top = bounds.top + (bounds.height - frame.height) / 2;
+      else if (mode === 'bottom') next.top = bounds.top + bounds.height - frame.height;
+      Object.assign(patch, patchFromFrameForLayer(name, authoredPart, next));
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  function distributeSelectedLayers(axis) {
+    const entries = selectedEditableLayerEntries();
+    if (entries.length < 3 || !core?.id) return;
+    const posKey = axis === 'x' ? 'left' : 'top';
+    const sizeKey = axis === 'x' ? 'width' : 'height';
+    const items = entries
+      .map(([name, authoredPart, renderedPart]) => ({ name, authoredPart, frame: partFrame(renderedPart) }))
+      .sort((a, b) => a.frame[posKey] - b.frame[posKey]);
+    const start = items[0].frame[posKey];
+    const lastFrame = items[items.length - 1].frame;
+    const end = lastFrame[posKey] + lastFrame[sizeKey];
+    const totalSize = items.reduce((sum, item) => sum + item.frame[sizeKey], 0);
+    const gap = (end - start - totalSize) / (items.length - 1);
+    const patch = {};
+    let cursor = start;
+    for (const { name, authoredPart, frame } of items) {
+      Object.assign(patch, patchFromFrameForLayer(name, authoredPart, { ...frame, [posKey]: cursor }));
+      cursor += frame[sizeKey] + gap;
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  // Distance read-outs between exactly two selected layers (horizontal +
+  // vertical gaps), rendered as dashed connectors with a px label.
+  let measurementLines = $derived.by(() => {
+    if (!showMeasurements || activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
+    const frames = selectedLayerNames
+      .map((name) => activeLayerFrames?.[name] ?? (parts?._children?.[name] ? partFrame(parts._children[name]) : null))
+      .filter(Boolean);
+    if (frames.length !== 2) return [];
+    const [a, b] = frames;
+    const lines = [];
+    const ay = a.top + a.height / 2;
+    const by = b.top + b.height / 2;
+    const ax = a.left + a.width / 2;
+    const bx = b.left + b.width / 2;
+    // Horizontal gap (only when the boxes don't overlap horizontally).
+    const leftBox = a.left <= b.left ? a : b;
+    const rightBox = a.left <= b.left ? b : a;
+    const hGap = rightBox.left - (leftBox.left + leftBox.width);
+    if (hGap > 0.5) {
+      const y = (ay + by) / 2;
+      lines.push({ axis: 'x', value: Math.round(hGap), x1: leftBox.left + leftBox.width, x2: rightBox.left, y });
+    }
+    const topBox = a.top <= b.top ? a : b;
+    const bottomBox = a.top <= b.top ? b : a;
+    const vGap = bottomBox.top - (topBox.top + topBox.height);
+    if (vGap > 0.5) {
+      const x = (ax + bx) / 2;
+      lines.push({ axis: 'y', value: Math.round(vGap), y1: topBox.top + topBox.height, y2: bottomBox.top, x });
+    }
+    return lines;
+  });
+
+  function isTypingTarget(target) {
+    const tag = target?.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable === true;
+  }
+
+  // Promote surface shortcuts to the window so nudge/delete/duplicate keep
+  // working when keyboard focus drifts off the surface <div>. Skips form fields
+  // so typing in a property input is never hijacked.
+  $effect(() => {
+    if (typeof window === 'undefined') return;
+    const onKeyDown = (event) => {
+      const typing = isTypingTarget(event.target);
+      if (!typing && (event.key === '?' || (event.key === '/' && event.shiftKey))) {
+        shortcutSheetOpen = !shortcutSheetOpen;
+        event.preventDefault();
+        return;
+      }
+      if (typing && event.key !== 'Escape') return;
+      handleSurfaceKeydown(event);
+    };
+    const onKeyUp = (event) => {
+      if (!isTypingTarget(event.target)) handleSurfaceKeyup(event);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  });
+
+  const SHORTCUT_GROUPS = [
+    {
+      title: 'Tools',
+      items: [
+        { keys: 'V', label: 'Select tool' },
+        { keys: 'R', label: 'Rectangle' },
+        { keys: 'O', label: 'Ellipse' },
+        { keys: 'T', label: 'Text' },
+        { keys: 'Esc', label: 'Cancel / deselect' },
+      ],
+    },
+    {
+      title: 'Edit',
+      items: [
+        { keys: 'Arrows', label: 'Nudge 1px' },
+        { keys: 'Shift+Arrows', label: 'Nudge 10px' },
+        { keys: 'Ctrl/Cmd+D', label: 'Duplicate' },
+        { keys: 'Del / Backspace', label: 'Delete' },
+        { keys: 'Tab', label: 'Cycle layers' },
+      ],
+    },
+    {
+      title: 'View',
+      items: [
+        { keys: 'Space + drag', label: 'Pan' },
+        { keys: 'Alt (while drag)', label: 'Ignore snapping' },
+        { keys: '?', label: 'Toggle this sheet' },
+      ],
+    },
+  ];
 
   function makeDrawnPart(kind, rect) {
     const partKind = kind === 'ellipse' ? 'circle' : kind;
@@ -2821,24 +3014,35 @@
     if (interaction.type === 'move') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeFrame = snapFrame({
+      activeFrame = applyMoveSnap({
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, event);
+      }, [selectedLayer], event);
       return;
     }
 
     if (interaction.type === 'groupMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
+      const names = Object.keys(interaction.startFrames ?? {});
+      const shifted = names.map((name) => ({
+        ...interaction.startFrames[name],
+        left: interaction.startFrames[name].left + dx,
+        top: interaction.startFrames[name].top + dy,
+      }));
+      const groupBounds = boundsForFrames(shifted);
+      // Snap the group as a whole, then apply the correction to each member.
+      const snapped = groupBounds ? applyMoveSnap(groupBounds, names, event) : null;
+      const cx = snapped ? snapped.left - groupBounds.left : 0;
+      const cy = snapped ? snapped.top - groupBounds.top : 0;
       const nextFrames = {};
-      for (const [name, startFrame] of Object.entries(interaction.startFrames ?? {})) {
-        nextFrames[name] = snapFrame({
-          ...startFrame,
-          left: startFrame.left + dx,
-          top: startFrame.top + dy,
-        }, event);
+      for (const name of names) {
+        nextFrames[name] = {
+          ...interaction.startFrames[name],
+          left: interaction.startFrames[name].left + dx + cx,
+          top: interaction.startFrames[name].top + dy + cy,
+        };
       }
       activeLayerFrames = nextFrames;
       return;
@@ -2847,11 +3051,11 @@
     if (interaction.type === 'zoneMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeZoneFrame = snapFrame({
+      activeZoneFrame = applyMoveSnap({
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, event);
+      }, [], event);
       return;
     }
 
@@ -2984,6 +3188,7 @@
     activeFrame = null;
     activeLayerFrames = {};
     activeZoneFrame = null;
+    liveSmartGuides = [];
   }
 
   function nudgeSelected(dx, dy) {
@@ -3293,8 +3498,6 @@
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
-    onkeydown={handleSurfaceKeydown}
-    onkeyup={handleSurfaceKeyup}
   >
     {#if !designerPreviewing && activeSelectionKind === 'layer' && selectedPart}
       <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
@@ -3610,6 +3813,14 @@
           onchange={(event) => setSnapSize(event.currentTarget.value)}
         />
       </label>
+      <label class="toggle-option" title="Snap to other layers' edges and centers while dragging">
+        <input type="checkbox" checked={smartGuidesEnabled} onchange={(event) => { smartGuidesEnabled = event.currentTarget.checked; }} />
+        <span>Smart</span>
+      </label>
+      <label class="toggle-option" title="Show distance read-outs between two selected layers">
+        <input type="checkbox" checked={showMeasurements} onchange={(event) => { showMeasurements = event.currentTarget.checked; }} />
+        <span>Measure</span>
+      </label>
       <label class="toggle-option">
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
         <span>Bounds</span>
@@ -3651,6 +3862,7 @@
       <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
       <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
+      <button type="button" class="surface-command" class:active={shortcutSheetOpen} onclick={() => { shortcutSheetOpen = !shortcutSheetOpen; }} title="Keyboard shortcuts (?)">?</button>
     </div>
 
     <div class="surface-body">
@@ -4174,8 +4386,47 @@
                 <span>{frameReadout(feedbackFrame)}</span>
               </div>
             {/if}
+
+            {#if !designerPreviewing}
+              {#each liveSmartGuides as guide, index (`smart-${guide.axis}-${guide.value}-${index}`)}
+                <span
+                  class={`smart-guide ${guide.axis}`}
+                  style={guide.axis === 'x'
+                    ? `left:${guide.value}px;top:0;height:${artboardHeight}px;`
+                    : `top:${guide.value}px;left:0;width:${artboardWidth}px;`}
+                ></span>
+              {/each}
+            {/if}
+
+            {#if !designerPreviewing}
+              {#each measurementLines as line, index (`measure-${line.axis}-${index}`)}
+                {#if line.axis === 'x'}
+                  <span class="measure-line x" style={`left:${line.x1}px;top:${line.y}px;width:${Math.max(0, line.x2 - line.x1)}px;`}></span>
+                  <span class="measure-tag" style={`left:${(line.x1 + line.x2) / 2}px;top:${line.y}px;`}>{line.value}</span>
+                {:else}
+                  <span class="measure-line y" style={`top:${line.y1}px;left:${line.x}px;height:${Math.max(0, line.y2 - line.y1)}px;`}></span>
+                  <span class="measure-tag" style={`top:${(line.y1 + line.y2) / 2}px;left:${line.x}px;`}>{line.value}</span>
+                {/if}
+              {/each}
+            {/if}
           </div>
         </div>
+        {#if !designerPreviewing && multiSelectionActive}
+          <div class="arrange-bar" role="toolbar" tabindex="-1" aria-label="Align and distribute" onmousedown={stopSelectionAction}>
+            <span class="arrange-label">Align</span>
+            <button type="button" onclick={() => alignSelectedLayers('left')} title="Align left edges">⊢</button>
+            <button type="button" onclick={() => alignSelectedLayers('centerX')} title="Align horizontal centers">⊣⊢</button>
+            <button type="button" onclick={() => alignSelectedLayers('right')} title="Align right edges">⊣</button>
+            <span class="arrange-divider"></span>
+            <button type="button" onclick={() => alignSelectedLayers('top')} title="Align top edges">⊤</button>
+            <button type="button" onclick={() => alignSelectedLayers('middleY')} title="Align vertical centers">⊥⊤</button>
+            <button type="button" onclick={() => alignSelectedLayers('bottom')} title="Align bottom edges">⊥</button>
+            <span class="arrange-divider"></span>
+            <span class="arrange-label">Distribute</span>
+            <button type="button" disabled={selectedLayerNames.length < 3} onclick={() => distributeSelectedLayers('x')} title="Distribute horizontally">↔</button>
+            <button type="button" disabled={selectedLayerNames.length < 3} onclick={() => distributeSelectedLayers('y')} title="Distribute vertically">↕</button>
+          </div>
+        {/if}
         {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
           <div
             class="selection-quickbar"
@@ -4996,6 +5247,28 @@
         </button>
       </div>
     </div>
+    {/if}
+
+    {#if shortcutSheetOpen}
+      <div class="shortcut-sheet" role="dialog" aria-label="Keyboard shortcuts">
+        <div class="shortcut-head">
+          <strong>Keyboard shortcuts</strong>
+          <button type="button" onclick={() => { shortcutSheetOpen = false; }} aria-label="Close shortcuts">&times;</button>
+        </div>
+        <div class="shortcut-grid">
+          {#each SHORTCUT_GROUPS as group (group.title)}
+            <div class="shortcut-group">
+              <span class="shortcut-group-title">{group.title}</span>
+              {#each group.items as item (item.label)}
+                <div class="shortcut-row">
+                  <kbd>{item.keys}</kbd>
+                  <span>{item.label}</span>
+                </div>
+              {/each}
+            </div>
+          {/each}
+        </div>
+      </div>
     {/if}
   </div>
 {:else}
@@ -7319,6 +7592,108 @@
 
   .snap-guide.y {
     height: 1px;
+  }
+
+  .smart-guide {
+    position: absolute;
+    z-index: 2385;
+    pointer-events: none;
+    background: rgba(243, 119, 196, 0.9);
+    box-shadow: 0 0 7px rgba(243, 119, 196, 0.45);
+  }
+
+  .smart-guide.x { width: 1px; }
+  .smart-guide.y { height: 1px; }
+
+  .measure-line {
+    position: absolute;
+    z-index: 2386;
+    pointer-events: none;
+    border-color: rgba(243, 196, 119, 0.95);
+  }
+
+  .measure-line.x { border-top: 1px dashed rgba(243, 196, 119, 0.95); height: 0; }
+  .measure-line.y { border-left: 1px dashed rgba(243, 196, 119, 0.95); width: 0; }
+
+  .measure-tag {
+    position: absolute;
+    z-index: 2387;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    background: rgba(20, 20, 20, 0.92);
+    color: #F3C477;
+    border: 1px solid rgba(243, 196, 119, 0.5);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 10px;
+    line-height: 15px;
+    white-space: nowrap;
+  }
+
+  .arrange-bar {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2440;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(26, 26, 26, 0.96);
+    border: 1px solid #3B3B3B;
+    border-radius: 6px;
+    padding: 4px 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  }
+
+  .arrange-bar button {
+    min-width: 24px;
+    height: 24px;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #DDD;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 0 5px;
+  }
+
+  .arrange-bar button:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
+  .arrange-bar button:disabled { opacity: 0.35; cursor: default; }
+  .arrange-label { color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 2px; }
+  .arrange-divider { width: 1px; height: 18px; background: #3B3B3B; margin: 0 2px; }
+
+  .shortcut-sheet {
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    z-index: 2500;
+    width: 340px;
+    max-width: calc(100% - 32px);
+    background: rgba(24, 24, 24, 0.98);
+    border: 1px solid #3B3B3B;
+    border-radius: 8px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    padding: 12px 14px;
+  }
+
+  .shortcut-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .shortcut-head strong { color: #EEE; font-size: 13px; }
+  .shortcut-head button { background: none; border: none; color: #AAA; font-size: 18px; line-height: 1; cursor: pointer; }
+  .shortcut-head button:hover { color: #FFF; }
+  .shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .shortcut-group { display: flex; flex-direction: column; gap: 4px; }
+  .shortcut-group-title { color: #7DC4F3; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+  .shortcut-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #BBB; }
+  .shortcut-row kbd {
+    flex: none;
+    background: #2A2A2A;
+    border: 1px solid #444;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 10px;
+    color: #E0E0E0;
   }
 
   .measure-badge {

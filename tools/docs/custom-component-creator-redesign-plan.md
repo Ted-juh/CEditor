@@ -141,14 +141,12 @@ Files: `utils/customComponentInteraction.js` (condition eval), `sections/CustomL
 
 ## 7. Design-tool surface upgrades (fixes problem 5)
 
-The surface already has snap-to-grid, zoom, multi-select, nudge, tool shortcuts, and space-pan. To feel like a real design tool it needs:
+The surface already has snap-to-grid, zoom, multi-select, nudge, tool shortcuts, and space-pan. ✅ **Done** — all four upgrades shipped in `sections/CustomDesignSurfaceEditor.svelte`:
 
-- **Object-relative smart guides** — snap to other parts' edges/centers and show equal-spacing hints (`snapGuides` is grid-only today).
-- **Align & distribute** controls.
-- **Distance/measurement readouts** between selected objects.
-- **A visible shortcut cheatsheet**, and promote shortcuts off the surface-`<div>` focus so nudge/delete/duplicate don't silently die when focus drifts.
-
-Files: `sections/CustomDesignSurfaceEditor.svelte`, `utils/transformMath.js`.
+- **Object-relative smart guides** ✅ — moves now snap to other parts' edges/centers and the artboard edges/center (`applyMoveSnap` / `smartSnapCandidates`), drawing magenta guide lines. Per-axis: object snap wins, else grid snap; **Alt** bypasses; toggled by a "Smart" toolbar checkbox. Group moves snap the selection's bounding box as a whole.
+- **Align & distribute** ✅ — a floating toolbar over a multi-selection: align left/center/right and top/middle/bottom (`alignSelectedLayers`), distribute horizontally/vertically (`distributeSelectedLayers`, needs 3+). Writes through the existing `patchFromFrameForLayer`.
+- **Distance/measurement readouts** ✅ — when exactly two layers are selected, dashed connectors show the horizontal/vertical pixel gaps (`measurementLines`); "Measure" toolbar toggle.
+- **Shortcut cheatsheet + global shortcuts** ✅ — a `?`-toggled overlay (and toolbar button) lists the shortcuts, and the surface key handling moved to a **window** listener (with a form-field guard and the handler's own `defaultPrevented`/input-tag guards) so nudge/delete/duplicate/tool keys keep working when focus drifts off the surface `<div>`.
 
 ---
 
@@ -169,7 +167,7 @@ Files: `properties/PropertyCell.svelte`, `properties/PropertySection.svelte`, `s
 | **1. Interactivity model** (§3) | ✅ **Done** — 1A follow-mode `source`/`inflate`/`minTouch` + shared resolver; 1B `makeInteractive` + archetypes; 1C relative dial drag + fine-drag + double-click reset; 1D fine-drag & dbl-click wired into surfaces; 1E Make Interactive tool flyout + layer context action; 1F grab-area halo. **Pending user visual QA** of 1E/1F in the running app. | — | Medium — touches factory + materializer + runtime |
 | **2. Unify the surface** (§4) | ✅ **Done** — 2A merged Public+Public API into one `CustomApiEditor` (Contract/Values modes); 2B de-duped Generators to the surface dock only (`Designer.focusSurfaceDock` jump-link); 2C removed the dead Assets dock tab. Channels confirmed single-home (panel only — not in the surface inspector). **2D folded in the last overlap:** removed the redundant panel "Layers" tab + `CustomLayersEditor` (surface dock is the single, feature-complete home), with jump-links redirected to `Designer.focusSurfaceDock: 'layers'`. Channels/Behaviors/Hit Zones formally classified as component-wide list managers (distinct scope from the per-object inspector — kept by design). Inspector contract fully defined across the three layers (surface inspector / surface dock / panel). | 1 (shared inspector) | Low–Medium |
 | **3. Structured logic** (§6) | ✅ **Done** — shared `ConditionBuilder.svelte` (channel · operator · value rows, Match all/any join, raw-text "Advanced" escape hatch) wired into Links (condition + expression) and Hit Zones; evaluator `conditionMatches` upgraded to real `&&`/`||` with `||` lower precedence (was single-comparison + silent `return true`); legacy strings still parse. Variants JSON-patch textarea replaced with a structured override surface (base value shown, typed edit, reset-to-base, diff highlight) keeping raw JSON under an "Advanced" toggle (§11.4). New `customComponentConditions.test.js` (5 cases). | — (parallel to 2) | Low |
-| **4. Design-tool surface** (§7) | Smart guides, align/distribute, measurements, shortcut overlay | — | Low |
+| **4. Design-tool surface** (§7) | ✅ **Done** — object-relative smart guides (snap to other parts' edges/centers + artboard, magenta guide lines, Alt to bypass, "Smart" toggle); align (6) + distribute (2) toolbar over multi-selection; distance read-outs between two selected layers ("Measure" toggle); `?` shortcut cheatsheet; surface shortcuts promoted to a window listener so nudge/delete/duplicate survive focus drift (form fields still skipped). | — | Low |
 | **5. Reactive bindings** (§5) | Live binding runtime (committed, §11.1) | — | High — runtime semantics |
 | **6. Density & readiness** (§8) | Type scale, property search, inline readiness | 2 | Low |
 
