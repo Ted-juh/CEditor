@@ -33,7 +33,6 @@ const LAZY_COMPONENT_LOADERS = {
   devicebindings: () => import('../sections/DeviceBindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
   designer: () => import('../sections/CustomDesignerEditor.svelte'),
-  customlayers: () => import('../sections/CustomLayersEditor.svelte'),
   valuechannels: () => import('../sections/CustomValueChannelsEditor.svelte'),
   behaviors: () => import('../sections/CustomBehaviorsEditor.svelte'),
   hitzones: () => import('../sections/CustomHitZonesEditor.svelte'),

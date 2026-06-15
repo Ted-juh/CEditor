@@ -124,7 +124,6 @@
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
     { id: 'designer',   icon: LayoutDashboard, label: 'Designer', section: 'Designer' },
     { id: 'surface',    icon: Frame,           label: 'Surface',  section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
-    { id: 'customlayers', icon: Rows3,       label: 'Layers',     section: 'Parts', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
     { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
     { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },

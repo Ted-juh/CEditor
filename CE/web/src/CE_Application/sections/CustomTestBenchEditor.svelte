@@ -271,7 +271,7 @@
     if (!name) return;
     focusDesigner({
       'Designer.selectedLayer': name,
-      'Designer.focusSection': 'customlayers',
+      'Designer.focusSurfaceDock': 'layers',
       'Designer.preview.showBounds': true,
     });
   }
@@ -462,7 +462,8 @@
       'Designer.selectedGenerator': generatorName,
       'Designer.selectedLayer': partEntries[0]?.[0] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedHitZone': zoneEntries[0]?.[0] ?? (designer?.selectedHitZone ?? ''),
-      'Designer.focusSection': partEntries.length ? 'customlayers' : 'hitzones',
+      'Designer.focusSection': partEntries.length ? '' : 'hitzones',
+      'Designer.focusSurfaceDock': partEntries.length ? 'layers' : '',
       'Designer.preview.showHitZones': zoneEntries.length > 0,
       'Designer.preview.showBounds': true,
     };
@@ -630,7 +631,7 @@
       found.push({ id: 'segmented', label: 'Segmented Enum', detail: `${enumGroupDiagnostics.length} enum group${enumGroupDiagnostics.length === 1 ? '' : 's'} with mutual exclusion and state coverage.`, action: 'Enum Groups', focus: () => {} });
     }
     if (designer?.arpeggiator?.enabled === true || materializedPartNames.some((name) => name.toLowerCase().includes('arp'))) {
-      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSection': 'customlayers' }) });
+      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'layers' }) });
     }
     if (['attack', 'decay', 'sustain', 'release'].some((name) => channelKeys.has(name))) {
       found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'valuechannels' }) });
