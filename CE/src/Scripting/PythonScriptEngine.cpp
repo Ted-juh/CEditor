@@ -42,6 +42,16 @@
 #include <map>
 #include <vector>
 
+#if defined(_WIN32)
+ #ifndef WIN32_LEAN_AND_MEAN
+  #define WIN32_LEAN_AND_MEAN
+ #endif
+ #ifndef NOMINMAX
+  #define NOMINMAX
+ #endif
+ #include <windows.h>   // GetModuleHandleEx/GetModuleFileName — resolve THIS plugin's own folder
+#endif
+
 namespace ceditor::scripting
 {
 
@@ -382,7 +392,7 @@ public:
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
-        if (! interpreterOk) { onError (def.id, "Python interpreter failed to initialize"); return false; }
+        if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
 
         // Fresh namespace dict per script (isolation). Seed builtins + owner, then prelude + source.
         PyObject* ns = PyDict_New();
@@ -478,7 +488,9 @@ private:
         PyConfig_InitIsolatedConfig (&config);   // don't read user site / env that could break a plugin
         config.site_import = 1;                  // but DO import site so the full stdlib is wired up
 
-        if (auto home = resolvePythonHome(); home.isNotEmpty())
+        juce::String diag;
+        const auto home = resolvePythonHome (diag);
+        if (home.isNotEmpty())
             PyConfig_SetBytesString (&config, &config.home, home.toRawUTF8());
 
         PyStatus status = Py_InitializeFromConfig (&config);
@@ -486,30 +498,52 @@ private:
 
         if (PyStatus_Exception (status))
         {
-            juce::Logger::writeToLog (juce::String ("[python] init failed: ")
-                                      + (status.err_msg ? status.err_msg : "unknown"));
             interpreterOk = false;
+            initInfo = "Python init FAILED: " + juce::String (status.err_msg ? status.err_msg : "unknown")
+                     + " | home=" + (home.isNotEmpty() ? home : juce::String ("<none — isolated init can't auto-find stdlib>"))
+                     + " | " + diag;
+            juce::Logger::writeToLog ("[python] " + initInfo);
             return;
         }
         interpreterOk = true;
+        initInfo = "Python ready | home=" + (home.isNotEmpty() ? home : juce::String ("<compiled-in>")) + " | " + diag;
     }
 
-    // Where the stdlib lives: explicit env override → `PythonRuntime` next to the binary → none.
-    static juce::String resolvePythonHome()
+    // Where the stdlib lives: env override → `PythonRuntime` next to THIS binary → none. `diag`
+    // accumulates what we found, surfaced into the script log so a failure is debuggable in-host.
+    static juce::String resolvePythonHome (juce::String& diag)
     {
         if (auto env = juce::SystemStats::getEnvironmentVariable ("CEDITOR_PYTHONHOME", {}); env.isNotEmpty())
-            return env;
+        { diag << "env CEDITOR_PYTHONHOME=" << env; return env; }
 
-        auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
-        for (auto candidate : { exeDir.getChildFile ("PythonRuntime"),
-                                exeDir.getChildFile ("Resources").getChildFile ("PythonRuntime") })
-            if (candidate.isDirectory()) return candidate.getFullPathName();
+        // In a PLUGIN the process exe is the HOST (reaper.exe), so currentExecutableFile is wrong. Get
+        // the directory of THIS module (the plugin DLL / this code) instead, so we find the bundled runtime.
+        juce::File moduleDir;
+       #if defined(_WIN32)
+        HMODULE hmod = nullptr;
+        if (GetModuleHandleExW (GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                reinterpret_cast<LPCWSTR> (&PyInit_ceditor), &hmod) && hmod != nullptr)
+        {
+            wchar_t path[MAX_PATH] = {};
+            if (GetModuleFileNameW (hmod, path, MAX_PATH) > 0)
+                moduleDir = juce::File (juce::String (path)).getParentDirectory();
+        }
+       #endif
+        if (moduleDir == juce::File())
+            moduleDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
 
+        diag << "moduleDir=" << moduleDir.getFullPathName();
+        for (auto candidate : { moduleDir.getChildFile ("PythonRuntime"),
+                                moduleDir.getChildFile ("Resources").getChildFile ("PythonRuntime") })
+            if (candidate.isDirectory()) { diag << " (found PythonRuntime)"; return candidate.getFullPathName(); }
+
+        diag << " (no PythonRuntime alongside)";
         return {}; // fall back to the interpreter's compiled-in default (a dev Python install)
     }
 
     ScriptHostApi* host = nullptr;
     bool interpreterOk = false;
+    juce::String initInfo;                        // why init failed (or where the stdlib was found) — for the log
     std::map<juce::String, PyObject*> namespaces; // scriptId -> namespace dict (owned ref)
     std::vector<Listener> listeners;
 };
