@@ -645,6 +645,26 @@ export function resolveInteractionContext(control, previewSession = {}) {
   };
 }
 
+// Apply a CustomComponent's bindings to a (already cloned/materialized) control
+// in place, given the current interaction signals. Each binding reads its source
+// channel/state from `signals` and writes the mapped result to its target
+// property path. This is the live recompute seam: callers re-run it whenever the
+// signals change (the runtime does so reactively via resolveInteractiveControl;
+// the Test Bench calls it on its preview snapshot) so bindings track value
+// changes instead of being frozen at materialize time. Returns the same control.
+export function applyCustomBindings(control, signals = {}) {
+  const bindings = getNodeChild(control, 'Bindings');
+  if (!bindings || bindings.enabled === false) return control;
+  for (const binding of Object.values(bindings?._children ?? {})) {
+    if (!binding || binding.enabled === false) continue;
+    const sourceValue = evaluateBindingSource(binding, signals);
+    const resolvedValue = resolveBindingValue(binding, sourceValue);
+    if (resolvedValue === undefined) continue;
+    setTreeValueAtPath(control, binding.target, resolvedValue);
+  }
+  return control;
+}
+
 export function resolveInteractiveControl(control, previewSession = {}) {
   const behavior = getNodeChild(control, 'Behavior');
   const parts = getNodeChild(control, 'Parts');
@@ -672,18 +692,8 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   const resolved = deepClone(control);
   const signals = resolveInteractionContext(control, effectivePreviewSession);
   materializeCustomComponent(resolved, signals);
-  const resolvedBindings = getNodeChild(resolved, 'Bindings');
+  applyCustomBindings(resolved, signals);
   const resolvedStates = getNodeChild(resolved, 'States');
-
-  if (resolvedBindings?.enabled !== false) {
-    for (const binding of Object.values(resolvedBindings?._children ?? {})) {
-      if (!binding || binding.enabled === false) continue;
-      const sourceValue = evaluateBindingSource(binding, signals);
-      const resolvedValue = resolveBindingValue(binding, sourceValue);
-      if (resolvedValue === undefined) continue;
-      setTreeValueAtPath(resolved, binding.target, resolvedValue);
-    }
-  }
 
   const priority = Array.isArray(resolvedStates?.priority)
     ? resolvedStates.priority.map((value) => normalizeKey(value))

@@ -20,6 +20,7 @@
     analyzeCustomComponentReadiness,
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
+  import { applyCustomBindings } from '../utils/interactionRuntime.js';
 
   let { control = null } = $props();
 
@@ -57,7 +58,10 @@
   let publishedPropertyEntries = $derived(Object.entries(published?.editableProperties ?? {}).filter(([, entry]) => entry?.enabled !== false));
   let seededValues = $derived(buildTestValues(control, preview.channelValues));
   let linkedDefaults = $derived(applyCustomLinks(control, seededValues));
-  let materialized = $derived(materializedCustomComponentSnapshot(control, {
+  // The signals that drive both generator materialization and live bindings, so
+  // the Test Bench preview reflects binding-driven part changes (position, color,
+  // rotation, …) as channel values are scrubbed — matching the running plugin.
+  let previewSignals = $derived({
     valueNormalized: preview.testValue ?? 0.5,
     customChannels: Object.fromEntries(
       Object.entries(values?._children ?? {}).flatMap(([name, channel]) => ([
@@ -65,7 +69,11 @@
         [`channel.${name}.normalized`, normalizeCustomChannelValue(channel, linkedDefaults.values?.[name] ?? seededValues?.[name])],
       ]))
     ),
-  }));
+  });
+  let materialized = $derived(applyCustomBindings(
+    materializedCustomComponentSnapshot(control, previewSignals),
+    previewSignals
+  ));
   let materializedParts = $derived(materialized?._children?.Parts?._children ?? {});
   let materializedHitZones = $derived(materialized?._children?.HitZones?._children ?? {});
   let materializedPartNames = $derived(Object.keys(materializedParts));
