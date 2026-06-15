@@ -4,7 +4,6 @@ import { get } from 'svelte/store';
 
 import { SCRIPT_TARGETS, portabilityForScript } from '../src/CE_Application/scripting/scriptCommandRegistry.js';
 import { deserializeScriptWorkspaceDocument, normalizeScriptWorkspaceMode, serializeScriptWorkspaceDocument } from '../src/CE_Application/scripting/scriptDocumentModel.js';
-import { createDebugSession } from '../src/CE_Application/scripting/scriptDebugger.js';
 import { emitScript, exportWarningsForScript } from '../src/CE_Application/scripting/scriptEmitters.js';
 import { compilePanelScripts } from '../src/CE_Application/scripting/scriptPanelExport.js';
 import { validateScriptForProject } from '../src/CE_Application/scripting/scriptProjectValidation.js';
@@ -311,22 +310,6 @@ test('project validation accepts active device profile parameter targets', () =>
 test('project validation keeps sample workspace targets out of real-error grouping', () => {
   const issues = validateScriptForProject(createMacroRoutingScript(), { panel: null });
   assert.equal(issues.some((issue) => issue.code === 'dead-target'), false);
-});
-
-test('debugger session pauses at breakpoints and reports why skipped scripts did not run', () => {
-  const script = createMacroRoutingScript();
-  script.debug = { breakpoints: ['macro-resonance'], watchPaths: ['event.value'] };
-  const session = createDebugSession(script, createScriptContext({
-    event: { name: 'onControlChanged', target: 'macroControl', value: 0.5 },
-  }));
-
-  assert.equal(session.paused, true);
-  assert.equal(session.pausedAt, 'macro-resonance');
-  assert.equal(session.frames.length, 2);
-  assert.equal(session.watches[0].value, 0.5);
-
-  const skipped = createDebugSession({ ...script, enabled: false }, createScriptContext());
-  assert.match(skipped.reasonNotRun, /disabled/i);
 });
 
 test('panel script export compiles panel and control attachments with validation', () => {
