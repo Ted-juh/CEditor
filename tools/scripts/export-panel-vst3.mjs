@@ -7,7 +7,7 @@
 //
 // Usage: node export-panel-vst3.mjs <panel.cepanel> <guid> [productName]
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, rmSync, readFileSync, writeFileSync, statSync, readdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 // Identity derivation is shared with the editor's Export-settings UI (single source of truth), so the
@@ -156,6 +156,7 @@ try {
   const built = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'VST3', `${productName}.vst3`);
   const dest = path.join(outDir, `${productName}.vst3`);
   if (existsSync(built)) {
+    rmSync(dest, { recursive: true, force: true });   // clear stale output so the size report is accurate
     cpSync(built, dest, { recursive: true });
     const baseBytes = dirSize(dest);
     console.log(`EXPORTED: ${dest} (${mb(baseBytes)} MB base)`);
