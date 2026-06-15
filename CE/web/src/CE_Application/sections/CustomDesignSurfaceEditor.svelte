@@ -14,6 +14,7 @@
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
+  import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
   import {
     createBackground,
     createBehaviorModule,
@@ -92,6 +93,12 @@
   let showMeasurements = $state(true);
   let liveSmartGuides = $state([]);
   let shortcutSheetOpen = $state(false);
+  let readinessDismissed = $state(false);
+  // Inline readiness nudges on the canvas (problem 7): surface the not-yet-done
+  // required/recommended setup steps right where the author is working, instead
+  // of only in the Designer tab. Optional steps stay out of the way.
+  let readiness = $derived(core?.controlType === 'CustomComponent' ? analyzeCustomComponentReadiness(control) : null);
+  let readinessNudges = $derived((readiness?.steps ?? []).filter((step) => !step.done && step.severity !== 'optional'));
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -5249,6 +5256,21 @@
     </div>
     {/if}
 
+    {#if !designerPreviewing && !readinessDismissed && readinessNudges.length}
+      <div class="readiness-nudges" role="status" aria-label="Component readiness">
+        <div class="readiness-nudges-head">
+          <strong>Setup{readiness?.ok ? '' : ` · ${readiness?.requiredOpenCount ?? 0} required`}</strong>
+          <button type="button" onclick={() => { readinessDismissed = true; }} aria-label="Dismiss readiness nudges">&times;</button>
+        </div>
+        {#each readinessNudges.slice(0, 4) as step (step.id)}
+          <div class="readiness-nudge" class:required={step.severity === 'required'}>
+            <span class="readiness-dot"></span>
+            <span class="readiness-text"><strong>{step.label}</strong> — {step.detail}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
     {#if shortcutSheetOpen}
       <div class="shortcut-sheet" role="dialog" aria-label="Keyboard shortcuts">
         <div class="shortcut-head">
@@ -7662,6 +7684,32 @@
   .arrange-bar button:disabled { opacity: 0.35; cursor: default; }
   .arrange-label { color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 2px; }
   .arrange-divider { width: 1px; height: 18px; background: #3B3B3B; margin: 0 2px; }
+
+  .readiness-nudges {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 2490;
+    width: 300px;
+    max-width: calc(100% - 32px);
+    background: rgba(24, 24, 24, 0.97);
+    border: 1px solid #3B3B3B;
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    padding: 9px 11px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .readiness-nudges-head { display: flex; align-items: center; justify-content: space-between; }
+  .readiness-nudges-head strong { color: #E0E0E0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .readiness-nudges-head button { background: none; border: none; color: #AAA; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
+  .readiness-nudges-head button:hover { color: #FFF; }
+  .readiness-nudge { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; color: #B6B6B6; line-height: 1.35; }
+  .readiness-nudge .readiness-text strong { color: #DADADA; }
+  .readiness-dot { flex: none; width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #C9A24B; }
+  .readiness-nudge.required .readiness-dot { background: #D56B6B; }
 
   .shortcut-sheet {
     position: absolute;
