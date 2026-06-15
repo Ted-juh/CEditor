@@ -390,11 +390,11 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
   return constrainCustomValues(control, nextValues, { primaryChannelName: channelName });
 }
 
-function conditionMatches(condition, values) {
-  const text = String(condition ?? '').trim();
-  if (!text) return true;
-  const match = text.match(/^([A-Za-z_$][\w$]*)\s*(={2,3}|!==|!=|>=|<=|>|<)\s*['"]?([^'"]+)['"]?$/);
-  if (!match) return true;
+// Evaluate a single `channel op value` comparison. Returns a boolean, or null
+// when the text is not a recognizable comparison (caller decides leniency).
+function comparisonMatches(text, values) {
+  const match = String(text ?? '').trim().match(/^([A-Za-z_$][\w$]*)\s*(={2,3}|!==|!=|>=|<=|>|<)\s*['"]?([^'"]*)['"]?$/);
+  if (!match) return null;
   const left = values?.[match[1]];
   const right = match[3];
   const leftNumber = Number(left);
@@ -416,8 +416,23 @@ function conditionMatches(condition, values) {
     case '<':
       return numeric ? leftNumber < rightNumber : String(left ?? '') < right;
     default:
-      return true;
+      return null;
   }
+}
+
+// Supports compound conditions joined with `&&` (all) and `||` (any). `||` has
+// the lower precedence, matching the structured builder's "match all / any"
+// groups. An unparseable clause stays lenient (treated as satisfied) so legacy
+// free-text conditions keep behaving as they did before.
+function conditionMatches(condition, values) {
+  const text = String(condition ?? '').trim();
+  if (!text) return true;
+  return text.split('||').some((orPart) =>
+    orPart.split('&&').every((andPart) => {
+      const result = comparisonMatches(andPart, values);
+      return result === null ? true : result;
+    })
+  );
 }
 
 function resolveSwitchLinkValue(link, values) {
