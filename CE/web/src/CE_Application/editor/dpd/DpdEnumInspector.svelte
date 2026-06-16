@@ -99,7 +99,7 @@
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Radio group</div>
           <div class="w-radio">
             {#each entries as entry, i (entry.id ?? i)}
-              <label class={[i === previewSel && 'on']} role="button" tabindex="-1" onclick={() => previewSel = i} onkeydown={() => {}}><span class="rb"></span>{entry.label}</label>
+              <div class={['ritem', i === previewSel && 'on']} role="button" tabindex="-1" onclick={() => previewSel = i} onkeydown={() => {}}><span class="rb"></span>{entry.label}</div>
             {/each}
           </div></div>
         <div class="pvitem"><div class="pvlabel"><span class="dot"></span>Segmented control</div>
