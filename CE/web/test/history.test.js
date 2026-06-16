@@ -17,6 +17,7 @@ import {
   componentDocuments,
   activeComponentDocumentId,
 } from '../src/CE_Application/stores/componentWorkspace.js';
+import { activeEditorTab } from '../src/CE_Application/stores/panels.js';
 
 function makeDoc(id, value) {
   return {
@@ -114,4 +115,35 @@ test('each document keeps an independent undo stack', () => {
   commit();
   undo();
   assert.equal(valueOf('docA'), 0);
+
+  // Reset the tab context for following tests.
+  activeEditorTab.set({ type: 'panel', id: null });
+});
+
+test('undo works in a standalone component tab even when mode is not surface', () => {
+  // Opening a standalone component tab resets componentWorkspaceMode back to
+  // 'panel' (EditorCanvas closes the surface workspace), but the creator stays
+  // live and keyed off the active editor tab. History must follow suit.
+  initHistory();
+
+  componentDocuments.set([makeDoc('docTab', 0)]);
+  activeComponentDocumentId.set('docTab');
+  componentWorkspaceMode.set('panel');
+  activeEditorTab.set({ type: 'component', id: 'docTab' });
+
+  commit();
+  assert.equal(canUndo(), false);
+
+  mutate('docTab', 7);
+  commit();
+  assert.equal(valueOf('docTab'), 7);
+  assert.equal(canUndo(), true, 'component-tab edits must be captured');
+
+  undo();
+  assert.equal(valueOf('docTab'), 0, 'undo must revert a component-tab edit');
+
+  redo();
+  assert.equal(valueOf('docTab'), 7);
+
+  activeEditorTab.set({ type: 'panel', id: null });
 });

@@ -1,5 +1,5 @@
 import { get, writable } from 'svelte/store';
-import { panels, resolvedActivePanelId } from './panels.js';
+import { panels, resolvedActivePanelId, activeEditorTab } from './panels.js';
 import {
   componentWorkspaceMode,
   componentDocuments,
@@ -41,9 +41,19 @@ let lastSnapshotJson = null;
  * Resolve which editing context is currently active. The component workspace
  * takes precedence when it is open with a valid active document; otherwise the
  * active panel is used. Returns null when nothing editable is focused.
+ *
+ * A custom component is being edited in two cases, mirroring how the editor
+ * decides to render the creator (see EditorCanvas's `componentSurfaceWorkspace`):
+ * either the workspace is in `surface` mode, or a standalone `component` editor
+ * tab is active. The tab case matters because opening a component tab resets the
+ * workspace mode back to `panel`, yet the creator (and its edits) stay live — so
+ * gating only on `surface` mode would miss every standalone-tab edit and leave
+ * undo/redo dead.
  */
 function activeContext() {
-  if (get(componentWorkspaceMode) === 'surface') {
+  const editingComponent =
+    get(componentWorkspaceMode) === 'surface' || get(activeEditorTab)?.type === 'component';
+  if (editingComponent) {
     const documentId = get(activeComponentDocumentId);
     if (documentId != null && get(componentDocuments).some((doc) => doc.id === documentId)) {
       return { kind: 'component', id: documentId };
@@ -249,6 +259,7 @@ export function initHistory() {
   resolvedActivePanelId.subscribe(resetBaseline);
   activeComponentDocumentId.subscribe(resetBaseline);
   componentWorkspaceMode.subscribe(resetBaseline);
+  activeEditorTab.subscribe(resetBaseline);
 
   // Watch for mutations in either editable store.
   panels.subscribe(() => {
