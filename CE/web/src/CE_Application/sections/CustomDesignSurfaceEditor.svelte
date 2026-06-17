@@ -160,6 +160,12 @@
       .map((kit) => ({ kit, frame: kitFrame(kit) }))
       .filter(({ frame }) => frame !== null)
   );
+  let kitPartOverlayEntries = $derived(
+    partEntries.filter(([name, part]) => kitIdFor(part) && !selectedLayerSet.has(name))
+  );
+  let selectedPartKitId = $derived(kitIdFor(selectedPart));
+  let selectedPartKit = $derived(kitEntries.find((k) => k.id === selectedPartKitId) ?? null);
+  let expandedKits = $state(new Set());
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
   let selectedAuthoredPart = $derived(authoredParts?._children?.[selectedLayer] ?? null);
   let selectedZone = $derived(hitZones?._children?.[selectedHitZone] ?? null);
@@ -2575,24 +2581,27 @@
     pulseSelection(`zone:${zone.name}`);
   }
 
-  function detachSelectedLayer() {
-    if (!core?.id || !selectedLayer || !selectedPart) return;
-    const detached = cloneValue(selectedPart);
-    detached.name = selectedLayer;
+  function detachLayerByName(name) {
+    if (!core?.id || !name) return;
+    const part = authoredParts?._children?.[name];
+    if (!part) return;
+    const detached = cloneValue(part);
+    detached.name = name;
     detached.generated = false;
-    detached.detachedFromGenerator = selectedPart?.meta?.generatedBy || selectedPart?.generatedBy || 'generator';
-    detached.meta = {
-      ...(detached.meta ?? {}),
-      generated: false,
-      detachedFromGenerator: detached.detachedFromGenerator,
-    };
+    detached.detachedFromGenerator = part?.meta?.generatedBy || part?.generatedBy || 'kit';
+    detached.meta = { ...(detached.meta ?? {}), generated: false, detachedFromGenerator: detached.detachedFromGenerator };
     applyControlPatch(core.id, {
-      [`Parts.${selectedLayer}`]: detached,
-      'Designer.selectedLayer': selectedLayer,
-      'Designer.selectedLayers': [selectedLayer],
+      [`Parts.${name}`]: detached,
+      'Designer.selectedLayer': name,
+      'Designer.selectedLayers': [name],
       'Designer.selectedSurfaceKind': 'layer',
     });
-    localSelectedLayerNames = [selectedLayer];
+    localSelectedLayerNames = [name];
+  }
+
+  function detachSelectedLayer() {
+    if (!core?.id || !selectedLayer || !selectedPart) return;
+    detachLayerByName(selectedLayer);
   }
 
   function removeSelectedLayer() {
@@ -2851,6 +2860,14 @@
     const primary = kit?.layerNames?.[0] ?? '';
     if (!primary) return;
     commitLayerSelection(kit.layerNames, primary);
+  }
+
+  function toggleKitExpand(kitId, event = null) {
+    event?.stopPropagation?.();
+    const next = new Set(expandedKits);
+    if (next.has(kitId)) next.delete(kitId);
+    else next.add(kitId);
+    expandedKits = next;
   }
 
   function convertSelectedValueControl(style) {
@@ -4354,6 +4371,24 @@
               </button>
             {/if}
 
+            {#if !designerPreviewing}
+              {#each kitPartOverlayEntries as [name, part] (name)}
+                <button
+                  class="part-bound kit-part-overlay"
+                  class:selected={activeSelectionKind === 'layer' && selectedLayer === name}
+                  class:pulse={selectionPulseTarget === `layer:${name}`}
+                  type="button"
+                  style={partOverlayStyle(name, part)}
+                  title={`${name}: ${part?.role ?? 'kit part'}`}
+                  onclick={(event) => { event.stopPropagation(); selectLayer(name, event); }}
+                  onpointerenter={() => setSurfaceHover('layer', name)}
+                  onpointerleave={() => clearSurfaceHover('layer', name)}
+                >
+                  <span class="selection-label">{part?.role ?? name}</span>
+                </button>
+              {/each}
+            {/if}
+
             {#if !designerPreviewing && multiSelectionActive && activeSelectionFrame}
               <div class="multi-selection-bound" style={selectionBoundsStyle(activeSelectionFrame)}>
                 <span>{selectedLayerNames.length} layers</span>
@@ -4551,6 +4586,7 @@
               class="list-row kit-row"
               class:selected={activeSelectionKind === 'kit' && selectedKit === kit.id}
               class:primary={activeSelectionKind === 'kit' && selectedKit === kit.id}
+              class:expanded={expandedKits.has(kit.id)}
               class:pulse={selectionPulseTarget === `kit:${kit.id}`}
               role="group"
               aria-label={`${kit.label} kit controls`}
@@ -4570,10 +4606,12 @@
               <div class="row-actions">
                 <button
                   type="button"
-                  onclick={(event) => { event.stopPropagation(); editKitParts(kit.id); }}
-                  title="Edit generated parts"
+                  class:active={expandedKits.has(kit.id)}
+                  onclick={(event) => toggleKitExpand(kit.id, event)}
+                  title={expandedKits.has(kit.id) ? 'Collapse kit parts' : 'Expand kit parts'}
+                  aria-label={expandedKits.has(kit.id) ? 'Collapse' : 'Expand'}
                 >
-                  Edit
+                  {expandedKits.has(kit.id) ? '▾' : '▸'}
                 </button>
                 <button
                   type="button"
@@ -4585,6 +4623,41 @@
                 </button>
               </div>
             </div>
+            {#if expandedKits.has(kit.id)}
+              {#each kit.layerNames as partName (partName)}
+                {@const kitPart = authoredParts?._children?.[partName]}
+                {#if kitPart}
+                  <div
+                    class="list-row kit-sub-row"
+                    class:selected={activeSelectionKind === 'layer' && selectedLayer === partName}
+                    class:primary={activeSelectionKind === 'layer' && selectedLayer === partName}
+                    class:pulse={selectionPulseTarget === `layer:${partName}`}
+                    role="group"
+                    aria-label={`${partName} kit part`}
+                    title={`${partName}: ${kitPart?.role ?? 'kit part'}`}
+                  >
+                    <button type="button" class="row-main" onclick={() => selectLayer(partName)}>
+                      <span class="layer-thumb" aria-hidden="true">
+                        <span class={`layer-thumb-shape ${layerKindClass(kitPart)}`} style={layerThumbPartStyle(partName, kitPart)}></span>
+                      </span>
+                      <span class="row-text">
+                        <strong>{kitPart?.role ?? partName}</strong>
+                        <em>kit part · {layerKindLabel(kitPart)}</em>
+                      </span>
+                    </button>
+                    <div class="row-actions">
+                      <button
+                        type="button"
+                        onclick={(event) => { event.stopPropagation(); detachLayerByName(partName); }}
+                        title="Detach from kit and make editable"
+                      >
+                        <Scissors size={12} aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                {/if}
+              {/each}
+            {/if}
           {/each}
           {#each generatedSourceEntries as source (source.source)}
             <div
@@ -4841,6 +4914,22 @@
                 {/if}
 
                 {#if activeSelectionKind === 'layer' && selectedPart}
+                  {#if selectedPartKit}
+                    <div class="dock-section kit-member-callout">
+                      <div class="dock-section-title">Kit Member</div>
+                      <div class="dock-note">Part of <strong>{selectedPartKit.label}</strong>. Edits are locked — detach to make this part standalone.</div>
+                      <div class="dock-button-grid">
+                        <button type="button" onclick={() => selectKit(selectedPartKitId)}>
+                          ← Back to Kit
+                        </button>
+                        <button type="button" onclick={detachSelectedLayer} disabled={!canDetachLayer} title="Detach from kit and make editable">
+                          <Scissors size={13} aria-hidden="true" />
+                          <span>Detach</span>
+                        </button>
+                      </div>
+                    </div>
+                  {/if}
+
                   <div class="dock-section">
                     <div class="dock-section-title">Layer</div>
                     <label class="dock-field wide">
@@ -6685,6 +6774,43 @@
     transform-origin: 50% 100%;
   }
 
+  .kit-sub-row {
+    padding-left: 20px;
+    min-height: 34px;
+    background: rgba(20, 184, 166, 0.04);
+    border-bottom-color: rgba(20, 184, 166, 0.12);
+    color: #A8D8D2;
+  }
+
+  .kit-sub-row:hover {
+    background: rgba(20, 184, 166, 0.09);
+  }
+
+  .kit-sub-row.selected {
+    background: #183530;
+    color: #CCFFF8;
+    box-shadow:
+      inset 3px 0 0 #14B8A6,
+      inset 0 0 0 1px rgba(20, 184, 166, 0.3);
+  }
+
+  .kit-sub-row .row-main {
+    grid-template-columns: 32px minmax(0, 1fr);
+    gap: 7px;
+    padding: 4px 8px;
+  }
+
+  .kit-sub-row .layer-thumb {
+    width: 28px;
+    height: 22px;
+  }
+
+  .kit-member-callout {
+    background: rgba(20, 184, 166, 0.06);
+    border-left: 3px solid #14B8A6;
+    border-radius: 0 4px 4px 0;
+  }
+
   .generated-group-thumb {
     display: grid;
     place-items: center;
@@ -7222,6 +7348,25 @@
   .part-bound.kit-bound > .selection-label {
     background: rgba(12, 54, 50, 0.96);
     color: #E6FFFB;
+  }
+
+  .part-bound.kit-part-overlay {
+    border: 1px dashed rgba(20, 184, 166, 0.38);
+    background: transparent;
+    color: #B5F0E8;
+  }
+
+  .part-bound.kit-part-overlay:hover {
+    border-color: rgba(20, 184, 166, 0.72);
+    background: rgba(20, 184, 166, 0.06);
+  }
+
+  .part-bound.kit-part-overlay.selected {
+    border: 2px solid #14B8A6;
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.72),
+      0 0 0 4px rgba(20, 184, 166, 0.18),
+      0 0 18px rgba(20, 184, 166, 0.28);
   }
 
   .part-bound.selected {
