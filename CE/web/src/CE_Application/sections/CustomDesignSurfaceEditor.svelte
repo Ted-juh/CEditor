@@ -154,6 +154,12 @@
   let overlayPartEntries = $derived(partEntries.filter(([name, part]) => !kitIdFor(part) || selectedLayerSet.has(name)));
   let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
   let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
+  let unselectedKitOverlays = $derived(
+    kitEntries
+      .filter((kit) => kit.id !== selectedKit)
+      .map((kit) => ({ kit, frame: kitFrame(kit) }))
+      .filter(({ frame }) => frame !== null)
+  );
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
   let selectedAuthoredPart = $derived(authoredParts?._children?.[selectedLayer] ?? null);
   let selectedZone = $derived(hitZones?._children?.[selectedHitZone] ?? null);
@@ -1990,11 +1996,12 @@
     arc._children.Background._children.Fill.solidEnabled = false;
     arc._children.Background._children.Border.enabled = false;
 
+    const pointerHeight = Math.max(24, size / 2 - 18);
     const pointer = makeDrawnPart('capsule', {
       left: centerX - 3,
-      top: top + 12,
+      top: centerY - pointerHeight,
       width: 6,
-      height: Math.max(24, size / 2 - 18),
+      height: pointerHeight,
     });
     pointer.name = pointerName;
     pointer.role = 'dialPointer';
@@ -2002,7 +2009,7 @@
     assignKitPart(pointer, kitMeta, 'pointer');
     pointer._children.Layout.anchorX = 'center';
     pointer._children.Layout.anchorY = 'bottom';
-    pointer._children.Layout.rotation = -45;
+    pointer._children.Layout.rotation = 0;
     pointer._children.Background._children.Fill.colour = 'FFEAF6FF';
     pointer._children.Background._children.Border.enabled = false;
 
@@ -3511,10 +3518,18 @@
         {#if selectedBackground}
           <label class="paint-swatch">
             <span>Fill</span>
+            <button
+              type="button"
+              class="fill-toggle"
+              class:active={selectedFill?.solidEnabled !== false}
+              disabled={!canPaintLayer}
+              title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
+              onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
+            ></button>
             <input
               type="color"
               value={colorInputValue(selectedFill?.colour)}
-              disabled={!canPaintLayer}
+              disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
               oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
             />
           </label>
@@ -4035,12 +4050,22 @@
         <section class="palette-group">
           <span>Fill</span>
           <label class="palette-swatch-row">
-            <input
-              type="color"
-              value={colorInputValue(selectedFill?.colour)}
-              disabled={!canPaintLayer || !selectedBackground}
-              oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-            />
+            <div class="swatch-fill-cell">
+              <button
+                type="button"
+                class="fill-toggle"
+                class:active={selectedFill?.solidEnabled !== false}
+                disabled={!canPaintLayer || !selectedBackground}
+                title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
+                onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
+              ></button>
+              <input
+                type="color"
+                value={colorInputValue(selectedFill?.colour)}
+                disabled={!canPaintLayer || !selectedBackground || selectedFill?.solidEnabled === false}
+                oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
+              />
+            </div>
             <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
             <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
           </label>
@@ -4292,6 +4317,23 @@
                       {/if}
                     {/each}
                   {/if}
+                </button>
+              {/each}
+            {/if}
+
+            {#if !designerPreviewing}
+              {#each unselectedKitOverlays as { kit, frame } (kit.id)}
+                <button
+                  class="part-bound kit-bound"
+                  class:pulse={selectionPulseTarget === `kit:${kit.id}`}
+                  type="button"
+                  style={selectionBoundsStyle(frame)}
+                  title={`${kit.label}: grouped kit`}
+                  onclick={(event) => { event.stopPropagation(); selectKit(kit.id); }}
+                  onpointerenter={() => setSurfaceHover('kit', kit.label)}
+                  onpointerleave={() => clearSurfaceHover('kit', kit.label)}
+                >
+                  <span class="selection-label">{kit.label}</span>
                 </button>
               {/each}
             {/if}
@@ -5508,6 +5550,37 @@
     border-radius: 3px;
     background: transparent;
     cursor: pointer;
+  }
+
+  .fill-toggle {
+    width: 14px;
+    height: 14px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    border-radius: 3px;
+    background: repeating-linear-gradient(
+      45deg,
+      rgba(255, 255, 255, 0.1) 0 3px,
+      transparent 3px 6px
+    );
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .fill-toggle.active {
+    border-color: rgba(91, 155, 213, 0.7);
+    background: rgba(91, 155, 213, 0.55);
+  }
+
+  .fill-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .swatch-fill-cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
   }
 
   .paint-number input {
