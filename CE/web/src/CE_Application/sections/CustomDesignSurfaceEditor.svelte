@@ -5062,16 +5062,6 @@
                       </label>
                       {#if activeSelectionKind === 'layer'}
                         <label>
-                          <span>Rot</span>
-                          <input
-                            type="number"
-                            step="1"
-                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
-                            disabled={!selectedPartEditable}
-                            onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
-                          />
-                        </label>
-                        <label>
                           <span>Pivot X</span>
                           <input
                             type="number"
@@ -5089,6 +5079,16 @@
                             value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50))}
                             disabled={!selectedPartEditable}
                             onchange={(event) => setLayerLayoutProperty('pivotY', numericInputValue(event, 50))}
+                          />
+                        </label>
+                        <label>
+                          <span>Rot</span>
+                          <input
+                            type="number"
+                            step="1"
+                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
+                            disabled={!selectedPartEditable}
+                            onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
                           />
                         </label>
                       {/if}
