@@ -283,26 +283,22 @@
     ].join('; ');
   });
 
-  let arcTrackStyle = $derived.by(() => {
-    if (!rendersArcTrack) return '';
-
+  let arcSvgData = $derived.by(() => {
+    if (!rendersArcTrack) return null;
     const size = Math.max(1, Math.min(frame.width, frame.height));
-    const thickness = clampNumber(
-      arcTrack?.thickness ?? backgroundBorder?.thickness,
-      1,
-      size / 2,
-    );
+    const thickness = clampNumber(arcTrack?.thickness ?? backgroundBorder?.thickness, 1, size / 2);
+    const r = Math.max(0.5, size / 2 - thickness / 2);
     const sweepAngle = clampNumber(arcTrack?.sweepAngle, 0, 360);
     const direction = String(arcTrack?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw';
     const startAngle = numberOr(arcTrack?.startAngle, -135);
     const renderedStartAngle = direction === 'ccw' ? startAngle - sweepAngle : startAngle;
+    const cap = arcTrack?.cap === 'round' ? 'round' : 'butt';
     const colour = cssColour(arcTrack?.colour ?? backgroundBorder?.colour ?? backgroundFill?.colour, '#2B3742');
-
-    return [
-      `background:conic-gradient(from ${renderedStartAngle}deg, ${colour} 0deg ${sweepAngle}deg, transparent ${sweepAngle}deg 360deg)`,
-      `-webkit-mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
-      `mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
-    ].join('; ');
+    const circumference = 2 * Math.PI * r;
+    const arcLength = circumference * Math.min(sweepAngle, 359.99) / 360;
+    // SVG 0° = 3-o'clock; CSS conic 0° = 12-o'clock → subtract 90 to align
+    const rotation = renderedStartAngle - 90;
+    return { size, r, thickness, arcLength, circumference, rotation, cap, colour };
   });
 
   let simpleBackgroundStyle = $derived.by(() => {
@@ -440,8 +436,20 @@
       <div class="interactive-value-arc" style={valueArcStyle}></div>
     {/if}
 
-    {#if rendersArcTrack}
-      <div class="interactive-arc-track" style={arcTrackStyle}></div>
+    {#if arcSvgData}
+      <svg class="interactive-arc-svg" viewBox="0 0 {arcSvgData.size} {arcSvgData.size}" aria-hidden="true">
+        <circle
+          cx={arcSvgData.size / 2}
+          cy={arcSvgData.size / 2}
+          r={arcSvgData.r}
+          fill="none"
+          stroke={arcSvgData.colour}
+          stroke-width={arcSvgData.thickness}
+          stroke-linecap={arcSvgData.cap}
+          stroke-dasharray="{arcSvgData.arcLength} {arcSvgData.circumference}"
+          transform="rotate({arcSvgData.rotation} {arcSvgData.size / 2} {arcSvgData.size / 2})"
+        />
+      </svg>
     {/if}
 
     {#if rendersEnvelopePath}
@@ -504,11 +512,19 @@
     pointer-events: none;
   }
 
-  .interactive-value-arc,
-  .interactive-arc-track {
+  .interactive-value-arc {
     position: absolute;
     inset: 0;
     border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .interactive-arc-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
     pointer-events: none;
   }
 

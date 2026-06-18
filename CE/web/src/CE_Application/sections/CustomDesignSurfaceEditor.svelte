@@ -14,6 +14,7 @@
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
+  import EditorRuler from '../editor/EditorRuler.svelte';
   import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
   import {
     createBackground,
@@ -215,6 +216,10 @@
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
   let surfaceScrollEl = $state(null);
+  let rulerScrollX = $state(0);
+  let rulerScrollY = $state(0);
+  let rulerViewWidth = $state(0);
+  let rulerViewHeight = $state(0);
   let draggingLayerName = $state('');
   let spacePanActive = $state(false);
   let surfacePan = $state(null);
@@ -3518,6 +3523,11 @@
       endSurfacePan();
     }
   }
+
+  function handleSurfaceScroll(event) {
+    rulerScrollX = event.currentTarget.scrollLeft;
+    rulerScrollY = event.currentTarget.scrollTop;
+  }
 </script>
 
 {#if core?.controlType === 'CustomComponent'}
@@ -3533,23 +3543,25 @@
     {#if !designerPreviewing && activeSelectionKind === 'layer' && selectedPart}
       <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
         {#if selectedBackground}
-          <label class="paint-swatch">
-            <span>Fill</span>
-            <button
-              type="button"
-              class="fill-toggle"
-              class:active={selectedFill?.solidEnabled !== false}
-              disabled={!canPaintLayer}
-              title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
-              onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
-            ></button>
-            <input
-              type="color"
-              value={colorInputValue(selectedFill?.colour)}
-              disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
-              oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-            />
-          </label>
+          {#if !selectedIsArc}
+            <label class="paint-swatch">
+              <span>Fill</span>
+              <button
+                type="button"
+                class="fill-toggle"
+                class:active={selectedFill?.solidEnabled !== false}
+                disabled={!canPaintLayer}
+                title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
+                onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
+              ></button>
+              <input
+                type="color"
+                value={colorInputValue(selectedFill?.colour)}
+                disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
+                oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
+              />
+            </label>
+          {/if}
           <label class="paint-swatch">
             <span>Stroke</span>
             <input
@@ -3818,6 +3830,45 @@
             }}
           />
         </label>
+        <label>
+          <span>Colour</span>
+          <input
+            type="color"
+            value={colorInputValue(selectedArcMeta?.colour, '#5B9BD5')}
+            oninput={(event) => {
+              const alpha = alphaFromColour(selectedArcMeta?.colour) ?? 'FF';
+              setArcMetaProperty('colour', colourFromInput(event.currentTarget.value, alpha));
+            }}
+          />
+        </label>
+        <div class="arc-toggle-group">
+          <button
+            type="button"
+            class:active={selectedArcMeta?.direction !== 'ccw'}
+            onclick={() => setArcMetaProperty('direction', 'cw')}
+            title="Clockwise"
+          >CW</button>
+          <button
+            type="button"
+            class:active={selectedArcMeta?.direction === 'ccw'}
+            onclick={() => setArcMetaProperty('direction', 'ccw')}
+            title="Counter-clockwise"
+          >CCW</button>
+        </div>
+        <div class="arc-toggle-group">
+          <button
+            type="button"
+            class:active={selectedArcMeta?.cap !== 'round'}
+            onclick={() => setArcMetaProperty('cap', 'flat')}
+            title="Flat end caps"
+          >Flat</button>
+          <button
+            type="button"
+            class:active={selectedArcMeta?.cap === 'round'}
+            onclick={() => setArcMetaProperty('cap', 'round')}
+            title="Round end caps"
+          >Round</button>
+        </div>
       </div>
     {/if}
 
@@ -4140,16 +4191,34 @@
         </section>
       </aside>
 
-      <div
-        class="surface-scroll"
-        class:space-pan={spacePanActive}
-        class:panning={!!surfacePan}
-        role="region"
-        aria-label="Design canvas scroll area"
-        style={surfaceGridStyle}
-        bind:this={surfaceScrollEl}
-        onmousedown={handleSurfaceScrollMouseDown}
-      >
+      <div class="surface-viewport">
+        <EditorRuler
+          orientation="horizontal"
+          length={rulerViewWidth}
+          scrollOffset={rulerScrollX}
+          contentOffset={112}
+          scale={surfaceZoom}
+        />
+        <EditorRuler
+          orientation="vertical"
+          length={rulerViewHeight}
+          scrollOffset={rulerScrollY}
+          contentOffset={96}
+          scale={surfaceZoom}
+        />
+        <div
+          class="surface-scroll"
+          class:space-pan={spacePanActive}
+          class:panning={!!surfacePan}
+          role="region"
+          aria-label="Design canvas scroll area"
+          style={surfaceGridStyle}
+          bind:this={surfaceScrollEl}
+          bind:clientWidth={rulerViewWidth}
+          bind:clientHeight={rulerViewHeight}
+          onscroll={handleSurfaceScroll}
+          onmousedown={handleSurfaceScrollMouseDown}
+        >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
         {/if}
@@ -4554,6 +4623,7 @@
             {/if}
           </div>
         {/if}
+      </div>
       </div>
 
       <div class="surface-dock">
@@ -5194,6 +5264,31 @@
                         />
                       </label>
                     </div>
+                    <label class="dock-field">
+                      <span>Colour</span>
+                      <input
+                        type="color"
+                        value={colorInputValue(selectedArcMeta?.colour, '#5B9BD5')}
+                        oninput={(event) => {
+                          const alpha = alphaFromColour(selectedArcMeta?.colour) ?? 'FF';
+                          setArcMetaProperty('colour', colourFromInput(event.currentTarget.value, alpha));
+                        }}
+                      />
+                    </label>
+                    <label class="dock-field">
+                      <span>Direction</span>
+                      <div class="dock-toggle-row">
+                        <button type="button" class:active={selectedArcMeta?.direction !== 'ccw'} onclick={() => setArcMetaProperty('direction', 'cw')}>CW</button>
+                        <button type="button" class:active={selectedArcMeta?.direction === 'ccw'} onclick={() => setArcMetaProperty('direction', 'ccw')}>CCW</button>
+                      </div>
+                    </label>
+                    <label class="dock-field">
+                      <span>Caps</span>
+                      <div class="dock-toggle-row">
+                        <button type="button" class:active={selectedArcMeta?.cap !== 'round'} onclick={() => setArcMetaProperty('cap', 'flat')}>Flat</button>
+                        <button type="button" class:active={selectedArcMeta?.cap === 'round'} onclick={() => setArcMetaProperty('cap', 'round')}>Round</button>
+                      </div>
+                    </label>
                   </div>
                 {/if}
               {:else if activeSelectionKind === 'hitZone' && selectedZone}
@@ -5916,6 +6011,64 @@
     font-size: 10px;
   }
 
+  .arc-strip input[type='color'] {
+    width: 30px;
+    height: 20px;
+    padding: 0;
+    cursor: pointer;
+  }
+
+  .arc-toggle-group {
+    display: flex;
+    border: 1px solid #303840;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .arc-toggle-group button {
+    padding: 0 7px;
+    height: 26px;
+    border: none;
+    border-radius: 0;
+    background: #202427;
+    color: #7A8A96;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .arc-toggle-group button + button {
+    border-left: 1px solid #303840;
+  }
+
+  .arc-toggle-group button.active {
+    background: rgba(91, 155, 213, 0.22);
+    color: #A8CCE8;
+  }
+
+  .dock-toggle-row {
+    display: flex;
+    gap: 4px;
+  }
+
+  .dock-toggle-row button {
+    flex: 1;
+    padding: 2px 6px;
+    border: 1px solid #2F3C46;
+    border-radius: 3px;
+    background: #17212A;
+    color: #7A8A96;
+    font: inherit;
+    font-size: 10px;
+    cursor: pointer;
+  }
+
+  .dock-toggle-row button.active {
+    border-color: rgba(91, 155, 213, 0.5);
+    background: rgba(91, 155, 213, 0.18);
+    color: #A8CCE8;
+  }
+
   .surface-options-strip {
     display: flex;
     align-items: center;
@@ -6147,7 +6300,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .surface-shell.previewing .surface-viewport :global(.ruler-wrapper) {
+    display: none;
+  }
+
   .surface-shell.previewing .surface-scroll {
+    inset: 0;
     background:
       radial-gradient(circle at center, rgba(20, 184, 166, 0.08), transparent 38%),
       #0D1216;
@@ -6984,10 +7142,15 @@
     font-size: 11px;
   }
 
-  .surface-scroll {
+  .surface-viewport {
     position: relative;
-    flex: 1;
     min-height: 0;
+    overflow: hidden;
+  }
+
+  .surface-scroll {
+    position: absolute;
+    inset: 20px 0 0 20px;
     overflow: auto;
     background:
       linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
