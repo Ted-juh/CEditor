@@ -6653,11 +6653,11 @@
   .artboard-create-palette {
     position: absolute;
     left: 50%;
-    top: 50%;
+    top: 100%;
     z-index: 2200;
     display: inline-flex;
     gap: 6px;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, 12px);
     padding: 7px;
     border: 1px solid rgba(91, 155, 213, 0.48);
     border-radius: 5px;
