@@ -182,6 +182,8 @@
   let activeTool = $state('select');
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
+  let interactiveFlyoutOpen = $state(false);
+  let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
   let drawNoticeTimer = null;
@@ -295,7 +297,16 @@
   ];
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
   const SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => SHAPE_TOOL_IDS.has(tool.id));
+  const INTERACTIVE_ARCHETYPES = [
+    { id: 'dial', label: 'Dial' },
+    { id: 'slider', label: 'Slider' },
+    { id: 'button', label: 'Button' },
+    { id: 'toggle', label: 'Toggle' },
+    { id: 'xy', label: 'XY Pad' },
+    { id: 'range', label: 'Range' },
+  ];
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
+  let activeInteractiveMeta = $derived(INTERACTIVE_ARCHETYPES.find((a) => a.id === interactiveArchetype) ?? INTERACTIVE_ARCHETYPES[0]);
 
   $effect(() => {
     componentDesignerStatus.set({
@@ -413,10 +424,27 @@
   function toggleShapeFlyout(event) {
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
+    interactiveFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
     }
+  }
+
+  function toggleInteractiveFlyout(event) {
+    event?.stopPropagation?.();
+    interactiveFlyoutOpen = !interactiveFlyoutOpen;
+    shapeFlyoutOpen = false;
+    if (interactiveFlyoutOpen && activeTool !== 'interactive') {
+      setActiveTool('interactive');
+      interactiveFlyoutOpen = true;
+    }
+  }
+
+  function selectInteractiveArchetype(event, id) {
+    event?.stopPropagation?.();
+    interactiveArchetype = id;
+    setActiveTool('interactive');
   }
 
   function numberOr(value, fallback = 0) {
