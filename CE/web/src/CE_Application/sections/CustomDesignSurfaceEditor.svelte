@@ -15,6 +15,7 @@
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activateGradientTarget } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import EditorRuler from '../editor/EditorRuler.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
@@ -197,6 +198,10 @@
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
   let filmstripCollapsed = $state(false);
+  let rulerScrollX = $state(0);
+  let rulerScrollY = $state(0);
+  let rulerViewWidth = $state(0);
+  let rulerViewHeight = $state(0);
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
   let behaviorEntries = $derived(Object.entries(behaviors?._children ?? {}));
@@ -3013,6 +3018,11 @@
     window.addEventListener('mouseup', endSurfacePan);
   }
 
+  function handleSurfaceScroll(event) {
+    rulerScrollX = event.currentTarget.scrollLeft;
+    rulerScrollY = event.currentTarget.scrollTop;
+  }
+
   function handleSurfaceScrollMouseDown(event) {
     beginSurfacePan(event);
     if (event.defaultPrevented || activeTool === 'select' || event.button !== 0) return;
@@ -3731,16 +3741,34 @@
         </section>
       </aside>
 
-      <div
-        class="surface-scroll"
-        class:space-pan={spacePanActive}
-        class:panning={!!surfacePan}
-        role="region"
-        aria-label="Design canvas scroll area"
-        style={surfaceGridStyle}
-        bind:this={surfaceScrollEl}
-        onmousedown={handleSurfaceScrollMouseDown}
-      >
+      <div class="surface-viewport">
+        <EditorRuler
+          orientation="horizontal"
+          length={rulerViewWidth}
+          scrollOffset={rulerScrollX}
+          contentOffset={112}
+          scale={surfaceZoom}
+        />
+        <EditorRuler
+          orientation="vertical"
+          length={rulerViewHeight}
+          scrollOffset={rulerScrollY}
+          contentOffset={96}
+          scale={surfaceZoom}
+        />
+        <div
+          class="surface-scroll"
+          class:space-pan={spacePanActive}
+          class:panning={!!surfacePan}
+          role="region"
+          aria-label="Design canvas scroll area"
+          style={surfaceGridStyle}
+          bind:this={surfaceScrollEl}
+          bind:clientWidth={rulerViewWidth}
+          bind:clientHeight={rulerViewHeight}
+          onscroll={handleSurfaceScroll}
+          onmousedown={handleSurfaceScrollMouseDown}
+        >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
         {/if}
@@ -4068,6 +4096,7 @@
             {/if}
           </div>
         {/if}
+      </div>
       </div>
 
       <div class="surface-dock">
@@ -5200,16 +5229,6 @@
     opacity: 0.45;
   }
 
-  .paint-swatch input {
-    width: 22px;
-    height: 20px;
-    padding: 0;
-    border: 1px solid #111;
-    border-radius: 3px;
-    background: transparent;
-    cursor: pointer;
-  }
-
   .fill-toggle {
     width: 22px;
     height: 22px;
@@ -5729,7 +5748,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .surface-shell.previewing .surface-viewport :global(.ruler-wrapper) {
+    display: none;
+  }
+
   .surface-shell.previewing .surface-scroll {
+    inset: 0;
     background:
       radial-gradient(circle at center, rgba(20, 184, 166, 0.08), transparent 38%),
       #0D1216;
@@ -6138,12 +6162,6 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
-  }
-
-  .paint-grid input[type='color'] {
-    width: 100%;
-    height: 28px;
-    padding: 2px;
   }
 
   .segmented {
@@ -7443,6 +7461,18 @@
     background: #0E141A;
   }
 
+  .surface-viewport {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .surface-scroll {
+    position: absolute;
+    inset: 20px 0 0 20px;
+    overflow: auto;
+  }
+
   .tool-strip {
     gap: 8px;
     padding: 7px 12px;
@@ -7564,7 +7594,6 @@
   }
 
   .palette-grid button:disabled,
-  .palette-swatch-row input:disabled,
   .palette-slider input:disabled,
   .palette-corner input:disabled {
     cursor: not-allowed;
@@ -7681,15 +7710,6 @@
   .palette-slider input {
     min-width: 0;
     accent-color: #14B8A6;
-  }
-
-  .palette-swatch-row input[type='color'] {
-    width: 30px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid #0A0E12;
-    border-radius: 4px;
-    background: transparent;
   }
 
   .palette-swatch-row code,
