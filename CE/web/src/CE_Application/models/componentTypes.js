@@ -392,7 +392,7 @@ export const COMPONENT_TYPES = {
     ],
     ports: getComponentPorts('CustomComponent'),
     defaultOverrides: {
-      Transform: { width: 260, height: 120 },
+      Transform: { width: 100, height: 100 },
       Background: {
         _children: {
           Fill: { colour: '00000000', solidEnabled: false },
