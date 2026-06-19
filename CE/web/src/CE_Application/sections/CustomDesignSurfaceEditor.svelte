@@ -12,10 +12,11 @@
     Unlock,
   } from 'lucide-svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { gradientToCSS } from '../utils/gradientCSS.js';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
-  import EditorRuler from '../editor/EditorRuler.svelte';
-  import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
   import {
     createBackground,
     createBehaviorModule,
@@ -27,10 +28,8 @@
     createPartNode,
     createText,
     createValueChannel,
-    makeInteractive,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
-  import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
@@ -90,16 +89,6 @@
   let surfaceZoom = $state(1);
   let snapEnabled = $state(true);
   let snapSize = $state(10);
-  let smartGuidesEnabled = $state(true);
-  let showMeasurements = $state(true);
-  let liveSmartGuides = $state([]);
-  let shortcutSheetOpen = $state(false);
-  let readinessDismissed = $state(false);
-  // Inline readiness nudges on the canvas (problem 7): surface the not-yet-done
-  // required/recommended setup steps right where the author is working, instead
-  // of only in the Designer tab. Optional steps stay out of the way.
-  let readiness = $derived(core?.controlType === 'CustomComponent' ? analyzeCustomComponentReadiness(control) : null);
-  let readinessNudges = $derived((readiness?.steps ?? []).filter((step) => !step.done && step.severity !== 'optional'));
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -155,18 +144,6 @@
   let overlayPartEntries = $derived(partEntries.filter(([name, part]) => !kitIdFor(part) || selectedLayerSet.has(name)));
   let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
   let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
-  let unselectedKitOverlays = $derived(
-    kitEntries
-      .filter((kit) => kit.id !== selectedKit)
-      .map((kit) => ({ kit, frame: kitFrame(kit) }))
-      .filter(({ frame }) => frame !== null)
-  );
-  let kitPartOverlayEntries = $derived(
-    partEntries.filter(([name, part]) => kitIdFor(part) && !selectedLayerSet.has(name))
-  );
-  let selectedPartKitId = $derived(kitIdFor(selectedPart));
-  let selectedPartKit = $derived(kitEntries.find((k) => k.id === selectedPartKitId) ?? null);
-  let expandedKits = $state(new Set());
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
   let selectedAuthoredPart = $derived(authoredParts?._children?.[selectedLayer] ?? null);
   let selectedZone = $derived(hitZones?._children?.[selectedHitZone] ?? null);
@@ -204,8 +181,6 @@
   let activeTool = $state('select');
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
-  let interactiveFlyoutOpen = $state(false);
-  let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
   let drawNoticeTimer = null;
@@ -216,15 +191,12 @@
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
   let surfaceScrollEl = $state(null);
-  let rulerScrollX = $state(0);
-  let rulerScrollY = $state(0);
-  let rulerViewWidth = $state(0);
-  let rulerViewHeight = $state(0);
   let draggingLayerName = $state('');
   let spacePanActive = $state(false);
   let surfacePan = $state(null);
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
+  let filmstripCollapsed = $state(false);
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
   let behaviorEntries = $derived(Object.entries(behaviors?._children ?? {}));
@@ -315,31 +287,10 @@
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
     { id: 'text', label: 'Text', key: 'T' },
-    { id: 'interactive', label: 'Interactive', key: 'I' },
   ];
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
   const SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => SHAPE_TOOL_IDS.has(tool.id));
-  // "Make Interactive" archetypes — each draws a pre-wired control set.
-  const INTERACTIVE_ARCHETYPES = [
-    { id: 'dial', label: 'Dial' },
-    { id: 'slider', label: 'Slider' },
-    { id: 'button', label: 'Button' },
-    { id: 'toggle', label: 'Toggle' },
-    { id: 'xy', label: 'XY Pad' },
-    { id: 'range', label: 'Range' },
-  ];
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
-  let activeInteractiveMeta = $derived(INTERACTIVE_ARCHETYPES.find((a) => a.id === interactiveArchetype) ?? INTERACTIVE_ARCHETYPES[0]);
-
-  // Generators live only in this surface dock now (plan §4 de-dup). Let other
-  // surfaces (Test Bench, generated-source links) focus the generators dock by
-  // setting Designer.focusSurfaceDock; consume it one-shot.
-  $effect(() => {
-    const requested = String(designer?.focusSurfaceDock ?? '').trim();
-    if (requested !== 'generators' && requested !== 'layers') return;
-    dockTab = requested;
-    if (core?.id) updateControlProperty(core.id, 'Designer.focusSurfaceDock', '');
-  });
 
   $effect(() => {
     componentDesignerStatus.set({
@@ -442,7 +393,6 @@
     activeTool = id;
     if (SHAPE_TOOL_IDS.has(id)) lastShapeTool = id;
     shapeFlyoutOpen = false;
-    interactiveFlyoutOpen = false;
     cancelDraw();
     if (core?.id && id !== 'select') {
       inlineTextEditLayer = '';
@@ -458,27 +408,10 @@
   function toggleShapeFlyout(event) {
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
-    interactiveFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
     }
-  }
-
-  function toggleInteractiveFlyout(event) {
-    event?.stopPropagation?.();
-    interactiveFlyoutOpen = !interactiveFlyoutOpen;
-    shapeFlyoutOpen = false;
-    if (interactiveFlyoutOpen && activeTool !== 'interactive') {
-      setActiveTool('interactive');
-      interactiveFlyoutOpen = true;
-    }
-  }
-
-  function selectInteractiveArchetype(event, id) {
-    event?.stopPropagation?.();
-    interactiveArchetype = id;
-    setActiveTool('interactive');
   }
 
   function numberOr(value, fallback = 0) {
@@ -930,9 +863,6 @@
   function defaultDrawSize(tool = activeTool) {
     if (tool === 'text') return { width: 96, height: 28 };
     if (tool === 'hitZone') return { width: 96, height: 52 };
-    if (tool === 'interactive') {
-      return ['dial', 'xy'].includes(interactiveArchetype) ? { width: 80, height: 80 } : { width: 160, height: 48 };
-    }
     if (['ellipse', 'ring', 'arcTrack'].includes(tool)) return { width: 72, height: 72 };
     return { width: 72, height: 52 };
   }
@@ -1143,6 +1073,25 @@
     });
     selectStateCard(name);
     inspectorTab = 'states';
+  }
+
+  function setFilmstripStateWhen(stateName, flag, value) {
+    if (!core?.id || !stateName || stateName === 'base') return;
+    updateControlProperty(core.id, `States.${stateName}.when.${flag}`, value);
+  }
+
+  function stateTriggerLabel(state, base = false) {
+    if (base) return '';
+    const when = state?.when ?? {};
+    if (when.hover) return 'Hover';
+    if (when.pressed) return 'Pressed';
+    if (when.disabled) return 'Disabled';
+    if (when.focused) return 'Focused';
+    if (when.dragging) return 'Dragging';
+    if (when.checked) return 'Checked';
+    const flags = Object.entries(when).filter(([, v]) => v === true).map(([k]) => k);
+    if (flags.length) return flags[0];
+    return 'No trigger';
   }
 
   function duplicateStateCard(name, state, event = null) {
@@ -1397,195 +1346,6 @@
       }));
   }
 
-  // --- Object-relative smart guides + align/distribute ---
-
-  // Candidate snap lines from other parts (edges + centers) and the artboard.
-  function smartSnapCandidates(excludeNames = []) {
-    const exclude = new Set(excludeNames);
-    const xs = [0, artboardWidth / 2, artboardWidth];
-    const ys = [0, artboardHeight / 2, artboardHeight];
-    for (const [name, part] of allPartEntries) {
-      if (exclude.has(name)) continue;
-      const frame = activeLayerFrames?.[name] ?? partFrame(part);
-      if (!frame) continue;
-      xs.push(frame.left, frame.left + frame.width / 2, frame.left + frame.width);
-      ys.push(frame.top, frame.top + frame.height / 2, frame.top + frame.height);
-    }
-    return { xs, ys };
-  }
-
-  function bestSnap(anchors, candidates, threshold) {
-    let best = null;
-    for (const anchor of anchors) {
-      for (const candidate of candidates) {
-        const diff = candidate - anchor;
-        if (Math.abs(diff) <= threshold && (!best || Math.abs(diff) < Math.abs(best.diff))) {
-          best = { diff, value: candidate };
-        }
-      }
-    }
-    return best;
-  }
-
-  // Snap a moving frame to nearby object edges/centers (preferred) and fall
-  // back to grid snapping per-axis. Records the matched guide lines for display.
-  function applyMoveSnap(frame, excludeNames = [], event = null) {
-    if (event?.altKey) { liveSmartGuides = []; return frame; }
-    let { left, top } = frame;
-    const guides = [];
-    if (smartGuidesEnabled) {
-      const threshold = 6 / Math.max(0.0001, surfaceZoom);
-      const { xs, ys } = smartSnapCandidates(excludeNames);
-      const bx = bestSnap([left, left + frame.width / 2, left + frame.width], xs, threshold);
-      const by = bestSnap([top, top + frame.height / 2, top + frame.height], ys, threshold);
-      if (bx) { left += bx.diff; guides.push({ axis: 'x', value: bx.value }); }
-      if (by) { top += by.diff; guides.push({ axis: 'y', value: by.value }); }
-      if (!bx && snapEnabled) left = snapValue(left);
-      if (!by && snapEnabled) top = snapValue(top);
-    } else if (snapEnabled) {
-      left = snapValue(left);
-      top = snapValue(top);
-    }
-    liveSmartGuides = guides;
-    return { ...frame, left, top };
-  }
-
-  function alignSelectedLayers(mode) {
-    const entries = selectedEditableLayerEntries();
-    if (entries.length < 2 || !core?.id) return;
-    const items = entries.map(([name, authoredPart, renderedPart]) => ({ name, authoredPart, frame: partFrame(renderedPart) }));
-    const bounds = boundsForFrames(items.map((item) => item.frame));
-    if (!bounds) return;
-    const patch = {};
-    for (const { name, authoredPart, frame } of items) {
-      const next = { ...frame };
-      if (mode === 'left') next.left = bounds.left;
-      else if (mode === 'centerX') next.left = bounds.left + (bounds.width - frame.width) / 2;
-      else if (mode === 'right') next.left = bounds.left + bounds.width - frame.width;
-      else if (mode === 'top') next.top = bounds.top;
-      else if (mode === 'middleY') next.top = bounds.top + (bounds.height - frame.height) / 2;
-      else if (mode === 'bottom') next.top = bounds.top + bounds.height - frame.height;
-      Object.assign(patch, patchFromFrameForLayer(name, authoredPart, next));
-    }
-    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
-  }
-
-  function distributeSelectedLayers(axis) {
-    const entries = selectedEditableLayerEntries();
-    if (entries.length < 3 || !core?.id) return;
-    const posKey = axis === 'x' ? 'left' : 'top';
-    const sizeKey = axis === 'x' ? 'width' : 'height';
-    const items = entries
-      .map(([name, authoredPart, renderedPart]) => ({ name, authoredPart, frame: partFrame(renderedPart) }))
-      .sort((a, b) => a.frame[posKey] - b.frame[posKey]);
-    const start = items[0].frame[posKey];
-    const lastFrame = items[items.length - 1].frame;
-    const end = lastFrame[posKey] + lastFrame[sizeKey];
-    const totalSize = items.reduce((sum, item) => sum + item.frame[sizeKey], 0);
-    const gap = (end - start - totalSize) / (items.length - 1);
-    const patch = {};
-    let cursor = start;
-    for (const { name, authoredPart, frame } of items) {
-      Object.assign(patch, patchFromFrameForLayer(name, authoredPart, { ...frame, [posKey]: cursor }));
-      cursor += frame[sizeKey] + gap;
-    }
-    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
-  }
-
-  // Distance read-outs between exactly two selected layers (horizontal +
-  // vertical gaps), rendered as dashed connectors with a px label.
-  let measurementLines = $derived.by(() => {
-    if (!showMeasurements || activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
-    const frames = selectedLayerNames
-      .map((name) => activeLayerFrames?.[name] ?? (parts?._children?.[name] ? partFrame(parts._children[name]) : null))
-      .filter(Boolean);
-    if (frames.length !== 2) return [];
-    const [a, b] = frames;
-    const lines = [];
-    const ay = a.top + a.height / 2;
-    const by = b.top + b.height / 2;
-    const ax = a.left + a.width / 2;
-    const bx = b.left + b.width / 2;
-    // Horizontal gap (only when the boxes don't overlap horizontally).
-    const leftBox = a.left <= b.left ? a : b;
-    const rightBox = a.left <= b.left ? b : a;
-    const hGap = rightBox.left - (leftBox.left + leftBox.width);
-    if (hGap > 0.5) {
-      const y = (ay + by) / 2;
-      lines.push({ axis: 'x', value: Math.round(hGap), x1: leftBox.left + leftBox.width, x2: rightBox.left, y });
-    }
-    const topBox = a.top <= b.top ? a : b;
-    const bottomBox = a.top <= b.top ? b : a;
-    const vGap = bottomBox.top - (topBox.top + topBox.height);
-    if (vGap > 0.5) {
-      const x = (ax + bx) / 2;
-      lines.push({ axis: 'y', value: Math.round(vGap), y1: topBox.top + topBox.height, y2: bottomBox.top, x });
-    }
-    return lines;
-  });
-
-  function isTypingTarget(target) {
-    const tag = target?.tagName;
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable === true;
-  }
-
-  // Promote surface shortcuts to the window so nudge/delete/duplicate keep
-  // working when keyboard focus drifts off the surface <div>. Skips form fields
-  // so typing in a property input is never hijacked.
-  $effect(() => {
-    if (typeof window === 'undefined') return;
-    const onKeyDown = (event) => {
-      const typing = isTypingTarget(event.target);
-      if (!typing && (event.key === '?' || (event.key === '/' && event.shiftKey))) {
-        shortcutSheetOpen = !shortcutSheetOpen;
-        event.preventDefault();
-        return;
-      }
-      if (typing && event.key !== 'Escape') return;
-      handleSurfaceKeydown(event);
-    };
-    const onKeyUp = (event) => {
-      if (!isTypingTarget(event.target)) handleSurfaceKeyup(event);
-    };
-    window.addEventListener('keydown', onKeyDown);
-    window.addEventListener('keyup', onKeyUp);
-    return () => {
-      window.removeEventListener('keydown', onKeyDown);
-      window.removeEventListener('keyup', onKeyUp);
-    };
-  });
-
-  const SHORTCUT_GROUPS = [
-    {
-      title: 'Tools',
-      items: [
-        { keys: 'V', label: 'Select tool' },
-        { keys: 'R', label: 'Rectangle' },
-        { keys: 'O', label: 'Ellipse' },
-        { keys: 'T', label: 'Text' },
-        { keys: 'Esc', label: 'Cancel / deselect' },
-      ],
-    },
-    {
-      title: 'Edit',
-      items: [
-        { keys: 'Arrows', label: 'Nudge 1px' },
-        { keys: 'Shift+Arrows', label: 'Nudge 10px' },
-        { keys: 'Ctrl/Cmd+D', label: 'Duplicate' },
-        { keys: 'Del / Backspace', label: 'Delete' },
-        { keys: 'Tab', label: 'Cycle layers' },
-      ],
-    },
-    {
-      title: 'View',
-      items: [
-        { keys: 'Space + drag', label: 'Pan' },
-        { keys: 'Alt (while drag)', label: 'Ignore snapping' },
-        { keys: '?', label: 'Toggle this sheet' },
-      ],
-    },
-  ];
-
   function makeDrawnPart(kind, rect) {
     const partKind = kind === 'ellipse' ? 'circle' : kind;
     const name = nextPartName(kind === 'text' ? 'textLayer' : kind);
@@ -1655,152 +1415,8 @@
     return zone;
   }
 
-  function uniqueInteractiveBase(archetypeId) {
-    const safe = String(archetypeId || 'control').replace(/[^a-zA-Z0-9_]/g, '') || 'control';
-    const used = new Set([
-      ...authoredPartNames,
-      ...Object.keys(valueChannels?._children ?? {}),
-      ...Object.keys(behaviors?._children ?? {}),
-    ]);
-    let name = safe;
-    let index = 1;
-    while (used.has(name) || used.has(`${name}Value`) || used.has(`${name}Behavior`)) {
-      index += 1;
-      name = `${safe}${index}`;
-    }
-    return name;
-  }
-
-  function publishChannelPatch(channels) {
-    const patch = {};
-    for (const [name, channel] of Object.entries(channels)) {
-      const type = channel?.type ?? 'float';
-      const label = channel?.label ?? name;
-      patch[`PublishedProperties.inputs.${name}`] = { channel: name, label, type, enabled: true };
-      patch[`PublishedProperties.outputs.${name}`] = { channel: name, label, type, enabled: true };
-    }
-    return patch;
-  }
-
-  // Build the visual parts for an archetype within a drawn frame, plus the
-  // options that point makeInteractive's hit zones at those parts. When
-  // `targetPartName` is set (the context action), no new parts are created and
-  // the wiring follows the existing part instead.
-  function buildInteractiveKit(archetypeId, rect, base, targetPartName) {
-    if (targetPartName) {
-      // Context action: wire the existing part. Cover every archetype's option
-      // shape so part-based zones follow this part (dial/xy ignore it and use
-      // the face, as designed).
-      return { parts: {}, options: { name: base, partName: targetPartName, minPart: targetPartName, maxPart: targetPartName } };
-    }
-    const frame = rect ?? { left: 0, top: 0, width: 96, height: 96 };
-    const x = Math.round(frame.left);
-    const y = Math.round(frame.top);
-    const w = Math.round(Math.max(8, frame.width));
-    const h = Math.round(Math.max(8, frame.height));
-    const parts = {};
-    let zStart = authoredPartNames.length + 1;
-    const addVisual = (name, kind, box, fill = 'FF5B9BD5', radius = 6) => {
-      parts[name] = createPartNode(name, {
-        kind,
-        role: archetypeId,
-        zIndex: zStart++,
-        layout: {
-          x: box.x, y: box.y, width: box.w, height: box.h,
-          xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px',
-          anchorX: 'left', anchorY: 'top',
-        },
-        sections: {
-          Background: createBackground(fill, {
-            borderEnabled: true,
-            borderColour: '55FFFFFF',
-            borderThickness: 1,
-            radius: kind === 'circle' ? 999 : radius,
-          }),
-        },
-      });
-    };
-
-    if (archetypeId === 'dial') {
-      addVisual(base, 'circle', { x, y, w, h }, 'FF2B3742', 999);
-      return { parts, options: { name: base } };
-    }
-    if (archetypeId === 'xy') {
-      addVisual(base, 'rectangle', { x, y, w, h }, 'FF1B2128', 8);
-      return { parts, options: { name: base } };
-    }
-    if (archetypeId === 'button' || archetypeId === 'toggle') {
-      const bg = `${base}Bg`;
-      addVisual(bg, 'roundedRectangle', { x, y, w, h }, 'FF2F6FED', 8);
-      return { parts, options: { name: base, partName: bg } };
-    }
-    if (archetypeId === 'slider') {
-      const track = `${base}Track`;
-      const handle = `${base}Handle`;
-      addVisual(track, 'roundedRectangle', { x, y: y + Math.round(h / 2) - 4, w, h: 8 }, 'FF2B3742', 999);
-      addVisual(handle, 'roundedRectangle', { x: x + Math.round(w / 2) - 8, y, w: 16, h }, 'FFFFFFFF', 4);
-      return { parts, options: { name: base, partName: track } };
-    }
-    if (archetypeId === 'range') {
-      const track = `${base}Track`;
-      const minHandle = `${base}MinHandle`;
-      const maxHandle = `${base}MaxHandle`;
-      addVisual(track, 'roundedRectangle', { x, y: y + Math.round(h / 2) - 4, w, h: 8 }, 'FF2B3742', 999);
-      addVisual(minHandle, 'roundedRectangle', { x: x + Math.round(w * 0.25) - 8, y, w: 16, h }, 'FFFFD36C', 4);
-      addVisual(maxHandle, 'roundedRectangle', { x: x + Math.round(w * 0.75) - 8, y, w: 16, h }, 'FF8EFFA5', 4);
-      return { parts, options: { name: base, minPart: minHandle, maxPart: maxHandle } };
-    }
-    return null;
-  }
-
-  function applyMakeInteractive(archetypeId, rect = null, targetPartName = null) {
-    if (!core?.id) return;
-    const base = uniqueInteractiveBase(archetypeId);
-    const kit = buildInteractiveKit(archetypeId, rect, base, targetPartName);
-    if (!kit) return;
-    const wiring = makeInteractive(archetypeId, kit.options);
-    if (!wiring) return;
-
-    const patch = {};
-    for (const [name, part] of Object.entries(kit.parts)) patch[`Parts.${name}`] = part;
-    for (const [name, channel] of Object.entries(wiring.valueChannels)) patch[`ValueChannels.${name}`] = channel;
-    for (const [name, behavior] of Object.entries(wiring.behaviors)) patch[`Behaviors.${name}`] = behavior;
-    let zonePriority = hitZoneEntries.length + 1;
-    for (const [name, zone] of Object.entries(wiring.hitZones)) {
-      zone.priority = zonePriority++;
-      patch[`HitZones.${name}`] = zone;
-    }
-    Object.assign(patch, publishChannelPatch(wiring.valueChannels));
-
-    const firstZone = Object.keys(wiring.hitZones)[0] ?? '';
-    const firstPart = Object.keys(kit.parts)[0] ?? targetPartName ?? '';
-    if (firstPart) {
-      localSelectedLayerNames = [firstPart];
-      patch['Designer.selectedLayer'] = firstPart;
-      patch['Designer.selectedLayers'] = [firstPart];
-      patch['Designer.selectedSurfaceKind'] = 'layer';
-    } else {
-      patch['Designer.selectedSurfaceKind'] = 'hitZone';
-    }
-    if (firstZone) patch['Designer.selectedHitZone'] = firstZone;
-    patch['Designer.selectedBehavior'] = Object.keys(wiring.behaviors)[0] ?? '';
-    patch['Designer.selectedValueChannel'] = Object.keys(wiring.valueChannels)[0] ?? '';
-    patch['Designer.preview.showHitZones'] = true;
-
-    applyControlPatch(core.id, patch);
-    activeTool = 'select';
-    interactiveFlyoutOpen = false;
-    lastDrawCreatedAt = Date.now();
-    if (firstPart) pulseSelection(`layer:${firstPart}`);
-    else if (firstZone) pulseSelection(`zone:${firstZone}`);
-  }
-
   function commitDrawnFrame(tool, rect, event = null) {
     if (!core?.id || !rect) return;
-    if (tool === 'interactive') {
-      applyMakeInteractive(interactiveArchetype, rect);
-      return;
-    }
     if (tool === 'hitZone') {
       const zone = makeDrawnHitZone(rect, event?.shiftKey ? 'circle' : 'rectangle');
       applyControlPatch(core.id, {
@@ -2007,12 +1623,11 @@
     arc._children.Background._children.Fill.solidEnabled = false;
     arc._children.Background._children.Border.enabled = false;
 
-    const pointerHeight = Math.max(24, size / 2 - 18);
     const pointer = makeDrawnPart('capsule', {
       left: centerX - 3,
-      top: centerY - pointerHeight,
+      top: top + 12,
       width: 6,
-      height: pointerHeight,
+      height: Math.max(24, size / 2 - 18),
     });
     pointer.name = pointerName;
     pointer.role = 'dialPointer';
@@ -2020,7 +1635,7 @@
     assignKitPart(pointer, kitMeta, 'pointer');
     pointer._children.Layout.anchorX = 'center';
     pointer._children.Layout.anchorY = 'bottom';
-    pointer._children.Layout.rotation = 0;
+    pointer._children.Layout.rotation = -45;
     pointer._children.Background._children.Fill.colour = 'FFEAF6FF';
     pointer._children.Background._children.Border.enabled = false;
 
@@ -2237,19 +1852,6 @@
   }
 
   function zoneFrame(zone) {
-    // Follow-mode zones (source 'face' / 'part:<name>') derive their grab area
-    // from a part or the control face, grown by inflate/minTouch. Resolve it
-    // with the same runtime resolver so the overlay shows the true grab area —
-    // the §3.4 halo — instead of stale authored bounds.
-    const source = String(zone?.source ?? 'independent');
-    if (source !== 'independent') {
-      const resolved = customHitZoneRect(
-        zone,
-        { left: 0, top: 0, width: artboardWidth, height: artboardHeight },
-        renderControl?._children?.Parts?._children ?? null
-      );
-      if (resolved) return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
-    }
     const bounds = zone?.bounds ?? {};
     const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : '%';
     const x = numberOr(bounds.x, 0);
@@ -2326,6 +1928,60 @@
     if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
     if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
     return fallback;
+  }
+
+  const DEFAULT_LAYER_GRADIENT = {
+    type: 'linear', angle: 90, centerX: 50, centerY: 50,
+    radiusX: 50, radiusY: 50, edge: 0,
+    stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
+  };
+
+  function swatchCss(value, fallback = '5B9BD5') {
+    const raw = String(value ?? '').trim();
+    if (/^[0-9a-f]{8}$/i.test(raw)) {
+      const a = parseInt(raw.slice(0, 2), 16) / 255;
+      const r = parseInt(raw.slice(2, 4), 16);
+      const g = parseInt(raw.slice(4, 6), 16);
+      const b = parseInt(raw.slice(6, 8), 16);
+      return `background:rgba(${r},${g},${b},${a}),repeating-conic-gradient(#555 0% 25%,#333 0% 50%);background-size:auto,8px 8px`;
+    }
+    return `background:#${fallback},repeating-conic-gradient(#555 0% 25%,#333 0% 50%);background-size:auto,8px 8px`;
+  }
+
+  function openLayerColour(relativePath, currentValue) {
+    if (!core?.id || !selectedLayer) return;
+    activateColorTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` },
+      currentValue ?? 'FF5B9BD5'
+    );
+  }
+
+  function openArcColour() {
+    if (!core?.id || !selectedLayer) return;
+    activateColorTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.meta.arcTrack.colour` },
+      selectedArcMeta?.colour ?? 'FF5B9BD5'
+    );
+  }
+
+  function openLayerGradient() {
+    if (!core?.id || !selectedLayer || !selectedFill) return;
+    const gradient = selectedFill.gradient?.stops?.length >= 2
+      ? selectedFill.gradient
+      : DEFAULT_LAYER_GRADIENT;
+    if (!selectedFill.gradient?.stops?.length) {
+      setLayerProperty('Background.Fill.gradient', gradient);
+    }
+    activateGradientTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.Background.Fill` },
+      gradient
+    );
+  }
+
+  function toggleFillGradient() {
+    const next = !selectedFill?.gradientEnabled;
+    setLayerProperty('Background.Fill.gradientEnabled', next);
+    if (next) openLayerGradient();
   }
 
   function alphaFromColour(value, fallback = 'FF') {
@@ -2586,27 +2242,24 @@
     pulseSelection(`zone:${zone.name}`);
   }
 
-  function detachLayerByName(name) {
-    if (!core?.id || !name) return;
-    const part = authoredParts?._children?.[name];
-    if (!part) return;
-    const detached = cloneValue(part);
-    detached.name = name;
-    detached.generated = false;
-    detached.detachedFromGenerator = part?.meta?.generatedBy || part?.generatedBy || 'kit';
-    detached.meta = { ...(detached.meta ?? {}), generated: false, detachedFromGenerator: detached.detachedFromGenerator };
-    applyControlPatch(core.id, {
-      [`Parts.${name}`]: detached,
-      'Designer.selectedLayer': name,
-      'Designer.selectedLayers': [name],
-      'Designer.selectedSurfaceKind': 'layer',
-    });
-    localSelectedLayerNames = [name];
-  }
-
   function detachSelectedLayer() {
     if (!core?.id || !selectedLayer || !selectedPart) return;
-    detachLayerByName(selectedLayer);
+    const detached = cloneValue(selectedPart);
+    detached.name = selectedLayer;
+    detached.generated = false;
+    detached.detachedFromGenerator = selectedPart?.meta?.generatedBy || selectedPart?.generatedBy || 'generator';
+    detached.meta = {
+      ...(detached.meta ?? {}),
+      generated: false,
+      detachedFromGenerator: detached.detachedFromGenerator,
+    };
+    applyControlPatch(core.id, {
+      [`Parts.${selectedLayer}`]: detached,
+      'Designer.selectedLayer': selectedLayer,
+      'Designer.selectedLayers': [selectedLayer],
+      'Designer.selectedSurfaceKind': 'layer',
+    });
+    localSelectedLayerNames = [selectedLayer];
   }
 
   function removeSelectedLayer() {
@@ -2867,14 +2520,6 @@
     commitLayerSelection(kit.layerNames, primary);
   }
 
-  function toggleKitExpand(kitId, event = null) {
-    event?.stopPropagation?.();
-    const next = new Set(expandedKits);
-    if (next.has(kitId)) next.delete(kitId);
-    else next.add(kitId);
-    expandedKits = next;
-  }
-
   function convertSelectedValueControl(style) {
     if (!core?.id || activeSelectionKind !== 'kit' || !selectedKitEntry) return;
     if (selectedKitEntry.control?.style === style) return;
@@ -3050,35 +2695,24 @@
     if (interaction.type === 'move') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeFrame = applyMoveSnap({
+      activeFrame = snapFrame({
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, [selectedLayer], event);
+      }, event);
       return;
     }
 
     if (interaction.type === 'groupMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      const names = Object.keys(interaction.startFrames ?? {});
-      const shifted = names.map((name) => ({
-        ...interaction.startFrames[name],
-        left: interaction.startFrames[name].left + dx,
-        top: interaction.startFrames[name].top + dy,
-      }));
-      const groupBounds = boundsForFrames(shifted);
-      // Snap the group as a whole, then apply the correction to each member.
-      const snapped = groupBounds ? applyMoveSnap(groupBounds, names, event) : null;
-      const cx = snapped ? snapped.left - groupBounds.left : 0;
-      const cy = snapped ? snapped.top - groupBounds.top : 0;
       const nextFrames = {};
-      for (const name of names) {
-        nextFrames[name] = {
-          ...interaction.startFrames[name],
-          left: interaction.startFrames[name].left + dx + cx,
-          top: interaction.startFrames[name].top + dy + cy,
-        };
+      for (const [name, startFrame] of Object.entries(interaction.startFrames ?? {})) {
+        nextFrames[name] = snapFrame({
+          ...startFrame,
+          left: startFrame.left + dx,
+          top: startFrame.top + dy,
+        }, event);
       }
       activeLayerFrames = nextFrames;
       return;
@@ -3087,11 +2721,11 @@
     if (interaction.type === 'zoneMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeZoneFrame = applyMoveSnap({
+      activeZoneFrame = snapFrame({
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, [], event);
+      }, event);
       return;
     }
 
@@ -3224,7 +2858,6 @@
     activeFrame = null;
     activeLayerFrames = {};
     activeZoneFrame = null;
-    liveSmartGuides = [];
   }
 
   function nudgeSelected(dx, dy) {
@@ -3461,10 +3094,6 @@
         shapeFlyoutOpen = false;
         return;
       }
-      if (interactiveFlyoutOpen) {
-        interactiveFlyoutOpen = false;
-        return;
-      }
       if (activeTool !== 'select') {
         setActiveTool('select');
         return;
@@ -3523,11 +3152,6 @@
       endSurfacePan();
     }
   }
-
-  function handleSurfaceScroll(event) {
-    rulerScrollX = event.currentTarget.scrollLeft;
-    rulerScrollY = event.currentTarget.scrollTop;
-  }
 </script>
 
 {#if core?.controlType === 'CustomComponent'}
@@ -3539,6 +3163,8 @@
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
+    onkeydown={handleSurfaceKeydown}
+    onkeyup={handleSurfaceKeyup}
   >
     {#if !designerPreviewing && activeSelectionKind === 'layer' && selectedPart}
       <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
@@ -3554,22 +3180,42 @@
                 title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
                 onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
               ></button>
-              <input
-                type="color"
-                value={colorInputValue(selectedFill?.colour)}
+              <button type="button" class="mini-swatch-btn"
                 disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
-                oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-              />
+                style={swatchCss(selectedFill?.colour)}
+                onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
+                title="Pick fill colour"
+              ></button>
+            </label>
+          {/if}
+          {#if selectedFill?.gradientEnabled}
+            <label class="paint-swatch">
+              <span>Grad</span>
+              <button type="button" class="mini-gradient-btn"
+                disabled={!canPaintLayer}
+                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
+                onclick={openLayerGradient}
+                title="Edit gradient"
+              ></button>
             </label>
           {/if}
           <label class="paint-swatch">
-            <span>Stroke</span>
-            <input
-              type="color"
-              value={colorInputValue(selectedBorder?.colour, '#FFFFFF')}
+            <span>Gradient</span>
+            <button type="button" class="fill-toggle"
+              class:active={selectedFill?.gradientEnabled}
               disabled={!canPaintLayer}
-              oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              onclick={toggleFillGradient}
+              title={selectedFill?.gradientEnabled ? 'Disable gradient' : 'Enable gradient'}
+            >G</button>
+          </label>
+          <label class="paint-swatch">
+            <span>Stroke</span>
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer}
+                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
+                title="Pick stroke colour"
+              ></button>
           </label>
           <label class="paint-number">
             <span>W</span>
@@ -3600,12 +3246,12 @@
         {#if selectedText}
           <label class="paint-swatch">
             <span>Text</span>
-            <input
-              type="color"
-              value={colorInputValue(selectedTextFill?.colour, '#FFFFFF')}
-              disabled={!canPaintLayer}
-              oninput={(event) => setLayerColour('Text.Fill.colour', selectedTextFill?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer}
+                style={swatchCss(selectedTextFill?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)}
+                title="Pick text colour"
+              ></button>
           </label>
           <label class="paint-number text-size">
             <span>Size</span>
@@ -3658,27 +3304,6 @@
             onchange={renameSelectedLayer}
           />
         </label>
-        <label class="rename-field">
-          <span>Interactive</span>
-          <select
-            value={interactiveArchetype}
-            disabled={!canManageLayer}
-            onchange={(event) => { interactiveArchetype = event.currentTarget.value; }}
-          >
-            {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
-              <option value={archetype.id}>{archetype.label}</option>
-            {/each}
-          </select>
-        </label>
-        <button
-          class="action-icon"
-          type="button"
-          onclick={() => applyMakeInteractive(interactiveArchetype, null, selectedLayer)}
-          disabled={!canManageLayer}
-          title="Wire this layer as an interactive control (value channel + behavior + hit zone)"
-        >
-          <span>Make Interactive</span>
-        </button>
         {#if canDetachLayer}
           <button class="action-icon detach" type="button" onclick={detachSelectedLayer} title="Detach generated layer">
             <Scissors size={14} aria-hidden="true" />
@@ -3832,14 +3457,11 @@
         </label>
         <label>
           <span>Colour</span>
-          <input
-            type="color"
-            value={colorInputValue(selectedArcMeta?.colour, '#5B9BD5')}
-            oninput={(event) => {
-              const alpha = alphaFromColour(selectedArcMeta?.colour) ?? 'FF';
-              setArcMetaProperty('colour', colourFromInput(event.currentTarget.value, alpha));
-            }}
-          />
+          <button type="button" class="mini-swatch-btn"
+            style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
+            onclick={openArcColour}
+            title="Pick arc colour"
+          ></button>
         </label>
         <div class="arc-toggle-group">
           <button
@@ -3903,14 +3525,6 @@
           onchange={(event) => setSnapSize(event.currentTarget.value)}
         />
       </label>
-      <label class="toggle-option" title="Snap to other layers' edges and centers while dragging">
-        <input type="checkbox" checked={smartGuidesEnabled} onchange={(event) => { smartGuidesEnabled = event.currentTarget.checked; }} />
-        <span>Smart</span>
-      </label>
-      <label class="toggle-option" title="Show distance read-outs between two selected layers">
-        <input type="checkbox" checked={showMeasurements} onchange={(event) => { showMeasurements = event.currentTarget.checked; }} />
-        <span>Measure</span>
-      </label>
       <label class="toggle-option">
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
         <span>Bounds</span>
@@ -3952,103 +3566,9 @@
       <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
       <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
-      <button type="button" class="surface-command" class:active={shortcutSheetOpen} onclick={() => { shortcutSheetOpen = !shortcutSheetOpen; }} title="Keyboard shortcuts (?)">?</button>
     </div>
 
     <div class="surface-body">
-      <div class="tool-strip" aria-label="Surface tools">
-        <button
-          type="button"
-          class:active={activeTool === 'select'}
-          title="Select (V)"
-          onclick={() => setActiveTool('select')}
-        >
-          <span class="tool-icon select"></span>
-          <strong>Select</strong>
-        </button>
-
-        <div class="tool-flyout-host">
-          <button
-            type="button"
-            class:active={shapeToolActive}
-            title={`Shape: ${activeShapeTool.label} (${activeShapeTool.key})`}
-            aria-haspopup="menu"
-            aria-expanded={shapeFlyoutOpen}
-            onclick={toggleShapeFlyout}
-          >
-            <span class={`tool-icon ${activeShapeTool.id}`}></span>
-            <strong>Shape: {activeShapeTool.label}</strong>
-          </button>
-          {#if shapeFlyoutOpen}
-            <div class="tool-flyout" role="menu" aria-label="Shape tools">
-              {#each SHAPE_TOOLS as tool (tool.id)}
-                <button
-                  type="button"
-                  role="menuitem"
-                  class:active={activeTool === tool.id}
-                  title={`${tool.label} (${tool.key})`}
-                  onclick={(event) => { event.stopPropagation(); setActiveTool(tool.id); }}
-                >
-                  <span class={`tool-icon ${tool.id}`}></span>
-                  <span>{tool.label}</span>
-                  <kbd>{tool.key}</kbd>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-
-        <button
-          type="button"
-          class:active={activeTool === 'text'}
-          title="Text (T)"
-          onclick={() => setActiveTool('text')}
-        >
-          <span class="tool-icon text"></span>
-          <strong>Text</strong>
-        </button>
-
-        <button
-          type="button"
-          class:active={activeTool === 'hitZone'}
-          title="Hit Zone (H)"
-          onclick={() => setActiveTool('hitZone')}
-        >
-          <span class="tool-icon hitZone"></span>
-          <strong>Hit Zone</strong>
-        </button>
-
-        <div class="tool-flyout-host">
-          <button
-            type="button"
-            class:active={activeTool === 'interactive'}
-            title={`Make Interactive: ${activeInteractiveMeta.label} (I) — draw a pre-wired control`}
-            aria-haspopup="menu"
-            aria-expanded={interactiveFlyoutOpen}
-            onclick={toggleInteractiveFlyout}
-          >
-            <span class="tool-icon interactive"></span>
-            <strong>Interactive: {activeInteractiveMeta.label}</strong>
-          </button>
-          {#if interactiveFlyoutOpen}
-            <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
-              {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
-                <button
-                  type="button"
-                  role="menuitem"
-                  class:active={activeTool === 'interactive' && interactiveArchetype === archetype.id}
-                  title={`Draw a ${archetype.label}`}
-                  onclick={(event) => selectInteractiveArchetype(event, archetype.id)}
-                >
-                  <span class="tool-icon interactive"></span>
-                  <span>{archetype.label}</span>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-      </div>
-
       <aside class="palette-panel" aria-label="Designer quick tools">
         <div class="palette-header">
           <strong>Shapes</strong>
@@ -4127,12 +3647,12 @@
                 title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
                 onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
               ></button>
-              <input
-                type="color"
-                value={colorInputValue(selectedFill?.colour)}
+              <button type="button" class="mini-swatch-btn"
                 disabled={!canPaintLayer || !selectedBackground || selectedFill?.solidEnabled === false}
-                oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-              />
+                style={swatchCss(selectedFill?.colour)}
+                onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
+                title="Pick fill colour"
+              ></button>
             </div>
             <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
             <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
@@ -4140,14 +3660,34 @@
         </section>
 
         <section class="palette-group">
+          <span>Gradient</span>
+          <div class="palette-grid compact">
+            <button type="button"
+              class:active={selectedFill?.gradientEnabled}
+              disabled={!canPaintLayer || !selectedBackground}
+              onclick={toggleFillGradient}
+              title={selectedFill?.gradientEnabled ? 'Disable gradient fill' : 'Enable gradient fill'}
+            >G</button>
+            {#if selectedFill?.gradientEnabled && selectedFill?.gradient}
+              <button type="button" class="mini-gradient-btn wide"
+                disabled={!canPaintLayer}
+                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
+                onclick={openLayerGradient}
+                title="Edit gradient"
+              ></button>
+            {/if}
+          </div>
+        </section>
+
+        <section class="palette-group">
           <span>Stroke</span>
           <label class="palette-swatch-row">
-            <input
-              type="color"
-              value={colorInputValue(selectedBorder?.colour, '#FFFFFF')}
-              disabled={!canPaintLayer || !selectedBackground}
-              oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer || !selectedBackground}
+                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
+                title="Pick stroke colour"
+              ></button>
             <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
             <strong>{Math.round(numberOr(selectedBorder?.thickness, 1))}px</strong>
           </label>
@@ -4191,34 +3731,16 @@
         </section>
       </aside>
 
-      <div class="surface-viewport">
-        <EditorRuler
-          orientation="horizontal"
-          length={rulerViewWidth}
-          scrollOffset={rulerScrollX}
-          contentOffset={112}
-          scale={surfaceZoom}
-        />
-        <EditorRuler
-          orientation="vertical"
-          length={rulerViewHeight}
-          scrollOffset={rulerScrollY}
-          contentOffset={96}
-          scale={surfaceZoom}
-        />
-        <div
-          class="surface-scroll"
-          class:space-pan={spacePanActive}
-          class:panning={!!surfacePan}
-          role="region"
-          aria-label="Design canvas scroll area"
-          style={surfaceGridStyle}
-          bind:this={surfaceScrollEl}
-          bind:clientWidth={rulerViewWidth}
-          bind:clientHeight={rulerViewHeight}
-          onscroll={handleSurfaceScroll}
-          onmousedown={handleSurfaceScrollMouseDown}
-        >
+      <div
+        class="surface-scroll"
+        class:space-pan={spacePanActive}
+        class:panning={!!surfacePan}
+        role="region"
+        aria-label="Design canvas scroll area"
+        style={surfaceGridStyle}
+        bind:this={surfaceScrollEl}
+        onmousedown={handleSurfaceScrollMouseDown}
+      >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
         {/if}
@@ -4407,23 +3929,6 @@
               {/each}
             {/if}
 
-            {#if !designerPreviewing}
-              {#each unselectedKitOverlays as { kit, frame } (kit.id)}
-                <button
-                  class="part-bound kit-bound"
-                  class:pulse={selectionPulseTarget === `kit:${kit.id}`}
-                  type="button"
-                  style={selectionBoundsStyle(frame)}
-                  title={`${kit.label}: grouped kit`}
-                  onclick={(event) => { event.stopPropagation(); selectKit(kit.id); }}
-                  onpointerenter={() => setSurfaceHover('kit', kit.label)}
-                  onpointerleave={() => clearSurfaceHover('kit', kit.label)}
-                >
-                  <span class="selection-label">{kit.label}</span>
-                </button>
-              {/each}
-            {/if}
-
             {#if !designerPreviewing && activeSelectionKind === 'kit' && selectedKitEntry && selectedKitFrame}
               <button
                 class="part-bound kit-bound"
@@ -4438,24 +3943,6 @@
               >
                 <span class="selection-label">{selectedKitEntry.label}</span>
               </button>
-            {/if}
-
-            {#if !designerPreviewing}
-              {#each kitPartOverlayEntries as [name, part] (name)}
-                <button
-                  class="part-bound kit-part-overlay"
-                  class:selected={activeSelectionKind === 'layer' && selectedLayer === name}
-                  class:pulse={selectionPulseTarget === `layer:${name}`}
-                  type="button"
-                  style={partOverlayStyle(name, part)}
-                  title={`${name}: ${part?.role ?? 'kit part'}`}
-                  onclick={(event) => { event.stopPropagation(); selectLayer(name, event); }}
-                  onpointerenter={() => setSurfaceHover('layer', name)}
-                  onpointerleave={() => clearSurfaceHover('layer', name)}
-                >
-                  <span class="selection-label">{part?.role ?? name}</span>
-                </button>
-              {/each}
             {/if}
 
             {#if !designerPreviewing && multiSelectionActive && activeSelectionFrame}
@@ -4498,20 +3985,17 @@
                   class:selected={activeSelectionKind === 'hitZone' && selectedHitZone === name}
                   class:dimmed={zoneDisplayMode === 'dim' && !(activeSelectionKind === 'hitZone' && selectedHitZone === name)}
                   class:locked={activeSelectionKind === 'hitZone' && selectedHitZone === name && !selectedZoneEditable}
-                  class:follow={String(zone?.source ?? 'independent') !== 'independent'}
                   class:pulse={selectionPulseTarget === `zone:${name}`}
                   type="button"
                   style={hitZoneStyle(name, zone)}
-                  title={String(zone?.source ?? 'independent') !== 'independent'
-                    ? `${name}: ${zone?.action ?? 'action'} — grab area follows ${zone.source}`
-                    : `${name}: ${zone?.action ?? 'action'}`}
+                  title={`${name}: ${zone?.action ?? 'action'}`}
                   onclick={(event) => { event.stopPropagation(); selectHitZone(name); }}
                   onpointerenter={() => setSurfaceHover('hitZone', name)}
                   onpointerleave={() => clearSurfaceHover('hitZone', name)}
                   onmousedown={(event) => beginZoneMove(name, zone, event)}
                 >
                   <span class="selection-label">{name}</span>
-                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable && String(zone?.source ?? 'independent') === 'independent'}
+                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       <span
                         class="resize-handle"
@@ -4539,47 +4023,8 @@
                 <span>{frameReadout(feedbackFrame)}</span>
               </div>
             {/if}
-
-            {#if !designerPreviewing}
-              {#each liveSmartGuides as guide, index (`smart-${guide.axis}-${guide.value}-${index}`)}
-                <span
-                  class={`smart-guide ${guide.axis}`}
-                  style={guide.axis === 'x'
-                    ? `left:${guide.value}px;top:0;height:${artboardHeight}px;`
-                    : `top:${guide.value}px;left:0;width:${artboardWidth}px;`}
-                ></span>
-              {/each}
-            {/if}
-
-            {#if !designerPreviewing}
-              {#each measurementLines as line, index (`measure-${line.axis}-${index}`)}
-                {#if line.axis === 'x'}
-                  <span class="measure-line x" style={`left:${line.x1}px;top:${line.y}px;width:${Math.max(0, line.x2 - line.x1)}px;`}></span>
-                  <span class="measure-tag" style={`left:${(line.x1 + line.x2) / 2}px;top:${line.y}px;`}>{line.value}</span>
-                {:else}
-                  <span class="measure-line y" style={`top:${line.y1}px;left:${line.x}px;height:${Math.max(0, line.y2 - line.y1)}px;`}></span>
-                  <span class="measure-tag" style={`top:${(line.y1 + line.y2) / 2}px;left:${line.x}px;`}>{line.value}</span>
-                {/if}
-              {/each}
-            {/if}
           </div>
         </div>
-        {#if !designerPreviewing && multiSelectionActive}
-          <div class="arrange-bar" role="toolbar" tabindex="-1" aria-label="Align and distribute" onmousedown={stopSelectionAction}>
-            <span class="arrange-label">Align</span>
-            <button type="button" onclick={() => alignSelectedLayers('left')} title="Align left edges">⊢</button>
-            <button type="button" onclick={() => alignSelectedLayers('centerX')} title="Align horizontal centers">⊣⊢</button>
-            <button type="button" onclick={() => alignSelectedLayers('right')} title="Align right edges">⊣</button>
-            <span class="arrange-divider"></span>
-            <button type="button" onclick={() => alignSelectedLayers('top')} title="Align top edges">⊤</button>
-            <button type="button" onclick={() => alignSelectedLayers('middleY')} title="Align vertical centers">⊥⊤</button>
-            <button type="button" onclick={() => alignSelectedLayers('bottom')} title="Align bottom edges">⊥</button>
-            <span class="arrange-divider"></span>
-            <span class="arrange-label">Distribute</span>
-            <button type="button" disabled={selectedLayerNames.length < 3} onclick={() => distributeSelectedLayers('x')} title="Distribute horizontally">↔</button>
-            <button type="button" disabled={selectedLayerNames.length < 3} onclick={() => distributeSelectedLayers('y')} title="Distribute vertically">↕</button>
-          </div>
-        {/if}
         {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
           <div
             class="selection-quickbar"
@@ -4624,7 +4069,6 @@
           </div>
         {/if}
       </div>
-      </div>
 
       <div class="surface-dock">
         <section class="dock-pane layer-tree" aria-label="Object tree">
@@ -4632,6 +4076,7 @@
             <div class="dock-tab-row" role="tablist" aria-label="Right dock sections">
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
+              <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
@@ -4656,7 +4101,6 @@
               class="list-row kit-row"
               class:selected={activeSelectionKind === 'kit' && selectedKit === kit.id}
               class:primary={activeSelectionKind === 'kit' && selectedKit === kit.id}
-              class:expanded={expandedKits.has(kit.id)}
               class:pulse={selectionPulseTarget === `kit:${kit.id}`}
               role="group"
               aria-label={`${kit.label} kit controls`}
@@ -4676,12 +4120,10 @@
               <div class="row-actions">
                 <button
                   type="button"
-                  class:active={expandedKits.has(kit.id)}
-                  onclick={(event) => toggleKitExpand(kit.id, event)}
-                  title={expandedKits.has(kit.id) ? 'Collapse kit parts' : 'Expand kit parts'}
-                  aria-label={expandedKits.has(kit.id) ? 'Collapse' : 'Expand'}
+                  onclick={(event) => { event.stopPropagation(); editKitParts(kit.id); }}
+                  title="Edit generated parts"
                 >
-                  {expandedKits.has(kit.id) ? '▾' : '▸'}
+                  Edit
                 </button>
                 <button
                   type="button"
@@ -4693,41 +4135,6 @@
                 </button>
               </div>
             </div>
-            {#if expandedKits.has(kit.id)}
-              {#each kit.layerNames as partName (partName)}
-                {@const kitPart = authoredParts?._children?.[partName]}
-                {#if kitPart}
-                  <div
-                    class="list-row kit-sub-row"
-                    class:selected={activeSelectionKind === 'layer' && selectedLayer === partName}
-                    class:primary={activeSelectionKind === 'layer' && selectedLayer === partName}
-                    class:pulse={selectionPulseTarget === `layer:${partName}`}
-                    role="group"
-                    aria-label={`${partName} kit part`}
-                    title={`${partName}: ${kitPart?.role ?? 'kit part'}`}
-                  >
-                    <button type="button" class="row-main" onclick={() => selectLayer(partName)}>
-                      <span class="layer-thumb" aria-hidden="true">
-                        <span class={`layer-thumb-shape ${layerKindClass(kitPart)}`} style={layerThumbPartStyle(partName, kitPart)}></span>
-                      </span>
-                      <span class="row-text">
-                        <strong>{kitPart?.role ?? partName}</strong>
-                        <em>kit part · {layerKindLabel(kitPart)}</em>
-                      </span>
-                    </button>
-                    <div class="row-actions">
-                      <button
-                        type="button"
-                        onclick={(event) => { event.stopPropagation(); detachLayerByName(partName); }}
-                        title="Detach from kit and make editable"
-                      >
-                        <Scissors size={12} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-                {/if}
-              {/each}
-            {/if}
           {/each}
           {#each generatedSourceEntries as source (source.source)}
             <div
@@ -4751,7 +4158,7 @@
                 {#if source.hasGenerator}
                   <button
                     type="button"
-                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
+                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source, 'Designer.focusSection': 'generators' }); }}
                     title={`Edit ${source.source} generator`}
                   >
                     Gen
@@ -4870,6 +4277,10 @@
             <div class="dock-generator-editor">
               <CustomGeneratorsEditor {control} />
             </div>
+          {:else}
+            <div class="dock-empty dock-empty-tab">
+              Assets are edited in the inspector for now.
+            </div>
           {/if}
         </section>
 
@@ -4984,22 +4395,6 @@
                 {/if}
 
                 {#if activeSelectionKind === 'layer' && selectedPart}
-                  {#if selectedPartKit}
-                    <div class="dock-section kit-member-callout">
-                      <div class="dock-section-title">Kit Member</div>
-                      <div class="dock-note">Part of <strong>{selectedPartKit.label}</strong>. Edits are locked — detach to make this part standalone.</div>
-                      <div class="dock-button-grid">
-                        <button type="button" onclick={() => selectKit(selectedPartKitId)}>
-                          ← Back to Kit
-                        </button>
-                        <button type="button" onclick={detachSelectedLayer} disabled={!canDetachLayer} title="Detach from kit and make editable">
-                          <Scissors size={13} aria-hidden="true" />
-                          <span>Detach</span>
-                        </button>
-                      </div>
-                    </div>
-                  {/if}
-
                   <div class="dock-section">
                     <div class="dock-section-title">Layer</div>
                     <label class="dock-field wide">
@@ -5132,6 +4527,16 @@
                       </label>
                       {#if activeSelectionKind === 'layer'}
                         <label>
+                          <span>Rot</span>
+                          <input
+                            type="number"
+                            step="1"
+                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
+                            disabled={!selectedPartEditable}
+                            onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
+                          />
+                        </label>
+                        <label>
                           <span>Pivot X</span>
                           <input
                             type="number"
@@ -5149,16 +4554,6 @@
                             value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.pivotY, 50))}
                             disabled={!selectedPartEditable}
                             onchange={(event) => setLayerLayoutProperty('pivotY', numericInputValue(event, 50))}
-                          />
-                        </label>
-                        <label>
-                          <span>Rot</span>
-                          <input
-                            type="number"
-                            step="1"
-                            value={Math.round(numberOr(selectedAuthoredPart?._children?.Layout?.rotation, 0))}
-                            disabled={!selectedPartEditable}
-                            onchange={(event) => setLayerLayoutProperty('rotation', normalizeRotation(numericInputValue(event, 0)))}
                           />
                         </label>
                       {/if}
@@ -5197,11 +4592,11 @@
                     <div class="paint-grid">
                       <label>
                         <span>Fill</span>
-                        <input type="color" value={colorInputValue(selectedFill?.colour)} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedFill?.colour)} onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)} title="Pick fill colour"></button>
                       </label>
                       <label>
                         <span>Stroke</span>
-                        <input type="color" value={colorInputValue(selectedBorder?.colour, '#FFFFFF')} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedBorder?.colour, 'FFFFFF')} onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)} title="Pick stroke colour"></button>
                       </label>
                       <label>
                         <span>Stroke W</span>
@@ -5221,7 +4616,7 @@
                     <div class="paint-grid">
                       <label>
                         <span>Text Color</span>
-                        <input type="color" value={colorInputValue(selectedTextFill?.colour, '#FFFFFF')} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Text.Fill.colour', selectedTextFill?.colour, event.currentTarget.value, 'FFFFFF')} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedTextFill?.colour, 'FFFFFF')} onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)} title="Pick text colour"></button>
                       </label>
                       <label>
                         <span>Size</span>
@@ -5266,14 +4661,11 @@
                     </div>
                     <label class="dock-field">
                       <span>Colour</span>
-                      <input
-                        type="color"
-                        value={colorInputValue(selectedArcMeta?.colour, '#5B9BD5')}
-                        oninput={(event) => {
-                          const alpha = alphaFromColour(selectedArcMeta?.colour) ?? 'FF';
-                          setArcMetaProperty('colour', colourFromInput(event.currentTarget.value, alpha));
-                        }}
-                      />
+                      <button type="button" class="mini-swatch-btn"
+                        style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
+                        onclick={openArcColour}
+                        title="Pick arc colour"
+                      ></button>
                     </label>
                     <label class="dock-field">
                       <span>Direction</span>
@@ -5424,10 +4816,107 @@
     </div>
 
     {#if !designerPreviewing}
-    <div class="state-filmstrip" aria-label="Component states">
+    <div class="tool-strip" aria-label="Surface tools">
+      <button
+        type="button"
+        class:active={activeTool === 'select'}
+        title="Select (V)"
+        onclick={() => setActiveTool('select')}
+      >
+        <span class="tool-icon select"></span>
+        <strong>Select</strong>
+      </button>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          class:active={shapeToolActive}
+          title={`Shape: ${activeShapeTool.label} (${activeShapeTool.key})`}
+          aria-haspopup="menu"
+          aria-expanded={shapeFlyoutOpen}
+          onclick={toggleShapeFlyout}
+        >
+          <span class={`tool-icon ${activeShapeTool.id}`}></span>
+          <strong>Shape: {activeShapeTool.label}</strong>
+        </button>
+        {#if shapeFlyoutOpen}
+          <div class="tool-flyout" role="menu" aria-label="Shape tools">
+            {#each SHAPE_TOOLS as tool (tool.id)}
+              <button
+                type="button"
+                role="menuitem"
+                class:active={activeTool === tool.id}
+                title={`${tool.label} (${tool.key})`}
+                onclick={(event) => { event.stopPropagation(); setActiveTool(tool.id); }}
+              >
+                <span class={`tool-icon ${tool.id}`}></span>
+                <span>{tool.label}</span>
+                <kbd>{tool.key}</kbd>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <button
+        type="button"
+        class:active={activeTool === 'text'}
+        title="Text (T)"
+        onclick={() => setActiveTool('text')}
+      >
+        <span class="tool-icon text"></span>
+        <strong>Text</strong>
+      </button>
+
+      <button
+        type="button"
+        class:active={activeTool === 'hitZone'}
+        title="Hit Zone (H)"
+        onclick={() => setActiveTool('hitZone')}
+      >
+        <span class="tool-icon hitZone"></span>
+        <strong>Hit Zone</strong>
+      </button>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          class:active={activeTool === 'interactive'}
+          title={`Make Interactive: ${activeInteractiveMeta.label} (I) — draw a pre-wired control`}
+          aria-haspopup="menu"
+          aria-expanded={interactiveFlyoutOpen}
+          onclick={toggleInteractiveFlyout}
+        >
+          <span class="tool-icon interactive"></span>
+          <strong>Interactive: {activeInteractiveMeta.label}</strong>
+        </button>
+        {#if interactiveFlyoutOpen}
+          <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
+            {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
+              <button
+                type="button"
+                role="menuitem"
+                class:active={activeTool === 'interactive' && interactiveArchetype === archetype.id}
+                title={`Draw a ${archetype.label}`}
+                onclick={(event) => selectInteractiveArchetype(event, archetype.id)}
+              >
+                <span class="tool-icon interactive"></span>
+                <span>{archetype.label}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+    {/if}
+
+    {#if !designerPreviewing}
+    <div class="state-filmstrip" class:collapsed={filmstripCollapsed} aria-label="Component states">
       <div class="state-title">
-        <strong>States</strong>
-        <span>{Math.max(1, stateFilmstripEntries.length)}</span>
+        <button type="button" class="filmstrip-collapse-btn" onclick={() => { filmstripCollapsed = !filmstripCollapsed; }} title={filmstripCollapsed ? 'Expand states' : 'Collapse states'}>
+          <strong>States</strong>
+          <span>{Math.max(1, stateFilmstripEntries.length)}</span>
+        </button>
       </div>
       <div class="state-chip-row">
         {#each statePreviewCards as entry (entry.name)}
@@ -5458,9 +4947,25 @@
                 <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
                 <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
               </span>
-              <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
+              <div class="state-count-trigger">
+                <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
+                {#if !entry.base}
+                  <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean)}>{stateTriggerLabel(entry.state, entry.base)}</span>
+                {/if}
+              </div>
             </button>
             <div class="state-actions" aria-label={`${entry.name} state actions`}>
+              {#if !entry.base}
+                <div class="when-toggles">
+                  {#each [['hover','H'],['pressed','P'],['disabled','D']] as [flag, label] (flag)}
+                    <button type="button"
+                      class:active={entry.state?.when?.[flag] === true}
+                      onclick={(e) => { e.stopPropagation(); setFilmstripStateWhen(entry.name, flag, !(entry.state?.when?.[flag] === true)); }}
+                      title={flag}
+                    >{label}</button>
+                  {/each}
+                </div>
+              {/if}
               <button type="button" onclick={(event) => { event.stopPropagation(); inspectorTab = 'states'; selectStateCard(entry.name); }} title="Edit state">
                 Edit
               </button>
@@ -5480,43 +4985,6 @@
         </button>
       </div>
     </div>
-    {/if}
-
-    {#if !designerPreviewing && !readinessDismissed && readinessNudges.length}
-      <div class="readiness-nudges" role="status" aria-label="Component readiness">
-        <div class="readiness-nudges-head">
-          <strong>Setup{readiness?.ok ? '' : ` · ${readiness?.requiredOpenCount ?? 0} required`}</strong>
-          <button type="button" onclick={() => { readinessDismissed = true; }} aria-label="Dismiss readiness nudges">&times;</button>
-        </div>
-        {#each readinessNudges.slice(0, 4) as step (step.id)}
-          <div class="readiness-nudge" class:required={step.severity === 'required'}>
-            <span class="readiness-dot"></span>
-            <span class="readiness-text"><strong>{step.label}</strong> — {step.detail}</span>
-          </div>
-        {/each}
-      </div>
-    {/if}
-
-    {#if shortcutSheetOpen}
-      <div class="shortcut-sheet" role="dialog" aria-label="Keyboard shortcuts">
-        <div class="shortcut-head">
-          <strong>Keyboard shortcuts</strong>
-          <button type="button" onclick={() => { shortcutSheetOpen = false; }} aria-label="Close shortcuts">&times;</button>
-        </div>
-        <div class="shortcut-grid">
-          {#each SHORTCUT_GROUPS as group (group.title)}
-            <div class="shortcut-group">
-              <span class="shortcut-group-title">{group.title}</span>
-              {#each group.items as item (item.label)}
-                <div class="shortcut-row">
-                  <kbd>{item.keys}</kbd>
-                  <span>{item.label}</span>
-                </div>
-              {/each}
-            </div>
-          {/each}
-        </div>
-      </div>
     {/if}
   </div>
 {:else}
@@ -5548,14 +5016,17 @@
 
   .tool-strip {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    justify-content: center;
     gap: 5px;
     min-width: 0;
     min-height: 0;
     padding: 8px 6px;
     background: #171B1F;
-    border-right: 1px solid #2A2A2A;
+    border-top: 1px solid #2A2A2A;
     overflow: visible;
     z-index: 5;
   }
@@ -5587,11 +5058,13 @@
 
   .tool-strip strong {
     position: absolute;
-    left: 40px;
-    top: 50%;
+    bottom: 100%;
+    left: 50%;
+    top: auto;
     z-index: 10;
     max-width: 140px;
-    transform: translateY(-50%);
+    transform: translateX(-50%);
+    margin-bottom: 4px;
     padding: 5px 7px;
     border: 1px solid #3B4652;
     border-radius: 4px;
@@ -5617,16 +5090,17 @@
   .tool-flyout-host::before {
     content: '';
     display: block;
-    width: 22px;
-    height: 1px;
-    margin: 2px auto 7px;
+    width: 1px;
+    height: 22px;
+    margin: 0 2px;
     background: #303840;
   }
 
   .tool-flyout {
     position: absolute;
-    left: 42px;
-    top: 0;
+    bottom: 100%;
+    left: 0;
+    top: auto;
     z-index: 30;
     width: 154px;
     padding: 6px;
@@ -5737,23 +5211,23 @@
   }
 
   .fill-toggle {
-    width: 14px;
-    height: 14px;
+    width: 22px;
+    height: 22px;
     padding: 0;
-    border: 1px solid rgba(255, 255, 255, 0.28);
+    border: 1px solid #2E3B45;
     border-radius: 3px;
-    background: repeating-linear-gradient(
-      45deg,
-      rgba(255, 255, 255, 0.1) 0 3px,
-      transparent 3px 6px
-    );
+    background: #1A242D;
+    color: #6B7A86;
+    font-size: 10px;
+    font-weight: 800;
     cursor: pointer;
-    flex-shrink: 0;
+    line-height: 1;
   }
 
   .fill-toggle.active {
-    border-color: rgba(91, 155, 213, 0.7);
-    background: rgba(91, 155, 213, 0.55);
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.22);
+    color: #8FEDE3;
   }
 
   .fill-toggle:disabled {
@@ -5761,10 +5235,43 @@
     cursor: not-allowed;
   }
 
-  .swatch-fill-cell {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  .mini-swatch-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mini-swatch-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mini-swatch-btn:hover:not(:disabled) {
+    border-color: rgba(255,255,255,0.4);
+  }
+
+  .mini-gradient-btn {
+    height: 18px;
+    min-width: 32px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mini-gradient-btn.wide {
+    min-width: 60px;
+    flex: 1;
+  }
+
+  .mini-gradient-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .paint-number input {
@@ -6011,64 +5518,6 @@
     font-size: 10px;
   }
 
-  .arc-strip input[type='color'] {
-    width: 30px;
-    height: 20px;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .arc-toggle-group {
-    display: flex;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .arc-toggle-group button {
-    padding: 0 7px;
-    height: 26px;
-    border: none;
-    border-radius: 0;
-    background: #202427;
-    color: #7A8A96;
-    font-size: 10px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-
-  .arc-toggle-group button + button {
-    border-left: 1px solid #303840;
-  }
-
-  .arc-toggle-group button.active {
-    background: rgba(91, 155, 213, 0.22);
-    color: #A8CCE8;
-  }
-
-  .dock-toggle-row {
-    display: flex;
-    gap: 4px;
-  }
-
-  .dock-toggle-row button {
-    flex: 1;
-    padding: 2px 6px;
-    border: 1px solid #2F3C46;
-    border-radius: 3px;
-    background: #17212A;
-    color: #7A8A96;
-    font: inherit;
-    font-size: 10px;
-    cursor: pointer;
-  }
-
-  .dock-toggle-row button.active {
-    border-color: rgba(91, 155, 213, 0.5);
-    background: rgba(91, 155, 213, 0.18);
-    color: #A8CCE8;
-  }
-
   .surface-options-strip {
     display: flex;
     align-items: center;
@@ -6233,25 +5682,6 @@
     transform: rotate(-35deg);
   }
 
-  .tool-icon.interactive::before {
-    content: '';
-    position: absolute;
-    inset: 3px;
-    border: 2px solid #7FD0A6;
-    border-radius: 999px;
-  }
-
-  .tool-icon.interactive::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 3px;
-    width: 2px;
-    height: 6px;
-    background: #7FD0A6;
-    transform: translateX(-50%);
-  }
-
   .tool-icon.text::after {
     content: 'T';
     position: absolute;
@@ -6284,13 +5714,12 @@
 
   .surface-body {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) 348px;
+    grid-template-columns: minmax(0, 1fr) 348px;
     flex: 1;
     min-height: 0;
   }
 
   .surface-shell.previewing .surface-options-strip,
-  .surface-shell.previewing .tool-strip,
   .surface-shell.previewing .palette-panel,
   .surface-shell.previewing .surface-dock {
     display: none;
@@ -6300,12 +5729,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .surface-shell.previewing .surface-viewport :global(.ruler-wrapper) {
-    display: none;
-  }
-
   .surface-shell.previewing .surface-scroll {
-    inset: 0;
     background:
       radial-gradient(circle at center, rgba(20, 184, 166, 0.08), transparent 38%),
       #0D1216;
@@ -6932,43 +6356,6 @@
     transform-origin: 50% 100%;
   }
 
-  .kit-sub-row {
-    padding-left: 20px;
-    min-height: 34px;
-    background: rgba(20, 184, 166, 0.04);
-    border-bottom-color: rgba(20, 184, 166, 0.12);
-    color: #A8D8D2;
-  }
-
-  .kit-sub-row:hover {
-    background: rgba(20, 184, 166, 0.09);
-  }
-
-  .kit-sub-row.selected {
-    background: #183530;
-    color: #CCFFF8;
-    box-shadow:
-      inset 3px 0 0 #14B8A6,
-      inset 0 0 0 1px rgba(20, 184, 166, 0.3);
-  }
-
-  .kit-sub-row .row-main {
-    grid-template-columns: 32px minmax(0, 1fr);
-    gap: 7px;
-    padding: 4px 8px;
-  }
-
-  .kit-sub-row .layer-thumb {
-    width: 28px;
-    height: 22px;
-  }
-
-  .kit-member-callout {
-    background: rgba(20, 184, 166, 0.06);
-    border-left: 3px solid #14B8A6;
-    border-radius: 0 4px 4px 0;
-  }
-
   .generated-group-thumb {
     display: grid;
     place-items: center;
@@ -7142,15 +6529,10 @@
     font-size: 11px;
   }
 
-  .surface-viewport {
-    position: relative;
-    min-height: 0;
-    overflow: hidden;
-  }
-
   .surface-scroll {
-    position: absolute;
-    inset: 20px 0 0 20px;
+    position: relative;
+    flex: 1;
+    min-height: 0;
     overflow: auto;
     background:
       linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
@@ -7513,25 +6895,6 @@
     color: #E6FFFB;
   }
 
-  .part-bound.kit-part-overlay {
-    border: 1px dashed rgba(20, 184, 166, 0.38);
-    background: transparent;
-    color: #B5F0E8;
-  }
-
-  .part-bound.kit-part-overlay:hover {
-    border-color: rgba(20, 184, 166, 0.72);
-    background: rgba(20, 184, 166, 0.06);
-  }
-
-  .part-bound.kit-part-overlay.selected {
-    border: 2px solid #14B8A6;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.72),
-      0 0 0 4px rgba(20, 184, 166, 0.18),
-      0 0 18px rgba(20, 184, 166, 0.28);
-  }
-
   .part-bound.selected {
     border: 2px solid #5B9BD5;
     box-shadow:
@@ -7727,31 +7090,6 @@
       0 0 0 1px rgba(255, 255, 255, 0.58),
       0 0 0 4px rgba(229, 160, 41, 0.16),
       0 0 18px rgba(229, 160, 41, 0.26);
-  }
-
-  /* Follow-mode grab area (the §3.4 halo): teal + dashed to read as a derived,
-     auto-tracking area distinct from hand-placed amber zones. */
-  .hit-zone.follow {
-    border-style: dashed;
-    border-color: rgba(45, 212, 191, 0.85);
-    background: rgba(45, 212, 191, 0.12);
-    color: #C9FFF6;
-    cursor: grab;
-  }
-
-  .hit-zone.follow.selected {
-    border-width: 2px;
-    background: rgba(45, 212, 191, 0.2);
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.5),
-      0 0 0 4px rgba(45, 212, 191, 0.16),
-      0 0 18px rgba(45, 212, 191, 0.26);
-  }
-
-  .hit-zone.follow > .selection-label {
-    background: rgba(8, 51, 47, 0.96);
-    border-color: rgba(45, 212, 191, 0.4);
-    color: #C9FFF6;
   }
 
   .hit-zone > .selection-label {
@@ -7997,134 +7335,6 @@
     height: 1px;
   }
 
-  .smart-guide {
-    position: absolute;
-    z-index: 2385;
-    pointer-events: none;
-    background: rgba(243, 119, 196, 0.9);
-    box-shadow: 0 0 7px rgba(243, 119, 196, 0.45);
-  }
-
-  .smart-guide.x { width: 1px; }
-  .smart-guide.y { height: 1px; }
-
-  .measure-line {
-    position: absolute;
-    z-index: 2386;
-    pointer-events: none;
-    border-color: rgba(243, 196, 119, 0.95);
-  }
-
-  .measure-line.x { border-top: 1px dashed rgba(243, 196, 119, 0.95); height: 0; }
-  .measure-line.y { border-left: 1px dashed rgba(243, 196, 119, 0.95); width: 0; }
-
-  .measure-tag {
-    position: absolute;
-    z-index: 2387;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    background: rgba(20, 20, 20, 0.92);
-    color: #F3C477;
-    border: 1px solid rgba(243, 196, 119, 0.5);
-    border-radius: 3px;
-    padding: 0 4px;
-    font-size: 10px;
-    line-height: 15px;
-    white-space: nowrap;
-  }
-
-  .arrange-bar {
-    position: absolute;
-    top: 8px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 2440;
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    background: rgba(26, 26, 26, 0.96);
-    border: 1px solid #3B3B3B;
-    border-radius: 6px;
-    padding: 4px 6px;
-    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
-  }
-
-  .arrange-bar button {
-    min-width: 24px;
-    height: 24px;
-    background: #252525;
-    border: 1px solid #3B3B3B;
-    border-radius: 3px;
-    color: #DDD;
-    font-size: 12px;
-    cursor: pointer;
-    padding: 0 5px;
-  }
-
-  .arrange-bar button:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
-  .arrange-bar button:disabled { opacity: 0.35; cursor: default; }
-  .arrange-label { color: #999; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; padding: 0 2px; }
-  .arrange-divider { width: 1px; height: 18px; background: #3B3B3B; margin: 0 2px; }
-
-  .readiness-nudges {
-    position: absolute;
-    left: 16px;
-    bottom: 16px;
-    z-index: 2490;
-    width: 300px;
-    max-width: calc(100% - 32px);
-    background: rgba(24, 24, 24, 0.97);
-    border: 1px solid #3B3B3B;
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
-    padding: 9px 11px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .readiness-nudges-head { display: flex; align-items: center; justify-content: space-between; }
-  .readiness-nudges-head strong { color: #E0E0E0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .readiness-nudges-head button { background: none; border: none; color: #AAA; font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px; }
-  .readiness-nudges-head button:hover { color: #FFF; }
-  .readiness-nudge { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; color: #B6B6B6; line-height: 1.35; }
-  .readiness-nudge .readiness-text strong { color: #DADADA; }
-  .readiness-dot { flex: none; width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: #C9A24B; }
-  .readiness-nudge.required .readiness-dot { background: #D56B6B; }
-
-  .shortcut-sheet {
-    position: absolute;
-    right: 16px;
-    bottom: 16px;
-    z-index: 2500;
-    width: 340px;
-    max-width: calc(100% - 32px);
-    background: rgba(24, 24, 24, 0.98);
-    border: 1px solid #3B3B3B;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-    padding: 12px 14px;
-  }
-
-  .shortcut-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .shortcut-head strong { color: #EEE; font-size: 13px; }
-  .shortcut-head button { background: none; border: none; color: #AAA; font-size: 18px; line-height: 1; cursor: pointer; }
-  .shortcut-head button:hover { color: #FFF; }
-  .shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .shortcut-group { display: flex; flex-direction: column; gap: 4px; }
-  .shortcut-group-title { color: #7DC4F3; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
-  .shortcut-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #BBB; }
-  .shortcut-row kbd {
-    flex: none;
-    background: #2A2A2A;
-    border: 1px solid #444;
-    border-radius: 3px;
-    padding: 1px 5px;
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 10px;
-    color: #E0E0E0;
-  }
-
   .measure-badge {
     position: absolute;
     z-index: 2410;
@@ -8229,15 +7439,15 @@
   }
 
   .surface-body {
-    grid-template-columns: 52px 220px minmax(420px, 1fr) clamp(340px, 25vw, 430px);
+    grid-template-columns: 220px minmax(420px, 1fr) clamp(340px, 25vw, 430px);
     background: #0E141A;
   }
 
   .tool-strip {
     gap: 8px;
-    padding: 12px 7px;
+    padding: 7px 12px;
     background: linear-gradient(180deg, #111A21, #0E141A);
-    border-right: 1px solid #26313A;
+    border-top: 1px solid #26313A;
   }
 
   .tool-strip button {
@@ -8706,12 +7916,84 @@
     background: linear-gradient(180deg, #151E25, #10171D);
   }
 
+  .state-filmstrip.collapsed .state-chip-row {
+    display: none;
+  }
+
+  .state-filmstrip.collapsed {
+    min-height: 0;
+  }
+
+  .filmstrip-collapse-btn {
+    display: grid;
+    gap: 4px;
+    align-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .state-count-trigger {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-size: 9px;
+  }
+
+  .state-trigger-badge {
+    padding: 1px 5px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: #8FEDE3;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .state-trigger-badge.no-trigger {
+    color: #6B7A86;
+    border-color: rgba(255,255,255,0.06);
+  }
+
+  .when-toggles {
+    display: flex;
+    gap: 2px;
+  }
+
+  .when-toggles button {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid #2E3B45;
+    border-radius: 3px;
+    background: #1A242D;
+    color: #6B7A86;
+    font-size: 9px;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .when-toggles button.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.22);
+    color: #8FEDE3;
+  }
+
   .state-title {
     display: grid;
-    align-content: center;
-    gap: 4px;
-    align-items: center;
-    padding: 0 14px;
+    align-content: stretch;
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
     border-right: 1px solid #2A3741;
     color: #D8E6EE;
     font-size: 11px;
@@ -8888,7 +8170,7 @@
 
   @media (max-width: 1380px) {
     .surface-body {
-      grid-template-columns: 52px 176px minmax(300px, 1fr) 330px;
+      grid-template-columns: 176px minmax(300px, 1fr) 330px;
     }
 
     .palette-panel {
@@ -8903,7 +8185,7 @@
 
   @media (max-width: 920px) {
     .surface-body {
-      grid-template-columns: 52px minmax(0, 1fr) 318px;
+      grid-template-columns: minmax(0, 1fr) 318px;
     }
 
     .palette-panel {
