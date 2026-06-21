@@ -3843,19 +3843,6 @@
               ></div>
             {/if}
 
-            {#if !designerPreviewing && partEntries.length === 0 && !drawDraft}
-              <div class="artboard-create-palette" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
-                <button type="button" onclick={() => addLayerAtCenter('rectangle')}>Rectangle</button>
-                <button type="button" onclick={() => addLayerAtCenter('ellipse')}>Ellipse</button>
-                <button type="button" onclick={() => addLayerAtCenter('text')}>Text</button>
-                <button type="button" onclick={() => { setActiveTool('hitZone'); addHitZoneAtCenter(); }}>Hit Zone</button>
-                <button type="button" onclick={addDialKit}>Dial</button>
-                <button type="button" onclick={addHorizontalScaleKit}>H Scale</button>
-                <button type="button" onclick={addVerticalScaleKit}>V Scale</button>
-                <button type="button" onclick={addArpeggiatorKit}>Arp Kit</button>
-              </div>
-            {/if}
-
             {#each partEntries as [name, part] (name)}
               <InteractivePartRenderer
                 part={renderPartForFrame(name, part)}
@@ -6648,39 +6635,6 @@
     inset: 0;
     z-index: 2300;
     cursor: crosshair;
-  }
-
-  .artboard-create-palette {
-    position: absolute;
-    left: 50%;
-    top: 100%;
-    z-index: 2200;
-    display: inline-flex;
-    gap: 6px;
-    transform: translate(-50%, 12px);
-    padding: 7px;
-    border: 1px solid rgba(91, 155, 213, 0.48);
-    border-radius: 5px;
-    background: rgba(15, 20, 25, 0.92);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
-  }
-
-  .artboard-create-palette button {
-    height: 28px;
-    padding: 0 9px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #DDEEFF;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .artboard-create-palette button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
   }
 
   .arp-editor {
