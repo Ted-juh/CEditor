@@ -29,6 +29,8 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
+  import { Undo2, Redo2 } from 'lucide-svelte';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { isSourceScript } from '../scripting/scriptModel.js';
@@ -432,6 +434,22 @@
               <strong>{selectedCustomComponentName}</strong>
             </div>
             <div class="component-workspace-actions">
+              <button
+                type="button"
+                class="icon-btn"
+                class:active={$undoAvailable}
+                disabled={!$undoAvailable}
+                title="Undo (Ctrl+Z)"
+                onclick={undo}
+              ><Undo2 size={14} strokeWidth={2} /></button>
+              <button
+                type="button"
+                class="icon-btn"
+                class:active={$redoAvailable}
+                disabled={!$redoAvailable}
+                title="Redo (Ctrl+Y)"
+                onclick={redo}
+              ><Redo2 size={14} strokeWidth={2} /></button>
               {#if $componentDesignerStatus?.kind}
                 <div class="component-workspace-status" aria-label="Component designer status">
                   <span title={`Canvas size: ${$componentDesignerStatus.artboard}`}>Canvas <strong>{$componentDesignerStatus.artboard}</strong></span>
@@ -886,6 +904,21 @@
     font-weight: 700;
     padding: 0 8px;
     cursor: pointer;
+  }
+
+  .component-workspace-header button.icon-btn {
+    width: 24px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #8BB8D4;
+  }
+
+  .component-workspace-header button.icon-btn:disabled {
+    color: #2F404B;
+    cursor: default;
+    pointer-events: none;
   }
 
   .component-workspace-header button:hover,

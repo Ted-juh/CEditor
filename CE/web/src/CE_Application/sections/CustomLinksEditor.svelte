@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import ConditionBuilder from './ConditionBuilder.svelte';
   import { activePanel } from '../stores/panels.js';
   import {
     createPanelCustomRouteLink,
@@ -488,8 +489,8 @@
           <option value={hint}></option>
         {/each}
       </datalist>
-      <PropertyCell label="Condition" span={4} hint="Optional future-safe expression deciding when this link runs.">
-        <input class="val" type="text" value={selected.condition ?? ''} onchange={(event) => set('condition', event.target.value)} placeholder="mode === 'A'" />
+      <PropertyCell label="Condition" span={4} hint="When this link runs. Leave empty to always run.">
+        <ConditionBuilder value={selected.condition ?? ''} channels={channelNames} onChange={(next) => set('condition', next)} placeholder="link always runs" />
       </PropertyCell>
     </PropertySection>
 
@@ -526,8 +527,8 @@
             <NumberInput value={selected.max ?? 1} step={0.01} onchange={(value) => set('max', value)} />
           </PropertyCell>
         {:else if selected.type === 'condition'}
-          <PropertyCell label="Expression" span={4} hint="Condition evaluated for this link, for example mode === B or mainValue > 0.5.">
-            <input class="val" type="text" value={selected.expression ?? ''} onchange={(event) => set('expression', event.target.value)} placeholder="mode === B" />
+          <PropertyCell label="Expression" span={4} hint="Condition picking the true/false value below.">
+            <ConditionBuilder value={selected.expression ?? ''} channels={channelNames} onChange={(next) => set('expression', next)} placeholder="evaluates to false" />
           </PropertyCell>
           <PropertyCell label="True" span={2} hint="Channel name or literal value written when the expression is true.">
             <input class="val" type="text" value={selected.trueValue ?? ''} onchange={(event) => set('trueValue', event.target.value)} placeholder="xValue" />

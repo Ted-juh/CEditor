@@ -376,7 +376,7 @@
     user-select: none;
   }
 
-  .menubar-area    { grid-area: menu; }
+  .menubar-area    { grid-area: menu; position: relative; z-index: 1000; }
   .icon-panel-area { grid-area: icon; }
   .center-area     { grid-area: center; display: flex; flex-direction: column; overflow: hidden; }
   .properties-area { grid-area: props; overflow: hidden; }

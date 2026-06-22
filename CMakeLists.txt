@@ -347,6 +347,7 @@ endif()
 
 install(TARGETS CEditor
     RUNTIME DESTINATION "."
+    RESOURCE DESTINATION "."
 )
 
 if (EXISTS "${CE_ROOT}/web/dist")

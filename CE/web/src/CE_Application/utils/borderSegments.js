@@ -364,7 +364,15 @@ export function buildBorderSegments(W, H, border, corners) {
   const tr = normalizeCorner(corners, 'tr');
   const br = normalizeCorner(corners, 'br');
   const bl = normalizeCorner(corners, 'bl');
-  const tlR = tl.radius, trR = tr.radius, brR = br.radius, blR = bl.radius;
+  // Clamp corner radii to half the smaller side, matching CSS border-radius
+  // behaviour. Round shapes (circle/ring/capsule) store radius: 999 to mean
+  // "fully round"; without this clamp the SVG corner arcs are generated at that
+  // literal radius and bleed far beyond the part as huge curved strokes.
+  const maxR = Math.max(0, Math.min(W, H) / 2);
+  const tlR = Math.min(tl.radius, maxR),
+        trR = Math.min(tr.radius, maxR),
+        brR = Math.min(br.radius, maxR),
+        blR = Math.min(bl.radius, maxR);
   const tlOn = isCornerOn(corners, 'tl');
   const trOn = isCornerOn(corners, 'tr');
   const brOn = isCornerOn(corners, 'br');

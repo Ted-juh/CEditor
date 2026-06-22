@@ -26,6 +26,10 @@ export function resolveWorkspaceChrome({
   const ownsChrome = workspaceOwnsChrome(workspaceKind);
   const compactPanel = workspaceKind === 'panel' && Number(viewportWidth) > 0 && Number(viewportWidth) < COMPACT_CHROME_BREAKPOINT;
 
+  // The Custom Component Designer renders its OWN DisplayPanel inside its centre
+  // column (between the full-height palette and inspector), so the App-level
+  // shared DisplayPanel is hidden here just like for other chrome-owning
+  // workspaces — it stays available only in the panel editor.
   return {
     workspaceKind,
     ownsChrome,

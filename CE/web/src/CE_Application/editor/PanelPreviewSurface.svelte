@@ -563,6 +563,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      fine: event?.shiftKey === true,
     });
     if (!controlId || !Object.keys(patch).length) return;
     patchControlSession(controlId, {
@@ -582,6 +583,7 @@
       startClientX: pointerDownPoint?.x,
       startClientY: pointerDownPoint?.y,
       startValues: pointerCustomStartValues,
+      fine: event?.shiftKey === true,
     });
     if (!Object.keys(patch).length) return;
     patchControlSession(getControlId(control), {

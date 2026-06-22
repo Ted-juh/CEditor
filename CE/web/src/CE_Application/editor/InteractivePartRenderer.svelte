@@ -1,6 +1,7 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
 
   let {
     part = null,
@@ -104,6 +105,13 @@
     && !rendersArcTrack
     && ['circle', 'ring', 'capsule'].includes(simpleBackgroundKind)
   );
+
+  // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
+  // <polygon> using the part's fill + border, instead of the CSS background.
+  let polygonVerts = $derived(polygonPoints(part?.kind));
+  let rendersPolygon = $derived(!!polygonVerts);
+  let rendersLine = $derived(simpleBackgroundKind === 'line');
+  let rendersVectorShape = $derived(rendersPolygon || rendersLine);
 
   let frame = $derived.by(() => {
     if (!layout) {
@@ -283,26 +291,22 @@
     ].join('; ');
   });
 
-  let arcTrackStyle = $derived.by(() => {
-    if (!rendersArcTrack) return '';
-
+  let arcSvgData = $derived.by(() => {
+    if (!rendersArcTrack) return null;
     const size = Math.max(1, Math.min(frame.width, frame.height));
-    const thickness = clampNumber(
-      arcTrack?.thickness ?? backgroundBorder?.thickness,
-      1,
-      size / 2,
-    );
+    const thickness = clampNumber(arcTrack?.thickness ?? backgroundBorder?.thickness, 1, size / 2);
+    const r = Math.max(0.5, size / 2 - thickness / 2);
     const sweepAngle = clampNumber(arcTrack?.sweepAngle, 0, 360);
     const direction = String(arcTrack?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw';
     const startAngle = numberOr(arcTrack?.startAngle, -135);
     const renderedStartAngle = direction === 'ccw' ? startAngle - sweepAngle : startAngle;
+    const cap = arcTrack?.cap === 'round' ? 'round' : 'butt';
     const colour = cssColour(arcTrack?.colour ?? backgroundBorder?.colour ?? backgroundFill?.colour, '#2B3742');
-
-    return [
-      `background:conic-gradient(from ${renderedStartAngle}deg, ${colour} 0deg ${sweepAngle}deg, transparent ${sweepAngle}deg 360deg)`,
-      `-webkit-mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
-      `mask:radial-gradient(circle at center, transparent 0 calc(50% - ${thickness}px), #000 calc(50% - ${thickness}px) calc(50% + 1px), transparent calc(50% + 1px) 100%)`,
-    ].join('; ');
+    const circumference = 2 * Math.PI * r;
+    const arcLength = circumference * Math.min(sweepAngle, 359.99) / 360;
+    // SVG 0° = 3-o'clock; CSS conic 0° = 12-o'clock → subtract 90 to align
+    const rotation = renderedStartAngle - 90;
+    return { size, r, thickness, arcLength, circumference, rotation, cap, colour };
   });
 
   let simpleBackgroundStyle = $derived.by(() => {
@@ -322,6 +326,37 @@
       `background:${fillColour}`,
       borderWidth > 0 ? `border:${borderWidth}px solid ${borderColour}` : 'border:none',
     ].join('; ');
+  });
+
+  let vectorShapeSvg = $derived.by(() => {
+    if (!rendersVectorShape) return null;
+    const width = Math.max(1, frame.width);
+    const height = Math.max(1, frame.height);
+    const fillEnabled = backgroundFill?.solidEnabled !== false;
+    const borderEnabled = backgroundBorder?.enabled === true && numberOr(backgroundBorder?.thickness, 0) > 0;
+    const strokeWidth = borderEnabled ? Math.max(1, numberOr(backgroundBorder?.thickness, 1)) : 0;
+    const fill = fillEnabled ? cssColour(backgroundFill?.colour ?? '00000000', 'transparent') : 'none';
+    const stroke = borderEnabled ? cssColour(backgroundBorder?.colour ?? 'FFFFFFFF', '#FFFFFF') : 'none';
+
+    if (rendersLine) {
+      // A line/divider has no area: paint the border as a centered stroke,
+      // falling back to the fill colour or white when no border is set.
+      const lineStroke = stroke !== 'none'
+        ? stroke
+        : (fillEnabled ? cssColour(backgroundFill?.colour ?? 'FFFFFFFF', '#FFFFFF') : '#FFFFFF');
+      const lineWidth = strokeWidth > 0 ? strokeWidth : 2;
+      return {
+        width, height, points: '',
+        line: { x1: 0, y1: height / 2, x2: width, y2: height / 2, stroke: lineStroke, width: lineWidth },
+      };
+    }
+
+    const inset = strokeWidth / 2;
+    return {
+      width, height, fill, stroke, strokeWidth,
+      points: polygonToSvgPoints(polygonVerts, width, height, inset),
+      line: null,
+    };
   });
 
   let envelopeSvg = $derived.by(() => {
@@ -430,18 +465,54 @@
 
 {#if part?.visible !== false}
   <div class="interactive-part" class:debug={debug} style={partStyle}>
-    {#if background && usesSimpleBackground}
+    {#if background && usesSimpleBackground && !rendersVectorShape}
       <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
-    {:else if background}
+    {:else if background && !rendersVectorShape}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} />
+    {/if}
+
+    {#if rendersVectorShape && vectorShapeSvg}
+      <svg class="interactive-vector-shape" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
+        {#if vectorShapeSvg.line}
+          <line
+            x1={vectorShapeSvg.line.x1}
+            y1={vectorShapeSvg.line.y1}
+            x2={vectorShapeSvg.line.x2}
+            y2={vectorShapeSvg.line.y2}
+            stroke={vectorShapeSvg.line.stroke}
+            stroke-width={vectorShapeSvg.line.width}
+            stroke-linecap="round"
+          ></line>
+        {:else}
+          <polygon
+            points={vectorShapeSvg.points}
+            fill={vectorShapeSvg.fill}
+            stroke={vectorShapeSvg.stroke}
+            stroke-width={vectorShapeSvg.strokeWidth}
+            stroke-linejoin="round"
+          ></polygon>
+        {/if}
+      </svg>
     {/if}
 
     {#if rendersValueArc}
       <div class="interactive-value-arc" style={valueArcStyle}></div>
     {/if}
 
-    {#if rendersArcTrack}
-      <div class="interactive-arc-track" style={arcTrackStyle}></div>
+    {#if arcSvgData}
+      <svg class="interactive-arc-svg" viewBox="0 0 {arcSvgData.size} {arcSvgData.size}" aria-hidden="true">
+        <circle
+          cx={arcSvgData.size / 2}
+          cy={arcSvgData.size / 2}
+          r={arcSvgData.r}
+          fill="none"
+          stroke={arcSvgData.colour}
+          stroke-width={arcSvgData.thickness}
+          stroke-linecap={arcSvgData.cap}
+          stroke-dasharray="{arcSvgData.arcLength} {arcSvgData.circumference}"
+          transform="rotate({arcSvgData.rotation} {arcSvgData.size / 2} {arcSvgData.size / 2})"
+        />
+      </svg>
     {/if}
 
     {#if rendersEnvelopePath}
@@ -504,16 +575,25 @@
     pointer-events: none;
   }
 
-  .interactive-value-arc,
-  .interactive-arc-track {
+  .interactive-value-arc {
     position: absolute;
     inset: 0;
     border-radius: 50%;
     pointer-events: none;
   }
 
+  .interactive-arc-svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
   .interactive-envelope-path,
-  .interactive-waveform-icon {
+  .interactive-waveform-icon,
+  .interactive-vector-shape {
     position: absolute;
     inset: 0;
     width: 100%;

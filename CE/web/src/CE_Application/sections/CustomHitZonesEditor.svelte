@@ -4,6 +4,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import ConditionBuilder from './ConditionBuilder.svelte';
   import { createHitZone } from '../utils/customComponentFactory.js';
 
   let { control = null } = $props();
@@ -282,8 +283,8 @@
           <option value="px">px</option>
         </select>
       </PropertyCell>
-      <PropertyCell label="Condition" span={2} hint="Optional future expression for enabling this zone.">
-        <input class="val" type="text" value={selected.condition ?? ''} onchange={(event) => set('condition', event.target.value)} />
+      <PropertyCell label="Condition" span={4} hint="When this zone is active. Leave empty for always.">
+        <ConditionBuilder value={selected.condition ?? ''} channels={channelNames} onChange={(next) => set('condition', next)} placeholder="zone always active" />
       </PropertyCell>
       <PropertyCell label="Preview" span={4} hint="Selected zone bounds as percentages of the component area.">
         <div class="selected-bounds">

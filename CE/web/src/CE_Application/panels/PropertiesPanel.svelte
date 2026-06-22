@@ -5,6 +5,7 @@
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
+  import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
   import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
@@ -55,6 +56,17 @@
   // Owner names for header overlays
   let panelName = $derived($activePanel?.name ?? 'Panel');
   let componentName = $derived($selectedControl?._children?.Core?.name ?? 'Component');
+
+  // Reset the property search whenever the selected control changes so a stale
+  // filter never silently hides another control's properties.
+  let lastFilteredControlId = $state(null);
+  $effect(() => {
+    const id = $selectedControl?._children?.Core?.id ?? null;
+    if (id !== lastFilteredControlId) {
+      lastFilteredControlId = id;
+      clearPropertyFilter();
+    }
+  });
   let ownerName = $derived(contextMode === 'panel' ? panelName : componentName);
   let selectedIsCustomComponent = $derived(
     String(getSection($selectedControl, 'Core')?.controlType ?? '') === 'CustomComponent'
@@ -122,17 +134,14 @@
     { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
     { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
-    { id: 'custompublic', icon: Cable,       label: 'Public',     section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'designer',   icon: LayoutDashboard, label: 'Designer', section: 'Designer' },
     { id: 'surface',    icon: Frame,           label: 'Surface',  section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
-    { id: 'customlayers', icon: Rows3,       label: 'Layers',     section: 'Parts', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
     { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
     { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },
-    { id: 'generators', icon: Grid3x3,       label: 'Generators', section: 'Generators' },
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
     { id: 'links',      icon: Workflow,      label: 'Links',      section: 'Links' },
-    { id: 'published',  icon: Cable,         label: 'Public API', section: 'PublishedProperties' },
+    { id: 'published',  icon: Cable,         label: 'API',        section: 'PublishedProperties' },
     { id: 'variants',   icon: Rows3,         label: 'Variants',   section: 'Variants' },
     { id: 'testbench',  icon: Play,          label: 'Test Bench', section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
@@ -363,6 +372,21 @@
       </button>
     {/if}
 
+    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
+      <div class="property-search">
+        <input
+          type="text"
+          placeholder="Search properties…"
+          value={$propertyFilter}
+          oninput={(event) => propertyFilter.set(event.currentTarget.value)}
+          aria-label="Search properties"
+        />
+        {#if $propertyFilter}
+          <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
+        {/if}
+      </div>
+    {/if}
+
     {#if $previewModeEnabled}
       <div class="preview-wrapper">
         <PreviewInspector />
@@ -503,6 +527,47 @@
   .component-designer-entry:hover {
     border-color: #5B9BD5;
     background: #20344B;
+  }
+
+  .property-search {
+    flex: 0 0 auto;
+    position: relative;
+    margin: 6px 8px 0 8px;
+  }
+
+  .property-search input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: #DDD;
+    font-size: 11px;
+    font-family: inherit;
+    padding: 5px 22px 5px 8px;
+    outline: none;
+  }
+
+  .property-search input:focus {
+    border-color: #5B9BD5;
+  }
+
+  .property-search-clear {
+    position: absolute;
+    right: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #999;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+  }
+
+  .property-search-clear:hover {
+    color: #FFF;
   }
 
   /* --- Normal view: icon bar + content side by side --- */

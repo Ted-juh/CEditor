@@ -165,11 +165,11 @@
 .dpd-app .w-combo{display:flex;align-items:center;justify-content:space-between;background:var(--bg);border:1px solid var(--line-2);border-radius:7px;padding:8px 11px;font-size:12.5px}
 .dpd-app .w-combo .car{color:var(--txt-faint)}
 .dpd-app .w-radio{display:flex;flex-direction:column;gap:6px}
-.dpd-app .w-radio label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt-dim);cursor:default}
+.dpd-app .w-radio .ritem{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--txt-dim);cursor:default}
 .dpd-app .w-radio .rb{width:13px;height:13px;border-radius:50%;border:1.5px solid var(--line-2);flex-shrink:0;position:relative}
-.dpd-app .w-radio label.on .rb{border-color:var(--violet)}
-.dpd-app .w-radio label.on .rb::after{content:'';position:absolute;inset:2.5px;border-radius:50%;background:var(--violet)}
-.dpd-app .w-radio label.on{color:var(--txt)}
+.dpd-app .w-radio .ritem.on .rb{border-color:var(--violet)}
+.dpd-app .w-radio .ritem.on .rb::after{content:'';position:absolute;inset:2.5px;border-radius:50%;background:var(--violet)}
+.dpd-app .w-radio .ritem.on{color:var(--txt)}
 .dpd-app .w-seg{display:flex;border:1px solid var(--line-2);border-radius:7px;overflow:hidden}
 .dpd-app .w-seg div{flex:1;text-align:center;font-size:11px;padding:7px 4px;color:var(--txt-faint);border-right:1px solid var(--line-2);white-space:nowrap}
 .dpd-app .w-seg div:last-child{border-right:none}

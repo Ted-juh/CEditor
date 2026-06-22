@@ -10,6 +10,7 @@
     scrollOffset = 0,
     contentOffset = 40,
     scale = 1,
+    gridStep = 0,
     onGuideCreate = null,
   } = $props();
 
@@ -64,26 +65,59 @@
       ctx.beginPath(); ctx.moveTo(w - 0.5, 0); ctx.lineTo(w - 0.5, h); ctx.stroke();
     }
 
-    const interval = pickInterval(scale);
-    const subDiv = interval >= 10 ? 5 : (interval >= 5 ? 5 : 2);
-    const subInterval = interval / subDiv;
+    // When a grid step is supplied (e.g. the custom design surface), ruler
+    // subdivisions and labels follow the grid so every tick lands on a multiple
+    // of the grid size (0-11-22-33 for grid 11). Otherwise fall back to "nice"
+    // intervals chosen to keep ~50px between major ticks at the current zoom.
+    const useGrid = gridStep > 0;
+    let tickStep;   // panel units between ticks
+    let interval;   // panel units between labelled (major) ticks in nice mode
+    if (useGrid) {
+      tickStep = gridStep;
+      // Keep ticks at least ~5px apart on screen; doubling stays on grid multiples.
+      while (tickStep * scale < 5) tickStep *= 2;
+      interval = tickStep;
+    } else {
+      interval = pickInterval(scale);
+      tickStep = interval / (interval >= 5 ? 5 : 2);
+    }
 
     // Range of panel coords visible
     const panelStart = (scrollOffset - contentOffset) / scale;
     const panelEnd = (scrollOffset + (isHorizontal ? w : h) - contentOffset) / scale;
 
-    const firstSub = Math.floor(panelStart / subInterval) * subInterval;
+    const firstTick = Math.floor(panelStart / tickStep) * tickStep;
 
-    ctx.fillStyle = '#999';
     ctx.font = '9px sans-serif';
     ctx.textBaseline = isHorizontal ? 'top' : 'middle';
     ctx.textAlign = isHorizontal ? 'center' : 'left';
 
-    for (let pc = firstSub; pc <= panelEnd; pc += subInterval) {
-      const screenPos = pc * scale - scrollOffset + contentOffset;
-      const isMajor = Math.abs(pc - Math.round(pc / interval) * interval) < 0.01;
-      const tickLen = isMajor ? 10 : 5;
+    // Minimum on-screen gap (px) between two adjacent labels in grid mode.
+    const LABEL_GAP = 6;
+    let lastLabelEnd = -Infinity;
 
+    for (let pc = firstTick; pc <= panelEnd; pc += tickStep) {
+      const screenPos = pc * scale - scrollOffset + contentOffset;
+
+      let isMajor;
+      let label = null;
+      if (useGrid) {
+        // Every grid line is a tick; label as many as fit without colliding so
+        // labels always sit on grid multiples but never overlap when zoomed out.
+        label = String(Math.round(pc));
+        const labelSpan = isHorizontal ? ctx.measureText(label).width : 9;
+        if (screenPos - labelSpan / 2 >= lastLabelEnd + LABEL_GAP) {
+          isMajor = true;
+          lastLabelEnd = screenPos + labelSpan / 2;
+        } else {
+          isMajor = false;
+        }
+      } else {
+        isMajor = Math.abs(pc - Math.round(pc / interval) * interval) < 0.01;
+        if (isMajor) label = String(Math.round(pc));
+      }
+
+      const tickLen = isMajor ? 10 : 5;
       ctx.strokeStyle = isMajor ? '#888' : '#555';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -99,8 +133,8 @@
       }
       ctx.stroke();
 
-      if (isMajor) {
-        const label = String(Math.round(pc));
+      if (isMajor && label !== null) {
+        ctx.fillStyle = '#999';
         if (isHorizontal) {
           ctx.fillText(label, screenPos, 2);
         } else {

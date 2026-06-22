@@ -103,40 +103,26 @@ function Reset-Directory([string]$Path) {
 }
 
 function Build-Frontend([string]$RepoRoot) {
-    $distIndex = Join-Path $RepoRoot "CE\web\dist\index.html"
     $frontendRoot = Join-Path $RepoRoot "CE\web"
 
-    if (Test-Path $distIndex) {
-        $distTime = (Get-Item $distIndex).LastWriteTimeUtc
-        $inputs = @(
-            (Join-Path $frontendRoot "vite.config.js"),
-            (Join-Path $frontendRoot "package.json")
-        )
-
-        $latestSource = Get-ChildItem (Join-Path $frontendRoot "src") -Recurse -File |
-            Sort-Object LastWriteTimeUtc -Descending |
-            Select-Object -First 1
-
-        if ($latestSource) {
-            $inputs += $latestSource.FullName
-        }
-
-        $needsRebuild = $false
-
-        foreach ($input in $inputs) {
-            if ((Test-Path $input) -and (Get-Item $input).LastWriteTimeUtc -gt $distTime) {
-                $needsRebuild = $true
-                break
+    # Always rebuild the UI bundle. The previous "skip if dist looks fresh"
+    # shortcut caused stale-UI bugs (a pulled fix would never reach the build),
+    # so correctness wins over the few seconds saved.
+    if (-not (Test-Path (Join-Path $frontendRoot "node_modules"))) {
+        Write-Host "Installing frontend dependencies (npm ci)..."
+        Push-Location $frontendRoot
+        try {
+            & npm ci
+            if ($LASTEXITCODE -ne 0) {
+                throw "npm ci failed."
             }
         }
-
-        if (-not $needsRebuild) {
-            Write-Host "Using existing frontend bundle at CE\\web\\dist"
-            return
+        finally {
+            Pop-Location
         }
     }
 
-    Write-Host "Building frontend bundle..."
+    Write-Host "Building frontend bundle (fresh build)..."
     Push-Location $frontendRoot
     try {
         & npm run build

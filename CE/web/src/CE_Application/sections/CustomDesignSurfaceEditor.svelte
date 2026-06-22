@@ -7,11 +7,24 @@
     Eye,
     EyeOff,
     Lock,
+    Maximize,
+    PanelBottom,
+    PanelLeft,
+    PanelRight,
+    Ruler,
     Scissors,
     Trash2,
     Unlock,
   } from 'lucide-svelte';
+  import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { isPolygonKind, clipPathForKind } from '../utils/shapeGeometry.js';
+  import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
+  import { setActiveEditorTab } from '../stores/panels.js';
+  import EditorRuler from '../editor/EditorRuler.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
@@ -178,6 +191,8 @@
   let activeTool = $state('select');
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
+  let interactiveFlyoutOpen = $state(false);
+  let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
   let drawNoticeTimer = null;
@@ -193,6 +208,52 @@
   let surfacePan = $state(null);
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
+  let filmstripCollapsed = $state(false);
+  // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
+  let paletteCollapsed = $state(false);
+  let dockHidden = $state(false);
+  let displayDockHidden = $state(false);
+  // Bottom zoom bar (mirrors the Panel Designer's ZoomBar, wired to surfaceZoom).
+  let surfaceZoomIncrement = $state(10);
+  let zoomEditing = $state(false);
+  let zoomEditValue = $state('100');
+  let surfaceShowRulers = $state(true);
+  // Scripts section in the top Look bar (a custom component can carry scripts).
+  let componentScripts = $derived(getSection(control, 'Scripts'));
+  let componentScriptList = $derived(Array.isArray(componentScripts?.scripts) ? componentScripts.scripts : []);
+  let componentScriptsEnabled = $derived(componentScripts?.enabled !== false);
+  let surfaceGridCols = $derived(
+    `${paletteCollapsed ? '--palette-w:46px;' : ''}${dockHidden ? '--dock-w:0px;' : ''}`
+  );
+  let rulerScrollX = $state(0);
+  let rulerScrollY = $state(0);
+  let rulerViewWidth = $state(0);
+  let rulerViewHeight = $state(0);
+  // Rendered top-left of the (centered, zoomed) artboard within the scroll content.
+  // Used as the ruler origin so 0,0 tracks the artboard corner. Defaults match the
+  // surface padding so the first paint is sensible before measurement runs.
+  let boardOffsetX = $state(112);
+  let boardOffsetY = $state(96);
+
+  // The artboard is flex-centered and scaled via transform, so its real position
+  // shifts with zoom and viewport size — measure it instead of assuming a fixed
+  // padding offset, otherwise ruler 0,0 drifts off the artboard corner.
+  function measureBoardOffset() {
+    if (!surfaceScrollEl) return;
+    const board = surfaceScrollEl.querySelector('.artboard');
+    if (!board) return;
+    const b = board.getBoundingClientRect();
+    const s = surfaceScrollEl.getBoundingClientRect();
+    boardOffsetX = b.left - s.left + surfaceScrollEl.scrollLeft;
+    boardOffsetY = b.top - s.top + surfaceScrollEl.scrollTop;
+  }
+
+  $effect(() => {
+    // Re-measure whenever anything that repositions or rescales the artboard changes.
+    const deps = `${surfaceZoom}:${artboardWidth}:${artboardHeight}:${rulerViewWidth}:${rulerViewHeight}`;
+    void deps;
+    measureBoardOffset();
+  });
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
   let behaviorEntries = $derived(Object.entries(behaviors?._children ?? {}));
@@ -283,10 +344,38 @@
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
     { id: 'text', label: 'Text', key: 'T' },
+    // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
+    { id: 'line', label: 'Line', key: 'L' },
+    { id: 'triangle', label: 'Triangle', key: '' },
+    { id: 'rightTriangle', label: 'Right triangle', key: '' },
+    { id: 'parallelogram', label: 'Parallelogram', key: '' },
+    { id: 'trapezoid', label: 'Trapezoid', key: '' },
+    { id: 'diamond', label: 'Diamond', key: '' },
+    { id: 'pentagon', label: 'Pentagon', key: '' },
+    { id: 'hexagon', label: 'Hexagon', key: '' },
+    { id: 'star', label: 'Star', key: '' },
+    { id: 'chevron', label: 'Chevron', key: '' },
+    { id: 'arrow', label: 'Arrow', key: '' },
+    { id: 'plus', label: 'Plus', key: '' },
   ];
+  const POLYGON_TOOL_IDS = ['triangle', 'rightTriangle', 'parallelogram', 'trapezoid', 'diamond', 'pentagon', 'hexagon', 'star', 'chevron', 'arrow', 'plus'];
+  // "Lines & Polygons" palette section: line first, then the flat polygons.
+  const VECTOR_SHAPE_TOOL_IDS = ['line', ...POLYGON_TOOL_IDS];
+  // SHAPE_TOOL_IDS stays the 6 "Basic" shapes — it drives the bottom tool-strip's
+  // Shape flyout. Lines/polygons are drawn directly from the left palette.
   const SHAPE_TOOL_IDS = new Set(['rectangle', 'roundedRectangle', 'ellipse', 'ring', 'arcTrack', 'capsule']);
   const SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => SHAPE_TOOL_IDS.has(tool.id));
+  const VECTOR_SHAPE_TOOLS = DRAW_TOOLS.filter((tool) => VECTOR_SHAPE_TOOL_IDS.includes(tool.id));
+  const INTERACTIVE_ARCHETYPES = [
+    { id: 'dial', label: 'Dial' },
+    { id: 'slider', label: 'Slider' },
+    { id: 'button', label: 'Button' },
+    { id: 'toggle', label: 'Toggle' },
+    { id: 'xy', label: 'XY Pad' },
+    { id: 'range', label: 'Range' },
+  ];
   let activeToolMeta = $derived(DRAW_TOOLS.find((tool) => tool.id === activeTool) ?? DRAW_TOOLS[0]);
+  let activeInteractiveMeta = $derived(INTERACTIVE_ARCHETYPES.find((a) => a.id === interactiveArchetype) ?? INTERACTIVE_ARCHETYPES[0]);
 
   $effect(() => {
     componentDesignerStatus.set({
@@ -404,10 +493,27 @@
   function toggleShapeFlyout(event) {
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
+    interactiveFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
     }
+  }
+
+  function toggleInteractiveFlyout(event) {
+    event?.stopPropagation?.();
+    interactiveFlyoutOpen = !interactiveFlyoutOpen;
+    shapeFlyoutOpen = false;
+    if (interactiveFlyoutOpen && activeTool !== 'interactive') {
+      setActiveTool('interactive');
+      interactiveFlyoutOpen = true;
+    }
+  }
+
+  function selectInteractiveArchetype(event, id) {
+    event?.stopPropagation?.();
+    interactiveArchetype = id;
+    setActiveTool('interactive');
   }
 
   function numberOr(value, fallback = 0) {
@@ -1071,6 +1177,25 @@
     inspectorTab = 'states';
   }
 
+  function setFilmstripStateWhen(stateName, flag, value) {
+    if (!core?.id || !stateName || stateName === 'base') return;
+    updateControlProperty(core.id, `States.${stateName}.when.${flag}`, value);
+  }
+
+  function stateTriggerLabel(state, base = false) {
+    if (base) return '';
+    const when = state?.when ?? {};
+    if (when.hover) return 'Hover';
+    if (when.pressed) return 'Pressed';
+    if (when.disabled) return 'Disabled';
+    if (when.focused) return 'Focused';
+    if (when.dragging) return 'Dragging';
+    if (when.checked) return 'Checked';
+    const flags = Object.entries(when).filter(([, v]) => v === true).map(([k]) => k);
+    if (flags.length) return flags[0];
+    return 'No trigger';
+  }
+
   function duplicateStateCard(name, state, event = null) {
     event?.stopPropagation?.();
     if (!core?.id) return;
@@ -1249,6 +1374,13 @@
     return `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`;
   }
 
+  // Clip the drag preview to the shape being drawn (polygons + a thin line bar).
+  function drawPreviewClip(tool) {
+    if (tool === 'line') return 'polygon(0% 42%, 100% 42%, 100% 58%, 0% 58%)';
+    if (isPolygonKind(tool)) return clipPathForKind(tool);
+    return 'none';
+  }
+
   function frameReadout(frame = feedbackFrame) {
     if (!frame) return '';
     return `${Math.round(frame.width)} x ${Math.round(frame.height)}  X ${Math.round(frame.left)}  Y ${Math.round(frame.top)}`;
@@ -1328,6 +1460,7 @@
     const name = nextPartName(kind === 'text' ? 'textLayer' : kind);
     const isCircularOutline = ['ring', 'arcTrack'].includes(kind);
     const isText = kind === 'text';
+    const isLine = kind === 'line';
     const radius = ['ellipse', 'ring', 'arcTrack', 'capsule'].includes(kind)
       ? 999
       : (kind === 'roundedRectangle' ? 8 : 0);
@@ -1351,10 +1484,10 @@
       sections: isText
         ? { Text: createText('Text', { size: 12, weight: 600 }) }
         : {
-          Background: createBackground(isCircularOutline ? '005B9BD5' : 'FF5B9BD5', {
+          Background: createBackground(isLine ? '00000000' : (isCircularOutline ? '005B9BD5' : 'FF5B9BD5'), {
             borderEnabled: true,
-            borderColour: isCircularOutline ? 'FF5B9BD5' : '55FFFFFF',
-            borderThickness: isCircularOutline ? 4 : 1,
+            borderColour: (isCircularOutline || isLine) ? 'FF5B9BD5' : '55FFFFFF',
+            borderThickness: isLine ? 3 : (isCircularOutline ? 4 : 1),
             radius,
           }),
         },
@@ -1907,6 +2040,68 @@
     return fallback;
   }
 
+  const DEFAULT_LAYER_GRADIENT = {
+    type: 'linear', angle: 90, centerX: 50, centerY: 50,
+    radiusX: 50, radiusY: 50, edge: 0,
+    stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
+  };
+
+  function swatchCss(value, fallback = '5B9BD5') {
+    const raw = String(value ?? '').trim().replace(/^#/, '');
+    if (/^[0-9a-f]{8}$/i.test(raw)) {
+      const a = parseInt(raw.slice(0, 2), 16) / 255;
+      const rgb = raw.slice(2);
+      // Opaque: just paint the solid colour.
+      if (a >= 0.999) return `background:#${rgb}`;
+      // Semi-transparent: layer the colour over a checkerboard so alpha shows.
+      // The colour must be a linear-gradient() to be a valid background-image layer.
+      const r = parseInt(raw.slice(2, 4), 16);
+      const g = parseInt(raw.slice(4, 6), 16);
+      const b = parseInt(raw.slice(6, 8), 16);
+      const c = `rgba(${r},${g},${b},${a})`;
+      return `background-image:linear-gradient(${c},${c}),repeating-conic-gradient(#555 0% 25%,#333 0% 50%);background-size:auto,8px 8px`;
+    }
+    // 6-digit RRGGBB (no alpha) — fully opaque.
+    if (/^[0-9a-f]{6}$/i.test(raw)) return `background:#${raw}`;
+    return `background:#${fallback}`;
+  }
+
+  function openLayerColour(relativePath, currentValue) {
+    if (!core?.id || !selectedLayer) return;
+    activateColorTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.${relativePath}` },
+      currentValue ?? 'FF5B9BD5'
+    );
+  }
+
+  function openArcColour() {
+    if (!core?.id || !selectedLayer) return;
+    activateColorTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.meta.arcTrack.colour` },
+      selectedArcMeta?.colour ?? 'FF5B9BD5'
+    );
+  }
+
+  function openLayerGradient() {
+    if (!core?.id || !selectedLayer || !selectedFill) return;
+    const gradient = selectedFill.gradient?.stops?.length >= 2
+      ? selectedFill.gradient
+      : DEFAULT_LAYER_GRADIENT;
+    if (!selectedFill.gradient?.stops?.length) {
+      setLayerProperty('Background.Fill.gradient', gradient);
+    }
+    activateGradientTarget(
+      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.Background.Fill` },
+      gradient
+    );
+  }
+
+  function toggleFillGradient() {
+    const next = !selectedFill?.gradientEnabled;
+    setLayerProperty('Background.Fill.gradientEnabled', next);
+    if (next) openLayerGradient();
+  }
+
   function alphaFromColour(value, fallback = 'FF') {
     const raw = String(value ?? '').trim();
     return /^[0-9a-f]{8}$/i.test(raw) ? raw.slice(0, 2).toUpperCase() : fallback;
@@ -1923,7 +2118,39 @@
   }
 
   function setZoom(value) {
-    surfaceZoom = Math.max(0.25, Math.min(2.5, numberOr(value, 1)));
+    surfaceZoom = Math.max(0.25, Math.min(5, numberOr(value, 1)));
+  }
+
+  // Bottom zoom bar helpers (percent-based, like the Panel Designer's ZoomBar).
+  function zoomStep(deltaPercent) {
+    setZoom(surfaceZoom + deltaPercent / 100);
+  }
+
+  function startZoomEdit() {
+    zoomEditValue = String(Math.round(surfaceZoom * 100));
+    zoomEditing = true;
+  }
+
+  function commitZoomEdit() {
+    zoomEditing = false;
+    const pct = parseInt(zoomEditValue, 10);
+    if (!isNaN(pct)) setZoom(pct / 100);
+  }
+
+  function zoomEditKeydown(event) {
+    if (event.key === 'Enter') commitZoomEdit();
+    else if (event.key === 'Escape') zoomEditing = false;
+  }
+
+  function setZoomIncrement(value) {
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num > 0) surfaceZoomIncrement = Math.min(100, num);
+  }
+
+  function openComponentScripts() {
+    if (!core?.id) return;
+    const doc = getOrCreateScriptDocForPanel(core.id, core?.name || 'Custom Component');
+    if (doc?.id) setActiveEditorTab({ type: 'script', id: doc.id });
   }
 
   function setSnapSize(value) {
@@ -1937,7 +2164,7 @@
     }
     const widthFit = (surfaceScrollEl.clientWidth - 96) / Math.max(1, artboardWidth);
     const heightFit = (surfaceScrollEl.clientHeight - 96) / Math.max(1, artboardHeight);
-    setZoom(Math.min(2.5, Math.max(0.25, Math.min(widthFit, heightFit))));
+    setZoom(Math.min(5, Math.max(0.25, Math.min(widthFit, heightFit))));
     requestAnimationFrame(() => {
       if (!surfaceScrollEl) return;
       surfaceScrollEl.scrollLeft = Math.max(0, (surfaceScrollEl.scrollWidth - surfaceScrollEl.clientWidth) / 2);
@@ -2517,11 +2744,16 @@
     if (event.button !== 0 || !selectedPartEditable || !selectedFrame) return;
     event.stopPropagation();
     event.preventDefault();
+    const layout = selectedAuthoredPart?._children?.Layout ?? {};
     interaction = {
       type: 'resize',
       handle,
       startMouse: { x: event.clientX, y: event.clientY },
       startFrame: selectedFrame,
+      // Rotation + pivot captured so resize can stay aligned to a rotated shape.
+      startRotation: numberOr(layout.rotation, 0),
+      pivotX: numberOr(layout.pivotX, 50) / 100,
+      pivotY: numberOr(layout.pivotY, 50) / 100,
     };
     activeFrame = selectedFrame;
     window.addEventListener('mousemove', handleInteractionMove);
@@ -2653,33 +2885,74 @@
     }
 
     if (interaction.type === 'resize') {
-      const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
-      const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      const rect = computeResizedRect(
-        {
-          x: interaction.startFrame.left,
-          y: interaction.startFrame.top,
-          w: interaction.startFrame.width,
-          h: interaction.startFrame.height,
-        },
-        interaction.handle,
-        dx,
-        dy,
-        {
-          aspectLock: event.shiftKey,
-          aspectRatio: interaction.startFrame.width / Math.max(1, interaction.startFrame.height),
-          minW: 4,
-          minH: 4,
-          maxW: 0,
-          maxH: 0,
-        }
-      );
-      activeFrame = snapFrame({
-        left: rect.x,
-        top: rect.y,
-        width: rect.w,
-        height: rect.h,
-      }, event);
+      const rotationDeg = interaction.startRotation || 0;
+      const theta = (rotationDeg * Math.PI) / 180;
+      const cos = Math.cos(theta);
+      const sin = Math.sin(theta);
+
+      // Convert the screen-space drag into the shape's local (un-rotated) axes,
+      // so a handle resizes along the shape's own edges instead of the screen's.
+      const sdx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
+      const sdy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
+      const dx = sdx * cos + sdy * sin;
+      const dy = -sdx * sin + sdy * cos;
+
+      const start = {
+        x: interaction.startFrame.left,
+        y: interaction.startFrame.top,
+        w: interaction.startFrame.width,
+        h: interaction.startFrame.height,
+      };
+      const rect = computeResizedRect(start, interaction.handle, dx, dy, {
+        aspectLock: event.shiftKey,
+        aspectRatio: start.w / Math.max(1, start.h),
+        minW: 4,
+        minH: 4,
+        maxW: 0,
+        maxH: 0,
+      });
+
+      if (Math.abs(rotationDeg) < 0.001) {
+        activeFrame = snapFrame({ left: rect.x, top: rect.y, width: rect.w, height: rect.h }, event);
+        return;
+      }
+
+      // Rotation-aware placement: keep the anchored edge/corner fixed in world
+      // space while the size changes, so the shape doesn't swing off the cursor.
+      // The CSS rotation pivots about (pivotX%, pivotY%) of the box.
+      const handle = interaction.handle;
+      const px = interaction.pivotX;
+      const py = interaction.pivotY;
+      const rot = (vx, vy) => ({ x: vx * cos - vy * sin, y: vx * sin + vy * cos });
+      // Local position (from top-left) of the anchored edge/corner that stays put.
+      const anchorLocal = (w, h) => ({
+        x: handle.includes('r') ? 0 : handle.includes('l') ? w : w / 2,
+        y: handle.includes('b') ? 0 : handle.includes('t') ? h : h / 2,
+      });
+      const worldAnchorFor = (left, top, w, h) => {
+        const pivot = { x: px * w, y: py * h };
+        const a = anchorLocal(w, h);
+        const off = rot(a.x - pivot.x, a.y - pivot.y);
+        return { x: left + pivot.x + off.x, y: top + pivot.y + off.y };
+      };
+
+      const snapSize = (v) => ((snapEnabled && !event?.altKey) ? Math.max(1, snapValue(v, event)) : Math.max(1, v));
+      const w1 = snapSize(rect.w);
+      const h1 = snapSize(rect.h);
+
+      // Anchor world point from the start frame, then solve for the new top-left
+      // that keeps that same world point under the resized + rotated box.
+      const world = worldAnchorFor(start.x, start.y, start.w, start.h);
+      const pivot1 = { x: px * w1, y: py * h1 };
+      const a1 = anchorLocal(w1, h1);
+      const off1 = rot(a1.x - pivot1.x, a1.y - pivot1.y);
+
+      activeFrame = {
+        left: world.x - pivot1.x - off1.x,
+        top: world.y - pivot1.y - off1.y,
+        width: w1,
+        height: h1,
+      };
       return;
     }
 
@@ -2936,6 +3209,11 @@
     window.addEventListener('mouseup', endSurfacePan);
   }
 
+  function handleSurfaceScroll(event) {
+    rulerScrollX = event.currentTarget.scrollLeft;
+    rulerScrollY = event.currentTarget.scrollTop;
+  }
+
   function handleSurfaceScrollMouseDown(event) {
     beginSurfacePan(event);
     if (event.defaultPrevented || activeTool === 'select' || event.button !== 0) return;
@@ -3083,32 +3361,67 @@
   <div
     class="surface-shell"
     class:previewing={designerPreviewing}
+    class:palette-collapsed={paletteCollapsed}
+    class:dock-hidden={dockHidden}
+    style={surfaceGridCols}
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
     onkeydown={handleSurfaceKeydown}
     onkeyup={handleSurfaceKeyup}
   >
-    {#if !designerPreviewing && activeSelectionKind === 'layer' && selectedPart}
+    {#if !designerPreviewing}
+    <div class="surface-lookbar" aria-label="Component look bar">
+      {#if activeSelectionKind === 'layer' && selectedPart}
       <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
         {#if selectedBackground}
+          {#if !selectedIsArc}
+            <label class="paint-swatch">
+              <span>Fill</span>
+              <button
+                type="button"
+                class="fill-toggle"
+                class:active={selectedFill?.solidEnabled !== false}
+                disabled={!canPaintLayer}
+                title={selectedFill?.solidEnabled !== false ? 'Make transparent' : 'Enable fill'}
+                onclick={() => setLayerProperty('Background.Fill.solidEnabled', selectedFill?.solidEnabled !== false ? false : true)}
+              ></button>
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
+                style={swatchCss(selectedFill?.colour)}
+                onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
+                title="Pick fill colour"
+              ></button>
+            </label>
+          {/if}
+          {#if selectedFill?.gradientEnabled}
+            <label class="paint-swatch">
+              <span>Grad</span>
+              <button type="button" class="mini-gradient-btn"
+                disabled={!canPaintLayer}
+                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
+                onclick={openLayerGradient}
+                title="Edit gradient"
+              ></button>
+            </label>
+          {/if}
           <label class="paint-swatch">
-            <span>Fill</span>
-            <input
-              type="color"
-              value={colorInputValue(selectedFill?.colour)}
+            <span>Gradient</span>
+            <button type="button" class="fill-toggle"
+              class:active={selectedFill?.gradientEnabled}
               disabled={!canPaintLayer}
-              oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-            />
+              onclick={toggleFillGradient}
+              title={selectedFill?.gradientEnabled ? 'Disable gradient' : 'Enable gradient'}
+            >G</button>
           </label>
           <label class="paint-swatch">
             <span>Stroke</span>
-            <input
-              type="color"
-              value={colorInputValue(selectedBorder?.colour, '#FFFFFF')}
-              disabled={!canPaintLayer}
-              oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer}
+                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
+                title="Pick stroke colour"
+              ></button>
           </label>
           <label class="paint-number">
             <span>W</span>
@@ -3139,12 +3452,12 @@
         {#if selectedText}
           <label class="paint-swatch">
             <span>Text</span>
-            <input
-              type="color"
-              value={colorInputValue(selectedTextFill?.colour, '#FFFFFF')}
-              disabled={!canPaintLayer}
-              oninput={(event) => setLayerColour('Text.Fill.colour', selectedTextFill?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer}
+                style={swatchCss(selectedTextFill?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)}
+                title="Pick text colour"
+              ></button>
           </label>
           <label class="paint-number text-size">
             <span>Size</span>
@@ -3183,6 +3496,25 @@
           <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
         </label>
       </div>
+      {:else}
+        <div class="lookbar-empty">Select a layer to edit its look</div>
+      {/if}
+      <div class="lookbar-scripts" aria-label="Component scripts">
+        <div class="lb-s-row">
+          <span class="lb-s-chip">SCRIPTS</span>
+          {#if componentScriptList.length > 0}
+            <span class="lb-s-count">{componentScriptList.length} script{componentScriptList.length === 1 ? '' : 's'}</span>
+            <span class={['lb-s-badge', componentScriptsEnabled ? 'on' : 'off']}>{componentScriptsEnabled ? 'on' : 'off'}</span>
+          {:else}
+            <span class="lb-s-none">none</span>
+          {/if}
+        </div>
+        <div class="lb-s-row">
+          <span class="lb-s-hint">{componentScriptList.length > 0 ? 'logic attached' : 'no logic attached'}</span>
+          <button type="button" class="lb-s-btn" onclick={openComponentScripts} title="Open the Script Editor for this component">Script Editor</button>
+        </div>
+      </div>
+    </div>
     {/if}
 
     {#if activeSelectionKind === 'layer' && selectedPart}
@@ -3348,24 +3680,47 @@
             }}
           />
         </label>
+        <label>
+          <span>Colour</span>
+          <button type="button" class="mini-swatch-btn"
+            style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
+            onclick={openArcColour}
+            title="Pick arc colour"
+          ></button>
+        </label>
+        <div class="arc-toggle-group">
+          <button
+            type="button"
+            class:active={selectedArcMeta?.direction !== 'ccw'}
+            onclick={() => setArcMetaProperty('direction', 'cw')}
+            title="Clockwise"
+          >CW</button>
+          <button
+            type="button"
+            class:active={selectedArcMeta?.direction === 'ccw'}
+            onclick={() => setArcMetaProperty('direction', 'ccw')}
+            title="Counter-clockwise"
+          >CCW</button>
+        </div>
+        <div class="arc-toggle-group">
+          <button
+            type="button"
+            class:active={selectedArcMeta?.cap !== 'round'}
+            onclick={() => setArcMetaProperty('cap', 'flat')}
+            title="Flat end caps"
+          >Flat</button>
+          <button
+            type="button"
+            class:active={selectedArcMeta?.cap === 'round'}
+            onclick={() => setArcMetaProperty('cap', 'round')}
+            title="Round end caps"
+          >Round</button>
+        </div>
       </div>
     {/if}
 
-    <div class="surface-options-strip" aria-label="Surface view options">
-      <label>
-        <span>Zoom</span>
-        <input
-          type="range"
-          min="0.25"
-          max="2.5"
-          step="0.05"
-          value={surfaceZoom}
-          oninput={(event) => setZoom(event.currentTarget.value)}
-        />
-        <strong>{Math.round(surfaceZoom * 100)}%</strong>
-      </label>
-      <button type="button" onclick={() => setZoom(1)}>100%</button>
-      <button type="button" onclick={fitArtboardToView}>Fit</button>
+    <div class="surface-options-strip" aria-label="Surface view + zoom options">
+      <div class="surface-toolbar-left">
       <label class="toggle-option">
         <input type="checkbox" checked={snapEnabled} onchange={(event) => { snapEnabled = event.currentTarget.checked; }} />
         <span>Snap</span>
@@ -3423,73 +3778,30 @@
       <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
       <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
-    </div>
-
-    <div class="surface-body">
-      <div class="tool-strip" aria-label="Surface tools">
-        <button
-          type="button"
-          class:active={activeTool === 'select'}
-          title="Select (V)"
-          onclick={() => setActiveTool('select')}
-        >
-          <span class="tool-icon select"></span>
-          <strong>Select</strong>
-        </button>
-
-        <div class="tool-flyout-host">
-          <button
-            type="button"
-            class:active={shapeToolActive}
-            title={`Shape: ${activeShapeTool.label} (${activeShapeTool.key})`}
-            aria-haspopup="menu"
-            aria-expanded={shapeFlyoutOpen}
-            onclick={toggleShapeFlyout}
-          >
-            <span class={`tool-icon ${activeShapeTool.id}`}></span>
-            <strong>Shape: {activeShapeTool.label}</strong>
-          </button>
-          {#if shapeFlyoutOpen}
-            <div class="tool-flyout" role="menu" aria-label="Shape tools">
-              {#each SHAPE_TOOLS as tool (tool.id)}
-                <button
-                  type="button"
-                  role="menuitem"
-                  class:active={activeTool === tool.id}
-                  title={`${tool.label} (${tool.key})`}
-                  onclick={(event) => { event.stopPropagation(); setActiveTool(tool.id); }}
-                >
-                  <span class={`tool-icon ${tool.id}`}></span>
-                  <span>{tool.label}</span>
-                  <kbd>{tool.key}</kbd>
-                </button>
-              {/each}
-            </div>
-          {/if}
-        </div>
-
-        <button
-          type="button"
-          class:active={activeTool === 'text'}
-          title="Text (T)"
-          onclick={() => setActiveTool('text')}
-        >
-          <span class="tool-icon text"></span>
-          <strong>Text</strong>
-        </button>
-
-        <button
-          type="button"
-          class:active={activeTool === 'hitZone'}
-          title="Hit Zone (H)"
-          onclick={() => setActiveTool('hitZone')}
-        >
-          <span class="tool-icon hitZone"></span>
-          <strong>Hit Zone</strong>
-        </button>
       </div>
 
+      <div class="surface-zoombar" aria-label="Zoom controls">
+        <button type="button" class="szb-btn" onclick={() => zoomStep(-surfaceZoomIncrement)} title="Zoom out">−</button>
+        {#if zoomEditing}
+          <!-- svelte-ignore a11y_autofocus -->
+          <input class="szb-zoom-input" type="text" bind:value={zoomEditValue} onblur={commitZoomEdit} onkeydown={zoomEditKeydown} onfocus={(event) => event.target.select()} autofocus />
+        {:else}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <span class="szb-zoom-value" ondblclick={startZoomEdit} title="Double-click to type a value">{Math.round(surfaceZoom * 100)}%</span>
+        {/if}
+        <button type="button" class="szb-btn" onclick={() => zoomStep(surfaceZoomIncrement)} title="Zoom in">+</button>
+        <span class="szb-inc-label">Dec/Inc</span>
+        <input class="szb-inc-input" type="number" value={surfaceZoomIncrement} onchange={(event) => setZoomIncrement(event.currentTarget.value)} min="1" max="100" />
+        <div class="szb-divider"></div>
+        <button type="button" class="szb-btn icon" onclick={() => setZoom(1)} title="Reset to 100%">⊡</button>
+        <button type="button" class="szb-btn icon" onclick={fitArtboardToView} title="Fit to window"><Maximize size={12} strokeWidth={1.6} /></button>
+        <div class="szb-divider"></div>
+        <button type="button" class="szb-btn icon" class:toggle-on={surfaceShowRulers} onclick={() => { surfaceShowRulers = !surfaceShowRulers; }} title="Toggle rulers"><Ruler size={12} strokeWidth={1.6} /></button>
+      </div>
+    </div>
+
       <aside class="palette-panel" aria-label="Designer quick tools">
+        <div class="palette-scroll">
         <div class="palette-header">
           <strong>Shapes</strong>
           <span>Draw and style</span>
@@ -3512,8 +3824,28 @@
         </section>
 
         <section class="palette-group">
+          <span>Lines &amp; Polygons</span>
+          <div class="palette-grid">
+            {#each VECTOR_SHAPE_TOOLS as tool (tool.id)}
+              <button
+                type="button"
+                class:active={activeTool === tool.id}
+                title={tool.label}
+                onclick={() => setActiveTool(tool.id)}
+              >
+                {#if tool.id === 'line'}
+                  <span class="poly-glyph line-glyph"></span>
+                {:else}
+                  <span class="poly-glyph" style={`clip-path:${clipPathForKind(tool.id)}`}></span>
+                {/if}
+              </button>
+            {/each}
+          </div>
+        </section>
+
+        <section class="palette-group">
           <span>Value Controls</span>
-          <div class="palette-grid compact">
+          <div class="palette-grid">
             <button type="button" onclick={addDialKit} title="Add circular dial value control">
               <span class="palette-glyph dial"></span>
             </button>
@@ -3548,38 +3880,86 @@
               <span class="brush-preview bold"></span>
             </button>
           </div>
-          <label class="palette-slider">
+          <label class="palette-stepper">
             <span>Size</span>
-            <input type="range" min="1" max="24" value={selectedBorder?.thickness ?? 1} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))} />
-            <strong>{Math.round(numberOr(selectedBorder?.thickness, 1))}px</strong>
+            <input
+              type="number"
+              min="1"
+              max="24"
+              value={Math.round(numberOr(selectedBorder?.thickness, 1))}
+              disabled={!canPaintLayer}
+              onfocus={(event) => event.target.select()}
+              onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))}
+            />
+            <strong>px</strong>
           </label>
         </section>
 
         <section class="palette-group">
           <span>Fill</span>
           <label class="palette-swatch-row">
-            <input
-              type="color"
-              value={colorInputValue(selectedFill?.colour)}
+            <button type="button" class="mini-swatch-btn"
               disabled={!canPaintLayer || !selectedBackground}
-              oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)}
-            />
+              style={swatchCss(selectedFill?.colour)}
+              onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
+              title="Pick fill colour"
+            ></button>
             <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
-            <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
+            <span class="swatch-num" title="Layer opacity (lower = more transparent)">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                value={Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}
+                disabled={!canPaintLayer || !selectedBackground}
+                onfocus={(event) => event.target.select()}
+                onchange={(event) => setLayerProperty('opacity', Math.max(0, Math.min(1, numericInputValue(event, 100) / 100)))}
+              />%
+            </span>
           </label>
+        </section>
+
+        <section class="palette-group">
+          <span>Gradient</span>
+          <div class="palette-grid compact">
+            <button type="button"
+              class:active={selectedFill?.gradientEnabled}
+              disabled={!canPaintLayer || !selectedBackground}
+              onclick={toggleFillGradient}
+              title={selectedFill?.gradientEnabled ? 'Disable gradient fill' : 'Enable gradient fill'}
+            >G</button>
+            {#if selectedFill?.gradientEnabled && selectedFill?.gradient}
+              <button type="button" class="mini-gradient-btn wide"
+                disabled={!canPaintLayer}
+                style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
+                onclick={openLayerGradient}
+                title="Edit gradient"
+              ></button>
+            {/if}
+          </div>
         </section>
 
         <section class="palette-group">
           <span>Stroke</span>
           <label class="palette-swatch-row">
-            <input
-              type="color"
-              value={colorInputValue(selectedBorder?.colour, '#FFFFFF')}
-              disabled={!canPaintLayer || !selectedBackground}
-              oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')}
-            />
+              <button type="button" class="mini-swatch-btn"
+                disabled={!canPaintLayer || !selectedBackground}
+                style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
+                onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
+                title="Pick stroke colour"
+              ></button>
             <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
-            <strong>{Math.round(numberOr(selectedBorder?.thickness, 1))}px</strong>
+            <span class="swatch-num" title="Stroke thickness">
+              <input
+                type="number"
+                min="0"
+                max="999"
+                value={Math.round(numberOr(selectedBorder?.thickness, 1))}
+                disabled={!canPaintLayer || !selectedBackground}
+                onfocus={(event) => event.target.select()}
+                onchange={(event) => setLayerProperty('Background.Border.thickness', numericInputValue(event, 1))}
+              />px
+            </span>
           </label>
         </section>
 
@@ -3619,18 +3999,52 @@
             <strong>radius</strong>
           </label>
         </section>
+        </div>
+        <div class="palette-toggles" aria-label="Panel toggles">
+          <button type="button" class:active={!paletteCollapsed} title={paletteCollapsed ? 'Expand the Shapes palette' : 'Collapse the Shapes palette'} onclick={() => { paletteCollapsed = !paletteCollapsed; }}>
+            <PanelLeft size={18} strokeWidth={1.6} />
+          </button>
+          <button type="button" class:active={!dockHidden} title="Toggle the inspector (right)" onclick={() => { dockHidden = !dockHidden; }}>
+            <PanelRight size={18} strokeWidth={1.6} />
+          </button>
+          <button type="button" class:active={!displayDockHidden} title="Toggle the Display panel (colours / gradient / align)" onclick={() => { displayDockHidden = !displayDockHidden; }}>
+            <PanelBottom size={18} strokeWidth={1.6} />
+          </button>
+        </div>
       </aside>
 
-      <div
-        class="surface-scroll"
-        class:space-pan={spacePanActive}
-        class:panning={!!surfacePan}
-        role="region"
-        aria-label="Design canvas scroll area"
-        style={surfaceGridStyle}
-        bind:this={surfaceScrollEl}
-        onmousedown={handleSurfaceScrollMouseDown}
-      >
+      <div class="surface-viewport" class:rulers-hidden={!surfaceShowRulers}>
+        {#if surfaceShowRulers}
+        <EditorRuler
+          orientation="horizontal"
+          length={rulerViewWidth}
+          scrollOffset={rulerScrollX}
+          contentOffset={boardOffsetX}
+          scale={surfaceZoom}
+          gridStep={snapSize}
+        />
+        <EditorRuler
+          orientation="vertical"
+          length={rulerViewHeight}
+          scrollOffset={rulerScrollY}
+          contentOffset={boardOffsetY}
+          scale={surfaceZoom}
+          gridStep={snapSize}
+        />
+        {/if}
+        <div
+          class="surface-scroll"
+          class:space-pan={spacePanActive}
+          class:panning={!!surfacePan}
+          role="region"
+          aria-label="Design canvas scroll area"
+          style={surfaceGridStyle}
+          bind:this={surfaceScrollEl}
+          bind:clientWidth={rulerViewWidth}
+          bind:clientHeight={rulerViewHeight}
+          onscroll={handleSurfaceScroll}
+          onmousedown={handleSurfaceScrollMouseDown}
+        >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
         {/if}
@@ -3675,19 +4089,6 @@
                 onmousedown={beginDraw}
                 onclick={commitClickDraw}
               ></div>
-            {/if}
-
-            {#if !designerPreviewing && partEntries.length === 0 && !drawDraft}
-              <div class="artboard-create-palette" onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
-                <button type="button" onclick={() => addLayerAtCenter('rectangle')}>Rectangle</button>
-                <button type="button" onclick={() => addLayerAtCenter('ellipse')}>Ellipse</button>
-                <button type="button" onclick={() => addLayerAtCenter('text')}>Text</button>
-                <button type="button" onclick={() => { setActiveTool('hitZone'); addHitZoneAtCenter(); }}>Hit Zone</button>
-                <button type="button" onclick={addDialKit}>Dial</button>
-                <button type="button" onclick={addHorizontalScaleKit}>H Scale</button>
-                <button type="button" onclick={addVerticalScaleKit}>V Scale</button>
-                <button type="button" onclick={addArpeggiatorKit}>Arp Kit</button>
-              </div>
             {/if}
 
             {#each partEntries as [name, part] (name)}
@@ -3899,7 +4300,7 @@
             {/if}
 
             {#if !designerPreviewing && drawDraft}
-              <div class={`draw-preview ${drawDraft.tool}`} style={drawPreviewStyle()}>
+              <div class={`draw-preview ${drawDraft.tool}`} style={`${drawPreviewStyle()} clip-path:${drawPreviewClip(drawDraft.tool)};`}>
                 <span>{DRAW_TOOLS.find((tool) => tool.id === drawDraft?.tool)?.label ?? 'Layer'}</span>
               </div>
             {/if}
@@ -3958,6 +4359,7 @@
             {/if}
           </div>
         {/if}
+      </div>
       </div>
 
       <div class="surface-dock">
@@ -4482,11 +4884,11 @@
                     <div class="paint-grid">
                       <label>
                         <span>Fill</span>
-                        <input type="color" value={colorInputValue(selectedFill?.colour)} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Background.Fill.colour', selectedFill?.colour, event.currentTarget.value)} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedFill?.colour)} onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)} title="Pick fill colour"></button>
                       </label>
                       <label>
                         <span>Stroke</span>
-                        <input type="color" value={colorInputValue(selectedBorder?.colour, '#FFFFFF')} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Background.Border.colour', selectedBorder?.colour, event.currentTarget.value, 'FFFFFF')} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedBorder?.colour, 'FFFFFF')} onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)} title="Pick stroke colour"></button>
                       </label>
                       <label>
                         <span>Stroke W</span>
@@ -4506,7 +4908,7 @@
                     <div class="paint-grid">
                       <label>
                         <span>Text Color</span>
-                        <input type="color" value={colorInputValue(selectedTextFill?.colour, '#FFFFFF')} disabled={!canPaintLayer} oninput={(event) => setLayerColour('Text.Fill.colour', selectedTextFill?.colour, event.currentTarget.value, 'FFFFFF')} />
+                        <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedTextFill?.colour, 'FFFFFF')} onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)} title="Pick text colour"></button>
                       </label>
                       <label>
                         <span>Size</span>
@@ -4549,6 +4951,28 @@
                         />
                       </label>
                     </div>
+                    <label class="dock-field">
+                      <span>Colour</span>
+                      <button type="button" class="mini-swatch-btn"
+                        style={swatchCss(selectedArcMeta?.colour, '5B9BD5')}
+                        onclick={openArcColour}
+                        title="Pick arc colour"
+                      ></button>
+                    </label>
+                    <label class="dock-field">
+                      <span>Direction</span>
+                      <div class="dock-toggle-row">
+                        <button type="button" class:active={selectedArcMeta?.direction !== 'ccw'} onclick={() => setArcMetaProperty('direction', 'cw')}>CW</button>
+                        <button type="button" class:active={selectedArcMeta?.direction === 'ccw'} onclick={() => setArcMetaProperty('direction', 'ccw')}>CCW</button>
+                      </div>
+                    </label>
+                    <label class="dock-field">
+                      <span>Caps</span>
+                      <div class="dock-toggle-row">
+                        <button type="button" class:active={selectedArcMeta?.cap !== 'round'} onclick={() => setArcMetaProperty('cap', 'flat')}>Flat</button>
+                        <button type="button" class:active={selectedArcMeta?.cap === 'round'} onclick={() => setArcMetaProperty('cap', 'round')}>Round</button>
+                      </div>
+                    </label>
                   </div>
                 {/if}
               {:else if activeSelectionKind === 'hitZone' && selectedZone}
@@ -4681,13 +5105,109 @@
           </div>
         </section>
       </div>
-    </div>
 
     {#if !designerPreviewing}
-    <div class="state-filmstrip" aria-label="Component states">
+    <div class="tool-strip" aria-label="Surface tools">
+      <button
+        type="button"
+        class:active={activeTool === 'select'}
+        title="Select (V)"
+        onclick={() => setActiveTool('select')}
+      >
+        <span class="tool-icon select"></span>
+        <strong>Select</strong>
+      </button>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          class:active={shapeToolActive}
+          title={`Shape: ${activeShapeTool.label} (${activeShapeTool.key})`}
+          aria-haspopup="menu"
+          aria-expanded={shapeFlyoutOpen}
+          onclick={toggleShapeFlyout}
+        >
+          <span class={`tool-icon ${activeShapeTool.id}`}></span>
+          <strong>Shape: {activeShapeTool.label}</strong>
+        </button>
+        {#if shapeFlyoutOpen}
+          <div class="tool-flyout" role="menu" aria-label="Shape tools">
+            {#each SHAPE_TOOLS as tool (tool.id)}
+              <button
+                type="button"
+                role="menuitem"
+                class:active={activeTool === tool.id}
+                title={`${tool.label} (${tool.key})`}
+                onclick={(event) => { event.stopPropagation(); setActiveTool(tool.id); }}
+              >
+                <span class={`tool-icon ${tool.id}`}></span>
+                <span>{tool.label}</span>
+                <kbd>{tool.key}</kbd>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <button
+        type="button"
+        class:active={activeTool === 'text'}
+        title="Text (T)"
+        onclick={() => setActiveTool('text')}
+      >
+        <span class="tool-icon text"></span>
+        <strong>Text</strong>
+      </button>
+
+      <button
+        type="button"
+        class:active={activeTool === 'hitZone'}
+        title="Hit Zone (H)"
+        onclick={() => setActiveTool('hitZone')}
+      >
+        <span class="tool-icon hitZone"></span>
+        <strong>Hit Zone</strong>
+      </button>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          class:active={activeTool === 'interactive'}
+          title={`Make Interactive: ${activeInteractiveMeta.label} (I) — draw a pre-wired control`}
+          aria-haspopup="menu"
+          aria-expanded={interactiveFlyoutOpen}
+          onclick={toggleInteractiveFlyout}
+        >
+          <span class="tool-icon interactive"></span>
+          <strong>Interactive: {activeInteractiveMeta.label}</strong>
+        </button>
+        {#if interactiveFlyoutOpen}
+          <div class="tool-flyout" role="menu" aria-label="Interactive archetypes">
+            {#each INTERACTIVE_ARCHETYPES as archetype (archetype.id)}
+              <button
+                type="button"
+                role="menuitem"
+                class:active={activeTool === 'interactive' && interactiveArchetype === archetype.id}
+                title={`Draw a ${archetype.label}`}
+                onclick={(event) => selectInteractiveArchetype(event, archetype.id)}
+              >
+                <span class="tool-icon interactive"></span>
+                <span>{archetype.label}</span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </div>
+    {/if}
+
+    {#if !designerPreviewing}
+    <div class="state-filmstrip" class:collapsed={filmstripCollapsed} aria-label="Component states">
       <div class="state-title">
-        <strong>States</strong>
-        <span>{Math.max(1, stateFilmstripEntries.length)}</span>
+        <button type="button" class="filmstrip-collapse-btn" onclick={() => { filmstripCollapsed = !filmstripCollapsed; }} title={filmstripCollapsed ? 'Expand states' : 'Collapse states'}>
+          <strong>States</strong>
+          <span>{Math.max(1, stateFilmstripEntries.length)}</span>
+        </button>
       </div>
       <div class="state-chip-row">
         {#each statePreviewCards as entry (entry.name)}
@@ -4718,9 +5238,25 @@
                 <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
                 <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
               </span>
-              <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
+              <div class="state-count-trigger">
+                <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
+                {#if !entry.base}
+                  <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean)}>{stateTriggerLabel(entry.state, entry.base)}</span>
+                {/if}
+              </div>
             </button>
             <div class="state-actions" aria-label={`${entry.name} state actions`}>
+              {#if !entry.base}
+                <div class="when-toggles">
+                  {#each [['hover','H'],['pressed','P'],['disabled','D']] as [flag, label] (flag)}
+                    <button type="button"
+                      class:active={entry.state?.when?.[flag] === true}
+                      onclick={(e) => { e.stopPropagation(); setFilmstripStateWhen(entry.name, flag, !(entry.state?.when?.[flag] === true)); }}
+                      title={flag}
+                    >{label}</button>
+                  {/each}
+                </div>
+              {/if}
               <button type="button" onclick={(event) => { event.stopPropagation(); inspectorTab = 'states'; selectStateCard(entry.name); }} title="Edit state">
                 Edit
               </button>
@@ -4741,6 +5277,10 @@
       </div>
     </div>
     {/if}
+
+    {#if !designerPreviewing && !displayDockHidden}
+      <div class="surface-display-dock"><DisplayPanel /></div>
+    {/if}
   </div>
 {:else}
   <div class="empty-state">Select a custom component to use the design surface.</div>
@@ -4748,14 +5288,52 @@
 
 <style>
   .surface-shell {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: var(--palette-w, 220px) minmax(420px, 1fr) var(--dock-w, clamp(340px, 25vw, 430px));
+    grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+    grid-template-areas:
+      "lookbar lookbar  lookbar"
+      "palette canvas   dock"
+      "palette toolbar  dock"
+      "palette states   dock"
+      "palette display  dock";
     min-height: 440px;
     height: calc(100vh - 190px);
     border: 1px solid #2A2A2A;
     background: #181818;
     overflow: hidden;
     outline: none;
+  }
+
+  .surface-options-strip { grid-area: toolbar; }
+  .surface-lookbar { grid-area: lookbar; }
+  .palette-panel { grid-area: palette; }
+  .surface-viewport { grid-area: canvas; }
+  .surface-dock { grid-area: dock; }
+  .state-filmstrip { grid-area: states; }
+  .surface-display-dock { grid-area: display; }
+  /* The floating tool-strip overlaps the bottom of the canvas cell. */
+  .tool-strip { grid-area: canvas; align-self: end; }
+
+  .surface-shell.previewing {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+
+  .surface-shell.dock-hidden .surface-dock {
+    display: none;
+  }
+
+  /* Shared DisplayPanel docked at the bottom of the centre column. */
+  .surface-display-dock {
+    min-height: 0;
+    height: 340px;
+    overflow: hidden;
+    border-top: 1px solid #26313A;
+    background: #0E141A;
+  }
+
+  .surface-display-dock :global(.display-panel) {
+    height: 100%;
   }
 
   .surface-shell:focus-within {
@@ -4771,14 +5349,17 @@
 
   .tool-strip {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
+    flex-wrap: wrap;
+    overflow-x: auto;
+    justify-content: center;
     gap: 5px;
     min-width: 0;
     min-height: 0;
     padding: 8px 6px;
     background: #171B1F;
-    border-right: 1px solid #2A2A2A;
+    border-top: 1px solid #2A2A2A;
     overflow: visible;
     z-index: 5;
   }
@@ -4810,11 +5391,13 @@
 
   .tool-strip strong {
     position: absolute;
-    left: 40px;
-    top: 50%;
+    bottom: 100%;
+    left: 50%;
+    top: auto;
     z-index: 10;
     max-width: 140px;
-    transform: translateY(-50%);
+    transform: translateX(-50%);
+    margin-bottom: 4px;
     padding: 5px 7px;
     border: 1px solid #3B4652;
     border-radius: 4px;
@@ -4837,19 +5420,22 @@
     position: relative;
   }
 
+  .tool-flyout-host {
+    display: flex;
+    align-items: center;
+  }
+
+  /* No divider line: it used to stack above the button, pushing flyout-tool
+     icons ~11px lower than the plain buttons and breaking the row alignment. */
   .tool-flyout-host::before {
-    content: '';
-    display: block;
-    width: 22px;
-    height: 1px;
-    margin: 2px auto 7px;
-    background: #303840;
+    display: none;
   }
 
   .tool-flyout {
     position: absolute;
-    left: 42px;
-    top: 0;
+    bottom: 100%;
+    left: 0;
+    top: auto;
     z-index: 30;
     width: 154px;
     padding: 6px;
@@ -4916,6 +5502,101 @@
     overflow-x: auto;
   }
 
+  /* Top Look bar: quick-actions toolbar (left) + Scripts (right). */
+  .surface-lookbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    min-height: 50px;
+    padding: 0 10px;
+    background: linear-gradient(180deg, #172027, #11181F);
+    border-bottom: 1px solid #26313A;
+    overflow: hidden;
+  }
+
+  .surface-lookbar .paint-strip {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border-bottom: none;
+    padding: 6px 0;
+  }
+
+  .lookbar-empty {
+    flex: 1;
+    color: #6F7E8A;
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  .lookbar-scripts {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding-left: 14px;
+    border-left: 1px solid #2D3A44;
+    font-size: 11px;
+  }
+
+  .lb-s-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .lb-s-chip {
+    color: #14B8A6;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+  }
+
+  .lb-s-count {
+    color: #E6EEF3;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .lb-s-none,
+  .lb-s-hint {
+    color: #7F8B94;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .lb-s-badge {
+    padding: 1px 5px;
+    border-radius: 3px;
+    border: 1px solid #2D3A44;
+    background: #0D1419;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .lb-s-badge.on { color: #14B8A6; }
+  .lb-s-badge.off { color: #7F8B94; }
+
+  .lb-s-btn {
+    margin-left: auto;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 4px;
+    border: 1px solid #2D3A44;
+    background: #18232B;
+    color: #B9C8D4;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .lb-s-btn:hover {
+    color: #EAF5FF;
+    border-color: rgba(20, 184, 166, 0.5);
+    background: rgba(20, 184, 166, 0.14);
+  }
+
   .paint-strip.disabled {
     color: #727D86;
   }
@@ -4949,14 +5630,97 @@
     opacity: 0.45;
   }
 
-  .paint-swatch input {
+  .fill-toggle {
     width: 22px;
-    height: 20px;
+    height: 22px;
     padding: 0;
-    border: 1px solid #111;
+    border: 1px solid #2E3B45;
     border-radius: 3px;
-    background: transparent;
+    background: #1A242D;
+    color: #6B7A86;
+    font-size: 10px;
+    font-weight: 800;
     cursor: pointer;
+    line-height: 1;
+  }
+
+  .fill-toggle.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.22);
+    color: #8FEDE3;
+  }
+
+  .fill-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mini-swatch-btn {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mini-swatch-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mini-swatch-btn:hover:not(:disabled) {
+    border-color: rgba(255,255,255,0.4);
+  }
+
+  /* Compact editable numeric field (e.g. stroke thickness) in a swatch row. */
+  .swatch-num {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: #DFEAF0;
+    font-size: 10px;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+
+  .swatch-num input {
+    width: 34px;
+    height: 22px;
+    padding: 0 2px;
+    border: 1px solid #34444F;
+    border-radius: 4px;
+    background: #0D1419;
+    color: #E8EEF5;
+    font: inherit;
+    font-size: 11px;
+    text-align: center;
+  }
+
+  .swatch-num input:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .mini-gradient-btn {
+    height: 18px;
+    min-width: 32px;
+    padding: 0;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .mini-gradient-btn.wide {
+    min-width: 60px;
+    flex: 1;
+  }
+
+  .mini-gradient-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .paint-number input {
@@ -5328,7 +6092,6 @@
 
   .tool-icon.rectangle::before,
   .tool-icon.roundedRectangle::before,
-  .tool-icon.capsule::before,
   .tool-icon.text::before {
     content: '';
     position: absolute;
@@ -5340,31 +6103,45 @@
     border-radius: 4px;
   }
 
+  /* Capsule — an elongated stadium pill: short, with straight sides and
+     fully rounded ends. */
   .tool-icon.capsule::before {
+    content: '';
+    position: absolute;
+    inset: 5px 1px;
+    border: 2px solid #DCEBFA;
     border-radius: 999px;
   }
 
-  .tool-icon.ellipse::before,
-  .tool-icon.ring::before,
+  /* Ellipse — a smooth oval, wider than tall (true elliptical curve, not a
+     stadium). border-radius:50% is what makes the sides curve continuously. */
+  .tool-icon.ellipse::before {
+    content: '';
+    position: absolute;
+    inset: 4px 1px;
+    border: 2px solid #DCEBFA;
+    border-radius: 50%;
+  }
+
+  /* Ring — a perfect circle with a hole punched out (thick-rimmed donut). */
+  .tool-icon.ring::before {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border: 3px solid #DCEBFA;
+    border-radius: 50%;
+  }
+
+  /* Arc — an open C: a ring segment with a clear gap (two sides removed). */
   .tool-icon.arcTrack::before {
     content: '';
     position: absolute;
     inset: 2px;
     border: 2px solid #DCEBFA;
-    border-radius: 999px;
-  }
-
-  .tool-icon.ring::after {
-    content: '';
-    position: absolute;
-    inset: 6px;
-    border-radius: 999px;
-    background: #22272B;
-  }
-
-  .tool-icon.arcTrack::before {
+    border-radius: 50%;
     border-left-color: transparent;
-    transform: rotate(-35deg);
+    border-bottom-color: transparent;
+    transform: rotate(-45deg);
   }
 
   .tool-icon.text::after {
@@ -5397,25 +6174,20 @@
     background: #E5A029;
   }
 
-  .surface-body {
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) 348px;
-    flex: 1;
-    min-height: 0;
-  }
+  /* (.surface-body wrapper removed — the shell itself is the CSS grid now.) */
 
   .surface-shell.previewing .surface-options-strip,
-  .surface-shell.previewing .tool-strip,
   .surface-shell.previewing .palette-panel,
   .surface-shell.previewing .surface-dock {
     display: none;
   }
 
-  .surface-shell.previewing .surface-body {
-    grid-template-columns: minmax(0, 1fr);
+  .surface-shell.previewing .surface-viewport :global(.ruler-wrapper) {
+    display: none;
   }
 
   .surface-shell.previewing .surface-scroll {
+    inset: 0;
     background:
       radial-gradient(circle at center, rgba(20, 184, 166, 0.08), transparent 38%),
       #0D1216;
@@ -5824,12 +6596,6 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
-  }
-
-  .paint-grid input[type='color'] {
-    width: 100%;
-    height: 28px;
-    padding: 2px;
   }
 
   .segmented {
@@ -6288,39 +7054,6 @@
     inset: 0;
     z-index: 2300;
     cursor: crosshair;
-  }
-
-  .artboard-create-palette {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    z-index: 2200;
-    display: inline-flex;
-    gap: 6px;
-    transform: translate(-50%, -50%);
-    padding: 7px;
-    border: 1px solid rgba(91, 155, 213, 0.48);
-    border-radius: 5px;
-    background: rgba(15, 20, 25, 0.92);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.32);
-  }
-
-  .artboard-create-palette button {
-    height: 28px;
-    padding: 0 9px;
-    border: 1px solid #303840;
-    border-radius: 4px;
-    background: #22272B;
-    color: #DDEEFF;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .artboard-create-palette button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
   }
 
   .arp-editor {
@@ -7096,12 +7829,127 @@
   }
 
   .surface-options-strip {
-    justify-content: center;
+    justify-content: space-between;
     min-height: 31px;
     padding: 3px 8px;
     background: linear-gradient(180deg, #172027, #11181F);
-    border-bottom-color: #26313A;
+    border-bottom: none;
+    border-top: 1px solid #26313A;
     scrollbar-width: thin;
+    gap: 12px;
+  }
+
+  .surface-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  /* Teal zoom controls (right side) — mirrors the Panel Designer's ZoomBar. */
+  .surface-zoombar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .surface-zoombar .szb-btn {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #2D3A44;
+    border-radius: 4px;
+    background: #18232B;
+    color: #9FB2BF;
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+
+  .surface-zoombar .szb-btn:hover {
+    color: #DCEBFA;
+    border-color: #3A4A56;
+  }
+
+  .surface-zoombar .szb-btn.icon {
+    width: auto;
+    padding: 0 5px;
+  }
+
+  .surface-zoombar .szb-btn.toggle-on {
+    color: #14B8A6;
+    border-color: rgba(20, 184, 166, 0.5);
+    background: rgba(20, 184, 166, 0.14);
+  }
+
+  .szb-zoom-value {
+    min-width: 38px;
+    text-align: center;
+    color: #B9C8D4;
+    font-size: 11px;
+    cursor: text;
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+
+  .szb-zoom-value:hover {
+    background: #1C2831;
+    color: #EAF5FF;
+  }
+
+  .szb-zoom-input {
+    width: 42px;
+    background: #0D1419;
+    border: 1px solid #14B8A6;
+    border-radius: 3px;
+    color: #E8EEF5;
+    font-size: 11px;
+    text-align: center;
+    padding: 1px 3px;
+    outline: none;
+  }
+
+  .szb-inc-label {
+    color: #6F7E8A;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .surface-zoombar .szb-inc-input {
+    width: 34px;
+    background: #0D1419;
+    border: 1px solid #2D3A44;
+    border-radius: 3px;
+    color: #E8EEF5;
+    font-size: 10px;
+    text-align: center;
+    padding: 2px;
+    outline: none;
+    appearance: textfield;
+    -moz-appearance: textfield;
+  }
+
+  .surface-zoombar .szb-inc-input::-webkit-inner-spin-button,
+  .surface-zoombar .szb-inc-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .surface-zoombar .szb-inc-input:focus {
+    border-color: #14B8A6;
+  }
+
+  .szb-divider {
+    width: 1px;
+    height: 14px;
+    background: #2D3A44;
+    margin: 0 3px;
   }
 
   .surface-options-strip label,
@@ -7124,16 +7972,34 @@
     accent-color: #14B8A6;
   }
 
-  .surface-body {
-    grid-template-columns: 52px 220px minmax(420px, 1fr) clamp(340px, 25vw, 430px);
-    background: #0E141A;
+  .surface-viewport {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .surface-scroll {
+    position: absolute;
+    inset: 20px 0 0 20px;
+    overflow: auto;
   }
 
   .tool-strip {
     gap: 8px;
-    padding: 12px 7px;
-    background: linear-gradient(180deg, #111A21, #0E141A);
-    border-right: 1px solid #26313A;
+    padding: 7px 12px;
+    /* Sits at the bottom of the canvas grid cell (align-self:end above) and
+       floats over the artboard rather than taking its own row. */
+    background: transparent;
+    border-top: none;
+    position: relative;
+    z-index: 6;
+    pointer-events: none;
+  }
+
+  /* Only the buttons should catch clicks — the empty strip lets them fall
+     through to the canvas underneath. */
+  .tool-strip > * {
+    pointer-events: auto;
   }
 
   .tool-strip button {
@@ -7163,8 +8029,7 @@
   .tool-icon.capsule::before,
   .tool-icon.text::before,
   .tool-icon.ellipse::before,
-  .tool-icon.ring::before,
-  .tool-icon.arcTrack::before {
+  .tool-icon.ring::before {
     border-color: #DCEBFA;
   }
 
@@ -7175,14 +8040,69 @@
   .palette-panel {
     min-width: 0;
     min-height: 0;
-    overflow-y: auto;
-    padding: 12px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     background:
       linear-gradient(180deg, rgba(28, 40, 49, 0.96), rgba(15, 22, 28, 0.96)),
       #111920;
     border-right: 1px solid #2A3741;
     box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.025);
+  }
+
+  .palette-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 12px 16px;
     scrollbar-width: thin;
+  }
+
+  /* Pane-toggle footer pinned at the bottom of the palette (like the normal
+     editor's IconPanel toggles). Stays visible even when the palette collapses. */
+  .palette-toggles {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: auto;
+    padding: 8px 6px;
+    border-top: 1px solid #26313A;
+    background: rgba(13, 19, 24, 0.55);
+  }
+
+  .palette-toggles button {
+    width: 34px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #2E3B45;
+    border-radius: 5px;
+    background: #172229;
+    color: #8A99A5;
+    cursor: pointer;
+  }
+
+  .palette-toggles button:hover {
+    color: #DCEBFA;
+    border-color: #3A4A56;
+  }
+
+  .palette-toggles button.active {
+    color: #14B8A6;
+    border-color: rgba(20, 184, 166, 0.5);
+    background: rgba(20, 184, 166, 0.12);
+  }
+
+  .surface-shell.palette-collapsed .palette-scroll {
+    display: none;
+  }
+
+  .surface-shell.palette-collapsed .palette-toggles {
+    flex-direction: column;
+    padding: 8px 4px;
   }
 
   .palette-header {
@@ -7221,7 +8141,9 @@
 
   .palette-grid {
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    /* 6 columns so the 6 Basic shapes / Value Controls fit on a single row
+       (no orphan icon wrapping to a second line). */
+    grid-template-columns: repeat(6, 1fr);
     gap: 7px;
   }
 
@@ -7250,11 +8172,23 @@
   }
 
   .palette-grid button:disabled,
-  .palette-swatch-row input:disabled,
-  .palette-slider input:disabled,
+  .palette-stepper input:disabled,
   .palette-corner input:disabled {
     cursor: not-allowed;
     opacity: 0.45;
+  }
+
+  /* Lines & polygons palette glyphs: a filled box clipped to the shape. */
+  .poly-glyph {
+    display: block;
+    width: 16px;
+    height: 16px;
+    background: #DCEBFA;
+  }
+
+  .line-glyph {
+    height: 2px;
+    border-radius: 2px;
   }
 
   .palette-glyph {
@@ -7351,7 +8285,7 @@
     background: #8FA4B0;
   }
 
-  .palette-slider,
+  .palette-stepper,
   .palette-swatch-row,
   .palette-corner {
     display: grid;
@@ -7364,23 +8298,9 @@
     font-weight: 800;
   }
 
-  .palette-slider input {
-    min-width: 0;
-    accent-color: #14B8A6;
-  }
-
-  .palette-swatch-row input[type='color'] {
-    width: 30px;
-    height: 24px;
-    padding: 0;
-    border: 1px solid #0A0E12;
-    border-radius: 4px;
-    background: transparent;
-  }
-
   .palette-swatch-row code,
   .palette-swatch-row strong,
-  .palette-slider strong,
+  .palette-stepper strong,
   .palette-corner strong {
     min-width: 0;
     color: #DFEAF0;
@@ -7389,7 +8309,8 @@
     white-space: nowrap;
   }
 
-  .palette-corner input {
+  .palette-corner input,
+  .palette-stepper input {
     width: 60px;
     height: 28px;
     border: 1px solid #34444F;
@@ -7426,13 +8347,13 @@
   }
 
   .artboard {
-    border-radius: 8px;
+    border-radius: 0;
     background:
       radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.055), transparent 38%),
       #10161B;
+    /* Crisp green outline + soft drop shadow only — no surrounding teal halo band. */
     box-shadow:
       0 0 0 1px rgba(20, 184, 166, 0.72),
-      0 0 0 8px rgba(20, 184, 166, 0.035),
       0 28px 72px rgba(0, 0, 0, 0.5);
   }
 
@@ -7602,12 +8523,84 @@
     background: linear-gradient(180deg, #151E25, #10171D);
   }
 
+  .state-filmstrip.collapsed .state-chip-row {
+    display: none;
+  }
+
+  .state-filmstrip.collapsed {
+    min-height: 0;
+  }
+
+  .filmstrip-collapse-btn {
+    display: grid;
+    gap: 4px;
+    align-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 0 14px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+
+  .state-count-trigger {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    font-size: 9px;
+  }
+
+  .state-trigger-badge {
+    padding: 1px 5px;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 3px;
+    background: rgba(255,255,255,0.06);
+    color: #8FEDE3;
+    font-size: 9px;
+    white-space: nowrap;
+  }
+
+  .state-trigger-badge.no-trigger {
+    color: #6B7A86;
+    border-color: rgba(255,255,255,0.06);
+  }
+
+  .when-toggles {
+    display: flex;
+    gap: 2px;
+  }
+
+  .when-toggles button {
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    border: 1px solid #2E3B45;
+    border-radius: 3px;
+    background: #1A242D;
+    color: #6B7A86;
+    font-size: 9px;
+    font-weight: 800;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  .when-toggles button.active {
+    border-color: #14B8A6;
+    background: rgba(20, 184, 166, 0.22);
+    color: #8FEDE3;
+  }
+
   .state-title {
     display: grid;
-    align-content: center;
-    gap: 4px;
-    align-items: center;
-    padding: 0 14px;
+    align-content: stretch;
+    gap: 0;
+    align-items: stretch;
+    padding: 0;
     border-right: 1px solid #2A3741;
     color: #D8E6EE;
     font-size: 11px;
@@ -7783,8 +8776,9 @@
   }
 
   @media (max-width: 1380px) {
-    .surface-body {
-      grid-template-columns: 52px 176px minmax(300px, 1fr) 330px;
+    .surface-shell {
+      --palette-w: 176px;
+      --dock-w: 330px;
     }
 
     .palette-panel {
@@ -7798,8 +8792,9 @@
   }
 
   @media (max-width: 920px) {
-    .surface-body {
-      grid-template-columns: 52px minmax(0, 1fr) 318px;
+    .surface-shell {
+      --palette-w: 0px;
+      --dock-w: 318px;
     }
 
     .palette-panel {

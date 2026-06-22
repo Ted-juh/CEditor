@@ -188,7 +188,7 @@
       [`Parts.${selectedLayer}.Background.Fill.${prefix}Src`]: source,
       [`Parts.${selectedLayer}.Background.Fill.${prefix}Fit`]: layer === 'overlay' ? 'cover' : 'fill',
       [`Parts.${selectedLayer}.Background.Fill.${prefix}Opacity`]: 100,
-      'Designer.focusSection': 'customlayers',
+      'Designer.focusSurfaceDock': 'layers',
       'Designer.selectedLayer': selectedLayer,
       'Designer.preview.showBounds': true,
     });

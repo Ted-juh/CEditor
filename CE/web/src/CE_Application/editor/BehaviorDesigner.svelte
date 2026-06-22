@@ -3,7 +3,7 @@
   // ScriptWorkspace). Cloned from the DPD shell: fixed frame, nav-rail by lifecycle,
   // screens via display:none/.active, list -> detail. Spec: tools/docs/panel-api-spec.md.
   import './behaviorDesigner.css';
-  import { tick, onMount } from 'svelte';
+  import { tick, onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
@@ -56,10 +56,11 @@
     { group: 'Device', items: DEVICE_EVENTS.map((e) => e.fn) },
   ];
 
-  let scripts = $state((initialScripts ?? []).map((s) => normalizeSourceScript(s)));
+  // Seed once from the props/initial state; these are deliberately initial-only.
+  let scripts = $state(untrack(() => (initialScripts ?? []).map((s) => normalizeSourceScript(s))));
 
   let activeScreen = $state('behaviors');
-  let selectedId = $state(scripts[0]?.id ?? null);
+  let selectedId = $state(untrack(() => scripts[0]?.id ?? null));
 
   let selected = $derived(scripts.find((s) => s.id === selectedId) ?? null);
   let problems = $derived(selected ? validateScript(selected) : []);
@@ -312,7 +313,10 @@
                     onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
                     {@attach (el) => { el.focus(); el.select(); }} />
                 {:else}
-                  <span class="sname" ondblclick={(e) => { e.stopPropagation(); startRename(s); }} title="Double-click to rename">{s.name}</span>
+                  <span class="sname" role="button" tabindex="0"
+                    ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
+                    onkeydown={(e) => { if (e.key === 'F2' || e.key === 'Enter') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
+                    title="Double-click (or F2) to rename">{s.name}</span>
                 {/if}
               </td>
               <td><span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span></td>

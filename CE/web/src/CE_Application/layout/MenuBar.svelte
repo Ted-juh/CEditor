@@ -11,6 +11,7 @@
   import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, saveActiveScriptWorkspace, saveActiveScriptWorkspaceAs } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
+  import { buildInfo, buildLabel } from '../buildInfo.js';
 
   function newCustomComponent() {
     const document = createComponentDocument();
@@ -157,7 +158,7 @@
       { label: 'Keyboard Shortcuts', shortcut: 'F1', action: () => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true }));
       }},
-      { label: 'About CEditor', action: () => {} },
+      { label: 'About CEditor', action: () => window.alert?.(`CEditor\n\nBuild ${buildInfo.sha}\nBranch ${buildInfo.branch}\nBuilt ${buildInfo.time}`) },
     ],
   };
 
@@ -218,6 +219,10 @@
       {/if}
     </div>
   {/each}
+
+  <span class="build-stamp" title="Build {buildInfo.sha} · {buildInfo.branch} · {buildInfo.time}">
+    build {buildLabel}
+  </span>
 </nav>
 
 <style>
@@ -311,5 +316,16 @@
     height: 1px;
     background: #444;
     margin: 4px 8px;
+  }
+
+  /* Always-visible build stamp, pushed to the far right of the menu bar. */
+  .build-stamp {
+    margin-left: auto;
+    padding: 0 10px;
+    color: #6A6A6A;
+    font-size: 11px;
+    font-family: inherit;
+    white-space: nowrap;
+    user-select: text;
   }
 </style>

@@ -437,37 +437,6 @@
     flex-direction: column;
     background: #1E1E1E;
   }
-  .device-bar {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
-    background: #252525;
-    border-bottom: 1px solid #333;
-    color: #AAA;
-    font-size: 11px;
-  }
-  .device-bar label { display: flex; align-items: center; gap: 6px; }
-  .device-bar select {
-    background: #1A1A1A;
-    color: #DDD;
-    border: 1px solid #3B3B3B;
-    border-radius: 3px;
-    font-size: 11px;
-    padding: 2px 6px;
-    outline: none;
-  }
-  .sync-btn {
-    background: #2A2A2A;
-    color: #DDD;
-    border: 1px solid #3B3B3B;
-    border-radius: 3px;
-    font-size: 11px;
-    padding: 2px 8px;
-    cursor: pointer;
-  }
-  .sync-btn:hover { background: #333; }
   .player-viewport {
     flex: 1 1 auto;
     display: flex;

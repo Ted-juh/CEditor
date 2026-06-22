@@ -3,6 +3,7 @@ import {
   resolveRuntimeArpeggiatorEdit,
   syncCustomArpeggiatorValues,
 } from './customComponentArpeggiator.js';
+import { resolvePartPixelRect } from './customComponentLayout.js';
 
 function numberOr(value, fallback = 0) {
   const numeric = Number(value);
@@ -46,6 +47,25 @@ export function customChannelDefaultValue(channel) {
 function customChannelResetValue(channel) {
   if (!channel) return 0;
   return channel.defaultValue ?? channel.currentValue ?? (String(channel.type ?? '') === 'bool' ? false : 0);
+}
+
+/**
+ * Reset one or more value channels to their default — the universal
+ * double-click convention. Pass a single channel name or an array; returns a
+ * new, constrained values object. Unknown channels are ignored.
+ */
+export function resetCustomChannelToDefault(control, channelNames, values = {}) {
+  const channels = getCustomValueChannels(control);
+  const names = Array.isArray(channelNames) ? channelNames : [channelNames];
+  const next = { ...(values ?? {}) };
+  let changed = false;
+  for (const name of names) {
+    const channel = channels?.[name];
+    if (!channel) continue;
+    next[name] = customChannelResetValue(channel);
+    changed = true;
+  }
+  return changed ? constrainCustomValues(control, next) : (values ?? {});
 }
 
 export function seedCustomValues(control) {
@@ -370,11 +390,11 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
   return constrainCustomValues(control, nextValues, { primaryChannelName: channelName });
 }
 
-function conditionMatches(condition, values) {
-  const text = String(condition ?? '').trim();
-  if (!text) return true;
-  const match = text.match(/^([A-Za-z_$][\w$]*)\s*(={2,3}|!==|!=|>=|<=|>|<)\s*['"]?([^'"]+)['"]?$/);
-  if (!match) return true;
+// Evaluate a single `channel op value` comparison. Returns a boolean, or null
+// when the text is not a recognizable comparison (caller decides leniency).
+function comparisonMatches(text, values) {
+  const match = String(text ?? '').trim().match(/^([A-Za-z_$][\w$]*)\s*(={2,3}|!==|!=|>=|<=|>|<)\s*['"]?([^'"]*)['"]?$/);
+  if (!match) return null;
   const left = values?.[match[1]];
   const right = match[3];
   const leftNumber = Number(left);
@@ -396,8 +416,23 @@ function conditionMatches(condition, values) {
     case '<':
       return numeric ? leftNumber < rightNumber : String(left ?? '') < right;
     default:
-      return true;
+      return null;
   }
+}
+
+// Supports compound conditions joined with `&&` (all) and `||` (any). `||` has
+// the lower precedence, matching the structured builder's "match all / any"
+// groups. An unparseable clause stays lenient (treated as satisfied) so legacy
+// free-text conditions keep behaving as they did before.
+function conditionMatches(condition, values) {
+  const text = String(condition ?? '').trim();
+  if (!text) return true;
+  return text.split('||').some((orPart) =>
+    orPart.split('&&').every((andPart) => {
+      const result = comparisonMatches(andPart, values);
+      return result === null ? true : result;
+    })
+  );
 }
 
 function resolveSwitchLinkValue(link, values) {
@@ -501,7 +536,53 @@ export function applyCustomLinks(control, values = {}) {
   return { values: nextValues, targets };
 }
 
-export function customHitZoneRect(zone, rect) {
+// Resolve a follow-mode hit zone's pixel rect from its source part (or the
+// control face), grown by `inflate` and clamped up to `minTouch`. Returns null
+// for independent zones or when the source can't be resolved, so the caller
+// falls back to the authored `bounds`.
+function followModeZoneRect(zone, rect, parts) {
+  const source = String(zone?.source ?? 'independent');
+  if (source === 'independent') return null;
+
+  let base = null;
+  if (source === 'face') {
+    base = { x: 0, y: 0, width: rect.width, height: rect.height };
+  } else if (source.startsWith('part:')) {
+    const partName = source.slice('part:'.length);
+    const layout = parts?.[partName]?._children?.Layout ?? null;
+    base = layout ? resolvePartPixelRect(layout, rect.width, rect.height) : null;
+  }
+  if (!base) return null;
+
+  const inflate = zone?.inflate ?? {};
+  const percentUnit = String(inflate.unit ?? 'px') === 'percent';
+  const inflateX = percentUnit ? (numberOr(inflate.x, 0) / 100) * rect.width : numberOr(inflate.x, 0);
+  const inflateY = percentUnit ? (numberOr(inflate.y, 0) / 100) * rect.height : numberOr(inflate.y, 0);
+  let resolved = {
+    x: base.x - inflateX,
+    y: base.y - inflateY,
+    width: base.width + inflateX * 2,
+    height: base.height + inflateY * 2,
+  };
+
+  const minTouch = numberOr(zone?.minTouch, 0);
+  if (minTouch > 0) {
+    if (resolved.width < minTouch) {
+      resolved.x -= (minTouch - resolved.width) / 2;
+      resolved.width = minTouch;
+    }
+    if (resolved.height < minTouch) {
+      resolved.y -= (minTouch - resolved.height) / 2;
+      resolved.height = minTouch;
+    }
+  }
+  return resolved;
+}
+
+export function customHitZoneRect(zone, rect, parts = null) {
+  const followRect = rect ? followModeZoneRect(zone, rect, parts) : null;
+  if (followRect) return followRect;
+
   const bounds = zone?.bounds ?? {};
   const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : 'percent';
   const width = Math.max(0, numberOr(bounds.width, 100));
@@ -521,8 +602,8 @@ export function customHitZoneRect(zone, rect) {
   };
 }
 
-function isPointInZone(zone, rect, localX, localY) {
-  const zoneRect = customHitZoneRect(zone, rect);
+function isPointInZone(zone, rect, localX, localY, parts = null) {
+  const zoneRect = customHitZoneRect(zone, rect, parts);
   const insideBox = localX >= zoneRect.x
     && localX <= zoneRect.x + zoneRect.width
     && localY >= zoneRect.y
@@ -555,21 +636,22 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, val
   if (!rect) return null;
   const localX = clientX - rect.left;
   const localY = clientY - rect.top;
+  const parts = control?._children?.Parts?._children ?? null;
   const conditionValues = constrainCustomValues(control, values ?? {});
   const entries = enabledEntries(getCustomHitZones(control))
     .filter(([, zone]) => conditionMatches(zone?.condition, conditionValues))
     .sort((left, right) => {
       const priorityDelta = numberOr(right[1]?.priority, 0) - numberOr(left[1]?.priority, 0);
       if (priorityDelta !== 0) return priorityDelta;
-      const leftRect = customHitZoneRect(left[1], rect);
-      const rightRect = customHitZoneRect(right[1], rect);
+      const leftRect = customHitZoneRect(left[1], rect, parts);
+      const rightRect = customHitZoneRect(right[1], rect, parts);
       const leftArea = Math.max(0, leftRect.width) * Math.max(0, leftRect.height);
       const rightArea = Math.max(0, rightRect.width) * Math.max(0, rightRect.height);
       return leftArea - rightArea;
     });
 
   for (const [name, zone] of entries) {
-    if (isPointInZone(zone, rect, localX, localY)) {
+    if (isPointInZone(zone, rect, localX, localY, parts)) {
       return { name, zone };
     }
   }
@@ -587,16 +669,22 @@ export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, 
     ? (['vertical', 'linear-vertical'].includes(geometry) ? 'vertical'
       : (['circular', 'ring', 'dial', 'arc'].includes(geometry) ? 'circular' : 'horizontal'))
     : configuredDragMode;
+  // 'relative' is an explicit, geometry-agnostic mode (the standard DAW knob
+  // feel): pointer movement nudges the value from where it was grabbed, so it
+  // also covers dials, not just linear modes.
+  const RELATIVE_MODES = ['vertical', 'horizontal', 'both', 'free', 'relative'];
   const hasDragStart = dragContext
     && Number.isFinite(Number(dragContext.startClientX))
     && Number.isFinite(Number(dragContext.startClientY))
     && Number.isFinite(Number(dragContext.startNormalized));
 
-  if (hasDragStart && ['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
-    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1));
+  if (hasDragStart && RELATIVE_MODES.includes(dragMode)) {
+    // Fine-drag modifier (Shift): slow the drag for precise adjustment.
+    const fineScale = dragContext?.fine ? 0.25 : 1;
+    const sensitivity = Math.max(0.01, numberOr(behaviorModule?.dragSensitivity, 1)) * fineScale;
     const deltaX = (clientX - dragContext.startClientX) / Math.max(1, rect.width);
     const deltaY = (dragContext.startClientY - clientY) / Math.max(1, rect.height);
-    const rawMovement = dragMode === 'vertical'
+    const rawMovement = (dragMode === 'vertical' || dragMode === 'relative')
       ? deltaY
       : (dragMode === 'horizontal'
         ? deltaX
@@ -609,7 +697,7 @@ export function resolveCustomNormalizedFromPoint(behaviorModule, rect, clientX, 
     return applyCustomMouseDirection(behaviorModule, 1 - (localY / Math.max(1, rect.height)));
   }
 
-  if (['circular', 'ring', 'dial', 'arc'].includes(geometry) && !['vertical', 'horizontal', 'both', 'free'].includes(dragMode)) {
+  if (['circular', 'ring', 'dial', 'arc'].includes(geometry) && !RELATIVE_MODES.includes(dragMode)) {
     const centerX = rect.width * (clamp(numberOr(behaviorModule?.centerX, 50), 0, 100) / 100);
     const centerY = rect.height * (clamp(numberOr(behaviorModule?.centerY, 50), 0, 100) / 100);
     const angle = dialAngleFromPoint(localX, localY, centerX, centerY);
@@ -708,6 +796,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         startClientX: point.startClientX,
         startClientY: point.startClientY,
         startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),
+        fine: point.fine === true,
       });
     }
     nextValue = denormalizeCustomChannelValue(channel, normalized);

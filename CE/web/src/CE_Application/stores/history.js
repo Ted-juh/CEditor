@@ -1,66 +1,134 @@
 import { get, writable } from 'svelte/store';
-import { panels, resolvedActivePanelId } from './panels.js';
+import { panels, resolvedActivePanelId, activeEditorTab } from './panels.js';
+import {
+  componentWorkspaceMode,
+  componentDocuments,
+  activeComponentDocumentId,
+} from './componentWorkspace.js';
 
 /** Reactive stores for UI binding */
 export const undoAvailable = writable(false);
 export const redoAvailable = writable(false);
 
 /**
- * Undo/Redo history — per-panel state snapshots.
+ * Undo/Redo history — per-context state snapshots.
  *
- * Approach: snapshot the active panel's state on each meaningful change.
+ * There are two editing contexts that share the same undo/redo entry points
+ * (global Ctrl+Z/Y, the menu, and the toolbar):
+ *   - `panel`     — the active panel in the `panels` store.
+ *   - `component` — the active custom-component document in the component
+ *                   workspace (`componentDocuments`), shown when the workspace
+ *                   is in `surface` mode.
+ *
+ * Whichever context is active receives the snapshot/undo/redo. History is kept
+ * per context id so switching between panels and components — or between two
+ * component documents — preserves each one's stack.
+ *
+ * Approach: snapshot the active context's state on each meaningful change.
  * A debounce timer groups rapid changes (drag, typing) into one snapshot.
  * Manual actions can call `pushSnapshot()` to flush immediately.
  */
 
 const MAX_HISTORY = 50;
 
-// Per-panel history: Map<panelId, { undoStack: [], redoStack: [] }>
+// Per-context history: Map<contextKey, { undoStack: [], redoStack: [] }>
 const historyMap = new Map();
 let isRestoring = false;
 let debounceTimer = null;
 let lastSnapshotJson = null;
 
-function getHistory(panelId) {
-  if (!historyMap.has(panelId)) {
-    historyMap.set(panelId, { undoStack: [], redoStack: [] });
+/**
+ * Resolve which editing context is currently active. The component workspace
+ * takes precedence when it is open with a valid active document; otherwise the
+ * active panel is used. Returns null when nothing editable is focused.
+ *
+ * A custom component is being edited in two cases, mirroring how the editor
+ * decides to render the creator (see EditorCanvas's `componentSurfaceWorkspace`):
+ * either the workspace is in `surface` mode, or a standalone `component` editor
+ * tab is active. The tab case matters because opening a component tab resets the
+ * workspace mode back to `panel`, yet the creator (and its edits) stay live — so
+ * gating only on `surface` mode would miss every standalone-tab edit and leave
+ * undo/redo dead.
+ */
+function activeContext() {
+  const editingComponent =
+    get(componentWorkspaceMode) === 'surface' || get(activeEditorTab)?.type === 'component';
+  if (editingComponent) {
+    const documentId = get(activeComponentDocumentId);
+    if (documentId != null && get(componentDocuments).some((doc) => doc.id === documentId)) {
+      return { kind: 'component', id: documentId };
+    }
   }
-  return historyMap.get(panelId);
+  const panelId = get(resolvedActivePanelId);
+  if (panelId != null) return { kind: 'panel', id: panelId };
+  return null;
+}
+
+function contextKey(context) {
+  return `${context.kind}:${context.id}`;
+}
+
+function getHistory(key) {
+  if (!historyMap.has(key)) {
+    historyMap.set(key, { undoStack: [], redoStack: [] });
+  }
+  return historyMap.get(key);
 }
 
 function updateAvailability() {
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) {
+  const context = activeContext();
+  if (!context) {
     undoAvailable.set(false);
     redoAvailable.set(false);
     return;
   }
-  const h = getHistory(panelId);
+  const h = getHistory(contextKey(context));
   undoAvailable.set(h.undoStack.length > 0);
   redoAvailable.set(h.redoStack.length > 0);
 }
 
-function snapshotPanel(panel) {
-  // Strip transient fields
+/** Serialize the active context's editable state, stripping transient fields. */
+function snapshotOf(context) {
+  if (!context) return null;
+  if (context.kind === 'component') {
+    const doc = get(componentDocuments).find((entry) => entry.id === context.id);
+    if (!doc?.control) return null;
+    return JSON.stringify(doc.control);
+  }
+  const panel = get(panels).find((p) => p.id === context.id);
+  if (!panel) return null;
   const { id, modified, ...data } = panel;
   return JSON.stringify(data);
 }
 
-function restoreSnapshot(panelId, json) {
-  const data = JSON.parse(json);
+function restoreSnapshot(context, json) {
+  if (json == null) return;
   isRestoring = true;
-  panels.update(list =>
-    list.map(p => {
-      if (p.id !== panelId) return p;
-      return { ...p, ...data, modified: true };
-    })
-  );
+  if (context.kind === 'component') {
+    const control = JSON.parse(json);
+    componentDocuments.update((list) =>
+      list.map((doc) => {
+        if (doc.id !== context.id) return doc;
+        return {
+          ...doc,
+          control,
+          name: control?._children?.Core?.name ?? doc.name,
+          modified: true,
+        };
+      })
+    );
+  } else {
+    const data = JSON.parse(json);
+    panels.update((list) =>
+      list.map((p) => (p.id === context.id ? { ...p, ...data, modified: true } : p))
+    );
+  }
   isRestoring = false;
   lastSnapshotJson = json;
 }
 
 /**
- * Push the current active panel state onto the undo stack.
+ * Push the current active context state onto the undo stack.
  * Called automatically via debounce, or manually before destructive actions.
  */
 export function pushSnapshot() {
@@ -68,18 +136,20 @@ export function pushSnapshot() {
   clearTimeout(debounceTimer);
   debounceTimer = null;
 
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return;
+  const context = activeContext();
+  if (!context) return;
 
-  const panel = get(panels).find(p => p.id === panelId);
-  if (!panel) return;
+  const json = snapshotOf(context);
+  if (json == null) return;
 
-  const json = snapshotPanel(panel);
-
-  // Skip if identical to last snapshot
+  // Skip if identical to last snapshot, or if there is no committed baseline yet.
   if (json === lastSnapshotJson) return;
+  if (lastSnapshotJson == null) {
+    lastSnapshotJson = json;
+    return;
+  }
 
-  const history = getHistory(panelId);
+  const history = getHistory(contextKey(context));
   history.undoStack.push(lastSnapshotJson);
 
   // Cap undo stack size
@@ -104,8 +174,15 @@ function scheduleSnapshot() {
   debounceTimer = setTimeout(pushSnapshot, 400);
 }
 
+/** Reset the committed baseline to the active context's current state. */
+function resetBaseline() {
+  if (isRestoring) return;
+  lastSnapshotJson = snapshotOf(activeContext());
+  updateAvailability();
+}
+
 /**
- * Undo the last action on the active panel.
+ * Undo the last action on the active context.
  */
 export function undo() {
   // Flush any pending debounced snapshot first
@@ -115,91 +192,90 @@ export function undo() {
     pushSnapshot();
   }
 
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return;
+  const context = activeContext();
+  if (!context) return;
 
-  const history = getHistory(panelId);
+  const history = getHistory(contextKey(context));
   if (history.undoStack.length === 0) return;
 
   // Save current state to redo
-  const panel = get(panels).find(p => p.id === panelId);
-  if (!panel) return;
-
-  history.redoStack.push(snapshotPanel(panel));
+  const current = snapshotOf(context);
+  if (current == null) return;
+  history.redoStack.push(current);
 
   // Restore previous state
   const prev = history.undoStack.pop();
-  restoreSnapshot(panelId, prev);
+  restoreSnapshot(context, prev);
   updateAvailability();
 }
 
 /**
- * Redo the last undone action on the active panel.
+ * Redo the last undone action on the active context.
  */
 export function redo() {
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return;
+  const context = activeContext();
+  if (!context) return;
 
-  const history = getHistory(panelId);
+  const history = getHistory(contextKey(context));
   if (history.redoStack.length === 0) return;
 
   // Save current state to undo
-  const panel = get(panels).find(p => p.id === panelId);
-  if (!panel) return;
-
-  history.undoStack.push(snapshotPanel(panel));
+  const current = snapshotOf(context);
+  if (current == null) return;
+  history.undoStack.push(current);
 
   // Restore redo state
   const next = history.redoStack.pop();
-  restoreSnapshot(panelId, next);
+  restoreSnapshot(context, next);
   updateAvailability();
 }
 
 /**
- * Check if undo/redo is available for the active panel.
+ * Check if undo/redo is available for the active context.
  */
 export function canUndo() {
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return false;
-  return getHistory(panelId).undoStack.length > 0;
+  const context = activeContext();
+  if (!context) return false;
+  return getHistory(contextKey(context)).undoStack.length > 0;
 }
 
 export function canRedo() {
-  const panelId = get(resolvedActivePanelId);
-  if (panelId == null) return false;
-  return getHistory(panelId).redoStack.length > 0;
+  const context = activeContext();
+  if (!context) return false;
+  return getHistory(contextKey(context)).redoStack.length > 0;
 }
 
 /**
  * Initialize history tracking.
- * Subscribe to panels store and capture snapshots on changes.
+ * Subscribe to the editable stores and capture snapshots on changes.
  * Call once at app startup.
  */
 export function initHistory() {
-  // Capture initial state of active panel
-  const panelId = get(resolvedActivePanelId);
-  if (panelId != null) {
-    const panel = get(panels).find(p => p.id === panelId);
-    if (panel) lastSnapshotJson = snapshotPanel(panel);
-  }
+  // Capture initial state of whatever context is active.
+  resetBaseline();
 
-  // Watch for active panel changes to reset lastSnapshotJson
-  resolvedActivePanelId.subscribe(id => {
-    if (id == null) { lastSnapshotJson = null; return; }
-    const panel = get(panels).find(p => p.id === id);
-    if (panel) lastSnapshotJson = snapshotPanel(panel);
-  });
+  // Re-baseline when the active context changes so the next edit is measured
+  // against the newly-focused panel or component document, not the previous one.
+  resolvedActivePanelId.subscribe(resetBaseline);
+  activeComponentDocumentId.subscribe(resetBaseline);
+  componentWorkspaceMode.subscribe(resetBaseline);
+  activeEditorTab.subscribe(resetBaseline);
 
-  // Watch for panel mutations
+  // Watch for mutations in either editable store.
   panels.subscribe(() => {
+    if (isRestoring) return;
+    scheduleSnapshot();
+  });
+  componentDocuments.subscribe(() => {
     if (isRestoring) return;
     scheduleSnapshot();
   });
 }
 
 /**
- * Clear history for a specific panel (e.g., on close).
+ * Clear history for a specific id (e.g., on panel or document close).
  */
-export function clearHistory(panelId) {
-  historyMap.delete(panelId);
+export function clearHistory(id) {
+  historyMap.delete(`panel:${id}`);
+  historyMap.delete(`component:${id}`);
 }

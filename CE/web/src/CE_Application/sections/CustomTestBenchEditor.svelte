@@ -20,6 +20,7 @@
     analyzeCustomComponentReadiness,
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
+  import { applyCustomBindings } from '../utils/interactionRuntime.js';
 
   let { control = null } = $props();
 
@@ -57,7 +58,10 @@
   let publishedPropertyEntries = $derived(Object.entries(published?.editableProperties ?? {}).filter(([, entry]) => entry?.enabled !== false));
   let seededValues = $derived(buildTestValues(control, preview.channelValues));
   let linkedDefaults = $derived(applyCustomLinks(control, seededValues));
-  let materialized = $derived(materializedCustomComponentSnapshot(control, {
+  // The signals that drive both generator materialization and live bindings, so
+  // the Test Bench preview reflects binding-driven part changes (position, color,
+  // rotation, …) as channel values are scrubbed — matching the running plugin.
+  let previewSignals = $derived({
     valueNormalized: preview.testValue ?? 0.5,
     customChannels: Object.fromEntries(
       Object.entries(values?._children ?? {}).flatMap(([name, channel]) => ([
@@ -65,7 +69,11 @@
         [`channel.${name}.normalized`, normalizeCustomChannelValue(channel, linkedDefaults.values?.[name] ?? seededValues?.[name])],
       ]))
     ),
-  }));
+  });
+  let materialized = $derived(applyCustomBindings(
+    materializedCustomComponentSnapshot(control, previewSignals),
+    previewSignals
+  ));
   let materializedParts = $derived(materialized?._children?.Parts?._children ?? {});
   let materializedHitZones = $derived(materialized?._children?.HitZones?._children ?? {});
   let materializedPartNames = $derived(Object.keys(materializedParts));
@@ -271,7 +279,7 @@
     if (!name) return;
     focusDesigner({
       'Designer.selectedLayer': name,
-      'Designer.focusSection': 'customlayers',
+      'Designer.focusSurfaceDock': 'layers',
       'Designer.preview.showBounds': true,
     });
   }
@@ -405,7 +413,7 @@
         'Designer.selectedHitZone': '',
         'Designer.selectedBehavior': zone?.targetBehavior ?? '',
         'Designer.selectedValueChannel': zone?.targetValueChannel ?? '',
-        'Designer.focusSection': 'generators',
+        'Designer.focusSurfaceDock': 'generators',
         'Designer.preview.showHitZones': true,
       });
       return;
@@ -440,7 +448,7 @@
     if (!generatorName) return;
     focusDesigner({
       'Designer.selectedGenerator': generatorName,
-      'Designer.focusSection': 'generators',
+      'Designer.focusSurfaceDock': 'generators',
       'Designer.preview.showHitZones': true,
     });
   }
@@ -462,7 +470,8 @@
       'Designer.selectedGenerator': generatorName,
       'Designer.selectedLayer': partEntries[0]?.[0] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedHitZone': zoneEntries[0]?.[0] ?? (designer?.selectedHitZone ?? ''),
-      'Designer.focusSection': partEntries.length ? 'customlayers' : 'hitzones',
+      'Designer.focusSection': partEntries.length ? '' : 'hitzones',
+      'Designer.focusSurfaceDock': partEntries.length ? 'layers' : '',
       'Designer.preview.showHitZones': zoneEntries.length > 0,
       'Designer.preview.showBounds': true,
     };
@@ -624,13 +633,13 @@
       found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'behaviors' }) });
     }
     if (generatorTypes.includes('repeated-leds') || generatorTypes.includes('meter-bars')) {
-      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSection': 'generators', 'Designer.preview.showHitZones': true }) });
+      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true }) });
     }
     if (enumGroupDiagnostics.length) {
       found.push({ id: 'segmented', label: 'Segmented Enum', detail: `${enumGroupDiagnostics.length} enum group${enumGroupDiagnostics.length === 1 ? '' : 's'} with mutual exclusion and state coverage.`, action: 'Enum Groups', focus: () => {} });
     }
     if (designer?.arpeggiator?.enabled === true || materializedPartNames.some((name) => name.toLowerCase().includes('arp'))) {
-      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSection': 'customlayers' }) });
+      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'layers' }) });
     }
     if (['attack', 'decay', 'sustain', 'release'].some((name) => channelKeys.has(name))) {
       found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'valuechannels' }) });
@@ -1034,7 +1043,7 @@
     <PropertyCell label="Actions" span={4} hint="Common finishing actions before saving, exporting, or sharing this component.">
       <div class="quick-actions">
         <button type="button" onclick={publishAllChannels} disabled={valueNames.length === 0}>Publish all channels</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
+        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
         <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'links' })}>Review links</button>
         <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'assets' })}>Review assets</button>
       </div>
