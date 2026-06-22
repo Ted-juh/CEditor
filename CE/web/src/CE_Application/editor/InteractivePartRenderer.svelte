@@ -1,6 +1,7 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
+  import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
 
   let {
     part = null,
@@ -104,6 +105,13 @@
     && !rendersArcTrack
     && ['circle', 'ring', 'capsule'].includes(simpleBackgroundKind)
   );
+
+  // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
+  // <polygon> using the part's fill + border, instead of the CSS background.
+  let polygonVerts = $derived(polygonPoints(part?.kind));
+  let rendersPolygon = $derived(!!polygonVerts);
+  let rendersLine = $derived(simpleBackgroundKind === 'line');
+  let rendersVectorShape = $derived(rendersPolygon || rendersLine);
 
   let frame = $derived.by(() => {
     if (!layout) {
@@ -320,6 +328,37 @@
     ].join('; ');
   });
 
+  let vectorShapeSvg = $derived.by(() => {
+    if (!rendersVectorShape) return null;
+    const width = Math.max(1, frame.width);
+    const height = Math.max(1, frame.height);
+    const fillEnabled = backgroundFill?.solidEnabled !== false;
+    const borderEnabled = backgroundBorder?.enabled === true && numberOr(backgroundBorder?.thickness, 0) > 0;
+    const strokeWidth = borderEnabled ? Math.max(1, numberOr(backgroundBorder?.thickness, 1)) : 0;
+    const fill = fillEnabled ? cssColour(backgroundFill?.colour ?? '00000000', 'transparent') : 'none';
+    const stroke = borderEnabled ? cssColour(backgroundBorder?.colour ?? 'FFFFFFFF', '#FFFFFF') : 'none';
+
+    if (rendersLine) {
+      // A line/divider has no area: paint the border as a centered stroke,
+      // falling back to the fill colour or white when no border is set.
+      const lineStroke = stroke !== 'none'
+        ? stroke
+        : (fillEnabled ? cssColour(backgroundFill?.colour ?? 'FFFFFFFF', '#FFFFFF') : '#FFFFFF');
+      const lineWidth = strokeWidth > 0 ? strokeWidth : 2;
+      return {
+        width, height, points: '',
+        line: { x1: 0, y1: height / 2, x2: width, y2: height / 2, stroke: lineStroke, width: lineWidth },
+      };
+    }
+
+    const inset = strokeWidth / 2;
+    return {
+      width, height, fill, stroke, strokeWidth,
+      points: polygonToSvgPoints(polygonVerts, width, height, inset),
+      line: null,
+    };
+  });
+
   let envelopeSvg = $derived.by(() => {
     if (!rendersEnvelopePath) return { d: '', fillD: '', stroke: '#65E6A0', fill: 'transparent', strokeWidth: 3 };
     const width = Math.max(1, frame.width);
@@ -426,10 +465,34 @@
 
 {#if part?.visible !== false}
   <div class="interactive-part" class:debug={debug} style={partStyle}>
-    {#if background && usesSimpleBackground}
+    {#if background && usesSimpleBackground && !rendersVectorShape}
       <div class="interactive-simple-background" style={simpleBackgroundStyle}></div>
-    {:else if background}
+    {:else if background && !rendersVectorShape}
       <BackgroundRenderer {background} width={frame.width} height={frame.height} />
+    {/if}
+
+    {#if rendersVectorShape && vectorShapeSvg}
+      <svg class="interactive-vector-shape" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
+        {#if vectorShapeSvg.line}
+          <line
+            x1={vectorShapeSvg.line.x1}
+            y1={vectorShapeSvg.line.y1}
+            x2={vectorShapeSvg.line.x2}
+            y2={vectorShapeSvg.line.y2}
+            stroke={vectorShapeSvg.line.stroke}
+            stroke-width={vectorShapeSvg.line.width}
+            stroke-linecap="round"
+          ></line>
+        {:else}
+          <polygon
+            points={vectorShapeSvg.points}
+            fill={vectorShapeSvg.fill}
+            stroke={vectorShapeSvg.stroke}
+            stroke-width={vectorShapeSvg.strokeWidth}
+            stroke-linejoin="round"
+          ></polygon>
+        {/if}
+      </svg>
     {/if}
 
     {#if rendersValueArc}
@@ -529,7 +592,8 @@
   }
 
   .interactive-envelope-path,
-  .interactive-waveform-icon {
+  .interactive-waveform-icon,
+  .interactive-vector-shape {
     position: absolute;
     inset: 0;
     width: 100%;
