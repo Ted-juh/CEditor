@@ -40,6 +40,19 @@
     try { localStorage.setItem('ce-theme', theme); } catch { /* ignore */ }
   }
 
+  // ----- minimap -----
+  let showMinimap = $state(readMinimap());
+  let minimapCanvas = $state(null);
+  let minimapWrap = $state(null);
+  let taClientH = $state(0);
+  function readMinimap() {
+    try { return localStorage.getItem('ce-minimap') === '1'; } catch { return false; }
+  }
+  function toggleMinimap() {
+    showMinimap = !showMinimap;
+    try { localStorage.setItem('ce-minimap', showMinimap ? '1' : '0'); } catch { /* ignore */ }
+  }
+
   // Parser-backed analysis (acorn / luaparse). Re-runs as the source or language changes.
   let analysis = $derived(analyze(value, language));
   let diagnostics = $derived(analysis.diagnostics);
@@ -91,8 +104,68 @@
   function onScroll() {
     scrollTop = taEl.scrollTop;
     scrollLeft = taEl.scrollLeft;
+    taClientH = taEl.clientHeight;
     acOpen = false;   // popups are positioned for the pre-scroll caret; close on scroll
     clearHover();
+  }
+
+  // Minimap: a scaled "shape of code" + a draggable viewport box.
+  let mmViewport = $derived.by(() => {
+    void scrollTop; void taClientH;
+    const total = lineCount * lineHeight;
+    if (total <= 0) return { top: 0, height: 100 };
+    const vh = (taClientH || (taEl?.clientHeight ?? 0));
+    return { top: Math.min(100, (scrollTop / total) * 100), height: Math.min(100, (vh / total) * 100) };
+  });
+  function drawMinimap() {
+    const cv = minimapCanvas, wrap = minimapWrap;
+    if (!cv || !wrap) return;
+    const W = wrap.clientWidth, H = wrap.clientHeight;
+    if (W === 0 || H === 0) return;
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const n = lines.length;
+    const cellH = Math.max(1, Math.min(4, H / Math.max(n, 1)));
+    const cellW = Math.max(0.8, Math.min(1.6, (W - 6) / 90));
+    const fg = theme === 'light' ? 'rgba(31,36,48,0.5)' : 'rgba(207,227,216,0.45)';
+    const com = theme === 'light' ? 'rgba(138,148,140,0.6)' : 'rgba(91,107,95,0.75)';
+    const tok = lineCommentToken(language);
+    for (let i = 0; i < n; i++) {
+      const y = i * cellH;
+      if (y > H) break;
+      const line = lines[i];
+      ctx.fillStyle = line.trimStart().startsWith(tok) ? com : fg;
+      let run = -1;
+      for (let c = 0; c <= line.length; c++) {
+        const ch = line[c];
+        const ws = ch === undefined || ch === ' ' || ch === '\t';
+        if (!ws && run < 0) run = c;
+        else if (ws && run >= 0) {
+          ctx.fillRect(4 + run * cellW, y, Math.max(1, (c - run) * cellW), Math.max(1, cellH - 0.6));
+          run = -1;
+        }
+      }
+    }
+  }
+  $effect(() => {
+    void value; void theme; void language; void showMinimap;
+    if (showMinimap) drawMinimap();
+  });
+  function minimapScrollTo(clientY) {
+    if (!taEl || !minimapWrap) return;
+    const r = minimapWrap.getBoundingClientRect();
+    const frac = Math.max(0, Math.min(1, (clientY - r.top) / r.height));
+    taEl.scrollTop = Math.max(0, frac * lineCount * lineHeight - taEl.clientHeight / 2);
+    onScroll();
+  }
+  function onMinimapDown(e) {
+    e.preventDefault();
+    minimapScrollTo(e.clientY);
+    const move = (ev) => minimapScrollTo(ev.clientY);
+    const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
   }
 
   function syncCaret() {
@@ -112,6 +185,7 @@
   $effect(() => {
     void fontSize;
     if (measureEl) charWidth = measureEl.getBoundingClientRect().width / 10 || charWidth;
+    if (taEl) taClientH = taEl.clientHeight;
   });
 
   // line/column (0-based) of a character offset.
@@ -627,6 +701,13 @@
     {/each}
   </div>
 
+  {#if showMinimap}
+    <div class="ce-minimap" bind:this={minimapWrap} onpointerdown={onMinimapDown}>
+      <canvas class="ce-minimap-canvas" bind:this={minimapCanvas}></canvas>
+      <div class="ce-minimap-vp" style="top:{mmViewport.top}%; height:{mmViewport.height}%"></div>
+    </div>
+  {/if}
+
   <span class="ce-measure" bind:this={measureEl} aria-hidden="true">0000000000</span>
 
   {#if showFind}
@@ -658,6 +739,8 @@
     </div>
   {/if}
 
+  <button class="ce-minimap-btn" title="Toggle minimap" aria-label="Toggle minimap"
+    onclick={toggleMinimap} class:on={showMinimap}>▤</button>
   <button class="ce-theme-btn" title="Toggle editor theme" aria-label="Toggle editor theme"
     onclick={toggleTheme}>{theme === 'dark' ? '☾' : '☀'}</button>
   <button class="ce-help-btn" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts"
@@ -939,6 +1022,42 @@
     transition: opacity .12s;
   }
   .ce-theme-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-minimap-btn {
+    position: absolute;
+    right: 64px; bottom: 8px;
+    z-index: 4;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--txt-dim);
+    cursor: pointer;
+    font-size: 11px;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity .12s;
+  }
+  .ce-minimap-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-minimap-btn.on { opacity: 1; color: var(--accent); border-color: var(--accent-dim); }
+
+  /* minimap */
+  .ce-minimap {
+    position: relative;
+    flex-shrink: 0;
+    width: 64px;
+    background: var(--ce-gutter-bg);
+    border-left: 1px solid var(--line);
+    cursor: pointer;
+    overflow: hidden;
+  }
+  .ce-minimap-canvas { display: block; width: 100%; height: 100%; }
+  .ce-minimap-vp {
+    position: absolute;
+    left: 0; right: 0;
+    background: rgba(120, 150, 200, 0.18);
+    border: 1px solid rgba(120, 150, 200, 0.35);
+    pointer-events: none;
+  }
   .ce-help {
     position: absolute;
     right: 14px; bottom: 38px;
