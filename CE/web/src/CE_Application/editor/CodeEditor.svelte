@@ -7,13 +7,14 @@
   // find & replace, and font zoom. Native textarea undo/redo and copy/paste are kept
   // intact by routing every programmatic edit through document.execCommand('insertText').
   import { tick } from 'svelte';
-  import { highlight, lineCommentToken } from './codeHighlight.js';
+  import { highlight, lineCommentToken, matchingBracket } from './codeHighlight.js';
 
   let {
     value = '',
     language = 'lua',
     oninput = null,
     onrun = null,
+    oncaret = null,
     placeholder = '',
     minHeight = 240,
   } = $props();
@@ -22,6 +23,7 @@
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
   let caretLine = $state(0);
+  let caretPos = $state(0);
   let fontSize = $state(13);
 
   const PAD_TOP = 10;
@@ -30,7 +32,13 @@
   let lines = $derived(value.split('\n'));
   let lineCount = $derived(lines.length);
   let gutterDigits = $derived(String(lineCount).length);
-  let highlighted = $derived(highlight(value, language));
+  // Highlight a matched bracket pair only when there's no active text selection.
+  let matchMarks = $derived.by(() => {
+    if (!taEl || taEl.selectionStart !== taEl.selectionEnd) return undefined;
+    const pair = matchingBracket(value, caretPos);
+    return pair ? new Set(pair) : undefined;
+  });
+  let highlighted = $derived(highlight(value, language, matchMarks));
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
   let highlightedSafe = $derived(highlighted + (value.endsWith('\n') ? '\n' : ''));
 
@@ -46,7 +54,12 @@
 
   function syncCaret() {
     if (!taEl) return;
-    caretLine = countLines(taEl.value.slice(0, taEl.selectionStart));
+    const pos = taEl.selectionStart;
+    caretPos = pos;
+    const before = taEl.value.slice(0, pos);
+    caretLine = countLines(before);
+    const col = pos - (before.lastIndexOf('\n') + 1);
+    oncaret?.(caretLine + 1, col + 1);
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
@@ -478,6 +491,11 @@
   .ce-hl :global(.tok-kw)  { color: #5a9bf0; }
   .ce-hl :global(.tok-lit) { color: #c98be0; }
   .ce-hl :global(.tok-bi)  { color: #4dd6a0; }
+  .ce-hl :global(.tok-match) {
+    background: rgba(90, 155, 240, 0.28);
+    border-radius: 2px;
+    box-shadow: 0 0 0 1px rgba(90, 155, 240, 0.55);
+  }
 
   .ce-find {
     position: absolute;

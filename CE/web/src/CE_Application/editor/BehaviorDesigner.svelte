@@ -117,11 +117,27 @@
   function removeWatch(i) { watchPaths = watchPaths.filter((_, n) => n !== i); }
 
   // Persist to the panel (debounced) whenever any script changes — add/edit/rename/folder/delete.
+  // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet flushed).
   let saveTimer = null;
+  let saveState = $state('saved');
+  let firstSnapshot = true;
+  let pendingSnap = null;
   $effect(() => {
     const snap = $state.snapshot(scripts); // deep-reads scripts so the effect tracks every change
-    if (onChange) { clearTimeout(saveTimer); saveTimer = setTimeout(() => onChange(snap), 400); }
+    pendingSnap = snap;
+    if (firstSnapshot) { firstSnapshot = false; return; } // initial seed isn't an edit
+    saveState = 'pending';
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { onChange?.(pendingSnap); saveState = 'saved'; }, 400);
   });
+  function saveNow() {
+    clearTimeout(saveTimer);
+    if (pendingSnap) onChange?.(pendingSnap);
+    saveState = 'saved';
+  }
+
+  // Cursor position reported by the code editor, shown in the footer.
+  let caret = $state({ line: 1, col: 1 });
 
   // --- Live dispatch: scripts fire on their own (value change, preview interaction, lifecycle). ---
   // Dispatch is global/always-on; here we just push the in-edit scripts as a live override so
@@ -292,7 +308,8 @@
         </span>
       </div>
       <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
-        oninput={(v) => updateField('source', v)} onrun={() => runScript(selected)} />
+        oninput={(v) => updateField('source', v)} onrun={() => runScript(selected)}
+        oncaret={(line, col) => caret = { line, col }} />
 
       {#if problems.length === 0}
         <div class="problems"><div class="problem ok">✓ No problems</div></div>
@@ -551,11 +568,17 @@
   <div class="stagefoot">
     <span>{scripts.length} scripts</span>
     <span class="ok">● {enabledCount} enabled</span>
+    {#if selected && activeScreen !== 'test'}
+      <span class="caretpos" title="Cursor position">Ln {caret.line}, Col {caret.col}</span>
+    {/if}
     <span class="spacer" style="flex:1"></span>
+    <span class={['savestate', saveState]} title={saveState === 'saved' ? 'All changes saved' : 'Saving…'}>
+      {saveState === 'saved' ? '✓ Saved' : '● Unsaved'}
+    </span>
     <label class="livetoggle" title="When on, onValueChanged scripts fire automatically as control values change">
       <input type="checkbox" checked={liveOn} onchange={(e) => liveOn = e.target.checked} />
       <span class={['liveled', liveOn && 'on']}></span> Live
     </label>
-    <button class="btn">Save</button>
+    <button class="btn" onclick={saveNow} disabled={saveState === 'saved'}>Save</button>
   </div>
 </div>

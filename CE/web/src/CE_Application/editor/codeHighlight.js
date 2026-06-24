@@ -53,13 +53,28 @@ function esc(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// Escape plain text, wrapping any character whose absolute index is in `marks`
+// (used to highlight a matched bracket pair). Falls back to a plain escape.
+function escWithMarks(text, base, marks) {
+  if (!marks || marks.size === 0) return esc(text);
+  let out = '';
+  for (let i = 0; i < text.length; i++) {
+    const ch = esc(text[i]);
+    out += marks.has(base + i) ? '<span class="tok-match">' + ch + '</span>' : ch;
+  }
+  return out;
+}
+
 function span(cls, text) {
   return '<span class="' + cls + '">' + esc(text) + '</span>';
 }
 
 // Highlight `source` for the given language id. Returns an HTML string with newlines
 // preserved (the caller renders it inside a <pre>). Always HTML-escapes plain text.
-export function highlight(source, langId) {
+// `marks` is an optional Set of character indices to wrap in <span class="tok-match">
+// (the matched bracket pair) — brackets always fall in the plain-text gaps, so marking
+// only those gaps keeps the highlight perfectly aligned with the source.
+export function highlight(source, langId, marks) {
   if (!source) return '';
   const lang = LANGS[languageKey(langId)];
   const re = lang.re;
@@ -68,7 +83,7 @@ export function highlight(source, langId) {
   let last = 0;
   let m;
   while ((m = re.exec(source)) !== null) {
-    if (m.index > last) out += esc(source.slice(last, m.index));
+    if (m.index > last) out += escWithMarks(source.slice(last, m.index), last, marks);
     const [whole, comment, mlString, dqString, sqString, num, word] = m;
     if (comment != null) out += span('tok-com', comment);
     else if (mlString != null) out += span('tok-str', mlString);
@@ -86,8 +101,50 @@ export function highlight(source, langId) {
     last = m.index + whole.length;
     if (whole.length === 0) re.lastIndex++; // guard against zero-width matches
   }
-  if (last < source.length) out += esc(source.slice(last));
+  if (last < source.length) out += escWithMarks(source.slice(last), last, marks);
   return out;
+}
+
+const BRACKET_OPEN = { '(': ')', '[': ']', '{': '}' };
+const BRACKET_CLOSE = { ')': '(', ']': '[', '}': '{' };
+
+function scanForward(text, start, open, close) {
+  let depth = 0;
+  for (let i = start; i < text.length; i++) {
+    if (text[i] === open) depth++;
+    else if (text[i] === close && --depth === 0) return i;
+  }
+  return -1;
+}
+
+function scanBackward(text, start, open, close) {
+  let depth = 0;
+  for (let i = start; i >= 0; i--) {
+    if (text[i] === close) depth++;
+    else if (text[i] === open && --depth === 0) return i;
+  }
+  return -1;
+}
+
+/**
+ * Find the bracket pair to highlight for a caret at `caret`. Prefers a bracket
+ * immediately before the caret, then one at the caret. Returns [a, b] (the two
+ * matching bracket indices, a < b) or null. This is a plain character scan — it
+ * does not skip brackets inside strings/comments (good enough for a visual aid).
+ */
+export function matchingBracket(text, caret) {
+  if (!text) return null;
+  for (const pos of [caret - 1, caret]) {
+    const ch = text[pos];
+    if (ch && BRACKET_OPEN[ch]) {
+      const j = scanForward(text, pos, ch, BRACKET_OPEN[ch]);
+      if (j !== -1) return [pos, j];
+    } else if (ch && BRACKET_CLOSE[ch]) {
+      const j = scanBackward(text, pos, BRACKET_CLOSE[ch], ch);
+      if (j !== -1) return [j, pos];
+    }
+  }
+  return null;
 }
 
 // Language-aware single-line comment prefix, used by the comment-toggle command.
