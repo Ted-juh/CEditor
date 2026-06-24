@@ -453,26 +453,12 @@
 {#snippet detailPanel()}
   <div class="detail">
     {#if selected}
-      <div class="field">
-        <label for="bd-name">Name</label>
-        <input id="bd-name" value={selected.name} onfocus={(e) => e.target.select()}
-          oninput={(e) => updateField('name', e.target.value)} />
-      </div>
       <div class="row2">
         <div class="field">
-          <label for="bd-lang">Language</label>
-          <select id="bd-lang" value={selected.language} onchange={(e) => updateField('language', e.target.value)}>
-            {#each SCRIPT_LANGUAGES as l (l.id)}<option value={l.id}>{l.label} {l.version}</option>{/each}
-          </select>
+          <label for="bd-name">Name</label>
+          <input id="bd-name" value={selected.name} onfocus={(e) => e.target.select()}
+            oninput={(e) => updateField('name', e.target.value)} />
         </div>
-        <div class="field">
-          <label for="bd-scope">Scope</label>
-          <select id="bd-scope" value={selected.scope} onchange={(e) => updateField('scope', e.target.value)}>
-            {#each SCRIPT_SCOPES as sc (sc)}<option value={sc}>{sc}</option>{/each}
-          </select>
-        </div>
-      </div>
-      <div class="row2">
         <div class="field">
           <label for="bd-event">Runs on (event / lifecycle)</label>
           <select id="bd-event" value={selected.event} onchange={(e) => updateField('event', e.target.value)}>
@@ -483,6 +469,8 @@
             {/each}
           </select>
         </div>
+      </div>
+      <div class="row2">
         <div class="field">
           <label for="bd-target">Attached control</label>
           <select id="bd-target" value={targetValue} onchange={(e) => updateField('target', e.target.value)}
@@ -491,14 +479,18 @@
             {#each controlNames as name (name)}<option value={name}>{name}</option>{/each}
           </select>
         </div>
-      </div>
-      <div class="field">
-        <label for="bd-folder">Folder (optional)</label>
-        <input id="bd-folder" value={selected.group ?? ''} list="bd-folders" placeholder="e.g. Filter section"
-          onfocus={(e) => e.target.select()} oninput={(e) => updateField('group', e.target.value)} />
-        <datalist id="bd-folders">
-          {#each folderNames as f (f)}<option value={f}></option>{/each}
-        </datalist>
+        <div class="field">
+          <label for="bd-scope">Scope</label>
+          <select id="bd-scope" value={selected.scope} onchange={(e) => updateField('scope', e.target.value)}>
+            {#each SCRIPT_SCOPES as sc (sc)}<option value={sc}>{sc}</option>{/each}
+          </select>
+        </div>
+        <div class="field">
+          <label for="bd-lang">Language</label>
+          <select id="bd-lang" value={selected.language} onchange={(e) => updateField('language', e.target.value)}>
+            {#each SCRIPT_LANGUAGES as l (l.id)}<option value={l.id}>{l.label} {l.version}</option>{/each}
+          </select>
+        </div>
       </div>
       <div class="codehead">
         <span class="lang">{langLabel(selected.language)} source</span>

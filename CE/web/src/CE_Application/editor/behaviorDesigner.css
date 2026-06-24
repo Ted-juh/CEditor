@@ -119,7 +119,7 @@
 .bd-app .testview{max-width:780px}
 .bd-app .detail{
   background:var(--panel);border:1px solid var(--line-2);border-radius:12px;
-  padding:16px;box-shadow:var(--shadow);
+  padding:12px 14px;box-shadow:var(--shadow);
 }
 
 /* tools drawer (Insert / Library / History) */
@@ -185,11 +185,11 @@
 .bd-app .chip button:hover{color:var(--red)}
 
 /* ---- detail form + code editor ---- */
-.bd-app .field{margin-bottom:12px}
-.bd-app .field label{display:block;font-size:11px;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.bd-app .field{margin-bottom:8px;min-width:0}
+.bd-app .field label{display:block;font-size:10px;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
 .bd-app .field input,.bd-app .field select{
   width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:7px;
-  padding:7px 9px;color:var(--txt);font-size:13px;font-family:inherit;
+  padding:6px 9px;color:var(--txt);font-size:13px;font-family:inherit;
 }
 .bd-app .row2{display:flex;gap:10px}
 .bd-app .row2>*{flex:1}
