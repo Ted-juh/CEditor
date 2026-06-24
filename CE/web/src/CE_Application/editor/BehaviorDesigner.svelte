@@ -12,6 +12,7 @@
   import { searchScripts } from '../scripting/scriptSearch.js';
   import { filenameForScript, scriptOverridesFromFile, inferEventFromSource } from '../scripting/scriptFileIo.js';
   import { recordVersion, getVersions, clearVersions } from '../utils/scriptHistory.js';
+  import { addScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
   import {
@@ -45,9 +46,23 @@
     catch { return String(t); }
   }
 
+  // --- line breakpoints (persisted per script across sessions) ---
+  const BP_KEY = 'ce-breakpoints';
+  function loadBreakpoints() { try { return JSON.parse(localStorage.getItem(BP_KEY) || '{}') || {}; } catch { return {}; } }
+  let breakpointsByScript = $state(loadBreakpoints());
+  function setBreakpoints(id, lines) {
+    breakpointsByScript = { ...breakpointsByScript, [id]: lines };
+    try { localStorage.setItem(BP_KEY, JSON.stringify(breakpointsByScript)); } catch { /* ignore */ }
+  }
+
   // Run a script and reveal the console so its output is visible where it ran.
   function runAndShow(script) {
     showConsole = true;
+    const bps = breakpointsByScript[script.id];
+    if (bps && bps.length) {
+      addScriptTrace('trace', script.id,
+        `▣ Breakpoint${bps.length > 1 ? 's' : ''} on line ${bps.join(', ')} — the web runtime runs to completion; line-pause/step lands with the host debugger.`);
+    }
     runScript(script);
   }
 
@@ -345,7 +360,9 @@
         <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
           oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
           oncaret={(line, col) => caret = { line, col }}
-          ondiagnostics={(d) => liveDiagnostics = d} />
+          ondiagnostics={(d) => liveDiagnostics = d}
+          breakpoints={breakpointsByScript[selectedId] ?? []}
+          onbreakpoints={(lines) => setBreakpoints(selectedId, lines)} />
       {/key}
 
       {#if problems.length === 0}

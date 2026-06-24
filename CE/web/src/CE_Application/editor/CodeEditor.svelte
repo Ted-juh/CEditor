@@ -17,9 +17,18 @@
     onrun = null,
     oncaret = null,
     ondiagnostics = null,
+    breakpoints = [],
+    onbreakpoints = null,
     placeholder = '',
     minHeight = 240,
   } = $props();
+
+  let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
+  function toggleBreakpoint(line) {
+    const next = new Set(bpSet);
+    next.has(line) ? next.delete(line) : next.add(line);
+    onbreakpoints?.([...next].sort((a, b) => a - b));
+  }
 
   let taEl = $state(null);       // the editable textarea (the source of truth for editing)
   let measureEl = $state(null);  // hidden element for measuring monospace character width
@@ -55,7 +64,7 @@
 
   // Parser-backed analysis (acorn / luaparse). The AST parse is the heaviest per-keystroke
   // cost, so for large scripts we debounce it (highlighting stays live — it's cheap regex).
-  let analyzedSource = $state(value);
+  let analyzedSource = $state('');
   let analyzeTimer = null;
   $effect(() => {
     const v = value;
@@ -707,7 +716,10 @@
   <div class="ce-gutter" aria-hidden="true">
     <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
       {#each lines as _, i (i)}
-        <div class={['ce-gln', i === caretLine && 'active', errorLines.has(i + 1) && 'err']}>{i + 1}</div>
+        <div class={['ce-gln', i === caretLine && 'active', errorLines.has(i + 1) && 'err', bpSet.has(i + 1) && 'bp']}
+          role="button" tabindex="-1" title="Toggle breakpoint"
+          onclick={() => toggleBreakpoint(i + 1)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreakpoint(i + 1); } }}>{i + 1}</div>
       {/each}
     </div>
   </div>
@@ -750,7 +762,8 @@
   </div>
 
   {#if showMinimap}
-    <div class="ce-minimap" bind:this={minimapWrap} onpointerdown={onMinimapDown}>
+    <div class="ce-minimap" bind:this={minimapWrap} onpointerdown={onMinimapDown}
+      role="button" tabindex="-1" aria-label="Minimap — click to scroll">
       <canvas class="ce-minimap-canvas" bind:this={minimapCanvas}></canvas>
       <div class="ce-minimap-vp" style="top:{mmViewport.top}%; height:{mmViewport.height}%"></div>
     </div>
@@ -843,9 +856,9 @@
   {/if}
 
   {#if soOpen}
-    <div class="ce-so-backdrop" use:portal onmousedown={() => { soOpen = false; taEl?.focus(); }}></div>
+    <div class="ce-so-backdrop" use:portal role="presentation" onmousedown={() => { soOpen = false; taEl?.focus(); }}></div>
     <div class="ce-so" use:portal style="left:{soScreen.x}px; top:{soScreen.y}px; width:{soScreen.w}px"
-      role="dialog" aria-label="Go to symbol" onmousedown={(e) => e.stopPropagation()}>
+      role="dialog" aria-label="Go to symbol" tabindex="-1" onmousedown={(e) => e.stopPropagation()}>
       <input class="ce-so-input" bind:this={soInputEl} bind:value={soQuery} placeholder="Go to symbol…"
         oninput={() => soIndex = 0} onkeydown={onSymbolKey} />
       <div class="ce-so-list">
@@ -933,8 +946,17 @@
     color: var(--txt-faint);
     font-variant-numeric: tabular-nums;
   }
+  .ce-gln { cursor: pointer; position: relative; }
+  .ce-gln:hover::before {
+    content: ''; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+    width: 7px; height: 7px; border-radius: 50%; background: var(--red); opacity: 0.35;
+  }
   .ce-gln.active { color: var(--txt-dim); }
   .ce-gln.err { color: var(--red); box-shadow: inset 2px 0 0 var(--red); }
+  .ce-gln.bp::before {
+    content: ''; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
+    width: 7px; height: 7px; border-radius: 50%; background: var(--red); opacity: 1;
+  }
 
   .ce-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
 

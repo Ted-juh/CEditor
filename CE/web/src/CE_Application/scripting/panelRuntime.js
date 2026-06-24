@@ -422,6 +422,20 @@ async function getHandlers(script) {
   return null;
 }
 
+// Report a thrown error as an error line plus a few call-stack frames (when available),
+// so the console shows the exception AND where it came from.
+function reportScriptError(scriptId, e) {
+  const msg = e?.message ?? String(e);
+  addScriptTrace('error', scriptId, msg);
+  const stack = e && typeof e.stack === 'string' ? e.stack : '';
+  if (stack) {
+    const frames = stack.split('\n').map((s) => s.trim())
+      .filter((l) => /^at\s|:\d+:\d+\)?$|^\[string/.test(l)) // JS "at …" frames / Lua "[string ...]:n"
+      .slice(0, 5);
+    for (const f of frames) addScriptTrace('trace', scriptId, `  ${f}`);
+  }
+}
+
 /** Run a script now — execute it and call its declared handler (or a named hook). */
 export async function runScript(script, hook = null, payload = undefined) {
   const handlers = await getHandlers(script);
@@ -437,7 +451,7 @@ export async function runScript(script, hook = null, payload = undefined) {
     if (result && typeof result.then === 'function') await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
   } catch (e) {
-    addScriptTrace('error', script.id, `${e?.message ?? e}`);
+    reportScriptError(script.id, e);
   }
 }
 
