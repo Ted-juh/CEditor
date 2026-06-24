@@ -93,7 +93,10 @@
   // Seed once from the props/initial state; these are deliberately initial-only.
   let scripts = $state(untrack(() => (initialScripts ?? []).map((s) => normalizeSourceScript(s))));
 
-  let activeScreen = $state('behaviors');
+  let mainView = $state('editor');   // what fills the stage: 'editor' | 'test'
+  let expanded = $state(new Set(['setup', 'teardown', 'behaviors'])); // expanded tree groups
+  function toggleExpand(id) { const n = new Set(expanded); n.has(id) ? n.delete(id) : n.add(id); expanded = n; }
+  function expand(id) { if (!expanded.has(id)) { const n = new Set(expanded); n.add(id); expanded = n; } }
   let selectedId = $state(untrack(() => scripts[0]?.id ?? null));
 
   let selected = $derived(scripts.find((s) => s.id === selectedId) ?? null);
@@ -116,7 +119,7 @@
     const s = scripts.find((x) => x.id === id);
     if (!s) return;
     selectedId = id;
-    activeScreen = screenOf(s.event);
+    mainView = 'editor';
   }
 
   // --- list grouping + inline rename ---
@@ -170,7 +173,7 @@
     return String(v);
   }
   $effect(() => {
-    if (activeScreen !== 'test' || watchPaths.length === 0) return;
+    if (mainView !== 'test' || watchPaths.length === 0) return;
     refreshWatches();
     const id = setInterval(refreshWatches, 500);
     return () => clearInterval(id);
@@ -220,29 +223,23 @@
   let teardownScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'teardown'));
   let enabledCount = $derived(scripts.filter((s) => s.enabled).length);
 
-  let nav = $derived([
-    { group: 'Panel lifecycle', items: [
-      { id: 'setup', icon: '▸', label: 'Setup', count: setupScripts.length || undefined },
-      { id: 'teardown', icon: '◾', label: 'Teardown', count: teardownScripts.length || undefined },
-    ] },
-    { group: 'During use', items: [
-      { id: 'behaviors', icon: '⚡', label: 'Behaviors', count: behaviorScripts.length || undefined },
-    ] },
-    { group: 'Tools', items: [
-      { id: 'test', icon: '◉', label: 'Test / Trace' },
-    ] },
-  ]);
+  // Lifecycle groups for the Scripts tree — each expands to its scripts; "+ New" on a group
+  // creates a script already set to that group's event/scope.
+  let setupNode = $derived({ id: 'setup', icon: '▸', label: 'Setup', event: 'onPanelReady', scope: 'panel', scripts: setupScripts });
+  let teardownNode = $derived({ id: 'teardown', icon: '◾', label: 'Teardown', event: 'onPanelClose', scope: 'panel', scripts: teardownScripts });
+  let behaviorsNode = $derived({ id: 'behaviors', icon: '⚡', label: 'Behaviors', event: 'onValueChanged', scope: 'component', scripts: behaviorScripts });
 
   function langClass(id) { return id === 'javascript' ? 'js' : 'lua'; }
   function langLabel(id) { return id === 'javascript' ? 'JavaScript' : 'Lua'; }
 
-  function selectScript(id) { selectedId = id; }
+  function selectScript(id) { selectedId = id; mainView = 'editor'; }
 
   function addScript(event, scope) {
     const s = createScript({ event, scope, language: selected?.language ?? 'lua', name: 'New ' + event });
     scripts = [...scripts, s];
     selectedId = s.id;
-    activeScreen = screenOf(event);
+    expand(screenOf(event));
+    mainView = 'editor';
   }
 
   function updateField(key, value) {
@@ -272,7 +269,8 @@
     });
     scripts = [...scripts, s];
     selectedId = s.id;
-    activeScreen = screenOf(entry.event);
+    expand(screenOf(entry.event));
+    mainView = 'editor';
     showLibrary = false;
   }
 
@@ -308,7 +306,8 @@
     const s = createScript({ ...overrides, event });
     scripts = [...scripts, s];
     selectedId = s.id;
-    activeScreen = screenOf(event);
+    expand(screenOf(event));
+    mainView = 'editor';
     e.target.value = ''; // let the same file be re-imported
   }
 </script>
@@ -419,62 +418,151 @@
   </div>
 {/snippet}
 
-{#snippet tableScreen(title, sub, items, addEvent, addScope)}
-  <div class="shead"><h1>{title}</h1></div>
-  <p class="sub">{sub}</p>
-  <div class="toolbar">
-    <button class="btn primary" onclick={() => addScript(addEvent, addScope)}>+ New</button>
-    <button class="btn ghost" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import file</button>
-    <span class="spacer"></span>
-    <div class="groupby" title="Group the list">
-      <button class={['gb', groupMode === 'flat' && 'active']} onclick={() => groupMode = 'flat'}>Flat</button>
-      <button class={['gb', groupMode === 'control' && 'active']} onclick={() => groupMode = 'control'}>Control</button>
-      <button class={['gb', groupMode === 'folder' && 'active']} onclick={() => groupMode = 'folder'}>Folder</button>
+{#snippet treeGroup(node)}
+  <div class="treegroup">
+    <div class={['tghead', expanded.has(node.id) && 'open']}>
+      <button class="tgtoggle" title={node.label}
+        onclick={() => toggleExpand(node.id)}>
+        <span class="tgcaret">{expanded.has(node.id) ? '▾' : '▸'}</span>
+        <span class="ti">{node.icon}</span>
+        <span class="tglabel">{node.label}</span>
+        {#if node.scripts.length}<span class="ct">{node.scripts.length}</span>{/if}
+      </button>
+      <button class="tgnew" title={'New ' + node.label + ' script (' + node.event + ')'}
+        onclick={() => addScript(node.event, node.scope)}>+</button>
     </div>
-  </div>
-  <div class="tablewrap">
-    <table>
-      <thead><tr>
-        <th style="width:56%">Script</th>
-        <th style="width:16%">Lang</th>
-        <th style="width:28%">Runs on</th>
-      </tr></thead>
-      <tbody>
-        {#each groupsOf(items) as g (g.key)}
-          {#if groupMode !== 'flat'}
-            <tr class="grouphead"><td colspan="3">{g.key} <span class="gc">{g.items.length}</span></td></tr>
-          {/if}
+    {#if expanded.has(node.id)}
+      {#if node.scripts.length === 0}
+        <div class="tgempty">No scripts — click <b>+</b> to add one.</div>
+      {:else}
+        {#each groupsOf(node.scripts) as g (g.key)}
+          {#if groupMode !== 'flat'}<div class="tgsub">{g.key} <span class="gc">{g.items.length}</span></div>{/if}
           {#each g.items as s (s.id)}
-            <tr class={[selectedId === s.id && 'sel', !s.enabled && 'off']}
+            <div class={['titem', selectedId === s.id && mainView === 'editor' && 'sel', !s.enabled && 'off']}
               role="button" tabindex="0"
               onclick={() => selectScript(s.id)}
               onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectScript(s.id)}>
-              <td>
-                {#if renamingId === s.id}
-                  <input class="renameinput" value={renameValue}
-                    oninput={(e) => renameValue = e.target.value}
-                    onblur={commitRename}
-                    onclick={(e) => e.stopPropagation()}
-                    onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
-                    {@attach (el) => { el.focus(); el.select(); }} />
-                {:else}
-                  <span class="sname" role="button" tabindex="0"
-                    ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
-                    onkeydown={(e) => { if (e.key === 'F2' || e.key === 'Enter') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
-                    title="Double-click (or F2) to rename">{s.name}</span>
-                {/if}
-              </td>
-              <td><span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span></td>
-              <td><span class="ev">{s.event}</span></td>
-            </tr>
+              {#if renamingId === s.id}
+                <input class="renameinput" value={renameValue}
+                  oninput={(e) => renameValue = e.target.value}
+                  onblur={commitRename}
+                  onclick={(e) => e.stopPropagation()}
+                  onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
+                  {@attach (el) => { el.focus(); el.select(); }} />
+              {:else}
+                <span class="sname" role="button" tabindex="0"
+                  ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
+                  onkeydown={(e) => { if (e.key === 'F2') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
+                  title="Double-click (or F2) to rename">{s.name}</span>
+                <span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span>
+              {/if}
+            </div>
           {/each}
         {/each}
-        {#if items.length === 0}
-          <tr><td colspan="3" style="color:var(--txt-faint);text-align:center;padding:22px">No scripts here yet.</td></tr>
-        {/if}
-      </tbody>
-    </table>
+      {/if}
+    {/if}
   </div>
+{/snippet}
+
+{#snippet testView()}
+  <div class="testview">
+    <div class="shead"><h1>Test / Trace</h1></div>
+    <p class="sub">Problems across every script (live), plus the trace from the running panel and "run until…" breakpoints.</p>
+
+    <div class="tsection">
+      <div class="tshead">Problems <span class="tcount">{allProblems.length}</span></div>
+      {#if allProblems.length === 0}
+        <div class="problem ok">✓ No problems in {scripts.length} script{scripts.length === 1 ? '' : 's'}</div>
+      {:else}
+        {#each allProblems as p (p.script + p.message)}
+          <div class={['problem', p.severity]}><span>{p.severity === 'error' ? '✕' : '!'}</span><span><b>{p.script}</b> — {p.message}</span></div>
+        {/each}
+      {/if}
+    </div>
+
+    <div class="tsection" style="height:260px;display:flex;flex-direction:column">
+      <div class="consolebox" style="flex:1;margin-top:0"><ScriptConsole /></div>
+    </div>
+
+    <div class="tsection">
+      <div class="tshead">Watch &amp; "run until"</div>
+      <p class="sub" style="margin:0 0 10px">Watch control values live (updates ~2×/sec while this screen is open). The "run until" thresholds are honored by the host runtime.</p>
+      <div class="bprow">
+        <input placeholder="path e.g. cutoff.value" value={bpPath} oninput={(e) => bpPath = e.target.value} onfocus={(e) => e.target.select()} />
+        <select value={bpOp} onchange={(e) => bpOp = e.target.value}>
+          <option>&gt;</option><option>&lt;</option><option>=</option><option>!=</option>
+        </select>
+        <input placeholder="value" style="max-width:90px" value={bpValue} oninput={(e) => bpValue = e.target.value} onfocus={(e) => e.target.select()} />
+        <button class="btn" onclick={addBreakpoint}>+ Run until</button>
+      </div>
+      {#each breakpoints as b, i (b.path + b.op + b.value + i)}
+        <div class="chip">run until <b>{b.path}</b> {b.op} {b.value} <button onclick={() => removeBreakpoint(i)}>×</button></div>
+      {/each}
+      <div class="bprow" style="margin-top:10px">
+        <input placeholder="watch a path e.g. resonance.value" value={watchInput} oninput={(e) => watchInput = e.target.value} onfocus={(e) => e.target.select()} />
+        <button class="btn" onclick={addWatch}>+ Watch</button>
+      </div>
+      {#each watchPaths as w, i (w + i)}
+        <div class="chip"><b>{w}</b> <span style="color:var(--accent)">= {fmtWatch(watchValues[w])}</span> <button onclick={() => removeWatch(i)}>×</button></div>
+      {/each}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet toolsDrawer()}
+  {#if showHistory}
+    <div class="pickerpane">
+      <div class="pickerhead">
+        <span>History <b>{versions.length}</b></span>
+        <span style="display:flex;gap:6px">
+          {#if versions.length}<button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>{/if}
+          <button class="btn ghost" onclick={() => showHistory = false}>Done</button>
+        </span>
+      </div>
+      <div class="liblist">
+        {#if versions.length === 0}
+          <div class="pcat" style="padding:12px">No saved versions yet. Snapshots are captured automatically as you edit (and persist across sessions). Restore any of them here.</div>
+        {:else}
+          {#each versions as v, i (v.t)}
+            <div class="librow">
+              <div class="libmeta">
+                <span class="sname">{i === 0 ? 'Latest' : fmtTime(v.t)}</span>
+                <span class="pd">{v.source.split('\n').length} lines · {v.source.length} chars</span>
+              </div>
+              <button class="btn primary" onclick={() => restoreVersion(v.source)} title="Replace the current source with this version">Restore</button>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </div>
+  {:else if showLibrary}
+    <div class="pickerpane">
+      <div class="pickerhead"><span>Library <b>{$scriptLibrary.length}</b></span><button class="btn ghost" onclick={() => showLibrary = false}>Done</button></div>
+      <div class="liblist">
+        {#if $scriptLibrary.length === 0}
+          <div class="pcat" style="padding:12px">No saved scripts yet. Select a script and click <b>★ Save to library</b> to reuse it on any panel.</div>
+        {:else}
+          {#each $scriptLibrary as e (e.id)}
+            <div class="librow">
+              <div class="libmeta">
+                <span class="sname">{e.name}</span>
+                <span class="pd"><span class={['pill', langClass(e.language)]}>{langLabel(e.language)}</span> {e.event}</span>
+              </div>
+              <span style="display:flex;gap:6px;flex-shrink:0">
+                <button class="btn primary" onclick={() => importFromLibrary(e)} title="Add an independent copy to this panel">Import</button>
+                <button class="btn ghost" onclick={() => removeFromLibrary(e.id)} title="Remove from library" style="color:var(--red)">✕</button>
+              </span>
+            </div>
+          {/each}
+        {/if}
+      </div>
+    </div>
+  {:else if showPicker && selected}
+    <div class="pickerpane">
+      <div class="pickerhead"><span>Insert into <b>{selected.name}</b></span><button class="btn ghost" onclick={() => showPicker = false}>Done</button></div>
+      <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
+    </div>
+  {/if}
 {/snippet}
 
 <div class="bd-app">
@@ -488,184 +576,84 @@
   </div>
 
   <div class="body">
+    <!-- LEFT: the Scripts tree — lifecycle groups expand to their scripts -->
     <div class="side">
       <div class="profilecard">
         <div class="pn"><span class="led"></span>Scripting</div>
         <div class="pm">{scripts.length} scripts · {enabledCount} enabled</div>
       </div>
-      {#each nav as section (section.group)}
-        <div class="treelbl">{section.group}</div>
-        {#each section.items as item (item.id)}
-          <div class={['tnode', activeScreen === item.id && 'active']}
-            role="button" tabindex="0"
-            onclick={() => activeScreen = item.id}
-            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (activeScreen = item.id)}>
-            <span class="ti">{item.icon}</span> {item.label}
-            {#if item.count != null}<span class="ct">{item.count}</span>{/if}
-          </div>
-        {/each}
-      {/each}
-      <div class="sidehint">One stable frame — screens swap in place, nothing jumps. Scripts run in the language you write them in.</div>
-    </div>
 
-    <div class="stage">
-      <div class="split" style="display:{activeScreen === 'test' ? 'none' : 'flex'}">
-        <!-- MIDDLE: the scripting area (code editor + picker + problems) — the main work surface -->
-        <div class="editorcol">
-          {@render detailPanel()}
-        </div>
-        <!-- RIGHT: the script list — or the Insert picker / Library while inserting -->
-        <div class="listcol">
-          {#if showHistory}
-            <div class="pickerpane">
-              <div class="pickerhead">
-                <span>History <b>{versions.length}</b></span>
-                <span style="display:flex;gap:6px">
-                  {#if versions.length}<button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>{/if}
-                  <button class="btn ghost" onclick={() => showHistory = false}>Done</button>
-                </span>
-              </div>
-              <div class="liblist">
-                {#if versions.length === 0}
-                  <div class="pcat" style="padding:12px">No saved versions yet. Snapshots are captured automatically as you edit (and persist across sessions). Restore any of them here.</div>
-                {:else}
-                  {#each versions as v, i (v.t)}
-                    <div class="librow">
-                      <div class="libmeta">
-                        <span class="sname">{i === 0 ? 'Latest' : fmtTime(v.t)}</span>
-                        <span class="pd">{v.source.split('\n').length} lines · {v.source.length} chars</span>
-                      </div>
-                      <button class="btn primary" onclick={() => restoreVersion(v.source)} title="Replace the current source with this version">Restore</button>
-                    </div>
-                  {/each}
-                {/if}
-              </div>
-            </div>
-          {:else if showLibrary}
-            <div class="pickerpane">
-              <div class="pickerhead"><span>Library <b>{$scriptLibrary.length}</b></span><button class="btn ghost" onclick={() => showLibrary = false}>Done</button></div>
-              <div class="liblist">
-                {#if $scriptLibrary.length === 0}
-                  <div class="pcat" style="padding:12px">No saved scripts yet. Select a script and click <b>★ Save to library</b> to reuse it on any panel.</div>
-                {:else}
-                  {#each $scriptLibrary as e (e.id)}
-                    <div class="librow">
-                      <div class="libmeta">
-                        <span class="sname">{e.name}</span>
-                        <span class="pd"><span class={['pill', langClass(e.language)]}>{langLabel(e.language)}</span> {e.event}</span>
-                      </div>
-                      <span style="display:flex;gap:6px;flex-shrink:0">
-                        <button class="btn primary" onclick={() => importFromLibrary(e)} title="Add an independent copy to this panel">Import</button>
-                        <button class="btn ghost" onclick={() => removeFromLibrary(e.id)} title="Remove from library" style="color:var(--red)">✕</button>
-                      </span>
-                    </div>
-                  {/each}
-                {/if}
-              </div>
-            </div>
-          {:else if showPicker && selected}
-            <div class="pickerpane">
-              <div class="pickerhead"><span>Insert into <b>{selected.name}</b></span><button class="btn ghost" onclick={() => showPicker = false}>Done</button></div>
-              <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
-            </div>
-          {:else}
-            <div class="searchbar">
-              <span class="si">⌕</span>
-              <input class="searchinput" placeholder="Search all scripts…" value={searchQuery}
-                oninput={(e) => searchQuery = e.target.value}
-                onkeydown={(e) => { if (e.key === 'Escape') searchQuery = ''; }} />
-              {#if searchQuery}
-                <span class="scount">{searchResults.length} match{searchResults.length === 1 ? '' : 'es'}</span>
-                <button class="searchclear" title="Clear (Esc)" onclick={() => searchQuery = ''}>✕</button>
-              {/if}
-            </div>
-            {#if searchQuery}
-              <div class="screen active">
-                <div class="searchresults">
-                  {#if searchResults.length === 0}
-                    <div class="noresults">No scripts match “{searchQuery}”.</div>
-                  {:else}
-                    {#each searchResults as r (r.id)}
-                      <div class={['resrow', selectedId === r.id && 'sel']} role="button" tabindex="0"
-                        onclick={() => openResult(r.id)}
-                        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openResult(r.id)}>
-                        <div class="resmeta">
-                          <span class="sname">{r.name}</span>
-                          <span class="pd"><span class={['pill', langClass(r.language)]}>{langLabel(r.language)}</span> {r.event}<span class="rfield"> · {r.field}</span></span>
-                        </div>
-                        {#if r.snippet}<div class="ressnip"><span class="rline">{r.line}</span><code>{r.snippet}</code></div>{/if}
-                      </div>
-                    {/each}
-                  {/if}
-                </div>
-              </div>
-            {:else}
-              <div class={['screen', activeScreen === 'setup' && 'active']}>
-                {@render tableScreen('Setup', 'Runs once as the panel starts — open MIDI, read the synth, fill controls.', setupScripts, 'onPanelReady', 'panel')}
-              </div>
-              <div class={['screen', activeScreen === 'behaviors' && 'active']}>
-                {@render tableScreen('Behaviors', 'The live, event-driven scripts — what happens while the panel is in use.', behaviorScripts, 'onValueChanged', 'component')}
-              </div>
-              <div class={['screen', activeScreen === 'teardown' && 'active']}>
-                {@render tableScreen('Teardown', 'Runs as the panel closes or the DAW saves/restores the project.', teardownScripts, 'onPanelClose', 'panel')}
-              </div>
-            {/if}
-          {/if}
-        </div>
+      <div class="treesearch">
+        <span class="si">⌕</span>
+        <input class="searchinput" placeholder="Search scripts…" value={searchQuery}
+          oninput={(e) => searchQuery = e.target.value}
+          onkeydown={(e) => { if (e.key === 'Escape') searchQuery = ''; }} />
+        {#if searchQuery}<button class="searchclear" title="Clear (Esc)" onclick={() => searchQuery = ''}>✕</button>{/if}
       </div>
-      <!-- Test screen is full-width (no list/editor split) -->
-      <div class={['screen', activeScreen === 'test' && 'active']}>
-        <div class="shead"><h1>Test / Trace</h1></div>
-        <p class="sub">Problems across every script (live), plus the trace from the running panel and "run until…" breakpoints.</p>
 
-        <!-- Problems — edit-time validation across ALL scripts (real, now) -->
-        <div class="tsection">
-          <div class="tshead">Problems <span class="tcount">{allProblems.length}</span></div>
-          {#if allProblems.length === 0}
-            <div class="problem ok">✓ No problems in {scripts.length} script{scripts.length === 1 ? '' : 's'}</div>
+      {#if searchQuery}
+        <div class="treebody">
+          {#if searchResults.length === 0}
+            <div class="noresults">No scripts match “{searchQuery}”.</div>
           {:else}
-            {#each allProblems as p (p.script + p.message)}
-              <div class={['problem', p.severity]}><span>{p.severity === 'error' ? '✕' : '!'}</span><span><b>{p.script}</b> — {p.message}</span></div>
+            <div class="scount">{searchResults.length} match{searchResults.length === 1 ? '' : 'es'}</div>
+            {#each searchResults as r (r.id)}
+              <div class={['resrow', selectedId === r.id && 'sel']} role="button" tabindex="0"
+                onclick={() => openResult(r.id)}
+                onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openResult(r.id)}>
+                <div class="resmeta">
+                  <span class="sname">{r.name}</span>
+                  <span class="pd"><span class={['pill', langClass(r.language)]}>{langLabel(r.language)}</span> {r.event}<span class="rfield"> · {r.field}</span></span>
+                </div>
+                {#if r.snippet}<div class="ressnip"><span class="rline">{r.line}</span><code>{r.snippet}</code></div>{/if}
+              </div>
             {/each}
           {/if}
         </div>
-
-        <!-- Output console — runtime log/trace/errors/MIDI, with per-kind filters -->
-        <div class="tsection" style="height:260px;display:flex;flex-direction:column">
-          <div class="consolebox" style="flex:1;margin-top:0"><ScriptConsole /></div>
+      {:else}
+        <div class="treetools">
+          <div class="groupby" title="Group scripts within each section">
+            <button class={['gb', groupMode === 'flat' && 'active']} onclick={() => groupMode = 'flat'}>Flat</button>
+            <button class={['gb', groupMode === 'control' && 'active']} onclick={() => groupMode = 'control'}>Control</button>
+            <button class={['gb', groupMode === 'folder' && 'active']} onclick={() => groupMode = 'folder'}>Folder</button>
+          </div>
+          <button class="btn ghost tiny" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import</button>
         </div>
 
-        <!-- Watch & "run until" — config now, enforced by the runtime later -->
-        <div class="tsection">
-          <div class="tshead">Watch &amp; "run until"</div>
-          <p class="sub" style="margin:0 0 10px">Watch control values live (updates ~2×/sec while this screen is open). The "run until" thresholds are honored by the host runtime.</p>
-          <div class="bprow">
-            <input placeholder="path e.g. cutoff.value" value={bpPath} oninput={(e) => bpPath = e.target.value} onfocus={(e) => e.target.select()} />
-            <select value={bpOp} onchange={(e) => bpOp = e.target.value}>
-              <option>&gt;</option><option>&lt;</option><option>=</option><option>!=</option>
-            </select>
-            <input placeholder="value" style="max-width:90px" value={bpValue} oninput={(e) => bpValue = e.target.value} onfocus={(e) => e.target.select()} />
-            <button class="btn" onclick={addBreakpoint}>+ Run until</button>
+        <div class="treebody">
+          <div class="treelbl">Panel lifecycle</div>
+          {@render treeGroup(setupNode)}
+          {@render treeGroup(teardownNode)}
+          <div class="treelbl">During use</div>
+          {@render treeGroup(behaviorsNode)}
+          <div class="treelbl">Tools</div>
+          <div class={['tnode', mainView === 'test' && 'active']} role="button" tabindex="0"
+            onclick={() => mainView = 'test'}
+            onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (mainView = 'test')}>
+            <span class="ti">◉</span> Test / Trace
           </div>
-          {#each breakpoints as b, i (b.path + b.op + b.value + i)}
-            <div class="chip">run until <b>{b.path}</b> {b.op} {b.value} <button onclick={() => removeBreakpoint(i)}>×</button></div>
-          {/each}
-          <div class="bprow" style="margin-top:10px">
-            <input placeholder="watch a path e.g. resonance.value" value={watchInput} oninput={(e) => watchInput = e.target.value} onfocus={(e) => e.target.select()} />
-            <button class="btn" onclick={addWatch}>+ Watch</button>
-          </div>
-          {#each watchPaths as w, i (w + i)}
-            <div class="chip"><b>{w}</b> <span style="color:var(--accent)">= {fmtWatch(watchValues[w])}</span> <button onclick={() => removeWatch(i)}>×</button></div>
-          {/each}
         </div>
-      </div>
+      {/if}
+    </div>
+
+    <div class="stage">
+      {#if mainView === 'test'}
+        {@render testView()}
+      {:else}
+        {@render detailPanel()}
+      {/if}
+
+      <!-- Tools drawer: Insert / Library / History slide over the editor on demand -->
+      {#if showHistory || showLibrary || (showPicker && selected)}
+        <div class="drawer">{@render toolsDrawer()}</div>
+      {/if}
     </div>
   </div>
 
   <div class="stagefoot">
     <span>{scripts.length} scripts</span>
     <span class="ok">● {enabledCount} enabled</span>
-    {#if selected && activeScreen !== 'test'}
+    {#if selected && mainView !== 'test'}
       <span class="caretpos" title="Cursor position">Ln {caret.line}, Col {caret.col}</span>
     {/if}
     <span class="spacer" style="flex:1"></span>
