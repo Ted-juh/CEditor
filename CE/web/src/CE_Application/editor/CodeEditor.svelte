@@ -30,6 +30,15 @@
   let caretPos = $state(0);
   let fontSize = $state(13);
   let charWidth = $state(7.8);
+  // Editor colour theme — persisted locally, independent of the app chrome.
+  let theme = $state(readTheme());
+  function readTheme() {
+    try { return localStorage.getItem('ce-theme') === 'light' ? 'light' : 'dark'; } catch { return 'dark'; }
+  }
+  function toggleTheme() {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('ce-theme', theme); } catch { /* ignore */ }
+  }
 
   // Parser-backed analysis (acorn / luaparse). Re-runs as the source or language changes.
   let analysis = $derived(analyze(value, language));
@@ -572,7 +581,7 @@
   }
 </script>
 
-<div class="ce" style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
+<div class={['ce', theme === 'light' && 'light']} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
   <div class="ce-gutter" aria-hidden="true">
     <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
       {#each lines as _, i (i)}
@@ -649,6 +658,8 @@
     </div>
   {/if}
 
+  <button class="ce-theme-btn" title="Toggle editor theme" aria-label="Toggle editor theme"
+    onclick={toggleTheme}>{theme === 'dark' ? '☾' : '☀'}</button>
   <button class="ce-help-btn" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts"
     onclick={() => showHelp = !showHelp}>?</button>
 
@@ -722,10 +733,25 @@
 
 <style>
   .ce {
+    /* editor colour theme (dark default) */
+    --ce-bg: #0a0c10;
+    --ce-gutter-bg: #080a0d;
+    --ce-fg: #cfe3d8;
+    --ce-active: rgba(255, 255, 255, 0.04);
+    --ce-occ: rgba(224, 162, 60, 0.18);
+    --ce-sel: rgba(90, 155, 240, 0.35);
+    --ce-com: #5b6b5f;
+    --ce-str: #9ed4a8;
+    --ce-numc: #e0a23c;
+    --ce-kw: #5a9bf0;
+    --ce-litc: #c98be0;
+    --ce-bic: #4dd6a0;
+    --ce-match-bg: rgba(90, 155, 240, 0.28);
+    --ce-match-ring: rgba(90, 155, 240, 0.55);
     position: relative;
     display: flex;
     width: 100%;
-    background: #0a0c10;
+    background: var(--ce-bg);
     border: 1px solid var(--line-2);
     border-radius: 8px;
     overflow: hidden;
@@ -734,13 +760,29 @@
     line-height: var(--ce-lh);
     resize: vertical;
   }
+  .ce.light {
+    --ce-bg: #fbfcfd;
+    --ce-gutter-bg: #f1f3f6;
+    --ce-fg: #1f2430;
+    --ce-active: rgba(0, 0, 0, 0.05);
+    --ce-occ: rgba(176, 104, 0, 0.16);
+    --ce-sel: rgba(42, 93, 176, 0.22);
+    --ce-com: #8a948c;
+    --ce-str: #2e7d46;
+    --ce-numc: #b06800;
+    --ce-kw: #2a5db0;
+    --ce-litc: #8a3fb0;
+    --ce-bic: #1a8f6a;
+    --ce-match-bg: rgba(42, 93, 176, 0.2);
+    --ce-match-ring: rgba(42, 93, 176, 0.5);
+  }
 
   .ce-gutter {
     position: relative;
     flex-shrink: 0;
     width: calc(var(--ce-gw) + 22px);
     overflow: hidden;
-    background: #080a0d;
+    background: var(--ce-gutter-bg);
     border-right: 1px solid var(--line);
     user-select: none;
   }
@@ -761,13 +803,13 @@
   .ce-activeline {
     position: absolute;
     left: 0; right: 0;
-    background: rgba(255, 255, 255, 0.04);
+    background: var(--ce-active);
     pointer-events: none;
     z-index: 0;
   }
   .ce-occ {
     position: absolute;
-    background: rgba(224, 162, 60, 0.18);
+    background: var(--ce-occ);
     border-radius: 2px;
     pointer-events: none;
     z-index: 0;
@@ -789,7 +831,7 @@
     position: absolute;
     top: 0; left: 0;
     min-width: 100%;
-    color: #cfe3d8;
+    color: var(--ce-fg);
     pointer-events: none;
     z-index: 1;
     will-change: transform;
@@ -801,26 +843,26 @@
     width: 100%; height: 100%;
     background: transparent;
     color: transparent;
-    caret-color: #cfe3d8;
+    caret-color: var(--ce-fg);
     resize: none;
     overflow: auto;
     outline: none;
     z-index: 2;
   }
-  .ce-ta::selection { background: rgba(90, 155, 240, 0.35); }
+  .ce-ta::selection { background: var(--ce-sel); }
   .ce-ta::placeholder { color: var(--txt-faint); }
 
   /* token colours — tuned for the dark #0a0c10 surface */
-  .ce-hl :global(.tok-com) { color: #5b6b5f; font-style: italic; }
-  .ce-hl :global(.tok-str) { color: #9ed4a8; }
-  .ce-hl :global(.tok-num) { color: #e0a23c; }
-  .ce-hl :global(.tok-kw)  { color: #5a9bf0; }
-  .ce-hl :global(.tok-lit) { color: #c98be0; }
-  .ce-hl :global(.tok-bi)  { color: #4dd6a0; }
+  .ce-hl :global(.tok-com) { color: var(--ce-com); font-style: italic; }
+  .ce-hl :global(.tok-str) { color: var(--ce-str); }
+  .ce-hl :global(.tok-num) { color: var(--ce-numc); }
+  .ce-hl :global(.tok-kw)  { color: var(--ce-kw); }
+  .ce-hl :global(.tok-lit) { color: var(--ce-litc); }
+  .ce-hl :global(.tok-bi)  { color: var(--ce-bic); }
   .ce-hl :global(.tok-match) {
-    background: rgba(90, 155, 240, 0.28);
+    background: var(--ce-match-bg);
     border-radius: 2px;
-    box-shadow: 0 0 0 1px rgba(90, 155, 240, 0.55);
+    box-shadow: 0 0 0 1px var(--ce-match-ring);
   }
 
   .ce-find {
@@ -881,6 +923,22 @@
     transition: opacity .12s;
   }
   .ce-help-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-theme-btn {
+    position: absolute;
+    right: 36px; bottom: 8px;
+    z-index: 4;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--txt-dim);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity .12s;
+  }
+  .ce-theme-btn:hover { opacity: 1; color: var(--txt); }
   .ce-help {
     position: absolute;
     right: 14px; bottom: 38px;
