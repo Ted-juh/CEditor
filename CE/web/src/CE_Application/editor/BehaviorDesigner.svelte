@@ -9,6 +9,7 @@
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
   import { searchScripts } from '../scripting/scriptSearch.js';
+  import { filenameForScript, scriptOverridesFromFile, inferEventFromSource } from '../scripting/scriptFileIo.js';
   import { scriptTrace, clearScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
@@ -193,6 +194,42 @@
     activeScreen = screenOf(entry.event);
     showLibrary = false;
   }
+
+  // --- File I/O: load/save a single script as a file on disk ---
+  let fileInputEl = $state(null);
+  // Every handler name the importer can recognise, so a loaded file opens on the right screen.
+  const KNOWN_EVENT_NAMES = [
+    ...LIFECYCLE_HOOKS.map((h) => h.id),
+    ...CONTROL_EVENTS.map((e) => e.fn),
+    ...PANEL_EVENTS.map((e) => e.fn),
+    ...DEVICE_EVENTS.map((e) => e.fn),
+  ];
+
+  function exportScriptFile() {
+    if (!selected) return;
+    const blob = new Blob([selected.source ?? ''], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filenameForScript(selected);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async function importScriptFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const overrides = scriptOverridesFromFile(file.name, text, selected?.language ?? 'lua');
+    const event = inferEventFromSource(text, KNOWN_EVENT_NAMES) ?? 'onValueChanged';
+    const s = createScript({ ...overrides, event });
+    scripts = [...scripts, s];
+    selectedId = s.id;
+    activeScreen = screenOf(event);
+    e.target.value = ''; // let the same file be re-imported
+  }
 </script>
 
 {#snippet detailPanel()}
@@ -274,6 +311,7 @@
           <input type="checkbox" checked={selected.enabled} onchange={(e) => updateField('enabled', e.target.checked)} /> Enabled
         </label>
         <span class="spacer"></span>
+        <button class="btn ghost" onclick={exportScriptFile} title="Save this script's source to a file on disk">⬇ Export file</button>
         <button class="btn ghost" onclick={saveSelectedToLibrary} title="Save a reusable copy to the library">★ Save to library</button>
         <button class="btn ghost" onclick={deleteSelected} style="color:var(--red)">Delete</button>
       </div>
@@ -288,6 +326,7 @@
   <p class="sub">{sub}</p>
   <div class="toolbar">
     <button class="btn primary" onclick={() => addScript(addEvent, addScope)}>+ New</button>
+    <button class="btn ghost" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import file</button>
     <span class="spacer"></span>
     <div class="groupby" title="Group the list">
       <button class={['gb', groupMode === 'flat' && 'active']} onclick={() => groupMode = 'flat'}>Flat</button>
@@ -341,6 +380,9 @@
 {/snippet}
 
 <div class="bd-app">
+  <!-- Hidden picker backing the "Import file" buttons. -->
+  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.py,.txt,text/plain"
+    style="display:none" onchange={importScriptFile} />
   <div class="titlebar">
     <div class="dots"><span></span><span></span><span></span></div>
     <div class="brand">CEditor</div>

@@ -103,6 +103,9 @@
     const start = ta.selectionStart, end = ta.selectionEnd;
     const mod = e.ctrlKey || e.metaKey;
 
+    // Shortcuts help overlay
+    if (e.key === 'F1') { e.preventDefault(); showHelp = !showHelp; return; }
+    if (showHelp && e.key === 'Escape') { e.preventDefault(); showHelp = false; return; }
     // Find / replace
     if (mod && (e.key === 'f' || e.key === 'h')) {
       e.preventDefault(); openFind(e.key === 'h'); return;
@@ -204,6 +207,22 @@
     }).join('\n');
     applyEdit(from, blockEnd, next, from, from + next.length);
   }
+
+  // ----- shortcuts help -----
+  let showHelp = $state(false);
+  const SHORTCUTS = [
+    { keys: 'Tab / Shift+Tab', desc: 'Indent / outdent line or selection' },
+    { keys: 'Enter', desc: 'New line with auto-indent' },
+    { keys: 'Ctrl/⌘ + F', desc: 'Find' },
+    { keys: 'Ctrl/⌘ + H', desc: 'Find & replace' },
+    { keys: 'Ctrl/⌘ + /', desc: 'Toggle line comment' },
+    { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
+    { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
+    { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
+    { keys: '(  [  {  "  \'  `', desc: 'Auto-close, or wrap the selection' },
+    { keys: 'F1', desc: 'Toggle this help' },
+  ];
+  export function toggleHelp() { showHelp = !showHelp; }
 
   // ----- find & replace -----
   let showFind = $state(false);
@@ -354,6 +373,20 @@
       {/if}
     </div>
   {/if}
+
+  <button class="ce-help-btn" title="Keyboard shortcuts (F1)" aria-label="Keyboard shortcuts"
+    onclick={() => showHelp = !showHelp}>?</button>
+
+  {#if showHelp}
+    <div class="ce-help" role="dialog" aria-label="Keyboard shortcuts">
+      <div class="ce-help-head"><span>Keyboard shortcuts</span><button class="ce-find-btn" title="Close (Esc)" onclick={() => showHelp = false}>✕</button></div>
+      <dl class="ce-help-list">
+        {#each SHORTCUTS as s (s.keys)}
+          <div class="ce-help-row"><dt>{s.keys}</dt><dd>{s.desc}</dd></div>
+        {/each}
+      </dl>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -486,4 +519,46 @@
   .ce-find-btn.wide { border-color: var(--line-2); }
   .ce-find-btn:hover, .ce-find-toggle:hover { background: var(--bg-2); color: var(--txt); }
   .ce-find-toggle.on { background: var(--accent-dim); color: #eafff5; border-color: var(--accent); }
+
+  /* shortcuts help */
+  .ce-help-btn {
+    position: absolute;
+    right: 8px; bottom: 8px;
+    z-index: 4;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--txt-dim);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity .12s;
+  }
+  .ce-help-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-help {
+    position: absolute;
+    right: 14px; bottom: 38px;
+    z-index: 6;
+    width: 320px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 10px 12px;
+    font-family: 'Archivo', system-ui, sans-serif;
+  }
+  .ce-help-head {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; font-weight: 600; color: var(--txt);
+    margin-bottom: 8px;
+  }
+  .ce-help-list { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+  .ce-help-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .ce-help-row dt {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .ce-help-row dd { margin: 0; font-size: 12px; color: var(--txt-dim); text-align: right; }
 </style>
