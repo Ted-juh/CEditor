@@ -14,7 +14,7 @@
   import { recordVersion, getVersions, clearVersions } from '../utils/scriptHistory.js';
   import { addScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
-  import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
+  import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled, readWatch } from '../scripting/panelRuntime.js';
   import {
     SCRIPT_LANGUAGES,
     SCRIPT_SCOPES,
@@ -155,6 +155,26 @@
   function removeBreakpoint(i) { breakpoints = breakpoints.filter((_, n) => n !== i); }
   function addWatch() { if (watchInput.trim()) { watchPaths = [...watchPaths, watchInput.trim()]; watchInput = ''; } }
   function removeWatch(i) { watchPaths = watchPaths.filter((_, n) => n !== i); }
+
+  // Live watch values — poll the runtime while the Test/Trace screen is open (variable inspection).
+  let watchValues = $state({});
+  function refreshWatches() {
+    const next = {};
+    for (const p of watchPaths) next[p] = readWatch(p);
+    watchValues = next;
+  }
+  function fmtWatch(v) {
+    if (v === undefined) return '—';
+    if (typeof v === 'number') return Number.isInteger(v) ? String(v) : v.toFixed(3);
+    if (typeof v === 'object') { try { return JSON.stringify(v); } catch { return String(v); } }
+    return String(v);
+  }
+  $effect(() => {
+    if (activeScreen !== 'test' || watchPaths.length === 0) return;
+    refreshWatches();
+    const id = setInterval(refreshWatches, 500);
+    return () => clearInterval(id);
+  });
 
   // Persist to the panel (debounced) whenever any script changes — add/edit/rename/folder/delete.
   // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet flushed).
@@ -618,7 +638,7 @@
         <!-- Watch & "run until" — config now, enforced by the runtime later -->
         <div class="tsection">
           <div class="tshead">Watch &amp; "run until"</div>
-          <p class="sub" style="margin:0 0 10px">Pause the run when a value crosses a threshold, or watch values live. Activates when the runtime is wired.</p>
+          <p class="sub" style="margin:0 0 10px">Watch control values live (updates ~2×/sec while this screen is open). The "run until" thresholds are honored by the host runtime.</p>
           <div class="bprow">
             <input placeholder="path e.g. cutoff.value" value={bpPath} oninput={(e) => bpPath = e.target.value} onfocus={(e) => e.target.select()} />
             <select value={bpOp} onchange={(e) => bpOp = e.target.value}>
@@ -635,7 +655,7 @@
             <button class="btn" onclick={addWatch}>+ Watch</button>
           </div>
           {#each watchPaths as w, i (w + i)}
-            <div class="chip"><b>{w}</b> <span style="color:var(--txt-faint)">= —</span> <button onclick={() => removeWatch(i)}>×</button></div>
+            <div class="chip"><b>{w}</b> <span style="color:var(--accent)">= {fmtWatch(watchValues[w])}</span> <button onclick={() => removeWatch(i)}>×</button></div>
           {/each}
         </div>
       </div>

@@ -144,6 +144,11 @@ function getValue(path) {
   return valueAtPath(control, modelPath);
 }
 
+/** Read a control value at a path, for the debugger's watch panel. Never throws. */
+export function readWatch(path) {
+  try { return getValue(path); } catch { return undefined; }
+}
+
 /* ------------------------------------------------------------------ helpers (pure) */
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
