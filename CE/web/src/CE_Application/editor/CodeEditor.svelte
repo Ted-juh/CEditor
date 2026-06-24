@@ -10,6 +10,7 @@
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
   import { projectFolds, pruneFolds } from './foldModel.js';
+  import { columnInsert, columnDelete, offsetOf } from './columnEdit.js';
 
   let {
     value = '',
@@ -401,6 +402,7 @@
       syncCaret();
       return;
     }
+    column = null; // a plain click collapses any column selection
     if (e.ctrlKey || e.metaKey) {
       const idx = indexAtClient(e.clientX, e.clientY);
       if (gotoDefinition(idx)) { e.preventDefault(); return; }
@@ -442,6 +444,36 @@
       applyEdit(0, value.length, v, caret);
     }
     taEl?.focus();
+  }
+
+  // ----- column (block) selection / multi-line edit -----
+  let column = $state(null); // { anchorLine, headLine, col } — all 0-based; carets across the range
+  let columnCaretLines = $derived.by(() => {
+    if (!column) return [];
+    const a = Math.min(column.anchorLine, column.headLine), b = Math.max(column.anchorLine, column.headLine);
+    const out = [];
+    for (let i = a; i <= b; i++) out.push(i);
+    return out;
+  });
+  function startOrExtendColumn(dir) {
+    if (isFolded) return;
+    if (!column) column = { anchorLine: caretLine, headLine: caretLine, col: caretCol };
+    const h = Math.max(0, Math.min(lines.length - 1, column.headLine + dir));
+    column = { ...column, headLine: h };
+  }
+  function columnRange() { return [Math.min(column.anchorLine, column.headLine), Math.max(column.anchorLine, column.headLine)]; }
+  function columnType(ch) {
+    const [a, b] = columnRange();
+    const next = columnInsert(value, a, b, column.col, ch);
+    applyEdit(0, value.length, next, offsetOf(next, column.headLine, column.col + 1));
+    column = { ...column, col: column.col + 1 };
+  }
+  function columnBackspace() {
+    if (column.col <= 0) return;
+    const [a, b] = columnRange();
+    const next = columnDelete(value, a, b, column.col);
+    applyEdit(0, value.length, next, offsetOf(next, column.headLine, column.col - 1));
+    column = { ...column, col: column.col - 1 };
   }
 
   // Select the next occurrence of the current word (wraps), scrolling it into view.
@@ -520,6 +552,18 @@
     const v = ta.value;
     const start = ta.selectionStart, end = ta.selectionEnd;
     const mod = e.ctrlKey || e.metaKey;
+
+    // Column (block) selection: Shift+Alt+Up/Down adds a caret on each line at the same column.
+    if (e.altKey && e.shiftKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+      e.preventDefault(); startOrExtendColumn(e.key === 'ArrowDown' ? 1 : -1); return;
+    }
+    if (column) {
+      if (e.key === 'Escape') { e.preventDefault(); column = null; return; }
+      if (e.key === 'Backspace') { e.preventDefault(); columnBackspace(); return; }
+      if (e.key.length === 1 && !mod && !e.altKey) { e.preventDefault(); columnType(e.key); return; }
+      // any other key (arrows, Enter, …) exits column mode and proceeds normally
+      column = null;
+    }
 
     // Autocomplete navigation takes priority while the popup is open.
     if (acOpen) {
@@ -660,6 +704,7 @@
     { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
     { keys: 'F2', desc: 'Rename symbol (all occurrences)' },
     { keys: 'Gutter ▾ / ⊟', desc: 'Fold a block / fold all (click to edit unfolds)' },
+    { keys: 'Shift+Alt+↑/↓', desc: 'Column selection — type/Backspace edits every line' },
     { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
     { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
     { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
@@ -795,6 +840,10 @@
       <div class="ce-occ"
         style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(o.end - o.start) * charWidth}px; height:{lineHeight}px"></div>
     {/each}
+    {#each columnCaretLines as ln (ln)}
+      <div class="ce-mcaret"
+        style="left:{PAD_L + column.col * charWidth - scrollLeft}px; top:{PAD_TOP + ln * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+    {/each}
     <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {-scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea
       class="ce-ta"
@@ -807,7 +856,7 @@
       autocapitalize="off"
       autocorrect="off"
       wrap="off"
-      oninput={() => { if (isFolded) return; emit(); syncCaret(); refreshCompletion(false); }}
+      oninput={() => { if (isFolded) return; emit(); syncCaret(); if (!column) refreshCompletion(false); }}
       onscroll={onScroll}
       onkeydown={onKeydown}
       onkeyup={syncCaret}
@@ -1048,6 +1097,15 @@
     pointer-events: none;
     z-index: 0;
   }
+  .ce-mcaret {
+    position: absolute;
+    width: 2px;
+    background: var(--accent);
+    pointer-events: none;
+    z-index: 3;
+    animation: ce-blink 1s steps(1) infinite;
+  }
+  @keyframes ce-blink { 50% { opacity: 0; } }
 
   .ce-hl, .ce-ta {
     margin: 0;
