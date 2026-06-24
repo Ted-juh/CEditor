@@ -53,13 +53,22 @@
     try { localStorage.setItem('ce-minimap', showMinimap ? '1' : '0'); } catch { /* ignore */ }
   }
 
-  // Parser-backed analysis (acorn / luaparse). Re-runs as the source or language changes.
-  let analysis = $derived(analyze(value, language));
+  // Parser-backed analysis (acorn / luaparse). The AST parse is the heaviest per-keystroke
+  // cost, so for large scripts we debounce it (highlighting stays live — it's cheap regex).
+  let analyzedSource = $state(value);
+  let analyzeTimer = null;
+  $effect(() => {
+    const v = value;
+    clearTimeout(analyzeTimer);
+    if (v.length < 4000) { analyzedSource = v; return; } // small: parse immediately
+    analyzeTimer = setTimeout(() => { analyzedSource = v; }, 250);
+  });
+  let analysis = $derived(analyze(analyzedSource, language));
   let diagnostics = $derived(analysis.diagnostics);
   let errorLines = $derived(new Set(diagnostics.map((d) => d.line)));
   // Each diagnostic, resolved to the on-screen token it underlines.
   let diagSpans = $derived(diagnostics.map((d) => {
-    const w = wordAt(value, d.index) || wordAt(value, d.index - 1);
+    const w = wordAt(analyzedSource, d.index) || wordAt(analyzedSource, d.index - 1);
     const len = w ? w.word.length : 1;
     return { line: d.line, col: d.col, len, message: d.message };
   }));
