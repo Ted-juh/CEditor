@@ -6,7 +6,7 @@
 .bd-app{
   --bg:#0c0e12;--bg-2:#13161c;--panel:#171b22;--panel-2:#1c2129;
   --line:#272d38;--line-2:#333b48;--txt:#e8ebf0;--txt-dim:#9aa3b2;--txt-faint:#5b6473;
-  --accent:#4dd6a0;--accent-dim:#2a6b54;--amber:#e0a23c;--blue:#5a9bf0;--red:#e0635a;
+  --accent:#4dd6a0;--accent-dim:#2a6b54;--amber:#e0a23c;--blue:#5a9bf0;--red:#e0635a;--violet:#b08cf0;
   --mono:'JetBrains Mono','Cascadia Code',ui-monospace,monospace;
   --shadow:0 12px 40px rgba(0,0,0,.55);
   display:flex;flex-direction:column;height:100%;min-height:0;width:100%;
@@ -69,6 +69,11 @@
 .bd-app .titem.off{opacity:.5}
 .bd-app .titem .sname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-app .titem .pill{flex-shrink:0}
+.bd-app .titembtn{flex-shrink:0;width:20px;height:20px;background:none;border:none;border-radius:5px;
+  color:var(--txt-faint);cursor:pointer;font-size:12px;line-height:1;padding:0;opacity:0}
+.bd-app .titem:hover .titembtn,.bd-app .titem.sel .titembtn{opacity:.55}
+.bd-app .titembtn:hover{opacity:1;background:var(--panel-2);color:var(--txt)}
+.bd-app .titembtn.del:hover{color:var(--red);background:none}
 .bd-app .titem .renameinput{flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--accent);border-radius:5px;
   padding:2px 6px;color:var(--txt);font-size:13px;font-family:inherit;outline:none}
 .bd-app .profilecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px}
@@ -124,9 +129,11 @@
 .bd-app tbody tr.sel{background:var(--panel-2)}
 .bd-app tbody td{padding:9px 12px;vertical-align:middle}
 .bd-app .sname{font-weight:600}
-.bd-app .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-family:var(--mono);border:1px solid var(--line-2)}
-.bd-app .pill.lua{color:var(--blue);border-color:var(--blue)}
-.bd-app .pill.js{color:var(--amber);border-color:var(--amber)}
+.bd-app .pill{display:inline-block;padding:0;font-size:11px;font-family:var(--mono);font-weight:600;background:none;border:none}
+.bd-app .pill.lua{color:var(--blue)}
+.bd-app .pill.js{color:var(--amber)}
+.bd-app .pill.py{color:var(--accent)}
+.bd-app .pill.cpp{color:var(--violet)}
 .bd-app .pill.muted{color:var(--txt-faint)}
 .bd-app .ev{font-family:var(--mono);color:var(--txt-dim);font-size:12px}
 .bd-app tr.off{opacity:.45}

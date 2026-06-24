@@ -154,6 +154,20 @@
   }
   function cancelRename() { renamingId = null; }
 
+  // Inline "move to folder" — assign a script's folder label from the tree (mirrors rename).
+  let foldering = $state(null);
+  let folderValue = $state('');
+  function startFolder(s) { foldering = s.id; folderValue = s.group ?? ''; renamingId = null; }
+  function commitFolder() {
+    const s = scripts.find((x) => x.id === foldering);
+    if (s) {
+      s.group = folderValue.trim();
+      if (s.group && groupMode !== 'folder') groupMode = 'folder'; // show the result of the move
+    }
+    foldering = null;
+  }
+  function cancelFolder() { foldering = null; }
+
   // --- Test / Trace screen state ---
   let allProblems = $derived(scripts.flatMap((s) => validateScript(s).map((p) => ({ ...p, script: s.name }))));
   let breakpoints = $state([]);              // { path, op, value } — "run until"; runtime enforces (later)
@@ -238,8 +252,19 @@
   let dawStateNode = $derived({ id: 'dawstate', icon: '▦', label: 'DAW state', event: 'onDawSaveState', scope: 'panel', scripts: dawStateScripts });
   let shutdownNode = $derived({ id: 'shutdown', icon: '◾', label: 'Shutdown', event: 'onPanelClose', scope: 'panel', scripts: shutdownScripts });
 
-  function langClass(id) { return id === 'javascript' ? 'js' : 'lua'; }
-  function langLabel(id) { return id === 'javascript' ? 'JavaScript' : 'Lua'; }
+  // Per-language tag (short label + color class). Add new languages here as they land.
+  function langClass(id) {
+    if (id === 'javascript') return 'js';
+    if (id === 'python') return 'py';
+    if (id === 'cpp' || id === 'c++') return 'cpp';
+    return 'lua';
+  }
+  function langLabel(id) {
+    if (id === 'javascript') return 'JS';
+    if (id === 'python') return 'Py';
+    if (id === 'cpp' || id === 'c++') return 'C++';
+    return 'Lua';
+  }
 
   function selectScript(id) { selectedId = id; mainView = 'editor'; }
 
@@ -261,12 +286,13 @@
     if (s) s.source = defaultSource(s.event, s.language);
   }
 
-  function deleteSelected() {
-    if (!selected) return;
-    const idx = scripts.findIndex((x) => x.id === selectedId);
-    scripts = scripts.filter((x) => x.id !== selectedId);
-    selectedId = scripts[Math.max(0, idx - 1)]?.id ?? null;
+  function deleteScript(id) {
+    const idx = scripts.findIndex((x) => x.id === id);
+    if (idx === -1) return;
+    scripts = scripts.filter((x) => x.id !== id);
+    if (selectedId === id) selectedId = scripts[Math.max(0, idx - 1)]?.id ?? null;
   }
+  function deleteSelected() { if (selected) deleteScript(selectedId); }
 
   // --- Reusable script library (copy-on-import) ---
   function saveSelectedToLibrary() { if (selected) saveToLibrary($state.snapshot(selected)); }
@@ -458,12 +484,24 @@
                   onclick={(e) => e.stopPropagation()}
                   onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
                   {@attach (el) => { el.focus(); el.select(); }} />
+              {:else if foldering === s.id}
+                <input class="renameinput" value={folderValue} list="bd-folders-tree"
+                  placeholder="Folder name (blank = none)…"
+                  oninput={(e) => folderValue = e.target.value}
+                  onblur={commitFolder}
+                  onclick={(e) => e.stopPropagation()}
+                  onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitFolder(); } else if (e.key === 'Escape') cancelFolder(); }}
+                  {@attach (el) => { el.focus(); el.select(); }} />
               {:else}
                 <span class="sname" role="button" tabindex="0"
                   ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
                   onkeydown={(e) => { if (e.key === 'F2') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
                   title="Double-click (or F2) to rename">{s.name}</span>
                 <span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span>
+                <button class="titembtn" title={s.group ? 'Folder: ' + s.group + ' — click to change' : 'Move to a folder…'}
+                  onclick={(e) => { e.stopPropagation(); startFolder(s); }}>🗀</button>
+                <button class="titembtn del" title="Delete script"
+                  onclick={(e) => { e.stopPropagation(); if (confirm('Delete script “' + s.name + '”?')) deleteScript(s.id); }}>✕</button>
               {/if}
             </div>
           {/each}
@@ -629,6 +667,9 @@
           <button class="btn ghost tiny" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import</button>
         </div>
 
+        <datalist id="bd-folders-tree">
+          {#each folderNames as f (f)}<option value={f}></option>{/each}
+        </datalist>
         <div class="treebody">
           <div class="treelbl">Panel lifecycle</div>
           {@render treeGroup(startupNode)}
