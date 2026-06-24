@@ -467,6 +467,7 @@
         onclick={() => addScript(node.event, node.scope)}>+</button>
     </div>
     {#if expanded.has(node.id)}
+      <div class="tgkids">
       {#if node.scripts.length === 0}
         <div class="tgempty">No scripts — click <b>+</b> to add one.</div>
       {:else}
@@ -507,6 +508,7 @@
           {/each}
         {/each}
       {/if}
+      </div>
     {/if}
   </div>
 {/snippet}

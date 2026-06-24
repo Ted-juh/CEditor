@@ -50,7 +50,7 @@
 .bd-app .treegroup{margin-bottom:1px}
 .bd-app .tghead{display:flex;align-items:center;gap:2px}
 .bd-app .tgtoggle{flex:1;min-width:0;display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;
-  color:var(--txt-dim);font-size:13px;font-weight:500;padding:7px 8px;border-radius:7px;text-align:left}
+  color:var(--txt);font-size:13px;font-weight:700;padding:7px 8px;border-radius:7px;text-align:left}
 .bd-app .tgtoggle:hover{background:var(--panel);color:var(--txt)}
 .bd-app .tgcaret{width:11px;font-size:9px;color:var(--txt-faint);flex-shrink:0}
 .bd-app .tghead .ti{width:16px;text-align:center;flex-shrink:0;opacity:.85}
@@ -59,21 +59,26 @@
 .bd-app .tgnew{width:24px;height:24px;flex-shrink:0;background:none;border:1px solid transparent;border-radius:6px;
   color:var(--txt-faint);cursor:pointer;font-size:15px;line-height:1}
 .bd-app .tgnew:hover{background:var(--accent-dim);color:#eafff5;border-color:var(--accent)}
-.bd-app .tgempty{padding:3px 10px 7px 30px;color:var(--txt-faint);font-size:12px}
-.bd-app .tgsub{padding:6px 10px 2px 28px;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--txt-faint)}
+/* Children of a lifecycle group are indented behind a guide line so the header
+   (bold, with icon) reads clearly as the parent and scripts as its contents. */
+.bd-app .tgkids{margin-left:17px;border-left:1px solid var(--line);padding-left:3px}
+.bd-app .tgempty{padding:3px 10px 7px 20px;color:var(--txt-faint);font-size:12px}
+.bd-app .tgsub{padding:7px 10px 2px 18px;font-size:10px;letter-spacing:.8px;text-transform:uppercase;color:var(--txt-faint)}
 .bd-app .tgsub .gc{color:var(--txt-faint);opacity:.7}
-.bd-app .titem{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 30px;border-radius:7px;cursor:pointer;
+.bd-app .titem{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 20px;border-radius:7px;cursor:pointer;
   color:var(--txt-dim);font-size:13px;border:1px solid transparent}
 .bd-app .titem:hover{background:var(--panel)}
 .bd-app .titem.sel{background:var(--panel-2);border-color:var(--line-2);color:var(--txt)}
 .bd-app .titem.off{opacity:.5}
-.bd-app .titem .sname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-app .titem .sname{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-app .titem .pill{flex-shrink:0}
 .bd-app .titembtn{flex-shrink:0;width:20px;height:20px;background:none;border:none;border-radius:5px;
   color:var(--txt-faint);cursor:pointer;font-size:12px;line-height:1;padding:0;opacity:0}
-.bd-app .titem:hover .titembtn,.bd-app .titem.sel .titembtn{opacity:.55}
+.bd-app .titem:hover .titembtn,.bd-app .titem.sel .titembtn{opacity:.6}
 .bd-app .titembtn:hover{opacity:1;background:var(--panel-2);color:var(--txt)}
-.bd-app .titembtn.del:hover{color:var(--red);background:none}
+.bd-app .titembtn.del{color:var(--red)}
+.bd-app .titem:hover .titembtn.del,.bd-app .titem.sel .titembtn.del{opacity:.9}
+.bd-app .titembtn.del:hover{opacity:1;color:#ff7a72;background:rgba(224,99,90,.18)}
 .bd-app .titem .renameinput{flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--accent);border-radius:5px;
   padding:2px 6px;color:var(--txt);font-size:13px;font-family:inherit;outline:none}
 .bd-app .profilecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px}
