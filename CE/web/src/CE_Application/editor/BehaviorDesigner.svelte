@@ -6,11 +6,11 @@
   import { onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';
   import CodeEditor from './CodeEditor.svelte';
+  import ScriptConsole from './ScriptConsole.svelte';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
   import { searchScripts } from '../scripting/scriptSearch.js';
   import { filenameForScript, scriptOverridesFromFile, inferEventFromSource } from '../scripting/scriptFileIo.js';
-  import { scriptTrace, clearScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
   import {
@@ -30,6 +30,13 @@
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
   let showPicker = $state(false); // when true, the RIGHT pane shows the Insert picker instead of the script list
   let showLibrary = $state(false); // when true, the RIGHT pane shows the reusable-script library
+  let showConsole = $state(false); // inline output console under the editor
+
+  // Run a script and reveal the console so its output is visible where it ran.
+  function runAndShow(script) {
+    showConsole = true;
+    runScript(script);
+  }
 
   async function insertAtCursor(text) {
     if (!selected) return;
@@ -306,14 +313,14 @@
       <div class="codehead">
         <span class="lang">{langLabel(selected.language)} source</span>
         <span style="display:flex;gap:6px">
-          <button class="btn primary" onclick={() => runScript(selected)} title="Run this script now against the live panel">▶ Run</button>
+          <button class="btn primary" onclick={() => runAndShow(selected)} title="Run this script now against the live panel">▶ Run</button>
           <button class={['btn', 'ghost', showPicker && 'primary']} onclick={() => { showPicker = !showPicker; if (showPicker) showLibrary = false; }} title="Browse & insert API in the right pane">+ Insert</button>
           <button class={['btn', 'ghost', showLibrary && 'primary']} onclick={() => { showLibrary = !showLibrary; if (showLibrary) showPicker = false; }} title="Reusable script library">📚 Library</button>
           <button class="btn ghost" onclick={regenerateSkeleton} title="Replace with a fresh skeleton">↺ skeleton</button>
         </span>
       </div>
       <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
-        oninput={(v) => updateField('source', v)} onrun={() => runScript(selected)}
+        oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
         oncaret={(line, col) => caret = { line, col }}
         ondiagnostics={(d) => liveDiagnostics = d} />
 
@@ -337,6 +344,13 @@
         <button class="btn ghost" onclick={exportScriptFile} title="Save this script's source to a file on disk">⬇ Export file</button>
         <button class="btn ghost" onclick={saveSelectedToLibrary} title="Save a reusable copy to the library">★ Save to library</button>
         <button class="btn ghost" onclick={deleteSelected} style="color:var(--red)">Delete</button>
+      </div>
+
+      <div class="consolewrap">
+        <button class="consoletoggle" onclick={() => showConsole = !showConsole}>
+          <span class="caret">{showConsole ? '▾' : '▸'}</span> Output console
+        </button>
+        {#if showConsole}<div class="consolebox"><ScriptConsole compact /></div>{/if}
       </div>
     {:else}
       <p class="sub" style="margin:0">Select a script on the left, or add one.</p>
@@ -530,18 +544,9 @@
           {/if}
         </div>
 
-        <!-- Trace console — runtime log/trace/errors (Model 2; fills when scripts run) -->
-        <div class="tsection">
-          <div class="tshead">Trace<span style="flex:1"></span><button class="btn ghost" onclick={clearScriptTrace}>Clear</button></div>
-          {#if $scriptTrace.length === 0}
-            <div class="placeholder">No trace yet — scripts run in the C++ host. Output (log / errors / MIDI) appears here once the runtime is live.</div>
-          {:else}
-            <div class="tracelist">
-              {#each $scriptTrace as e (e.id)}
-                <div class={['traceline', e.kind]}><span class="tt">{e.time}</span><span class="tk">{e.kind}</span><span class="tm">{e.message}</span></div>
-              {/each}
-            </div>
-          {/if}
+        <!-- Output console — runtime log/trace/errors/MIDI, with per-kind filters -->
+        <div class="tsection" style="height:260px;display:flex;flex-direction:column">
+          <div class="consolebox" style="flex:1;margin-top:0"><ScriptConsole /></div>
         </div>
 
         <!-- Watch & "run until" — config now, enforced by the runtime later -->

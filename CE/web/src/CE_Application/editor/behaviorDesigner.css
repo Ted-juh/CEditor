@@ -192,6 +192,15 @@
 .bd-app .ressnip .rline{color:var(--txt-faint);min-width:22px;text-align:right;flex-shrink:0}
 .bd-app .ressnip code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
+/* ---- inline output console ---- */
+.bd-app .consolewrap{margin-top:14px}
+.bd-app .consoletoggle{display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;
+  color:var(--txt-dim);font-size:12px;text-transform:uppercase;letter-spacing:.4px;padding:4px 0}
+.bd-app .consoletoggle:hover{color:var(--txt)}
+.bd-app .consoletoggle .caret{color:var(--txt-faint);font-size:10px}
+.bd-app .consolebox{margin-top:8px;height:200px;display:flex}
+.bd-app .consolebox>*{flex:1;min-height:0}
+
 /* ---- problems list ---- */
 .bd-app .problems{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .bd-app .problem{display:flex;gap:8px;align-items:flex-start;padding:6px 9px;border-radius:6px;font-size:12px;line-height:1.4}
