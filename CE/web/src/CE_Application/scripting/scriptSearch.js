@@ -1,6 +1,6 @@
 // scriptSearch.js — cross-script search for the BehaviorDesigner.
 //
-// The script list is split across lifecycle screens (Setup / Behaviors / Teardown),
+// The script list is split across lifecycle groups (Startup / Ready / Runtime / Shutdown / DAW state),
 // so finding "where did I use sendCC" means hunting screen by screen. This searches
 // EVERY script at once — name, event, attached control, folder, and source body —
 // and returns lightweight match records the UI can render as a flat results list.

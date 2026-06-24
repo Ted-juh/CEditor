@@ -73,13 +73,18 @@
     selected.source = selected.source + text;
   }
 
-  // Which lifecycle group an event belongs to — drives nav grouping.
-  const SETUP = new Set(['onPanelLoad', 'onPanelReady']);
-  const TEARDOWN = new Set(['onPanelClose', 'onDawSaveState', 'onDawRestoreState']);
+  // Which lifecycle group an event belongs to — drives nav grouping ONLY. This is a
+  // display bucket; it has no effect on dispatch. The host fires each hook by name
+  // (onPanelLoad/onPanelReady/onPanelClose/onDawSaveState/onDawRestoreState) regardless
+  // of which group it's shown under, so DAW save/restore stay handled correctly here.
+  // The four real moments are kept distinct, in runtime order: startup → ready → runtime → shutdown.
+  const DAW_STATE = new Set(['onDawSaveState', 'onDawRestoreState']);
   function screenOf(event) {
-    if (SETUP.has(event)) return 'setup';
-    if (TEARDOWN.has(event)) return 'teardown';
-    return 'behaviors';
+    if (event === 'onPanelLoad') return 'startup';   // Phase 1 — before the GUI exists
+    if (event === 'onPanelReady') return 'ready';    // Phase 2 — GUI built, fill controls
+    if (event === 'onPanelClose') return 'shutdown'; // Phase 4 — really closing
+    if (DAW_STATE.has(event)) return 'dawstate';     // host-driven save/restore (any time)
+    return 'runtime';                                // Phase 3 — during use (events)
   }
 
   // Event options for the detail <select>, grouped.
@@ -94,7 +99,7 @@
   let scripts = $state(untrack(() => (initialScripts ?? []).map((s) => normalizeSourceScript(s))));
 
   let mainView = $state('editor');   // what fills the stage: 'editor' | 'test'
-  let expanded = $state(new Set(['setup', 'teardown', 'behaviors'])); // expanded tree groups
+  let expanded = $state(new Set(['startup', 'ready', 'runtime', 'shutdown', 'dawstate'])); // expanded tree groups
   function toggleExpand(id) { const n = new Set(expanded); n.has(id) ? n.delete(id) : n.add(id); expanded = n; }
   function expand(id) { if (!expanded.has(id)) { const n = new Set(expanded); n.add(id); expanded = n; } }
   let selectedId = $state(untrack(() => scripts[0]?.id ?? null));
@@ -112,7 +117,7 @@
   let controlNames = $derived((controls ?? []).map((c) => c.name).filter(Boolean));
   let targetValue = $derived(selected ? (selected.target === 'self' || !selected.target ? '*' : selected.target) : '*');
 
-  // --- cross-script search (spans Setup / Behaviors / Teardown) ---
+  // --- cross-script search (spans every lifecycle group) ---
   let searchQuery = $state('');
   let searchResults = $derived(searchScripts(scripts, searchQuery));
   function openResult(id) {
@@ -218,16 +223,20 @@
   $effect(() => { setLiveScripts($state.snapshot(scripts), panelId); });
   $effect(() => { setLiveEnabled(liveOn); });
 
-  let setupScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'setup'));
-  let behaviorScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'behaviors'));
-  let teardownScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'teardown'));
+  let startupScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'startup'));
+  let readyScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'ready'));
+  let runtimeScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'runtime'));
+  let shutdownScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'shutdown'));
+  let dawStateScripts = $derived(scripts.filter((s) => screenOf(s.event) === 'dawstate'));
   let enabledCount = $derived(scripts.filter((s) => s.enabled).length);
 
   // Lifecycle groups for the Scripts tree — each expands to its scripts; "+ New" on a group
-  // creates a script already set to that group's event/scope.
-  let setupNode = $derived({ id: 'setup', icon: '▸', label: 'Setup', event: 'onPanelReady', scope: 'panel', scripts: setupScripts });
-  let teardownNode = $derived({ id: 'teardown', icon: '◾', label: 'Teardown', event: 'onPanelClose', scope: 'panel', scripts: teardownScripts });
-  let behaviorsNode = $derived({ id: 'behaviors', icon: '⚡', label: 'Behaviors', event: 'onValueChanged', scope: 'component', scripts: behaviorScripts });
+  // creates a script already set to that group's event/scope. Listed in runtime order.
+  let startupNode = $derived({ id: 'startup', icon: '▸', label: 'Startup', event: 'onPanelLoad', scope: 'panel', scripts: startupScripts });
+  let readyNode = $derived({ id: 'ready', icon: '◆', label: 'Ready', event: 'onPanelReady', scope: 'panel', scripts: readyScripts });
+  let runtimeNode = $derived({ id: 'runtime', icon: '⚡', label: 'Runtime', event: 'onValueChanged', scope: 'component', scripts: runtimeScripts });
+  let dawStateNode = $derived({ id: 'dawstate', icon: '▦', label: 'DAW state', event: 'onDawSaveState', scope: 'panel', scripts: dawStateScripts });
+  let shutdownNode = $derived({ id: 'shutdown', icon: '◾', label: 'Shutdown', event: 'onPanelClose', scope: 'panel', scripts: shutdownScripts });
 
   function langClass(id) { return id === 'javascript' ? 'js' : 'lua'; }
   function langLabel(id) { return id === 'javascript' ? 'JavaScript' : 'Lua'; }
@@ -622,10 +631,11 @@
 
         <div class="treebody">
           <div class="treelbl">Panel lifecycle</div>
-          {@render treeGroup(setupNode)}
-          {@render treeGroup(teardownNode)}
-          <div class="treelbl">During use</div>
-          {@render treeGroup(behaviorsNode)}
+          {@render treeGroup(startupNode)}
+          {@render treeGroup(readyNode)}
+          {@render treeGroup(runtimeNode)}
+          {@render treeGroup(dawStateNode)}
+          {@render treeGroup(shutdownNode)}
           <div class="treelbl">Tools</div>
           <div class={['tnode', mainView === 'test' && 'active']} role="button" tabindex="0"
             onclick={() => mainView = 'test'}
