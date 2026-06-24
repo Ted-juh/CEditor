@@ -110,8 +110,9 @@
 .bd-app .tnode.active .ct{color:var(--accent)}
 .bd-app .sidehint{margin-top:auto;padding:12px 10px 4px;color:var(--txt-faint);font-size:11px;line-height:1.5}
 
-/* ---- stage: the editor (or Test/Trace) fills it; tools slide in as a right drawer ---- */
-.bd-app .stage{flex:1;min-width:0;overflow:auto;position:relative;padding:22px 26px 60px}
+/* ---- stage: editor area + docked Insert column; Library/History slide over as a drawer ---- */
+.bd-app .stage{flex:1;min-width:0;display:flex;position:relative}
+.bd-app .stagemain{flex:1;min-width:0;overflow:auto;padding:22px 26px 60px}
 .bd-app .shead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 .bd-app .shead h1{font-size:19px;font-weight:600;margin:0}
 .bd-app .sub{color:var(--txt-dim);font-size:13px;margin:0 0 20px;max-width:680px}
@@ -122,7 +123,12 @@
   padding:12px 14px;box-shadow:var(--shadow);
 }
 
-/* tools drawer (Insert / Library / History) */
+/* docked Insert / API column (default-open right column) */
+.bd-app .dock{width:340px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
+  background:var(--bg-2);border-left:1px solid var(--line)}
+.bd-app .dock .picker{margin-top:0;border:none;border-radius:0;max-height:none;flex:1;min-height:0;overflow:auto}
+
+/* tools drawer (Library / History) */
 .bd-app .drawer{
   position:absolute;top:0;right:0;bottom:0;width:340px;flex-shrink:0;
   background:var(--bg-2);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(0,0,0,.4);

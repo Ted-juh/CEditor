@@ -30,7 +30,7 @@
   let { panelName = 'Untitled Panel', panelId = null, controls = [], initialScripts = [], onChange = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
-  let showPicker = $state(false); // when true, the RIGHT pane shows the Insert picker instead of the script list
+  let showPicker = $state(true); // Insert/API picker docked as a right column by default (toggle with "+ Insert")
   let showLibrary = $state(false); // when true, the RIGHT pane shows the reusable-script library
   let showConsole = $state(false); // inline output console under the editor
   let showHistory = $state(false); // right pane shows version history of the selected script
@@ -496,7 +496,7 @@
         <span class="lang">{langLabel(selected.language)} source</span>
         <span style="display:flex;gap:6px">
           <button class="btn primary" onclick={() => runAndShow(selected)} title="Run this script now against the live panel">▶ Run</button>
-          <button class={['btn', 'ghost', showPicker && 'primary']} onclick={() => { showPicker = !showPicker; if (showPicker) showLibrary = false; }} title="Browse & insert API in the right pane">+ Insert</button>
+          <button class={['btn', 'ghost', showPicker && 'primary']} onclick={() => showPicker = !showPicker} title="Show/hide the docked Insert · API panel on the right">+ Insert</button>
           <button class={['btn', 'ghost', showLibrary && 'primary']} onclick={() => { showLibrary = !showLibrary; if (showLibrary) { showPicker = false; showHistory = false; } }} title="Reusable script library">📚 Library</button>
           <button class={['btn', 'ghost', showHistory && 'primary']} onclick={() => { showHistory = !showHistory; if (showHistory) { showPicker = false; showLibrary = false; } }} title="Version history (restorable across sessions)">🕘 History</button>
           <button class="btn ghost" onclick={regenerateSkeleton} title="Replace with a fresh skeleton">↺ skeleton</button>
@@ -745,11 +745,6 @@
         {/if}
       </div>
     </div>
-  {:else if showPicker && selected}
-    <div class="pickerpane">
-      <div class="pickerhead"><span>Insert into <b>{selected.name}</b></span><button class="btn ghost" onclick={() => showPicker = false}>Done</button></div>
-      <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
-    </div>
   {/if}
 {/snippet}
 
@@ -828,14 +823,29 @@
     </div>
 
     <div class="stage">
-      {#if mainView === 'test'}
-        {@render testView()}
-      {:else}
-        {@render detailPanel()}
+      <div class="stagemain">
+        {#if mainView === 'test'}
+          {@render testView()}
+        {:else}
+          {@render detailPanel()}
+        {/if}
+      </div>
+
+      <!-- Insert / API picker: docked as a right column by default (toggle with "+ Insert"). -->
+      {#if showPicker && selected && mainView !== 'test'}
+        <aside class="dock">
+          <div class="pickerpane">
+            <div class="pickerhead">
+              <span>Insert into <b>{selected.name}</b></span>
+              <button class="btn ghost" onclick={() => showPicker = false} title="Hide the Insert panel">⟩ Hide</button>
+            </div>
+            <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
+          </div>
+        </aside>
       {/if}
 
-      <!-- Tools drawer: Insert / Library / History slide over the editor on demand -->
-      {#if showHistory || showLibrary || (showPicker && selected)}
+      <!-- Library / History slide over the editor on demand. -->
+      {#if showHistory || showLibrary}
         <div class="drawer">{@render toolsDrawer()}</div>
       {/if}
     </div>
