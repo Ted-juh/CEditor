@@ -112,7 +112,7 @@
 
 /* ---- stage: editor area + docked Insert column; Library/History slide over as a drawer ---- */
 .bd-app .stage{flex:1;min-width:0;display:flex;position:relative}
-.bd-app .stagemain{flex:1;min-width:0;overflow:auto;padding:22px 26px 60px}
+.bd-app .stagemain{flex:1;min-width:0;overflow:auto;padding:22px 26px 22px;display:flex;flex-direction:column}
 .bd-app .shead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 .bd-app .shead h1{font-size:19px;font-weight:600;margin:0}
 .bd-app .sub{color:var(--txt-dim);font-size:13px;margin:0 0 20px;max-width:680px}
@@ -121,7 +121,10 @@
 .bd-app .detail{
   background:var(--panel);border:1px solid var(--line-2);border-radius:12px;
   padding:12px 14px;box-shadow:var(--shadow);
+  flex:1;min-height:0;display:flex;flex-direction:column;
 }
+/* the code editor fills the leftover height so the middle section uses the whole window */
+.bd-app .detail>.ce{flex:1 1 0;min-height:0}
 
 /* docked Insert / API column (default-open right column) */
 .bd-app .dock{width:340px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
