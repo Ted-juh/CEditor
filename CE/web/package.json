@@ -18,6 +18,8 @@
     "vite": "^6.0.0"
   },
   "dependencies": {
+    "acorn": "^8.17.0",
+    "luaparse": "^0.3.1",
     "lucide-svelte": "^1.0.1",
     "wasmoon": "^1.16.0"
   }

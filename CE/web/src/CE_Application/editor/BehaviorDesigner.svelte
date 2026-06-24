@@ -62,7 +62,12 @@
   let selectedId = $state(untrack(() => scripts[0]?.id ?? null));
 
   let selected = $derived(scripts.find((s) => s.id === selectedId) ?? null);
-  let problems = $derived(selected ? validateScript(selected) : []);
+  // Real syntax errors from the editor's parser (acorn/luaparse), reported live.
+  let liveDiagnostics = $state([]);
+  let problems = $derived([
+    ...liveDiagnostics.map((d) => ({ severity: 'error', message: `Line ${d.line}: ${d.message}` })),
+    ...(selected ? validateScript(selected) : []),
+  ]);
 
   // Target attachment: the panel's control names, plus the "Any control" wildcard. A legacy
   // 'self' target (the old component-scope default) reads as the wildcard here.
@@ -309,7 +314,8 @@
       </div>
       <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
         oninput={(v) => updateField('source', v)} onrun={() => runScript(selected)}
-        oncaret={(line, col) => caret = { line, col }} />
+        oncaret={(line, col) => caret = { line, col }}
+        ondiagnostics={(d) => liveDiagnostics = d} />
 
       {#if problems.length === 0}
         <div class="problems"><div class="problem ok">✓ No problems</div></div>

@@ -8,6 +8,7 @@
   // intact by routing every programmatic edit through document.execCommand('insertText').
   import { tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket } from './codeHighlight.js';
+  import { analyze, getCompletions, getHover, getDefinition, wordAt } from '../scripting/languageService.js';
 
   let {
     value = '',
@@ -15,19 +16,33 @@
     oninput = null,
     onrun = null,
     oncaret = null,
+    ondiagnostics = null,
     placeholder = '',
     minHeight = 240,
   } = $props();
 
   let taEl = $state(null);       // the editable textarea (the source of truth for editing)
+  let measureEl = $state(null);  // hidden element for measuring monospace character width
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
   let caretLine = $state(0);
   let caretPos = $state(0);
   let fontSize = $state(13);
+  let charWidth = $state(7.8);
+
+  // Parser-backed analysis (acorn / luaparse). Re-runs as the source or language changes.
+  let analysis = $derived(analyze(value, language));
+  let diagnostics = $derived(analysis.diagnostics);
+  let errorLines = $derived(new Set(diagnostics.map((d) => d.line)));
+  // Each diagnostic, resolved to the on-screen token it underlines.
+  let diagSpans = $derived(diagnostics.map((d) => {
+    const w = wordAt(value, d.index) || wordAt(value, d.index - 1);
+    const len = w ? w.word.length : 1;
+    return { line: d.line, col: d.col, len, message: d.message };
+  }));
+  $effect(() => { ondiagnostics?.(diagnostics); });
 
   const PAD_TOP = 10;
-  const PAD_LEFT = 4;            // gap between gutter and code start
   let lineHeight = $derived(Math.round(fontSize * 1.6));
   let lines = $derived(value.split('\n'));
   let lineCount = $derived(lines.length);
@@ -50,6 +65,8 @@
   function onScroll() {
     scrollTop = taEl.scrollTop;
     scrollLeft = taEl.scrollLeft;
+    acOpen = false;   // popups are positioned for the pre-scroll caret; close on scroll
+    clearHover();
   }
 
   function syncCaret() {
@@ -63,6 +80,117 @@
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
+
+  const PAD_L = 4;   // .ce-hl / .ce-ta left padding (px) — keep in sync with the CSS
+  // Measure the monospace character width whenever the font size changes.
+  $effect(() => {
+    void fontSize;
+    if (measureEl) charWidth = measureEl.getBoundingClientRect().width / 10 || charWidth;
+  });
+
+  // line/column (0-based) of a character offset.
+  function posOf(index) {
+    const before = value.slice(0, index);
+    const nl = before.lastIndexOf('\n');
+    return { line: countLines(before), col: index - (nl + 1) };
+  }
+  // Content-space pixel (pre-scroll) for a line/col.
+  function xyOf(line, col) {
+    return { x: PAD_L + col * charWidth, y: PAD_TOP + line * lineHeight };
+  }
+  // Character offset nearest a client (mouse) coordinate.
+  function indexAtClient(clientX, clientY) {
+    if (!taEl) return 0;
+    const r = taEl.getBoundingClientRect();
+    const lx = clientX - r.left + taEl.scrollLeft - PAD_L;
+    const ly = clientY - r.top + taEl.scrollTop - PAD_TOP;
+    const line = Math.max(0, Math.floor(ly / lineHeight));
+    const col = Math.max(0, Math.round(lx / charWidth));
+    const lines = value.split('\n');
+    if (line >= lines.length) return value.length;
+    let base = 0;
+    for (let i = 0; i < line; i++) base += lines[i].length + 1;
+    return base + Math.min(col, lines[line].length);
+  }
+
+  // ----- autocomplete -----
+  let acOpen = $state(false);
+  let acOptions = $state([]);
+  let acIndex = $state(0);
+  let acFrom = $state(0);
+  let acTo = $state(0);
+  let acAnchor = $derived(acOpen ? posOf(acFrom) : { line: 0, col: 0 });
+  // Viewport coords of the completion anchor (fixed-positioned so it escapes the editor's clip).
+  let acScreen = $derived.by(() => {
+    if (!acOpen || !taEl) return { x: 0, y: 0 };
+    const r = taEl.getBoundingClientRect();
+    return {
+      x: r.left + PAD_L + acAnchor.col * charWidth - taEl.scrollLeft,
+      y: r.top + PAD_TOP + (acAnchor.line + 1) * lineHeight - taEl.scrollTop,
+    };
+  });
+
+  function refreshCompletion(force) {
+    if (!taEl) return;
+    const caret = taEl.selectionStart;
+    if (caret !== taEl.selectionEnd) { acOpen = false; return; }
+    const { from, to, options } = getCompletions(value, language, caret);
+    const prefixLen = to - from;
+    // Auto-open only once there's a prefix; Ctrl+Space (force) opens regardless.
+    if (!force && prefixLen === 0) { acOpen = false; return; }
+    if (options.length === 0) { acOpen = false; return; }
+    acOptions = options;
+    acFrom = from;
+    acTo = to;
+    acIndex = 0;
+    acOpen = true;
+  }
+
+  function acceptCompletion() {
+    const opt = acOptions[acIndex];
+    if (!opt) { acOpen = false; return; }
+    applyEdit(acFrom, taEl.selectionStart, opt.label, acFrom + opt.label.length);
+    acOpen = false;
+  }
+
+  const KIND_ICON = { function: 'ƒ', variable: 'x', parameter: 'p', property: '.', builtin: 'b', keyword: 'k' };
+  function kindIcon(kind) { return KIND_ICON[kind] ?? '•'; }
+
+  // ----- hover -----
+  let hover = $state(null);   // { title, doc, x, y }
+  let hoverTimer = null;
+  function onMouseMove(e) {
+    clearTimeout(hoverTimer);
+    const cx = e.clientX, cy = e.clientY;
+    hoverTimer = setTimeout(() => {
+      const idx = indexAtClient(cx, cy);
+      const w = wordAt(value, idx);
+      const info = w ? getHover(value, language, idx) : null;
+      hover = info ? { ...info, cx, cy } : null;
+    }, 220);
+  }
+  function clearHover() { clearTimeout(hoverTimer); hover = null; }
+
+  // ----- go to definition -----
+  function gotoDefinition(index) {
+    const def = getDefinition(value, language, index);
+    if (!def) return false;
+    taEl.focus();
+    taEl.setSelectionRange(def.index, def.index);
+    const top = (def.line - 1) * lineHeight;
+    if (top < taEl.scrollTop || top > taEl.scrollTop + taEl.clientHeight - lineHeight * 2) {
+      taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 2);
+    }
+    syncCaret();
+    return true;
+  }
+  function onEditorClick(e) {
+    if (e.ctrlKey || e.metaKey) {
+      const idx = indexAtClient(e.clientX, e.clientY);
+      if (gotoDefinition(idx)) { e.preventDefault(); return; }
+    }
+    syncCaret();
+  }
 
   // Replace [start,end) with text, preserving the native undo stack, then optionally
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
@@ -115,6 +243,18 @@
     const v = ta.value;
     const start = ta.selectionStart, end = ta.selectionEnd;
     const mod = e.ctrlKey || e.metaKey;
+
+    // Autocomplete navigation takes priority while the popup is open.
+    if (acOpen) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); acIndex = (acIndex + 1) % acOptions.length; return; }
+      if (e.key === 'ArrowUp') { e.preventDefault(); acIndex = (acIndex - 1 + acOptions.length) % acOptions.length; return; }
+      if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); acceptCompletion(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); acOpen = false; return; }
+    }
+    // Trigger completion explicitly (Ctrl/⌘+Space).
+    if (mod && e.key === ' ') { e.preventDefault(); refreshCompletion(true); return; }
+    // Go to definition.
+    if (e.key === 'F12') { e.preventDefault(); gotoDefinition(ta.selectionStart); return; }
 
     // Shortcuts help overlay
     if (e.key === 'F1') { e.preventDefault(); showHelp = !showHelp; return; }
@@ -325,13 +465,20 @@
     taEl.focus();
   }
   export function focus() { taEl?.focus(); }
+
+  // Move a node to <body> so fixed-positioned popups aren't clipped by an ancestor's
+  // overflow or transformed containing block.
+  function portal(node) {
+    document.body.appendChild(node);
+    return { destroy() { node.remove(); } };
+  }
 </script>
 
 <div class="ce" style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
   <div class="ce-gutter" aria-hidden="true">
     <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
       {#each lines as _, i (i)}
-        <div class={['ce-gln', i === caretLine && 'active']}>{i + 1}</div>
+        <div class={['ce-gln', i === caretLine && 'active', errorLines.has(i + 1) && 'err']}>{i + 1}</div>
       {/each}
     </div>
   </div>
@@ -349,14 +496,26 @@
       autocapitalize="off"
       autocorrect="off"
       wrap="off"
-      oninput={() => { emit(); syncCaret(); }}
+      oninput={() => { emit(); syncCaret(); refreshCompletion(false); }}
       onscroll={onScroll}
       onkeydown={onKeydown}
       onkeyup={syncCaret}
-      onclick={syncCaret}
+      onclick={onEditorClick}
       onfocus={syncCaret}
+      onblur={() => { acOpen = false; clearHover(); }}
+      onmousemove={onMouseMove}
+      onmouseleave={clearHover}
     ></textarea>
+
+    <!-- diagnostics underline layer (clipped with the content) -->
+    {#each diagSpans as d (d.line + ':' + d.col)}
+      <div class="ce-squiggle"
+        style="left:{PAD_L + d.col * charWidth - scrollLeft}px; top:{PAD_TOP + (d.line - 1) * lineHeight - scrollTop + lineHeight - 3}px; width:{Math.max(d.len, 1) * charWidth}px"
+        title={d.message}></div>
+    {/each}
   </div>
+
+  <span class="ce-measure" bind:this={measureEl} aria-hidden="true">0000000000</span>
 
   {#if showFind}
     <div class="ce-find" role="search">
@@ -400,6 +559,28 @@
       </dl>
     </div>
   {/if}
+
+  {#if hover}
+    <div class="ce-hover" use:portal style="left:{hover.cx + 6}px; top:{hover.cy + 16}px">
+      <div class="ce-hover-title">{hover.title}</div>
+      {#if hover.doc}<div class="ce-hover-doc">{hover.doc}</div>{/if}
+    </div>
+  {/if}
+
+  {#if acOpen}
+    <div class="ce-ac" use:portal style="left:{acScreen.x}px; top:{acScreen.y}px">
+      {#each acOptions as o, i (o.kind + o.label)}
+        <div class={['ce-ac-row', i === acIndex && 'sel']}
+          role="option" aria-selected={i === acIndex} tabindex="-1"
+          onmousedown={(e) => { e.preventDefault(); acIndex = i; acceptCompletion(); }}
+          onmouseenter={() => acIndex = i}>
+          <span class={['ce-ac-kind', o.kind]}>{kindIcon(o.kind)}</span>
+          <span class="ce-ac-label">{o.label}</span>
+          <span class="ce-ac-detail">{o.detail}</span>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -436,6 +617,7 @@
     font-variant-numeric: tabular-nums;
   }
   .ce-gln.active { color: var(--txt-dim); }
+  .ce-gln.err { color: var(--red); box-shadow: inset 2px 0 0 var(--red); }
 
   .ce-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
 
@@ -579,4 +761,75 @@
     white-space: nowrap; flex-shrink: 0;
   }
   .ce-help-row dd { margin: 0; font-size: 12px; color: var(--txt-dim); text-align: right; }
+
+  /* hidden monospace measuring element */
+  .ce-measure {
+    position: absolute; visibility: hidden; pointer-events: none; white-space: pre;
+    font-family: var(--mono); font-size: var(--ce-fs); line-height: var(--ce-lh);
+    top: -9999px; left: -9999px;
+  }
+
+  /* diagnostics squiggle */
+  .ce-squiggle {
+    position: absolute;
+    height: 3px;
+    z-index: 1;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 Q1.5 0 3 1.5 T6 3' stroke='%23e0635a' fill='none' stroke-width='0.9'/%3E%3C/svg%3E");
+    background-repeat: repeat-x;
+    background-position: left bottom;
+  }
+
+  /* hover tooltip */
+  .ce-hover {
+    position: fixed;
+    z-index: 60;
+    max-width: 360px;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 7px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 7px 9px;
+    pointer-events: none;
+    font-family: 'Archivo', system-ui, sans-serif;
+  }
+  .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
+  .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
+
+  /* autocomplete popup */
+  .ce-ac {
+    position: fixed;
+    z-index: 61;
+    min-width: 240px;
+    max-width: 420px;
+    max-height: 240px;
+    overflow-y: auto;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 7px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    padding: 4px;
+    font-family: 'Archivo', system-ui, sans-serif;
+  }
+  .ce-ac-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 7px; border-radius: 5px; cursor: pointer;
+  }
+  .ce-ac-row.sel { background: var(--accent-dim); }
+  .ce-ac-kind {
+    flex-shrink: 0; width: 16px; height: 16px; border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    background: var(--bg-2); color: var(--txt-dim);
+  }
+  .ce-ac-kind.function { color: var(--blue); }
+  .ce-ac-kind.variable, .ce-ac-kind.parameter { color: var(--accent); }
+  .ce-ac-kind.keyword { color: #c98be0; }
+  .ce-ac-kind.property { color: var(--amber); }
+  .ce-ac-label { font-family: var(--mono); font-size: 12px; color: var(--txt); flex-shrink: 0; }
+  .ce-ac-detail {
+    font-size: 11px; color: var(--txt-faint); margin-left: auto;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ce-ac-row.sel .ce-ac-label, .ce-ac-row.sel .ce-ac-detail { color: #eafff5; }
 </style>
