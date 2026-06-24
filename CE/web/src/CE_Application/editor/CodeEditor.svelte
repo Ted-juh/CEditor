@@ -348,6 +348,42 @@
     syncCaret();
   }
 
+  // ----- rename symbol (multi-occurrence edit) -----
+  let renaming = $state(null);   // { word, occ, x, y }
+  let renameDraft = $state('');
+  let renameInputEl = $state(null);
+  async function startRename() {
+    const w = wordAt(value, taEl.selectionStart);
+    if (!w) return;
+    const occ = identifierOccurrences(value, language, w.word);
+    if (occ.length === 0) return;
+    const r = taEl.getBoundingClientRect();
+    const p = posOf(w.start);
+    renaming = {
+      word: w.word, occ,
+      x: r.left + PAD_L + p.col * charWidth - taEl.scrollLeft,
+      y: r.top + PAD_TOP + p.line * lineHeight - taEl.scrollTop,
+    };
+    renameDraft = w.word;
+    await tick();
+    renameInputEl?.focus();
+    renameInputEl?.select();
+  }
+  function commitRename() {
+    const r = renaming;
+    renaming = null;
+    if (!r) return;
+    const name = renameDraft.trim();
+    if (name && name !== r.word && /^[A-Za-z_$][\w$]*$/.test(name)) {
+      let v = value;
+      // Replace from the end so earlier offsets stay valid.
+      for (let i = r.occ.length - 1; i >= 0; i--) v = v.slice(0, r.occ[i].start) + name + v.slice(r.occ[i].end);
+      const caret = r.occ[0].start + name.length;
+      applyEdit(0, value.length, v, caret);
+    }
+    taEl?.focus();
+  }
+
   // Select the next occurrence of the current word (wraps), scrolling it into view.
   function jumpToNextOccurrence() {
     const occ = occurrences;
@@ -426,6 +462,8 @@
     if (mod && e.key === ' ') { e.preventDefault(); refreshCompletion(true); return; }
     // Go to symbol (Ctrl/⌘+Shift+O).
     if (mod && e.shiftKey && (e.key === 'O' || e.key === 'o')) { e.preventDefault(); openSymbols(); return; }
+    // Rename symbol (F2) — edits every occurrence at once.
+    if (e.key === 'F2') { e.preventDefault(); startRename(); return; }
     // Go to definition (F12) / cycle references (Shift+F12).
     if (e.key === 'F12') {
       e.preventDefault();
@@ -550,6 +588,7 @@
     { keys: 'F12 / Ctrl/⌘+Click', desc: 'Go to definition' },
     { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
     { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
+    { keys: 'F2', desc: 'Rename symbol (all occurrences)' },
     { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
     { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
     { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
@@ -755,6 +794,13 @@
         {/each}
       </dl>
     </div>
+  {/if}
+
+  {#if renaming}
+    <input class="ce-rename" use:portal bind:this={renameInputEl} bind:value={renameDraft}
+      style="left:{renaming.x}px; top:{renaming.y}px"
+      onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') { e.preventDefault(); renaming = null; taEl?.focus(); } }}
+      onblur={commitRename} />
   {/if}
 
   {#if hover}
@@ -1099,6 +1145,23 @@
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='3'%3E%3Cpath d='M0 3 Q1.5 0 3 1.5 T6 3' stroke='%23e0635a' fill='none' stroke-width='0.9'/%3E%3C/svg%3E");
     background-repeat: repeat-x;
     background-position: left bottom;
+  }
+
+  /* rename input */
+  .ce-rename {
+    position: fixed;
+    z-index: 64;
+    transform: translateY(-2px);
+    min-width: 90px;
+    background: var(--panel-2);
+    border: 1px solid var(--accent);
+    border-radius: 5px;
+    padding: 2px 6px;
+    color: var(--txt);
+    font-family: var(--mono);
+    font-size: var(--ce-fs);
+    outline: none;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
   }
 
   /* hover tooltip */
