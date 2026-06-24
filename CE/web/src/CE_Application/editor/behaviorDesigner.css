@@ -164,6 +164,28 @@
 .bd-app .liveled{width:7px;height:7px;border-radius:50%;background:var(--txt-faint)}
 .bd-app .liveled.on{background:var(--accent);box-shadow:0 0 6px var(--accent)}
 
+/* ---- cross-script search ---- */
+.bd-app .searchbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line-2);
+  background:var(--bg-2);border-radius:8px;margin-bottom:12px}
+.bd-app .searchbar .si{color:var(--txt-faint);font-size:14px}
+.bd-app .searchinput{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--txt);font-size:13px;font-family:inherit}
+.bd-app .searchinput::placeholder{color:var(--txt-faint)}
+.bd-app .searchbar .scount{font-size:11px;color:var(--txt-faint);white-space:nowrap}
+.bd-app .searchclear{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.bd-app .searchclear:hover{color:var(--txt)}
+.bd-app .searchresults{display:flex;flex-direction:column;gap:6px;overflow:auto}
+.bd-app .noresults{color:var(--txt-faint);font-size:13px;text-align:center;padding:22px}
+.bd-app .resrow{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;transition:.12s}
+.bd-app .resrow:hover{border-color:var(--accent-dim)}
+.bd-app .resrow.sel{border-color:var(--accent);background:var(--panel-2)}
+.bd-app .resmeta{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.bd-app .resmeta .sname{font-size:13px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-app .resmeta .pd{font-size:11px;color:var(--txt-faint);white-space:nowrap;flex-shrink:0}
+.bd-app .resmeta .rfield{color:var(--txt-faint);opacity:.8}
+.bd-app .ressnip{display:flex;gap:8px;align-items:baseline;margin-top:6px;font-family:var(--mono);font-size:11px}
+.bd-app .ressnip .rline{color:var(--txt-faint);min-width:22px;text-align:right;flex-shrink:0}
+.bd-app .ressnip code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
 /* ---- problems list ---- */
 .bd-app .problems{margin-top:10px;display:flex;flex-direction:column;gap:4px}
 .bd-app .problem{display:flex;gap:8px;align-items:flex-start;padding:6px 9px;border-radius:6px;font-size:12px;line-height:1.4}

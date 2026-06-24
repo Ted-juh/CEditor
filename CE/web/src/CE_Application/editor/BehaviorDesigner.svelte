@@ -8,6 +8,7 @@
   import CodeEditor from './CodeEditor.svelte';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
+  import { searchScripts } from '../scripting/scriptSearch.js';
   import { scriptTrace, clearScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
@@ -66,6 +67,16 @@
   // 'self' target (the old component-scope default) reads as the wildcard here.
   let controlNames = $derived((controls ?? []).map((c) => c.name).filter(Boolean));
   let targetValue = $derived(selected ? (selected.target === 'self' || !selected.target ? '*' : selected.target) : '*');
+
+  // --- cross-script search (spans Setup / Behaviors / Teardown) ---
+  let searchQuery = $state('');
+  let searchResults = $derived(searchScripts(scripts, searchQuery));
+  function openResult(id) {
+    const s = scripts.find((x) => x.id === id);
+    if (!s) return;
+    selectedId = id;
+    activeScreen = screenOf(s.event);
+  }
 
   // --- list grouping + inline rename ---
   let groupMode = $state('flat'); // 'flat' | 'control' | 'folder'
@@ -393,15 +404,47 @@
               <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
             </div>
           {:else}
-            <div class={['screen', activeScreen === 'setup' && 'active']}>
-              {@render tableScreen('Setup', 'Runs once as the panel starts — open MIDI, read the synth, fill controls.', setupScripts, 'onPanelReady', 'panel')}
+            <div class="searchbar">
+              <span class="si">⌕</span>
+              <input class="searchinput" placeholder="Search all scripts…" value={searchQuery}
+                oninput={(e) => searchQuery = e.target.value}
+                onkeydown={(e) => { if (e.key === 'Escape') searchQuery = ''; }} />
+              {#if searchQuery}
+                <span class="scount">{searchResults.length} match{searchResults.length === 1 ? '' : 'es'}</span>
+                <button class="searchclear" title="Clear (Esc)" onclick={() => searchQuery = ''}>✕</button>
+              {/if}
             </div>
-            <div class={['screen', activeScreen === 'behaviors' && 'active']}>
-              {@render tableScreen('Behaviors', 'The live, event-driven scripts — what happens while the panel is in use.', behaviorScripts, 'onValueChanged', 'component')}
-            </div>
-            <div class={['screen', activeScreen === 'teardown' && 'active']}>
-              {@render tableScreen('Teardown', 'Runs as the panel closes or the DAW saves/restores the project.', teardownScripts, 'onPanelClose', 'panel')}
-            </div>
+            {#if searchQuery}
+              <div class="screen active">
+                <div class="searchresults">
+                  {#if searchResults.length === 0}
+                    <div class="noresults">No scripts match “{searchQuery}”.</div>
+                  {:else}
+                    {#each searchResults as r (r.id)}
+                      <div class={['resrow', selectedId === r.id && 'sel']} role="button" tabindex="0"
+                        onclick={() => openResult(r.id)}
+                        onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && openResult(r.id)}>
+                        <div class="resmeta">
+                          <span class="sname">{r.name}</span>
+                          <span class="pd"><span class={['pill', langClass(r.language)]}>{langLabel(r.language)}</span> {r.event}<span class="rfield"> · {r.field}</span></span>
+                        </div>
+                        {#if r.snippet}<div class="ressnip"><span class="rline">{r.line}</span><code>{r.snippet}</code></div>{/if}
+                      </div>
+                    {/each}
+                  {/if}
+                </div>
+              </div>
+            {:else}
+              <div class={['screen', activeScreen === 'setup' && 'active']}>
+                {@render tableScreen('Setup', 'Runs once as the panel starts — open MIDI, read the synth, fill controls.', setupScripts, 'onPanelReady', 'panel')}
+              </div>
+              <div class={['screen', activeScreen === 'behaviors' && 'active']}>
+                {@render tableScreen('Behaviors', 'The live, event-driven scripts — what happens while the panel is in use.', behaviorScripts, 'onValueChanged', 'component')}
+              </div>
+              <div class={['screen', activeScreen === 'teardown' && 'active']}>
+                {@render tableScreen('Teardown', 'Runs as the panel closes or the DAW saves/restores the project.', teardownScripts, 'onPanelClose', 'panel')}
+              </div>
+            {/if}
           {/if}
         </div>
       </div>
