@@ -127,26 +127,10 @@
     mainView = 'editor';
   }
 
-  // --- list grouping + inline rename ---
-  let groupMode = $state('flat'); // 'flat' | 'control' | 'folder'
+  // --- inline rename ---
   let renamingId = $state(null);
   let renameValue = $state('');
-  let folderNames = $derived([...new Set(scripts.map((s) => (s.group ?? '').trim()).filter(Boolean))]);
-
-  function controlGroupOf(s) { return (s.target && s.target !== '*' && s.target !== 'self') ? s.target : 'Any control'; }
-  function groupKeyOf(s) {
-    if (groupMode === 'folder') return (s.group ?? '').trim() || 'Ungrouped';
-    if (groupMode === 'control') return controlGroupOf(s);
-    return '';
-  }
-  function groupsOf(items) {
-    if (groupMode === 'flat') return [{ key: '', items }];
-    const map = new Map();
-    for (const s of items) { const k = groupKeyOf(s); if (!map.has(k)) map.set(k, []); map.get(k).push(s); }
-    return [...map.entries()].map(([key, list]) => ({ key, items: list }));
-  }
-
-  function startRename(s) { renamingId = s.id; renameValue = s.name; }
+  function startRename(s) { renamingId = s.id; renameValue = s.name; foldering = null; }
   function commitRename() {
     const s = scripts.find((x) => x.id === renamingId);
     if (s && renameValue.trim()) s.name = renameValue.trim();
@@ -154,19 +138,138 @@
   }
   function cancelRename() { renamingId = null; }
 
-  // Inline "move to folder" — assign a script's folder label from the tree (mirrors rename).
+  // --- folders (scoped per lifecycle) -------------------------------------------------
+  // A folder is identified by (lifecycle, name). A script's lifecycle is DERIVED from its
+  // event (screenOf), so a folder only ever sub-groups scripts already in that lifecycle —
+  // you can't drag a Shutdown script into a Startup folder. Non-empty folders are implied
+  // by each script's `group`; EMPTY folders are remembered in a per-panel registry so they
+  // persist (kept in localStorage — empty folders are an editing convenience, so they don't
+  // travel with the exported document the way `group` labels on real scripts do).
+  const LIFECYCLES = ['startup', 'ready', 'runtime', 'dawstate', 'shutdown'];
+  const panelKey = String(panelId ?? 'debug');
+  const FOLDERS_KEY = 'ce-script-folders';
+  function loadFolderReg() {
+    const reg = {}; for (const lc of LIFECYCLES) reg[lc] = [];
+    try {
+      const mine = (JSON.parse(localStorage.getItem(FOLDERS_KEY) || '{}'))[panelKey] || {};
+      for (const lc of LIFECYCLES) if (Array.isArray(mine[lc])) reg[lc] = mine[lc].map(String);
+    } catch { /* defaults */ }
+    return reg;
+  }
+  let folderReg = $state(loadFolderReg());
+  function saveFolderReg() {
+    try {
+      const all = JSON.parse(localStorage.getItem(FOLDERS_KEY) || '{}');
+      all[panelKey] = folderReg;
+      localStorage.setItem(FOLDERS_KEY, JSON.stringify(all));
+    } catch { /* best-effort */ }
+  }
+
+  // All folder names anywhere (for the detail-panel datalist).
+  let folderNames = $derived.by(() => {
+    const set = new Set();
+    for (const lc of LIFECYCLES) for (const n of folderReg[lc] ?? []) set.add(n);
+    for (const s of scripts) { const g = (s.group ?? '').trim(); if (g) set.add(g); }
+    return [...set];
+  });
+
+  // Folders shown under a lifecycle = registry ∪ folders implied by its scripts.
+  function foldersIn(lc, nodeScripts) {
+    const names = new Set(folderReg[lc] ?? []);
+    for (const s of nodeScripts) { const g = (s.group ?? '').trim(); if (g) names.add(g); }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+  function ungroupedIn(nodeScripts) { return nodeScripts.filter((s) => !(s.group ?? '').trim()); }
+  function scriptsInFolder(nodeScripts, name) { return nodeScripts.filter((s) => (s.group ?? '').trim() === name); }
+
+  // Keep the registry in sync: any folder a script references is remembered, so it survives
+  // (as an empty folder) if that script later leaves or is deleted. Single registration point.
+  $effect(() => {
+    let changed = false; const next = { ...folderReg };
+    for (const s of scripts) {
+      const g = (s.group ?? '').trim(); if (!g) continue;
+      const lc = screenOf(s.event);
+      if (!next[lc].includes(g)) { next[lc] = [...next[lc], g]; changed = true; }
+    }
+    if (changed) { folderReg = next; saveFolderReg(); }
+  });
+
+  // Folder collapse state (default = expanded; track only the collapsed ones).
+  let collapsedFolders = $state(new Set());
+  function folderKey(lc, name) { return lc + '::' + name; }
+  function toggleFolder(lc, name) {
+    const k = folderKey(lc, name); const n = new Set(collapsedFolders);
+    n.has(k) ? n.delete(k) : n.add(k); collapsedFolders = n;
+  }
+
+  function addFolder(lc) {
+    const taken = new Set(foldersIn(lc, scripts.filter((s) => screenOf(s.event) === lc)));
+    let name = 'New folder', i = 2; while (taken.has(name)) name = 'New folder ' + i++;
+    folderReg = { ...folderReg, [lc]: [...(folderReg[lc] ?? []), name] };
+    saveFolderReg();
+    expand(lc);
+    startFolderRename(lc, name); // let the user name it immediately
+  }
+  function deleteFolder(lc, name) {
+    if (!confirm('Delete folder “' + name + '”? Its scripts move to ungrouped (they are NOT deleted).')) return;
+    folderReg = { ...folderReg, [lc]: (folderReg[lc] ?? []).filter((n) => n !== name) };
+    for (const s of scripts) if (screenOf(s.event) === lc && (s.group ?? '').trim() === name) s.group = '';
+    saveFolderReg();
+  }
+
+  // Inline rename of a folder header.
+  let folderRenaming = $state(null); // { lc, name }
+  let folderRenameValue = $state('');
+  function startFolderRename(lc, name) { folderRenaming = { lc, name }; folderRenameValue = name; }
+  function commitFolderRename() {
+    if (!folderRenaming) return;
+    const { lc, name } = folderRenaming; const next = folderRenameValue.trim();
+    folderRenaming = null;
+    if (!next || next === name) return;
+    folderReg = { ...folderReg, [lc]: [...new Set((folderReg[lc] ?? []).map((n) => (n === name ? next : n)))] };
+    for (const s of scripts) if (screenOf(s.event) === lc && (s.group ?? '').trim() === name) s.group = next;
+    saveFolderReg();
+  }
+  function cancelFolderRename() { folderRenaming = null; }
+
+  // Inline "move to folder" on a single script row (keyboard-friendly alternative to drag).
   let foldering = $state(null);
   let folderValue = $state('');
   function startFolder(s) { foldering = s.id; folderValue = s.group ?? ''; renamingId = null; }
   function commitFolder() {
     const s = scripts.find((x) => x.id === foldering);
-    if (s) {
-      s.group = folderValue.trim();
-      if (s.group && groupMode !== 'folder') groupMode = 'folder'; // show the result of the move
-    }
+    if (s) s.group = folderValue.trim(); // registry stays in sync via the $effect above
     foldering = null;
   }
   function cancelFolder() { foldering = null; }
+
+  // --- drag a script into a folder (within its lifecycle only) ---
+  let dragId = $state(null);     // script being dragged
+  let dragLc = $state(null);     // its lifecycle — drops are only offered here
+  let dropTarget = $state(null); // folderKey currently hovered (drives the highlight)
+  function onDragStart(s, e) {
+    dragId = s.id; dragLc = screenOf(s.event);
+    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', s.id); } catch { /* ignore */ }
+  }
+  function onDragEnd() { dragId = null; dragLc = null; dropTarget = null; }
+  function onDropZoneOver(lc, name, e) {
+    if (dragId == null || lc !== dragLc) return; // cross-lifecycle drops are not allowed
+    e.preventDefault(); e.stopPropagation();
+    e.dataTransfer.dropEffect = 'move';
+    dropTarget = folderKey(lc, name);
+  }
+  function onDropZoneLeave(lc, name) { if (dropTarget === folderKey(lc, name)) dropTarget = null; }
+  function onDropZoneDrop(lc, name, e) {
+    if (dragId == null || lc !== dragLc) return;
+    e.preventDefault(); e.stopPropagation();
+    const s = scripts.find((x) => x.id === dragId);
+    if (s) s.group = name; // '' = ungrouped
+    onDragEnd();
+  }
+
+  // Expand / collapse everything.
+  function expandAll() { expanded = new Set(LIFECYCLES); collapsedFolders = new Set(); }
+  function collapseAll() { expanded = new Set(); }
 
   // --- Test / Trace screen state ---
   let allProblems = $derived(scripts.flatMap((s) => validateScript(s).map((p) => ({ ...p, script: s.name }))));
@@ -453,7 +556,45 @@
   </div>
 {/snippet}
 
+{#snippet scriptRow(s)}
+  <div class={['titem', selectedId === s.id && mainView === 'editor' && 'sel', !s.enabled && 'off']}
+    role="button" tabindex="0"
+    draggable={renamingId !== s.id && foldering !== s.id}
+    ondragstart={(e) => onDragStart(s, e)} ondragend={onDragEnd}
+    onclick={() => selectScript(s.id)}
+    onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectScript(s.id)}>
+    {#if renamingId === s.id}
+      <input class="renameinput" value={renameValue}
+        oninput={(e) => renameValue = e.target.value}
+        onblur={commitRename}
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
+        {@attach (el) => { el.focus(); el.select(); }} />
+    {:else if foldering === s.id}
+      <input class="renameinput" value={folderValue} list="bd-folders-tree"
+        placeholder="Folder name (blank = none)…"
+        oninput={(e) => folderValue = e.target.value}
+        onblur={commitFolder}
+        onclick={(e) => e.stopPropagation()}
+        onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitFolder(); } else if (e.key === 'Escape') cancelFolder(); }}
+        {@attach (el) => { el.focus(); el.select(); }} />
+    {:else}
+      <span class="sname" role="button" tabindex="0"
+        ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
+        onkeydown={(e) => { if (e.key === 'F2') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
+        title="Drag to a folder · double-click (or F2) to rename">{s.name}</span>
+      <span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span>
+      <button class="titembtn" title={s.group ? 'Folder: ' + s.group + ' — click to change' : 'Move to a folder…'}
+        onclick={(e) => { e.stopPropagation(); startFolder(s); }}>🗀</button>
+      <button class="titembtn del" title="Delete script"
+        onclick={(e) => { e.stopPropagation(); if (confirm('Delete script “' + s.name + '”?')) deleteScript(s.id); }}>✕</button>
+    {/if}
+  </div>
+{/snippet}
+
 {#snippet treeGroup(node)}
+  {@const folders = foldersIn(node.id, node.scripts)}
+  {@const ungrouped = ungroupedIn(node.scripts)}
   <div class="treegroup">
     <div class={['tghead', expanded.has(node.id) && 'open']}>
       <button class="tgtoggle" title={node.label}
@@ -463,51 +604,57 @@
         <span class="tglabel">{node.label}</span>
         {#if node.scripts.length}<span class="ct">{node.scripts.length}</span>{/if}
       </button>
+      <button class="tgnew folder" title={'New folder in ' + node.label}
+        onclick={() => addFolder(node.id)}>🗀+</button>
       <button class="tgnew" title={'New ' + node.label + ' script (' + node.event + ')'}
         onclick={() => addScript(node.event, node.scope)}>+</button>
     </div>
     {#if expanded.has(node.id)}
-      <div class="tgkids">
-      {#if node.scripts.length === 0}
-        <div class="tgempty">No scripts — click <b>+</b> to add one.</div>
-      {:else}
-        {#each groupsOf(node.scripts) as g (g.key)}
-          {#if groupMode !== 'flat'}<div class="tgsub">{g.key} <span class="gc">{g.items.length}</span></div>{/if}
-          {#each g.items as s (s.id)}
-            <div class={['titem', selectedId === s.id && mainView === 'editor' && 'sel', !s.enabled && 'off']}
-              role="button" tabindex="0"
-              onclick={() => selectScript(s.id)}
-              onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && selectScript(s.id)}>
-              {#if renamingId === s.id}
-                <input class="renameinput" value={renameValue}
-                  oninput={(e) => renameValue = e.target.value}
-                  onblur={commitRename}
-                  onclick={(e) => e.stopPropagation()}
-                  onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') cancelRename(); }}
-                  {@attach (el) => { el.focus(); el.select(); }} />
-              {:else if foldering === s.id}
-                <input class="renameinput" value={folderValue} list="bd-folders-tree"
-                  placeholder="Folder name (blank = none)…"
-                  oninput={(e) => folderValue = e.target.value}
-                  onblur={commitFolder}
-                  onclick={(e) => e.stopPropagation()}
-                  onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitFolder(); } else if (e.key === 'Escape') cancelFolder(); }}
-                  {@attach (el) => { el.focus(); el.select(); }} />
-              {:else}
-                <span class="sname" role="button" tabindex="0"
-                  ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
-                  onkeydown={(e) => { if (e.key === 'F2') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
-                  title="Double-click (or F2) to rename">{s.name}</span>
-                <span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span>
-                <button class="titembtn" title={s.group ? 'Folder: ' + s.group + ' — click to change' : 'Move to a folder…'}
-                  onclick={(e) => { e.stopPropagation(); startFolder(s); }}>🗀</button>
-                <button class="titembtn del" title="Delete script"
-                  onclick={(e) => { e.stopPropagation(); if (confirm('Delete script “' + s.name + '”?')) deleteScript(s.id); }}>✕</button>
+      <div class={['tgkids', dropTarget === folderKey(node.id, '') && 'drop']}
+        ondragover={(e) => onDropZoneOver(node.id, '', e)}
+        ondragleave={() => onDropZoneLeave(node.id, '')}
+        ondrop={(e) => onDropZoneDrop(node.id, '', e)}>
+        {#if node.scripts.length === 0 && folders.length === 0}
+          <div class="tgempty">No scripts — click <b>+</b> to add one, or <b>🗀+</b> for a folder.</div>
+        {:else}
+          {#each folders as fname (fname)}
+            {@const fscripts = scriptsInFolder(node.scripts, fname)}
+            {@const open = !collapsedFolders.has(folderKey(node.id, fname))}
+            <div class={['tgfolderwrap', dropTarget === folderKey(node.id, fname) && 'drop']}
+              ondragover={(e) => onDropZoneOver(node.id, fname, e)}
+              ondragleave={() => onDropZoneLeave(node.id, fname)}
+              ondrop={(e) => onDropZoneDrop(node.id, fname, e)}>
+              <div class="tgfolder">
+                {#if folderRenaming && folderRenaming.lc === node.id && folderRenaming.name === fname}
+                  <input class="renameinput" value={folderRenameValue} list="bd-folders-tree"
+                    oninput={(e) => folderRenameValue = e.target.value}
+                    onblur={commitFolderRename}
+                    onclick={(e) => e.stopPropagation()}
+                    onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitFolderRename(); } else if (e.key === 'Escape') cancelFolderRename(); }}
+                    {@attach (el) => { el.focus(); el.select(); }} />
+                {:else}
+                  <button class="tgftoggle" onclick={() => toggleFolder(node.id, fname)}>
+                    <span class="tgcaret">{open ? '▾' : '▸'}</span>
+                    <span class="fi">🗀</span>
+                    <span class="tglabel">{fname}</span>
+                    <span class="ct">{fscripts.length}</span>
+                  </button>
+                  <button class="titembtn" title="Rename folder"
+                    onclick={(e) => { e.stopPropagation(); startFolderRename(node.id, fname); }}>✎</button>
+                  <button class="titembtn del" title="Delete folder (keeps its scripts)"
+                    onclick={(e) => { e.stopPropagation(); deleteFolder(node.id, fname); }}>✕</button>
+                {/if}
+              </div>
+              {#if open}
+                <div class="tgfkids">
+                  {#each fscripts as s (s.id)}{@render scriptRow(s)}{/each}
+                  {#if fscripts.length === 0}<div class="tgempty">Empty — drag scripts here.</div>{/if}
+                </div>
               {/if}
             </div>
           {/each}
-        {/each}
-      {/if}
+          {#each ungrouped as s (s.id)}{@render scriptRow(s)}{/each}
+        {/if}
       </div>
     {/if}
   </div>
@@ -661,10 +808,9 @@
         </div>
       {:else}
         <div class="treetools">
-          <div class="groupby" title="Group scripts within each section">
-            <button class={['gb', groupMode === 'flat' && 'active']} onclick={() => groupMode = 'flat'}>Flat</button>
-            <button class={['gb', groupMode === 'control' && 'active']} onclick={() => groupMode = 'control'}>Control</button>
-            <button class={['gb', groupMode === 'folder' && 'active']} onclick={() => groupMode = 'folder'}>Folder</button>
+          <div class="groupby">
+            <button class="gb" onclick={expandAll} title="Expand every lifecycle group and folder">⊞ Expand all</button>
+            <button class="gb" onclick={collapseAll} title="Collapse every lifecycle group">⊟ Collapse</button>
           </div>
           <button class="btn ghost tiny" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import</button>
         </div>
