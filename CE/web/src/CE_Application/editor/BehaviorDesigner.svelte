@@ -3,8 +3,9 @@
   // ScriptWorkspace). Cloned from the DPD shell: fixed frame, nav-rail by lifecycle,
   // screens via display:none/.active, list -> detail. Spec: tools/docs/panel-api-spec.md.
   import './behaviorDesigner.css';
-  import { tick, onMount, untrack } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import ScriptPicker from './ScriptPicker.svelte';
+  import CodeEditor from './CodeEditor.svelte';
   import { createScript, normalizeSourceScript, defaultSource } from '../scripting/scriptModel.js';
   import { validateScript } from '../scripting/scriptValidate.js';
   import { scriptTrace, clearScriptTrace } from '../stores/scriptConsole.js';
@@ -24,19 +25,15 @@
   // passes a demo set). Real persistence back to the panel model is follow-on wiring.
   let { panelName = 'Untitled Panel', panelId = null, controls = [], initialScripts = [], onChange = null } = $props();
 
-  let codeEl = $state(null);   // the <textarea>, for insert-at-cursor
+  let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
   let showPicker = $state(false); // when true, the RIGHT pane shows the Insert picker instead of the script list
   let showLibrary = $state(false); // when true, the RIGHT pane shows the reusable-script library
 
   async function insertAtCursor(text) {
-    const s = scripts.find((x) => x.id === selectedId);
-    if (!s) return;
-    const el = codeEl;
-    const start = el ? el.selectionStart : s.source.length;
-    const end = el ? el.selectionEnd : s.source.length;
-    s.source = s.source.slice(0, start) + text + s.source.slice(end);
-    await tick();
-    if (el) { const pos = start + text.length; el.focus(); el.setSelectionRange(pos, pos); }
+    if (!selected) return;
+    if (codeEditor) { await codeEditor.insert(text); return; }
+    // Fallback (editor not mounted): append to the source.
+    selected.source = selected.source + text;
   }
 
   // Which lifecycle group an event belongs to — drives nav grouping.
@@ -246,8 +243,8 @@
           <button class="btn ghost" onclick={regenerateSkeleton} title="Replace with a fresh skeleton">↺ skeleton</button>
         </span>
       </div>
-      <textarea class="code" bind:this={codeEl} spellcheck="false" value={selected.source}
-        oninput={(e) => updateField('source', e.target.value)}></textarea>
+      <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
+        oninput={(v) => updateField('source', v)} onrun={() => runScript(selected)} />
 
       {#if problems.length === 0}
         <div class="problems"><div class="problem ok">✓ No problems</div></div>

@@ -135,11 +135,6 @@
 }
 .bd-app .row2{display:flex;gap:10px}
 .bd-app .row2>*{flex:1}
-.bd-app .code{
-  width:100%;min-height:240px;resize:vertical;background:#0a0c10;border:1px solid var(--line-2);
-  border-radius:8px;padding:12px;color:#cfe3d8;font-family:var(--mono);font-size:13px;line-height:1.55;
-  tab-size:2;white-space:pre;overflow:auto;
-}
 .bd-app .codehead{display:flex;align-items:center;justify-content:space-between;margin:6px 0 6px}
 .bd-app .codehead .lang{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
 
