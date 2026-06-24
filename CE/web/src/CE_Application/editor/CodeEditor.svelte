@@ -8,7 +8,7 @@
   // intact by routing every programmatic edit through document.execCommand('insertText').
   import { tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
-  import { analyze, getCompletions, getHover, getDefinition, wordAt } from '../scripting/languageService.js';
+  import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, wordAt } from '../scripting/languageService.js';
 
   let {
     value = '',
@@ -26,6 +26,7 @@
   let scrollTop = $state(0);
   let scrollLeft = $state(0);
   let caretLine = $state(0);
+  let caretCol = $state(0);
   let caretPos = $state(0);
   let fontSize = $state(13);
   let charWidth = $state(7.8);
@@ -91,8 +92,8 @@
     caretPos = pos;
     const before = taEl.value.slice(0, pos);
     caretLine = countLines(before);
-    const col = pos - (before.lastIndexOf('\n') + 1);
-    oncaret?.(caretLine + 1, col + 1);
+    caretCol = pos - (before.lastIndexOf('\n') + 1);
+    oncaret?.(caretLine + 1, caretCol + 1);
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
@@ -143,6 +144,21 @@
     return {
       x: r.left + PAD_L + acAnchor.col * charWidth - taEl.scrollLeft,
       y: r.top + PAD_TOP + (acAnchor.line + 1) * lineHeight - taEl.scrollTop,
+    };
+  });
+
+  // ----- signature help -----
+  let signature = $derived.by(() => {
+    void caretPos;
+    if (!taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
+    return getSignatureHelp(value, language, caretPos);
+  });
+  let sigScreen = $derived.by(() => {
+    if (!signature || !taEl) return { x: 0, y: 0 };
+    const r = taEl.getBoundingClientRect();
+    return {
+      x: r.left + PAD_L + caretCol * charWidth - taEl.scrollLeft,
+      y: r.top + PAD_TOP + caretLine * lineHeight - taEl.scrollTop,
     };
   });
 
@@ -610,6 +626,14 @@
     </div>
   {/if}
 
+  {#if signature && !acOpen}
+    <div class="ce-sig" use:portal style="left:{sigScreen.x}px; top:{sigScreen.y}px">
+      <span class="ce-sig-name">{signature.name}</span>(<!--
+        -->{#each signature.params as p, i (i)}<span class={['ce-sig-param', i === signature.activeParam && 'active']}>{p}</span>{#if i < signature.params.length - 1}, {/if}{/each}<!--
+      -->)
+    </div>
+  {/if}
+
   {#if acOpen}
     <div class="ce-ac" use:portal style="left:{acScreen.x}px; top:{acScreen.y}px">
       {#each acOptions as o, i (o.kind + o.label)}
@@ -845,6 +869,26 @@
   }
   .ce-hover-title { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: pre-wrap; }
   .ce-hover-doc { font-size: 12px; color: var(--txt-dim); margin-top: 4px; line-height: 1.4; }
+
+  /* signature help */
+  .ce-sig {
+    position: fixed;
+    z-index: 59;
+    transform: translateY(calc(-100% - 5px));
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 6px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    padding: 5px 9px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--txt-dim);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .ce-sig-name { color: var(--blue); }
+  .ce-sig-param { color: var(--txt-faint); }
+  .ce-sig-param.active { color: var(--accent); font-weight: 700; text-decoration: underline; }
 
   /* autocomplete popup */
   .ce-ac {

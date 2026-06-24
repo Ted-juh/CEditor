@@ -26,6 +26,19 @@ const API_FUNCTIONS = [...COMMANDS, ...HELPERS].map((m) => ({
   doc: m.summary || '',
 }));
 const API_BY_NAME = Object.fromEntries(API_FUNCTIONS.map((f) => [f.label, f]));
+
+// Parameter names per API function, for signature help. Prefer the structured
+// params array (commands); fall back to parsing the signature string (helpers).
+function paramsFromSignature(sig) {
+  const m = /\(([^)]*)\)/.exec(sig || '');
+  if (!m || !m[1].trim()) return [];
+  return m[1].split(',').map((s) => s.trim()).filter(Boolean);
+}
+const API_PARAMS = {};
+for (const m of [...COMMANDS, ...HELPERS]) {
+  const params = Array.isArray(m.params) ? m.params.map((p) => p.name) : paramsFromSignature(m.signature);
+  API_PARAMS[m.id] = { name: m.id, params, signature: m.signature || `${m.id}(…)` };
+}
 const EVENT_BY_FN = Object.fromEntries(ALL_EVENTS.map((e) => [e.fn, e]));
 const ACCESSOR_BY_ID = Object.fromEntries(VALUE_ACCESSORS.map((a) => [a.id, a]));
 
@@ -287,6 +300,44 @@ export function getHover(source, languageId, index) {
 }
 
 /* ---------------------------------------------------------------- definition */
+
+/**
+ * Signature help for the call enclosing `caret` → { name, params, activeParam } or null.
+ * Scans backwards for the unmatched '(' and the identifier before it, counting top-level
+ * commas to find the active argument. Looks the function up in the panel API, then the
+ * document's own functions. (Heuristic: doesn't skip commas inside strings.)
+ */
+export function getSignatureHelp(source, languageId, caret) {
+  const src = String(source ?? '');
+  const pre = src.slice(0, caret);
+  let depth = 0, commas = 0, i = pre.length - 1;
+  for (; i >= 0; i--) {
+    const c = pre[i];
+    if (c === ')' || c === ']' || c === '}') depth++;
+    else if (c === '(') { if (depth === 0) break; depth--; }
+    else if (c === '[' || c === '{') { if (depth === 0) return null; depth--; }
+    else if (c === ',' && depth === 0) commas++;
+    else if (c === ';' && depth === 0) return null;
+  }
+  if (i < 0) return null;
+  let j = i - 1;
+  while (j >= 0 && /\s/.test(pre[j])) j--;
+  if (j < 0) return null;
+  const w = wordAt(src, j);
+  if (!w) return null;
+
+  let info = API_PARAMS[w.word];
+  if (!info) {
+    // Parse the source up to the current (likely incomplete) line so the call being
+    // typed doesn't break the parse and hide the function's declaration.
+    const lineStart = src.lastIndexOf('\n', caret - 1) + 1;
+    const probe = src.slice(0, lineStart) || src;
+    const fn = analyze(probe, languageId).symbols.find((s) => s.name === w.word && s.kind === 'function');
+    if (fn) info = { name: w.word, params: paramsFromSignature(fn.detail), signature: fn.detail };
+  }
+  if (!info || info.params.length === 0) return null;
+  return { name: info.name, params: info.params, activeParam: Math.min(commas, info.params.length - 1), signature: info.signature };
+}
 
 /** Source offset where the identifier at `index` is declared → { index, line, col } or null. */
 export function getDefinition(source, languageId, index) {

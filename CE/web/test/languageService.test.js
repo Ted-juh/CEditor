@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  analyze, getCompletions, getHover, getDefinition, wordAt, languageKey,
+  analyze, getCompletions, getHover, getDefinition, getSignatureHelp, wordAt, languageKey,
 } from '../src/CE_Application/scripting/languageService.js';
 
 /* ------------------------------------------------------------- diagnostics */
@@ -125,6 +125,40 @@ test('getDefinition jumps to a function declaration', () => {
 
 test('getDefinition returns null for API / unknown names', () => {
   assert.equal(getDefinition('set("a", 1)', 'lua', 1), null);
+});
+
+/* ----------------------------------------------------------- signature help */
+
+test('getSignatureHelp resolves a panel API call and the active argument', () => {
+  const s0 = getSignatureHelp('sendCC(', 'lua', 7);
+  assert.ok(s0);
+  assert.equal(s0.name, 'sendCC');
+  assert.deepEqual(s0.params, ['channel', 'cc', 'value']);
+  assert.equal(s0.activeParam, 0);
+
+  const s2 = getSignatureHelp('sendCC(1, 74, ', 'lua', 14);
+  assert.equal(s2.activeParam, 2);
+});
+
+test('getSignatureHelp works for helpers (params parsed from signature)', () => {
+  const s = getSignatureHelp('scale(x, ', 'lua', 9);
+  assert.equal(s.name, 'scale');
+  assert.deepEqual(s.params, ['v', 'inLo', 'inHi', 'outLo', 'outHi']);
+  assert.equal(s.activeParam, 1);
+});
+
+test('getSignatureHelp resolves a document function', () => {
+  const src = 'local function add(a, b)\n  return a + b\nend\nadd(1, ';
+  const s = getSignatureHelp(src, 'lua', src.length);
+  assert.ok(s);
+  assert.equal(s.name, 'add');
+  assert.deepEqual(s.params, ['a', 'b']);
+  assert.equal(s.activeParam, 1);
+});
+
+test('getSignatureHelp returns null outside any call', () => {
+  assert.equal(getSignatureHelp('local x = 1', 'lua', 11), null);
+  assert.equal(getSignatureHelp('set("a", 1);\n', 'lua', 13), null);
 });
 
 /* --------------------------------------------------------------- misc */
