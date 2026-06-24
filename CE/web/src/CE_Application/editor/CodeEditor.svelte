@@ -203,18 +203,59 @@
   }
   function clearHover() { clearTimeout(hoverTimer); hover = null; }
 
-  // ----- go to definition -----
-  function gotoDefinition(index) {
-    const def = getDefinition(value, language, index);
-    if (!def) return false;
+  // Move the caret to an offset and scroll it into view.
+  function jumpTo(index) {
     taEl.focus();
-    taEl.setSelectionRange(def.index, def.index);
-    const top = (def.line - 1) * lineHeight;
+    taEl.setSelectionRange(index, index);
+    const top = posOf(index).line * lineHeight;
     if (top < taEl.scrollTop || top > taEl.scrollTop + taEl.clientHeight - lineHeight * 2) {
       taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 2);
     }
     syncCaret();
+  }
+
+  // ----- go to definition -----
+  function gotoDefinition(index) {
+    const def = getDefinition(value, language, index);
+    if (!def) return false;
+    jumpTo(def.index);
     return true;
+  }
+
+  // ----- go to symbol (outline palette) -----
+  let soOpen = $state(false);
+  let soQuery = $state('');
+  let soIndex = $state(0);
+  let soInputEl = $state(null);
+  let soAll = $derived(
+    analysis.symbols.filter((s) => s.kind === 'function' || s.kind === 'variable')
+      .slice().sort((a, b) => a.index - b.index));
+  let soItems = $derived.by(() => {
+    const q = soQuery.trim().toLowerCase();
+    return q ? soAll.filter((s) => s.name.toLowerCase().includes(q)) : soAll;
+  });
+  let soScreen = $derived.by(() => {
+    if (!soOpen || !taEl) return { x: 0, y: 0, w: 360 };
+    const r = taEl.getBoundingClientRect();
+    const w = Math.min(420, r.width - 24);
+    return { x: r.left + (r.width - w) / 2, y: r.top + 14, w };
+  });
+  async function openSymbols() {
+    if (soAll.length === 0) return;
+    soOpen = true; soQuery = ''; soIndex = 0;
+    await tick();
+    soInputEl?.focus();
+  }
+  function acceptSymbol() {
+    const s = soItems[soIndex];
+    soOpen = false;
+    if (s) jumpTo(s.index);
+  }
+  function onSymbolKey(e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); soIndex = Math.min(soIndex + 1, soItems.length - 1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); soIndex = Math.max(soIndex - 1, 0); }
+    else if (e.key === 'Enter') { e.preventDefault(); acceptSymbol(); }
+    else if (e.key === 'Escape') { e.preventDefault(); soOpen = false; taEl?.focus(); }
   }
   function onEditorClick(e) {
     if (e.ctrlKey || e.metaKey) {
@@ -300,6 +341,8 @@
     }
     // Trigger completion explicitly (Ctrl/⌘+Space).
     if (mod && e.key === ' ') { e.preventDefault(); refreshCompletion(true); return; }
+    // Go to symbol (Ctrl/⌘+Shift+O).
+    if (mod && e.shiftKey && (e.key === 'O' || e.key === 'o')) { e.preventDefault(); openSymbols(); return; }
     // Go to definition (F12) / cycle references (Shift+F12).
     if (e.key === 'F12') {
       e.preventDefault();
@@ -423,6 +466,7 @@
     { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete' },
     { keys: 'F12 / Ctrl/⌘+Click', desc: 'Go to definition' },
     { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
+    { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
     { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
     { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
     { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
@@ -646,6 +690,32 @@
           <span class="ce-ac-detail">{o.detail}</span>
         </div>
       {/each}
+    </div>
+  {/if}
+
+  {#if soOpen}
+    <div class="ce-so-backdrop" use:portal onmousedown={() => { soOpen = false; taEl?.focus(); }}></div>
+    <div class="ce-so" use:portal style="left:{soScreen.x}px; top:{soScreen.y}px; width:{soScreen.w}px"
+      role="dialog" aria-label="Go to symbol" onmousedown={(e) => e.stopPropagation()}>
+      <input class="ce-so-input" bind:this={soInputEl} bind:value={soQuery} placeholder="Go to symbol…"
+        oninput={() => soIndex = 0} onkeydown={onSymbolKey} />
+      <div class="ce-so-list">
+        {#if soItems.length === 0}
+          <div class="ce-so-empty">No symbols</div>
+        {:else}
+          {#each soItems as s, i (s.index)}
+            <div class={['ce-so-row', i === soIndex && 'sel']}
+              role="option" aria-selected={i === soIndex} tabindex="-1"
+              onmousedown={(e) => { e.preventDefault(); soIndex = i; acceptSymbol(); }}
+              onmouseenter={() => soIndex = i}>
+              <span class={['ce-ac-kind', s.kind]}>{kindIcon(s.kind)}</span>
+              <span class="ce-so-name">{s.name}</span>
+              <span class="ce-so-detail">{s.detail}</span>
+              <span class="ce-so-line">{s.line}</span>
+            </div>
+          {/each}
+        {/if}
+      </div>
     </div>
   {/if}
 </div>
@@ -926,4 +996,33 @@
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .ce-ac-row.sel .ce-ac-label, .ce-ac-row.sel .ce-ac-detail { color: #eafff5; }
+
+  /* go to symbol palette */
+  .ce-so-backdrop { position: fixed; inset: 0; z-index: 62; background: rgba(0, 0, 0, 0.25); }
+  .ce-so {
+    position: fixed;
+    z-index: 63;
+    max-height: 60vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    border-radius: 9px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    font-family: 'Archivo', system-ui, sans-serif;
+  }
+  .ce-so-input {
+    border: 0; border-bottom: 1px solid var(--line); outline: none;
+    background: var(--bg-2); color: var(--txt);
+    padding: 9px 12px; font-size: 13px; font-family: var(--mono);
+  }
+  .ce-so-list { overflow-y: auto; padding: 4px; }
+  .ce-so-empty { padding: 16px; text-align: center; color: var(--txt-faint); font-size: 12px; }
+  .ce-so-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; cursor: pointer; }
+  .ce-so-row.sel { background: var(--accent-dim); }
+  .ce-so-name { font-family: var(--mono); font-size: 12px; color: var(--txt); flex-shrink: 0; }
+  .ce-so-detail { font-size: 11px; color: var(--txt-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ce-so-line { margin-left: auto; font-size: 11px; color: var(--txt-faint); font-variant-numeric: tabular-nums; }
+  .ce-so-row.sel .ce-so-name, .ce-so-row.sel .ce-so-detail, .ce-so-row.sel .ce-so-line { color: #eafff5; }
 </style>
