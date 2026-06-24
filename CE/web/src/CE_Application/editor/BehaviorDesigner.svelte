@@ -506,7 +506,7 @@
            presents the next function in a fresh editor. No unsaved-changes prompt is
            needed because every edit is already captured in `scripts`. -->
       {#key selectedId}
-        <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
+        <CodeEditor bind:this={codeEditor} minHeight={140} language={selected.language} value={selected.source}
           oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
           oncaret={(line, col) => caret = { line, col }}
           ondiagnostics={(d) => liveDiagnostics = d}
