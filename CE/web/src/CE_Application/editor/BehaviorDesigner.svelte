@@ -106,6 +106,7 @@
   let selectedId = $state(untrack(() => scripts[0]?.id ?? null));
 
   let selected = $derived(scripts.find((s) => s.id === selectedId) ?? null);
+  let selectedLangMeta = $derived(selected ? SCRIPT_LANGUAGES.find((l) => l.id === selected.language) ?? null : null);
   // Real syntax errors from the editor's parser (acorn/luaparse), reported live.
   let liveDiagnostics = $state([]);
   let problems = $derived([
@@ -553,8 +554,10 @@
       <div class="codehead">
         <span class="lang">
           {langLabel(selected.language)} source
-          {#if !SCRIPT_LANGUAGES.find((l) => l.id === selected.language)?.live}
+          {#if selectedLangMeta && !selectedLangMeta.live}
             <span class="previewtag" title="This language runs in the WebView preview only — it does not execute live yet, and won't run in the shipped C++ runtime.">preview · not live</span>
+          {:else if selectedLangMeta?.subset}
+            <span class="previewtag" title="C++ runs live here through an interpreted subset (the panel-API surface). The full C++ source is compiled into the exported plugin.">interpreted subset</span>
           {/if}
         </span>
         <span style="display:flex;gap:6px">
@@ -810,7 +813,7 @@
 
 <div class="bd-app">
   <!-- Hidden picker backing the "Import file" buttons. -->
-  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.py,.txt,text/plain"
+  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.py,.cpp,.cc,.cxx,.hpp,.h,.txt,text/plain"
     style="display:none" onchange={importScriptFile} />
   <div class="titlebar">
     <div class="dots"><span></span><span></span><span></span></div>
@@ -859,7 +862,7 @@
             <button class="gb" onclick={expandAll} title="Expand every lifecycle group and folder">⊞ Expand all</button>
             <button class="gb" onclick={collapseAll} title="Collapse every lifecycle group">⊟ Collapse</button>
           </div>
-          <button class="btn ghost tiny" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py)">⬆ Import</button>
+          <button class="btn ghost tiny" onclick={() => fileInputEl?.click()} title="Load a script file from disk (.lua / .js / .py / .cpp)">⬆ Import</button>
         </div>
 
         <datalist id="bd-folders-tree">

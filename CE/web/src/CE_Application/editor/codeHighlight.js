@@ -30,6 +30,20 @@ const LUA_BUILTINS = new Set([
   'panel', 'control', 'midi', 'device', 'log', 'self',
 ]);
 
+const CPP_KEYWORDS = new Set([
+  'int', 'double', 'float', 'bool', 'char', 'void', 'auto', 'const', 'constexpr', 'static',
+  'unsigned', 'signed', 'long', 'short', 'size_t', 'if', 'else', 'for', 'while', 'do', 'switch',
+  'case', 'default', 'break', 'continue', 'return', 'struct', 'class', 'enum', 'public', 'private',
+  'protected', 'namespace', 'using', 'template', 'typename', 'new', 'delete', 'sizeof', 'operator',
+]);
+const CPP_LITERALS = new Set(['true', 'false', 'nullptr', 'NULL']);
+const CPP_BUILTINS = new Set([
+  'std', 'min', 'max', 'abs', 'clamp', 'floor', 'ceil', 'round', 'sqrt', 'pow', 'fabs', 'fmod',
+  'sin', 'cos', 'tan', 'exp', 'static_cast', 'string', 'printf',
+  // panel scripting host surface
+  'CeContext', 'CeEvent', 'ctx', 'event',
+]);
+
 // Each language regex shares the SAME capture-group semantics so one scan loop handles both:
 //   g1 = comment   g2 = multiline string (template/long)   g3 = "double"   g4 = 'single'
 //   g5 = number    g6 = word (keyword / literal / builtin / identifier)
@@ -43,10 +57,16 @@ const LANGS = {
     re: /((?:--\[\[[\s\S]*?\]\])|(?:--[^\n]*))|(\[\[[\s\S]*?\]\])|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_][\w]*)/g,
     keywords: LUA_KEYWORDS, literals: LUA_LITERALS, builtins: LUA_BUILTINS,
   },
+  cpp: {
+    re: /((?:\/\/[^\n]*)|(?:\/\*[\s\S]*?\*\/))|()|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_]\w*)/g,
+    keywords: CPP_KEYWORDS, literals: CPP_LITERALS, builtins: CPP_BUILTINS,
+  },
 };
 
 export function languageKey(id) {
-  return id === 'javascript' ? 'javascript' : 'lua';
+  if (id === 'javascript') return 'javascript';
+  if (id === 'cpp' || id === 'c++') return 'cpp';
+  return 'lua';
 }
 
 function esc(s) {
@@ -149,7 +169,8 @@ export function matchingBracket(text, caret) {
 
 // Language-aware single-line comment prefix, used by the comment-toggle command.
 export function lineCommentToken(langId) {
-  return languageKey(langId) === 'javascript' ? '//' : '--';
+  const k = languageKey(langId);
+  return k === 'javascript' || k === 'cpp' ? '//' : '--';
 }
 
 /**

@@ -53,11 +53,17 @@ const PY_KEYWORDS = ['def', 'return', 'if', 'elif', 'else', 'for', 'while', 'bre
 const JS_BUILTINS = ['console', 'Math', 'JSON', 'Object', 'Array', 'String', 'Number', 'parseInt', 'parseFloat'];
 const LUA_BUILTINS = ['print', 'pairs', 'ipairs', 'tostring', 'tonumber', 'type', 'math', 'string', 'table'];
 const PY_BUILTINS = ['print', 'len', 'range', 'str', 'int', 'float', 'list', 'dict', 'enumerate', 'abs', 'min', 'max'];
+const CPP_KEYWORDS = ['int', 'double', 'float', 'bool', 'char', 'void', 'auto', 'const', 'static', 'if',
+  'else', 'for', 'while', 'do', 'switch', 'case', 'break', 'continue', 'return', 'struct', 'class',
+  'namespace', 'using', 'template', 'true', 'false', 'nullptr', 'unsigned', 'long', 'short', 'size_t'];
+const CPP_BUILTINS = ['std', 'min', 'max', 'abs', 'clamp', 'floor', 'ceil', 'round', 'sqrt', 'pow',
+  'static_cast', 'CeContext', 'CeEvent', 'ctx', 'event'];
 
 function keywordItems(language) {
   let kw = LUA_KEYWORDS, bi = LUA_BUILTINS;
   if (language === 'javascript') { kw = JS_KEYWORDS; bi = JS_BUILTINS; }
   else if (language === 'python') { kw = PY_KEYWORDS; bi = PY_BUILTINS; }
+  else if (language === 'cpp' || language === 'c++') { kw = CPP_KEYWORDS; bi = CPP_BUILTINS; }
   return [
     ...kw.map((k) => ({ label: k, kind: 'keyword', detail: 'keyword', doc: '' })),
     ...bi.map((b) => ({ label: b, kind: 'builtin', detail: 'built-in', doc: '' })),

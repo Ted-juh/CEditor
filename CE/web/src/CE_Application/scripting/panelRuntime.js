@@ -22,6 +22,7 @@ import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionP
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
+import { compileCpp, invokeCpp } from './cppPreview.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 
@@ -414,16 +415,37 @@ async function loadHandlersPython(script) {
   }
 }
 
+/* ----------------------------------------------------------------------- C++ executor */
+// Interpreted preview of the C++ behavior-handler subset (cppPreview.js). The real C++ is
+// compiled into the exported plugin; this lets a C++ script move live controls in the editor.
+// `ctx.*` maps onto the same panel API as Lua/JS; `event` is the handler payload.
+function loadHandlersCpp(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const { handlers: parsed, diagnostics } = compileCpp(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `C++ preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    out[name] = (payload) => {
+      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      try { return invokeCpp(fnNode, [ctx, event]); }
+      catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
+    };
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- unified run / load */
 
-/** Execute a script's source and return its declared handlers (JS sync; Lua/Python async). */
+/** Execute a script's source and return its declared handlers (JS/C++ sync; Lua/Python async). */
 async function getHandlers(script) {
   const lang = script?.language ?? 'lua';
   if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
   if (lang === 'lua') return loadHandlersLua(script);
   if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
+  if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
   addScriptTrace('error', script?.id ?? '',
-    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, and Python run here).`);
+    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, Python, and C++ run here).`);
   return null;
 }
 
