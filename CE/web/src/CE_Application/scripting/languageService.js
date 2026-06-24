@@ -351,3 +351,36 @@ export function getDefinition(source, languageId, index) {
   if (!def) return null;
   return { index: def.index, line: def.line, col: def.col };
 }
+
+// AST node types whose multi-line span is foldable, per language.
+const JS_FOLD = new Set(['BlockStatement', 'ObjectExpression', 'ArrayExpression', 'SwitchStatement', 'ClassBody']);
+const LUA_FOLD = new Set(['FunctionDeclaration', 'IfStatement', 'ForNumericStatement',
+  'ForGenericStatement', 'WhileStatement', 'RepeatStatement', 'DoStatement', 'TableConstructorExpression']);
+
+/**
+ * Foldable regions for the gutter, derived from the parser AST. Returns
+ * [{ startLine, endLine }] (1-based, inclusive) for every multi-line block; folding a
+ * region hides startLine+1..endLine. One region per start line (largest wins). Returns []
+ * when the source doesn't parse (no guessing).
+ */
+export function getFoldRegions(source, languageId) {
+  const src = String(source ?? '');
+  if (languageId !== 'javascript' && languageId !== 'lua') return [];
+  let ast;
+  try {
+    ast = languageId === 'javascript'
+      ? parseJs(src, { ecmaVersion: 2023, locations: true, sourceType: 'script', allowReturnOutsideFunction: true, allowAwaitOutsideFunction: true })
+      : luaparse.parse(src, { locations: true, ranges: true, comments: false });
+  } catch { return []; }
+
+  const want = languageId === 'javascript' ? JS_FOLD : LUA_FOLD;
+  const byStart = new Map();
+  walk(ast, (node) => {
+    if (!want.has(node.type) || !node.loc) return;
+    const startLine = node.loc.start.line, endLine = node.loc.end.line;
+    if (endLine <= startLine) return;
+    const prev = byStart.get(startLine);
+    if (!prev || endLine > prev.endLine) byStart.set(startLine, { startLine, endLine });
+  });
+  return [...byStart.values()].sort((a, b) => a.startLine - b.startLine);
+}

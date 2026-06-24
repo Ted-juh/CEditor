@@ -8,7 +8,8 @@
   // intact by routing every programmatic edit through document.execCommand('insertText').
   import { tick } from 'svelte';
   import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
-  import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, wordAt } from '../scripting/languageService.js';
+  import { analyze, getCompletions, getHover, getDefinition, getSignatureHelp, getFoldRegions, wordAt } from '../scripting/languageService.js';
+  import { projectFolds, pruneFolds } from './foldModel.js';
 
   let {
     value = '',
@@ -75,8 +76,33 @@
   let analysis = $derived(analyze(analyzedSource, language));
   let diagnostics = $derived(analysis.diagnostics);
   let errorLines = $derived(new Set(diagnostics.map((d) => d.line)));
+
+  // ----- code folding -----
+  // The full `value` is always the truth (emitted/saved). Folding only changes the
+  // DISPLAYED text; while folds are active the textarea is read-only and a click unfolds.
+  let folded = $state(new Set());                 // full-source start-lines that are folded
+  let foldRegions = $derived(getFoldRegions(analyzedSource, language));
+  let foldStarts = $derived(new Set(foldRegions.map((r) => r.startLine)));
+  $effect(() => { // drop folds whose region disappeared after an edit
+    const pruned = pruneFolds(folded, foldRegions);
+    if (pruned.size !== folded.size) folded = pruned;
+  });
+  let isFolded = $derived(folded.size > 0);
+  let projection = $derived(isFolded ? projectFolds(value, folded, foldRegions) : null);
+  let displayText = $derived(projection ? projection.text : value);
+  function fullLineOf(displayIdx) { return projection ? (projection.displayToFull[displayIdx] ?? displayIdx + 1) : displayIdx + 1; }
+  function toggleFold(fullLine) {
+    if (!foldStarts.has(fullLine)) return;
+    const next = new Set(folded);
+    next.has(fullLine) ? next.delete(fullLine) : next.add(fullLine);
+    folded = next;
+  }
+  function unfoldAll() { if (isFolded) folded = new Set(); }
+  function toggleFoldAll() { folded = isFolded ? new Set() : new Set(foldStarts); }
   // Each diagnostic, resolved to the on-screen token it underlines.
-  let diagSpans = $derived(diagnostics.map((d) => {
+  // Squiggle overlay positions are in full-source space; suppress while folded
+  // (the gutter error tint still shows via errorLines, keyed by full line number).
+  let diagSpans = $derived(isFolded ? [] : diagnostics.map((d) => {
     const w = wordAt(analyzedSource, d.index) || wordAt(analyzedSource, d.index - 1);
     const len = w ? w.word.length : 1;
     return { line: d.line, col: d.col, len, message: d.message };
@@ -85,16 +111,18 @@
 
   const PAD_TOP = 10;
   let lineHeight = $derived(Math.round(fontSize * 1.6));
-  let lines = $derived(value.split('\n'));
+  let lines = $derived(displayText.split('\n'));
   let lineCount = $derived(lines.length);
-  let gutterDigits = $derived(String(lineCount).length);
-  // Highlight a matched bracket pair only when there's no active text selection.
+  // Gutter shows full-source line numbers, so size it to the full line count (not the
+  // possibly-fewer displayed rows when folded).
+  let gutterDigits = $derived(String(value.split('\n').length).length);
+  // Highlight a matched bracket pair only when there's no active text selection (and not folded).
   let matchMarks = $derived.by(() => {
-    if (!taEl || taEl.selectionStart !== taEl.selectionEnd) return undefined;
-    const pair = matchingBracket(value, caretPos);
+    if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return undefined;
+    const pair = matchingBracket(displayText, caretPos);
     return pair ? new Set(pair) : undefined;
   });
-  let highlighted = $derived(highlight(value, language, matchMarks));
+  let highlighted = $derived(highlight(displayText, language, matchMarks));
 
   // Highlight every occurrence of the identifier under the caret (or the selected word).
   const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
@@ -107,12 +135,12 @@
     return w && w.word.length >= 2 ? w.word : null;
   });
   let occurrences = $derived.by(() => {
-    if (!targetWord) return [];
-    const occ = identifierOccurrences(value, language, targetWord);
+    if (isFolded || !targetWord) return [];
+    const occ = identifierOccurrences(displayText, language, targetWord);
     return occ.length >= 2 ? occ.slice(0, 200) : [];
   });
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
-  let highlightedSafe = $derived(highlighted + (value.endsWith('\n') ? '\n' : ''));
+  let highlightedSafe = $derived(highlighted + (displayText.endsWith('\n') ? '\n' : ''));
 
   const CLOSERS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
   const OPENERS = new Set(Object.keys(CLOSERS));
@@ -193,7 +221,7 @@
     const before = taEl.value.slice(0, pos);
     caretLine = countLines(before);
     caretCol = pos - (before.lastIndexOf('\n') + 1);
-    oncaret?.(caretLine + 1, caretCol + 1);
+    oncaret?.(fullLineOf(caretLine), caretCol + 1);
   }
 
   function countLines(s) { let n = 0; for (let i = 0; i < s.length; i++) if (s[i] === '\n') n++; return n; }
@@ -251,7 +279,7 @@
   // ----- signature help -----
   let signature = $derived.by(() => {
     void caretPos;
-    if (!taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
+    if (isFolded || !taEl || taEl.selectionStart !== taEl.selectionEnd) return null;
     return getSignatureHelp(value, language, caretPos);
   });
   let sigScreen = $derived.by(() => {
@@ -293,6 +321,7 @@
   let hover = $state(null);   // { title, doc, x, y }
   let hoverTimer = null;
   function onMouseMove(e) {
+    if (isFolded) { clearHover(); return; }
     clearTimeout(hoverTimer);
     const cx = e.clientX, cy = e.clientY;
     hoverTimer = setTimeout(() => {
@@ -358,7 +387,20 @@
     else if (e.key === 'Enter') { e.preventDefault(); acceptSymbol(); }
     else if (e.key === 'Escape') { e.preventDefault(); soOpen = false; taEl?.focus(); }
   }
-  function onEditorClick(e) {
+  async function onEditorClick(e) {
+    // Click in the folded view → unfold and drop the caret on the clicked line of the full source.
+    if (isFolded) {
+      const idx = indexAtClient(e.clientX, e.clientY);
+      const dispLine = countLines(displayText.slice(0, idx));
+      const fullLine = fullLineOf(dispLine);
+      unfoldAll();
+      await tick();
+      const offset = value.split('\n').slice(0, fullLine - 1).reduce((n, l) => n + l.length + 1, 0);
+      taEl.focus();
+      taEl.setSelectionRange(offset, offset);
+      syncCaret();
+      return;
+    }
     if (e.ctrlKey || e.metaKey) {
       const idx = indexAtClient(e.clientX, e.clientY);
       if (gotoDefinition(idx)) { e.preventDefault(); return; }
@@ -420,6 +462,7 @@
   // Replace [start,end) with text, preserving the native undo stack, then optionally
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
   function applyEdit(start, end, text, selStart, selEnd) {
+    if (isFolded) return; // never edit the projected (folded) text — the full source is the truth
     const ta = taEl;
     ta.focus();
     ta.setSelectionRange(start, end);
@@ -463,8 +506,17 @@
     applyEdit(from, selEnd, next, Math.max(from, selStart + firstDelta), selEnd + totalDelta);
   }
 
+  const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', 'Escape']);
   function onKeydown(e) {
     const ta = taEl;
+    // While folded the view is read-only: navigation passes through; any editing key
+    // unfolds first (then the user edits the real, full source) — no edit hits projected text.
+    if (isFolded) {
+      if (NAV_KEYS.has(e.key)) return;
+      e.preventDefault();
+      unfoldAll();
+      return;
+    }
     const v = ta.value;
     const start = ta.selectionStart, end = ta.selectionEnd;
     const mod = e.ctrlKey || e.metaKey;
@@ -607,6 +659,7 @@
     { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
     { keys: 'Ctrl/⌘ + Shift + O', desc: 'Go to symbol' },
     { keys: 'F2', desc: 'Rename symbol (all occurrences)' },
+    { keys: 'Gutter ▾ / ⊟', desc: 'Fold a block / fold all (click to edit unfolds)' },
     { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
     { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
     { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
@@ -697,6 +750,7 @@
   // ----- exposed API (used by the API-insert picker in BehaviorDesigner) -----
   export async function insert(text) {
     if (!taEl) return;
+    if (isFolded) { unfoldAll(); await tick(); }
     const start = taEl.selectionStart, end = taEl.selectionEnd;
     applyEdit(start, end, text, start + text.length);
     await tick();
@@ -713,13 +767,23 @@
 </script>
 
 <div class={['ce', theme === 'light' && 'light']} style="--ce-fs:{fontSize}px; --ce-lh:{lineHeight}px; --ce-pad-top:{PAD_TOP}px; --ce-gw:{gutterDigits}ch; min-height:{minHeight}px">
-  <div class="ce-gutter" aria-hidden="true">
+  <div class="ce-gutter">
     <div class="ce-gutter-inner" style="transform:translateY({-scrollTop}px)">
       {#each lines as _, i (i)}
-        <div class={['ce-gln', i === caretLine && 'active', errorLines.has(i + 1) && 'err', bpSet.has(i + 1) && 'bp']}
+        {@const fl = fullLineOf(i)}
+        <div class={['ce-gln', i === caretLine && 'active', errorLines.has(fl) && 'err', bpSet.has(fl) && 'bp']}
           role="button" tabindex="-1" title="Toggle breakpoint"
-          onclick={() => toggleBreakpoint(i + 1)}
-          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreakpoint(i + 1); } }}>{i + 1}</div>
+          onclick={() => toggleBreakpoint(fl)}
+          onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleBreakpoint(fl); } }}>
+          {#if foldStarts.has(fl)}
+            <span class="ce-fold" role="button" tabindex="-1" title="Fold / unfold (region)"
+              onclick={(e) => { e.stopPropagation(); toggleFold(fl); }}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); toggleFold(fl); } }}>{folded.has(fl) ? '▸' : '▾'}</span>
+          {:else}
+            <span class="ce-fold ce-fold-empty"></span>
+          {/if}
+          <span class="ce-lnnum">{fl}</span>
+        </div>
       {/each}
     </div>
   </div>
@@ -735,14 +799,15 @@
     <textarea
       class="ce-ta"
       bind:this={taEl}
-      {value}
+      value={displayText}
+      readonly={isFolded}
       {placeholder}
       spellcheck="false"
       autocomplete="off"
       autocapitalize="off"
       autocorrect="off"
       wrap="off"
-      oninput={() => { emit(); syncCaret(); refreshCompletion(false); }}
+      oninput={() => { if (isFolded) return; emit(); syncCaret(); refreshCompletion(false); }}
       onscroll={onScroll}
       onkeydown={onKeydown}
       onkeyup={syncCaret}
@@ -800,6 +865,10 @@
     </div>
   {/if}
 
+  {#if foldRegions.length > 0}
+    <button class="ce-fold-btn" title={isFolded ? 'Unfold all' : 'Fold all'} aria-label="Fold all"
+      onclick={toggleFoldAll} class:on={isFolded}>{isFolded ? '⊞' : '⊟'}</button>
+  {/if}
   <button class="ce-minimap-btn" title="Toggle minimap" aria-label="Toggle minimap"
     onclick={toggleMinimap} class:on={showMinimap}>▤</button>
   <button class="ce-theme-btn" title="Toggle editor theme" aria-label="Toggle editor theme"
@@ -939,24 +1008,29 @@
   }
   .ce-gutter-inner { position: absolute; top: 0; left: 0; right: 0; padding-top: var(--ce-pad-top); will-change: transform; }
   .ce-gln {
+    display: flex;
+    align-items: center;
     height: var(--ce-lh);
     line-height: var(--ce-lh);
     padding-right: 8px;
-    text-align: right;
     color: var(--txt-faint);
     font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    position: relative;
   }
-  .ce-gln { cursor: pointer; position: relative; }
-  .ce-gln:hover::before {
-    content: ''; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
-    width: 7px; height: 7px; border-radius: 50%; background: var(--red); opacity: 0.35;
+  .ce-fold {
+    flex-shrink: 0; width: 13px; text-align: center; font-size: 9px;
+    color: var(--txt-faint); cursor: pointer; opacity: 0;
+    transition: opacity .1s;
   }
-  .ce-gln.active { color: var(--txt-dim); }
+  .ce-gutter:hover .ce-fold { opacity: 0.85; }
+  .ce-fold-empty { cursor: default; }
+  .ce-lnnum { flex: 1; text-align: right; }
+  .ce-gln.active .ce-lnnum { color: var(--txt-dim); }
   .ce-gln.err { color: var(--red); box-shadow: inset 2px 0 0 var(--red); }
-  .ce-gln.bp::before {
-    content: ''; position: absolute; left: 4px; top: 50%; transform: translateY(-50%);
-    width: 7px; height: 7px; border-radius: 50%; background: var(--red); opacity: 1;
-  }
+  .ce-gln.err .ce-lnnum { color: var(--red); }
+  .ce-gln.bp { box-shadow: inset 3px 0 0 var(--red); }
+  .ce-gln.bp .ce-lnnum { color: var(--red); }
 
   .ce-area { position: relative; flex: 1; min-width: 0; overflow: hidden; }
 
@@ -1099,6 +1173,23 @@
     transition: opacity .12s;
   }
   .ce-theme-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-fold-btn {
+    position: absolute;
+    right: 92px; bottom: 8px;
+    z-index: 4;
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--panel-2);
+    border: 1px solid var(--line-2);
+    color: var(--txt-dim);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.55;
+    transition: opacity .12s;
+  }
+  .ce-fold-btn:hover { opacity: 1; color: var(--txt); }
+  .ce-fold-btn.on { opacity: 1; color: var(--accent); border-color: var(--accent-dim); }
   .ce-minimap-btn {
     position: absolute;
     right: 64px; bottom: 8px;
