@@ -11,6 +11,7 @@
   import { validateScript } from '../scripting/scriptValidate.js';
   import { searchScripts } from '../scripting/scriptSearch.js';
   import { filenameForScript, scriptOverridesFromFile, inferEventFromSource } from '../scripting/scriptFileIo.js';
+  import { recordVersion, getVersions, clearVersions } from '../utils/scriptHistory.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled } from '../scripting/panelRuntime.js';
   import {
@@ -31,6 +32,18 @@
   let showPicker = $state(false); // when true, the RIGHT pane shows the Insert picker instead of the script list
   let showLibrary = $state(false); // when true, the RIGHT pane shows the reusable-script library
   let showConsole = $state(false); // inline output console under the editor
+  let showHistory = $state(false); // right pane shows version history of the selected script
+  let historyTick = $state(0);     // bump to refresh the version list after a save
+  let versions = $derived.by(() => { historyTick; return selectedId ? getVersions(selectedId) : []; });
+
+  function restoreVersion(source) {
+    if (selected) { selected.source = source; }
+    showHistory = false;
+  }
+  function fmtTime(t) {
+    try { return new Date(t).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', month: 'short', day: 'numeric' }); }
+    catch { return String(t); }
+  }
 
   // Run a script and reveal the console so its output is visible where it ran.
   function runAndShow(script) {
@@ -140,7 +153,12 @@
     if (firstSnapshot) { firstSnapshot = false; return; } // initial seed isn't an edit
     saveState = 'pending';
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { onChange?.(pendingSnap); saveState = 'saved'; }, 400);
+    saveTimer = setTimeout(() => {
+      onChange?.(pendingSnap);
+      saveState = 'saved';
+      const s = scripts.find((x) => x.id === selectedId);
+      if (s) { recordVersion(s.id, s.source); historyTick++; } // coalesces internally
+    }, 400);
   });
   function saveNow() {
     clearTimeout(saveTimer);
@@ -315,14 +333,20 @@
         <span style="display:flex;gap:6px">
           <button class="btn primary" onclick={() => runAndShow(selected)} title="Run this script now against the live panel">▶ Run</button>
           <button class={['btn', 'ghost', showPicker && 'primary']} onclick={() => { showPicker = !showPicker; if (showPicker) showLibrary = false; }} title="Browse & insert API in the right pane">+ Insert</button>
-          <button class={['btn', 'ghost', showLibrary && 'primary']} onclick={() => { showLibrary = !showLibrary; if (showLibrary) showPicker = false; }} title="Reusable script library">📚 Library</button>
+          <button class={['btn', 'ghost', showLibrary && 'primary']} onclick={() => { showLibrary = !showLibrary; if (showLibrary) { showPicker = false; showHistory = false; } }} title="Reusable script library">📚 Library</button>
+          <button class={['btn', 'ghost', showHistory && 'primary']} onclick={() => { showHistory = !showHistory; if (showHistory) { showPicker = false; showLibrary = false; } }} title="Version history (restorable across sessions)">🕘 History</button>
           <button class="btn ghost" onclick={regenerateSkeleton} title="Replace with a fresh skeleton">↺ skeleton</button>
         </span>
       </div>
-      <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
-        oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
-        oncaret={(line, col) => caret = { line, col }}
-        ondiagnostics={(d) => liveDiagnostics = d} />
+      <!-- Keyed by script id: switching functions auto-saves (debounced persist) and
+           presents the next function in a fresh editor. No unsaved-changes prompt is
+           needed because every edit is already captured in `scripts`. -->
+      {#key selectedId}
+        <CodeEditor bind:this={codeEditor} language={selected.language} value={selected.source}
+          oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
+          oncaret={(line, col) => caret = { line, col }}
+          ondiagnostics={(d) => liveDiagnostics = d} />
+      {/key}
 
       {#if problems.length === 0}
         <div class="problems"><div class="problem ok">✓ No problems</div></div>
@@ -455,7 +479,32 @@
         </div>
         <!-- RIGHT: the script list — or the Insert picker / Library while inserting -->
         <div class="listcol">
-          {#if showLibrary}
+          {#if showHistory}
+            <div class="pickerpane">
+              <div class="pickerhead">
+                <span>History <b>{versions.length}</b></span>
+                <span style="display:flex;gap:6px">
+                  {#if versions.length}<button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>{/if}
+                  <button class="btn ghost" onclick={() => showHistory = false}>Done</button>
+                </span>
+              </div>
+              <div class="liblist">
+                {#if versions.length === 0}
+                  <div class="pcat" style="padding:12px">No saved versions yet. Snapshots are captured automatically as you edit (and persist across sessions). Restore any of them here.</div>
+                {:else}
+                  {#each versions as v, i (v.t)}
+                    <div class="librow">
+                      <div class="libmeta">
+                        <span class="sname">{i === 0 ? 'Latest' : fmtTime(v.t)}</span>
+                        <span class="pd">{v.source.split('\n').length} lines · {v.source.length} chars</span>
+                      </div>
+                      <button class="btn primary" onclick={() => restoreVersion(v.source)} title="Replace the current source with this version">Restore</button>
+                    </div>
+                  {/each}
+                {/if}
+              </div>
+            </div>
+          {:else if showLibrary}
             <div class="pickerpane">
               <div class="pickerhead"><span>Library <b>{$scriptLibrary.length}</b></span><button class="btn ghost" onclick={() => showLibrary = false}>Done</button></div>
               <div class="liblist">
