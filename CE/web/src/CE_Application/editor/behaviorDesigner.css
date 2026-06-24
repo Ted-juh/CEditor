@@ -84,6 +84,9 @@
 .bd-app .titem.off{opacity:.5}
 .bd-app .titem .sname{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-app .titem .pill{flex-shrink:0}
+.bd-app .titem .sbadge{flex-shrink:0;width:13px;text-align:center;font-size:11px;font-weight:700;line-height:1}
+.bd-app .titem .sbadge.error{color:var(--red)}
+.bd-app .titem .sbadge.warn{color:var(--amber)}
 .bd-app .titembtn{flex-shrink:0;width:20px;height:20px;background:none;border:none;border-radius:5px;
   color:var(--txt-faint);cursor:pointer;font-size:12px;line-height:1;padding:0;opacity:0}
 .bd-app .titem:hover .titembtn,.bd-app .titem.sel .titembtn,.bd-app .tgfolder:hover .titembtn{opacity:.6}
@@ -129,9 +132,17 @@
 .bd-app .detail>.row2,.bd-app .detail>.codehead,.bd-app .detail>.problems,
 .bd-app .detail>.toolbar,.bd-app .detail>.consolewrap{flex-shrink:0}
 
-/* docked Insert / API column (default-open right column) */
+/* docked Insert / Library / History column (default-open right column) */
 .bd-app .dock{width:340px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
   background:var(--bg-2);border-left:1px solid var(--line)}
+.bd-app .dock.float{position:absolute;top:0;right:0;bottom:0;z-index:20;box-shadow:-10px 0 30px rgba(0,0,0,.4)}
+.bd-app .docktabs{padding:7px 10px}
+.bd-app .dtabs{display:flex;gap:2px;min-width:0;overflow:hidden}
+.bd-app .dtab{padding:5px 10px;font-size:12px;border-radius:6px;color:var(--txt-dim);background:transparent;border:none;cursor:pointer;font-family:inherit;white-space:nowrap}
+.bd-app .dtab:hover{color:var(--txt)}
+.bd-app .dtab.active{background:var(--panel-2);color:var(--txt)}
+.bd-app .dtab b{color:var(--txt-faint);font-weight:600;margin-left:2px}
+.bd-app .dtab.active b{color:var(--accent)}
 .bd-app .dock .picker{margin-top:0;border:none;border-radius:0;max-height:none;flex:1;min-height:0;overflow:auto}
 
 /* tools drawer (Library / History) */
@@ -206,7 +217,9 @@
 .bd-app .row2{display:flex;gap:10px}
 .bd-app .row2>*{flex:1}
 .bd-app .codehead{display:flex;align-items:center;justify-content:space-between;margin:6px 0 6px}
-.bd-app .codehead .lang{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+.bd-app .codehead .lang{font-size:11px;color:var(--txt-faint);font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.bd-app .previewtag{font-family:inherit;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--amber);
+  border:1px solid var(--amber);border-radius:10px;padding:1px 7px;opacity:.85;cursor:help}
 
 /* ---- buttons + footer ---- */
 .bd-app .btn{

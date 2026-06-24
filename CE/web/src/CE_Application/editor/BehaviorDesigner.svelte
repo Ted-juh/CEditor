@@ -30,16 +30,17 @@
   let { panelName = 'Untitled Panel', panelId = null, controls = [], initialScripts = [], onChange = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
-  let showPicker = $state(true); // Insert/API picker docked as a right column by default (toggle with "+ Insert")
-  let showLibrary = $state(false); // when true, the RIGHT pane shows the reusable-script library
+  // Right-hand docked panel: one column with Insert / Library / History tabs (default open).
+  let showDock = $state(true);
+  let dockTab = $state('insert'); // 'insert' | 'library' | 'history'
+  let narrow = $state(false);     // viewport too narrow to dock inline → float the dock as an overlay
+  function openDock(tab) { if (showDock && dockTab === tab) { showDock = false; } else { showDock = true; dockTab = tab; } }
   let showConsole = $state(false); // inline output console under the editor
-  let showHistory = $state(false); // right pane shows version history of the selected script
   let historyTick = $state(0);     // bump to refresh the version list after a save
   let versions = $derived.by(() => { historyTick; return selectedId ? getVersions(selectedId) : []; });
 
   function restoreVersion(source) {
     if (selected) { selected.source = source; }
-    showHistory = false;
   }
   function fmtTime(t) {
     try { return new Date(t).toLocaleString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', month: 'short', day: 'numeric' }); }
@@ -335,7 +336,13 @@
   let liveOn = $state(true);
   onMount(() => {
     initPanelRuntime();
-    return () => setLiveScripts(null);
+    // Below this width the dock floats over the editor instead of squeezing it, and
+    // starts collapsed so it never hides the code on a narrow window.
+    const mq = window.matchMedia('(max-width: 1180px)');
+    const applyNarrow = () => { narrow = mq.matches; if (narrow) showDock = false; };
+    applyNarrow();
+    mq.addEventListener('change', applyNarrow);
+    return () => { setLiveScripts(null); mq.removeEventListener('change', applyNarrow); };
   });
   $effect(() => { setLiveScripts($state.snapshot(scripts), panelId); });
   $effect(() => { setLiveEnabled(liveOn); });
@@ -384,10 +391,49 @@
     if (s) s[key] = value;
   }
 
+  // True when the source is still the untouched starter skeleton for (event, language).
+  function isDefaultSource(s) {
+    const src = (s.source ?? '').trim();
+    return !src || src === defaultSource(s.event, s.language).trim();
+  }
+
+  // Changing language: migrate an untouched skeleton silently; otherwise offer to regenerate
+  // (the old code is in another language, so the editor would mis-highlight / mis-run it).
+  function updateLanguage(newLang) {
+    const s = scripts.find((x) => x.id === selectedId);
+    if (!s || newLang === s.language) return;
+    const wasDefault = isDefaultSource(s);
+    const old = s.language;
+    s.language = newLang;
+    if (wasDefault) { s.source = defaultSource(s.event, newLang); return; }
+    if (confirm(`Switched to ${langLabel(newLang)}. Replace the body with a fresh ${langLabel(newLang)} skeleton? Your current code is written in ${langLabel(old)}.`)) {
+      s.source = defaultSource(s.event, newLang);
+    }
+  }
+
+  // Changing event: if the body is still the default skeleton, re-key it to the new handler.
+  function updateEvent(newEvent) {
+    const s = scripts.find((x) => x.id === selectedId);
+    if (!s || newEvent === s.event) return;
+    const wasDefault = isDefaultSource(s);
+    s.event = newEvent;
+    if (wasDefault) s.source = defaultSource(newEvent, s.language);
+  }
+
   function regenerateSkeleton() {
     const s = scripts.find((x) => x.id === selectedId);
     if (s) s.source = defaultSource(s.event, s.language);
   }
+
+  function duplicateSelected() {
+    if (!selected) return;
+    const copy = createScript({ ...$state.snapshot(selected), id: undefined, name: selected.name + ' copy' });
+    const idx = scripts.findIndex((x) => x.id === selectedId);
+    scripts = [...scripts.slice(0, idx + 1), copy, ...scripts.slice(idx + 1)];
+    selectedId = copy.id;
+  }
+
+  function toggleEnabled(s) { s.enabled = !s.enabled; }
 
   function deleteScript(id) {
     const idx = scripts.findIndex((x) => x.id === id);
@@ -396,6 +442,17 @@
     if (selectedId === id) selectedId = scripts[Math.max(0, idx - 1)]?.id ?? null;
   }
   function deleteSelected() { if (selected) deleteScript(selectedId); }
+
+  // Worst problem severity per script, for the badge on each tree row.
+  let problemSevByScript = $derived.by(() => {
+    const m = {};
+    for (const s of scripts) {
+      const ps = validateScript(s);
+      if (ps.some((p) => p.severity === 'error')) m[s.id] = 'error';
+      else if (ps.some((p) => p.severity === 'warn')) m[s.id] = 'warn';
+    }
+    return m;
+  });
 
   // --- Reusable script library (copy-on-import) ---
   function saveSelectedToLibrary() { if (selected) saveToLibrary($state.snapshot(selected)); }
@@ -409,7 +466,6 @@
     selectedId = s.id;
     expand(screenOf(entry.event));
     mainView = 'editor';
-    showLibrary = false;
   }
 
   // --- File I/O: load/save a single script as a file on disk ---
@@ -461,7 +517,7 @@
         </div>
         <div class="field">
           <label for="bd-event">Runs on (event / lifecycle)</label>
-          <select id="bd-event" value={selected.event} onchange={(e) => updateField('event', e.target.value)}>
+          <select id="bd-event" value={selected.event} onchange={(e) => updateEvent(e.target.value)}>
             {#each EVENT_GROUPS as g (g.group)}
               <optgroup label={g.group}>
                 {#each g.items as ev (ev)}<option value={ev}>{ev}</option>{/each}
@@ -471,14 +527,16 @@
         </div>
       </div>
       <div class="row2">
-        <div class="field">
-          <label for="bd-target">Attached control</label>
-          <select id="bd-target" value={targetValue} onchange={(e) => updateField('target', e.target.value)}
-            title="Which control this script reacts to. 'self' inside the script resolves to it.">
-            <option value="*">Any control</option>
-            {#each controlNames as name (name)}<option value={name}>{name}</option>{/each}
-          </select>
-        </div>
+        {#if selected.scope === 'component'}
+          <div class="field">
+            <label for="bd-target">Attached control</label>
+            <select id="bd-target" value={targetValue} onchange={(e) => updateField('target', e.target.value)}
+              title="Which control this script reacts to. 'self' inside the script resolves to it.">
+              <option value="*">Any control</option>
+              {#each controlNames as name (name)}<option value={name}>{name}</option>{/each}
+            </select>
+          </div>
+        {/if}
         <div class="field">
           <label for="bd-scope">Scope</label>
           <select id="bd-scope" value={selected.scope} onchange={(e) => updateField('scope', e.target.value)}>
@@ -487,18 +545,23 @@
         </div>
         <div class="field">
           <label for="bd-lang">Language</label>
-          <select id="bd-lang" value={selected.language} onchange={(e) => updateField('language', e.target.value)}>
-            {#each SCRIPT_LANGUAGES as l (l.id)}<option value={l.id}>{l.label} {l.version}</option>{/each}
+          <select id="bd-lang" value={selected.language} onchange={(e) => updateLanguage(e.target.value)}>
+            {#each SCRIPT_LANGUAGES as l (l.id)}<option value={l.id}>{l.label} {l.version}{l.live ? '' : ' — preview'}</option>{/each}
           </select>
         </div>
       </div>
       <div class="codehead">
-        <span class="lang">{langLabel(selected.language)} source</span>
+        <span class="lang">
+          {langLabel(selected.language)} source
+          {#if !SCRIPT_LANGUAGES.find((l) => l.id === selected.language)?.live}
+            <span class="previewtag" title="This language runs in the WebView preview only — it does not execute live yet, and won't run in the shipped C++ runtime.">preview · not live</span>
+          {/if}
+        </span>
         <span style="display:flex;gap:6px">
           <button class="btn primary" onclick={() => runAndShow(selected)} title="Run this script now against the live panel">▶ Run</button>
-          <button class={['btn', 'ghost', showPicker && 'primary']} onclick={() => showPicker = !showPicker} title="Show/hide the docked Insert · API panel on the right">+ Insert</button>
-          <button class={['btn', 'ghost', showLibrary && 'primary']} onclick={() => { showLibrary = !showLibrary; if (showLibrary) { showPicker = false; showHistory = false; } }} title="Reusable script library">📚 Library</button>
-          <button class={['btn', 'ghost', showHistory && 'primary']} onclick={() => { showHistory = !showHistory; if (showHistory) { showPicker = false; showLibrary = false; } }} title="Version history (restorable across sessions)">🕘 History</button>
+          <button class={['btn', 'ghost', showDock && dockTab === 'insert' && 'primary']} onclick={() => openDock('insert')} title="Insert · API reference (docked right)">+ Insert</button>
+          <button class={['btn', 'ghost', showDock && dockTab === 'library' && 'primary']} onclick={() => openDock('library')} title="Reusable script library (docked right)">📚 Library</button>
+          <button class={['btn', 'ghost', showDock && dockTab === 'history' && 'primary']} onclick={() => openDock('history')} title="Version history (docked right)">🕘 History</button>
           <button class="btn ghost" onclick={regenerateSkeleton} title="Replace with a fresh skeleton">↺ skeleton</button>
         </span>
       </div>
@@ -531,6 +594,7 @@
           <input type="checkbox" checked={selected.enabled} onchange={(e) => updateField('enabled', e.target.checked)} /> Enabled
         </label>
         <span class="spacer"></span>
+        <button class="btn ghost" onclick={duplicateSelected} title="Create a copy of this script">⧉ Duplicate</button>
         <button class="btn ghost" onclick={exportScriptFile} title="Save this script's source to a file on disk">⬇ Export file</button>
         <button class="btn ghost" onclick={saveSelectedToLibrary} title="Save a reusable copy to the library">★ Save to library</button>
         <button class="btn ghost" onclick={deleteSelected} style="color:var(--red)">Delete</button>
@@ -571,11 +635,17 @@
         onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitFolder(); } else if (e.key === 'Escape') cancelFolder(); }}
         {@attach (el) => { el.focus(); el.select(); }} />
     {:else}
+      {#if problemSevByScript[s.id]}
+        <span class={['sbadge', problemSevByScript[s.id]]}
+          title={problemSevByScript[s.id] === 'error' ? 'Has an error' : 'Has a warning'}>{problemSevByScript[s.id] === 'error' ? '✕' : '!'}</span>
+      {/if}
       <span class="sname" role="button" tabindex="0"
         ondblclick={(e) => { e.stopPropagation(); startRename(s); }}
         onkeydown={(e) => { if (e.key === 'F2') { e.stopPropagation(); e.preventDefault(); startRename(s); } }}
         title="Drag to a folder · double-click (or F2) to rename">{s.name}</span>
       <span class={['pill', langClass(s.language)]}>{langLabel(s.language)}</span>
+      <button class="titembtn" title={s.enabled ? 'Enabled — click to disable' : 'Disabled — click to enable'}
+        onclick={(e) => { e.stopPropagation(); toggleEnabled(s); }}>{s.enabled ? '◉' : '○'}</button>
       <button class="titembtn" title={s.group ? 'Folder: ' + s.group + ' — click to change' : 'Move to a folder…'}
         onclick={(e) => { e.stopPropagation(); startFolder(s); }}>🗀</button>
       <button class="titembtn del" title="Delete script"
@@ -697,53 +767,43 @@
   </div>
 {/snippet}
 
-{#snippet toolsDrawer()}
-  {#if showHistory}
-    <div class="pickerpane">
-      <div class="pickerhead">
-        <span>History <b>{versions.length}</b></span>
-        <span style="display:flex;gap:6px">
-          {#if versions.length}<button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>{/if}
-          <button class="btn ghost" onclick={() => showHistory = false}>Done</button>
-        </span>
-      </div>
-      <div class="liblist">
-        {#if versions.length === 0}
-          <div class="pcat" style="padding:12px">No saved versions yet. Snapshots are captured automatically as you edit (and persist across sessions). Restore any of them here.</div>
-        {:else}
-          {#each versions as v, i (v.t)}
-            <div class="librow">
-              <div class="libmeta">
-                <span class="sname">{i === 0 ? 'Latest' : fmtTime(v.t)}</span>
-                <span class="pd">{v.source.split('\n').length} lines · {v.source.length} chars</span>
-              </div>
-              <button class="btn primary" onclick={() => restoreVersion(v.source)} title="Replace the current source with this version">Restore</button>
+{#snippet dockBody()}
+  {#if dockTab === 'insert'}
+    <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
+  {:else if dockTab === 'library'}
+    <div class="liblist">
+      {#if $scriptLibrary.length === 0}
+        <div class="pcat" style="padding:12px">No saved scripts yet. Select a script and click <b>★ Save to library</b> (below the editor) to reuse it on any panel.</div>
+      {:else}
+        {#each $scriptLibrary as e (e.id)}
+          <div class="librow">
+            <div class="libmeta">
+              <span class="sname">{e.name}</span>
+              <span class="pd"><span class={['pill', langClass(e.language)]}>{langLabel(e.language)}</span> {e.event}</span>
             </div>
-          {/each}
-        {/if}
-      </div>
+            <span style="display:flex;gap:6px;flex-shrink:0">
+              <button class="btn primary" onclick={() => importFromLibrary(e)} title="Add an independent copy to this panel">Import</button>
+              <button class="btn ghost" onclick={() => removeFromLibrary(e.id)} title="Remove from library" style="color:var(--red)">✕</button>
+            </span>
+          </div>
+        {/each}
+      {/if}
     </div>
-  {:else if showLibrary}
-    <div class="pickerpane">
-      <div class="pickerhead"><span>Library <b>{$scriptLibrary.length}</b></span><button class="btn ghost" onclick={() => showLibrary = false}>Done</button></div>
-      <div class="liblist">
-        {#if $scriptLibrary.length === 0}
-          <div class="pcat" style="padding:12px">No saved scripts yet. Select a script and click <b>★ Save to library</b> to reuse it on any panel.</div>
-        {:else}
-          {#each $scriptLibrary as e (e.id)}
-            <div class="librow">
-              <div class="libmeta">
-                <span class="sname">{e.name}</span>
-                <span class="pd"><span class={['pill', langClass(e.language)]}>{langLabel(e.language)}</span> {e.event}</span>
-              </div>
-              <span style="display:flex;gap:6px;flex-shrink:0">
-                <button class="btn primary" onclick={() => importFromLibrary(e)} title="Add an independent copy to this panel">Import</button>
-                <button class="btn ghost" onclick={() => removeFromLibrary(e.id)} title="Remove from library" style="color:var(--red)">✕</button>
-              </span>
+  {:else if dockTab === 'history'}
+    <div class="liblist">
+      {#if versions.length === 0}
+        <div class="pcat" style="padding:12px">No saved versions yet. Snapshots are captured automatically as you edit (and persist across sessions). Restore any of them here.</div>
+      {:else}
+        {#each versions as v, i (v.t)}
+          <div class="librow">
+            <div class="libmeta">
+              <span class="sname">{i === 0 ? 'Latest' : fmtTime(v.t)}</span>
+              <span class="pd">{v.source.split('\n').length} lines · {v.source.length} chars</span>
             </div>
-          {/each}
-        {/if}
-      </div>
+            <button class="btn primary" onclick={() => restoreVersion(v.source)} title="Replace the current source with this version">Restore</button>
+          </div>
+        {/each}
+      {/if}
     </div>
   {/if}
 {/snippet}
@@ -831,22 +891,27 @@
         {/if}
       </div>
 
-      <!-- Insert / API picker: docked as a right column by default (toggle with "+ Insert"). -->
-      {#if showPicker && selected && mainView !== 'test'}
-        <aside class="dock">
+      <!-- Right dock: Insert / Library / History tabs. Docked column by default; floats over
+           the editor on narrow viewports so it never squeezes the code. -->
+      {#if showDock && selected && mainView !== 'test'}
+        <aside class={['dock', narrow && 'float']}>
           <div class="pickerpane">
-            <div class="pickerhead">
-              <span>Insert into <b>{selected.name}</b></span>
-              <button class="btn ghost" onclick={() => showPicker = false} title="Hide the Insert panel">⟩ Hide</button>
+            <div class="pickerhead docktabs">
+              <span class="dtabs">
+                <button class={['dtab', dockTab === 'insert' && 'active']} onclick={() => dockTab = 'insert'}>Insert</button>
+                <button class={['dtab', dockTab === 'library' && 'active']} onclick={() => dockTab = 'library'}>Library <b>{$scriptLibrary.length}</b></button>
+                <button class={['dtab', dockTab === 'history' && 'active']} onclick={() => dockTab = 'history'}>History <b>{versions.length}</b></button>
+              </span>
+              <span style="display:flex;gap:6px;flex-shrink:0">
+                {#if dockTab === 'history' && versions.length}
+                  <button class="btn ghost" onclick={() => { if (selectedId) { clearVersions(selectedId); historyTick++; } }} style="color:var(--red)" title="Forget this script's history">Clear</button>
+                {/if}
+                <button class="btn ghost" onclick={() => showDock = false} title="Hide this panel">⟩ Hide</button>
+              </span>
             </div>
-            <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
+            {@render dockBody()}
           </div>
         </aside>
-      {/if}
-
-      <!-- Library / History slide over the editor on demand. -->
-      {#if showHistory || showLibrary}
-        <div class="drawer">{@render toolsDrawer()}</div>
       {/if}
     </div>
   </div>

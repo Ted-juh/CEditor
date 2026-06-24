@@ -27,9 +27,10 @@ export function validateScript(script) {
   const scope = script.scope || 'component';
 
   // 1) Handler presence — the script should define a function for the event it runs on.
+  //    Matches Lua/JS (`function name(`) and Python (`def name(`).
   const handler = script.event;
   if (handler && /^[A-Za-z_]\w*$/.test(handler)) {
-    const defined = new RegExp(`function\\s+${escapeRe(handler)}\\s*\\(`).test(src);
+    const defined = new RegExp(`(?:function\\s+|def\\s+)${escapeRe(handler)}\\s*\\(`).test(src);
     if (!defined) {
       problems.push({
         severity: 'warn',
