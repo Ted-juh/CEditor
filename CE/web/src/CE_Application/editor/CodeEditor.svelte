@@ -7,7 +7,7 @@
   // find & replace, and font zoom. Native textarea undo/redo and copy/paste are kept
   // intact by routing every programmatic edit through document.execCommand('insertText').
   import { tick } from 'svelte';
-  import { highlight, lineCommentToken, matchingBracket } from './codeHighlight.js';
+  import { highlight, lineCommentToken, matchingBracket, identifierOccurrences } from './codeHighlight.js';
   import { analyze, getCompletions, getHover, getDefinition, wordAt } from '../scripting/languageService.js';
 
   let {
@@ -54,6 +54,22 @@
     return pair ? new Set(pair) : undefined;
   });
   let highlighted = $derived(highlight(value, language, matchMarks));
+
+  // Highlight every occurrence of the identifier under the caret (or the selected word).
+  const IDENT_RE = /^[A-Za-z_$][\w$]*$/;
+  let targetWord = $derived.by(() => {
+    if (!taEl) return null;
+    void caretPos; // re-run when the caret/selection moves
+    const s = taEl.selectionStart, e = taEl.selectionEnd;
+    if (s !== e) { const sel = value.slice(s, e); return IDENT_RE.test(sel) ? sel : null; }
+    const w = wordAt(value, s);
+    return w && w.word.length >= 2 ? w.word : null;
+  });
+  let occurrences = $derived.by(() => {
+    if (!targetWord) return [];
+    const occ = identifierOccurrences(value, language, targetWord);
+    return occ.length >= 2 ? occ.slice(0, 200) : [];
+  });
   // A trailing newline collapses in <pre>; pad so the highlight layer matches the textarea height.
   let highlightedSafe = $derived(highlighted + (value.endsWith('\n') ? '\n' : ''));
 
@@ -192,6 +208,21 @@
     syncCaret();
   }
 
+  // Select the next occurrence of the current word (wraps), scrolling it into view.
+  function jumpToNextOccurrence() {
+    const occ = occurrences;
+    if (occ.length === 0) return;
+    const pos = taEl.selectionStart;
+    const next = occ.find((o) => o.start > pos) || occ[0];
+    taEl.focus();
+    taEl.setSelectionRange(next.start, next.end);
+    const top = posOf(next.start).line * lineHeight;
+    if (top < taEl.scrollTop || top > taEl.scrollTop + taEl.clientHeight - lineHeight * 2) {
+      taEl.scrollTop = Math.max(0, top - taEl.clientHeight / 2);
+    }
+    syncCaret();
+  }
+
   // Replace [start,end) with text, preserving the native undo stack, then optionally
   // reselect [selStart,selEnd]. Fires the textarea input path so the parent stays in sync.
   function applyEdit(start, end, text, selStart, selEnd) {
@@ -253,8 +284,12 @@
     }
     // Trigger completion explicitly (Ctrl/⌘+Space).
     if (mod && e.key === ' ') { e.preventDefault(); refreshCompletion(true); return; }
-    // Go to definition.
-    if (e.key === 'F12') { e.preventDefault(); gotoDefinition(ta.selectionStart); return; }
+    // Go to definition (F12) / cycle references (Shift+F12).
+    if (e.key === 'F12') {
+      e.preventDefault();
+      if (e.shiftKey) jumpToNextOccurrence(); else gotoDefinition(ta.selectionStart);
+      return;
+    }
 
     // Shortcuts help overlay
     if (e.key === 'F1') { e.preventDefault(); showHelp = !showHelp; return; }
@@ -369,6 +404,9 @@
     { keys: 'Ctrl/⌘ + F', desc: 'Find' },
     { keys: 'Ctrl/⌘ + H', desc: 'Find & replace' },
     { keys: 'Ctrl/⌘ + /', desc: 'Toggle line comment' },
+    { keys: 'Ctrl/⌘ + Space', desc: 'Trigger autocomplete' },
+    { keys: 'F12 / Ctrl/⌘+Click', desc: 'Go to definition' },
+    { keys: 'Shift + F12', desc: 'Next occurrence (references)' },
     { keys: 'Ctrl/⌘ + Enter', desc: 'Run script' },
     { keys: 'Ctrl/⌘ + = / − / 0', desc: 'Zoom in / out / reset' },
     { keys: 'Ctrl/⌘ + Z / Y', desc: 'Undo / redo' },
@@ -485,6 +523,11 @@
 
   <div class="ce-area">
     <div class="ce-activeline" style="top:{PAD_TOP + caretLine * lineHeight - scrollTop}px; height:{lineHeight}px"></div>
+    {#each occurrences as o (o.start)}
+      {@const p = posOf(o.start)}
+      <div class="ce-occ"
+        style="left:{PAD_L + p.col * charWidth - scrollLeft}px; top:{PAD_TOP + p.line * lineHeight - scrollTop}px; width:{(o.end - o.start) * charWidth}px; height:{lineHeight}px"></div>
+    {/each}
     <pre class="ce-hl" aria-hidden="true" style="transform:translate({-scrollLeft}px, {-scrollTop}px)">{@html highlightedSafe}</pre>
     <textarea
       class="ce-ta"
@@ -625,6 +668,13 @@
     position: absolute;
     left: 0; right: 0;
     background: rgba(255, 255, 255, 0.04);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .ce-occ {
+    position: absolute;
+    background: rgba(224, 162, 60, 0.18);
+    border-radius: 2px;
     pointer-events: none;
     z-index: 0;
   }

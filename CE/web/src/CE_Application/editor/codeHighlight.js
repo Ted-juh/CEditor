@@ -151,3 +151,22 @@ export function matchingBracket(text, caret) {
 export function lineCommentToken(langId) {
   return languageKey(langId) === 'javascript' ? '//' : '--';
 }
+
+/**
+ * All occurrences of the identifier `name` as a real word token — i.e. excluding
+ * matches inside strings, comments, and numbers — by reusing the same tokenizer the
+ * highlighter uses. Returns [{ start, end }] character ranges. Powers highlight-
+ * occurrences / find-references in the editor.
+ */
+export function identifierOccurrences(source, langId, name) {
+  if (!source || !name) return [];
+  const re = LANGS[languageKey(langId)].re;
+  re.lastIndex = 0;
+  const out = [];
+  let m;
+  while ((m = re.exec(source)) !== null) {
+    if (m[6] === name) out.push({ start: m.index, end: m.index + m[0].length });
+    if (m[0].length === 0) re.lastIndex++;
+  }
+  return out;
+}

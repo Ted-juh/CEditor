@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { highlight, lineCommentToken, languageKey, matchingBracket } from '../src/CE_Application/editor/codeHighlight.js';
+import { highlight, lineCommentToken, languageKey, matchingBracket, identifierOccurrences } from '../src/CE_Application/editor/codeHighlight.js';
 
 test('languageKey maps javascript to itself and everything else to lua', () => {
   assert.equal(languageKey('javascript'), 'javascript');
@@ -69,6 +69,21 @@ test('matchingBracket finds the pair adjacent to the caret', () => {
   assert.deepEqual(matchingBracket(t, 9), [3, 8]);
   // caret at the "(" position itself (char at caret) → [3, 8]
   assert.deepEqual(matchingBracket(t, 3), [3, 8]);
+});
+
+test('identifierOccurrences finds word tokens but skips strings/comments/numbers', () => {
+  const src = 'local x = 1\nset("x", x) -- x here\nreturn x';
+  const occ = identifierOccurrences(src, 'lua', 'x');
+  // the literal "x" inside the string and the "x" in the comment must NOT count
+  assert.equal(occ.length, 3);
+  // first occurrence is the declaration
+  assert.equal(occ[0].start, src.indexOf('x'));
+  assert.equal(src.slice(occ[0].start, occ[0].end), 'x');
+});
+
+test('identifierOccurrences returns [] for empty inputs', () => {
+  assert.deepEqual(identifierOccurrences('', 'lua', 'x'), []);
+  assert.deepEqual(identifierOccurrences('local y = 1', 'lua', ''), []);
 });
 
 test('matchingBracket respects nesting and returns null when unbalanced or away', () => {
