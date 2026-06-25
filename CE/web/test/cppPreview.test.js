@@ -254,6 +254,21 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('range-for over a std::map with structured bindings', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::map<std::string, int> m;
+    m["a"] = 1; m["b"] = 2; m["c"] = 3;
+    int total = 0;
+    int keys = 0;
+    for (auto& [name, val] : m) { total += val; keys += name.size(); }
+    ctx.setValue("total", total);
+    ctx.setValue("keys", keys);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.total, 6);
+  assert.equal(values.keys, 3); // "a","b","c" each length 1
+});
+
 test('STL algorithms: sort, accumulate, max_element, find over a vector', () => {
   const src = `void onClick(CeContext& ctx, const CeEvent& event) {
     std::vector<int> v;

@@ -388,13 +388,13 @@ class Parser {
 
   parseFor() {
     this.eat('for'); this.eat('(');
-    // Range-based for: for (auto x : container)
+    // Range-based for: for (auto x : c) or structured binding for (auto& [k, v] : c)
     if (this.isDeclStart()) {
       const save = this.i;
-      const name = this.parseDeclaratorName();
-      if (name && this.isV(':')) {
+      const names = this.parseRangeBinding();
+      if (names && this.isV(':')) {
         this.next(); const iterable = this.parseExpr(); this.eat(')');
-        return { type: 'forEach', varName: name, iterable, body: this.parseStatement() };
+        return { type: 'forEach', varNames: names, iterable, body: this.parseStatement() };
       }
       this.i = save; // not a range-for — reparse as a classic for
     }
@@ -415,16 +415,21 @@ class Parser {
     return { type: 'seq', list };
   }
 
-  // Consume type specifiers + one declarator name, returning the name (for range-for detection).
-  parseDeclaratorName() {
+  // For range-for detection: consume the loop variable's type, return its binding name(s) — a single
+  // name, or several for a structured binding `[a, b]`. Returns null if this isn't a range-for head.
+  parseRangeBinding() {
     for (;;) {
       const k = this.peek();
       if (k.value === '<') { this.skipAngles(); continue; }
-      if (k.value === '*' || k.value === '&' || k.value === '::') { this.next(); continue; }
+      if (k.value === '*' || k.value === '&' || k.value === '::' || k.value === 'const' || k.value === 'auto') { this.next(); continue; }
+      if (k.value === '[') {
+        this.next(); const names = [];
+        if (!this.isV(']')) do { names.push(this.next().value); } while (this.isV(',') && this.next());
+        this.eat(']'); return names;
+      }
       if (k.type === 'id') {
-        const nx = this.peek(1).value;
-        if (nx === ':' || nx === '=' || nx === ';' || nx === ')') return this.next().value;
-        this.next(); continue;
+        if (this.peek(1).value === ':') return [this.next().value];
+        this.next(); continue; // part of the type
       }
       return null;
     }
@@ -765,9 +770,15 @@ function execStmt(node, env) {
     case 'doWhile': do { try { execStmt(node.body, env); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; } } while (truthy(evalNode(node.cond, env))); return;
     case 'forEach': {
       const it = evalNode(node.iterable, env);
-      const list = typeof it === 'string' ? it.split('') : Array.isArray(it) ? it : [];
+      const list = it instanceof Map ? [...it.entries()].map(([k, v]) => ({ first: k, second: v }))
+        : typeof it === 'string' ? it.split('') : Array.isArray(it) ? it : [];
+      const names = node.varNames;
       for (const el of list) {
-        const inner = new Env(env); inner.define(node.varName, el);
+        const inner = new Env(env);
+        if (names.length === 1) inner.define(names[0], el);
+        else if (el && typeof el === 'object' && 'first' in el) { inner.define(names[0], el.first); if (names[1]) inner.define(names[1], el.second); }
+        else if (Array.isArray(el)) names.forEach((n, idx) => inner.define(n, el[idx]));
+        else inner.define(names[0], el);
         try { execStmt(node.body, inner); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; }
       }
       return;
