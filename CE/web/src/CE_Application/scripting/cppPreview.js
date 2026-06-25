@@ -6,8 +6,8 @@
 //
 // SUPPORTED
 //   • void handlers, e.g.  void onPanelReady(CeContext& ctx, const CeEvent& event) { … }
-//   • user-defined helper functions (callable from handlers, recursion ok)
-//   • data structs (default + member-initialized fields, member get/set) and enums / enum class
+//   • user-defined helper functions (callable from handlers, recursion ok), lambdas (with capture)
+//   • structs with data members AND methods (implicit `this`), enums / enum class, std::pair
 //   • variable decls: int/double/float/bool/char/auto/const/long/short/unsigned/size_t/string and
 //     user types (Type name = expr;), comma lists, C arrays + brace initializers
 //   • containers: std::vector / std::array (.size/.push_back/.at/.back/.front/.empty/.clear),
@@ -43,6 +43,7 @@ const BUILTINS = {
   clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
   to_string: (x) => String(x), stoi: (x) => parseInt(x, 10), stod: (x) => parseFloat(x), stof: (x) => parseFloat(x),
   static_cast: (x) => x, reinterpret_cast: (x) => x, const_cast: (x) => x, dynamic_cast: (x) => x,
+  make_pair: (a, b) => ({ first: a, second: b }),
   M_PI: Math.PI, M_E: Math.E,
 };
 
@@ -124,7 +125,7 @@ function extractTypes(toks) {
     if (t.type === 'id' && t.value === 'struct' && toks[i + 1]?.type === 'id' && toks[i + 2]?.value === '{') {
       const name = toks[i + 1].value;
       const bEnd = matchClose(toks, i + 2, '{', '}');
-      try { structs.set(name, { fields: parseStructFields(toks.slice(i + 3, bEnd)) }); }
+      try { structs.set(name, parseStructMembers(toks.slice(i + 3, bEnd))); }
       catch (e) { diagnostics.push(`struct ${name}: ${e.message ?? e}`); }
       i = bEnd + 1; continue;
     }
@@ -144,15 +145,42 @@ function extractTypes(toks) {
   return { structs, enums, diagnostics };
 }
 
-function parseStructFields(toks) {
-  const p = new Parser([...toks, { type: 'eof', value: null }]);
-  const fields = [];
-  while (!p.atEnd()) {
-    if (p.isV('public') || p.isV('private') || p.isV('protected')) { p.next(); if (p.isV(':')) p.next(); continue; }
-    if (!p.isDeclStart()) throw new Error('only data members are supported');
-    for (const decl of p.parseDecl().decls) fields.push(decl);
+function parseStructMembers(toks) {
+  const fields = [], methods = new Map();
+  let i = 0;
+  while (i < toks.length) {
+    if (['public', 'private', 'protected'].includes(toks[i]?.value)) { i++; if (toks[i]?.value === ':') i++; continue; }
+    if (toks[i]?.value === ';') { i++; continue; }
+    // Walk type specifiers to the declarator name; field vs method by the token after the name.
+    let j = i, name = null, nameIdx = -1, isMethod = false;
+    while (j < toks.length) {
+      const v = toks[j].value;
+      if (v === '<') { let d = 0; do { if (toks[j].value === '<') d++; else if (toks[j].value === '>') d--; j++; } while (d > 0 && j < toks.length); continue; }
+      if (v === '{' || v === '}') break;
+      if (toks[j].type === 'id') {
+        const nx = toks[j + 1]?.value;
+        if (nx === '(') { name = toks[j].value; nameIdx = j; isMethod = true; break; }
+        if (nx === '=' || nx === ';' || nx === ',' || nx === '[') { name = toks[j].value; nameIdx = j; break; }
+      }
+      j++;
+    }
+    if (name === null) break;
+    if (isMethod) {
+      const pOpen = nameIdx + 1, pEnd = matchClose(toks, pOpen, '(', ')');
+      if (toks[pEnd + 1]?.value === '{') {
+        const bEnd = matchClose(toks, pEnd + 1, '{', '}');
+        methods.set(name, { params: paramNames(toks.slice(pOpen + 1, pEnd)), bodyToks: toks.slice(pEnd + 2, bEnd), body: null });
+        i = bEnd + 1;
+      } else { i = pEnd + 1; if (toks[i]?.value === ';') i++; } // prototype only
+    } else {
+      let k = i, d = 0;
+      while (k < toks.length && !(toks[k].value === ';' && d === 0)) { if ('([{'.includes(toks[k].value)) d++; if (')]}'.includes(toks[k].value)) d--; k++; }
+      const p = new Parser([...toks.slice(i, k), { type: 'op', value: ';' }, { type: 'eof', value: null }]);
+      for (const decl of p.parseDecl().decls) fields.push(decl);
+      i = k + 1;
+    }
   }
-  return fields;
+  return { fields, methods };
 }
 
 function parseEnumerators(toks, enums) {
@@ -408,8 +436,17 @@ class Parser {
 
   parseArgs() { const a = []; if (this.isV(')')) return a; do { a.push(this.parseAssign()); } while (this.isV(',') && this.next()); return a; }
 
+  parseLambda() {
+    this.eat('['); { let d = 1; while (d > 0 && !this.atEnd()) { const v = this.next().value; if (v === '[') d++; else if (v === ']') d--; } } // skip captures
+    let params = [];
+    if (this.isV('(')) { this.next(); const start = this.i; let d = 1; while (d > 0 && !this.atEnd()) { const v = this.next().value; if (v === '(') d++; else if (v === ')') d--; } params = paramNames(this.t.slice(start, this.i - 1)); }
+    if (this.isV('->')) { while (!this.isV('{') && !this.atEnd()) this.next(); } // skip trailing return type
+    return { type: 'lambda', params, body: this.parseBlock().body };
+  }
+
   parsePrimary() {
     if (this.isV('{')) return this.parseArrayLiteral();
+    if (this.isV('[')) return this.parseLambda();
     const k = this.next();
     if (k.type === 'num' || k.type === 'char') return { type: 'num', value: k.value };
     if (k.type === 'str') return { type: 'str', value: k.value };
@@ -437,19 +474,33 @@ function cppStr(v) { return typeof v === 'boolean' ? (v ? '1' : '0') : String(v)
 
 // Default value for a declaration with no initializer, from its type (struct / map / vector / …).
 function declDefault(d, env) {
-  if (d.init) return evalNode(d.init, env);
+  if (d.init) {
+    // pair p = {a, b}  →  { first, second }
+    if (d.typeName === 'pair' && d.init.type === 'array' && d.init.elems.length === 2) {
+      return { first: evalNode(d.init.elems[0], env), second: evalNode(d.init.elems[1], env) };
+    }
+    return evalNode(d.init, env);
+  }
   if (d.isArray) return new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
   const prog = env.get('__program');
   if (prog && prog.structs && prog.structs.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
   if (d.typeName === 'map' || d.typeName === 'unordered_map') return new Map();
+  if (d.typeName === 'pair') return { first: 0, second: 0 };
   if (d.typeHint === 'array') return [];
   if (d.typeHint === 'string' || d.typeName === 'string') return '';
   return 0;
 }
 
 function constructStruct(def, env) {
+  const prog = env.get('__program');
   const obj = {};
   for (const f of def.fields) obj[f.name] = declDefault(f, env);
+  if (def.methods) for (const [mname, m] of def.methods) {
+    obj[mname] = (...args) => {
+      if (!m.body) m.body = new Parser([...m.bodyToks, { type: 'eof', value: null }]).parseProgram();
+      return runBody(m.body, m.params, prog, obj, args);
+    };
+  }
   return obj;
 }
 
@@ -504,7 +555,13 @@ class Env {
 }
 
 function lvalue(node, env) {
-  if (node.type === 'ident') return { get: () => env.get(node.name), set: (v) => env.set(node.name, v) };
+  if (node.type === 'ident') {
+    if (!env.has(node.name)) {
+      const self = env.get('this');
+      if (self && typeof self === 'object' && node.name in self) return { get: () => self[node.name], set: (v) => { self[node.name] = v; } };
+    }
+    return { get: () => env.get(node.name), set: (v) => env.set(node.name, v) };
+  }
   if (node.type === 'member') { const o = evalNode(node.obj, env); return { get: () => o?.[node.name], set: (v) => { o[node.name] = v; } }; }
   if (node.type === 'index') {
     const o = evalNode(node.obj, env); const k = evalNode(node.index, env);
@@ -529,10 +586,21 @@ function evalNode(node, env) {
     case 'str': return node.value;
     case 'ident': {
       if (env.has(node.name)) return env.get(node.name);
+      const self = env.get('this');
+      if (self && typeof self === 'object' && node.name in self) return self[node.name];
       if (node.name in BUILTINS) return BUILTINS[node.name];
       throw new Error(`'${node.name}' is not defined`);
     }
     case 'array': return node.elems.map((e) => evalNode(e, env));
+    case 'lambda': {
+      const captured = env;
+      return (...args) => {
+        const fenv = new Env(captured);
+        node.params.forEach((p, i) => fenv.define(p, args[i]));
+        try { for (const s of node.body) execStmt(s, fenv); }
+        catch (e) { if (e instanceof ReturnSignal) return e.value; if (e === BREAK || e === CONTINUE) return undefined; throw e; }
+      };
+    }
     case 'member': {
       const o = evalNode(node.obj, env);
       if (o == null) return undefined;
@@ -658,18 +726,24 @@ export function compileCpp(source) {
 /** Invoke a parsed handler. `args` bind to its params positionally (ctx, event). opts.print
  *  receives anything written via std::cout / printf. Helper functions in the same source are
  *  callable (and may recurse). */
-export function invokeCpp(fnNode, args = [], opts = {}) {
-  const program = fnNode.program;
-  if (program && opts.print) program.print = opts.print;
+// Core runner: build a scope (program funcs + enums, optional `this`), bind params, execute.
+function runBody(body, params, program, thisObj, args) {
   const env = new Env(null);
   env.define('__program', program ?? null);
   env.define('__print', program?.print ?? (() => {}));
+  if (thisObj) env.define('this', thisObj);
   if (program) {
     for (const [name, v] of program.enums) env.define(name, v);
-    for (const [name, f] of program.funcs) env.define(name, (...callArgs) => invokeCpp(f, callArgs));
+    for (const [name, f] of program.funcs) env.define(name, (...a) => runBody(f.body, f.params, program, null, a));
   }
-  (fnNode.params ?? []).forEach((name, idx) => env.define(name, args[idx]));
-  try { for (const s of fnNode.body) execStmt(s, env); }
+  (params ?? []).forEach((name, idx) => env.define(name, args[idx]));
+  try { for (const s of body) execStmt(s, env); }
   catch (e) { if (e instanceof ReturnSignal) return e.value; if (e === BREAK || e === CONTINUE) return undefined; throw e; }
   return undefined;
+}
+
+export function invokeCpp(fnNode, args = [], opts = {}) {
+  const program = fnNode.program;
+  if (program && opts.print) program.print = opts.print;
+  return runBody(fnNode.body, fnNode.params, program, null, args);
 }

@@ -222,3 +222,46 @@ test('helper using a struct returns it; nested field math', () => {
     }`;
   assert.equal(run(src, 'onClick', {}).values.span, 7);
 });
+
+test('struct methods with implicit-this field access', () => {
+  const src = `
+    struct Counter {
+      int n = 0;
+      void bump() { n += 1; }
+      int doubled() { return n * 2; }
+    };
+    void onClick(CeContext& ctx, const CeEvent& event) {
+      Counter c;
+      c.bump(); c.bump(); c.bump();
+      ctx.setValue("n", c.n);
+      ctx.setValue("d", c.doubled());
+    }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.n, 3);
+  assert.equal(values.d, 6);
+});
+
+test('lambdas: definition, capture, and call', () => {
+  const src = `void onValueChanged(CeContext& ctx, const CeEvent& event) {
+    double gain = 3.0;
+    auto scale = [&](double x) { return x * gain; };
+    auto add = [](int a, int b) { return a + b; };
+    ctx.setValue("scaled", scale(event.value));
+    ctx.setValue("sum", add(4, 5));
+  }`;
+  const { values } = run(src, 'onValueChanged', { value: 10 });
+  assert.equal(values.scaled, 30);
+  assert.equal(values.sum, 9);
+});
+
+test('std::pair via make_pair and brace-init', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::pair<int, int> p = {3, 7};
+    auto q = std::make_pair(10, 20);
+    ctx.setValue("a", p.first + p.second);
+    ctx.setValue("b", q.second - q.first);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.a, 10);
+  assert.equal(values.b, 10);
+});
