@@ -52,7 +52,7 @@ export const SCRIPT_LANGUAGES = [
     label: 'Python',
     version: '3.x',
     host: 'Pyodide (WASM)',
-    live: false, // Tier 2 — WebView only (editor preview + open plugin window); not in the C++ runtime
+    live: false, // Tier 2 — live in the WebView (editor preview + plugin window); in the native C++ runtime only when CPython is embedded at export (embedPython auto/on), not in the always-on Lua+JS core
     block: 'def ${e}:\n  $0',
     method: '.',
     comment: '#',
@@ -92,9 +92,10 @@ export const SCRIPT_LANGUAGES = [
   },
 ];
 
-// Tier-1 = always available everywhere (incl. the C++ window-closed runtime). Python is Tier-2
-// (WebView only). RUNNABLE_LANGUAGES is every language the WebView runtime can execute (C++ via
-// the interpreted preview subset).
+// Tier-1 = always built into every export incl. the C++ window-closed runtime (Lua + JS). Python is
+// Tier-2: live in the WebView, and in the native runtime only when CPython is embedded at export (the
+// embedPython auto/on setting). RUNNABLE_LANGUAGES is every language the WebView runtime can execute
+// (C++ via the interpreted preview subset).
 export const TIER1_LANGUAGES = ['lua', 'javascript', 'typescript'];
 export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp', 'java'];
 

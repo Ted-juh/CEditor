@@ -597,7 +597,7 @@
         <span class="lang">
           {langLabel(selected.language)} source
           {#if selectedLangMeta && !selectedLangMeta.live}
-            <span class="previewtag" title="This language runs in the WebView preview only — it does not execute live yet, and won't run in the shipped C++ runtime.">preview · not live</span>
+            <span class="previewtag" title="This language runs in the WebView preview and is not part of the always-on native core (Lua + JS). Python runs in the shipped plugin only when its native CPython runtime is embedded at export (window-closed + offline); otherwise it runs window-open only.">preview · not live</span>
           {:else if selectedLangMeta?.subset}
             <span class="previewtag" title="C++ runs live here through an interpreted subset (the panel-API surface). The full C++ source is compiled into the exported plugin.">interpreted subset</span>
           {/if}

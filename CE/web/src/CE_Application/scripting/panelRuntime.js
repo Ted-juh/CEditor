@@ -383,8 +383,10 @@ async function loadHandlersLua(script) {
 
 /* ------------------------------------------------------------------ Python executor */
 // Python via Pyodide (CPython in WASM), loaded lazily from the jsDelivr CDN on the first Python
-// script. Tier-2 language: runs in the WebView (editor preview + the OPEN plugin window). Offline /
-// window-closed Python is a follow-up (bundle Pyodide's assets; the C++ Model-2 runtime is Lua+JS).
+// script. Tier-2 language: in the WebView (editor preview + the OPEN plugin window) it runs via
+// Pyodide. Window-closed / offline native execution is delivered by embedding REAL CPython at export
+// (Scripting Runtime -> Python; CMake CEDITOR_PYTHON -> PythonScriptEngine.cpp), NOT Pyodide. The
+// always-on native core is Lua+JS; embedded CPython is the optional third window-closed engine.
 
 let pyodidePromise = null;
 async function getPyodideEngine() {

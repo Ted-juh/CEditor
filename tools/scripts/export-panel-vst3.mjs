@@ -14,6 +14,7 @@ import path from 'node:path';
 // codes shown in the editor are exactly what gets built. The self-check below still validates it
 // against the canonical C++ output (PanelExportIdentity) on every run.
 import { deriveIdentity } from '../../CE/web/src/CE_Application/utils/exportIdentity.js';
+import { panelScriptLanguages, shouldEmbedPython } from './pythonEmbed.mjs';
 
 // Self-check against the canonical C++ output (PanelExportIdentityTests).
 {
@@ -53,22 +54,20 @@ console.log('Export identity:', id);
 // 'auto' embeds the native CPython runtime only when the panel actually has Python scripts; 'on'/'off'
 // force it. Embedding links libpython into the plugin AND bundles the full stdlib next to the binary,
 // so Python scripts run window-closed + offline (matching the Lua/JS window-closed runtimes).
-function panelScriptLanguages(doc) {
-  const langs = new Set();
-  for (const s of doc.scripts ?? []) if (s?.enabled !== false) langs.add(s?.language);
-  for (const c of doc.controls ?? []) {
-    const sec = c?._children?.Scripts;
-    if (sec?.enabled === false) continue;
-    for (const s of sec?.scripts ?? []) if (s?.enabled !== false) langs.add(s?.language);
-  }
-  return langs;
-}
+// Detection (empty-stub exclusion + 'py' alias) lives in pythonEmbed.mjs so it is unit-tested and
+// matches the shipped C++ isSourceScript predicate (non-empty source + language).
 const hasPython = panelScriptLanguages(panelDoc).has('python');
 const embedMode = es.embedPython ?? 'auto';
-const embedPython = embedMode === 'on' || (embedMode === 'auto' && hasPython);
+const embedPython = shouldEmbedPython(panelDoc, embedMode);
 console.log(`Python runtime: mode=${embedMode}, panelHasPython=${hasPython} -> ${embedPython ? 'EMBED (native CPython + full stdlib)' : 'skip (no size cost)'}`);
 if (embedMode === 'off' && hasPython)
   console.warn('  ⚠ Panel has Python scripts but embed is Off — they will NOT run window-closed (only window-open).');
+// The native bundler below currently only lays out the Windows VST3 (Contents/x86_64-win + .dll). On
+// macOS/Linux the embed links libpython but the runtime files are not yet bundled, so Python would run
+// window-open only. Warn loudly rather than fail silently until the cross-platform bundler lands.
+if (embedPython && process.platform !== 'win32')
+  console.warn('  ⚠ Python embed requested, but the runtime bundler only fully supports the Windows VST3 layout yet — '
+    + 'Python may NOT run window-closed on this platform (only window-open). Lua/JS are unaffected.');
 
 // --- size + python-bundling helpers ---
 const mb = (bytes) => (bytes / 1048576).toFixed(1);
