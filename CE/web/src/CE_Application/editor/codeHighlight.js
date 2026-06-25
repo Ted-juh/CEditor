@@ -61,10 +61,17 @@ const LANGS = {
     re: /((?:\/\/[^\n]*)|(?:\/\*[\s\S]*?\*\/))|()|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_]\w*)/g,
     keywords: CPP_KEYWORDS, literals: CPP_LITERALS, builtins: CPP_BUILTINS,
   },
+  typescript: {
+    re: /((?:\/\/[^\n]*)|(?:\/\*[\s\S]*?\*\/))|(`(?:\\[\s\S]|[^`\\])*`?)|("(?:\\[\s\S]|[^"\\\n])*"?)|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_$][\w$]*)/g,
+    keywords: new Set([...JS_KEYWORDS, 'interface', 'type', 'enum', 'namespace', 'implements',
+      'declare', 'readonly', 'public', 'private', 'protected', 'abstract', 'as', 'satisfies', 'keyof', 'is']),
+    literals: JS_LITERALS, builtins: JS_BUILTINS,
+  },
 };
 
 export function languageKey(id) {
   if (id === 'javascript') return 'javascript';
+  if (id === 'typescript' || id === 'ts') return 'typescript';
   if (id === 'cpp' || id === 'c++') return 'cpp';
   return 'lua';
 }
@@ -170,7 +177,7 @@ export function matchingBracket(text, caret) {
 // Language-aware single-line comment prefix, used by the comment-toggle command.
 export function lineCommentToken(langId) {
   const k = languageKey(langId);
-  return k === 'javascript' || k === 'cpp' ? '//' : '--';
+  return k === 'javascript' || k === 'cpp' || k === 'typescript' ? '//' : '--';
 }
 
 /**

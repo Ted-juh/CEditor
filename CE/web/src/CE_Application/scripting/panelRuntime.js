@@ -23,6 +23,7 @@ import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
 import { compileCpp, invokeCpp } from './cppPreview.js';
+import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 
@@ -308,18 +309,31 @@ function ownerOf(script) {
 
 /* -------------------------------------------------------------- JavaScript executor */
 
-/** Execute a JS script's source and return its declared handlers (sync). */
-function loadHandlersJs(script) {
-  const api = buildApi(ownerOf(script));
+/** Run JS source with the panel API bound and collect its declared handlers (sync). */
+function runJsSource(source, scriptId, api) {
   const probe = HANDLER_NAMES.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
-  const body = `${script.source}\n;return {${probe}};`;
+  const body = `${source}\n;return {${probe}};`;
   try {
     const factory = new Function(...Object.keys(api), body);
     return factory(...Object.values(api)) || {};
   } catch (e) {
-    addScriptTrace('error', script.id, `load error: ${e?.message ?? e}`);
+    addScriptTrace('error', scriptId, `load error: ${e?.message ?? e}`);
     return null;
   }
+}
+
+/** Execute a JS script's source and return its declared handlers (sync). */
+function loadHandlersJs(script) {
+  return runJsSource(script.source, script.id, buildApi(ownerOf(script)));
+}
+
+/** TypeScript: transpile to JS (lazy compiler) and run through the JS path. */
+async function loadHandlersTs(script) {
+  const ts = await ensureTs();
+  if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
+  const js = transpileTs(script.source);
+  if (js == null) { addScriptTrace('error', script.id, 'TypeScript transpile failed'); return null; }
+  return runJsSource(js, script.id, buildApi(ownerOf(script)));
 }
 
 /* --------------------------------------------------------------------- Lua executor */
@@ -442,11 +456,12 @@ function loadHandlersCpp(script) {
 async function getHandlers(script) {
   const lang = script?.language ?? 'lua';
   if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
+  if (lang === 'typescript' || lang === 'ts') return loadHandlersTs(script);
   if (lang === 'lua') return loadHandlersLua(script);
   if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
   if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
   addScriptTrace('error', script?.id ?? '',
-    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, Python, and C++ run here).`);
+    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, and C++ run here).`);
   return null;
 }
 

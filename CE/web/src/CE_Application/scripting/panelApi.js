@@ -38,6 +38,16 @@ export const SCRIPT_LANGUAGES = [
     comment: '//',
   },
   {
+    id: 'typescript',
+    label: 'TypeScript',
+    version: '5.x',
+    host: 'transpiled to JS (QuickJS)',
+    live: true, // transpiles to JS, which runs everywhere JS does
+    block: '(${e}) => {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
+  {
     id: 'python',
     label: 'Python',
     version: '3.x',
@@ -63,8 +73,8 @@ export const SCRIPT_LANGUAGES = [
 // Tier-1 = always available everywhere (incl. the C++ window-closed runtime). Python is Tier-2
 // (WebView only). RUNNABLE_LANGUAGES is every language the WebView runtime can execute (C++ via
 // the interpreted preview subset).
-export const TIER1_LANGUAGES = ['lua', 'javascript'];
-export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'python', 'cpp'];
+export const TIER1_LANGUAGES = ['lua', 'javascript', 'typescript'];
+export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 'cpp'];
 
 /* ----------------------------------------------------------- scopes / context */
 // Where a member is valid. 'any' = all scopes. Scope-relative resolution (Q7):

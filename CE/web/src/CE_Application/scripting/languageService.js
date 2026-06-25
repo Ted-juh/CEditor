@@ -16,6 +16,7 @@ import { parse as parseJs } from 'acorn';
 import luaparse from 'luaparse';
 import { analyzeCpp, foldCpp } from './cppPreview.js';
 import { analyzePython, foldPython } from './pythonService.js';
+import { analyzeTs, foldTs } from './tsService.js';
 import {
   COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
@@ -62,9 +63,14 @@ const CPP_KEYWORDS = ['int', 'double', 'float', 'bool', 'char', 'void', 'auto', 
 const CPP_BUILTINS = ['std', 'min', 'max', 'abs', 'clamp', 'floor', 'ceil', 'round', 'sqrt', 'pow',
   'static_cast', 'CeContext', 'CeEvent', 'ctx', 'event'];
 
+const TS_KEYWORDS = [...JS_KEYWORDS, 'interface', 'type', 'enum', 'namespace', 'implements',
+  'declare', 'readonly', 'public', 'private', 'protected', 'abstract', 'as', 'satisfies', 'keyof',
+  'number', 'string', 'boolean', 'any', 'unknown', 'never', 'void'];
+
 function keywordItems(language) {
   let kw = LUA_KEYWORDS, bi = LUA_BUILTINS;
   if (language === 'javascript') { kw = JS_KEYWORDS; bi = JS_BUILTINS; }
+  else if (language === 'typescript' || language === 'ts') { kw = TS_KEYWORDS; bi = JS_BUILTINS; }
   else if (language === 'python') { kw = PY_KEYWORDS; bi = PY_BUILTINS; }
   else if (language === 'cpp' || language === 'c++') { kw = CPP_KEYWORDS; bi = CPP_BUILTINS; }
   return [
@@ -155,6 +161,7 @@ export function analyze(source, languageId) {
   // C++ has its own interpreter front-end (cppPreview); Python uses a lightweight scanner.
   if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
   if (languageId === 'python') return analyzePython(src);
+  if (languageId === 'typescript' || languageId === 'ts') return analyzeTs(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return { diagnostics: [], symbols: [] };
 
   if (languageId === 'javascript') {
@@ -378,6 +385,7 @@ export function getFoldRegions(source, languageId) {
   const src = String(source ?? '');
   if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
   if (languageId === 'python') return foldPython(src);
+  if (languageId === 'typescript' || languageId === 'ts') return foldTs(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return [];
   let ast;
   try {

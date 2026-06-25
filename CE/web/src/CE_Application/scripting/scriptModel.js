@@ -32,7 +32,7 @@ export function isSourceScript(script) {
 
 /** Generate a starter function skeleton for an event/hook name in a given language. */
 export function defaultSource(eventName = 'onValueChanged', languageId = 'lua') {
-  const isJs = languageId === 'javascript';
+  const isJs = languageId === 'javascript' || languageId === 'typescript';
   const isPy = languageId === 'python';
   const isCpp = languageId === 'cpp' || languageId === 'c++';
   // C++ handlers use a fixed (CeContext& ctx, const CeEvent& event) signature; `param` is ignored.

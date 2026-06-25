@@ -366,12 +366,14 @@
   // Per-language tag (short label + color class). Add new languages here as they land.
   function langClass(id) {
     if (id === 'javascript') return 'js';
+    if (id === 'typescript') return 'ts';
     if (id === 'python') return 'py';
     if (id === 'cpp' || id === 'c++') return 'cpp';
     return 'lua';
   }
   function langLabel(id) {
     if (id === 'javascript') return 'JS';
+    if (id === 'typescript') return 'TS';
     if (id === 'python') return 'Py';
     if (id === 'cpp' || id === 'c++') return 'C++';
     return 'Lua';
@@ -813,7 +815,7 @@
 
 <div class="bd-app">
   <!-- Hidden picker backing the "Import file" buttons. -->
-  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.py,.cpp,.cc,.cxx,.hpp,.h,.txt,text/plain"
+  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.ts,.tsx,.mts,.py,.cpp,.cc,.cxx,.hpp,.h,.txt,text/plain"
     style="display:none" onchange={importScriptFile} />
   <div class="titlebar">
     <div class="dots"><span></span><span></span><span></span></div>

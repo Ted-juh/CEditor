@@ -172,6 +172,7 @@
 .bd-app .pill{display:inline-block;padding:0;font-size:11px;font-family:var(--mono);font-weight:600;background:none;border:none}
 .bd-app .pill.lua{color:var(--blue)}
 .bd-app .pill.js{color:var(--amber)}
+.bd-app .pill.ts{color:#4a90d9}
 .bd-app .pill.py{color:var(--accent)}
 .bd-app .pill.cpp{color:var(--violet)}
 .bd-app .pill.muted{color:var(--txt-faint)}
