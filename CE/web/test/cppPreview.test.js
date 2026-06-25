@@ -162,3 +162,63 @@ test('std::string methods (size, substr)', () => {
   assert.equal(values.len, 5);
   assert.equal(values.head, 'he');
 });
+
+test('structs: default fields, member init, member access/assignment', () => {
+  const src = `
+    struct Point { double x; double y = 2.5; };
+    void onClick(CeContext& ctx, const CeEvent& event) {
+      Point p;
+      p.x = 4.0;
+      ctx.setValue("sum", p.x + p.y);
+    }`;
+  assert.equal(run(src, 'onClick', {}).values.sum, 6.5);
+});
+
+test('std::map: operator[], count, at, size', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::map<std::string, int> m;
+    m["a"] = 10;
+    m["b"] = 20;
+    m["a"] += 5;
+    ctx.setValue("a", m["a"]);
+    ctx.setValue("has_b", m.count("b"));
+    ctx.setValue("n", m.size());
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.a, 15);
+  assert.equal(values.has_b, 1);
+  assert.equal(values.n, 2);
+});
+
+test('enum and enum class enumerators resolve as constants', () => {
+  const src = `
+    enum Waveform { Sine, Saw, Square };
+    enum class Mode { Off = 0, On = 4, Auto };
+    void onValueChanged(CeContext& ctx, const CeEvent& event) {
+      ctx.setValue("saw", Saw);
+      ctx.setValue("auto", Mode::Auto);
+    }`;
+  const { values } = run(src, 'onValueChanged', {});
+  assert.equal(values.saw, 1);     // 0,1,2
+  assert.equal(values.auto, 5);    // Off=0, On=4, Auto=5
+});
+
+test('nullptr is usable and falsy', () => {
+  const src = `void onPanelLoad(CeContext& ctx, const CeEvent& event) {
+    int x = nullptr;
+    if (!x) { ctx.setValue("nil", 1); }
+  }`;
+  assert.equal(run(src, 'onPanelLoad', {}).values.nil, 1);
+});
+
+test('helper using a struct returns it; nested field math', () => {
+  const src = `
+    struct Range { double lo = 0; double hi = 1; };
+    double span(Range r) { return r.hi - r.lo; }
+    void onClick(CeContext& ctx, const CeEvent& event) {
+      Range r;
+      r.lo = 2; r.hi = 9;
+      ctx.setValue("span", span(r));
+    }`;
+  assert.equal(run(src, 'onClick', {}).values.span, 7);
+});

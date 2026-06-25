@@ -7,19 +7,22 @@
 // SUPPORTED
 //   • void handlers, e.g.  void onPanelReady(CeContext& ctx, const CeEvent& event) { … }
 //   • user-defined helper functions (callable from handlers, recursion ok)
+//   • data structs (default + member-initialized fields, member get/set) and enums / enum class
 //   • variable decls: int/double/float/bool/char/auto/const/long/short/unsigned/size_t/string and
-//     user types (Type name = expr;), comma lists, C arrays + brace initializers, std::vector/array
-//   • assignment (= += -= *= /= %=), prefix/postfix ++/--
+//     user types (Type name = expr;), comma lists, C arrays + brace initializers
+//   • containers: std::vector / std::array (.size/.push_back/.at/.back/.front/.empty/.clear),
+//     std::map / std::unordered_map (operator[], .count/.contains/.at/.size/.empty/.erase/.clear),
+//     std::string (.size/.length/.substr/.find/.empty/.at)
+//   • assignment (= += -= *= /= %=), prefix/postfix ++/--, nullptr
 //   • if/else, for, range-based for, while, switch/case (fallthrough), return, break, continue
 //   • arithmetic + - * / %, comparison, &&/|| (short-circuit), ternary ?:, unary !/-/+
 //   • calls: ctx.method(…), member a.b / a->b, indexing a[i], math builtins (std:: forms ok)
-//   • container methods: vector .size/.push_back/.at/.back/.front/.empty/.clear; string .size/.substr/.find
 //   • string literals + concatenation; (int)x and static_cast<int>(x) casts
 //   • std::cout << … << std::endl and printf(…) → the script console
 //
-// NOT SUPPORTED (raises a clear error instead of mis-running): templates you define, classes/
-// structs, pointer arithmetic, std::map and other containers, lambdas, goto, exceptions. Integer
-// division is not truncated (numbers are doubles) — a preview approximation, noted to the user.
+// NOT SUPPORTED (raises a clear error instead of mis-running): templates you define, classes with
+// methods, pointer arithmetic, struct member functions, lambdas, goto, exceptions, iterators.
+// Integer division is not truncated (numbers are doubles) — a preview approximation.
 
 const TYPE_WORDS = new Set([
   'int', 'double', 'float', 'bool', 'char', 'void', 'auto', 'long', 'short', 'unsigned',
@@ -110,6 +113,66 @@ function extractFunctions(toks) {
     i++;
   }
   return fns;
+}
+
+// Top-level `struct Name { … };` (data members) and `enum [class] Name { … }` definitions.
+function extractTypes(toks) {
+  const structs = new Map(), enums = new Map(), diagnostics = [];
+  let i = 0;
+  while (i < toks.length) {
+    const t = toks[i];
+    if (t.type === 'id' && t.value === 'struct' && toks[i + 1]?.type === 'id' && toks[i + 2]?.value === '{') {
+      const name = toks[i + 1].value;
+      const bEnd = matchClose(toks, i + 2, '{', '}');
+      try { structs.set(name, { fields: parseStructFields(toks.slice(i + 3, bEnd)) }); }
+      catch (e) { diagnostics.push(`struct ${name}: ${e.message ?? e}`); }
+      i = bEnd + 1; continue;
+    }
+    if (t.type === 'id' && t.value === 'enum') {
+      let j = i + 1;
+      if (toks[j]?.value === 'class' || toks[j]?.value === 'struct') j++;
+      if (toks[j]?.type === 'id') j++;
+      while (toks[j] && toks[j].value !== '{' && toks[j].value !== ';') j++;
+      if (toks[j]?.value === '{') {
+        const bEnd = matchClose(toks, j, '{', '}');
+        parseEnumerators(toks.slice(j + 1, bEnd), enums);
+        i = bEnd + 1; continue;
+      }
+    }
+    i++;
+  }
+  return { structs, enums, diagnostics };
+}
+
+function parseStructFields(toks) {
+  const p = new Parser([...toks, { type: 'eof', value: null }]);
+  const fields = [];
+  while (!p.atEnd()) {
+    if (p.isV('public') || p.isV('private') || p.isV('protected')) { p.next(); if (p.isV(':')) p.next(); continue; }
+    if (!p.isDeclStart()) throw new Error('only data members are supported');
+    for (const decl of p.parseDecl().decls) fields.push(decl);
+  }
+  return fields;
+}
+
+function parseEnumerators(toks, enums) {
+  let val = 0, i = 0;
+  while (i < toks.length) {
+    if (toks[i].type !== 'id') { i++; continue; }
+    const name = toks[i].value; i++;
+    if (toks[i]?.value === '=') {
+      i++; const start = i; let depth = 0;
+      while (i < toks.length && !(toks[i].value === ',' && depth === 0)) { if ('([{'.includes(toks[i].value)) depth++; if (')]}'.includes(toks[i].value)) depth--; i++; }
+      try { val = evalConst(toks.slice(start, i)); } catch { /* keep running value */ }
+    }
+    enums.set(name, val);
+    val = (typeof val === 'number' ? val : 0) + 1;
+    if (toks[i]?.value === ',') i++;
+  }
+}
+
+function evalConst(toks) {
+  return evalNode(new Parser([...toks, { type: 'eof', value: null }]).parseExpr(), new Env(null));
 }
 
 // Parameter NAME = the last identifier in each comma-separated segment (`const CeEvent& event` → event).
@@ -254,7 +317,7 @@ class Parser {
 
   parseDecl(noSemi = false) {
     // Consume type specifiers up to the declarator name; note the kind for a sensible default value.
-    let typeHint = 'num';
+    let typeHint = 'num', typeName = '';
     for (;;) {
       const k = this.peek();
       if (k.value === '<') { this.skipAngles(); continue; }
@@ -264,7 +327,7 @@ class Parser {
         else if (k.value === 'vector' || k.value === 'array') typeHint = 'array';
         const nx = this.peek(1).value;
         if (nx === '=' || nx === ';' || nx === ',' || nx === '[' || nx === ')') break; // k is the name
-        this.next(); continue; // part of the type
+        typeName = k.value; this.next(); continue; // part of the type
       }
       break;
     }
@@ -276,7 +339,7 @@ class Parser {
       if (this.isV('[')) { isArray = true; this.next(); arrayLen = this.isV(']') ? null : this.parseAssign(); this.eat(']'); }
       let init = null;
       if (this.isV('=')) { this.next(); init = this.parseInitializer(); }
-      decls.push({ name: nameTok.value, init, isArray, arrayLen, typeHint });
+      decls.push({ name: nameTok.value, init, isArray, arrayLen, typeHint, typeName });
     } while (this.isV(',') && this.next());
     if (!noSemi) this.eat(';');
     return { type: 'decl', decls };
@@ -357,6 +420,7 @@ class Parser {
       if (/cast$/.test(name) && this.isV('<')) this.skipAngles();       // static_cast<T> → drop the <T>
       if (name === 'true') return { type: 'num', value: 1, bool: true };
       if (name === 'false') return { type: 'num', value: 0, bool: true };
+      if (name === 'nullptr' || name === 'NULL') return { type: 'num', value: 0 };
       return { type: 'ident', name };
     }
     throw new Error(`unexpected '${k.value}' (line ${k.line})`);
@@ -371,8 +435,37 @@ const BREAK = Symbol('break'), CONTINUE = Symbol('continue');
 function truthy(v) { return typeof v === 'number' ? v !== 0 : typeof v === 'boolean' ? v : v != null; }
 function cppStr(v) { return typeof v === 'boolean' ? (v ? '1' : '0') : String(v); }
 
+// Default value for a declaration with no initializer, from its type (struct / map / vector / …).
+function declDefault(d, env) {
+  if (d.init) return evalNode(d.init, env);
+  if (d.isArray) return new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
+  const prog = env.get('__program');
+  if (prog && prog.structs && prog.structs.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
+  if (d.typeName === 'map' || d.typeName === 'unordered_map') return new Map();
+  if (d.typeHint === 'array') return [];
+  if (d.typeHint === 'string' || d.typeName === 'string') return '';
+  return 0;
+}
+
+function constructStruct(def, env) {
+  const obj = {};
+  for (const f of def.fields) obj[f.name] = declDefault(f, env);
+  return obj;
+}
+
 // std::vector / std::array / std::string member functions, mapped onto JS arrays/strings.
 function containerMethod(obj, name) {
+  if (obj instanceof Map) {
+    switch (name) {
+      case 'size': return () => obj.size;
+      case 'empty': return () => obj.size === 0;
+      case 'count': return (k) => (obj.has(k) ? 1 : 0);
+      case 'contains': return (k) => obj.has(k);
+      case 'at': return (k) => obj.get(k);
+      case 'erase': return (k) => { obj.delete(k); };
+      case 'clear': return () => obj.clear();
+    }
+  }
   if (Array.isArray(obj)) {
     switch (name) {
       case 'size': case 'length': return () => obj.length;
@@ -413,7 +506,11 @@ class Env {
 function lvalue(node, env) {
   if (node.type === 'ident') return { get: () => env.get(node.name), set: (v) => env.set(node.name, v) };
   if (node.type === 'member') { const o = evalNode(node.obj, env); return { get: () => o?.[node.name], set: (v) => { o[node.name] = v; } }; }
-  if (node.type === 'index') { const o = evalNode(node.obj, env); const k = evalNode(node.index, env); return { get: () => o?.[k], set: (v) => { o[k] = v; } }; }
+  if (node.type === 'index') {
+    const o = evalNode(node.obj, env); const k = evalNode(node.index, env);
+    if (o instanceof Map) return { get: () => (o.has(k) ? o.get(k) : 0), set: (v) => o.set(k, v) };
+    return { get: () => o?.[k], set: (v) => { o[k] = v; } };
+  }
   throw new Error('invalid assignment target');
 }
 
@@ -441,7 +538,11 @@ function evalNode(node, env) {
       if (o == null) return undefined;
       return containerMethod(o, node.name) ?? o[node.name];
     }
-    case 'index': { const o = evalNode(node.obj, env); return o == null ? undefined : o[evalNode(node.index, env)]; }
+    case 'index': {
+      const o = evalNode(node.obj, env); const k = evalNode(node.index, env);
+      if (o instanceof Map) return o.has(k) ? o.get(k) : 0;
+      return o == null ? undefined : o[k];
+    }
     case 'call': {
       if (node.callee.type === 'ident' && node.callee.name === 'printf') {
         (env.get('__print') || (() => {}))(formatPrintf(node.args.map((a) => evalNode(a, env))));
@@ -486,15 +587,7 @@ function execStmt(node, env) {
       (env.get('__print') || (() => {}))(s);
       return;
     }
-    case 'decl': for (const d of node.decls) {
-      let val;
-      if (d.init) val = evalNode(d.init, env);
-      else if (d.isArray) val = new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
-      else if (d.typeHint === 'array') val = [];
-      else if (d.typeHint === 'string') val = '';
-      else val = 0;
-      env.define(d.name, val);
-    } return;
+    case 'decl': for (const d of node.decls) env.define(d.name, declDefault(d, env)); return;
     case 'block': { const inner = new Env(env); for (const s of node.body) execStmt(s, inner); return; }
     case 'if': if (truthy(evalNode(node.cond, env))) execStmt(node.then, env); else if (node.els) execStmt(node.els, env); return;
     case 'while': while (truthy(evalNode(node.cond, env))) { try { execStmt(node.body, env); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; } } return;
@@ -539,10 +632,17 @@ function execStmt(node, env) {
 export function compileCpp(source) {
   const diagnostics = [];
   const handlers = new Map();
-  const program = { funcs: new Map(), print: null };
-  let fns;
-  try { fns = extractFunctions(tokenize(String(source ?? ''))); }
+  const program = { funcs: new Map(), structs: new Map(), enums: new Map(), print: null };
+  let toks;
+  try { toks = tokenize(String(source ?? '')); }
   catch (e) { return { handlers, diagnostics: [String(e.message ?? e)] }; }
+  const types = extractTypes(toks);
+  for (const [n, s] of types.structs) program.structs.set(n, s);
+  for (const [n, v] of types.enums) program.enums.set(n, v);
+  diagnostics.push(...types.diagnostics);
+  let fns;
+  try { fns = extractFunctions(toks); }
+  catch (e) { return { handlers, diagnostics: [...diagnostics, String(e.message ?? e)] }; }
   for (const fn of fns) {
     try {
       fn.params = paramNames(fn.paramToks);
@@ -562,8 +662,12 @@ export function invokeCpp(fnNode, args = [], opts = {}) {
   const program = fnNode.program;
   if (program && opts.print) program.print = opts.print;
   const env = new Env(null);
+  env.define('__program', program ?? null);
   env.define('__print', program?.print ?? (() => {}));
-  if (program) for (const [name, f] of program.funcs) env.define(name, (...callArgs) => invokeCpp(f, callArgs));
+  if (program) {
+    for (const [name, v] of program.enums) env.define(name, v);
+    for (const [name, f] of program.funcs) env.define(name, (...callArgs) => invokeCpp(f, callArgs));
+  }
   (fnNode.params ?? []).forEach((name, idx) => env.define(name, args[idx]));
   try { for (const s of fnNode.body) execStmt(s, env); }
   catch (e) { if (e instanceof ReturnSignal) return e.value; if (e === BREAK || e === CONTINUE) return undefined; throw e; }
