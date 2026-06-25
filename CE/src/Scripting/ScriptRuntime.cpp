@@ -12,6 +12,7 @@ ScriptDefinition ScriptDefinition::fromVar (const juce::var& v)
         d.name     = o->getProperty ("name").toString();
         d.language = o->getProperty ("language").toString();
         d.source   = o->getProperty ("source").toString();
+        if (o->hasProperty ("compiledJs")) d.compiledSource = o->getProperty ("compiledJs").toString();
         d.scope    = o->getProperty ("scope").toString();
         d.event    = o->getProperty ("event").toString();
         d.owner    = o->getProperty ("target").toString(); // "target" in the JS model = the owner / "self"
@@ -38,7 +39,8 @@ ScriptRuntime::~ScriptRuntime() = default;
 
 ScriptEngine* ScriptRuntime::engineFor (const juce::String& language)
 {
-    if (language == "javascript") return js.get();
+    // TypeScript ships as JS: the editor transpiles it to def.compiledSource, which the JS engine runs.
+    if (language == "javascript" || language == "typescript") return js.get();
     if (language == "python")     return python.get(); // null if not built → python scripts no-op
     return lua.get(); // default + "lua"
 }

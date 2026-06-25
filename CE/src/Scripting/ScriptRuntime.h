@@ -43,8 +43,9 @@ struct ScriptDefinition
 {
     juce::String id;
     juce::String name;
-    juce::String language;  // "lua" | "javascript"
-    juce::String source;    // the real code
+    juce::String language;  // "lua" | "javascript" | "typescript"
+    juce::String source;    // the real code (the language the user wrote)
+    juce::String compiledSource; // for "typescript": the editor-transpiled JS the JS engine runs (empty otherwise)
     juce::String scope;     // component | panel | device | project
     juce::String event;     // the lifecycle hook / event handler name it runs on (e.g. "onValueChanged")
     juce::String owner;     // attached control/component name ("" for panel/project)

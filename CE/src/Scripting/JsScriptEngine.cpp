@@ -109,15 +109,26 @@ public:
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
+        // TypeScript runs as the JS the editor already transpiled (compiledSource). Raw TS — type
+        // annotations, interfaces — won't parse in QuickJS, so a TS script with no compiledSource
+        // is an editor/build error: report and skip rather than feed unparseable source in.
+        const bool isTs = def.language.equalsIgnoreCase ("typescript");
+        if (isTs && def.compiledSource.isEmpty())
+        {
+            onError (def.id, "typescript script has no compiled JS (transpile failed) — skipping");
+            return false;
+        }
+        const juce::String code = def.compiledSource.isNotEmpty() ? def.compiledSource : def.source;
+
         auto eng = std::make_unique<juce::JavascriptEngine>();
         eng->registerNativeObject ("__api", makeApi (host, def.owner).get());
 
-        // Inject owner + prelude + the user source.
+        // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
         juce::String boot = "var __owner = " + def.owner.quoted() + ";\n";
         auto r1 = eng->execute (boot + juce::String (kJsPrelude));
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
-        auto r2 = eng->execute (def.source);
+        auto r2 = eng->execute (code);
         if (r2.failed()) { onError (def.id, "load error: " + r2.getErrorMessage()); return false; }
 
         engines[def.id] = std::move (eng);

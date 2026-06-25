@@ -15,6 +15,7 @@
   import { addScriptTrace } from '../stores/scriptConsole.js';
   import { scriptLibrary, saveToLibrary, removeFromLibrary } from '../stores/scriptLibrary.js';
   import { runScript, initPanelRuntime, setLiveScripts, setLiveEnabled, readWatch } from '../scripting/panelRuntime.js';
+  import { ensureTs, transpileTs } from '../scripting/tsService.js';
   import {
     SCRIPT_LANGUAGES,
     SCRIPT_SCOPES,
@@ -303,6 +304,38 @@
     return () => clearInterval(id);
   });
 
+  // TypeScript ships through the C++ host's JS engine (it has no TS compiler), so every saved
+  // snapshot must carry the transpiled JS on each TS script's `compiledJs`. transpileTs is
+  // synchronous once the compiler chunk is loaded; we kick the lazy load and re-run when ready.
+  let tsLoadTick = $state(0);
+  const tsCompiledFrom = new Map(); // scriptId -> source last transpiled (skip redundant work; off-snapshot)
+  // Best-effort synchronous pass: writes compiledJs for any TS script whose source changed.
+  // Returns true if at least one script still needs the (not-yet-loaded) compiler.
+  function syncCompileTs() {
+    let needsCompiler = false;
+    for (const s of scripts) {
+      if (s.language !== 'typescript') {
+        if (s.compiledJs != null) s.compiledJs = undefined; // language switched away from TS
+        tsCompiledFrom.delete(s.id);
+        continue;
+      }
+      if (tsCompiledFrom.get(s.id) === s.source && typeof s.compiledJs === 'string') continue;
+      const out = transpileTs(s.source);
+      if (out == null) { needsCompiler = true; continue; } // compiler not loaded yet
+      s.compiledJs = out;
+      tsCompiledFrom.set(s.id, s.source);
+    }
+    return needsCompiler;
+  }
+  // Keep compiledJs current as TS sources change. untrack() so writing compiledJs here doesn't
+  // re-fire THIS effect; the source/tick reads above are what re-run it.
+  $effect(() => {
+    tsLoadTick; // re-run after the compiler finishes loading
+    for (const s of scripts) { s.language; s.source; } // track language + source of every script
+    const needsCompiler = untrack(() => syncCompileTs());
+    if (needsCompiler) ensureTs().then((m) => { if (m) tsLoadTick++; });
+  });
+
   // Persist to the panel (debounced) whenever any script changes — add/edit/rename/folder/delete.
   // saveState drives the footer indicator: 'saved' (clean) | 'pending' (edited, not yet flushed).
   let saveTimer = null;
@@ -324,7 +357,10 @@
   });
   function saveNow() {
     clearTimeout(saveTimer);
-    if (pendingSnap) onChange?.(pendingSnap);
+    syncCompileTs(); // make sure the manual save captures the latest transpiled TS, if compiler is loaded
+    const snap = $state.snapshot(scripts);
+    pendingSnap = snap;
+    onChange?.(snap);
     saveState = 'saved';
   }
 

@@ -51,7 +51,8 @@ static void check (bool ok, const juce::String& name)
 }
 
 static juce::var makeScript (const char* id, const char* lang, const char* scope,
-                             const char* event, const char* target, const juce::String& source)
+                             const char* event, const char* target, const juce::String& source,
+                             const juce::String& compiledJs = {})
 {
     auto* o = new juce::DynamicObject();
     o->setProperty ("id", id);
@@ -61,6 +62,7 @@ static juce::var makeScript (const char* id, const char* lang, const char* scope
     o->setProperty ("event", event);
     o->setProperty ("target", target);
     o->setProperty ("source", source);
+    if (compiledJs.isNotEmpty()) o->setProperty ("compiledJs", compiledJs);
     o->setProperty ("enabled", true);
     return juce::var (o);
 }
@@ -80,6 +82,15 @@ int main()
         "function onValueChanged(value) { log(\"js got \" + value) }"));
     scripts.add (makeScript ("lua2", "lua", "panel", "onPanelReady", "*",
         "function onPanelReady(info)\n  if info.firstTime then log(\"ready-first\") end\nend\n"));
+    // TypeScript ships as the JS the editor transpiled (compiledJs). The host has no TS compiler:
+    // it must run compiledJs through the JS engine, NOT the raw TS in `source` (which is unparseable).
+    scripts.add (makeScript ("ts1", "typescript", "panel", "onValueChanged", "*",
+        "function onValueChanged(value: number): void { log(\"ts \" + value); }",
+        "function onValueChanged(value) { log(\"ts got \" + value); }"));
+    // A TypeScript script with NO compiledJs is an editor/build error: it must be skipped, never
+    // fed as raw TS to QuickJS (its handler must not run).
+    scripts.add (makeScript ("ts2", "typescript", "panel", "onValueChanged", "*",
+        "function onValueChanged(value: number): void { log(\"ts2 ran\"); }"));
     runtime.loadScripts (juce::var (scripts));
 
     // 1) event dispatch -> both Lua and JS handlers fire on the same event
@@ -88,6 +99,8 @@ int main()
     const double cutoff = (double) host.values["cutoff.value"];
     check (cutoff > 50.0 && cutoff < 51.0, "Lua ran: set(cutoff.value) via scale() => ~50.4 (got " + juce::String (cutoff) + ")");
     check (host.logs.contains ("js got 64"), "JS ran: log(\"js got 64\")");
+    check (host.logs.contains ("ts got 64"), "TS ran via compiledJs: log(\"ts got 64\")");
+    check (! host.logs.contains ("ts2 ran"), "TS without compiledJs skipped (raw TS not fed to QuickJS)");
 
     // 2) lifecycle hook with firstTime
     runtime.onPanelReady (true);

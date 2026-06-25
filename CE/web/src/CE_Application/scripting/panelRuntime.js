@@ -329,8 +329,11 @@ function loadHandlersJs(script) {
   return runJsSource(script.source, script.id, buildApi(ownerOf(script)));
 }
 
-/** TypeScript: transpile to JS (lazy compiler) and run through the JS path. */
+/** TypeScript: prefer the JS the editor already transpiled (what the C++ host ships), else
+    transpile on the fly via the lazy compiler. Both run through the JS path. */
 async function loadHandlersTs(script) {
+  if (typeof script.compiledJs === 'string' && script.compiledJs.length)
+    return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script)));
   const ts = await ensureTs();
   if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
   const js = transpileTs(script.source);

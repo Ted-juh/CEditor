@@ -87,6 +87,9 @@ export function createScript(overrides = {}) {
     enabled: overrides.enabled !== false,
     description: String(overrides.description ?? ''),
     group: String(overrides.group ?? ''), // optional manual folder label
+    // TypeScript ships through the JS engine: the editor stores the transpiled JS here so the
+    // C++ host (no TS compiler) can run it. Only meaningful for language === 'typescript'.
+    compiledJs: language === 'typescript' && typeof overrides.compiledJs === 'string' ? overrides.compiledJs : undefined,
   };
 }
 
@@ -107,6 +110,7 @@ export function normalizeSourceScript(script, index = 0) {
     enabled: script?.enabled !== false,
     description: String(script?.description ?? ''),
     group: String(script?.group ?? ''),
+    compiledJs: language === 'typescript' && typeof script?.compiledJs === 'string' ? script.compiledJs : undefined,
   };
 }
 
