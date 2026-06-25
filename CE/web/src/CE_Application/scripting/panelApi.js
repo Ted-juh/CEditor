@@ -79,13 +79,24 @@ export const SCRIPT_LANGUAGES = [
     method: '.',
     comment: '//',
   },
+  {
+    id: 'java',
+    label: 'Java',
+    version: '21',
+    host: 'CeScript interpreter (preview) · javac at export',
+    live: true,
+    subset: true,
+    block: '(${e}) -> {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
 ];
 
 // Tier-1 = always available everywhere (incl. the C++ window-closed runtime). Python is Tier-2
 // (WebView only). RUNNABLE_LANGUAGES is every language the WebView runtime can execute (C++ via
 // the interpreted preview subset).
 export const TIER1_LANGUAGES = ['lua', 'javascript', 'typescript'];
-export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp'];
+export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp', 'java'];
 
 /* ----------------------------------------------------------- scopes / context */
 // Where a member is valid. 'any' = all scopes. Scope-relative resolution (Q7):

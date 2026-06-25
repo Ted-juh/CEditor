@@ -24,6 +24,7 @@ import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
 import { compileCpp, invokeCpp } from './cppPreview.js';
 import { compileCsharp, invokeCsharp } from './csharpPreview.js';
+import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
@@ -481,9 +482,28 @@ function loadHandlersCsharp(script) {
   return out;
 }
 
+/* ----------------------------------------------------------------------- Java executor */
+// Interpreted preview of the Java behavior-handler subset (javaPreview.js).
+function loadHandlersJava(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
+  const { handlers: parsed, diagnostics } = compileJava(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `Java preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    out[name] = (payload) => {
+      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      try { return invokeJava(fnNode, [ctx, event], { print }); }
+      catch (e) { addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
+    };
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- unified run / load */
 
-/** Execute a script's source and return its declared handlers (JS/C++/C# sync; Lua/Python async). */
+/** Execute a script's source and return its declared handlers (JS/C++/C#/Java sync; Lua/Python async). */
 async function getHandlers(script) {
   const lang = script?.language ?? 'lua';
   if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
@@ -492,8 +512,9 @@ async function getHandlers(script) {
   if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
   if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
   if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script);
+  if (lang === 'java') return loadHandlersJava(script);
   addScriptTrace('error', script?.id ?? '',
-    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, C++, and C# run here).`);
+    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, C++, C#, and Java run here).`);
   return null;
 }
 

@@ -370,6 +370,7 @@
     if (id === 'python') return 'py';
     if (id === 'cpp' || id === 'c++') return 'cpp';
     if (id === 'csharp' || id === 'cs') return 'cs';
+    if (id === 'java') return 'java';
     return 'lua';
   }
   function langLabel(id) {
@@ -378,6 +379,7 @@
     if (id === 'python') return 'Py';
     if (id === 'cpp' || id === 'c++') return 'C++';
     if (id === 'csharp' || id === 'cs') return 'C#';
+    if (id === 'java') return 'Java';
     return 'Lua';
   }
 
@@ -817,7 +819,7 @@
 
 <div class="bd-app">
   <!-- Hidden picker backing the "Import file" buttons. -->
-  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.ts,.tsx,.mts,.py,.cpp,.cc,.cxx,.hpp,.h,.cs,.txt,text/plain"
+  <input type="file" bind:this={fileInputEl} accept=".lua,.js,.mjs,.cjs,.ts,.tsx,.mts,.py,.cpp,.cc,.cxx,.hpp,.h,.cs,.java,.txt,text/plain"
     style="display:none" onchange={importScriptFile} />
   <div class="titlebar">
     <div class="dots"><span></span><span></span><span></span></div>

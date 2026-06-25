@@ -4,7 +4,7 @@
 // decision-shaped is here so it can be unit-tested: extension <-> language mapping,
 // safe filenames, and turning a loaded file into createScript() overrides.
 
-const EXT_BY_LANG = { lua: 'lua', javascript: 'js', typescript: 'ts', python: 'py', cpp: 'cpp', csharp: 'cs' };
+const EXT_BY_LANG = { lua: 'lua', javascript: 'js', typescript: 'ts', python: 'py', cpp: 'cpp', csharp: 'cs', java: 'java' };
 const LANG_BY_EXT = {
   lua: 'lua',
   js: 'javascript', mjs: 'javascript', cjs: 'javascript',
@@ -12,8 +12,9 @@ const LANG_BY_EXT = {
   py: 'python',
   cpp: 'cpp', cc: 'cpp', cxx: 'cpp', hpp: 'cpp', h: 'cpp',
   cs: 'csharp',
+  java: 'java',
 };
-const RUNNABLE = new Set(['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp']);
+const RUNNABLE = new Set(['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp', 'java']);
 
 /** File extension (no dot) for a script's language. Defaults to lua. */
 export function extensionForLanguage(languageId) {

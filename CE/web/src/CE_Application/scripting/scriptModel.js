@@ -36,13 +36,14 @@ export function defaultSource(eventName = 'onValueChanged', languageId = 'lua') 
   const isPy = languageId === 'python';
   const isCpp = languageId === 'cpp' || languageId === 'c++';
   const isCs = languageId === 'csharp' || languageId === 'cs';
-  // C++/C# handlers use a fixed (ctx, event) signature; `param` is ignored.
+  const isJava = languageId === 'java';
+  // C++/C#/Java handlers use a fixed (ctx, event) signature; `param` is ignored.
   const open = (name, param) =>
     isCpp ? `void ${name}(CeContext& ctx, const CeEvent& event) {`
-    : isCs ? `void ${name}(CeContext ctx, CeEvent e) {`
+    : isCs || isJava ? `void ${name}(CeContext ctx, CeEvent e) {`
     : isPy ? `def ${name}(${param}):` : isJs ? `function ${name}(${param}) {` : `function ${name}(${param})`;
   const body = isPy ? '    pass' : '  ';
-  const close = isPy ? '' : isJs || isCpp || isCs ? '}\n' : 'end\n';
+  const close = isPy ? '' : isJs || isCpp || isCs || isJava ? '}\n' : 'end\n';
   const skeleton = (name, param) => `${open(name, param)}\n${body}\n${close}`;
 
   // Lifecycle hooks — onPanelReady gets the firstTime guard.
@@ -52,7 +53,7 @@ export function defaultSource(eventName = 'onValueChanged', languageId = 'lua') 
     if (eventName === 'onPanelReady') {
       if (isPy) return `def onPanelReady(info):\n    if info.firstTime:\n        pass\n`;
       if (isCpp) return `void onPanelReady(CeContext& ctx, const CeEvent& event) {\n  if (event.firstTime) {\n    \n  }\n}\n`;
-      if (isCs) return `void onPanelReady(CeContext ctx, CeEvent e) {\n  if (e.firstTime) {\n    \n  }\n}\n`;
+      if (isCs || isJava) return `void onPanelReady(CeContext ctx, CeEvent e) {\n  if (e.firstTime) {\n    \n  }\n}\n`;
       return isJs
         ? `function onPanelReady(info) {\n  if (info.firstTime) {\n    \n  }\n}\n`
         : `function onPanelReady(info)\n  if info.firstTime then\n    \n  end\nend\n`;

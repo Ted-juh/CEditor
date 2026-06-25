@@ -176,6 +176,7 @@
 .bd-app .pill.py{color:var(--accent)}
 .bd-app .pill.cpp{color:var(--violet)}
 .bd-app .pill.cs{color:#7a5cff}
+.bd-app .pill.java{color:#e76f00}
 .bd-app .pill.muted{color:var(--txt-faint)}
 .bd-app .ev{font-family:var(--mono);color:var(--txt-dim);font-size:12px}
 .bd-app tr.off{opacity:.45}

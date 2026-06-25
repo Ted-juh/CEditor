@@ -18,6 +18,7 @@ import { analyzeCpp, foldCpp } from './cppPreview.js';
 import { analyzePython, foldPython } from './pythonService.js';
 import { analyzeTs, foldTs } from './tsService.js';
 import { analyzeCsharp, foldCsharp } from './csharpPreview.js';
+import { analyzeJava, foldJava } from './javaPreview.js';
 import {
   COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
@@ -69,6 +70,13 @@ const CS_KEYWORDS = ['var', 'int', 'long', 'double', 'float', 'decimal', 'bool',
   'foreach', 'in', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue', 'try', 'catch',
   'finally', 'throw', 'true', 'false', 'null', 'this', 'base', 'override', 'virtual', 'abstract'];
 const CS_BUILTINS = ['Console', 'Math', 'List', 'Dictionary', 'String', 'Convert', 'Enumerable', 'ctx'];
+const JAVA_KEYWORDS = ['var', 'int', 'long', 'short', 'byte', 'double', 'float', 'boolean', 'char',
+  'void', 'String', 'Object', 'final', 'static', 'public', 'private', 'protected', 'abstract', 'class',
+  'interface', 'enum', 'extends', 'implements', 'new', 'return', 'if', 'else', 'for', 'while', 'do',
+  'switch', 'case', 'default', 'break', 'continue', 'try', 'catch', 'finally', 'throw', 'throws',
+  'true', 'false', 'null', 'this', 'super', 'instanceof', 'import', 'package'];
+const JAVA_BUILTINS = ['System', 'Math', 'List', 'ArrayList', 'Map', 'HashMap', 'String',
+  'StringBuilder', 'Integer', 'Double', 'Object', 'Exception', 'ctx'];
 
 const TS_KEYWORDS = [...JS_KEYWORDS, 'interface', 'type', 'enum', 'namespace', 'implements',
   'declare', 'readonly', 'public', 'private', 'protected', 'abstract', 'as', 'satisfies', 'keyof',
@@ -81,6 +89,7 @@ function keywordItems(language) {
   else if (language === 'python') { kw = PY_KEYWORDS; bi = PY_BUILTINS; }
   else if (language === 'cpp' || language === 'c++') { kw = CPP_KEYWORDS; bi = CPP_BUILTINS; }
   else if (language === 'csharp' || language === 'cs') { kw = CS_KEYWORDS; bi = CS_BUILTINS; }
+  else if (language === 'java') { kw = JAVA_KEYWORDS; bi = JAVA_BUILTINS; }
   return [
     ...kw.map((k) => ({ label: k, kind: 'keyword', detail: 'keyword', doc: '' })),
     ...bi.map((b) => ({ label: b, kind: 'builtin', detail: 'built-in', doc: '' })),
@@ -171,6 +180,7 @@ export function analyze(source, languageId) {
   if (languageId === 'python') return analyzePython(src);
   if (languageId === 'typescript' || languageId === 'ts') return analyzeTs(src);
   if (languageId === 'csharp' || languageId === 'cs') return analyzeCsharp(src);
+  if (languageId === 'java') return analyzeJava(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return { diagnostics: [], symbols: [] };
 
   if (languageId === 'javascript') {
@@ -396,6 +406,7 @@ export function getFoldRegions(source, languageId) {
   if (languageId === 'python') return foldPython(src);
   if (languageId === 'typescript' || languageId === 'ts') return foldTs(src);
   if (languageId === 'csharp' || languageId === 'cs') return foldCsharp(src);
+  if (languageId === 'java') return foldJava(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return [];
   let ast;
   try {
