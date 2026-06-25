@@ -257,6 +257,12 @@ option(CEDITOR_SCRIPTING "Build the panel scripting runtime (Lua via Sol3 + JS v
 # Point at a specific interpreter with -DPython3_EXECUTABLE=... if CMake picks the wrong one.
 option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-closed script language" OFF)
 
+# Optional: load COMPILE-AT-EXPORT native handler modules (C++/C#/Java). No language runtime is
+# embedded — the exporter AOT-compiles each panel's handlers into a small native shared library that
+# the player loads via the flat C ABI in CE/src/Scripting/NativeHandlerAbi.h. Requires CEDITOR_SCRIPTING.
+# See CE/src/Scripting/native-handlers-design.md. OFF by default (feature is build-unverified).
+option(CEDITOR_NATIVE_HANDLERS "Load compile-at-export native handler modules (C++/C#/Java) in the player" OFF)
+
 if (CEDITOR_SCRIPTING)
     include(FetchContent)
 
@@ -305,6 +311,15 @@ if (CEDITOR_SCRIPTING)
         add_executable(CEditorPythonScriptTests "${CE_ROOT}/tests/PythonScriptEngineTests.cpp")
         target_link_libraries(CEditorPythonScriptTests PRIVATE ceditor_scripting juce::juce_core)
         target_include_directories(CEditorPythonScriptTests PRIVATE "${CE_ROOT}/src")
+    endif()
+
+    # --- Optional: compile-at-export native handler loader (C++/C#/Java) ---
+    # Only the loader links into the player; the handler MODULES are built separately at export by
+    # tools/scripts/nativeHandlers and loaded at runtime via juce::DynamicLibrary (no extra deps here).
+    if (CEDITOR_NATIVE_HANDLERS)
+        target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/NativeHandlerEngine.cpp")
+        target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_NATIVE_HANDLERS=1)
+        message(STATUS "CEditor: native handler loader ENABLED (C++/C#/Java compiled-at-export modules).")
     endif()
 
     # Smoke test: verifies the runtime actually executes Lua + JS. Run ./CEditorScriptingTests

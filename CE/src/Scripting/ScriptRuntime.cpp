@@ -33,6 +33,9 @@ ScriptRuntime::ScriptRuntime (ScriptHostApi& h) : host (h)
    #if CEDITOR_PYTHON
     python = createPythonEngine();   // real embedded CPython (full stdlib), window-closed only
    #endif
+   #if CEDITOR_NATIVE_HANDLERS
+    native = createNativeHandlerEngine(); // C++/C#/Java handlers compiled to native modules at export
+   #endif
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
@@ -42,6 +45,8 @@ ScriptEngine* ScriptRuntime::engineFor (const juce::String& language)
     // TypeScript ships as JS: the editor transpiles it to def.compiledSource, which the JS engine runs.
     if (language == "javascript" || language == "typescript") return js.get();
     if (language == "python")     return python.get(); // null if not built → python scripts no-op
+    // C++/C#/Java are compiled to a native module at export and loaded by the native engine.
+    if (language == "cpp" || language == "csharp" || language == "java") return native.get(); // null if not built → no-op
     return lua.get(); // default + "lua"
 }
 
@@ -58,11 +63,13 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     if (lua)    lua->reset();
     if (js)     js->reset();
     if (python) python->reset();
+    if (native) native->reset();
 
     // Install the API into each engine once.
     if (lua)    lua->installApi (host);
     if (js)     js->installApi (host);
     if (python) python->installApi (host);
+    if (native) native->installApi (host);
 
     const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
 
@@ -160,6 +167,7 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
     if (lua)    lua->deliverEvent (target, event, payload, onError);
     if (js)     js->deliverEvent (target, event, payload, onError);
     if (python) python->deliverEvent (target, event, payload, onError);
+    if (native) native->deliverEvent (target, event, payload, onError);
 }
 
 } // namespace ceditor::scripting

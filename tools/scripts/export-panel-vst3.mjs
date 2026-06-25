@@ -69,6 +69,13 @@ if (embedPython && process.platform !== 'win32')
   console.warn('  ⚠ Python embed requested, but the runtime bundler only fully supports the Windows VST3 layout yet — '
     + 'Python may NOT run window-closed on this platform (only window-open). Lua/JS are unaffected.');
 
+// --- Native handlers (C++/C#/Java compiled-at-export) — opt-in, experimental/build-unverified ---
+// 'on' AOT-compiles each panel's C++/C#/Java handlers into native modules bundled beside the plugin,
+// and links the loader (-DCEDITOR_NATIVE_HANDLERS=ON). Default off: those handlers stay preview-only.
+const compileNative = (es.compileNativeHandlers ?? 'off') === 'on';
+if (compileNative)
+  console.log('Native handlers: compile-at-export ENABLED (experimental) — C++/C#/Java handlers will be AOT-compiled into native modules.');
+
 // --- size + python-bundling helpers ---
 const mb = (bytes) => (bytes / 1048576).toFixed(1);
 function dirSize(p) {
@@ -185,6 +192,7 @@ execSync('npm run build', { cwd: path.join(repo, 'CE', 'web'), stdio: 'inherit' 
 const vcvars = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat';
 const cfg = `cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
   + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
+  + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
   + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
   + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
   + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
@@ -204,6 +212,12 @@ try {
       const addedBytes = bundlePythonRuntime(dest);
       if (addedBytes > 0)
         console.log(`Python runtime: +${mb(addedBytes)} MB  →  total ${mb(baseBytes + addedBytes)} MB`);
+    }
+    if (compileNative) {
+      const { compileNativeHandlers } = await import(pathToFileURL(path.join(repo, 'tools/scripts/nativeHandlers/index.mjs')).href);
+      const binDir = vst3BinDir(dest);
+      const report = await compileNativeHandlers(panelDoc, { binDir, workRoot: path.join(outDir, 'native-handlers', productName) });
+      for (const b of report.built ?? []) console.log(`Native handlers: ${b.lang} module bundled (+${mb(b.bytes)} MB)`);
     }
   }
   else console.error('Build artifact not found:', built);

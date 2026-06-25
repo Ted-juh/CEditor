@@ -119,14 +119,16 @@ CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void);
  * here; C#: first call triggers NativeAOT runtime/GC bring-up — keep it here so it's deterministic.) */
 CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state);
 
-/* Run handler `event_id` (e.g. "onValueChanged") with `payload`. Optional `out_result` for handlers
- * that return a value (e.g. onDawSaveState). Must NOT let an exception cross this frame. */
-CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr event_id,
+/* Run `script_id`'s handler `event_id` (e.g. "onValueChanged") with `payload`. The script id keys the
+ * call so a panel can hold several scripts that each define the same handler name without colliding
+ * (the generator compiles each script into its own namespace). Optional `out_result` for handlers that
+ * return a value (e.g. onDawSaveState). Must NOT let an exception cross this frame. */
+CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr event_id,
                                           const CeValue* payload, CeValue* out_result /*nullable*/);
 
-/* Does this module implement `event_id`? Lets the host skip events with no handler (parity with
+/* Does `script_id` implement `event_id`? Lets the host skip events with no handler (parity with
  * ScriptEngine::hasHandler). */
-CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr event_id);
+CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_id);
 
 /* Called at teardown. (Java: tear down the isolate. C#: NativeAOT cannot truly unload — the host
  * keeps the module loaded for process lifetime; this just flushes handler state.) */

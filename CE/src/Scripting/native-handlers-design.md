@@ -1,7 +1,25 @@
 # Compile-at-export native handlers (C++ / C# / Java)
 
-**Status: DESIGN.** Nothing here is built yet except the shared contract `NativeHandlerAbi.h`. This
-document is the concrete plan, grounded in the real toolchain behaviour (verified 2026).
+**Status: PARTIALLY IMPLEMENTED.** This document is the design; the contract + host loader + all three
+generators now exist. The C++ path is verified end-to-end (no JUCE needed); the C#/Java paths are
+written but build-unverified (no .NET-AOT / GraalVM toolchain in this environment).
+
+### Implementation status (this branch)
+| Piece | File | Status |
+|---|---|---|
+| Shared C ABI | `NativeHandlerAbi.h` | ✅ done; compiles as C and C++ |
+| Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ⚠️ written, needs a JUCE build |
+| C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
+| C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
+| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ written, build-unverified |
+| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,genJava.mjs}` | ⚠️ written, build-unverified |
+| Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ written, build-unverified |
+
+The remaining gate is a real per-OS build (JUCE for the loader; .NET SDK / GraalVM for the managed
+modules) + a DAW load test. The C++ path is the proof the ABI + dispatch model are sound.
+
+---
+
 
 ## 1. The problem, stated honestly
 

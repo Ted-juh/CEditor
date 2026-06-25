@@ -1,0 +1,567 @@
+// CeRuntime.java — the Java side of CEditor's compile-at-export native handler module, built with
+// GraalVM native-image (--shared). It mirrors the C++ surface in cpp/ce_runtime.h (CeContext + CeEvent)
+// and exports the GraalVM @CEntryPoint methods that the C shim (ce_java_shim.c) forwards the flat ABI
+// to. Read NativeHandlerAbi.h for the binding contract — this file MUST NOT deviate from that layout.
+//
+// ============================================================================================
+// BUILD-UNVERIFIED. This was written WITHOUT a GraalVM toolchain present. It is correct, well-
+// structured scaffold a build machine iterates on. The three things a reviewer MUST verify on a real
+// native-image build are flagged inline with `REVIEW:` comments:
+//   1. The @CStruct field offsets actually match NativeHandlerAbi.h (the union + explicit _pad).
+//   2. The isolate-thread lifecycle (shim creates/attaches; entry points run on it).
+//   3. CFunctionPointer invocation marshalling (CeStr-by-value across @InvokeCFunctionPointer).
+// ============================================================================================
+//
+// THE KEY DESIGN PROBLEM (documented here and in ce_java_shim.c):
+// GraalVM @CEntryPoint methods REQUIRE an IsolateThread (or Isolate) as their FIRST parameter. But the
+// host (NativeHandlerEngine.cpp) resolves the FLAT ABI symbols ce_handler_init/dispatch/has/shutdown
+// with NO isolate parameter — the host knows nothing about GraalVM isolates. Therefore we CANNOT export
+// `ce_handler_dispatch` directly as a @CEntryPoint (its signature would have to start with
+// IsolateThread, which the host does not pass).
+//
+// The fix, implemented across this file + the shim:
+//   (a) Here: export @CEntryPoint methods under DIFFERENT names — cej_abi_version / cej_init /
+//       cej_dispatch / cej_has / cej_shutdown — each taking IsolateThread as the first parameter.
+//   (b) In ce_java_shim.c: export the REAL flat ABI (ce_handler_abi_version/init/dispatch/has/shutdown),
+//       own a process-global graal_isolate_t* + graal_isolatethread_t* (created in ce_handler_init via
+//       graal_create_isolate), and forward each call to the matching cej_* entry point, passing the
+//       stored IsolateThread as the first argument. ce_handler_shutdown calls graal_tear_down_isolate.
+//   (c) The shim is compiled and linked into the SAME shared library, named ce_handlers_java.<ext>,
+//       which is exactly what the host's moduleFileName("java") looks for.
+
+import org.graalvm.nativeimage.IsolateThread;
+import org.graalvm.nativeimage.c.function.CEntryPoint;
+import org.graalvm.nativeimage.c.function.CFunction;
+import org.graalvm.nativeimage.c.function.CFunctionPointer;
+import org.graalvm.nativeimage.c.function.InvokeCFunctionPointer;
+import org.graalvm.nativeimage.c.struct.CField;
+import org.graalvm.nativeimage.c.struct.CFieldAddress;
+import org.graalvm.nativeimage.c.struct.CStruct;
+import org.graalvm.nativeimage.c.struct.SizeOf;
+import org.graalvm.nativeimage.c.type.CCharPointer;
+import org.graalvm.nativeimage.c.type.CTypeConversion;
+import org.graalvm.nativeimage.c.type.WordPointer;
+import org.graalvm.word.PointerBase;
+import org.graalvm.word.WordFactory;
+
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+
+public final class CeRuntime {
+
+    private CeRuntime() {}
+
+    // CE_ABI_VERSION from NativeHandlerAbi.h. Keep in lockstep with the header (the host refuses a
+    // mismatch via ce_handler_abi_version()).
+    static final int CE_ABI_VERSION = 1;
+
+    // CeTag enum (NativeHandlerAbi.h). Stored as int32 in CeValue.tag.
+    static final int CE_NULL = 0, CE_DOUBLE = 1, CE_INT64 = 2, CE_BOOL = 3,
+                     CE_STRING = 4, CE_BYTES = 5, CE_LIST = 6, CE_MAP = 7;
+
+    // =====================================================================================
+    // ABI struct mappings (@CStruct). These mirror NativeHandlerAbi.h EXACTLY. native-image computes
+    // field offsets from the C declarations it sees at build time, so the layout it lays down matches
+    // the host's compiled CeValue/CeHostVtable. We declare the fields we read; the union is modelled as
+    // overlapping accessors at the SAME offset (8 bytes past the 4-byte tag + 4-byte pad).
+    //
+    // REVIEW #1: confirm native-image places `u` at offset 8 (tag@0, _pad@4) and that CeStr's two
+    // members are {const char* ptr; int64_t len;} (ptr@0, len@8 inside the union).
+    // =====================================================================================
+
+    // struct CeStr { const char* ptr; int64_t len; }  — UTF-8, NOT necessarily NUL-terminated.
+    @CStruct("CeStr")
+    interface CeStr extends PointerBase {
+        @CField("ptr") CCharPointer getPtr();
+        @CField("ptr") void setPtr(CCharPointer p);
+        @CField("len") long getLen();
+        @CField("len") void setLen(long n);
+    }
+
+    // struct CeBytes { const uint8_t* ptr; int64_t len; }
+    @CStruct("CeBytes")
+    interface CeBytes extends PointerBase {
+        @CField("ptr") CCharPointer getPtr();
+        @CField("len") long getLen();
+    }
+
+    // struct CeValue { int32_t tag; int32_t _pad; union {...} u; }
+    // We expose the union members as accessors. native-image overlays union members at the same offset,
+    // so getU_d()/getU_i()/getU_s() all read the union region — only the one matching `tag` is valid.
+    @CStruct("CeValue")
+    interface CeValue extends PointerBase {
+        @CField("tag") int  getTag();
+        @CField("tag") void setTag(int t);
+
+        // Union scalar views. The C field path "u.d" etc. lets native-image resolve the offset.
+        @CField("u.d") double getDouble();
+        @CField("u.d") void   setDouble(double d);
+        @CField("u.i") long   getInt64();
+        @CField("u.i") void   setInt64(long i);
+        @CField("u.b") int    getBool();
+        @CField("u.b") void   setBool(int b);
+
+        // CeStr s — the union region viewed as a CeStr. @CFieldAddress gives &value->u.s, i.e. the
+        // address of the embedded CeStr, reinterpreted via the CeStr @CStruct accessors. Because `u` is a
+        // union, &u.s == &u.by == &u == ((char*)value)+8, so the same address also serves asMap().
+        @CFieldAddress("u.s") CeStr asStr();
+        @CFieldAddress("u.map") CeMap asMap();
+        // The raw native address of a CeValue (used as the pin-stash key) comes from the inherited
+        // PointerBase.rawValue(); see addrOf(). No @CField is needed for it.
+    }
+
+    // NOTE on the union views above: if a given native-image version rejects @CFieldAddress on a union
+    // member, fall back to pointer arithmetic: the union begins at offsetof(CeValue,u) == 8
+    // (tag@0 int32 + _pad@4 int32). REVIEW #1 covers confirming the offset on a real build.
+
+    // -------------------------------------------------------------------------------------
+    // struct CeHostVtable — the host services. We declare the fields the handler calls. The function
+    // pointers are CFunctionPointer subtypes with @InvokeCFunctionPointer signatures matching the C
+    // declarations (CE_CALL is empty on 64-bit; on win32 it is __cdecl — REVIEW the calling convention
+    // if a 32-bit target is ever shipped).
+    // -------------------------------------------------------------------------------------
+    @CStruct("CeHostVtable")
+    interface CeHostVtable extends PointerBase {
+        @CField("abi_version") int getAbiVersion();
+        @CField("struct_size") int getStructSize();
+        @CField("host_ctx")    WordPointer getHostCtx();
+
+        @CField("set")        SetFn        getSet();
+        @CField("get")        GetFn        getGet();
+        @CField("send_cc")    SendCcFn     getSendCc();
+        @CField("send_nrpn")  SendNrpnFn   getSendNrpn();
+        @CField("send_sysex") SendSysexFn  getSendSysex();
+        @CField("log")        LogFn        getLog();
+        @CField("emit")       EmitFn       getEmit();
+        @CField("free_value") FreeValueFn  getFreeValue();
+        @CField("alloc")      AllocFn      getAlloc();
+        @CField("dealloc")    DeallocFn    getDealloc();
+    }
+
+    // --- vtable function-pointer types. The first arg of each is host_ctx (void*). ---
+    // int (*set)(void* host_ctx, CeStr key, const CeValue* v, const CeValue* opts);
+    interface SetFn extends CFunctionPointer {
+        @InvokeCFunctionPointer int invoke(WordPointer hostCtx, CeStr key, CeValue v, CeValue opts);
+    }
+    // int (*get)(void* host_ctx, CeStr key, CeStr form, CeValue* out);
+    interface GetFn extends CFunctionPointer {
+        @InvokeCFunctionPointer int invoke(WordPointer hostCtx, CeStr key, CeStr form, CeValue out);
+    }
+    // void (*send_cc)(void* host_ctx, int32_t channel, int32_t cc, const CeValue* v);
+    interface SendCcFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, int channel, int cc, CeValue v);
+    }
+    // void (*send_nrpn)(void* host_ctx, int32_t channel, int32_t msb, int32_t lsb, const CeValue* v);
+    interface SendNrpnFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, int channel, int msb, int lsb, CeValue v);
+    }
+    // void (*send_sysex)(void* host_ctx, CeBytes bytes);  — bytes passed BY VALUE (struct).
+    interface SendSysexFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, CeBytes bytes);
+    }
+    // void (*log)(void* host_ctx, int32_t level, CeStr msg);
+    interface LogFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, int level, CeStr msg);
+    }
+    // void (*emit)(void* host_ctx, CeStr name, const CeValue* data);
+    interface EmitFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, CeStr name, CeValue data);
+    }
+    // void (*free_value)(void* host_ctx, CeValue* v);
+    interface FreeValueFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, CeValue v);
+    }
+    // void* (*alloc)(void* host_ctx, size_t n);
+    interface AllocFn extends CFunctionPointer {
+        @InvokeCFunctionPointer WordPointer invoke(WordPointer hostCtx, long n);
+    }
+    // void (*dealloc)(void* host_ctx, void* p, size_t n);
+    interface DeallocFn extends CFunctionPointer {
+        @InvokeCFunctionPointer void invoke(WordPointer hostCtx, WordPointer p, long n);
+    }
+
+    // =====================================================================================
+    // Cached host vtable (set in cej_init). Process-global: there is exactly ONE isolate and ONE module
+    // per language, init'd once on the message thread. We keep the native CeHostVtable pointer so the
+    // Java CeContext can call back into the host.
+    // =====================================================================================
+    private static CeHostVtable gHost = WordFactory.nullPointer();
+
+    // =====================================================================================
+    // Dispatch registry: (scriptId, eventId) -> handler. Populated at class-init time by the GENERATED
+    // registration class (see genJava.mjs -> GeneratedRegistry.register(...)). Closed-world: no runtime
+    // reflection — handlers are wired by direct method references the generator emits.
+    // =====================================================================================
+    @FunctionalInterface
+    public interface Handler {
+        // Mirrors the C++ signature `void onValueChanged(CeContext&, const CeEvent&)`.
+        void run(CeContext ctx, CeEvent event);
+    }
+
+    private static final Map<String, Handler> REGISTRY = new HashMap<>();
+
+    private static String key(String scriptId, String eventId) {
+        return scriptId + "\u0000" + eventId;  // NUL separator: cannot appear in UTF-8 ids/event names
+    }
+
+    /** Called by the generated registry to wire one handler. */
+    public static void register(String scriptId, String eventId, Handler h) {
+        REGISTRY.put(key(scriptId, eventId), h);
+    }
+
+    // The generator emits a class whose static initializer calls register(...). We must force that class
+    // to load so its <clinit> runs. The generated module name is fixed: "GeneratedRegistry".
+    private static void ensureRegistryLoaded() {
+        try {
+            // Class.forName triggers <clinit>. Under closed-world this class is reachable from Main, so
+            // it is included in the image; forName on an included class is allowed.
+            Class.forName("GeneratedRegistry");
+        } catch (Throwable t) {
+            // Registry absent or failed to init — leave REGISTRY empty; has/dispatch become no-ops.
+        }
+    }
+
+    // =====================================================================================
+    // @CEntryPoint methods. NAMED cej_* (NOT the flat ABI names) precisely because each takes an
+    // IsolateThread first parameter, which the flat-ABI host does not pass. The shim bridges the gap.
+    // Every body is wrapped so NO Java exception escapes the entry-point frame (an exception crossing an
+    // extern "C" frame is undefined behaviour — NativeHandlerAbi.h §rules).
+    // =====================================================================================
+
+    // uint32_t ce_handler_abi_version(void)  <- shim forwards here.
+    @CEntryPoint(name = "cej_abi_version")
+    static int cej_abi_version(IsolateThread thread) {
+        return CE_ABI_VERSION;
+    }
+
+    // int ce_handler_init(const CeHostVtable* host, void** out_state)
+    // The shim attaches/creates the isolate, then calls this with the host vtable. We cache it, validate
+    // the ABI, load the generated registry, and return 0/-1. out_state is handled by the shim (it stores
+    // the isolate); we have nothing isolate-opaque to give the host beyond a non-null marker.
+    @CEntryPoint(name = "cej_init")
+    static int cej_init(IsolateThread thread, CeHostVtable host) {
+        try {
+            if (host.isNull() || host.getAbiVersion() != CE_ABI_VERSION) {
+                return -1;
+            }
+            gHost = host;
+            ensureRegistryLoaded();
+            return 0;
+        } catch (Throwable t) {
+            return -2; // never let it escape the C frame
+        }
+    }
+
+    // int ce_handler_has(void* state, CeStr script_id, CeStr event_id)
+    @CEntryPoint(name = "cej_has")
+    static int cej_has(IsolateThread thread, CeStr scriptId, CeStr eventId) {
+        try {
+            String sid = readUtf8(scriptId);
+            String ev  = readUtf8(eventId);
+            return REGISTRY.containsKey(key(sid, ev)) ? 1 : 0;
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    // int ce_handler_dispatch(void* state, CeStr script_id, CeStr event_id,
+    //                         const CeValue* payload, CeValue* out_result)
+    @CEntryPoint(name = "cej_dispatch")
+    static int cej_dispatch(IsolateThread thread, CeStr scriptId, CeStr eventId,
+                            CeValue payload, CeValue outResult) {
+        try {
+            String sid = readUtf8(scriptId);
+            String ev  = readUtf8(eventId);
+            Handler h = REGISTRY.get(key(sid, ev));
+            if (h == null) {
+                return 0; // "no such handler" is not an error (parity with the C++ glue)
+            }
+            CeContext ctx = new CeContext(gHost);
+            CeEvent event = new CeEvent(payload);
+            h.run(ctx, event);
+            // Value-returning handlers (e.g. onDawSaveState) are a TODO: we would build a CeValue tree in
+            // host-allocated memory (via gHost.getAlloc()) into outResult. See design §4.
+            return 0;
+        } catch (Throwable t) {
+            return -1; // surface as a non-zero status; host logs + disables. No exception escapes.
+        }
+    }
+
+    // void ce_handler_shutdown(void* state)
+    // The shim tears down the isolate AFTER this returns. We just flush handler-side state.
+    @CEntryPoint(name = "cej_shutdown")
+    static void cej_shutdown(IsolateThread thread) {
+        try {
+            gHost = WordFactory.nullPointer();
+            REGISTRY.clear();
+        } catch (Throwable t) {
+            // swallow
+        }
+    }
+
+    // =====================================================================================
+    // Marshalling helpers (boundary only — these run inside an entry point with an attached isolate).
+    // =====================================================================================
+
+    /** Read a CeStr (UTF-8 ptr,len, not NUL-terminated) into a Java String. */
+    static String readUtf8(CeStr s) {
+        if (s.isNull() || s.getPtr().isNull() || s.getLen() <= 0) {
+            return "";
+        }
+        long n = s.getLen();
+        byte[] buf = new byte[(int) n];
+        CCharPointer p = s.getPtr();
+        for (int i = 0; i < n; i++) {
+            buf[i] = p.read(i);
+        }
+        return new String(buf, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Pin a Java String as UTF-8 native bytes and fill a stack-allocated CeStr the caller provides.
+     * Used by CeContext when handing strings to the host. The returned CCharHolder MUST be closed after
+     * the host call returns so the pinned memory is released (host copies what it needs synchronously —
+     * see NativeHandlerEngine's fromCeStr, which copies immediately).
+     */
+    static CTypeConversion.CCharPointerHolder pinUtf8(String s) {
+        return CTypeConversion.toCString(s); // NUL-terminated UTF-8; we also pass an explicit length.
+    }
+
+    // Convert a scalar CeValue to a Java Object (scalars + strings).
+    static Object scalarOf(CeValue v) {
+        switch (v.getTag()) {
+            case CE_DOUBLE: return v.getDouble();
+            case CE_INT64:  return v.getInt64();
+            case CE_BOOL:   return v.getBool() != 0;
+            case CE_STRING: return readUtf8(v.asStr());
+            default:        return null;
+        }
+    }
+
+    // CE_MAP key lookup. Reads CeMap { CeStr* keys; CeValue* vals; int64_t len; } from the union.
+    // REVIEW #1: the CeMap @CStruct accessors / pointer math must match the header. Modelled here via a
+    // dedicated @CStruct view obtained from the union address.
+    static Object mapLookup(CeValue v, String key) {
+        CeMap m = v.asMap();
+        long len = m.getLen();
+        long keysBase = addrOf(m.getKeys());   // CeStr*  base address
+        long valsBase = addrOf(m.getVals());   // CeValue* base address
+        int strSize = SizeOf.get(CeStr.class);
+        int valSize = SizeOf.get(CeValue.class);
+        for (long i = 0; i < len; i++) {
+            CeStr ki  = WordFactory.pointer(keysBase + i * strSize);
+            if (key.equals(readUtf8(ki))) {
+                CeValue vi = WordFactory.pointer(valsBase + i * valSize);
+                return scalarOf(vi);
+            }
+        }
+        return null;
+    }
+
+    // struct CeMap { CeStr* keys; CeValue* vals; int64_t len; } — lives in the CeValue union.
+    @CStruct("CeMap")
+    interface CeMap extends PointerBase {
+        @CField("keys") CeStr   getKeys();
+        @CField("vals") CeValue getVals();
+        @CField("len")  long    getLen();
+    }
+
+    // ---- raw pointer + stack-scratch helpers ----
+    // These small helpers abstract the few raw-pointer operations the boundary needs. On a real image
+    // they compile to direct address math; the bodies below document intent for the reviewer.
+    //
+    // REVIEW #1/#3: `stackValue()` / `stackStr()` must allocate transient C structs whose lifetime spans
+    // the single host call. GraalVM provides StackValue.get(Class) for exactly this. We funnel through
+    // these wrappers so the allocation strategy is changed in one place.
+    static CeValue stackValue() {
+        return org.graalvm.nativeimage.StackValue.get(CeValue.class);
+    }
+    static CeStr stackStr(CCharPointer ptr, long len) {
+        CeStr s = org.graalvm.nativeimage.StackValue.get(CeStr.class);
+        s.setPtr(ptr);
+        s.setLen(len);
+        return s;
+    }
+    static int utf8Len(String s) {
+        return s.getBytes(StandardCharsets.UTF_8).length;
+    }
+
+    // Raw native address of a Word/pointer. PointerBase extends org.graalvm.word.WordBase, which exposes
+    // rawValue() returning the address as a long. Used as a stash key and for element pointer math.
+    static long addrOf(PointerBase p) {
+        return p.rawValue();
+    }
+
+    // Pin stash keyed by CeValue raw address — see fillValue/releaseValue. A tiny per-thread map keeps
+    // the holder alive across the single synchronous host call. (Message-thread-only, so a plain
+    // ThreadLocal<HashMap> is safe.)
+    private static final ThreadLocal<Map<Long, CTypeConversion.CCharPointerHolder>> PIN_STASH =
+            ThreadLocal.withInitial(HashMap::new);
+    static void stashPin(long addr, CTypeConversion.CCharPointerHolder pin) { PIN_STASH.get().put(addr, pin); }
+    static CTypeConversion.CCharPointerHolder unstashPin(long addr) { return PIN_STASH.get().remove(addr); }
+}
+
+// ====================================================================================================
+// CeContext — the user-facing host surface, mirroring cpp/ce_runtime.h ce::Context. A TOP-LEVEL,
+// package-private class (NOT nested in CeRuntime) so the GENERATED handler signatures can name it
+// unqualified: `void onValueChanged(CeContext ctx, CeEvent e)`. It wraps the cached CeHostVtable and
+// calls its C function pointers via @InvokeCFunctionPointer; strings are marshalled to UTF-8. A thin
+// per-dispatch object, created in CeRuntime.cej_dispatch.
+// ====================================================================================================
+final class CeContext {
+    private final CeRuntime.CeHostVtable h;
+
+    CeContext(CeRuntime.CeHostVtable host) { this.h = host; }
+
+    /** setValue(path, value) — value as a Java Object (Double/Long/Integer/Boolean/String/null). */
+    public void setValue(String path, Object value) {
+        if (h.isNull()) return;
+        try (CTypeConversion.CCharPointerHolder keyPin = CeRuntime.pinUtf8(path)) {
+            CeRuntime.CeStr key = CeRuntime.stackStr(keyPin.get(), CeRuntime.utf8Len(path));
+            // Build a transient CeValue on the C stack for the argument.
+            CeRuntime.CeValue v = CeRuntime.stackValue();
+            fillValue(v, value);
+            h.getSet().invoke(h.getHostCtx(), key, v, WordFactory.nullPointer());
+            releaseValue(v, value);
+        }
+    }
+
+    public void setValue(String path, double d) { setValue(path, Double.valueOf(d)); }
+
+    /**
+     * getValue(path, form) — returns a Java Object (Double/Long/Boolean/String/null). The host fills a
+     * host-owned CeValue we must release with free_value. Lists/maps are a TODO here (scalars + strings
+     * only, matching the C++ Var convenience getters).
+     */
+    public Object getValue(String path, String form) {
+        if (h.isNull()) return null;
+        try (CTypeConversion.CCharPointerHolder keyPin = CeRuntime.pinUtf8(path);
+             CTypeConversion.CCharPointerHolder formPin = CeRuntime.pinUtf8(form)) {
+            CeRuntime.CeStr key   = CeRuntime.stackStr(keyPin.get(),  CeRuntime.utf8Len(path));
+            CeRuntime.CeStr formS = CeRuntime.stackStr(formPin.get(), CeRuntime.utf8Len(form));
+            CeRuntime.CeValue out = CeRuntime.stackValue();
+            out.setTag(CeRuntime.CE_NULL);
+            h.getGet().invoke(h.getHostCtx(), key, formS, out);
+            Object r = copyOut(out);
+            h.getFreeValue().invoke(h.getHostCtx(), out); // host produced it -> host frees it
+            return r;
+        }
+    }
+
+    public Object getValue(String path) { return getValue(path, "value"); }
+
+    public void sendCC(int channel, int cc, Object value) {
+        if (h.isNull()) return;
+        CeRuntime.CeValue v = CeRuntime.stackValue();
+        fillValue(v, value);
+        h.getSendCc().invoke(h.getHostCtx(), channel, cc, v);
+        releaseValue(v, value);
+    }
+
+    public void log(String msg) {
+        if (h.isNull()) return;
+        try (CTypeConversion.CCharPointerHolder pin = CeRuntime.pinUtf8(msg)) {
+            CeRuntime.CeStr m = CeRuntime.stackStr(pin.get(), CeRuntime.utf8Len(msg));
+            h.getLog().invoke(h.getHostCtx(), 0, m);
+        }
+    }
+
+    public void emit(String name, Object data) {
+        if (h.isNull()) return;
+        try (CTypeConversion.CCharPointerHolder pin = CeRuntime.pinUtf8(name)) {
+            CeRuntime.CeStr n = CeRuntime.stackStr(pin.get(), CeRuntime.utf8Len(name));
+            CeRuntime.CeValue v = CeRuntime.stackValue();
+            fillValue(v, data);
+            h.getEmit().invoke(h.getHostCtx(), n, v);
+            releaseValue(v, data);
+        }
+    }
+
+    // --- scalar/string CeValue <-> Java Object marshalling (scalars + strings; list/map are TODO,
+    // matching the C++ surface's convenience getters). ---
+    private void fillValue(CeRuntime.CeValue v, Object o) {
+        if (o == null) { v.setTag(CeRuntime.CE_NULL); return; }
+        if (o instanceof Double)  { v.setTag(CeRuntime.CE_DOUBLE); v.setDouble((Double) o); return; }
+        if (o instanceof Float)   { v.setTag(CeRuntime.CE_DOUBLE); v.setDouble(((Float) o).doubleValue()); return; }
+        if (o instanceof Long)    { v.setTag(CeRuntime.CE_INT64);  v.setInt64((Long) o); return; }
+        if (o instanceof Integer) { v.setTag(CeRuntime.CE_INT64);  v.setInt64(((Integer) o).longValue()); return; }
+        if (o instanceof Boolean) { v.setTag(CeRuntime.CE_BOOL);   v.setBool(((Boolean) o) ? 1 : 0); return; }
+        if (o instanceof String) {
+            v.setTag(CeRuntime.CE_STRING);
+            // Pin the string and write ptr/len into the union's CeStr region. The pin is released in
+            // releaseValue() AFTER the host call (host copies synchronously). We stash the holder in a
+            // thread-local map keyed off the CeValue address.
+            CTypeConversion.CCharPointerHolder pin = CeRuntime.pinUtf8((String) o);
+            CeRuntime.stashPin(CeRuntime.addrOf(v), pin);
+            CeRuntime.CeStr s = v.asStr();
+            s.setPtr(pin.get());
+            s.setLen(CeRuntime.utf8Len((String) o));
+            return;
+        }
+        v.setTag(CeRuntime.CE_NULL); // unsupported types degrade to null
+    }
+
+    private void releaseValue(CeRuntime.CeValue v, Object o) {
+        if (o instanceof String) {
+            CTypeConversion.CCharPointerHolder pin = CeRuntime.unstashPin(CeRuntime.addrOf(v));
+            if (pin != null) pin.close();
+        }
+    }
+
+    private Object copyOut(CeRuntime.CeValue o) {
+        switch (o.getTag()) {
+            case CeRuntime.CE_STRING: return CeRuntime.readUtf8(o.asStr());
+            case CeRuntime.CE_DOUBLE: return o.getDouble();
+            case CeRuntime.CE_INT64:  return o.getInt64();
+            case CeRuntime.CE_BOOL:   return o.getBool() != 0;
+            default:                  return null;
+        }
+    }
+}
+
+// ====================================================================================================
+// CeEvent — mirrors cpp/ce_runtime.h ce::Event. Public fields value/firstTime plus field access by key
+// (for CE_MAP payloads). Scalars + strings covered; list/map field VALUES round-trip as Objects.
+// Top-level + package-private for the same reason as CeContext.
+// ====================================================================================================
+final class CeEvent {
+    public final double value;
+    public final boolean firstTime;
+    private final CeRuntime.CeValue payload;
+
+    CeEvent(CeRuntime.CeValue p) {
+        this.payload = p;
+        this.value = asDouble(field("value"));
+        this.firstTime = asBool(field("firstTime"));
+    }
+
+    /** Get a payload field as a Java Object (null if absent). */
+    public Object get(String key) { return field(key); }
+
+    /** Look up a key in a CE_MAP payload, or treat a scalar payload as the "value" field. */
+    private Object field(String key) {
+        if (payload.isNull()) return null;
+        if (payload.getTag() == CeRuntime.CE_MAP) {
+            // CeMap { CeStr* keys; CeValue* vals; int64_t len; } lives in the union at offset 8.
+            // REVIEW #1: confirm map field access on a real image.
+            return CeRuntime.mapLookup(payload, key);
+        }
+        if ("value".equals(key)) {
+            return CeRuntime.scalarOf(payload); // scalar payload == the value
+        }
+        return null;
+    }
+
+    private static double asDouble(Object o) {
+        if (o instanceof Double)  return (Double) o;
+        if (o instanceof Long)    return ((Long) o).doubleValue();
+        if (o instanceof Integer) return ((Integer) o).doubleValue();
+        if (o instanceof Boolean) return ((Boolean) o) ? 1 : 0;
+        return 0;
+    }
+    private static boolean asBool(Object o) {
+        if (o instanceof Boolean) return (Boolean) o;
+        return asDouble(o) != 0;
+    }
+}
