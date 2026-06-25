@@ -19,6 +19,7 @@
 //   • calls: ctx.method(…), member a.b / a->b, indexing a[i], math builtins (std:: forms ok)
 //   • <algorithm>/<numeric> over iterators: sort (with comparator), reverse, accumulate, find/find_if,
 //     count/count_if, max_element/min_element, fill, iota, for_each, distance, begin/end; *it, ++it
+//   • try / catch / throw (std::runtime_error & friends, .what()); object-like #define macros
 //   • top-level global variables / constants; do/while; comma operator; bitwise & | ^
 //   • string literals + concatenation; (int)x and static_cast<int>(x) casts
 //   • std::cout << … << std::endl and printf(…) → the script console
@@ -68,6 +69,10 @@ const BUILTINS = {
   for_each: (f, l, fn) => { const c = f.container; for (let i = f.pos; i < l.pos; i++) fn(c[i]); },
   distance: (f, l) => l.pos - f.pos,
   begin: (c) => new CppIter(c, 0), end: (c) => new CppIter(c, c.length),
+  // exceptions: std::runtime_error("msg") etc. → an object whose .what() returns the message
+  runtime_error: (m) => ({ what: () => String(m ?? '') }), logic_error: (m) => ({ what: () => String(m ?? '') }),
+  invalid_argument: (m) => ({ what: () => String(m ?? '') }), out_of_range: (m) => ({ what: () => String(m ?? '') }),
+  length_error: (m) => ({ what: () => String(m ?? '') }), exception: () => ({ what: () => '' }),
 };
 
 /* ------------------------------------------------------------------------ tokenizer */
@@ -107,6 +112,28 @@ function tokenize(src) {
   }
   toks.push({ type: 'eof', value: null, line });
   return toks;
+}
+
+// Object-like #define macros: `#define NAME replacement` (function-like macros are not expanded).
+function extractDefines(source) {
+  const macros = new Map();
+  const re = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)(?!\()[ \t]*(.*)$/gm;
+  let m;
+  while ((m = re.exec(String(source ?? '')))) {
+    let body = m[2].replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+    if (!body) { macros.set(m[1], []); continue; }
+    try { const t = tokenize(body); t.pop(); macros.set(m[1], t); } catch { /* skip bad macro */ }
+  }
+  return macros;
+}
+
+function expandMacros(tokens, macros) {
+  const out = [];
+  for (const t of tokens) {
+    if (t.type === 'id' && macros.has(t.value)) out.push(...macros.get(t.value));
+    else out.push(t);
+  }
+  return out;
 }
 
 /* --------------------------------------------------------------- function extraction */
@@ -339,6 +366,18 @@ class Parser {
         case 'while': return this.parseWhile();
         case 'switch': return this.parseSwitch();
         case 'do': { this.next(); const body = this.parseStatement(); this.eat('while'); this.eat('('); const cond = this.parseExpr(); this.eat(')'); this.eat(';'); return { type: 'doWhile', body, cond }; }
+        case 'throw': { this.next(); const e = this.isV(';') ? null : this.parseExpr(); this.eat(';'); return { type: 'throw', expr: e }; }
+        case 'try': {
+          this.next(); const block = this.parseBlock(); const catches = [];
+          while (this.isV('catch')) {
+            this.next(); this.eat('(');
+            const start = this.i; let d = 1;
+            while (d > 0 && !this.atEnd()) { const v = this.next().value; if (v === '(') d++; else if (v === ')') d--; }
+            const ids = this.t.slice(start, this.i - 1).filter((tk) => tk.type === 'id' && !DECL_LEADERS.has(tk.value));
+            catches.push({ param: ids.length ? ids[ids.length - 1].value : null, body: this.parseBlock() });
+          }
+          return { type: 'try', block, catches };
+        }
         case 'return': { this.next(); const e = this.isV(';') ? null : this.parseExpr(); this.eat(';'); return { type: 'return', expr: e }; }
         case 'break': this.next(); this.eat(';'); return { type: 'break' };
         case 'continue': this.next(); this.eat(';'); return { type: 'continue' };
@@ -564,6 +603,7 @@ class Parser {
 /* ------------------------------------------------------------------------ interpreter */
 
 class ReturnSignal { constructor(value) { this.value = value; } }
+class CppThrow { constructor(value) { this.value = value; } }
 const BREAK = Symbol('break'), CONTINUE = Symbol('continue');
 
 function truthy(v) { return typeof v === 'number' ? v !== 0 : typeof v === 'boolean' ? v : v != null; }
@@ -803,6 +843,17 @@ function execStmt(node, env) {
       return;
     }
     case 'return': throw new ReturnSignal(node.expr ? evalNode(node.expr, env) : undefined);
+    case 'throw': throw new CppThrow(node.expr ? evalNode(node.expr, env) : undefined);
+    case 'try': {
+      try { execStmt(node.block, new Env(env)); }
+      catch (e) {
+        if (e instanceof ReturnSignal || e === BREAK || e === CONTINUE || !node.catches.length) throw e;
+        const c = node.catches[0]; const inner = new Env(env);
+        inner.define(c.param ?? '__exc', e instanceof CppThrow ? e.value : { what: () => String(e?.message ?? e) });
+        execStmt(c.body, inner);
+      }
+      return;
+    }
     case 'break': throw BREAK;
     case 'continue': throw CONTINUE;
     default: throw new Error(`cannot execute ${node.type}`);
@@ -819,6 +870,8 @@ export function compileCpp(source) {
   let toks;
   try { toks = tokenize(String(source ?? '')); }
   catch (e) { return { handlers, diagnostics: [String(e.message ?? e)] }; }
+  const macros = extractDefines(source);
+  if (macros.size) toks = expandMacros(toks, macros);
   const types = extractTypes(toks);
   for (const [n, s] of types.structs) program.structs.set(n, s);
   for (const [n, v] of types.enums) program.enums.set(n, v);

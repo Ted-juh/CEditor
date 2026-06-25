@@ -254,6 +254,38 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('object-like #define macros expand', () => {
+  const src = `
+    #define MAX_LEVEL 127
+    #define TWO_PI (2 * 3.14159)
+    void onValueChanged(CeContext& ctx, const CeEvent& event) {
+      ctx.setValue("clamped", event.value > MAX_LEVEL ? MAX_LEVEL : event.value);
+      ctx.setValue("circ", TWO_PI);
+    }`;
+  const { values } = run(src, 'onValueChanged', { value: 200 });
+  assert.equal(values.clamped, 127);
+  assert.ok(Math.abs(values.circ - 6.28318) < 1e-9);
+});
+
+test('try / catch / throw with std::runtime_error', () => {
+  const src = `void onValueChanged(CeContext& ctx, const CeEvent& event) {
+    int code = 0;
+    try {
+      if (event.value < 0) { throw std::runtime_error("negative"); }
+      code = 1;
+    } catch (const std::exception& e) {
+      ctx.setValue("msg", e.what());
+      code = -1;
+    }
+    ctx.setValue("code", code);
+  }`;
+  const neg = run(src, 'onValueChanged', { value: -3 });
+  assert.equal(neg.values.code, -1);
+  assert.equal(neg.values.msg, 'negative');
+  const pos = run(src, 'onValueChanged', { value: 5 });
+  assert.equal(pos.values.code, 1);
+});
+
 test('range-for over a std::map with structured bindings', () => {
   const src = `void onClick(CeContext& ctx, const CeEvent& event) {
     std::map<std::string, int> m;
