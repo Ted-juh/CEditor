@@ -254,6 +254,40 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('do-while loop runs at least once', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    int i = 0; int n = 0;
+    do { n += i; i++; } while (i < 4);
+    ctx.setValue("n", n);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.n, 6); // 0+1+2+3
+});
+
+test('for loop with comma init and update', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    int hits = 0;
+    for (int i = 0, j = 6; i < j; i++, j--) { hits++; }
+    ctx.setValue("hits", hits);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.hits, 3); // (0,6)(1,5)(2,4) then 3<3 false
+});
+
+test('bitwise operators and string::npos', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    int flags = 6;
+    ctx.setValue("and", flags & 2);
+    ctx.setValue("or", flags | 1);
+    ctx.setValue("xor", flags ^ 3);
+    std::string s = "hello";
+    ctx.setValue("missing", s.find("z") == std::string::npos ? 1 : 0);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.and, 2);
+  assert.equal(values.or, 7);
+  assert.equal(values.xor, 5);
+  assert.equal(values.missing, 1);
+});
+
 test('std::pair via make_pair and brace-init', () => {
   const src = `void onClick(CeContext& ctx, const CeEvent& event) {
     std::pair<int, int> p = {3, 7};

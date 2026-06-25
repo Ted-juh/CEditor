@@ -33,7 +33,7 @@ const DECL_LEADERS = new Set([...TYPE_WORDS, 'const', 'constexpr', 'static']);
 const INT_CASTS = new Set(['int', 'long', 'short', 'unsigned', 'size_t', 'char',
   'int8_t', 'int16_t', 'int32_t', 'int64_t', 'uint8_t', 'uint16_t', 'uint32_t', 'uint64_t']);
 
-const BINPREC = { '||': 1, '&&': 2, '==': 3, '!=': 3, '<': 4, '<=': 4, '>': 4, '>=': 4, '+': 5, '-': 5, '*': 6, '/': 6, '%': 6 };
+const BINPREC = { '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '<=': 7, '>': 7, '>=': 7, '+': 8, '-': 8, '*': 9, '/': 9, '%': 9 };
 
 const BUILTINS = {
   min: Math.min, max: Math.max, abs: Math.abs, fabs: Math.abs,
@@ -43,8 +43,8 @@ const BUILTINS = {
   clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
   to_string: (x) => String(x), stoi: (x) => parseInt(x, 10), stod: (x) => parseFloat(x), stof: (x) => parseFloat(x),
   static_cast: (x) => x, reinterpret_cast: (x) => x, const_cast: (x) => x, dynamic_cast: (x) => x,
-  make_pair: (a, b) => ({ first: a, second: b }),
-  M_PI: Math.PI, M_E: Math.E,
+  make_pair: (a, b) => ({ first: a, second: b }), swap: () => {},
+  M_PI: Math.PI, M_E: Math.E, npos: -1,
 };
 
 /* ------------------------------------------------------------------------ tokenizer */
@@ -257,6 +257,7 @@ class Parser {
         case 'for': return this.parseFor();
         case 'while': return this.parseWhile();
         case 'switch': return this.parseSwitch();
+        case 'do': { this.next(); const body = this.parseStatement(); this.eat('while'); this.eat('('); const cond = this.parseExpr(); this.eat(')'); this.eat(';'); return { type: 'doWhile', body, cond }; }
         case 'return': { this.next(); const e = this.isV(';') ? null : this.parseExpr(); this.eat(';'); return { type: 'return', expr: e }; }
         case 'break': this.next(); this.eat(';'); return { type: 'break' };
         case 'continue': this.next(); this.eat(';'); return { type: 'continue' };
@@ -317,11 +318,20 @@ class Parser {
       this.i = save; // not a range-for — reparse as a classic for
     }
     let init = null;
-    if (!this.isV(';')) init = this.isDeclStart() ? this.parseDecl(true) : { type: 'exprStmt', expr: this.parseExpr() };
+    if (!this.isV(';')) init = this.isDeclStart() ? this.parseDecl(true) : { type: 'exprStmt', expr: this.parseCommaExpr() };
     this.eat(';');
     const cond = this.isV(';') ? null : this.parseExpr(); this.eat(';');
-    const update = this.isV(')') ? null : this.parseExpr(); this.eat(')');
+    const update = this.isV(')') ? null : this.parseCommaExpr(); this.eat(')');
     return { type: 'for', init, cond, update, body: this.parseStatement() };
+  }
+
+  // Comma operator (used in for-init / for-update): evaluate each, yield the last.
+  parseCommaExpr() {
+    const first = this.parseAssign();
+    if (!this.isV(',')) return first;
+    const list = [first];
+    while (this.isV(',') && this.next()) list.push(this.parseAssign());
+    return { type: 'seq', list };
   }
 
   // Consume type specifiers + one declarator name, returning the name (for range-for detection).
@@ -535,6 +545,9 @@ function containerMethod(obj, name) {
       case 'at': return (i) => obj[i];
       case 'substr': return (a, b) => (b === undefined ? obj.substr(a) : obj.substr(a, b));
       case 'find': return (s) => obj.indexOf(s);
+      case 'c_str': case 'data': return () => obj;
+      case 'back': return () => obj[obj.length - 1];
+      case 'front': return () => obj[0];
     }
   }
   return undefined;
@@ -576,6 +589,7 @@ function applyBin(op, a, b) {
     case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b; case '%': return a % b;
     case '==': return a === b; case '!=': return a !== b;
     case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
+    case '&': return a & b; case '|': return a | b; case '^': return a ^ b;
   }
   throw new Error(`unsupported operator '${op}'`);
 }
@@ -592,6 +606,7 @@ function evalNode(node, env) {
       throw new Error(`'${node.name}' is not defined`);
     }
     case 'array': return node.elems.map((e) => evalNode(e, env));
+    case 'seq': { let v; for (const e of node.list) v = evalNode(e, env); return v; }
     case 'lambda': {
       const captured = env;
       return (...args) => {
@@ -659,6 +674,7 @@ function execStmt(node, env) {
     case 'block': { const inner = new Env(env); for (const s of node.body) execStmt(s, inner); return; }
     case 'if': if (truthy(evalNode(node.cond, env))) execStmt(node.then, env); else if (node.els) execStmt(node.els, env); return;
     case 'while': while (truthy(evalNode(node.cond, env))) { try { execStmt(node.body, env); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; } } return;
+    case 'doWhile': do { try { execStmt(node.body, env); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; } } while (truthy(evalNode(node.cond, env))); return;
     case 'forEach': {
       const it = evalNode(node.iterable, env);
       const list = typeof it === 'string' ? it.split('') : Array.isArray(it) ? it : [];
