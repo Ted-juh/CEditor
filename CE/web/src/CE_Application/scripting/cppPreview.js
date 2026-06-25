@@ -105,12 +105,12 @@ function tokenize(src) {
       if (type === 'num') value = text[1] === 'x' || text[1] === 'X' ? parseInt(text, 16) : parseFloat(text.replace(/[fFuUlL]+$/, ''));
       else if (type === 'str') value = unescape(text.slice(1, -1));
       else if (type === 'char') value = unescape(text.slice(1, -1)).charCodeAt(0);
-      toks.push({ type: type === 'num' || type === 'str' || type === 'char' ? type : type, value, line });
+      toks.push({ type, value, line, index: i });
       i += text.length; matched = true; break;
     }
     if (!matched) throw new Error(`unexpected character '${src[i]}' at line ${line}`);
   }
-  toks.push({ type: 'eof', value: null, line });
+  toks.push({ type: 'eof', value: null, line, index: src.length });
   return toks;
 }
 
@@ -169,7 +169,7 @@ function extractFunctions(toks) {
       const pEnd = matchClose(toks, i + 1, '(', ')');
       if (toks[pEnd + 1] && toks[pEnd + 1].value === '{') {
         const bEnd = matchClose(toks, pEnd + 1, '{', '}');
-        fns.push({ name: t.value, paramToks: toks.slice(i + 2, pEnd), bodyToks: toks.slice(pEnd + 2, bEnd) });
+        fns.push({ name: t.value, line: t.line, index: t.index, paramToks: toks.slice(i + 2, pEnd), bodyToks: toks.slice(pEnd + 2, bEnd) });
         i = bEnd + 1; continue;
       }
     }
@@ -957,4 +957,57 @@ export function invokeCpp(fnNode, args = [], opts = {}) {
   const program = fnNode.program;
   if (program && opts.print) program.print = opts.print;
   return runBody(fnNode.body, fnNode.params, program, null, args);
+}
+
+/* -------------------------------------------------- editor language-service support */
+
+function lineOffsets(src) {
+  const offs = [0];
+  for (let i = 0; i < src.length; i++) if (src[i] === '\n') offs.push(i + 1);
+  return offs;
+}
+
+/** Editor analysis: parser-backed diagnostics + document symbols (parity with the JS/Lua service). */
+export function analyzeCpp(source) {
+  const src = String(source ?? '');
+  if (!src.trim()) return { diagnostics: [], symbols: [] };
+  const offs = lineOffsets(src);
+  const { diagnostics: raw } = compileCpp(src);
+  const diagnostics = raw.map((d) => {
+    const message = String(d);
+    const ln = Math.max(1, parseInt((/\(line (\d+)\)/.exec(message) || [])[1] || '1', 10));
+    return { severity: 'error', message: message.replace(/\s*\(line \d+\)/, ''), line: ln, col: 0, index: offs[ln - 1] ?? 0 };
+  });
+
+  const symbols = [];
+  let toks;
+  try { toks = tokenize(src); } catch { return { diagnostics, symbols }; }
+  const macros = extractDefines(src);
+  if (macros.size) toks = expandMacros(toks, macros);
+  for (const fn of extractFunctions(toks)) {
+    symbols.push({ name: fn.name, kind: 'function', detail: `${fn.name}(${paramNames(fn.paramToks).join(', ')})`, line: fn.line ?? 1, col: 0, index: fn.index ?? 0 });
+  }
+  // struct / enum names and enumerators, located by a light scan (line-level positions).
+  let m;
+  const reType = /\b(struct|class|enum(?:\s+class)?)\s+([A-Za-z_]\w*)/g;
+  while ((m = reType.exec(src))) {
+    const line = src.slice(0, m.index).split('\n').length;
+    symbols.push({ name: m[2], kind: 'class', detail: `${m[1].split(/\s+/)[0]} ${m[2]}`, line, col: 0, index: m.index });
+  }
+  return { diagnostics, symbols };
+}
+
+/** Brace-based foldable regions for C++ (the JS/Lua service folds via AST; C++ folds on { } ). */
+export function foldCpp(source) {
+  let toks;
+  try { toks = tokenize(String(source ?? '')); } catch { return []; }
+  const stack = [], byStart = new Map();
+  for (const t of toks) {
+    if (t.value === '{') stack.push(t.line);
+    else if (t.value === '}') {
+      const s = stack.pop();
+      if (s != null && t.line > s) { const prev = byStart.get(s); if (!prev || t.line > prev.endLine) byStart.set(s, { startLine: s, endLine: t.line }); }
+    }
+  }
+  return [...byStart.values()].sort((a, b) => a.startLine - b.startLine);
 }

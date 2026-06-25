@@ -13,6 +13,7 @@
 
 import { parse as parseJs } from 'acorn';
 import luaparse from 'luaparse';
+import { analyzeCpp, foldCpp } from './cppPreview.js';
 import {
   COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
@@ -149,7 +150,8 @@ const lastGoodSymbols = { javascript: [], lua: [] };
 export function analyze(source, languageId) {
   const src = String(source ?? '');
   if (!src.trim()) return { diagnostics: [], symbols: [] };
-  // Only JS and Lua have parsers here; Python (Tier-2) gets no diagnostics/symbols.
+  // C++ has its own interpreter front-end (cppPreview); Python (Tier-2) has no parser here.
+  if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return { diagnostics: [], symbols: [] };
 
   if (languageId === 'javascript') {
@@ -371,6 +373,7 @@ const LUA_FOLD = new Set(['FunctionDeclaration', 'IfStatement', 'ForNumericState
  */
 export function getFoldRegions(source, languageId) {
   const src = String(source ?? '');
+  if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return [];
   let ast;
   try {
