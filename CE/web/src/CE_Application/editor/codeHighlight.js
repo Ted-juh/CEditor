@@ -67,12 +67,24 @@ const LANGS = {
       'declare', 'readonly', 'public', 'private', 'protected', 'abstract', 'as', 'satisfies', 'keyof', 'is']),
     literals: JS_LITERALS, builtins: JS_BUILTINS,
   },
+  csharp: {
+    re: /((?:\/\/[^\n]*)|(?:\/\*[\s\S]*?\*\/))|(@?"(?:\\[\s\S]|""|[^"\\])*"?)|()|('(?:\\[\s\S]|[^'\\\n])*'?)|(\b\d[\w.]*\b)|([A-Za-z_]\w*)/g,
+    keywords: new Set(['var', 'int', 'long', 'short', 'byte', 'uint', 'ulong', 'double', 'float',
+      'decimal', 'bool', 'char', 'string', 'object', 'void', 'const', 'readonly', 'static', 'public',
+      'private', 'protected', 'internal', 'class', 'struct', 'enum', 'interface', 'namespace', 'using',
+      'new', 'return', 'if', 'else', 'for', 'foreach', 'in', 'while', 'do', 'switch', 'case', 'default',
+      'break', 'continue', 'try', 'catch', 'finally', 'throw', 'this', 'base', 'override', 'virtual',
+      'abstract', 'sealed', 'as', 'is', 'get', 'set']),
+    literals: new Set(['true', 'false', 'null']),
+    builtins: new Set(['Console', 'Math', 'List', 'Dictionary', 'String', 'Convert', 'ctx']),
+  },
 };
 
 export function languageKey(id) {
   if (id === 'javascript') return 'javascript';
   if (id === 'typescript' || id === 'ts') return 'typescript';
   if (id === 'cpp' || id === 'c++') return 'cpp';
+  if (id === 'csharp' || id === 'cs') return 'csharp';
   return 'lua';
 }
 
@@ -177,7 +189,7 @@ export function matchingBracket(text, caret) {
 // Language-aware single-line comment prefix, used by the comment-toggle command.
 export function lineCommentToken(langId) {
   const k = languageKey(langId);
-  return k === 'javascript' || k === 'cpp' || k === 'typescript' ? '//' : '--';
+  return k === 'javascript' || k === 'cpp' || k === 'typescript' || k === 'csharp' ? '//' : '--';
 }
 
 /**

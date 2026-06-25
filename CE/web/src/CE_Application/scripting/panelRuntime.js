@@ -23,6 +23,7 @@ import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
 import { compileCpp, invokeCpp } from './cppPreview.js';
+import { compileCsharp, invokeCsharp } from './csharpPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
@@ -450,9 +451,39 @@ function loadHandlersCpp(script) {
   return out;
 }
 
+/* ----------------------------------------------------------------------- C# executor */
+// Interpreted preview of the C# behavior-handler subset (csharpPreview.js). `ctx` exposes the
+// panel API in both C# (PascalCase) and lower-case spellings; handler names match camelCase
+// (the skeleton) or PascalCase (idiomatic C#).
+function loadHandlersCsharp(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = {
+    ...api, setValue: api.set, getValue: api.get,
+    SetValue: api.set, GetValue: api.get, Log: api.log,
+    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex, Clamp: api.clamp, Scale: api.scale,
+  };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
+  const { handlers: parsed, diagnostics } = compileCsharp(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `C# preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    const fire = (payload) => {
+      const event = payload && typeof payload === 'object'
+        ? { ...payload, Value: payload.value, FirstTime: payload.firstTime }
+        : { value: payload, Value: payload };
+      try { return invokeCsharp(fnNode, [ctx, event], { print }); }
+      catch (e) { addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
+    };
+    out[name] = fire;
+    const lower = name.charAt(0).toLowerCase() + name.slice(1); // OnValueChanged → onValueChanged
+    if (lower !== name && !out[lower]) out[lower] = fire;
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- unified run / load */
 
-/** Execute a script's source and return its declared handlers (JS/C++ sync; Lua/Python async). */
+/** Execute a script's source and return its declared handlers (JS/C++/C# sync; Lua/Python async). */
 async function getHandlers(script) {
   const lang = script?.language ?? 'lua';
   if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
@@ -460,8 +491,9 @@ async function getHandlers(script) {
   if (lang === 'lua') return loadHandlersLua(script);
   if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
   if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
+  if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script);
   addScriptTrace('error', script?.id ?? '',
-    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, and C++ run here).`);
+    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, C++, and C# run here).`);
   return null;
 }
 

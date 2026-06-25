@@ -17,6 +17,7 @@ import luaparse from 'luaparse';
 import { analyzeCpp, foldCpp } from './cppPreview.js';
 import { analyzePython, foldPython } from './pythonService.js';
 import { analyzeTs, foldTs } from './tsService.js';
+import { analyzeCsharp, foldCsharp } from './csharpPreview.js';
 import {
   COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
@@ -62,6 +63,12 @@ const CPP_KEYWORDS = ['int', 'double', 'float', 'bool', 'char', 'void', 'auto', 
   'namespace', 'using', 'template', 'true', 'false', 'nullptr', 'unsigned', 'long', 'short', 'size_t'];
 const CPP_BUILTINS = ['std', 'min', 'max', 'abs', 'clamp', 'floor', 'ceil', 'round', 'sqrt', 'pow',
   'static_cast', 'CeContext', 'CeEvent', 'ctx', 'event'];
+const CS_KEYWORDS = ['var', 'int', 'long', 'double', 'float', 'decimal', 'bool', 'char', 'string',
+  'object', 'void', 'const', 'readonly', 'static', 'public', 'private', 'protected', 'internal',
+  'class', 'struct', 'enum', 'interface', 'namespace', 'using', 'new', 'return', 'if', 'else', 'for',
+  'foreach', 'in', 'while', 'do', 'switch', 'case', 'default', 'break', 'continue', 'try', 'catch',
+  'finally', 'throw', 'true', 'false', 'null', 'this', 'base', 'override', 'virtual', 'abstract'];
+const CS_BUILTINS = ['Console', 'Math', 'List', 'Dictionary', 'String', 'Convert', 'Enumerable', 'ctx'];
 
 const TS_KEYWORDS = [...JS_KEYWORDS, 'interface', 'type', 'enum', 'namespace', 'implements',
   'declare', 'readonly', 'public', 'private', 'protected', 'abstract', 'as', 'satisfies', 'keyof',
@@ -73,6 +80,7 @@ function keywordItems(language) {
   else if (language === 'typescript' || language === 'ts') { kw = TS_KEYWORDS; bi = JS_BUILTINS; }
   else if (language === 'python') { kw = PY_KEYWORDS; bi = PY_BUILTINS; }
   else if (language === 'cpp' || language === 'c++') { kw = CPP_KEYWORDS; bi = CPP_BUILTINS; }
+  else if (language === 'csharp' || language === 'cs') { kw = CS_KEYWORDS; bi = CS_BUILTINS; }
   return [
     ...kw.map((k) => ({ label: k, kind: 'keyword', detail: 'keyword', doc: '' })),
     ...bi.map((b) => ({ label: b, kind: 'builtin', detail: 'built-in', doc: '' })),
@@ -162,6 +170,7 @@ export function analyze(source, languageId) {
   if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
   if (languageId === 'python') return analyzePython(src);
   if (languageId === 'typescript' || languageId === 'ts') return analyzeTs(src);
+  if (languageId === 'csharp' || languageId === 'cs') return analyzeCsharp(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return { diagnostics: [], symbols: [] };
 
   if (languageId === 'javascript') {
@@ -386,6 +395,7 @@ export function getFoldRegions(source, languageId) {
   if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
   if (languageId === 'python') return foldPython(src);
   if (languageId === 'typescript' || languageId === 'ts') return foldTs(src);
+  if (languageId === 'csharp' || languageId === 'cs') return foldCsharp(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return [];
   let ast;
   try {
