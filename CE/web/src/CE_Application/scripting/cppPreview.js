@@ -35,8 +35,9 @@ const INT_CASTS = new Set(['int', 'long', 'short', 'unsigned', 'size_t', 'char',
 
 const BINPREC = { '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '<=': 7, '>': 7, '>=': 7, '+': 8, '-': 8, '*': 9, '/': 9, '%': 9 };
 
+const spreadable = (a) => (a.length === 1 && Array.isArray(a[0]) ? a[0] : a);
 const BUILTINS = {
-  min: Math.min, max: Math.max, abs: Math.abs, fabs: Math.abs,
+  min: (...a) => Math.min(...spreadable(a)), max: (...a) => Math.max(...spreadable(a)), abs: Math.abs, fabs: Math.abs,
   floor: Math.floor, ceil: Math.ceil, round: Math.round, trunc: Math.trunc,
   sqrt: Math.sqrt, pow: Math.pow, fmod: (a, b) => a % b,
   sin: Math.sin, cos: Math.cos, tan: Math.tan, exp: Math.exp, log: Math.log, log10: Math.log10,
@@ -143,6 +144,60 @@ function extractTypes(toks) {
     i++;
   }
   return { structs, enums, diagnostics };
+}
+
+// Top-level global variables / constants (so handlers can reference `const int kMax = 127;`).
+// Skips struct/enum/function/using definitions; evaluates each remaining decl into program.globals.
+function extractGlobals(toks, program) {
+  const globals = new Map();
+  let i = 0;
+  while (i < toks.length) {
+    const t = toks[i];
+    if (t.type === 'id' && (t.value === 'struct' || t.value === 'class' || t.value === 'enum' || t.value === 'union')) {
+      let j = i; while (j < toks.length && toks[j].value !== '{' && toks[j].value !== ';') j++;
+      if (toks[j]?.value === '{') { i = matchClose(toks, j, '{', '}') + 1; if (toks[i]?.value === ';') i++; } else i = j + 1;
+      continue;
+    }
+    if (t.type === 'id' && ['using', 'namespace', 'typedef', 'template', 'friend', 'extern'].includes(t.value)) {
+      let j = i; while (j < toks.length && toks[j].value !== ';' && toks[j].value !== '{') j++;
+      if (toks[j]?.value === '{') { i = matchClose(toks, j, '{', '}') + 1; if (toks[i]?.value === ';') i++; } else i = j + 1;
+      continue;
+    }
+    if (t.type === 'id') {
+      let j = i, name = null, nameIdx = -1, isFunc = false, isDecl = false;
+      while (j < toks.length) {
+        const v = toks[j].value;
+        if (v === '<') { let d = 0; do { if (toks[j].value === '<') d++; else if (toks[j].value === '>') d--; j++; } while (d > 0 && j < toks.length); continue; }
+        if (v === ';' || v === '{' || v === '}') break;
+        if (toks[j].type === 'id') {
+          const nx = toks[j + 1]?.value;
+          if (nx === '(') { name = toks[j].value; nameIdx = j; isFunc = true; break; }
+          if (nx === '=' || nx === ';' || nx === ',' || nx === '[') { name = toks[j].value; nameIdx = j; isDecl = true; break; }
+        }
+        j++;
+      }
+      if (isFunc) {
+        const pEnd = matchClose(toks, nameIdx + 1, '(', ')');
+        if (toks[pEnd + 1]?.value === '{') { i = matchClose(toks, pEnd + 1, '{', '}') + 1; } else { i = pEnd + 1; if (toks[i]?.value === ';') i++; }
+        continue;
+      }
+      if (isDecl) {
+        let k = i, d = 0;
+        while (k < toks.length && !(toks[k].value === ';' && d === 0)) { if ('([{'.includes(toks[k].value)) d++; if (')]}'.includes(toks[k].value)) d--; k++; }
+        try {
+          const decl = new Parser([...toks.slice(i, k), { type: 'op', value: ';' }, { type: 'eof', value: null }]).parseDecl();
+          const env = new Env(null);
+          env.define('__program', program);
+          for (const [n, v] of program.enums) env.define(n, v);
+          for (const [n, v] of globals) env.define(n, v);
+          for (const dcl of decl.decls) globals.set(dcl.name, declDefault(dcl, env));
+        } catch { /* not a global var decl — ignore */ }
+        i = k + 1; continue;
+      }
+    }
+    i++;
+  }
+  return globals;
 }
 
 function parseStructMembers(toks) {
@@ -716,7 +771,7 @@ function execStmt(node, env) {
 export function compileCpp(source) {
   const diagnostics = [];
   const handlers = new Map();
-  const program = { funcs: new Map(), structs: new Map(), enums: new Map(), print: null };
+  const program = { funcs: new Map(), structs: new Map(), enums: new Map(), globals: new Map(), print: null };
   let toks;
   try { toks = tokenize(String(source ?? '')); }
   catch (e) { return { handlers, diagnostics: [String(e.message ?? e)] }; }
@@ -736,6 +791,8 @@ export function compileCpp(source) {
       handlers.set(fn.name, fn);
     } catch (e) { diagnostics.push(`${fn.name}: ${e.message ?? e}`); }
   }
+  try { for (const [n, v] of extractGlobals(toks, program)) program.globals.set(n, v); }
+  catch (e) { diagnostics.push(`globals: ${e.message ?? e}`); }
   return { handlers, diagnostics };
 }
 
@@ -749,6 +806,7 @@ function runBody(body, params, program, thisObj, args) {
   env.define('__print', program?.print ?? (() => {}));
   if (thisObj) env.define('this', thisObj);
   if (program) {
+    for (const [name, v] of program.globals) env.define(name, v);
     for (const [name, v] of program.enums) env.define(name, v);
     for (const [name, f] of program.funcs) env.define(name, (...a) => runBody(f.body, f.params, program, null, a));
   }

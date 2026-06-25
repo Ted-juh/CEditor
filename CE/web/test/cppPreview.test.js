@@ -254,6 +254,32 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('top-level global constants are visible to handlers', () => {
+  const src = `
+    const int kMax = 127;
+    static const double kPi = 3.14159;
+    int gBase = 10;
+    void onValueChanged(CeContext& ctx, const CeEvent& event) {
+      ctx.setValue("max", kMax);
+      ctx.setValue("scaled", event.value * kPi);
+      ctx.setValue("based", gBase + 5);
+    }`;
+  const { values } = run(src, 'onValueChanged', { value: 2 });
+  assert.equal(values.max, 127);
+  assert.ok(Math.abs(values.scaled - 6.28318) < 1e-9);
+  assert.equal(values.based, 15);
+});
+
+test('std::max / std::min with an initializer list', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    ctx.setValue("hi", std::max({3, 9, 5, 1}));
+    ctx.setValue("lo", std::min({3, 9, 5, 1}));
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.hi, 9);
+  assert.equal(values.lo, 1);
+});
+
 test('do-while loop runs at least once', () => {
   const src = `void onClick(CeContext& ctx, const CeEvent& event) {
     int i = 0; int n = 0;
