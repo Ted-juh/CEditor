@@ -511,7 +511,7 @@ class Parser {
         if (k.value === 'string') typeHint = 'string';
         else if (k.value === 'vector' || k.value === 'array') typeHint = 'array';
         const nx = this.peek(1).value;
-        if (nx === '=' || nx === ';' || nx === ',' || nx === '[' || nx === ')') break; // k is the name
+        if (nx === '=' || nx === ';' || nx === ',' || nx === '[' || nx === ')' || nx === '(' || nx === '{') break; // k is the name
         typeName = k.value; this.next(); continue; // part of the type
       }
       break;
@@ -522,9 +522,11 @@ class Parser {
       if (nameTok.type !== 'id') throw new Error(`expected a variable name (line ${nameTok.line})`);
       let isArray = false, arrayLen = null;
       if (this.isV('[')) { isArray = true; this.next(); arrayLen = this.isV(']') ? null : this.parseAssign(); this.eat(']'); }
-      let init = null;
+      let init = null, ctorArgs = null;
       if (this.isV('=')) { this.next(); init = this.parseInitializer(); }
-      decls.push({ name: nameTok.value, init, isArray, arrayLen, typeHint, typeName });
+      else if (this.isV('{')) init = this.parseArrayLiteral();          // direct-list-init  v{1,2,3}
+      else if (this.isV('(')) { this.next(); ctorArgs = this.parseArgs(); this.eat(')'); } // ctor  v(n, val)
+      decls.push({ name: nameTok.value, init, isArray, arrayLen, typeHint, typeName, ctorArgs });
     } while (this.isV(',') && this.next());
     if (!noSemi) this.eat(';');
     return { type: 'decl', decls };
@@ -639,6 +641,15 @@ function declDefault(d, env) {
       return { first: evalNode(d.init.elems[0], env), second: evalNode(d.init.elems[1], env) };
     }
     return evalNode(d.init, env);
+  }
+  if (d.ctorArgs) {
+    const a = d.ctorArgs.map((x) => evalNode(x, env));
+    if (d.typeName === 'vector' || d.typeName === 'array') return new Array(Math.max(0, (a[0] ?? 0) | 0)).fill(a.length >= 2 ? a[1] : 0);
+    if (d.typeName === 'string') return a.length >= 2 ? String.fromCharCode(a[1]).repeat(Math.max(0, a[0] | 0)) : String(a[0] ?? '');
+    if (d.typeName === 'pair') return { first: a[0] ?? 0, second: a[1] ?? 0 };
+    const prog = env.get('__program');
+    if (prog?.structs?.has(d.typeName)) return constructStruct(prog.structs.get(d.typeName), env);
+    return a.length === 1 ? a[0] : 0; // int x(5)
   }
   if (d.isArray) return new Array(Math.max(0, (d.arrayLen ? evalNode(d.arrayLen, env) : 0) | 0)).fill(0);
   const prog = env.get('__program');

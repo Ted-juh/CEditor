@@ -254,6 +254,25 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('constructor-style declarations: vector(n,val), string(n,ch), direct-list-init', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::vector<int> v(4, 7);
+    std::string dashes(3, '-');
+    std::vector<int> nums{2, 4, 6};
+    int total = 0;
+    for (auto x : v) total += x;
+    ctx.setValue("vsum", total);
+    ctx.setValue("vlen", v.size());
+    ctx.setValue("dash", dashes.size());
+    ctx.setValue("nums", nums[0] + nums[1] + nums[2]);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.vsum, 28); // 4 * 7
+  assert.equal(values.vlen, 4);
+  assert.equal(values.dash, 3);
+  assert.equal(values.nums, 12);
+});
+
 test('function-like #define macros expand with arguments', () => {
   const src = `
     #define SQUARE(x) ((x) * (x))
