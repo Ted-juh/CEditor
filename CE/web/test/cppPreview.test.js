@@ -254,6 +254,50 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('STL algorithms: sort, accumulate, max_element, find over a vector', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::vector<int> v;
+    v.push_back(5); v.push_back(1); v.push_back(9); v.push_back(3);
+    std::sort(v.begin(), v.end());
+    int sum = std::accumulate(v.begin(), v.end(), 0);
+    int hi = *std::max_element(v.begin(), v.end());
+    int found = (std::find(v.begin(), v.end(), 9) != v.end()) ? 1 : 0;
+    int missing = (std::find(v.begin(), v.end(), 42) != v.end()) ? 1 : 0;
+    ctx.setValue("first", v[0]);
+    ctx.setValue("sum", sum);
+    ctx.setValue("hi", hi);
+    ctx.setValue("found", found);
+    ctx.setValue("missing", missing);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.first, 1); // sorted ascending
+  assert.equal(values.sum, 18);
+  assert.equal(values.hi, 9);
+  assert.equal(values.found, 1);
+  assert.equal(values.missing, 0);
+});
+
+test('manual iterator loop with *it and ++it', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::vector<int> v;
+    for (int i = 1; i <= 3; i++) v.push_back(i * 2);
+    int total = 0;
+    for (auto it = v.begin(); it != v.end(); ++it) { total += *it; }
+    ctx.setValue("total", total);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.total, 12); // 2+4+6
+});
+
+test('std::sort with a custom comparator (lambda)', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::vector<int> v;
+    v.push_back(1); v.push_back(2); v.push_back(3);
+    std::sort(v.begin(), v.end(), [](int a, int b) { return a > b; });
+    ctx.setValue("first", v[0]);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.first, 3); // descending
+});
+
 test('top-level global constants are visible to handlers', () => {
   const src = `
     const int kMax = 127;

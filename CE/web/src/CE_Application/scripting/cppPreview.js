@@ -17,6 +17,9 @@
 //   • if/else, for, range-based for, while, switch/case (fallthrough), return, break, continue
 //   • arithmetic + - * / %, comparison, &&/|| (short-circuit), ternary ?:, unary !/-/+
 //   • calls: ctx.method(…), member a.b / a->b, indexing a[i], math builtins (std:: forms ok)
+//   • <algorithm>/<numeric> over iterators: sort (with comparator), reverse, accumulate, find/find_if,
+//     count/count_if, max_element/min_element, fill, iota, for_each, distance, begin/end; *it, ++it
+//   • top-level global variables / constants; do/while; comma operator; bitwise & | ^
 //   • string literals + concatenation; (int)x and static_cast<int>(x) casts
 //   • std::cout << … << std::endl and printf(…) → the script console
 //
@@ -35,6 +38,9 @@ const INT_CASTS = new Set(['int', 'long', 'short', 'unsigned', 'size_t', 'char',
 
 const BINPREC = { '||': 1, '&&': 2, '|': 3, '^': 4, '&': 5, '==': 6, '!=': 6, '<': 7, '<=': 7, '>': 7, '>=': 7, '+': 8, '-': 8, '*': 9, '/': 9, '%': 9 };
 
+// A random-access iterator over a JS array, used by std::begin/end and the algorithms below.
+class CppIter { constructor(container, pos) { this.container = container; this.pos = pos; } }
+
 const spreadable = (a) => (a.length === 1 && Array.isArray(a[0]) ? a[0] : a);
 const BUILTINS = {
   min: (...a) => Math.min(...spreadable(a)), max: (...a) => Math.max(...spreadable(a)), abs: Math.abs, fabs: Math.abs,
@@ -46,6 +52,22 @@ const BUILTINS = {
   static_cast: (x) => x, reinterpret_cast: (x) => x, const_cast: (x) => x, dynamic_cast: (x) => x,
   make_pair: (a, b) => ({ first: a, second: b }), swap: () => {},
   M_PI: Math.PI, M_E: Math.E, npos: -1,
+  // <algorithm> / <numeric> over [first, last) iterator ranges
+  sort: (f, l, cmp) => { const c = f.container, a = c.slice(f.pos, l.pos); a.sort(cmp ? (x, y) => (cmp(x, y) ? -1 : cmp(y, x) ? 1 : 0) : (x, y) => x - y); for (let k = 0; k < a.length; k++) c[f.pos + k] = a[k]; },
+  stable_sort: (f, l, cmp) => BUILTINS.sort(f, l, cmp),
+  reverse: (f, l) => { const c = f.container; let i = f.pos, j = l.pos - 1; while (i < j) { const t = c[i]; c[i] = c[j]; c[j] = t; i++; j--; } },
+  accumulate: (f, l, init, op) => { const c = f.container; let a = init; for (let i = f.pos; i < l.pos; i++) a = op ? op(a, c[i]) : a + c[i]; return a; },
+  count: (f, l, v) => { const c = f.container; let n = 0; for (let i = f.pos; i < l.pos; i++) if (c[i] === v) n++; return n; },
+  count_if: (f, l, p) => { const c = f.container; let n = 0; for (let i = f.pos; i < l.pos; i++) if (p(c[i])) n++; return n; },
+  find: (f, l, v) => { const c = f.container; for (let i = f.pos; i < l.pos; i++) if (c[i] === v) return new CppIter(c, i); return new CppIter(c, l.pos); },
+  find_if: (f, l, p) => { const c = f.container; for (let i = f.pos; i < l.pos; i++) if (p(c[i])) return new CppIter(c, i); return new CppIter(c, l.pos); },
+  max_element: (f, l) => { const c = f.container; let b = f.pos; for (let i = f.pos + 1; i < l.pos; i++) if (c[i] > c[b]) b = i; return new CppIter(c, b); },
+  min_element: (f, l) => { const c = f.container; let b = f.pos; for (let i = f.pos + 1; i < l.pos; i++) if (c[i] < c[b]) b = i; return new CppIter(c, b); },
+  fill: (f, l, v) => { const c = f.container; for (let i = f.pos; i < l.pos; i++) c[i] = v; },
+  iota: (f, l, v) => { const c = f.container; let x = v; for (let i = f.pos; i < l.pos; i++) c[i] = x++; },
+  for_each: (f, l, fn) => { const c = f.container; for (let i = f.pos; i < l.pos; i++) fn(c[i]); },
+  distance: (f, l) => l.pos - f.pos,
+  begin: (c) => new CppIter(c, 0), end: (c) => new CppIter(c, c.length),
 };
 
 /* ------------------------------------------------------------------------ tokenizer */
@@ -296,9 +318,13 @@ class Parser {
     const k = this.peek();
     if (k.type !== 'id') return false;
     if (DECL_LEADERS.has(k.value)) return true;
-    if (this.peek(1).type === 'id') return true;       // UserType name
-    if (this.peek(1).value === '::') return true;       // ns::Type name
-    return false;
+    // Scan a (possibly qualified / templated / pointer) type, then require a declarator name after
+    // it — so `std::vector<int> v` is a decl but `std::sort(...)` (a call) is not.
+    let i = this.i + 1;
+    while (this.t[i]?.value === '::' && this.t[i + 1]?.type === 'id') i += 2;
+    if (this.t[i]?.value === '<') { let d = 0; do { const v = this.t[i]?.value; if (v === '<') d++; else if (v === '>') d--; i++; } while (d > 0 && i < this.t.length); }
+    while (this.t[i]?.value === '*' || this.t[i]?.value === '&') i++;
+    return this.t[i]?.type === 'id';
   }
 
   parseStatement() {
@@ -477,6 +503,7 @@ class Parser {
 
   parseUnary() {
     const k = this.peek();
+    if (k.value === '*') { this.next(); return { type: 'deref', arg: this.parseUnary() }; } // *iterator
     if (k.type === 'op' && (k.value === '!' || k.value === '-' || k.value === '+')) { this.next(); return { type: 'unary', op: k.value, arg: this.parseUnary() }; }
     if (k.value === '++' || k.value === '--') { this.next(); return { type: 'preincr', op: k.value, arg: this.parseUnary() }; }
     // C-style cast: ( typeword ) expr
@@ -592,6 +619,9 @@ function containerMethod(obj, name) {
       case 'front': return () => obj[0];
       case 'empty': return () => obj.length === 0;
       case 'clear': return () => { obj.length = 0; };
+      case 'begin': case 'cbegin': return () => new CppIter(obj, 0);
+      case 'end': case 'cend': return () => new CppIter(obj, obj.length);
+      case 'resize': return (n) => { obj.length = n | 0; for (let i = 0; i < obj.length; i++) if (obj[i] === undefined) obj[i] = 0; };
     }
   } else if (typeof obj === 'string') {
     switch (name) {
@@ -630,6 +660,7 @@ function lvalue(node, env) {
     }
     return { get: () => env.get(node.name), set: (v) => env.set(node.name, v) };
   }
+  if (node.type === 'deref') { const it = evalNode(node.arg, env); if (it instanceof CppIter) return { get: () => it.container[it.pos], set: (v) => { it.container[it.pos] = v; } }; throw new Error('cannot dereference'); }
   if (node.type === 'member') { const o = evalNode(node.obj, env); return { get: () => o?.[node.name], set: (v) => { o[node.name] = v; } }; }
   if (node.type === 'index') {
     const o = evalNode(node.obj, env); const k = evalNode(node.index, env);
@@ -642,7 +673,8 @@ function lvalue(node, env) {
 function applyBin(op, a, b) {
   switch (op) {
     case '+': return a + b; case '-': return a - b; case '*': return a * b; case '/': return a / b; case '%': return a % b;
-    case '==': return a === b; case '!=': return a !== b;
+    case '==': return (a instanceof CppIter && b instanceof CppIter) ? (a.container === b.container && a.pos === b.pos) : a === b;
+    case '!=': return (a instanceof CppIter && b instanceof CppIter) ? !(a.container === b.container && a.pos === b.pos) : a !== b;
     case '<': return a < b; case '<=': return a <= b; case '>': return a > b; case '>=': return a >= b;
     case '&': return a & b; case '|': return a | b; case '^': return a ^ b;
   }
@@ -701,6 +733,7 @@ function evalNode(node, env) {
       return applyBin(node.op, evalNode(node.left, env), evalNode(node.right, env));
     }
     case 'unary': { const v = evalNode(node.arg, env); return node.op === '!' ? !truthy(v) : node.op === '-' ? -v : +v; }
+    case 'deref': { const it = evalNode(node.arg, env); if (it instanceof CppIter) return it.container[it.pos]; throw new Error('cannot dereference a non-iterator'); }
     case 'cond': return truthy(evalNode(node.c, env)) ? evalNode(node.a, env) : evalNode(node.b, env);
     case 'cast': { const v = evalNode(node.arg, env); return INT_CASTS.has(node.t) ? Math.trunc(v) : v; }
     case 'assign': {
@@ -709,8 +742,8 @@ function evalNode(node, env) {
       const v = node.op === '=' ? rhs : applyBin(node.op[0], lv.get(), rhs);
       lv.set(v); return v;
     }
-    case 'preincr': { const lv = lvalue(node.arg, env); const v = lv.get() + (node.op === '++' ? 1 : -1); lv.set(v); return v; }
-    case 'postincr': { const lv = lvalue(node.arg, env); const old = lv.get(); lv.set(old + (node.op === '++' ? 1 : -1)); return old; }
+    case 'preincr': { const lv = lvalue(node.arg, env); const cur = lv.get(); if (cur instanceof CppIter) { cur.pos += node.op === '++' ? 1 : -1; return cur; } const v = cur + (node.op === '++' ? 1 : -1); lv.set(v); return v; }
+    case 'postincr': { const lv = lvalue(node.arg, env); const cur = lv.get(); if (cur instanceof CppIter) { const old = new CppIter(cur.container, cur.pos); cur.pos += node.op === '++' ? 1 : -1; return old; } lv.set(cur + (node.op === '++' ? 1 : -1)); return cur; }
     default: throw new Error(`cannot evaluate ${node.type}`);
   }
 }
