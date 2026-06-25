@@ -61,9 +61,9 @@ export const SCRIPT_LANGUAGES = [
     id: 'cpp',
     label: 'C++',
     version: '17',
-    host: 'CeScript interpreter (preview) · clang at export',
-    live: true,    // runs live via the interpreted handler subset (cppPreview.js)
-    subset: true,  // …a subset — the full source is compiled into the export
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
+    live: true,    // runs live in the editor via the interpreted handler subset (cppPreview.js)
+    subset: true,  // …a subset; does NOT yet run in the shipped plugin (see native-handlers-design.md)
     block: '[](CeContext& ctx, const CeEvent& event) {\n  $0\n}',
     method: '.',
     comment: '//',
@@ -72,7 +72,7 @@ export const SCRIPT_LANGUAGES = [
     id: 'csharp',
     label: 'C#',
     version: '12',
-    host: 'CeScript interpreter (preview) · .NET at export',
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
     live: true,
     subset: true,
     block: '(${e}) => {\n  $0\n}',
@@ -83,7 +83,7 @@ export const SCRIPT_LANGUAGES = [
     id: 'java',
     label: 'Java',
     version: '21',
-    host: 'CeScript interpreter (preview) · javac at export',
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
     live: true,
     subset: true,
     block: '(${e}) -> {\n  $0\n}',
