@@ -28,7 +28,9 @@ test('analyze does not parse Python as Lua (no bogus diagnostics)', () => {
   const py = 'def on_value(v):\n    set("a", v)';
   const { diagnostics, symbols } = analyze(py, 'python');
   assert.equal(diagnostics.length, 0);
-  assert.equal(symbols.length, 0);
+  // Python now gets its own lightweight analysis: clean source has no diagnostics, and the
+  // def is surfaced as a function symbol (it is NOT mis-parsed as Lua).
+  assert.ok(symbols.some((s) => s.name === 'on_value' && s.kind === 'function'));
 });
 
 test('analyze returns no diagnostics for valid source', () => {

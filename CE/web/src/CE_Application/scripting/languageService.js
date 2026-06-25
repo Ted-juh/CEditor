@@ -1,6 +1,7 @@
 // languageService.js — real parser-backed language intelligence for the script editor.
 //
-// Built on acorn (JavaScript) and luaparse (Lua). From a source string it derives:
+// Built on acorn (JavaScript), luaparse (Lua), cppPreview (C++) and a lightweight Python
+// scanner (pythonService). From a source string it derives:
 //   • diagnostics  — syntax errors with precise line/col/offset (inline squiggles + panel)
 //   • symbols      — declared functions / variables / parameters (completion, go-to-def)
 //   • completions  — keywords + panel API + document symbols, filtered at the caret
@@ -14,6 +15,7 @@
 import { parse as parseJs } from 'acorn';
 import luaparse from 'luaparse';
 import { analyzeCpp, foldCpp } from './cppPreview.js';
+import { analyzePython, foldPython } from './pythonService.js';
 import {
   COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
@@ -150,8 +152,9 @@ const lastGoodSymbols = { javascript: [], lua: [] };
 export function analyze(source, languageId) {
   const src = String(source ?? '');
   if (!src.trim()) return { diagnostics: [], symbols: [] };
-  // C++ has its own interpreter front-end (cppPreview); Python (Tier-2) has no parser here.
+  // C++ has its own interpreter front-end (cppPreview); Python uses a lightweight scanner.
   if (languageId === 'cpp' || languageId === 'c++') return analyzeCpp(src);
+  if (languageId === 'python') return analyzePython(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return { diagnostics: [], symbols: [] };
 
   if (languageId === 'javascript') {
@@ -374,6 +377,7 @@ const LUA_FOLD = new Set(['FunctionDeclaration', 'IfStatement', 'ForNumericState
 export function getFoldRegions(source, languageId) {
   const src = String(source ?? '');
   if (languageId === 'cpp' || languageId === 'c++') return foldCpp(src);
+  if (languageId === 'python') return foldPython(src);
   if (languageId !== 'javascript' && languageId !== 'lua') return [];
   let ast;
   try {
