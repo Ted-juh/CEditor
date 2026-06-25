@@ -422,13 +422,14 @@ async function loadHandlersPython(script) {
 function loadHandlersCpp(script) {
   const api = buildApi(ownerOf(script));
   const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
   for (const d of diagnostics) addScriptTrace('error', script.id, `C++ preview: ${d}`);
   const out = {};
   for (const [name, fnNode] of parsed) {
     out[name] = (payload) => {
       const event = payload && typeof payload === 'object' ? payload : { value: payload };
-      try { return invokeCpp(fnNode, [ctx, event]); }
+      try { return invokeCpp(fnNode, [ctx, event], { print }); }
       catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
     };
   }

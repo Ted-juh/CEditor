@@ -22,8 +22,9 @@ function run(src, handler, event, initial) {
   const h = handlers.get(handler);
   assert.ok(h, `handler ${handler} not found; diagnostics: ${diagnostics.join('; ')}`);
   const { ctx, values, log } = makeCtx(initial);
-  const ret = invokeCpp(h, [ctx, event]);
-  return { ret, values, log, diagnostics };
+  const out = [];
+  const ret = invokeCpp(h, [ctx, event], { print: (s) => out.push(s) });
+  return { ret, values, log, out, diagnostics };
 }
 
 test('reads event.value, does arithmetic, writes via ctx.setValue', () => {
@@ -79,7 +80,8 @@ test('ctx.log is callable', () => {
 
 test('unsupported construct yields a clear diagnostic, not a crash', () => {
   const src = `void onClick(CeContext& ctx, const CeEvent& event) {
-    switch (1) { case 1: break; }
+    goto done;
+    done: ;
   }`;
   const { handlers, diagnostics } = compileCpp(src);
   assert.equal(handlers.has('onClick'), false);
@@ -92,4 +94,71 @@ test('multiple handlers in one source are all found', () => {
     void onPanelClose(CeContext& ctx, const CeEvent& event) { ctx.setValue("b", 2); }`;
   const { handlers } = compileCpp(src);
   assert.deepEqual([...handlers.keys()].sort(), ['onPanelClose', 'onPanelLoad']);
+});
+
+test('user-defined helper functions are callable (incl. recursion)', () => {
+  const src = `
+    int factorial(int n) { if (n <= 1) return 1; return n * factorial(n - 1); }
+    void onClick(CeContext& ctx, const CeEvent& event) { ctx.setValue("fac", factorial(5)); }`;
+  assert.equal(run(src, 'onClick', {}).values.fac, 120);
+});
+
+test('std::vector with push_back, size, and range-based for', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    std::vector<int> xs;
+    for (int i = 0; i < 4; i++) { xs.push_back(i * 10); }
+    int total = 0;
+    for (auto x : xs) { total += x; }
+    ctx.setValue("count", xs.size());
+    ctx.setValue("total", total);
+  }`;
+  const { values } = run(src, 'onClick', {});
+  assert.equal(values.count, 4);
+  assert.equal(values.total, 60);
+});
+
+test('C-style array with initializer list and indexing', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    double gains[3] = {1.5, 2.5, 4.0};
+    ctx.setValue("g", gains[0] + gains[2]);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.g, 5.5);
+});
+
+test('switch / case with fallthrough and break', () => {
+  const src = `void onValueChanged(CeContext& ctx, const CeEvent& event) {
+    int mode = (int)event.value;
+    int r = 0;
+    switch (mode) {
+      case 0: r = 1; break;
+      case 1: r += 10;
+      case 2: r += 100; break;
+      default: r = -1;
+    }
+    ctx.setValue("r", r);
+  }`;
+  assert.equal(run(src, 'onValueChanged', { value: 0 }).values.r, 1);
+  assert.equal(run(src, 'onValueChanged', { value: 1 }).values.r, 110); // fallthrough 1 -> 2
+  assert.equal(run(src, 'onValueChanged', { value: 9 }).values.r, -1);  // default
+});
+
+test('std::cout and printf route to the print sink', () => {
+  const src = `void onPanelLoad(CeContext& ctx, const CeEvent& event) {
+    int n = 3;
+    std::cout << "n=" << n << std::endl;
+    printf("val %d done", n);
+  }`;
+  const { out } = run(src, 'onPanelLoad', {});
+  assert.equal(out.join(''), 'n=3\nval 3 done');
+});
+
+test('std::string methods (size, substr)', () => {
+  const src = `void onPanelLoad(CeContext& ctx, const CeEvent& event) {
+    std::string s = "hello";
+    ctx.setValue("len", s.size());
+    ctx.setValue("head", s.substr(0, 2));
+  }`;
+  const { values } = run(src, 'onPanelLoad', {});
+  assert.equal(values.len, 5);
+  assert.equal(values.head, 'he');
 });
