@@ -114,24 +114,36 @@ function tokenize(src) {
   return toks;
 }
 
-// Object-like #define macros: `#define NAME replacement` (function-like macros are not expanded).
+// #define macros — object-like (`#define NAME repl`) and function-like (`#define SQ(x) ((x)*(x))`).
+function macroBody(text) {
+  const body = text.replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
+  if (!body) return [];
+  try { const t = tokenize(body); t.pop(); return t; } catch { return []; }
+}
 function extractDefines(source) {
-  const macros = new Map();
-  const re = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)(?!\()[ \t]*(.*)$/gm;
-  let m;
-  while ((m = re.exec(String(source ?? '')))) {
-    let body = m[2].replace(/\/\/.*$/, '').replace(/\/\*[\s\S]*?\*\//g, '').trim();
-    if (!body) { macros.set(m[1], []); continue; }
-    try { const t = tokenize(body); t.pop(); macros.set(m[1], t); } catch { /* skip bad macro */ }
-  }
+  const macros = new Map(); const s = String(source ?? ''); let m;
+  const reFn = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)\(([^)]*)\)[ \t]*(.*)$/gm;
+  while ((m = reFn.exec(s))) macros.set(m[1], { kind: 'fn', params: m[2].split(',').map((x) => x.trim()).filter(Boolean), body: macroBody(m[3]) });
+  const reObj = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)(?!\()[ \t]*(.*)$/gm;
+  while ((m = reObj.exec(s))) if (!macros.has(m[1])) macros.set(m[1], { kind: 'obj', body: macroBody(m[2]) });
   return macros;
 }
 
 function expandMacros(tokens, macros) {
   const out = [];
-  for (const t of tokens) {
-    if (t.type === 'id' && macros.has(t.value)) out.push(...macros.get(t.value));
-    else out.push(t);
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i], mac = t.type === 'id' ? macros.get(t.value) : null;
+    if (mac && mac.kind === 'obj') { out.push(...mac.body); continue; }
+    if (mac && mac.kind === 'fn' && tokens[i + 1]?.value === '(') {
+      const close = matchClose(tokens, i + 1, '(', ')');
+      const args = []; let cur = [], d = 0;
+      for (const a of tokens.slice(i + 2, close)) { if ('([{'.includes(a.value)) d++; if (')]}'.includes(a.value)) d--; if (a.value === ',' && d === 0) { args.push(cur); cur = []; } else cur.push(a); }
+      if (cur.length || args.length) args.push(cur);
+      const argMap = new Map(); mac.params.forEach((p, idx) => argMap.set(p, args[idx] ?? []));
+      for (const b of mac.body) { if (b.type === 'id' && argMap.has(b.value)) out.push(...argMap.get(b.value)); else out.push(b); }
+      i = close; continue;
+    }
+    out.push(t);
   }
   return out;
 }
@@ -479,6 +491,16 @@ class Parser {
   skipAngles() { let d = 0; do { const v = this.next().value; if (v === '<') d++; else if (v === '>') d--; } while (d > 0 && !this.atEnd()); }
 
   parseDecl(noSemi = false) {
+    // Structured binding: [const] auto [&] [a, b] = expr;
+    { let i = this.i; while (['const', 'auto', '&', '*'].includes(this.t[i]?.value)) i++;
+      if (this.t[i]?.value === '[') {
+        this.i = i + 1; const names = [];
+        if (!this.isV(']')) do { names.push(this.next().value); } while (this.isV(',') && this.next());
+        this.eat(']'); this.eat('='); const init = this.parseInitializer();
+        if (!noSemi) this.eat(';');
+        return { type: 'bindDecl', names, init };
+      }
+    }
     // Consume type specifiers up to the declarator name; note the kind for a sensible default value.
     let typeHint = 'num', typeName = '';
     for (;;) {
@@ -804,6 +826,13 @@ function execStmt(node, env) {
       return;
     }
     case 'decl': for (const d of node.decls) env.define(d.name, declDefault(d, env)); return;
+    case 'bindDecl': {
+      const val = evalNode(node.init, env);
+      if (val && typeof val === 'object' && 'first' in val) { env.define(node.names[0], val.first); if (node.names[1]) env.define(node.names[1], val.second); }
+      else if (Array.isArray(val)) node.names.forEach((n, i) => env.define(n, val[i]));
+      else env.define(node.names[0], val);
+      return;
+    }
     case 'block': { const inner = new Env(env); for (const s of node.body) execStmt(s, inner); return; }
     case 'if': if (truthy(evalNode(node.cond, env))) execStmt(node.then, env); else if (node.els) execStmt(node.els, env); return;
     case 'while': while (truthy(evalNode(node.cond, env))) { try { execStmt(node.body, env); } catch (e) { if (e === BREAK) break; if (e !== CONTINUE) throw e; } } return;

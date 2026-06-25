@@ -254,6 +254,27 @@ test('lambdas: definition, capture, and call', () => {
   assert.equal(values.sum, 9);
 });
 
+test('function-like #define macros expand with arguments', () => {
+  const src = `
+    #define SQUARE(x) ((x) * (x))
+    #define MAXV(a, b) ((a) > (b) ? (a) : (b))
+    void onValueChanged(CeContext& ctx, const CeEvent& event) {
+      ctx.setValue("sq", SQUARE(event.value + 1));
+      ctx.setValue("mx", MAXV(3, 8));
+    }`;
+  const { values } = run(src, 'onValueChanged', { value: 4 });
+  assert.equal(values.sq, 25); // (4+1)^2, parens protect precedence
+  assert.equal(values.mx, 8);
+});
+
+test('statement-level structured binding', () => {
+  const src = `void onClick(CeContext& ctx, const CeEvent& event) {
+    auto [q, r] = std::make_pair(10, 20);
+    ctx.setValue("d", r - q);
+  }`;
+  assert.equal(run(src, 'onClick', {}).values.d, 10);
+});
+
 test('object-like #define macros expand', () => {
   const src = `
     #define MAX_LEVEL 127
