@@ -323,6 +323,25 @@ if (CEDITOR_SCRIPTING)
     if (TARGET CEditorPlayerVST)
         target_link_libraries(CEditorPlayerVST PRIVATE ceditor_scripting)
         message(STATUS "CEditor: scripting runtime LINKED into CEditorPlayerVST (window-closed scripts).")
+
+        # When CPython is embedded, the bundled libpython is co-located with the plugin binary (the
+        # exporter copies it there). libpython is a runtime shared-lib dependency (DT_NEEDED / dylib
+        # load command) recorded with the BUILD machine's path, so a clean end-user box can't resolve
+        # it without a self-relative runpath. Lua/JS are static (no runtime dep) and need none.
+        # UNVERIFIED until a native mac/Linux build; on mac also rewrite libpython's install-name to
+        # @loader_path/<lib> (install_name_tool) where the bundler places it.
+        if (CEDITOR_PYTHON)
+            foreach(_fmt VST3 Standalone)
+                set(_t CEditorPlayerVST_${_fmt})
+                if (TARGET ${_t})
+                    if (APPLE)
+                        set_target_properties(${_t} PROPERTIES BUILD_WITH_INSTALL_RPATH ON INSTALL_RPATH "@loader_path")
+                    elseif (UNIX)
+                        set_target_properties(${_t} PROPERTIES BUILD_WITH_INSTALL_RPATH ON INSTALL_RPATH "$ORIGIN")
+                    endif()
+                endif()
+            endforeach()
+        endif()
     endif()
 
     message(STATUS "CEditor: scripting runtime ENABLED (link `ceditor_scripting` into your host target).")

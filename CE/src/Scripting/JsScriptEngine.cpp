@@ -32,6 +32,18 @@ function __deliver(target, event, payload) {
 }
 function set(path, value, opts) { return __api.set(path, value, opts || null); }
 function get(path, form) { return __api.get(path, form || "value"); }
+
+// `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is injected per
+// script (boot string below). Plain object literal (not an ES class) so it works in QuickJS configs
+// without class support. Empty/"self"/"*" owner => no prefix.
+function __ownerPrefix(p) {
+  var o = (typeof __owner !== 'undefined' && __owner) ? __owner : "";
+  return (!o || o === "self" || o === "*") ? p : (o + "." + p);
+}
+var self = {
+  set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
+  get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+};
 function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
@@ -75,7 +87,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
 {
     using Args = juce::var::NativeFunctionArgs;
     auto api = new juce::DynamicObject();
-    juce::ignoreUnused (owner); // owner-relative resolution is applied via `self` in the prelude (future)
+    juce::ignoreUnused (owner); // owner-relative resolution is applied via `self`/__owner in the prelude
 
     auto arg = [] (const Args& a, int i) -> juce::var { return i < a.numArguments ? a.arguments[i] : juce::var(); };
 

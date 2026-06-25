@@ -83,6 +83,12 @@ int main()
     scripts.add (makeScript ("py2", "onValueChanged", "*",
         "def onValueChanged(value):\n"
         "    log(\"second \" + str(value * 2))\n"));
+    // round() is a superset of the prelude's 1-arg helper: 1-arg = half-up int (Lua/JS parity),
+    // 2-arg = Python's builtin (ported code calling round(x, 2) must not raise TypeError).
+    scripts.add (makeScript ("pyRound", "onValueChanged", "*",
+        "def onValueChanged(value):\n"
+        "    set(\"r1\", round(2.5))\n"
+        "    set(\"r2\", round(3.14159, 2))\n"));
     runtime.loadScripts (juce::var (scripts));
 
     runtime.dispatchEvent ("onValueChanged", "panel", juce::var (64));
@@ -91,6 +97,8 @@ int main()
     check (cutoff > 50.0 && cutoff < 51.0, "Python ran: set(cutoff.value) via scale() => ~50.4 (got " + juce::String (cutoff) + ")");
     check (host.logs.contains ("py got 64"), "Python ran: log(\"py got 64\")");
     check (host.logs.contains ("second 128"), "Isolation: py2.onValueChanged fired independently (second 128)");
+    check ((int) host.values["r1"] == 3, "round(2.5) -> 3 (1-arg half-up int, Lua/JS parity)");
+    { const double r2 = (double) host.values["r2"]; check (r2 > 3.13 && r2 < 3.15, "round(3.14159, 2) -> ~3.14 (2-arg builtin, no TypeError)"); }
 
     runtime.onPanelReady (true);
     check (host.logs.contains ("stdlib 7 42"), "FULL STDLIB: import json + re worked window-closed");

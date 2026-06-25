@@ -80,48 +80,89 @@ function dirSize(p) {
 }
 function pythonInfo() {
   try {
-    const out = execSync(
-      'python -c "import sys; print(sys.base_prefix); print(\'%d.%d\' % sys.version_info[:2])"',
-      { encoding: 'utf8' }
-    ).trim().split(/\r?\n/);
-    return { prefix: out[0], ver: out[1] };
+    // One newline-separated query that works in both `cmd` and POSIX sh (single quotes inside, double
+    // outside). POSIX fields (libdir/ldlibrary/instsoname/stdlib/dynload) are empty on Windows.
+    const expr = "import sys,sysconfig as s;"
+      + "print(sys.base_prefix);"
+      + "print('%d.%d'%sys.version_info[:2]);"
+      + "print(s.get_config_var('LIBDIR') or '');"
+      + "print(s.get_config_var('LDLIBRARY') or '');"
+      + "print(s.get_config_var('INSTSONAME') or '');"
+      + "print(s.get_path('stdlib') or '');"
+      + "print(s.get_config_var('DESTSHARED') or '')";
+    const out = execSync(`python -c "${expr}"`, { encoding: 'utf8' }).trim().split(/\r?\n/);
+    return { prefix: out[0], ver: out[1], libdir: out[2], ldlibrary: out[3], instsoname: out[4], stdlib: out[5], dynload: out[6] };
   } catch { return null; }
 }
-// Copy the CPython runtime + full stdlib into <vst3>/Contents/x86_64-win/PythonRuntime (where the
-// engine's resolvePythonHome() looks). Returns bytes added (0 if it couldn't locate a Python install).
+// The JUCE VST3 bundle puts the binary in a platform-specific subfolder: Contents/x86_64-win (Win),
+// Contents/MacOS (mac), Contents/<arch>-linux (Linux). Pick the one that exists, with a sane default.
+function vst3BinDir(vst3Dir) {
+  const contents = path.join(vst3Dir, 'Contents');
+  if (process.platform === 'darwin') return path.join(contents, 'MacOS');
+  const want = process.platform === 'win32' ? /-win$/ : /-linux$/;
+  const sub = existsSync(contents)
+    ? readdirSync(contents).find((d) => want.test(d) && statSync(path.join(contents, d)).isDirectory())
+    : null;
+  return sub ? path.join(contents, sub)
+             : path.join(contents, process.platform === 'win32' ? 'x86_64-win' : 'x86_64-linux');
+}
+// Copy the CPython runtime + full stdlib into the VST3 bundle (where the engine's resolvePythonHome()
+// looks). Returns bytes added (0 if it couldn't locate a Python install).
+// NOTE: the Windows layout is shipped + exercised; the macOS/Linux branch is UNVERIFIED — the exact
+// PYTHONHOME stdlib layout and dylib/.so loader resolution must be confirmed against a native build.
 function bundlePythonRuntime(vst3Dir) {
   const info = pythonInfo();
   if (!info) { console.warn('  ⚠ Python not found on PATH — runtime NOT bundled. Install Python or set it on PATH.'); return 0; }
-  const binDir = path.join(vst3Dir, 'Contents', 'x86_64-win');
+  const binDir = vst3BinDir(vst3Dir);
   if (!existsSync(binDir)) { console.warn('  ⚠ VST3 binary dir not found, runtime NOT bundled:', binDir); return 0; }
-  const runtime = path.join(binDir, 'PythonRuntime');
+  // resolvePythonHome() probes <module>/PythonRuntime and <module>/Resources/PythonRuntime; on mac the
+  // binary is in Contents/MacOS so its Resources sibling is the natural home.
+  const runtime = process.platform === 'darwin'
+    ? path.join(vst3Dir, 'Contents', 'Resources', 'PythonRuntime')
+    : path.join(binDir, 'PythonRuntime');
   mkdirSync(runtime, { recursive: true });
-  const verNoDot = info.ver.replace('.', '');
   // Exclude site-packages (third-party pip installs — NOT the stdlib, can be hundreds of MB) and
-  // __pycache__ (compiled bytecode, regenerated on first import). Everything else under Lib/ is the
-  // genuine full standard library.
+  // __pycache__ (compiled bytecode, regenerated on first import). Everything else is the full stdlib.
   const skip = (src) => {
     const n = src.replace(/\\/g, '/');
     return !/\/site-packages(\/|$)/.test(n) && !/\/__pycache__(\/|$)/.test(n);
   };
   let added = 0;
-  // The interpreter DLLs are IMPLICITLY linked, so the loader must resolve them from the plugin's OWN
-  // directory at load time (it does NOT search subdirs). Place python3.dll + pythonXX.dll next to the
-  // plugin binary — NOT in PythonRuntime — or the plugin won't load on a machine without Python on PATH.
-  for (const dll of ['python3.dll', `python${verNoDot}.dll`]) {
-    const src = path.join(info.prefix, dll);
-    if (existsSync(src)) { const dst = path.join(binDir, dll); cpSync(src, dst); added += statSync(dst).size; }
-    else console.warn(`  ⚠ missing CPython DLL: ${src}`);
-  }
-  // The stdlib (Lib/) + C-extension modules (DLLs/) go in PythonRuntime/, which the engine points
-  // PYTHONHOME at (resolvePythonHome) so <home>/Lib + <home>/DLLs are on sys.path.
-  for (const dir of ['Lib', 'DLLs']) {
-    const src = path.join(info.prefix, dir);
-    if (existsSync(src)) { const dst = path.join(runtime, dir); cpSync(src, dst, { recursive: true, filter: skip }); added += dirSize(dst); }
-    else console.warn(`  ⚠ missing CPython dir: ${src}`);
+
+  if (process.platform === 'win32') {
+    const verNoDot = info.ver.replace('.', '');
+    // Interpreter DLLs are IMPLICITLY linked, so the loader must resolve them from the plugin's OWN
+    // directory (it does NOT search subdirs). Place them next to the binary, NOT in PythonRuntime.
+    for (const dll of ['python3.dll', `python${verNoDot}.dll`]) {
+      const src = path.join(info.prefix, dll);
+      if (existsSync(src)) { const dst = path.join(binDir, dll); cpSync(src, dst); added += statSync(dst).size; }
+      else console.warn(`  ⚠ missing CPython DLL: ${src}`);
+    }
+    // Stdlib (Lib/) + C-extension modules (DLLs/) go in PythonRuntime/, where PYTHONHOME points.
+    for (const dir of ['Lib', 'DLLs']) {
+      const src = path.join(info.prefix, dir);
+      if (existsSync(src)) { const dst = path.join(runtime, dir); cpSync(src, dst, { recursive: true, filter: skip }); added += dirSize(dst); }
+      else console.warn(`  ⚠ missing CPython dir: ${src}`);
+    }
+  } else {
+    // macOS/Linux: place the shared libpython next to the binary (rpath @loader_path / $ORIGIN — see
+    // CMakeLists CEDITOR_PYTHON), and the stdlib + lib-dynload under PythonRuntime/lib/pythonX.Y.
+    for (const lib of [info.ldlibrary, info.instsoname].filter(Boolean)) {
+      const src = path.join(info.libdir, lib);
+      if (existsSync(src)) { const dst = path.join(binDir, path.basename(src)); cpSync(src, dst); added += statSync(dst).size; }
+      else console.warn(`  ⚠ missing libpython: ${src}`);
+    }
+    if (info.stdlib && existsSync(info.stdlib)) {
+      const dst = path.join(runtime, 'lib', `python${info.ver}`);
+      cpSync(info.stdlib, dst, { recursive: true, filter: skip }); added += dirSize(dst);
+    } else console.warn('  ⚠ missing CPython stdlib dir:', info.stdlib);
+    if (info.dynload && existsSync(info.dynload)) {
+      const dst = path.join(runtime, 'lib', `python${info.ver}`, 'lib-dynload');
+      cpSync(info.dynload, dst, { recursive: true, filter: skip }); added += dirSize(dst);
+    }
   }
   if (added === 0) { console.warn('  ⚠ No CPython runtime files copied from', info.prefix); return 0; }
-  console.log(`  Bundled CPython ${info.ver} (full stdlib) — interpreter DLLs beside the plugin, stdlib in PythonRuntime/`);
+  console.log(`  Bundled CPython ${info.ver} (full stdlib) — interpreter lib beside the plugin, stdlib in PythonRuntime/`);
   return added;
 }
 
