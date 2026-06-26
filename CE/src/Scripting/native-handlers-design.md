@@ -11,12 +11,14 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ✅ **verified against real JUCE 8**: `node tools/scripts/nativeHandlers/cpp/verify-host.mjs` builds the loader + `juce_core` + a generated module and asserts load→init→hasHandler→dispatch→host callbacks. (Building it caught two real bugs: a `juce::DynamicLibrary` move-assignment and a dangling-`CeStr` lifetime.) |
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
-| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ written, build-unverified |
-| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,genJava.mjs}` | ⚠️ written, build-unverified |
+| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ generator output **structurally verified** (`verify-csharp.mjs`: the five entry points, csproj AOT knobs, per-script registration). Actual `dotnet publish` AOT build still needs the .NET SDK. |
+| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,genJava.mjs}` | ⚠️ **type-checks against the real GraalVM SDK** (`verify-java.mjs`: javac against `graal-sdk` — @CEntryPoint/@CStruct/@CField + generated registry all compile). Actual `native-image` build still needs a GraalVM toolchain. |
 | Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ written, build-unverified |
 
-The remaining gate is a real per-OS build (JUCE for the loader; .NET SDK / GraalVM for the managed
-modules) + a DAW load test. The C++ path is the proof the ABI + dispatch model are sound.
+Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` (each check skips when its toolchain
+is absent). What still needs a real per-OS build: the `dotnet publish` (C#) and `native-image` + C-shim
+link (Java) AOT compiles, and a DAW load test. The C++ path — generator AND the host loader against
+real JUCE — is fully proven, so the ABI + dispatch model are sound; C#/Java reuse them unchanged.
 
 ---
 
