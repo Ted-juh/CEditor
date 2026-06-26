@@ -192,7 +192,31 @@ execSync('npm run build', { cwd: path.join(repo, 'CE', 'web'), stdio: 'inherit' 
 
 // 3. Configure (DEV_MODE OFF -> bundled UI, not localhost) with this panel's identity, build the
 //    VST3 wrapper, copy to export-out, then restore DEV_MODE ON so the dev build dir is unchanged.
-const vcvars = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat';
+// Locate vcvars64.bat without hardcoding a machine-specific path: ask vswhere (the supported way),
+// then fall back to the well-known VS 2022/2025 install roots.
+function findVcvars() {
+  const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  const vswhere = path.join(pf86, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
+  try {
+    if (existsSync(vswhere)) {
+      const installPath = execSync(`"${vswhere}" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`, { encoding: 'utf8' }).trim();
+      const c = installPath && path.join(installPath, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
+      if (c && existsSync(c)) return c;
+    }
+  } catch { /* fall through to known roots */ }
+  for (const root of [
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise',
+    'C:\\Program Files\\Microsoft Visual Studio\\18\\Community',
+  ]) {
+    const c = path.join(root, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
+    if (existsSync(c)) return c;
+  }
+  throw new Error('Could not locate vcvars64.bat — install Visual Studio with the "Desktop development with C++" workload.');
+}
+const vcvars = findVcvars();
+console.log('Using Visual Studio:', vcvars);
 const cfg = `cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
   + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
   + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
