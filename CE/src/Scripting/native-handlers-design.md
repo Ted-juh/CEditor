@@ -8,7 +8,7 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | Piece | File | Status |
 |---|---|---|
 | Shared C ABI | `NativeHandlerAbi.h` | ✅ done; compiles as C and C++ |
-| Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ⚠️ written, needs a JUCE build |
+| Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ✅ **verified against real JUCE 8**: `node tools/scripts/nativeHandlers/cpp/verify-host.mjs` builds the loader + `juce_core` + a generated module and asserts load→init→hasHandler→dispatch→host callbacks. (Building it caught two real bugs: a `juce::DynamicLibrary` move-assignment and a dangling-`CeStr` lifetime.) |
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
 | C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ written, build-unverified |

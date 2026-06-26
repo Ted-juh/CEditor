@@ -43,12 +43,9 @@ namespace
 struct HostCtx { ScriptHostApi* host = nullptr; };
 
 // --- CeStr helpers ------------------------------------------------------------------------------
-CeStr toCeStr (const juce::String& s, std::vector<std::string>& pool)
-{
-    pool.emplace_back (s.toStdString());
-    auto& back = pool.back();
-    return CeStr { back.data(), (int64_t) back.size() };
-}
+// A CeStr borrows a std::string's buffer — keep the owning std::string in a named local for the whole
+// call (do NOT build several CeStr from a growing vector: a reallocation dangles earlier pointers).
+CeStr borrow (const std::string& s) { return CeStr { s.data(), (int64_t) s.size() }; }
 juce::String fromCeStr (const CeStr& s)
 {
     return s.ptr == nullptr ? juce::String() : juce::String::fromUTF8 (s.ptr, (int) s.len);
@@ -238,10 +235,10 @@ public:
         auto langIt = scriptLang.find (scriptId);
         if (langIt == scriptLang.end()) return false;
         auto modIt = modules.find (langIt->second);
-        if (modIt == modules.end() || ! modIt->second.ok) return false;
-        const auto& m = modIt->second;
-        std::vector<std::string> pool;
-        return m.has (m.state, toCeStr (scriptId, pool), toCeStr (fn, pool)) != 0;
+        if (modIt == modules.end() || modIt->second == nullptr || ! modIt->second->ok) return false;
+        const auto& m = *modIt->second;
+        const std::string sidS = scriptId.toStdString(), fnS = fn.toStdString();
+        return m.has (m.state, borrow (sidS), borrow (fnS)) != 0;
     }
 
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
@@ -250,10 +247,10 @@ public:
         auto langIt = scriptLang.find (scriptId);
         if (langIt == scriptLang.end()) return {};
         auto modIt = modules.find (langIt->second);
-        if (modIt == modules.end() || ! modIt->second.ok) return {};
-        auto& m = modIt->second;
+        if (modIt == modules.end() || modIt->second == nullptr || ! modIt->second->ok) return {};
+        auto& m = *modIt->second;
 
-        std::vector<std::string> pool;
+        const std::string sidS = scriptId.toStdString(), fnS = fn.toStdString();
         CeValue arg = buildCeValue (payload);
         CeValue result {}; result.tag = CE_NULL;
         int rc = -1;
@@ -261,7 +258,7 @@ public:
         // catch hardware faults (segfault) — see native-handlers-design.md §5. Windows SEH hardening
         // is a TODO (needs a C shim with no C++ objects in scope).
         try {
-            rc = m.dispatch (m.state, toCeStr (scriptId, pool), toCeStr (fn, pool), &arg, &result);
+            rc = m.dispatch (m.state, borrow (sidS), borrow (fnS), &arg, &result);
         } catch (...) {
             onError (scriptId, "native handler threw across the ABI boundary");
             freeCeValueDeep (&arg);
@@ -279,8 +276,9 @@ public:
         for (auto& kv : modules)
         {
             auto& m = kv.second;
-            if (m.ok && m.shutdown != nullptr && m.state != nullptr) m.shutdown (m.state);
-            m.lib.close();
+            if (m == nullptr) continue;
+            if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
+            m->lib.close();
         }
         modules.clear();
         scriptLang.clear();
@@ -308,14 +306,17 @@ private:
     Module* ensureModule (const juce::String& language, const ScriptErrorSink& onError)
     {
         if (auto it = modules.find (language); it != modules.end())
-            return it->second.ok ? &it->second : nullptr;
+            return (it->second && it->second->ok) ? it->second.get() : nullptr;
 
-        Module m;
+        // Heap-allocated (juce::DynamicLibrary is non-movable, and the heap address keeps the vtable's
+        // host_ctx pointer stable for the module's whole lifetime).
+        auto mp = std::make_unique<Module>();
+        Module& m = *mp;
         const auto file = hostModuleDir().getChildFile (moduleFileName (language));
         if (! file.existsAsFile() || ! m.lib.open (file.getFullPathName()))
         {
             onError ("native:" + language, "handler module not found: " + file.getFullPathName());
-            modules[language] = std::move (m);
+            modules[language] = std::move (mp);
             return nullptr;
         }
 
@@ -327,13 +328,13 @@ private:
         if (ver == nullptr || ini == nullptr || m.dispatch == nullptr || m.has == nullptr)
         {
             onError ("native:" + language, "handler module missing required entry points");
-            modules[language] = std::move (m);
+            modules[language] = std::move (mp);
             return nullptr;
         }
         if (ver() != CE_ABI_VERSION)
         {
             onError ("native:" + language, "handler module ABI mismatch (got " + juce::String (ver()) + ", expected " + juce::String (CE_ABI_VERSION) + ")");
-            modules[language] = std::move (m);
+            modules[language] = std::move (mp);
             return nullptr;
         }
 
@@ -341,27 +342,27 @@ private:
         m.vtable = CeHostVtable {};
         m.vtable.abi_version = CE_ABI_VERSION;
         m.vtable.struct_size = (uint32_t) sizeof (CeHostVtable);
-        m.vtable.host_ctx    = &modules; // placeholder; fixed up after the map insert below
+        m.vtable.host_ctx    = &m.ctx; // stable: m lives on the heap for the module's lifetime
         m.vtable.set = host_set; m.vtable.get = host_get;
         m.vtable.send_cc = host_send_cc; m.vtable.send_nrpn = host_send_nrpn; m.vtable.send_sysex = host_send_sysex;
         m.vtable.log = host_log; m.vtable.emit = host_emit;
         m.vtable.free_value = host_free_value; m.vtable.alloc = host_alloc; m.vtable.dealloc = host_dealloc;
 
-        auto& stored = (modules[language] = std::move (m));
-        stored.vtable.host_ctx = &stored.ctx; // stable address now that it lives in the map
-        if (ini (&stored.vtable, &stored.state) != 0 || stored.state == nullptr)
+        if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
         {
             onError ("native:" + language, "handler module init failed");
-            stored.ok = false;
+            modules[language] = std::move (mp);
             return nullptr;
         }
-        stored.ok = true;
-        return &stored;
+        m.ok = true;
+        Module* raw = mp.get();
+        modules[language] = std::move (mp);
+        return raw;
     }
 
     ScriptHostApi* host = nullptr;
-    std::map<juce::String, Module> modules;       // language -> loaded module
-    std::map<juce::String, juce::String> scriptLang; // scriptId -> language
+    std::map<juce::String, std::unique_ptr<Module>> modules; // language -> loaded module (heap: stable addr)
+    std::map<juce::String, juce::String> scriptLang;         // scriptId -> language
 };
 
 std::unique_ptr<ScriptEngine> createNativeHandlerEngine() { return std::make_unique<NativeHandlerEngine>(); }
