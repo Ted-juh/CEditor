@@ -69,12 +69,15 @@ if (embedPython && process.platform !== 'win32')
   console.warn('  ⚠ Python embed requested, but the runtime bundler only fully supports the Windows VST3 layout yet — '
     + 'Python may NOT run window-closed on this platform (only window-open). Lua/JS are unaffected.');
 
-// --- Native handlers (C++/C#/Java compiled-at-export) — opt-in, experimental/build-unverified ---
-// 'on' AOT-compiles each panel's C++/C#/Java handlers into native modules bundled beside the plugin,
-// and links the loader (-DCEDITOR_NATIVE_HANDLERS=ON). Default off: those handlers stay preview-only.
-const compileNative = (es.compileNativeHandlers ?? 'off') === 'on';
-if (compileNative)
-  console.log('Native handlers: compile-at-export ENABLED (experimental) — C++/C#/Java handlers will be AOT-compiled into native modules.');
+// --- Native handlers (C++/C#/Java compiled-at-export) ---
+// 'auto' (default) AOT-compiles the native-handler languages the panel actually uses, when their
+// toolchain is present (index.mjs warns + skips any that's missing, so the export never hard-fails);
+// 'on' forces it; 'off' keeps those handlers preview-only. When active it also links the loader
+// (-DCEDITOR_NATIVE_HANDLERS=ON) so the shipped plugin can load the modules.
+const nhMode = es.compileNativeHandlers ?? 'auto';
+const nativeLangs = ['cpp', 'csharp', 'java'].filter((l) => panelScriptLanguages(panelDoc).has(l));
+const compileNative = nhMode === 'on' || (nhMode === 'auto' && nativeLangs.length > 0);
+console.log(`Native handlers: mode=${nhMode}, panel uses [${nativeLangs.join(', ') || 'none'}] -> ${compileNative ? 'COMPILE (toolchain permitting)' : 'skip'}`);
 
 // --- size + python-bundling helpers ---
 const mb = (bytes) => (bytes / 1048576).toFixed(1);

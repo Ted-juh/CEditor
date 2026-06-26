@@ -40,9 +40,10 @@ export function createPanel(name = null) {
       // Costs ~the size of a CPython runtime + stdlib in the exported plugin (shown in the Export tab).
       embedPython: 'auto',
       // Compile-at-export C++/C#/Java handlers into native modules (no language runtime shipped).
-      // 'off' = those handlers stay editor-preview-only; 'on' = AOT-compile + bundle them (experimental,
-      // needs the per-language toolchains on the export machine — see native-handlers-design.md).
-      compileNativeHandlers: 'off',
+      // 'auto' = compile the native-handler languages the panel actually uses, when their toolchain is
+      // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
+      // warning for any that's missing; 'on' = force; 'off' = keep those handlers editor-preview-only.
+      compileNativeHandlers: 'auto',
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,
