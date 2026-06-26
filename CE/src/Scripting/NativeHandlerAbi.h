@@ -88,14 +88,16 @@ typedef struct CeHostVtable {
     uint32_t struct_size;   /* sizeof(CeHostVtable) — append-only growth, handler checks before new fields */
     void*    host_ctx;      /* opaque; passed back to every call below */
 
-    /* Panel API surface — mirrors ScriptHostApi (set/get/sendCC/log/...). UTF-8 keys. */
-    int  (CE_CALL *set)     (void* host_ctx, CeStr key, const CeValue* v, const CeValue* opts /*nullable*/);
-    int  (CE_CALL *get)     (void* host_ctx, CeStr key, CeStr form, CeValue* out /*host-owned, free_value*/);
+    /* Panel API surface — mirrors ScriptHostApi (set/get/sendCC/log/...). UTF-8 keys. All struct args
+     * are passed BY POINTER (never by value): a GraalVM @CStruct is a pointer type, so a by-value struct
+     * arg can't be expressed on the Java callback side. C/C++ callers simply take the address. */
+    int  (CE_CALL *set)     (void* host_ctx, const CeStr* key, const CeValue* v, const CeValue* opts /*nullable*/);
+    int  (CE_CALL *get)     (void* host_ctx, const CeStr* key, const CeStr* form, CeValue* out /*host-owned, free_value*/);
     void (CE_CALL *send_cc) (void* host_ctx, int32_t channel, int32_t cc, const CeValue* v);
     void (CE_CALL *send_nrpn)(void* host_ctx, int32_t channel, int32_t msb, int32_t lsb, const CeValue* v);
-    void (CE_CALL *send_sysex)(void* host_ctx, CeBytes bytes);
-    void (CE_CALL *log)     (void* host_ctx, int32_t level, CeStr msg);
-    void (CE_CALL *emit)    (void* host_ctx, CeStr name, const CeValue* data /*nullable*/);
+    void (CE_CALL *send_sysex)(void* host_ctx, const CeBytes* bytes);
+    void (CE_CALL *log)     (void* host_ctx, int32_t level, const CeStr* msg);
+    void (CE_CALL *emit)    (void* host_ctx, const CeStr* name, const CeValue* data /*nullable*/);
 
     /* Memory discipline. Free a value the HOST produced (e.g. via get). */
     void (CE_CALL *free_value)(void* host_ctx, CeValue* v);

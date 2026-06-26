@@ -13,17 +13,17 @@ static std::map<std::string,double> g_set;
 static int g_cc = -1;
 static std::string g_log;
 
-static int  CE_CALL h_set(void*, CeStr k, const CeValue* v, const CeValue*) {
-  std::string key(k.ptr,(size_t)k.len);
+static int  CE_CALL h_set(void*, const CeStr* k, const CeValue* v, const CeValue*) {
+  std::string key(k->ptr,(size_t)k->len);
   double d = v->tag==CE_DOUBLE? v->u.d : v->tag==CE_INT64? (double)v->u.i : 0;
   g_set[key]=d; return 0;
 }
-static int  CE_CALL h_get(void*, CeStr, CeStr, CeValue* out){ if(out){out->tag=CE_NULL;} return 0; }
+static int  CE_CALL h_get(void*, const CeStr*, const CeStr*, CeValue* out){ if(out){out->tag=CE_NULL;} return 0; }
 static void CE_CALL h_cc(void*, int32_t, int32_t cc, const CeValue*){ g_cc=cc; }
 static void CE_CALL h_nrpn(void*, int32_t,int32_t,int32_t,const CeValue*){}
-static void CE_CALL h_sysex(void*, CeBytes){}
-static void CE_CALL h_log(void*, int32_t, CeStr m){ g_log.assign(m.ptr,(size_t)m.len); }
-static void CE_CALL h_emit(void*, CeStr, const CeValue*){}
+static void CE_CALL h_sysex(void*, const CeBytes*){}
+static void CE_CALL h_log(void*, int32_t, const CeStr* m){ g_log.assign(m->ptr,(size_t)m->len); }
+static void CE_CALL h_emit(void*, const CeStr*, const CeValue*){}
 static void CE_CALL h_freev(void*, CeValue*){}
 static void* CE_CALL h_alloc(void*, size_t n){ return malloc(n); }
 static void  CE_CALL h_dealloc(void*, void* p, size_t){ free(p); }

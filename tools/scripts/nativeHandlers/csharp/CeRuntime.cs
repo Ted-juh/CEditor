@@ -127,20 +127,20 @@ namespace Ce
         public uint struct_size; // sizeof(CeHostVtable) on the host side — gate before reading new fields
         public IntPtr host_ctx;  // void* opaque, passed back to every callback below
 
-        // int set(void* host_ctx, CeStr key, const CeValue* v, const CeValue* opts /*nullable*/);
-        public delegate* unmanaged[Cdecl]<IntPtr, CeStr, CeValue*, CeValue*, int> set;
-        // int get(void* host_ctx, CeStr key, CeStr form, CeValue* out /*host-owned, free_value*/);
-        public delegate* unmanaged[Cdecl]<IntPtr, CeStr, CeStr, CeValue*, int> get;
+        // int set(void* host_ctx, const CeStr* key, const CeValue* v, const CeValue* opts /*nullable*/);
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, CeValue*, int> set;
+        // int get(void* host_ctx, const CeStr* key, const CeStr* form, CeValue* out /*host-owned, free_value*/);
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeStr*, CeValue*, int> get;
         // void send_cc(void* host_ctx, int32_t channel, int32_t cc, const CeValue* v);
         public delegate* unmanaged[Cdecl]<IntPtr, int, int, CeValue*, void> send_cc;
         // void send_nrpn(void* host_ctx, int32_t channel, int32_t msb, int32_t lsb, const CeValue* v);
         public delegate* unmanaged[Cdecl]<IntPtr, int, int, int, CeValue*, void> send_nrpn;
-        // void send_sysex(void* host_ctx, CeBytes bytes);
-        public delegate* unmanaged[Cdecl]<IntPtr, CeBytes, void> send_sysex;
-        // void log(void* host_ctx, int32_t level, CeStr msg);
-        public delegate* unmanaged[Cdecl]<IntPtr, int, CeStr, void> log;
-        // void emit(void* host_ctx, CeStr name, const CeValue* data /*nullable*/);
-        public delegate* unmanaged[Cdecl]<IntPtr, CeStr, CeValue*, void> emit;
+        // void send_sysex(void* host_ctx, const CeBytes* bytes);
+        public delegate* unmanaged[Cdecl]<IntPtr, CeBytes*, void> send_sysex;
+        // void log(void* host_ctx, int32_t level, const CeStr* msg);
+        public delegate* unmanaged[Cdecl]<IntPtr, int, CeStr*, void> log;
+        // void emit(void* host_ctx, const CeStr* name, const CeValue* data /*nullable*/);
+        public delegate* unmanaged[Cdecl]<IntPtr, CeStr*, CeValue*, void> emit;
         // void free_value(void* host_ctx, CeValue* v);
         public delegate* unmanaged[Cdecl]<IntPtr, CeValue*, void> free_value;
         // void* alloc(void* host_ctx, size_t n);
@@ -298,13 +298,13 @@ namespace Ce
                     {
                         scratch = v.OwnedBacking;
                         scratch.s = new CeStr { ptr = (IntPtr)sp, len = v.OwnedUtf8.Length };
-                        _h->set(_h->host_ctx, key, &scratch, null);
+                        _h->set(_h->host_ctx, &key, &scratch, null);
                     }
                 }
                 else
                 {
                     CeValue* abi = v.Abi(&scratch);
-                    _h->set(_h->host_ctx, key, abi, null);
+                    _h->set(_h->host_ctx, &key, abi, null);
                 }
             }
             finally { Utf8.Free(key); }
@@ -321,7 +321,7 @@ namespace Ce
             try
             {
                 CeValue outv = CeValue.Null();
-                _h->get(_h->host_ctx, key, frm, &outv);
+                _h->get(_h->host_ctx, &key, &frm, &outv);
                 Var r = CopyOut(&outv);
                 _h->free_value(_h->host_ctx, &outv); // host-produced value -> host frees
                 return r;
@@ -355,7 +355,7 @@ namespace Ce
         public void Log(string msg)
         {
             CeStr m = Utf8.Alloc(msg);
-            try { _h->log(_h->host_ctx, 0, m); }
+            try { _h->log(_h->host_ctx, 0, &m); }
             finally { Utf8.Free(m); }
         }
 
@@ -371,13 +371,13 @@ namespace Ce
                     {
                         scratch = data.OwnedBacking;
                         scratch.s = new CeStr { ptr = (IntPtr)sp, len = data.OwnedUtf8.Length };
-                        _h->emit(_h->host_ctx, nm, &scratch);
+                        _h->emit(_h->host_ctx, &nm, &scratch);
                     }
                 }
                 else
                 {
                     CeValue* abi = data.Abi(&scratch);
-                    _h->emit(_h->host_ctx, nm, abi);
+                    _h->emit(_h->host_ctx, &nm, abi);
                 }
             }
             finally { Utf8.Free(nm); }

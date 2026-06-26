@@ -81,13 +81,20 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
       if (!have('native-image')) return { ok: false, lang, error: 'GraalVM native-image not found on PATH' };
       const { generateJavaModule } = await import('./java/genJava.mjs');
       const gen = generateJavaModule({ scripts, outDir, abiInfo: { dir: ABI_DIR } });
-      // buildSteps groups the native-image compile then the C-shim compile+link (see genJava.mjs +
-      // the emitted BUILD.md). The shim commands are Linux-shaped; on win/mac follow BUILD.md instead.
+      // buildSteps groups the native-image compile + rename, then the C-shim compile+link (proven on
+      // GraalVM CE 21; see genJava.mjs + the emitted BUILD.md). Linux-shaped; on win/mac follow BUILD.md.
       const steps = [...(gen.buildSteps?.nativeImage ?? []), ...(gen.buildSteps?.shimCompileLink ?? [])];
       for (const step of steps) execSync(step, { cwd: outDir, stdio: 'inherit' });
-      const built = findBuilt(outDir, moduleName, ext);
-      if (!built) return { ok: false, lang, error: 'Java native-image produced no module' };
-      cpSync(built, dest);
+      // Java ships TWO files: the shim (ce_handlers_java.<ext>, what the host opens) + its native-image
+      // sibling lib<name>_svm.<ext>. Copy every declared artifact next to the plugin binary.
+      let bytes = 0;
+      for (const art of gen.buildSteps?.artifacts ?? [`${moduleName}${ext}`]) {
+        const src = path.join(outDir, art);
+        if (!existsSync(src)) return { ok: false, lang, error: `Java build missing artifact ${art}` };
+        cpSync(src, path.join(binDir, art));
+        bytes += statSync(path.join(binDir, art)).size;
+      }
+      return { ok: true, lang, bytes };
     }
     return { ok: true, lang, bytes: statSync(dest).size };
   } catch (e) {

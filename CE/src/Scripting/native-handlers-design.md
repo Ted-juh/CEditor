@@ -11,14 +11,18 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ✅ **verified against real JUCE 8**: `node tools/scripts/nativeHandlers/cpp/verify-host.mjs` builds the loader + `juce_core` + a generated module and asserts load→init→hasHandler→dispatch→host callbacks. (Building it caught two real bugs: a `juce::DynamicLibrary` move-assignment and a dangling-`CeStr` lifetime.) |
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
-| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ generator output **structurally verified** (`verify-csharp.mjs`: the five entry points, csproj AOT knobs, per-script registration). Actual `dotnet publish` AOT build still needs the .NET SDK. |
-| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,genJava.mjs}` | ⚠️ **type-checks against the real GraalVM SDK** (`verify-java.mjs`: javac against `graal-sdk` — @CEntryPoint/@CStruct/@CField + generated registry all compile). Actual `native-image` build still needs a GraalVM toolchain. |
-| Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ written, build-unverified |
+| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,harness.c,genJava.mjs}` | ✅ **FULLY verified on GraalVM CE 21.0.2**: `verify-java.mjs` runs the real `native-image --shared` build + the C-shim isolate link, loads the 14 MB module, and dispatches a Java handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a javac-against-`graal-sdk` type-check where native-image is absent. |
+| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ generator output **structurally verified** (`verify-csharp.mjs`) and the interop updated to the pointer-ABI for consistency with the verified C++/Java sides. The actual `dotnet publish` AOT build was **NOT runnable here**: the .NET SDK CDNs (`download.visualstudio.microsoft.com`, `builds.dotnet.microsoft.com`) are denied by this environment's egress policy — a sandbox limit, not a code gap. It needs a .NET SDK on the export/CI machine. |
+| Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ C++/Java build paths exercised by the verifiers; the VST3-bundling wrapper is end-to-end-unverified. |
 
-Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` (each check skips when its toolchain
-is absent). What still needs a real per-OS build: the `dotnet publish` (C#) and `native-image` + C-shim
-link (Java) AOT compiles, and a DAW load test. The C++ path — generator AND the host loader against
-real JUCE — is fully proven, so the ABI + dispatch model are sound; C#/Java reuse them unchanged.
+Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` (each check runs as far as its toolchain
+allows; full native-image build when GraalVM is present, else a type-check). **Building Java for real
+caught five bugs** the type-checks couldn't: a header-copy key mismatch, a missing `@CContext` directive,
+`@CContext`-forces-build-time-init vs. `CeRuntime`'s runtime state, the shim passing `@CStruct` args
+by value (native-image lowers them to pointers), and — the ABI fix that propagated to all sides — the
+host vtable passing `CeStr`/`CeBytes` by value, which GraalVM can't express, so the callbacks now pass
+them **by pointer**. What still needs a real build: the **C#** `dotnet publish` AOT (blocked here by
+egress policy) and a **DAW load test** of the bundled modules. C++ and Java are proven end to end.
 
 ---
 

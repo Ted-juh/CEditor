@@ -151,27 +151,27 @@ juce::var ceToVar (const CeValue* v)
 }
 
 // --- vtable trampolines (host services the module calls) ----------------------------------------
-int  CE_CALL host_set (void* ctx, CeStr key, const CeValue* v, const CeValue* opts)
+int  CE_CALL host_set (void* ctx, const CeStr* key, const CeValue* v, const CeValue* opts)
 {
     auto* h = static_cast<HostCtx*> (ctx)->host;
-    h->setValue (fromCeStr (key), ceToVar (v), opts ? ceToVar (opts) : juce::var());
+    h->setValue (key ? fromCeStr (*key) : juce::String(), ceToVar (v), opts ? ceToVar (opts) : juce::var());
     return 0;
 }
-int  CE_CALL host_get (void* ctx, CeStr key, CeStr form, CeValue* out)
+int  CE_CALL host_get (void* ctx, const CeStr* key, const CeStr* form, CeValue* out)
 {
     auto* h = static_cast<HostCtx*> (ctx)->host;
-    if (out != nullptr) *out = buildCeValue (h->getValue (fromCeStr (key), fromCeStr (form)));
+    if (out != nullptr) *out = buildCeValue (h->getValue (key ? fromCeStr (*key) : juce::String(), form ? fromCeStr (*form) : juce::String ("value")));
     return 0;
 }
 void CE_CALL host_send_cc   (void* ctx, int32_t ch, int32_t cc, const CeValue* v)            { static_cast<HostCtx*> (ctx)->host->sendCC (ch, cc, ceToVar (v)); }
 void CE_CALL host_send_nrpn (void* ctx, int32_t ch, int32_t msb, int32_t lsb, const CeValue* v){ static_cast<HostCtx*> (ctx)->host->sendNRPN (ch, msb, lsb, ceToVar (v)); }
-void CE_CALL host_send_sysex(void* ctx, CeBytes bytes)
+void CE_CALL host_send_sysex(void* ctx, const CeBytes* bytes)
 {
-    juce::Array<juce::var> a; for (int64_t i = 0; i < bytes.len; ++i) a.add ((int) bytes.ptr[i]);
+    juce::Array<juce::var> a; if (bytes) for (int64_t i = 0; i < bytes->len; ++i) a.add ((int) bytes->ptr[i]);
     static_cast<HostCtx*> (ctx)->host->sendSysex (juce::var (a));
 }
-void CE_CALL host_log  (void* ctx, int32_t /*level*/, CeStr msg) { static_cast<HostCtx*> (ctx)->host->log (fromCeStr (msg), juce::var()); }
-void CE_CALL host_emit (void* ctx, CeStr name, const CeValue* data) { static_cast<HostCtx*> (ctx)->host->emitEvent (fromCeStr (name), data ? ceToVar (data) : juce::var()); }
+void CE_CALL host_log  (void* ctx, int32_t /*level*/, const CeStr* msg) { static_cast<HostCtx*> (ctx)->host->log (msg ? fromCeStr (*msg) : juce::String(), juce::var()); }
+void CE_CALL host_emit (void* ctx, const CeStr* name, const CeValue* data) { static_cast<HostCtx*> (ctx)->host->emitEvent (name ? fromCeStr (*name) : juce::String(), data ? ceToVar (data) : juce::var()); }
 void CE_CALL host_free_value (void* /*ctx*/, CeValue* v) { freeCeValueDeep (v); }
 void* CE_CALL host_alloc   (void* /*ctx*/, size_t n) { return std::malloc (n); }
 void  CE_CALL host_dealloc (void* /*ctx*/, void* p, size_t /*n*/) { std::free (p); }

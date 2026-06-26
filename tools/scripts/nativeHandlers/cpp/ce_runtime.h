@@ -43,18 +43,19 @@ private:
 class Context {
 public:
     explicit Context(const CeHostVtable* h) : h_(h) {}
-    void setValue(const char* path, const Var& v) { h_->set(h_->host_ctx, cstr(path), v.abi(), nullptr); }
+    void setValue(const char* path, const Var& v) { CeStr k = cstr(path); h_->set(h_->host_ctx, &k, v.abi(), nullptr); }
     void setValue(const char* path, double d)     { setValue(path, Var(d)); }
     Var  getValue(const char* path, const char* form = "value") {
         CeValue out {}; out.tag = CE_NULL;
-        h_->get(h_->host_ctx, cstr(path), cstr(form), &out);
+        CeStr k = cstr(path), f = cstr(form);
+        h_->get(h_->host_ctx, &k, &f, &out);
         Var r = copyOut(out);
         h_->free_value(h_->host_ctx, &out);
         return r;
     }
     void sendCC(int ch, int cc, const Var& v) { h_->send_cc(h_->host_ctx, ch, cc, v.abi()); }
-    void log(const char* msg)                 { h_->log(h_->host_ctx, 0, cstr(msg)); }
-    void emit(const char* name, const Var& data) { h_->emit(h_->host_ctx, cstr(name), data.abi()); }
+    void log(const char* msg)                 { CeStr m = cstr(msg); h_->log(h_->host_ctx, 0, &m); }
+    void emit(const char* name, const Var& data) { CeStr n = cstr(name); h_->emit(h_->host_ctx, &n, data.abi()); }
 
 private:
     static CeStr cstr(const char* s) { return CeStr { s, (int64_t) std::strlen(s) }; }

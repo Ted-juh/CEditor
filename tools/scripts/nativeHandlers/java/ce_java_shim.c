@@ -115,8 +115,9 @@ CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr ev
     if (g_main_thread == NULL) {
         return -1; /* not initialised */
     }
-    /* cej_dispatch's @CStruct params are non-const; cast away const on payload (Java side reads only). */
-    return cej_dispatch(g_main_thread, script_id, event_id, (CeValue*) payload, out_result);
+    /* native-image lowers @CStruct params to POINTERS (CeStr*, CeValue*), so pass the addresses of the
+     * by-value CeStr args; payload/out_result are already pointers. Cast away const (Java reads only). */
+    return cej_dispatch(g_main_thread, &script_id, &event_id, (CeValue*) payload, out_result);
 }
 
 /* Forward a presence check. */
@@ -126,7 +127,7 @@ CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_i
     if (g_main_thread == NULL) {
         return 0;
     }
-    return cej_has(g_main_thread, script_id, event_id);
+    return cej_has(g_main_thread, &script_id, &event_id);
 }
 
 /* Flush Java-side state, then tear the isolate down. After this the module must not be called again
