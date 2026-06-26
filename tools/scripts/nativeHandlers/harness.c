@@ -1,8 +1,9 @@
-/* harness.c — JUCE-free host harness for a compiled Java (GraalVM native-image) handler module.
- * Loads ce_handlers_java.so through the flat ABI, provides a CeHostVtable, inits (which creates the
- * GraalVM isolate via the C shim), checks hasHandler, and dispatches knob1.onValueChanged with a
- * scalar payload of 10 — asserting the handler ran inside the isolate and called back into the host
- * (set("out", 21) + log("ran")). Used by verify-java.mjs when native-image is available. */
+/* harness.c — JUCE-free host harness for a compiled native handler module (C++, C# NativeAOT, or Java
+ * GraalVM native-image). Loads the module (argv[1], default ./ce_handlers_java.so) through the flat
+ * ABI, provides a CeHostVtable, inits (which brings up the language runtime: GC for C#, isolate for
+ * Java), checks hasHandler, and dispatches knob1.onValueChanged with a scalar payload of 10 —
+ * asserting the handler ran and called back into the host (set("out", 21) + log("ran")). Used by
+ * verify-{java,csharp}.mjs when the toolchain is available. */
 #include "NativeHandlerAbi.h"
 #include <dlfcn.h>
 #include <stdio.h>
@@ -26,8 +27,8 @@ static void CE_CALL h_fv(void* c,CeValue* v){ (void)c;(void)v; }
 static void* CE_CALL h_al(void* c,size_t n){ (void)c; return malloc(n); }
 static void CE_CALL h_de(void* c,void* p,size_t n){ (void)c;(void)n; free(p); }
 
-int main(void) {
-    void* lib = dlopen("./ce_handlers_java.so", RTLD_NOW);
+int main(int argc, char** argv) {
+    void* lib = dlopen(argc>1?argv[1]:"./ce_handlers_java.so", RTLD_NOW);
     if (!lib) { printf("dlopen: %s\n", dlerror()); return 1; }
     uint32_t (CE_CALL *ver)(void)                                      = (uint32_t(CE_CALL*)(void))dlsym(lib,"ce_handler_abi_version");
     int (CE_CALL *init)(const CeHostVtable*, void**)                   = (int(CE_CALL*)(const CeHostVtable*,void**))dlsym(lib,"ce_handler_init");
@@ -47,6 +48,6 @@ int main(void) {
     disp(st, sid, ev, &p, NULL);
     printf("abi=%u init=%d has=%d out(%s)=%.1f log='%s'\n", ver(), r, hh, g_out_key, g_out_val, g_log);
     int ok = ver()==1 && r==0 && hh==1 && g_out_val==21.0 && strcmp(g_log,"ran")==0;
-    printf("%s\n", ok ? "JAVA NATIVE-IMAGE E2E PASS" : "FAIL");
+    printf("%s\n", ok ? "NATIVE HANDLER E2E PASS" : "FAIL");
     return ok ? 0 : 1;
 }

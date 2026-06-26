@@ -12,17 +12,19 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
 | Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,harness.c,genJava.mjs}` | ✅ **FULLY verified on GraalVM CE 21.0.2**: `verify-java.mjs` runs the real `native-image --shared` build + the C-shim isolate link, loads the 14 MB module, and dispatches a Java handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a javac-against-`graal-sdk` type-check where native-image is absent. |
-| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ⚠️ generator output **structurally verified** (`verify-csharp.mjs`) and the interop updated to the pointer-ABI for consistency with the verified C++/Java sides. The actual `dotnet publish` AOT build was **NOT runnable here**: the .NET SDK CDNs (`download.visualstudio.microsoft.com`, `builds.dotnet.microsoft.com`) are denied by this environment's egress policy — a sandbox limit, not a code gap. It needs a .NET SDK on the export/CI machine. |
-| Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ C++/Java build paths exercised by the verifiers; the VST3-bundling wrapper is end-to-end-unverified. |
+| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ✅ **FULLY verified on .NET 10 NativeAOT**: `verify-csharp.mjs` runs the real `dotnet publish -p:NativeLib=Shared`, loads the ~1 MB module, and dispatches a C# handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a structural check where the .NET SDK is absent. |
+| Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ all three per-language build paths exercised by the verifiers; the VST3-bundling wrapper + a DAW load test are the remaining end-to-end gap. |
 
-Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` (each check runs as far as its toolchain
-allows; full native-image build when GraalVM is present, else a type-check). **Building Java for real
-caught five bugs** the type-checks couldn't: a header-copy key mismatch, a missing `@CContext` directive,
-`@CContext`-forces-build-time-init vs. `CeRuntime`'s runtime state, the shim passing `@CStruct` args
-by value (native-image lowers them to pointers), and — the ABI fix that propagated to all sides — the
-host vtable passing `CeStr`/`CeBytes` by value, which GraalVM can't express, so the callbacks now pass
-them **by pointer**. What still needs a real build: the **C#** `dotnet publish` AOT (blocked here by
-egress policy) and a **DAW load test** of the bundled modules. C++ and Java are proven end to end.
+Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` — each check runs the **real AOT build +
+dispatch** when its toolchain is present (clang/JUCE for C++, .NET 10 NativeAOT for C#, GraalVM
+native-image for Java), else degrades to a type/structural check. **Building all three for real caught
+nine bugs** the type-checks couldn't — including the load-bearing ABI fix: the host vtable passed
+`CeStr`/`CeBytes` *by value*, which GraalVM `@CStruct` (a pointer type) cannot express, so the callbacks
+now pass them **by pointer** across every side. C# added four more (duplicate `Compile` items; a static
+class can't hold the user's instance handler; PascalCase vs the camelCase cross-language API; a private
+handler unreachable by the registry → partial self-register). **All three languages build and dispatch
+end to end.** The only remaining gap is wiring the compiled modules into a real `.vst3` and loading that
+in a DAW.
 
 ---
 

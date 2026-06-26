@@ -286,7 +286,7 @@ namespace Ce
         private readonly CeHostVtable* _h;
         internal CeContext(CeHostVtable* h) { _h = h; }
 
-        public void SetValue(string path, Var v)
+        public void setValue(string path, Var v)
         {
             CeStr key = Utf8.Alloc(path);
             try
@@ -310,11 +310,11 @@ namespace Ce
             finally { Utf8.Free(key); }
         }
 
-        public void SetValue(string path, double d) => SetValue(path, new Var(d));
+        public void setValue(string path, double d) => setValue(path, new Var(d));
 
         // get() returns a host-owned CeValue tree; we copy out the scalar/string we need and then free it
         // via vtable.free_value, honoring the memory rule.
-        public Var GetValue(string path, string form = "value")
+        public Var getValue(string path, string form = "value")
         {
             CeStr key = Utf8.Alloc(path);
             CeStr frm = Utf8.Alloc(form);
@@ -333,7 +333,7 @@ namespace Ce
             }
         }
 
-        public void SendCC(int channel, int cc, Var v)
+        public void sendCC(int channel, int cc, Var v)
         {
             CeValue scratch;
             if (v.IsOwnedString && v.OwnedUtf8 != null)
@@ -352,14 +352,14 @@ namespace Ce
             }
         }
 
-        public void Log(string msg)
+        public void log(string msg)
         {
             CeStr m = Utf8.Alloc(msg);
             try { _h->log(_h->host_ctx, 0, &m); }
             finally { Utf8.Free(m); }
         }
 
-        public void Emit(string name, Var data)
+        public void emit(string name, Var data)
         {
             CeStr nm = Utf8.Alloc(name);
             try
@@ -408,14 +408,14 @@ namespace Ce
     {
         private readonly CeValue* _p;
 
-        public double Value { get; }
-        public bool FirstTime { get; }
+        public double value { get; }
+        public bool firstTime { get; }
 
         internal CeEvent(CeValue* payload)
         {
             _p = payload;
-            Value = Field("value").AsDouble();
-            FirstTime = Field("firstTime").AsBool();
+            value = Field("value").AsDouble();
+            firstTime = Field("firstTime").AsBool();
         }
 
         public Var Get(string key) => Field(key);

@@ -37,10 +37,10 @@ try {
     // --- FULL build + dispatch ---
     for (const step of [...gen.buildSteps.nativeImage, ...gen.buildSteps.shimCompileLink])
       execSync(step, { cwd: work, stdio: 'inherit' });
-    execSync(`cc -I "${work}" "${path.join(HERE, 'harness.c')}" -o "${path.join(work, 'jharness')}" -ldl`, { stdio: 'inherit' });
+    execSync(`cc -I "${work}" "${path.join(HERE, '..', 'harness.c')}" -o "${path.join(work, 'jharness')}" -ldl`, { stdio: 'inherit' });
     const out = execSync(`"${path.join(work, 'jharness')}"`, { cwd: work, encoding: 'utf8' });
     process.stdout.write(out);
-    if (!/JAVA NATIVE-IMAGE E2E PASS/.test(out)) { console.error('verify-java: FAIL (full build)'); process.exit(1); }
+    if (!/NATIVE HANDLER E2E PASS/.test(out)) { console.error('verify-java: FAIL (full build)'); process.exit(1); }
     console.log('verify-java: full native-image build loads + dispatches a Java handler (host callbacks OK) ✓');
     process.exit(0);
   }
