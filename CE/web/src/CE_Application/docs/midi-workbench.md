@@ -110,17 +110,37 @@ Controller, and Learn apply across targets with the source/sink differences abov
 
 ## GUI shell (clean, understandable, intuitive)
 
-Mirror the DPD designer so it feels native:
+Mirror the DPD designer so it feels native. Group by **what the user is doing**,
+not by feature — so six capabilities collapse into **three tabs** (connect →
+operate → manage data):
 
-- **Left nav rail** of sub-tabs: Connections · Monitor · Dump Analyzer · Test ·
-  Learn · Presets.
-- **Persistent top strip** (visible on every sub-tab): active device / profile,
-  connection-status LED, quick port switch, global monitor record/pause. You
-  never lose sight of "connected? data flowing?" regardless of sub-tab.
-- **Progressive disclosure** throughout: clean defaults; advanced controls
-  (raw hex, dump internals, diagnostics) behind expanders.
+| Tab | Absorbs | What it is |
+|---|---|---|
+| **Connections** | Setup (§1) | Ports, roles, identity, MIDI-CI discovery, status |
+| **Console** | Monitor (§2) + Test (§3) + **Learn (§4, as a mode)** | Live two-way traffic: watch, inject, capture-to-bind |
+| **Dumps** | Analyzer (§5) + Presets (§6) | Capture → librarian (default) + analyze/diff (mode) → DPD |
 
-Sub-tabs map to the capability sections below.
+Why these merges:
+- **Monitor + Test are two halves of live I/O** — watch + inject in one
+  bidirectional console. **Learn is just the console with "bind on next message"
+  armed** — a mode, not a tab (which also surfaces it better).
+- **Analyzer + Presets are both device memory** — a preset *is* a dump; the
+  analyzer dissects dumps. Default to the librarian; "Analyze/Diff" is a mode.
+
+Shell details:
+- **Left nav rail**: Connections · Console · Dumps.
+- **Persistent top strip** (every tab): active device / profile, connection-status
+  LED, quick port switch, global monitor record/pause — never lose sight of
+  "connected? data flowing?".
+- **Progressive disclosure**: clean defaults; advanced controls (raw hex, dump
+  internals, diagnostics) behind expanders.
+
+> Fallback (4 tabs) if Dumps gets cramped: split the developer-facing **Analyzer**
+> from the user-facing **Presets** → Connections · Console · Analyzer · Presets.
+> Start at 3.
+
+The capability sections below (§1–§6) are the detail; they map into the three
+tabs per the table above — nothing is cut, just grouped.
 
 ## 1. MIDI Setup
 
