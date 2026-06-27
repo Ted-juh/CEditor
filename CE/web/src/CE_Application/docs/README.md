@@ -23,7 +23,7 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 | Part | Type | Status | Summary | Doc |
 |------|------|--------|---------|-----|
 | LCD Display | Component | 📝 | Ready-made-but-flexible hardware display (character / dot-matrix / segment / VFD / OLED), MIDI text+graphics I/O, device-bound fields, scriptable internals. | [lcd-display-component.md](./lcd-display-component.md) |
-| Timer System | Subsystem | 📝 design complete | A `TimerManager` on top of `juce::Timer` (no custom primitive): named one-shot / repeating / countdown / stopwatch timers. Semantics + lifecycle specified; ready to implement. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
+| Timer System | Subsystem | 📝 design complete | A `TimerManager` on top of `juce::Timer` (no custom primitive): named one-shot / repeating / countdown / stopwatch timers. Semantics + lifecycle specified. ⚠️ Live C++ backing not wired yet — currently a no-op outside the preview sim. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
 
 ## Parking lot (not yet doc'd — promote when fleshed out)
 

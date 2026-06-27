@@ -170,9 +170,29 @@ All major design questions are now settled in this doc:
 - ~~Heartbeat: `juce::Timer` vs `VBlankAttachment`~~ → **plain `juce::Timer`**,
   `VBlankAttachment` reserved for frame-synced animation parts.
 
-Remaining is implementation, not design: wire `TimerManager` into
-`CE/src/Scripting/*`, expose the additive script commands, and mirror the spec
-in the preview simulator.
+Remaining is implementation, not design — see below.
+
+## Implementation TODO
+
+⚠️ **The live C++ backing does not exist yet and must be built.** Today
+`startTimer` / `stopTimer` / `onTimer` only live in the JS preview simulator
+(`scriptRuntime.js`) and the code exporters (`scriptEmitters.js`) — nothing in
+`CE/src/Scripting/*` actually runs them at runtime. Until this is wired, timers
+are a no-op in the real app.
+
+- [ ] **Build `TimerManager`** (C++, message thread) over a single
+  `juce::Timer`, implementing the Repeat & scheduling and Lifecycle specs above.
+- [ ] **Wire it into the live script runtime** (`CE/src/Scripting/*`,
+  `ScriptRuntime.cpp` / `BridgeScriptHost.h`) so `startTimer` / `stopTimer` fire
+  real callbacks and dispatch `onTimer` / `onTimerDone` back to scripts.
+- [ ] **Expose the additive commands** (`pauseTimer` / `resumeTimer` /
+  `restartTimer` / `resetTimer` / `setTimerInterval`, queries, options form of
+  `startTimer`) across the registry, emitters, and runtime.
+- [ ] **Serialize timer definitions** in the ValueTree; keep runtime state out.
+- [ ] **Mirror the spec in the preview simulator** so design-time matches
+  runtime.
+- [ ] **(Optional)** declarative Timer **section** + routing-layer event so
+  non-scripted parts (e.g. LCD scroll) can use it.
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->
