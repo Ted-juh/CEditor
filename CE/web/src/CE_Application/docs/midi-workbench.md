@@ -108,6 +108,20 @@ Controller, and Learn apply across targets with the source/sink differences abov
 
 ---
 
+## GUI shell (clean, understandable, intuitive)
+
+Mirror the DPD designer so it feels native:
+
+- **Left nav rail** of sub-tabs: Connections · Monitor · Dump Analyzer · Test ·
+  Learn · Presets.
+- **Persistent top strip** (visible on every sub-tab): active device / profile,
+  connection-status LED, quick port switch, global monitor record/pause. You
+  never lose sight of "connected? data flowing?" regardless of sub-tab.
+- **Progressive disclosure** throughout: clean defaults; advanced controls
+  (raw hex, dump internals, diagnostics) behind expanders.
+
+Sub-tabs map to the capability sections below.
+
 ## 1. MIDI Setup
 
 - Enumerate & select **input / output ports** (`listMidiInputs` /
@@ -155,6 +169,43 @@ A capture-to-bind mode that ties Setup + Monitor + binding together: arm Learn,
 wiggle a hardware control, capture the incoming CC/NRPN/note, and **bind it to a
 panel control / device parameter** (reuses the routing/binding layer). This is
 the highest-value feature for a controller editor — surfaces the whole tool.
+
+## 5. Dump Analyzer (the DPD pre-help — flagship)
+
+Capture a bulk / SysEx dump and break it down — a reverse-engineering tool that
+feeds the Device Profile Designer:
+
+- **Structure overlay** on the hex: auto-detect header / manufacturer ID /
+  device ID / command / address / data / checksum / footer.
+- **Diff mode (the killer feature):** capture dump A → change one parameter on
+  the hardware → capture dump B → **highlight exactly which bytes changed** →
+  infer that parameter's address/offset without docs.
+- **Checksum detection** (e.g. Roland-style sum) + verify/recompute helper.
+- **Record / stride splitting:** detect a bulk dump made of N repeated records
+  (e.g. 128 patches × M bytes) and show the stride.
+- **Annotate → export:** name byte ranges, then emit a **draft DPD message shape
+  / parameter map** the Designer imports. (Today raw parse is buried in
+  `DpdAdvancedScreen`; this promotes it to a first-class, diff-driven workflow.)
+
+## 6. Preset / Bank Librarian
+
+A patch librarian + device backup:
+
+- **Scan & browse** presets / banks (`startPresetListScan`); rename, reorder.
+- **Save / restore banks** to disk as `.syx`.
+- **Whole-device backup & restore** (capture all dumps to a file, restore later).
+
+## What else — candidate sub-tabs (ranked)
+
+1. **Device snapshot / backup & restore** — one-click full backup to file
+   (overlaps the librarian; high value).
+2. **`.syx` file library** — import / export / organize SysEx files; send a file.
+3. **Macros / sequences** — saved ordered message lists with delays (ties into
+   the [Timer system](./timer-system.md)).
+4. **Round-trip / latency test** — ping device, measure response time.
+5. **MIDI router / thru / filter** — channel remap, filtering, soft-thru
+   (advanced; can defer).
+6. **Utilities** — standalone checksum / 14-bit / hex calculators.
 
 ## Cross-cutting
 

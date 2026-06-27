@@ -26,7 +26,7 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 | Timer System | Subsystem | 📝 design complete | A `TimerManager` on top of `juce::Timer` (no custom primitive): named one-shot / repeating / countdown / stopwatch timers. Semantics + lifecycle specified. ⚠️ Live C++ backing not wired yet — currently a no-op outside the preview sim. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
 | Scripting Runtime gaps | Findings | 🟡 audit | Events advertised in `panelApi.js` but not dispatched by the live C++ runtime (`onParameterReceived`, raw MIDI in, device connect, `onTimer`, …). Mostly wiring, not new imports. | [scripting-runtime-gaps.md](./scripting-runtime-gaps.md) |
 | JUCE capabilities | Survey | 💡 backlog | Broad sweep of JUCE classes/modules a no-audio MIDI editor could use (OSC, MIDI 2.0/UMP, Bluetooth MIDI, ThreadPool, ZipFile, crypto, ValueTreeSynchroniser, …); most live in already-linked modules. | [juce-capabilities.md](./juce-capabilities.md) |
-| MIDI Workbench | Tool | 🟡 mostly-plumbed | Cohesive MIDI Setup + Monitor + Controller/tester + MIDI Learn. Backend (~70%) already exists (`listMidiInputs`, `getMidiMonitorEvents`, `triggerRawMidiAction`); gap is the unified UI. | [midi-workbench.md](./midi-workbench.md) |
+| MIDI Workbench | Workspace | 🟡 mostly-plumbed | First-class `tabType: 'midi'` workspace: Connections · Monitor · Dump Analyzer · Test · Learn · Presets. Foundational live-MIDI session the DPD derives from. Backend (~70%) exists; gap is the unified UI. | [midi-workbench.md](./midi-workbench.md) |
 
 ## Parking lot (not yet doc'd — promote when fleshed out)
 
