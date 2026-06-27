@@ -3,10 +3,9 @@
 > Status: **design / mostly-plumbed.** Backend MIDI plumbing already exists; the
 > gap is a cohesive UI. Part of the [panel parts backlog](./README.md).
 >
-> Scope assumption: this is an **app-level tool** (like the DPD screens), because
-> "setup" is inherently app-level. Several pieces could *also* ship as placeable
-> panel components — see "Spin-off panel components". If you meant only the
-> placeable widgets, say so and this re-scopes.
+> Scope: there are **two distinct layers** — app/authoring MIDI (the Workbench,
+> port-owning) and panel runtime MIDI (target-aware widgets). See "Two layers"
+> below.
 
 ## Why
 
@@ -32,6 +31,45 @@ From `DeviceProfile/DeviceRuntimeBridge.cpp` + `stores/deviceProfiles.js`:
 
 So the backend is ~70% there. The work is a cohesive UI + filtering/decode/learn/
 export, plus a few event-dispatch hooks (see scripting-runtime-gaps.md).
+
+---
+
+## Two layers + three runtime contexts
+
+MIDI shows up in two different roles; don't conflate them.
+
+- **App / authoring MIDI (the Workbench, port-owning).** The editor (and the
+  standalone Player) open their own ports to talk to a real device. This is for
+  *building and operating* a panel: setup, monitor, learn, dumps.
+- **Panel runtime MIDI (target-aware widgets).** How a *finished* panel does I/O
+  at runtime — and the backend depends on the build target.
+
+Three contexts, all confirmed in code:
+
+| Context | MIDI ownership | Source / sink |
+|---|---|---|
+| **CEditor (authoring app)** | Owns `DeviceProfileService` → own ports | Device under edit (patches, dumps, discovery) |
+| **Standalone Player** | `PlayerHost.ownedService` → own ports | End-user's synth |
+| **Plugin / VST** | Uses the processor's service; **host owns routing** | `processBlock` `MidiBuffer` in; `scriptMidiCollector` → host bus out |
+
+**Implication — a transport abstraction.** A panel widget should never hardcode
+"open port X"; it talks to a MIDI transport the runtime binds: real ports for
+editor/standalone, the host buffer for the plugin. This half-exists already
+(`PlayerHost` chooses owned-vs-processor service; `scriptMidiCollector` for the
+plugin). Then "send CC" works everywhere, and only *setup* is target-specific.
+
+### Widget availability by target
+
+| Capability | Editor | Standalone | Plugin |
+|---|---|---|---|
+| Port selection / connection setup | app tool | ✅ | ❌ host routes |
+| MIDI monitor (widget or tool) | ✅ | ✅ | ✅ host stream |
+| Activity LED / panic | ✅ | ✅ | ✅ into host bus |
+| MIDI Learn (CC→control) | ✅ | ✅ | ✅ from host (cf. DAW learn) |
+| Panel parameter send | to device | to chosen port | to host MIDI bus |
+
+The Setup section below is **app/authoring + standalone only**; Monitor,
+Controller, and Learn apply across targets with the source/sink differences above.
 
 ---
 
@@ -91,12 +129,18 @@ the highest-value feature for a controller editor — surfaces the whole tool.
   (see [scripting-runtime-gaps.md](./scripting-runtime-gaps.md)).
 - **MIDI 2.0 / UMP:** decode/show UMP + MIDI-CI Property Exchange traffic.
 
-## Spin-off panel components (if the end-user-placeable angle is wanted)
+## Panel runtime MIDI — target-aware widgets
 
-- **MIDI Activity LED** — blink on in/out traffic (bind to a port/channel).
-- **MIDI Monitor widget** — a compact live log placeable on a panel.
-- **Panic button** — all-notes-off (a Button preset).
-- **MIDI Learn helper** — a control that captures + binds inline.
+Placeable components for the *finished* panel (see the availability matrix
+above). All route through the runtime's MIDI transport, not a hardcoded port:
+
+- **MIDI Activity LED** — blink on in/out traffic (all targets).
+- **MIDI Monitor widget** — compact live log placeable on a panel (all targets;
+  plugin shows the host stream).
+- **Panic button** — all-notes-off (a Button preset; into host bus under plugin).
+- **MIDI Learn helper** — captures + binds CC→control inline (all targets).
+- **Port/connection widget** — **standalone only** (no ports to pick in the
+  plugin; hide/disable under the plugin target).
 
 ## Status / effort
 
@@ -107,10 +151,15 @@ the highest-value feature for a controller editor — surfaces the whole tool.
 
 ## Open questions / parking lot
 
-- App tool vs placeable components vs both (default: app tool + spin-offs).
-- Where does it live — a new editor screen alongside the DPD screens, or a dock?
+- ~~App tool vs placeable components~~ → **both, as two layers** (authoring
+  Workbench + target-aware panel widgets).
+- Define the **MIDI transport abstraction** the runtime binds (real ports vs host
+  buffer) so widgets are target-agnostic.
+- Where does the Workbench live — a new editor screen alongside the DPD screens,
+  or a dock?
 - Monitor buffer size / persistence; does capture survive reloads?
-- Does MIDI Learn write into device bindings, panel routes, or both?
+- Does MIDI Learn write into device bindings, panel routes, or both? Under the
+  plugin, how does panel-internal learn coexist with the DAW's own MIDI learn?
 
 ## Add your ideas below
 <!-- New MIDI workbench ideas go here. -->
