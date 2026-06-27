@@ -50,9 +50,10 @@ unconfirmed — define it explicitly (add a `repeat` arg).
 
 ## TimerManager (the thing we build)
 
-A small manager on the **message thread**, driven by a single `juce::Timer`
-(or `VBlankAttachment` for smooth animation), multiplexing many logical timers
-onto one heartbeat. Message-thread callbacks can touch the `ValueTree` /
+A small manager on the **message thread**, multiplexing many logical timers onto
+one heartbeat. **Proposed default:** drive it with a single plain `juce::Timer`;
+reserve `VBlankAttachment` only for parts that genuinely need frame-synced
+animation (e.g. smooth LCD scroll), rather than as the global heartbeat. Message-thread callbacks can touch the `ValueTree` /
 `ValueTreeBridge` / WebView directly — no locking — which is exactly what
 scroll / blink / page-advance need.
 
@@ -88,6 +89,12 @@ Proposed additions (additive):
 
 ## Declarative form (a Timer "part")
 
+**Proposed default:** implement the declarative Timer as a **section** (not its
+own `controlType`). It's lighter than a full control and composes into any part
+that needs its own timing, rather than forcing a separate component on the
+canvas. Revisit only if a standalone, canvas-placed timer turns out to be
+needed.
+
 A panel part you add and configure without scripting:
 - Properties: `name`, `mode`, `interval`, `repeat`, `autostart`, `runInPreview`.
 - Emits an event other parts can route to (ties into the panel routing layer,
@@ -114,10 +121,14 @@ A panel part you add and configure without scripting:
 
 ## Open questions / parking lot
 
-- Confirm / define repeat semantics; add an explicit `repeat` arg.
-- Should the declarative Timer be its own `controlType` or a section other parts
-  embed?
-- `juce::Timer` heartbeat vs `VBlankAttachment` for animation-grade smoothness.
+- Confirm / define repeat semantics; add an explicit `repeat` arg. *(still open)*
+- ~~Declarative Timer as its own `controlType` vs a section~~ → **default: section**
+  (see Declarative form).
+- ~~`juce::Timer` heartbeat vs `VBlankAttachment`~~ → **default: plain
+  `juce::Timer`**, `VBlankAttachment` reserved for frame-synced animation parts
+  (see TimerManager).
+- Lifecycle/serialization edge cases (panel close, state change, preview↔runtime
+  parity). *(still open)*
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->
