@@ -1,5 +1,8 @@
 # LCD Display — Component Design Notes
 
+> Part of the [panel parts backlog](./README.md). Timing for this component is
+> designed separately in [timer-system.md](./timer-system.md).
+>
 > Status: **idea / design exploration** (no implementation yet).
 > Purpose: capture the property/feature surface for a ready-made-but-flexible
 > `LcdDisplay` component so we can keep extending the list before building.
@@ -240,27 +243,13 @@ per-field `text` / `value` / `color` / `visible`, per-cell / per-pixel set,
 `onPageChange`) so other components/scripts can react. If a script can set any
 pixel and read any value, the property UI becomes just the convenient front end.
 
-### 17. Timing & timers — heads-up (existing + gaps)
-Timing matters for MIDI, scrolling, and blink, so here's the current state.
-
-**Exists:**
-- `startTimer(id, ms)` / `stopTimer(id)` commands (`scriptCommandRegistry.js`,
-  category "Timers", scopes component/panel/project, portable + exportSafe).
-  Named/keyed → multiple concurrent timers.
-- `onTimer` event with `info.id` (`panelApi.js`, `PANEL_EVENTS`).
-- The `Animations` section for declarative, property-level motion.
-
-**Gaps to confirm / fill before relying on them:**
-- **One-shot vs repeating is unconfirmed.** Command args are only `id` + `ms`;
-  no `repeat` / `interval` flag, and the visible runtime (`scriptRuntime.js`) is
-  the preview/trace simulator, not the live engine. If one-shot, repeating
-  motion is "re-arm `startTimer` inside `onTimer`" — works, but verify against
-  the C++ side. Worth adding an explicit `repeat` arg.
-- **No musical / tempo timing.** No `tempo` / `bpm` / `transport` / MIDI-clock
-  (24 PPQN) primitive anywhere in scripting — timing is **wall-clock
-  milliseconds only**. Tempo-synced scroll/blink (locked to host tempo or
-  incoming MIDI clock) is not expressible today; would need a clock event
-  (e.g. `onClock` / `onBeat`) to be added. This is the main timing limitation.
+### 17. Timing & timers — see the Timer system
+Scroll / blink / cursor / page auto-advance / warm-up fade all need timing. A
+basic timer exists (`startTimer` / `stopTimer` / `onTimer`) but has gaps
+(repeat semantics unconfirmed; no tempo / MIDI-clock sync). This grew into its
+own subsystem design — see **[timer-system.md](./timer-system.md)**. The LCD is
+a primary consumer: ideally a Timer part can drive `scrollOffset` / `pageIndex`
+directly via the panel routing layer, with scripts for anything fancier.
 
 ---
 
