@@ -184,10 +184,62 @@ above). All route through the runtime's MIDI transport, not a hardcoded port:
   MIDI Learn, and a few event-dispatch hooks.
 - So "fully established/working" is mostly **UI work over existing plumbing**.
 
+## Implementation approach — build new, then prune
+
+Strategy: build a cohesive **MIDI Surface** alongside the existing cockpit, then
+de-clutter `ParameterBrowserTab`. Never gut the working tab first.
+
+### Load-bearing decision first — the split rule
+
+Decide what the new surface owns vs what stays near the canvas, so later pruning
+is deterministic, not a judgment call:
+
+- **Global / session-scoped → MIDI Surface:** connections, ports, role mapping,
+  identity, monitor, raw send/test, MIDI-learn, bulk dumps.
+- **Component-scoped → stays in the Display Panel:** the parameter browser +
+  binding for the *currently selected* control.
+
+→ "What to remove from `ParameterBrowserTab`" then becomes "everything global."
+
+### Where it lives (proposed)
+
+A new **top-level "MIDI" screen**, sibling to the Device Profile Designer (same
+`editor/TabBar.svelte` pattern), with sub-tabs **Connections · Monitor · Test ·
+Learn**. It's app-level authoring tooling like the DPD and needs room (esp. the
+monitor). Alternative: a dock — rejected as too cramped (the problem we're
+escaping). *(Open: confirm tab vs dock.)*
+
+### Phases (non-destructive → migrate → prune)
+
+1. **New view over existing state.** Scaffold the MIDI screen on the **same
+   `stores/deviceProfiles.js` calls** `ParameterBrowserTab` already uses — no new
+   plumbing, no data migration, low risk. Ship **Connections + a real Monitor**
+   first (biggest gaps). `ParameterBrowserTab` untouched.
+2. **Close missing features.** Add **Test** (raw `compileRawMidiAction` /
+   `triggerRawMidiAction` send UI) and **Learn** (replace the disabled
+   `DpdParametersScreen` placeholder).
+3. **Prune.** For each feature now in the surface, delete its duplicate from
+   `ParameterBrowserTab` per the split rule, until only the component-scoped
+   binding browser remains.
+4. **Polish.** Progressive disclosure + persistence.
+
+### Principles
+
+- **It's a view, not new plumbing** — reorganize UI, reuse stores; feature-flag
+  during dev so both coexist.
+- **Progressive disclosure, not feature removal** — clean default (status + big
+  monitor); advanced bits (raw hex send, dump capture, diagnostics) in secondary
+  panels. Nothing lost, just layered.
+
+**De-clutter done when:** the Display Panel's Device tab shows *only* what's tied
+to the selected component.
+
 ## Open questions / parking lot
 
 - ~~App tool vs placeable components~~ → **both, as two layers** (authoring
   Workbench + target-aware panel widgets).
+- ~~How to tackle the build~~ → **build new MIDI Surface, then prune
+  `ParameterBrowserTab`** (see Implementation approach). Confirm tab-vs-dock.
 - Define the **MIDI transport abstraction** the runtime binds (real ports vs host
   buffer) so widgets are target-agnostic.
 - Where does the Workbench live — a new editor screen alongside the DPD screens,
