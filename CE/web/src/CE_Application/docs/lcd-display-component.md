@@ -216,6 +216,52 @@ systems, so the LCD mostly needs to *expose the right channels*.
   channels — e.g. `text`, `value`, `field[n].text`, `foregroundColor`,
   `backgroundColor`, `brightness`, `pageIndex` — via `PublishedProperties`.
 
+### 16. Scripting depth — go beyond properties (new)
+The truly awesome interactions come from scripting, so the LCD must be designed
+**script-first**: every visual/state aspect addressable by path, plus
+LCD-specific events. The scripting surface is already strong (see
+`scripting/panelApi.js`, `scripting/scriptCommandRegistry.js`):
+
+- **Event hooks:** `onTimer`, `onMidiIn`, `onSysexIn`, `onCcIn`,
+  `onParameterReceived`, `onDumpReceived`, `onControlChanged`, plus control
+  events (press/hover/wheel/stateChanged).
+- **Values:** `setValue` / `getValue` by path, with `.value` /
+  `.normalizedValue` / `.midiValue` suffixes.
+- **MIDI:** `sendCC`, `sendNRPN`, `sendSysex`, `buildSysex`, `checksum`,
+  `to14Bit`, bulk `requestDump` / `applyDump` / `sendDump` / `buildDump`.
+- **Flow:** `emitEvent`, animation start/stop, `startTimer` / `stopTimer`.
+- **Scopes:** component / panel / project; multi-language export
+  (Lua / JS / Python / CE).
+
+**Design implication — expose scriptable internals as settable paths:**
+per-field `text` / `value` / `color` / `visible`, per-cell / per-pixel set,
+`brightness`, `contrast`, `backlightColor`, `pageIndex`, `scrollOffset`,
+`cursor`. Consider LCD-specific emitted events (e.g. `onScrollWrap`,
+`onPageChange`) so other components/scripts can react. If a script can set any
+pixel and read any value, the property UI becomes just the convenient front end.
+
+### 17. Timing & timers — heads-up (existing + gaps)
+Timing matters for MIDI, scrolling, and blink, so here's the current state.
+
+**Exists:**
+- `startTimer(id, ms)` / `stopTimer(id)` commands (`scriptCommandRegistry.js`,
+  category "Timers", scopes component/panel/project, portable + exportSafe).
+  Named/keyed → multiple concurrent timers.
+- `onTimer` event with `info.id` (`panelApi.js`, `PANEL_EVENTS`).
+- The `Animations` section for declarative, property-level motion.
+
+**Gaps to confirm / fill before relying on them:**
+- **One-shot vs repeating is unconfirmed.** Command args are only `id` + `ms`;
+  no `repeat` / `interval` flag, and the visible runtime (`scriptRuntime.js`) is
+  the preview/trace simulator, not the live engine. If one-shot, repeating
+  motion is "re-arm `startTimer` inside `onTimer`" — works, but verify against
+  the C++ side. Worth adding an explicit `repeat` arg.
+- **No musical / tempo timing.** No `tempo` / `bpm` / `transport` / MIDI-clock
+  (24 PPQN) primitive anywhere in scripting — timing is **wall-clock
+  milliseconds only**. Tempo-synced scroll/blink (locked to host tempo or
+  incoming MIDI clock) is not expressible today; would need a clock event
+  (e.g. `onClock` / `onBeat`) to be added. This is the main timing limitation.
+
 ---
 
 ## Feasibility
