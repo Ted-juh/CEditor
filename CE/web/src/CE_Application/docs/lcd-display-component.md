@@ -186,6 +186,36 @@ names as illustrative; verify exact specs before claiming hardware accuracy.
 - **LED / dot matrix:** step grids, monome-style surfaces
 - **Plasma:** vintage high-end workstations
 
+### 15. Color, sizing, segment interaction & cross-component linking (new)
+Answers to recurring "can it still do X?" questions — all map onto existing
+systems, so the LCD mostly needs to *expose the right channels*.
+
+- **Per-element color (letters/numbers vs background, and per-segment).**
+  Foreground = `Text._children.Fill.colour`; background =
+  `Background._children.Fill.colour` (already independent). Per-character /
+  per-field color comes from the **Fields model** (each field has its own
+  `Fill`). Per-segment overrides already have a pattern in the `Value` section:
+  `segmentStyle: { shared, rows }` — a shared style plus per-row overrides, so
+  individual digits/segments can be colored independently.
+- **Screen size — two independent axes.** Physical size via `Transform`
+  (`width` / `height` / `aspectLock`); *resolution* via the `Display` section
+  (rows×cols, dot pitch/gap). Same 16×2 panel can be 200px or 600px, and dot
+  count can change without resizing the box.
+- **Segments interacting with each other.** Use `Bindings` (value-driven
+  mappings into other parts' properties) + `Links` + `States`: one segment's
+  value can drive another's color / visibility / content — the same machinery
+  custom components already use.
+- **Linking other components → the LCD (strongest existing fit).** The
+  panel-level routing layer (`utils/panelCustomComponentLinks.js`) lets a
+  slider/button **publish an output endpoint** and route it to an LCD **input
+  channel** (`createPanelCustomRouteLink`, `applyPanelCustomLinkRoutes`), with
+  `endpointTypeCompatibility` + `convertPanelRouteValue` handling type/range
+  conversion. `ExternalAPI.addressableName` gives components stable names to
+  address. So "this knob's value shows as text/number on that LCD" is a route,
+  not new code. **Design implication:** the LCD must publish sensible input
+  channels — e.g. `text`, `value`, `field[n].text`, `foregroundColor`,
+  `backgroundColor`, `brightness`, `pageIndex` — via `PublishedProperties`.
+
 ---
 
 ## Feasibility
