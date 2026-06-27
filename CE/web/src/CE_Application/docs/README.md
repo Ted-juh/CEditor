@@ -24,6 +24,7 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 |------|------|--------|---------|-----|
 | LCD Display | Component | 📝 | Ready-made-but-flexible hardware display (character / dot-matrix / segment / VFD / OLED), MIDI text+graphics I/O, device-bound fields, scriptable internals. | [lcd-display-component.md](./lcd-display-component.md) |
 | Timer System | Subsystem | 📝 design complete | A `TimerManager` on top of `juce::Timer` (no custom primitive): named one-shot / repeating / countdown / stopwatch timers. Semantics + lifecycle specified. ⚠️ Live C++ backing not wired yet — currently a no-op outside the preview sim. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
+| Scripting Runtime gaps | Findings | 🟡 audit | Events advertised in `panelApi.js` but not dispatched by the live C++ runtime (`onParameterReceived`, raw MIDI in, device connect, `onTimer`, …). Mostly wiring, not new imports. | [scripting-runtime-gaps.md](./scripting-runtime-gaps.md) |
 
 ## Parking lot (not yet doc'd — promote when fleshed out)
 
