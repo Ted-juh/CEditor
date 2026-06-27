@@ -32,6 +32,41 @@ From `DeviceProfile/DeviceRuntimeBridge.cpp` + `stores/deviceProfiles.js`:
 So the backend is ~70% there. The work is a cohesive UI + filtering/decode/learn/
 export, plus a few event-dispatch hooks (see scripting-runtime-gaps.md).
 
+### Authoring app — GUI that exists today
+
+There is meaningful UI already, but it's **scattered and overloaded**, not a
+cohesive surface:
+
+- **Menu** (`layout/MenuBar.svelte`): New / Open / Import Device Profile,
+  "Discover Device (MIDI-CI)…".
+- **Device tab → Device Profile Designer** (`editor/DeviceProfileDesignerV2.svelte`)
+  with 7 screens (`editor/dpd/Dpd*Screen.svelte`): Discovery (MIDI-CI scan),
+  Parameters, Overview, DeviceStructure, MessageShapes, BulkDumps, Advanced
+  (raw JSON + SysEx parse + engine tests).
+- **Display Panel → "Device" tab = `components/ParameterBrowserTab.svelte`** —
+  the de-facto MIDI cockpit: port dropdowns (in/out), sync direction
+  (pull/push/live), status/identity, **monitor panel (last 4–20 events)**,
+  bulk-send diagnostics, issues, live conflicts. Everything is crammed here.
+- **Look bar → `layout/DeviceInsight.svelte`**: binding status, live device
+  value, quick-bind picker.
+- **Properties → Device Bindings tab** (`panels/PropertiesPanel.svelte`).
+
+### Authoring app — concrete GUI gaps
+
+1. **No dedicated MIDI connection / port manager** — pickers live only in
+   `ParameterBrowserTab`'s toolbar.
+2. **MIDI Learn** — a **disabled "Coming soon" placeholder** in
+   `DpdParametersScreen.svelte`. Not implemented.
+3. **No raw MIDI send / test UI** — `compileRawMidiAction` /
+   `triggerRawMidiAction` are exposed with no construct-and-send surface.
+4. **Monitor is a peek, not a monitor** — no filters, no CC/NRPN/SysEx decode
+   breakdown, no parameter-annotated stream, no export.
+5. **No preset browser** — scans run (`startPresetListScan`) but presets aren't
+   browsable / selectable.
+6. **No post-handshake identity readout** (manufacturer / product / revision).
+7. **No incoming bulk-dump capture UI** — send only; parsing is hidden behind
+   the Advanced-screen JSON textarea.
+
 ---
 
 ## Two layers + three runtime contexts
