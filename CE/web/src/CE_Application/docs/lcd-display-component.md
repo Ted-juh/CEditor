@@ -188,6 +188,66 @@ names as illustrative; verify exact specs before claiming hardware accuracy.
 
 ---
 
+## Feasibility
+
+Verdict: **feasible to a high degree.** Roughly 70% of this rides on
+infrastructure that already exists; the concentrated effort is one canvas
+renderer plus a few bounded algorithms. The ambitious extremes (color
+touchscreen, exhaustive protocol library) are optional and can be staged later.
+
+### Already there — near-free
+- **MIDI in *and* out, including SysEx.** The scripting runtime already exposes
+  `sendSysex(bytes)`, `sendCC`, `sendNRPN`, `buildSysex`, `checksum`, `to14Bit`
+  and inbound hooks `onMidiIn` (raw) and `onSysexIn` (raw SysEx) — see
+  `scripting/panelApi.js` and `scripting/scriptEmitters.js`. So §10 (screen as a
+  MIDI sink *and* source) is supported at the API level today; a Sound Canvas /
+  Push / MCU adapter is "parse bytes in `onSysexIn` → write fields" — a script,
+  not new engine code.
+- **Device-bound fields.** `DeviceBindings` + ports (`models/componentPorts.js`)
+  + the DPD device-parameter system already drive value / `.midiValue` / enum-name
+  lookups (§9).
+- **Text / fonts / multiline / glow-bevel-reflection / backgrounds / gradients /
+  animations / image import** — all exist as reusable sections
+  (`models/sectionDefaults.js`) and CSS builders (`utils/effectsCSS`,
+  `utils/gradientCSS`). The lit-phosphor look and bezel/glass come mostly free.
+- **The section/property model** is just data — adding a `Display` section is
+  trivial.
+
+### Feasible, but real net-new work
+- **The dot/segment renderer (main piece).** Controls currently render as
+  **DOM + CSS** (`editor/CanvasControl.svelte` → `BackgroundRenderer`,
+  `SliderFamilyRenderer`). Fine for a 16×2 character LCD (~32 cells) but a
+  128×64 graphic LCD is 8,192 dots — too many DOM nodes. A graphic display wants
+  a real `<canvas>` renderer. Bounded and well-understood, but it is the core new
+  engineering.
+- **1-bit dithering** of imported images onto the grid (Floyd–Steinberg etc.) —
+  straightforward.
+- **Motion loop** (marquee / blink / cursor) — a requestAnimationFrame ticker.
+- **7/14/16-segment geometry** — static per-segment path definitions; moderate.
+
+### Harder / scope-creep (defer)
+- Full **color TFT + touchscreen menu-diving** — large; likely out of scope for v1.
+- **CGRAM custom-glyph authoring UX**, refresh/tearing/persistence realism —
+  polish, fiddly.
+- Shipping **many built-in hardware protocol adapters** — each needs the device
+  spec; treat as ongoing, not a blocker.
+
+### The key build decision
+1. **Native `controlType: 'LcdDisplay'` with a canvas renderer** — best
+   performance/polish; needs the new renderer + a `Display` section. Right call if
+   high-res graphic dot-matrix matters.
+2. **Compose from the existing CustomComponent designer** (`Generators` for the
+   cell grid, `Bindings` to drive cells, `Assets` for glyphs, `Scripts` for
+   SysEx) — almost no new engine code, credible character LCD + bound fields
+   quickly, but high-res graphic mode strains the DOM.
+
+**Recommended:** hybrid — a small native canvas "panel" primitive for the
+dot/segment surface, leaning on existing sections (Text / Effects / Background /
+Animations / DeviceBindings / Assets) + scripting for everything else. Keeps it
+ready-made with presets while staying fully tweakable.
+
+---
+
 ## Open questions / parking lot
 
 - Express motion via `Animations` section vs first-class field props?
