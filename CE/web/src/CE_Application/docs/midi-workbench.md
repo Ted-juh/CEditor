@@ -201,13 +201,47 @@ is deterministic, not a judgment call:
 
 → "What to remove from `ParameterBrowserTab`" then becomes "everything global."
 
-### Where it lives (proposed)
+### Where it lives — a first-class workspace
 
-A new **top-level "MIDI" screen**, sibling to the Device Profile Designer (same
-`editor/TabBar.svelte` pattern), with sub-tabs **Connections · Monitor · Test ·
-Learn**. It's app-level authoring tooling like the DPD and needs room (esp. the
-monitor). Alternative: a dock — rejected as too cramped (the problem we're
-escaping). *(Open: confirm tab vs dock.)*
+Make it a **top-level workspace**, a peer to the Component Designer, Script
+Editor, and Device Profile Designer — i.e. a new `tabType: 'midi'` in the
+`editorTabs` system (`stores/panels.js`, which already dispatches `panel` /
+`component` / `script` / `deviceProfile` / `settings`). Internally it has
+sub-tabs **Connections · Monitor · Test · Learn**.
+
+This settles the earlier tab-vs-dock question: it's neither a dock nor a sub-tab
+of the DPD — it's its own entity, matching how every other major mode is built.
+
+### Relationship to the DPD — Workbench as the foundation
+
+The Workbench and DPD overlap today because the DPD re-implements live MIDI in
+several screens. Split the concerns:
+
+- **MIDI Workbench = the live session layer.** Connections, ports, roles,
+  identity, monitor, send/test, learn, live dump capture/discovery. Works with
+  **no profile loaded**.
+- **DPD = the device data-model layer.** Parameters, message shapes, addresses,
+  dump layouts, inheritance. Pure authoring.
+
+Once the Workbench owns the session, the DPD's live-MIDI screens become **thin
+consumers** of it (this is the "simplify the DPD" win):
+
+- `DpdDiscoveryScreen` (MIDI-CI scan) → uses the Workbench session; DPD only
+  turns results into a profile draft.
+- `DpdBulkDumpsScreen` round-trip verify → uses the Workbench connection +
+  monitor.
+- `DpdAdvancedScreen` SysEx parse → operates on dumps the Workbench captured.
+- The disabled **"MIDI learn"** in `DpdParametersScreen` → calls Workbench learn
+  (capture address → fill parameter).
+
+**MIDI Learn becomes one capability with two sinks:** it can fill a *panel
+binding* (Display Panel) or a *profile parameter address* (DPD), since both now
+sit on the same session.
+
+**Store note:** `stores/deviceProfiles.js` already mixes the live-session slice
+and the profile-data slice. The Workbench can own the session slice as-is now;
+splitting the store (live session vs profile authoring) is a later cleanup, not
+a prerequisite.
 
 ### Phases (non-destructive → migrate → prune)
 
@@ -219,8 +253,9 @@ escaping). *(Open: confirm tab vs dock.)*
    `triggerRawMidiAction` send UI) and **Learn** (replace the disabled
    `DpdParametersScreen` placeholder).
 3. **Prune.** For each feature now in the surface, delete its duplicate from
-   `ParameterBrowserTab` per the split rule, until only the component-scoped
-   binding browser remains.
+   **both** `ParameterBrowserTab` (down to the component-scoped binding browser)
+   **and** the DPD's live-MIDI screens (which become thin consumers of the
+   Workbench session) — per the split rule.
 4. **Polish.** Progressive disclosure + persistence.
 
 ### Principles
@@ -238,8 +273,11 @@ to the selected component.
 
 - ~~App tool vs placeable components~~ → **both, as two layers** (authoring
   Workbench + target-aware panel widgets).
-- ~~How to tackle the build~~ → **build new MIDI Surface, then prune
-  `ParameterBrowserTab`** (see Implementation approach). Confirm tab-vs-dock.
+- ~~How to tackle the build~~ → **build new MIDI Surface, then prune** (see
+  Implementation approach).
+- ~~Tab vs dock~~ → **top-level workspace** (`tabType: 'midi'`), peer to the
+  Component/Script/Device designers.
+- Later: split `deviceProfiles.js` into live-session vs profile-authoring stores?
 - Define the **MIDI transport abstraction** the runtime binds (real ports vs host
   buffer) so widgets are target-agnostic.
 - Where does the Workbench live — a new editor screen alongside the DPD screens,
