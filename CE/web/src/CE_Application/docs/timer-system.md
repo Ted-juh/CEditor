@@ -37,8 +37,10 @@ From `scripting/scriptCommandRegistry.js`, `scripting/panelApi.js`,
 **Note:** these script commands appear to have **no live C++ backing** yet —
 they exist in the JS preview simulator (`scriptRuntime.js`) and the code
 exporters (`scriptEmitters.js`), but `CE/src/Scripting/*` has no timer wiring.
-The `TimerManager` is what makes them real. One-shot vs repeating is therefore
-unconfirmed — define it explicitly (add a `repeat` arg).
+The `TimerManager` is what makes them real. Because there is no legacy live
+behavior to preserve, we are free to *define* the semantics outright — see
+**Repeat & scheduling semantics** and **Lifecycle & serialization** below. The
+preview sim and the `TimerManager` implement that same spec.
 
 ## Goals
 
@@ -101,16 +103,53 @@ A panel part you add and configure without scripting:
   `utils/panelCustomComponentLinks.js`) — e.g. a Timer drives an LCD's
   `scrollOffset` or `pageIndex` directly via a link, no script needed.
 
-## Semantics to nail down
+## Repeat & scheduling semantics (spec)
 
-- **Scheduling discipline** — fixed-rate (compensate for drift) vs fixed-delay.
-  Pick fixed-rate with drift compensation and document the guarantee.
-- **Resolution & limits** — minimum interval, max concurrent timers, behavior
-  under load (coalesce missed fires?).
-- **Lifecycle** — what happens on panel state change, preview↔runtime, panel
-  close, and export. Timer *definitions* serialize; *runtime* state does not.
-- **Preview vs live parity** — the trace simulator (`scriptRuntime.js`) and the
-  `TimerManager` must agree on fire timing and repeat semantics.
+- **Bare `startTimer(id, ms)` repeats** (mode `repeating`, infinite). This
+  matches the house mental model (existing `startTimerHz` heartbeats) and the
+  common panel uses (scroll / blink / refresh). One-shot is the explicit case.
+- **`repeat`** = max number of fires for `repeating`: `0` / omitted = infinite;
+  `n` = fire `n` times, then stop and emit `onTimerDone`. `repeat: 1` is
+  equivalent to `mode: 'oneShot'`.
+- **`mode` summary:**
+  - `oneShot` — fire once after `ms`, emit `onTimer` then `onTimerDone`, stop.
+  - `repeating` — fire every `ms`; honor `repeat`; `onTimerDone` after the last.
+  - `countdown` — tick every `ms` decrementing a remaining count; `onTimer` each
+    tick (with `info.remaining`); `onTimerDone` at zero.
+  - `stopwatch` — no auto-fire; counts up; read via `getTimerElapsed`.
+- **Scheduling = fixed-rate with drift compensation.** Fire times are anchored
+  to the start, not to the previous (possibly late) callback, so a 100 ms timer
+  averages 100 ms even if the heartbeat jitters.
+- **Late/under-load = coalesce, never burst.** If several periods elapse between
+  heartbeats, fire **once** and realign to the schedule — no backlog flood.
+- **Restart-on-reuse.** `startTimer` on an existing `id` reconfigures and
+  restarts it (idempotent replace), rather than stacking a second timer.
+- **Reentrancy-safe.** A timer's callback may `stop` / `restart` itself or others;
+  structural changes are applied at the end of the current tick, not mid-iteration.
+- **Resolution / limits.** Practical floor ~1 ms (message-thread bound); set a
+  sane minimum interval and document that sub-frame intervals coalesce.
+
+## Lifecycle & serialization (spec)
+
+- **Editor (design / preview):** a timer fires only if `runInPreview` is true.
+- **Runtime (Player / exported panel):** timers fire normally and are
+  **independent of the editor window** being open or closed — mirroring how
+  scripts already keep running window-closed in `PluginProcessor`.
+- **Panel state change** does **not** reset running timers (they are component /
+  panel / project scoped, not state-scoped). Scripts may start/stop them on a
+  state if desired.
+- **Scope = lifetime:** a component-scoped timer dies with its component;
+  panel/project-scoped timers live with the panel/project.
+- **Serialization:** timer **definitions** (declarative section props — `name`,
+  `mode`, `interval`, `repeat`, `autostart`, `runInPreview`) persist in the
+  ValueTree and export (`portable` + `exportSafe`). **Runtime state**
+  (`running` / `paused` / `elapsed` / `count`) does **not** serialize.
+- **On load / reopen:** `autostart` timers start fresh from zero; all others sit
+  idle. No attempt to restore mid-flight runtime state.
+- **Pause/resume:** `pauseTimer` freezes `elapsed`; `resumeTimer` continues from
+  the frozen value (it does not realign to wall-clock).
+- **Preview vs live parity:** the trace simulator (`scriptRuntime.js`) and the
+  `TimerManager` implement this same spec, so design-time and runtime agree.
 
 ## Integration points
 
@@ -119,16 +158,21 @@ A panel part you add and configure without scripting:
 - **Animations section** — could use the timer as its tick driver.
 - **Value commits** — debounce / throttle rapid changes.
 
-## Open questions / parking lot
+## Decisions (resolved)
 
-- Confirm / define repeat semantics; add an explicit `repeat` arg. *(still open)*
-- ~~Declarative Timer as its own `controlType` vs a section~~ → **default: section**
-  (see Declarative form).
-- ~~`juce::Timer` heartbeat vs `VBlankAttachment`~~ → **default: plain
-  `juce::Timer`**, `VBlankAttachment` reserved for frame-synced animation parts
-  (see TimerManager).
-- Lifecycle/serialization edge cases (panel close, state change, preview↔runtime
-  parity). *(still open)*
+All major design questions are now settled in this doc:
+
+- ~~Custom timer primitive?~~ → **No** — `TimerManager` over `juce::Timer`.
+- ~~Repeat semantics~~ → **defined** (see Repeat & scheduling semantics).
+- ~~Lifecycle / serialization edge cases~~ → **defined** (see Lifecycle &
+  serialization).
+- ~~Declarative Timer: `controlType` vs section~~ → **section**.
+- ~~Heartbeat: `juce::Timer` vs `VBlankAttachment`~~ → **plain `juce::Timer`**,
+  `VBlankAttachment` reserved for frame-synced animation parts.
+
+Remaining is implementation, not design: wire `TimerManager` into
+`CE/src/Scripting/*`, expose the additive script commands, and mirror the spec
+in the preview simulator.
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->
