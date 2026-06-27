@@ -23,14 +23,12 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 | Part | Type | Status | Summary | Doc |
 |------|------|--------|---------|-----|
 | LCD Display | Component | 📝 | Ready-made-but-flexible hardware display (character / dot-matrix / segment / VFD / OLED), MIDI text+graphics I/O, device-bound fields, scriptable internals. | [lcd-display-component.md](./lcd-display-component.md) |
-| Timer System | Subsystem | 🟡 → 📝 | First-class panel-wide timing: one-shot / repeating / countdown / stopwatch + tempo & MIDI-clock sync. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
+| Timer System | Subsystem | 🟡 → 📝 | A `TimerManager` on top of `juce::Timer` (no custom primitive): named one-shot / repeating / countdown / stopwatch timers. Extends existing `startTimer` / `onTimer`. | [timer-system.md](./timer-system.md) |
 
 ## Parking lot (not yet doc'd — promote when fleshed out)
 
 Ideas that came up while designing the above and deserve their own row/doc later:
 
-- **Clock source** abstraction (internal ms / tempo BPM / incoming MIDI clock /
-  host transport) — prerequisite for tempo-synced timers and animations.
 - **Bargraph / Meter** ready-made part (segment bars, VU/peak, EG display).
 - **Scope / Waveform / Envelope** mini-visualizer part.
 - **Soft-key label strip** (row of fields aligned to physical buttons/knobs).

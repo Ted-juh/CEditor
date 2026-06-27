@@ -245,11 +245,11 @@ pixel and read any value, the property UI becomes just the convenient front end.
 
 ### 17. Timing & timers — see the Timer system
 Scroll / blink / cursor / page auto-advance / warm-up fade all need timing. A
-basic timer exists (`startTimer` / `stopTimer` / `onTimer`) but has gaps
-(repeat semantics unconfirmed; no tempo / MIDI-clock sync). This grew into its
-own subsystem design — see **[timer-system.md](./timer-system.md)**. The LCD is
-a primary consumer: ideally a Timer part can drive `scrollOffset` / `pageIndex`
-directly via the panel routing layer, with scripts for anything fancier.
+basic timer exists (`startTimer` / `stopTimer` / `onTimer`); the full design is
+its own subsystem — see **[timer-system.md](./timer-system.md)** (a
+`TimerManager` over `juce::Timer`). The LCD is a primary consumer: ideally a
+Timer part drives `scrollOffset` / `pageIndex` directly via the panel routing
+layer, with scripts for anything fancier.
 
 ---
 
