@@ -112,6 +112,80 @@ parameter via the existing `DeviceBindings` / ports:
 - **Page / screen system**: multiple layouts cycled by a bound value
   (mode / page index)
 
+### 10. MIDI-driven display I/O (new — the screen as a MIDI endpoint)
+This is the angle that makes an LCD more than decoration, and it has real
+hardware precedent: a number of devices accept MIDI (usually SysEx) that pushes
+**text and even graphics** onto their screen, and control surfaces use the
+display as a live readout of incoming MIDI. We can model the LCD in **both
+directions**:
+
+- **Sink (incoming MIDI → screen):** the display renders content received over
+  MIDI — SysEx text frames, dot-matrix bitmap frames, CC/NRPN values mapped to
+  fields/bargraphs, MMC/transport state, etc. Useful for emulating a hardware
+  screen or building a custom remote readout.
+- **Source (interaction → outgoing MIDI):** menu navigation, soft-key presses,
+  and field edits emit MIDI/SysEx (wire through existing ports + `DeviceBindings`
+  / Scripts).
+
+Real-world reference points worth supporting as presets / parsers:
+
+- **Roland Sound Canvas (SC-55 / SC-88 / SC-88Pro):** SysEx writes a text line
+  *and* a 16×16 dot-matrix graphic to the LCD — a clean example of "graphics
+  over MIDI". Great template for a dot-matrix frame format.
+- **Ableton Push:** one SysEx message per line (~68 chars/line, 4 lines) sets
+  display text — simple line-addressed text protocol.
+- **Mackie Control / Logic Control (MCU) & HUI:** the LCD message
+  (header + `0x12` + position byte + ASCII) drives a 2×56 "scribble strip" split
+  per channel; plus 7-segment time/assignment displays. Behringer X-Touch and
+  many DAW surfaces speak this. Good model for **scribble strips** and
+  **per-channel labels**.
+
+Things to model for this:
+
+- Frame/protocol adapters (text-line, dot-matrix bitmap, scribble-strip,
+  CC/NRPN→field) — pluggable so users pick or define one
+- Character offset / line addressing, partial updates
+- Mapping table: incoming address/range → which field or pixel region updates
+
+### 11. Character ROM & encoding (new)
+- Selectable character ROM: HD44780 **A00** (Japanese / katakana) vs **A02**
+  (European/Cyrillic), plus vendor tables (Roland/Yamaha custom glyph sets)
+- Custom **CGRAM** glyph slots (reuse `Assets` for storage)
+- Code page / encoding for incoming MIDI text
+
+### 12. Refresh & timing realism (new)
+- Refresh rate, partial-region updates, tearing on fast scroll
+- Slow-LCD smear vs instant-OLED snap (ties into the persistence cue in §8)
+
+### 13. Interactive / touch & soft-keys (new)
+- Touchscreen mode (Korg Triton/Kronos-style menu diving)
+- **Soft-key labels**: a row of fields aligned to physical buttons/knobs below
+  the screen (Roland JD/JV "function" rows) — each emits MIDI when pressed
+- Menu/page cursor navigation
+
+### 14. Multi-display arrangement (new)
+- Main display + sub-display (value box, octave indicator, etc.)
+- Tiling several LCD instances that share one palette/backlight preset
+
+---
+
+## Reference catalog (to ground the presets)
+
+A non-exhaustive taxonomy so "ready-made" presets mirror real gear. Treat model
+names as illustrative; verify exact specs before claiming hardware accuracy.
+
+- **7-segment LED:** drum machines / sequencers (TR-style), patch-number boxes
+- **Character LCD (16×2 / 24×2):** classic FM & analog synths, workstation
+  patch screens
+- **Large custom-segment LCD:** late-80s flagships with bespoke iconography
+- **Graphic dot-matrix LCD (e.g. 128×64):** rompler/workstation menus, modern
+  desktop synths
+- **VFD (blue-green):** grooveboxes, samplers, mixers
+- **OLED (128×64 mono):** modern boutique/Eurorack and groovebox gear
+- **Color TFT / touchscreen:** workstation flagships
+- **LED / dot matrix:** step grids, monome-style surfaces
+- **Plasma:** vintage high-end workstations
+
 ---
 
 ## Open questions / parking lot
@@ -121,6 +195,21 @@ parameter via the existing `DeviceBindings` / ports:
 - Should fields be a new section or sit inside `Parts` / `Generators`?
 - Default port set for `LcdDisplay` in `componentPorts.js` (page index, field
   values, brightness, etc.).
+- MIDI-driven display: where do incoming-SysEx parsers live (Scripting layer?
+  a new adapter registry?), and how do we keep them sandboxed?
+- Do we ship built-in protocol adapters (Sound Canvas, Push, MCU/HUI) or expose
+  a generic frame-mapping editor and let users build them?
+- CGRAM / custom glyph authoring UX — reuse the icon/asset pipeline?
+
+## References
+
+- Mackie/Logic Control LCD (`0x12`) scribble-strip protocol —
+  https://github.com/NicoG60/TouchMCU/blob/main/doc/mackie_control_protocol.md
+  and https://github.com/Silhm/bcf-scribble-strips/wiki/Understanding-Mackie-Control-Protocol
+- Roland SC-88Pro LCD text + dot-matrix SysEx generator —
+  http://robbi-985.homeip.net/blog/?p=1352
+- Ableton Push LCD text via SysEx —
+  https://cycling74.com/forums/how-to-control-the-push-lcd-with-sysex-messages
 
 ## Add your ideas below
 <!-- New ideas go here; promote them into the sections above once fleshed out. -->
