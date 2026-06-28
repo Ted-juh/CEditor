@@ -179,6 +179,24 @@ function bundlePythonRuntime(vst3Dir) {
 // 1. Bake CURRENT exportParameters (params + device wire) into a temp copy of the panel, so the
 //    plugin is always built from up-to-date data without mutating the user's file.
 mkdirSync(outDir, { recursive: true });
+// Ensure every TypeScript handler carries compiledJs (the shipped C++ host has no TS compiler — it runs
+// the transpiled JS). The editor sets this on save, but a panel that wasn't re-saved, was imported, or
+// was generated may lack it — transpile any that are missing so TS always runs window-closed.
+{
+  const ts = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/scripting/tsService.js')).href);
+  await ts.ensureTs();
+  let fixed = 0;
+  const fixTs = (s) => {
+    if (s && s.language === 'typescript' && typeof s.source === 'string' && !(typeof s.compiledJs === 'string' && s.compiledJs)) {
+      const js = ts.transpileTs(s.source);
+      if (js != null) { s.compiledJs = js; fixed++; }
+    }
+  };
+  for (const s of panelDoc.scripts ?? []) fixTs(s);
+  for (const c of panelDoc.controls ?? []) for (const s of c?._children?.Scripts?.scripts ?? []) fixTs(s);
+  if (fixed) console.log(`TypeScript: transpiled ${fixed} handler(s) to compiledJs for the shipped runtime`);
+}
+
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
 const bakedPanel = path.join(outDir, `${productName}.cepanel`);
