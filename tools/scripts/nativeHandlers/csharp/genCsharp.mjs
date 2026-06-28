@@ -1,28 +1,35 @@
-// genCsharp.mjs — generate a buildable C# (NativeAOT) handler module from a panel's C# scripts.
+// genCsharp.mjs — generate a buildable C# handler module from a panel's C# scripts, using the
+// HOSTED-CoreCLR path (NOT NativeAOT). See native-handlers-design.md §C# for the why.
 //
-// Mirror of genCpp.mjs, for the C# compile-at-export path. Output (<outDir>):
-//   • CeRuntime.cs                       — the interop + user-facing surface (copied from this dir)
-//   • Handlers.<sanitizedId>.cs (per script) — the user's source wrapped in `static class Script_<id>`
-//   • HandlerRegistry.Registration.cs    — the generated `GeneratedRegistration.RegisterAll()` partial
-//                                           that adds each (scriptId, eventId) -> Script_<id>.<event>
-//   • ce_handlers_csharp.csproj          — NativeAOT shared-library project (size-tuned)
+// Why hosted-CoreCLR and not NativeAOT: NativeAOT-on-Windows needs the MSVC CRT + Windows SDK import
+// libraries, which are Microsoft-proprietary and NOT redistributable — so we cannot ship a
+// no-Visual-Studio NativeAOT path to a user's machine. Instead:
+//   • Roslyn (`dotnet publish`, pure IL emission — NO native linker, NO MSVC, NO Windows SDK) compiles
+//     the user's C# + CeRuntime.cs into a managed `ce_managed.dll`.
+//   • A self-contained publish bundles a trimmed-capable CoreCLR (MIT, freely redistributable) beside it.
+//   • A tiny C shim (CeHost.c, built with the bundled llvm-mingw clang — no MSVC) exports the flat C ABI
+//     and boots that CoreCLR via hostfxr, forwarding every call to the managed [UnmanagedCallersOnly]
+//     entry points on Ce.Exports.
 //
-// The project/assembly name is `ce_handlers_csharp`, so `dotnet publish` emits
-// `ce_handlers_csharp.<dll|dylib|so>` — exactly the file NativeHandlerEngine::moduleFileName() loads.
+// Output (<outDir>):
+//   • CeRuntime.cs                       — interop + user-facing surface (copied from this dir)
+//   • Handlers.<sanitizedId>.cs (per script) — the user's source wrapped in `sealed partial Script_<id>`
+//   • HandlerRegistry.Registration.cs    — generated GeneratedRegistration.RegisterAll() partial
+//   • Program.cs                         — no-op entry point (hostfxr command-line init needs one; never run)
+//   • roots.xml                          — trimmer root descriptor (keeps the handler assembly whole)
+//   • ce_managed.csproj                  — self-contained CoreCLR project (assembly name `ce_managed`)
+//   • CeHost.c + hosting/*.h             — the native hosting shim + vendored hostfxr headers (copied)
 //
-// BUILD STATUS / REQUIREMENTS — BUILD-UNVERIFIED SCAFFOLD:
-//   • Requires the .NET 9 or 10 SDK PLUS the platform native toolchain NativeAOT shells out to
-//     (Linux: clang + the usual binutils/zlib dev packages; macOS: Xcode command-line tools;
-//      Windows: MSVC build tools / Desktop C++ workload).
-//   • Build is PER-OS: NativeAOT cannot cross-compile across OSes. Run `publishCommand(rid)` on a host
-//     matching the target OS (e.g. linux-x64 on Linux, osx-arm64 on macOS, win-x64 on Windows).
-//   • Expected module size is ~1.5-4 MB (the GC + a trimmed runtime are baked in; see NativeHandlerAbi.h).
-//   • OUTPUT NAMING: on Linux, NativeLib=Shared emits `ce_handlers_csharp.so` (NO `lib` prefix), which is
-//     exactly what the host wants. On Windows it is `ce_handlers_csharp.dll` and on macOS
-//     `ce_handlers_csharp.dylib` — both already match. If a future SDK emits a `lib`-prefixed name, the
-//     export pipeline must rename it to `ce_handlers_csharp.<ext>` before bundling next to the plugin.
+// The full build is two steps (run by index.mjs):
+//   1) dotnet publish -c Release -r <rid> --self-contained true -o pub   (Roslyn → ce_managed.dll + CoreCLR)
+//   2) <clang> -x c CeHost.c -o pub/ce_handlers_csharp.<ext>             (the shim, into the publish dir)
+// then the whole `pub/` dir ships next to the plugin (the host loads ce_handlers_csharp.<ext>; the shim
+// self-locates hostfxr + ce_managed.dll beside itself).
+//
+// VERIFIED 2026-06 on .NET 10 (linux-x64): `verify-csharp.mjs` runs the real publish + shim build and
+// dispatches a C# handler through the flat ABI that calls back into the host (out=21, log='ran').
 
-import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -33,8 +40,7 @@ function sanitize(id) {
   return String(id).replace(/[^A-Za-z0-9_]/g, '_');
 }
 
-// C# string literal — JSON string escaping is valid for our ids/event names (no surprises in C# verbatim
-// vs JSON for the ASCII identifiers + dotted ids we use).
+// C# string literal — JSON string escaping is valid for our ids/event names (ASCII identifiers + dotted ids).
 function csstr(s) {
   return JSON.stringify(String(s));
 }
@@ -46,14 +52,17 @@ export function generateCsharpModule({ scripts, outDir, abiInfo }) {
     (s) => s?.enabled !== false && typeof s?.source === 'string' && s.source.trim() && s.event,
   );
 
-  // 1) Copy the runtime verbatim so the generated project compiles against the exact interop surface.
-  const runtimeSrc = readFileSync(path.join(__dirname, 'CeRuntime.cs'), 'utf8');
-  writeFileSync(path.join(outDir, 'CeRuntime.cs'), runtimeSrc);
+  // 1) Copy the managed runtime + the native shim + the vendored hosting headers verbatim.
+  copyFileSync(path.join(__dirname, 'CeRuntime.cs'), path.join(outDir, 'CeRuntime.cs'));
+  copyFileSync(path.join(__dirname, 'CeHost.c'), path.join(outDir, 'CeHost.c'));
+  const hostingOut = path.join(outDir, 'hosting');
+  mkdirSync(hostingOut, { recursive: true });
+  for (const h of ['hostfxr.h', 'coreclr_delegates.h'])
+    copyFileSync(path.join(__dirname, 'hosting', h), path.join(hostingOut, h));
 
   // 2) Per-script wrapper: the user writes `void onValueChanged(CeContext ctx, CeEvent e) {...}` (an
-  //    INSTANCE method, matching the editor skeleton) and we drop their source inside a sealed class
-  //    Script_<id> in the Ce.Handlers namespace. Two controls can both define onValueChanged without
-  //    colliding (distinct classes). Registration binds `new Script_<id>().<event>` as the delegate.
+  //    INSTANCE method, matching the editor skeleton) inside a sealed partial Script_<id>. Two controls
+  //    can both define onValueChanged without colliding (distinct classes).
   for (const s of usable) {
     const cls = `Script_${sanitize(s.id)}`;
     const body = `// GENERATED by genCsharp.mjs — do not edit. Script: ${s.name ?? s.id}
@@ -72,12 +81,8 @@ ${s.source}
     writeFileSync(path.join(outDir, `Handlers.${sanitize(s.id)}.cs`), body);
   }
 
-  // 3) Registration partial: implements GeneratedRegistration.RegisterAll(), adding each
-  //    (scriptId, eventId) -> Script_<id>.<event> to the HandlerRegistry. Always emitted (empty body if
-  //    no handlers) so the partial in CeRuntime.cs has its implementation and the module compiles.
-  // Each script's handler is an INSTANCE method with default (private) access, so the registry in
-  // namespace Ce can't bind it directly. Give each Script_<id> a partial self-register method: it lives
-  // INSIDE the class, so it can take the private handler as a delegate, and RegisterAll() just calls it.
+  // 3) Registration partial: each Script_<id> gets a partial self-register method (it lives INSIDE the
+  //    class so it can bind the private instance handler as a delegate); RegisterAll() calls them all.
   const partials = usable
     .map((s) => {
       const cls = `Script_${sanitize(s.id)}`;
@@ -111,55 +116,92 @@ ${regLines || '            // no enabled handlers'}
 `;
   writeFileSync(path.join(outDir, 'HandlerRegistry.Registration.cs'), registration);
 
-  // 4) NativeAOT shared-library project. Assembly name pinned to ce_handlers_csharp so the published
-  //    native lib is ce_handlers_csharp.<ext>. Size knobs trim the ~MB-scale baked-in runtime.
-  const targetFramework = (abiInfo && abiInfo.targetFramework) || 'net9.0';
-  const csproj = `<!-- GENERATED by genCsharp.mjs — do not edit. NativeAOT shared-library handler module. -->
+  // 4) No-op entry point. hostfxr command-line init (used because it supports self-contained components,
+  //    which initialize_for_runtime_config does not) needs the assembly to have an entry point. We never
+  //    run Main — the shim only gets a runtime delegate and resolves the [UnmanagedCallersOnly] exports.
+  writeFileSync(
+    path.join(outDir, 'Program.cs'),
+    `// GENERATED by genCsharp.mjs — no-op entry point (the native shim inits the runtime via hostfxr and
+// never runs Main; it only exists so a self-contained publish has an entry point).
+namespace Ce { internal static class Program { static void Main() { } } }
+`,
+  );
+
+  // 5) Trimmer root descriptor — preserve the whole (tiny) handler assembly so the trimmer never prunes
+  //    the [UnmanagedCallersOnly] exports / user handlers it can't see are reached from native code.
+  writeFileSync(
+    path.join(outDir, 'roots.xml'),
+    `<!-- GENERATED by genCsharp.mjs. Keep the handler assembly whole; the trimmer can't see the
+     [UnmanagedCallersOnly] entry points are reachable (they're called from the native host shim). -->
+<linker>
+  <assembly fullname="ce_managed" preserve="all" />
+</linker>
+`,
+  );
+
+  // 6) The self-contained CoreCLR project. AssemblyName pinned to ce_managed so the shim's hard-coded
+  //    "ce_managed.dll" / "Ce.Exports, ce_managed" resolve. Self-contained so a trimmed CoreCLR ships in
+  //    `pub/` beside the shim (no machine-wide .NET needed on the END-USER's box).
+  //    Trimming is OFF by default (PublishTrimmed=false): the untrimmed self-contained layout is the
+  //    proven-correct baseline (~80 MB). Size-trim is a tunable follow-up — see native-handlers-design.md
+  //    §C# (full `link` trim breaks UnmanagedCallersOnly resolution / the hostfxr component-activator
+  //    path unless those roots are added; tracked as a size optimization, not correctness).
+  const targetFramework = (abiInfo && abiInfo.targetFramework) || 'net10.0';
+  const csproj = `<!-- GENERATED by genCsharp.mjs — do not edit. Self-contained CoreCLR handler assembly. -->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Library</OutputType>
+    <OutputType>Exe</OutputType>
     <TargetFramework>${targetFramework}</TargetFramework>
-    <!-- Pins the output file name to ce_handlers_csharp.<dll|dylib|so> (the host's expected name). -->
-    <AssemblyName>ce_handlers_csharp</AssemblyName>
+    <!-- Pins the assembly to ce_managed.dll (the shim loads it + resolves Ce.Exports by this name). -->
+    <AssemblyName>ce_managed</AssemblyName>
     <RootNamespace>Ce</RootNamespace>
 
     <Nullable>enable</Nullable>
     <ImplicitUsings>disable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
-    <!-- NativeAOT shared library. -->
-    <PublishAot>true</PublishAot>
-    <NativeLib>Shared</NativeLib>
+    <!-- Ship a self-contained CoreCLR in pub/ (no user .NET install). Untrimmed = proven baseline. -->
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>false</PublishTrimmed>
 
-    <!-- Size / determinism knobs (shrink the baked-in runtime; no globalization/ICU, no stack traces). -->
+    <!-- Determinism / size knobs that don't affect hosting correctness. -->
     <InvariantGlobalization>true</InvariantGlobalization>
-    <StackTraceSupport>false</StackTraceSupport>
-    <UseSystemResourceKeys>true</UseSystemResourceKeys>
-    <IlcOptimizationPreference>Size</IlcOptimizationPreference>
     <DebuggerSupport>false</DebuggerSupport>
     <EventSourceSupport>false</EventSourceSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
     <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
     <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
     <AutoreleasePoolSupport>false</AutoreleasePoolSupport>
   </PropertyGroup>
 
-  <!-- The SDK auto-includes every .cs in this dir (CeRuntime.cs + the generated handler/registry
-       files), which is exactly what we want. Do NOT also list them explicitly — that trips NETSDK1022
-       (duplicate Compile items). -->
+  <ItemGroup>
+    <TrimmerRootDescriptor Include="roots.xml" />
+  </ItemGroup>
+
+  <!-- The SDK auto-includes every .cs in this dir (CeRuntime.cs + the generated files + Program.cs),
+       which is exactly what we want. Do NOT list them explicitly — that trips NETSDK1022. -->
 
 </Project>
 `;
-  writeFileSync(path.join(outDir, 'ce_handlers_csharp.csproj'), csproj);
+  writeFileSync(path.join(outDir, 'ce_managed.csproj'), csproj);
+
+  // The publish output dir (relative to outDir) where ce_managed.dll + the CoreCLR land; the shim is
+  // compiled INTO it and the whole dir ships next to the plugin.
+  const publishSubdir = 'pub';
 
   return {
     dir: outDir,
     moduleName: 'ce_handlers_csharp',
+    managedName: 'ce_managed',
     handlerCount: usable.length,
-    // Per-OS NativeAOT publish. `rid` is a .NET runtime identifier matching the BUILD host's OS, e.g.
-    // 'linux-x64', 'osx-arm64', 'win-x64'. Output: ce_handlers_csharp.<so|dylib|dll>.
+    publishSubdir,
+    shimSource: path.join(outDir, 'CeHost.c'),
+    hostingIncludeDir: hostingOut,
+    // Roslyn publish → self-contained CoreCLR + ce_managed.dll in `pub/`. `rid` matches the BUILD host's
+    // OS/arch (linux-x64, win-x64, osx-arm64). No NativeAOT, no native linker — pure IL emission.
     publishCommand(rid) {
-      return `dotnet publish -c Release -r ${rid} -p:NativeLib=Shared`;
+      return `dotnet publish -c Release -r ${rid} --self-contained true -o ${publishSubdir}`;
     },
   };
 }

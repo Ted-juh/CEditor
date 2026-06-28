@@ -73,13 +73,37 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
       if (!existsSync(out)) return { ok: false, lang, error: 'C++ module build produced no output' };
       cpSync(out, dest);
     } else if (lang === 'csharp') {
-      if (!have('dotnet')) return { ok: false, lang, error: 'dotnet SDK not found on PATH' };
+      // Hosted-CoreCLR path (NOT NativeAOT — see csharp/genCsharp.mjs): Roslyn compiles a managed
+      // ce_managed.dll + a self-contained CoreCLR (no MSVC / no Windows SDK), and a tiny C shim
+      // (CeHost.c, built with the bundled clang) boots it via hostfxr. The whole self-contained `pub/`
+      // dir ships next to the plugin binary.
+      if (!have('dotnet')) return { ok: false, lang, error: 'dotnet SDK not found — provision the .NET SDK (tools/toolchains)' };
+      const tc = cppCompiler();
+      if (!tc) return { ok: false, lang, error: 'no C compiler for the C# host shim — run: node tools/toolchains/provision.mjs llvm-mingw' };
       const { generateCsharpModule } = await import('./csharp/genCsharp.mjs');
       const gen = generateCsharpModule({ scripts, outDir, abiInfo: { dir: ABI_DIR } });
-      execSync(gen.publishCommand(dotnetRid()), { cwd: outDir, stdio: 'inherit' });
-      const built = findBuilt(outDir, moduleName, ext);
-      if (!built) return { ok: false, lang, error: 'C# AOT publish produced no module' };
-      cpSync(built, dest);
+      // 1) Roslyn → self-contained CoreCLR + ce_managed.dll in outDir/pub.
+      execSync(gen.publishCommand(dotnetRid()), {
+        cwd: outDir, stdio: 'inherit',
+        env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' },
+      });
+      const pubDir = path.join(outDir, gen.publishSubdir);
+      if (!existsSync(path.join(pubDir, `${gen.managedName}.dll`))) return { ok: false, lang, error: 'C# publish produced no ce_managed.dll' };
+      // 2) Compile the native hosting shim INTO the publish dir (it self-locates hostfxr beside itself).
+      const shimOut = path.join(pubDir, `${moduleName}${ext}`);
+      const cflags = process.platform === 'win32' ? '' : '-fPIC';
+      execSync(`"${tc.cxx}" -x c -shared ${cflags} -O2 -fvisibility=hidden -I "${ABI_DIR}" -I "${gen.hostingIncludeDir}" "${gen.shimSource}" -o "${shimOut}"`, { stdio: 'inherit' });
+      if (!existsSync(shimOut)) return { ok: false, lang, error: 'C# host shim build produced no output' };
+      // 3) Ship the entire self-contained publish dir next to the plugin binary (shim + ce_managed + CoreCLR).
+      let bytes = 0;
+      for (const f of readdirRec(pubDir)) {
+        const rel = path.relative(pubDir, f);
+        const d = path.join(binDir, rel);
+        mkdirSync(path.dirname(d), { recursive: true });
+        cpSync(f, d);
+        bytes += statSync(d).size;
+      }
+      return { ok: true, lang, bytes };
     } else if (lang === 'java') {
       if (!have('native-image')) return { ok: false, lang, error: 'GraalVM native-image not found on PATH' };
       const { generateJavaModule } = await import('./java/genJava.mjs');
@@ -103,6 +127,20 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
   } catch (e) {
     return { ok: false, lang, error: e?.message ?? String(e) };
   }
+}
+
+// Recursively list every file (not dir) under root — used to copy the whole self-contained C# publish dir.
+function readdirRec(root) {
+  const out = [];
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else out.push(p);
+    }
+  };
+  walk(root);
+  return out;
 }
 
 // native-image / dotnet may name the output libce_handlers_X.so or place it under publish/ — find it.

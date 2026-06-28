@@ -12,7 +12,7 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
 | Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,harness.c,genJava.mjs}` | ✅ **FULLY verified on GraalVM CE 21.0.2**: `verify-java.mjs` runs the real `native-image --shared` build + the C-shim isolate link, loads the 14 MB module, and dispatches a Java handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a javac-against-`graal-sdk` type-check where native-image is absent. |
-| C# generator (NativeAOT) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,genCsharp.mjs}` | ✅ **FULLY verified on .NET 10 NativeAOT**: `verify-csharp.mjs` runs the real `dotnet publish -p:NativeLib=Shared`, loads the ~1 MB module, and dispatches a C# handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a structural check where the .NET SDK is absent. |
+| C# generator (hosted-CoreCLR) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,CeHost.c,genCsharp.mjs,hosting/*.h}` | ✅ **FULLY verified on .NET 10 (linux-x64)**: `verify-csharp.mjs` runs the real build — Roslyn `dotnet publish --self-contained` → `ce_managed.dll` + a CoreCLR; the C shim `CeHost.c` (built with the bundled clang, **no MSVC**) is compiled into the publish dir; the shared host harness loads `ce_handlers_csharp.so`, the shim boots CoreCLR via `hostfxr` (command-line init, which supports self-contained), and a C# handler dispatches + calls back into the host (`out=21`, `log='ran'`). **Replaced NativeAOT** — that path needs non-redistributable MSVC/WinSDK import libs on Windows (researched 2026-06, see §C#). Self-contained layout ~80 MB untrimmed (proven baseline); size-trim is a tracked follow-up. |
 | Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ all three per-language build paths exercised by the verifiers; the VST3-bundling wrapper + a DAW load test are the remaining end-to-end gap. |
 
 Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` — each check runs the **real AOT build +
@@ -123,21 +123,46 @@ auto-detection in `pythonEmbed.mjs`), so a Lua-only panel pays nothing.
 - **Toolchain at export**: the same MSVC/clang already required to build the plugin. **No new
   dependency.** This is why C++ ships first.
 
-### C# — .NET NativeAOT (`NativeLib=Shared`)
-- **Build**: a generated `.csproj` (`<PublishAot>true</PublishAot>`, `<NativeLib>Shared</NativeLib>`,
-  size knobs: `InvariantGlobalization`, `StackTraceSupport=false`, `IlcOptimizationPreference=Size`),
-  then `dotnet publish -c Release -r <rid> -p:NativeLib=Shared`. Output is a true native `.dll/.so/
-  .dylib` with **no CLR shipped**.
-- **Entry points**: `[UnmanagedCallersOnly(EntryPoint="ce_handler_dispatch", CallConvs=[CallConvCdecl])]`
-  static methods; host callbacks via `delegate* unmanaged<…>` cached at init. **Blittable only** across
-  the boundary — strings/arrays as (ptr,len); wrap every export body in `try/catch`→status (a managed
-  exception escaping the boundary crashes the host).
-- **Constraints**: no `Reflection.Emit`/dynamic loading; `System.Text.Json` only via source-gen; the
-  runtime self-inits on first call (we force it in `ce_handler_init`); **no unload**.
-- **Cost**: **~1.5–4 MB** per module per platform (GC + runtime slice baked in — no sub-MB option);
-  build seconds.
-- **Toolchain at export**: .NET 9/10 SDK **+** a native toolchain (MSVC on Win, clang on Linux, Xcode
-  on mac). **No cross-OS build.**
+### C# — Roslyn managed DLL + shipped CoreCLR + C hosting shim  *(was: NativeAOT)*
+
+**Why not NativeAOT (for the zero-VS user).** NativeAOT *does* build and dispatch, and I proved the link
+step needs no MSVC linker (`-p:LinkerFlavor=lld` → `Linker: Ubuntu LLD 18.1.3`, E2E PASS on linux-x64).
+But on **Windows** NativeAOT's generated objects still reference the **MSVC CRT + Windows SDK import
+libraries** (`libcmt.lib`, `libucrt.lib`, `kernel32.lib`, …). `llvm-mingw` does not supply those, and
+they are **Microsoft-proprietary and outside the VS redistribution grant** — we cannot legally bundle
+them into CEditor and ship them to a user's machine. (Tools like `xwin` fetch them *per-developer at
+build time*, which doesn't cover shipping them to end users.) So NativeAOT-no-VS is a licensing
+dead-end. Kept only as an optional path for users who *do* have the C++ build tools.
+
+**The shipped-runtime design (mirrors Java's jlink-JRE + JNI shim, and Python's embeddable).**
+- **Build (no native toolchain for the managed side)**: Roslyn (`csc` / `dotnet build`) compiles
+  `CeRuntime.cs` + the user's handler sources + the generated registration into a **managed IL**
+  `ce_managed.dll` (+ `ce_managed.runtimeconfig.json` pointing at `Microsoft.NETCore.App`). No linker,
+  no MSVC, no Windows SDK — pure IL emission.
+- **Host shim** `ce_handlers_csharp.<dll|so|dylib>`: a tiny **C** shim built with the bundled
+  **llvm-mingw clang** (its own MinGW/UCRT, statically linked — no MSVC). It exports our flat C ABI
+  (`ce_handler_init/dispatch/has/shutdown`); inside, it `LoadLibrary`/`dlopen`s the **shipped**
+  `hostfxr` by relative path (we ship the runtime, so no `nethost` link dependency is needed),
+  `hostfxr_initialize_for_runtime_config` → `hdt_load_assembly_and_get_function_pointer`, and resolves
+  the managed `[UnmanagedCallersOnly]` entry points of `ce_managed.dll` (init/dispatch/has/shutdown).
+  `ce_handler_init` forwards the `CeHostVtable*` to managed `ce_managed_init`; dispatch/has just forward.
+- **Ship into the plugin**: a **trimmed self-contained CoreCLR** (`coreclr`, `clrjit`, `hostfxr`,
+  `hostpolicy`, `System.Private.CoreLib` + the BCL slice the handler API needs) **+** `ce_managed.dll`
+  + its runtimeconfig + the C shim. All **MIT-licensed and freely redistributable**.
+- **Mechanism proven (2026-06, linux-x64)**: `dotnet build` (Roslyn) → `ce_managed.dll`; a C shim using
+  `get_hostfxr_path` → `hostfxr_initialize_for_runtime_config` → `load_assembly_and_get_function_pointer`
+  (`UNMANAGEDCALLERSONLY_METHOD`) called a managed method through a function pointer — `Doubler(20)=41`,
+  **CORECLR HOST E2E PASS**.
+- **Entry points (managed)**: `[UnmanagedCallersOnly]` static methods (`ce_managed_dispatch`, …); host
+  callbacks via the `CeHostVtable*` passed at init (cached `delegate* unmanaged<…>`). **Blittable only**
+  across the boundary; every export body wrapped in `try/catch`→status.
+- **Cost**: a **one-time ~15–30 MB trimmed CoreCLR** shipped once per plugin and **shared across every
+  C# handler**; the `ce_managed.dll` itself is KBs. Build is Roslyn-fast (seconds), **no `native-image`
+  closed-world rebuild** like Java. Unlike NativeAOT, the CLR **can** be torn down at shutdown.
+- **Toolchain at export**: a portable **.NET SDK** (for Roslyn; provisioned like the JDK) **+** the
+  bundled llvm-mingw clang (for the ~100-line C shim). **No MSVC, no Windows SDK, no NativeAOT, no
+  cross-OS link problem** — the managed DLL is platform-neutral IL; only the tiny shim + the shipped
+  runtime are per-OS, and the runtime is just downloaded per-OS, never linked by us.
 
 ### Java — GraalVM native-image (`--shared`, isolates)
 - **Build**: `native-image --shared -o ce_handlers_<panel>_java -cp handlers.jar com.ce.Handlers`,
