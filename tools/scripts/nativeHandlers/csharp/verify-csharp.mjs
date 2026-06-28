@@ -35,8 +35,10 @@ try {
 
   // --- FULL hosted-CoreCLR build + dispatch, when dotnet + a C compiler are present ---
   if (which('dotnet') && cc) {
+    // Exercise sendCC (numeric overload) + setValue + log — the same API surface the selftest panel
+    // uses — so an API/signature mismatch fails the build here, not on the user's machine.
     const gen = generateCsharpModule({ scripts: [
-      { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
+      { id: 'knob1', name: 'Cutoff', event: 'onValueChanged', source: 'void onValueChanged(CeContext ctx, CeEvent e){ ctx.sendCC(1, 25, 127); ctx.setValue("out", e.value*2+1); ctx.log("ran"); }' },
     ], outDir: work, abiInfo: { dir: ABI_DIR } });
 
     // 1) Roslyn → self-contained CoreCLR + ce_managed.dll

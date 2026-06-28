@@ -352,6 +352,10 @@ namespace Ce
             }
         }
 
+        // Numeric convenience (mirrors setValue(string,double)): handlers call sendCC(1, 25, 127) with a
+        // plain number; without this overload the int literal has no conversion to Var and won't compile.
+        public void sendCC(int channel, int cc, double v) => sendCC(channel, cc, new Var(v));
+
         public void log(string msg)
         {
             CeStr m = Utf8.Alloc(msg);
