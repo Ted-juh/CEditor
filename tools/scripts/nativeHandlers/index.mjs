@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { cppCompiler } from '../../toolchains/resolveToolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../CE/src/Scripting'); // holds NativeHandlerAbi.h
@@ -60,15 +61,17 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
 
   try {
     if (lang === 'cpp') {
-      if (!have('cmake')) return { ok: false, lang, error: 'cmake not found on PATH' };
+      // Build the handler module with the BUNDLED LLVM-MinGW Clang (no Visual Studio / Windows SDK).
+      // Direct clang invocation — no CMake, no system toolchain. -static links the mingw runtime in so
+      // the .dll is self-contained; the flat C ABI means it loads into the MSVC-built host regardless.
       const { generateCppModule } = await import('./cpp/genCpp.mjs');
       generateCppModule({ scripts, outDir, abiHeaderDir: ABI_DIR, runtimeHeaderDir: path.join(HERE, 'cpp') });
-      const build = path.join(outDir, 'build');
-      execSync(`cmake -S "${outDir}" -B "${build}" -DCMAKE_BUILD_TYPE=Release`, { stdio: 'inherit' });
-      execSync(`cmake --build "${build}" --config Release`, { stdio: 'inherit' });
-      const built = findBuilt(build, moduleName, ext);
-      if (!built) return { ok: false, lang, error: 'C++ module build produced no output' };
-      cpSync(built, dest);
+      const tc = cppCompiler();
+      if (!tc) return { ok: false, lang, error: 'no C++ compiler — run: node tools/toolchains/provision.mjs llvm-mingw' };
+      const out = path.join(outDir, `${moduleName}${ext}`);
+      execSync(`"${tc.cxx}" -std=c++20 -shared -static -O2 -fvisibility=hidden -I "${ABI_DIR}" -I "${path.join(HERE, 'cpp')}" "${path.join(outDir, 'glue.cpp')}" -o "${out}"`, { stdio: 'inherit' });
+      if (!existsSync(out)) return { ok: false, lang, error: 'C++ module build produced no output' };
+      cpSync(out, dest);
     } else if (lang === 'csharp') {
       if (!have('dotnet')) return { ok: false, lang, error: 'dotnet SDK not found on PATH' };
       const { generateCsharpModule } = await import('./csharp/genCsharp.mjs');

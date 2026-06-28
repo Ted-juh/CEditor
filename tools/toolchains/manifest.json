@@ -1,0 +1,37 @@
+{
+  "_comment": "Pinned, redistributable build toolchains CEditor provisions so a user can export every language WITHOUT pre-installing Visual Studio / .NET SDK / GraalVM. provision.mjs downloads the entry matching the host platform into tools/toolchains/<id>/. The installer bundles or downloads these (see tools/installer/CEditor.iss). Binaries are gitignored — never committed.",
+  "toolchains": {
+    "llvm-mingw": {
+      "desc": "Self-contained Clang/LLD C/C++ toolchain (no Visual Studio, no Windows SDK). Builds the JUCE plugin AND the C-ABI handler modules; its lld-link also backs the C# NativeAOT link step.",
+      "version": "20260616",
+      "license": "Apache-2.0-with-LLVM-exception + permissive mingw-w64",
+      "bin": "bin",
+      "platforms": {
+        "win32-x64":  { "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-x86_64.zip", "sizeMB": 178, "strip": 1 },
+        "linux-x64":  { "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-ubuntu-22.04-x86_64.tar.xz", "sizeMB": 78, "strip": 1 },
+        "darwin-x64": { "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-macos-universal.tar.xz", "sizeMB": 116, "strip": 1 },
+        "darwin-arm64": { "url": "https://github.com/mstorsjo/llvm-mingw/releases/download/20260616/llvm-mingw-20260616-ucrt-macos-universal.tar.xz", "sizeMB": 116, "strip": 1 }
+      }
+    },
+    "python-embed": {
+      "desc": "CPython Windows embeddable runtime, bundled INTO the exported plugin so Python panels run with zero user install. (mac/Linux use python-build-standalone — added when those export hosts are wired.)",
+      "version": "3.13.1",
+      "license": "PSF-2.0",
+      "platforms": {
+        "win32-x64": { "url": "https://www.python.org/ftp/python/3.13.1/python-3.13.1-embed-amd64.zip", "sizeMB": 11, "strip": 0 }
+      }
+    },
+    "jdk": {
+      "desc": "Temurin JDK 21 (LTS). Dev-side javac+jlink: compile Java handlers to bytecode and emit a ~30-50MB trimmed JRE shipped INTO the plugin (JNI). Pinned to 21 because JDK 24+ drops jmods/ (JEP 493), breaking cross-platform jlink.",
+      "version": "21.0.5+11",
+      "license": "GPLv2-with-Classpath-Exception",
+      "bin": "bin",
+      "platforms": {
+        "win32-x64":  { "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_windows_hotspot_21.0.5_11.zip", "sizeMB": 200, "strip": 1 },
+        "linux-x64":  { "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz", "sizeMB": 196, "strip": 1 },
+        "darwin-arm64": { "url": "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_aarch64_mac_hotspot_21.0.5_11.tar.gz", "sizeMB": 200, "strip": 1 }
+      }
+    }
+  },
+  "_dotnet_note": "C# uses NativeAOT 'slim packs' (ILCompiler + runtime pack, ~40MB) restored from nuget at first export, linked with the lld-link from llvm-mingw — no full .NET SDK. Wired in nativeHandlers/csharp; see native-handlers-design.md."
+}
