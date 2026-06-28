@@ -201,7 +201,9 @@ namespace Ce { internal static class Program { static void Main() { } } }
     // Roslyn publish → self-contained CoreCLR + ce_managed.dll in `pub/`. `rid` matches the BUILD host's
     // OS/arch (linux-x64, win-x64, osx-arm64). No NativeAOT, no native linker — pure IL emission.
     publishCommand(rid) {
-      return `dotnet publish -c Release -r ${rid} --self-contained true -o ${publishSubdir}`;
+      // Name the project explicitly so publish never has to auto-detect from the cwd (defensive against
+      // a stray second .csproj — see MSB1011).
+      return `dotnet publish ce_managed.csproj -c Release -r ${rid} --self-contained true -o ${publishSubdir}`;
     },
   };
 }

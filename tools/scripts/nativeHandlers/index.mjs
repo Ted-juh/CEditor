@@ -7,7 +7,7 @@
 // when Export settings opt in (compileNativeHandlers === 'on'); it also passes -DCEDITOR_NATIVE_HANDLERS=ON
 // to the player CMake so the loader is linked in.
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, cpSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, cpSync, statSync, readdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cppCompiler, dotnetExe, jdkTools } from '../../toolchains/resolveToolchain.mjs';
@@ -54,6 +54,10 @@ function have(cmd) {
 // Build one language's module and copy it next to the plugin binary. Returns { ok, lang, bytes, error }.
 async function buildLanguage(lang, scripts, { workRoot, binDir }) {
   const outDir = path.join(workRoot, lang);
+  // Clean the per-language build dir first: workRoot persists across exports, and stale files from a
+  // PRIOR generator (e.g. the old NativeAOT C# `ce_handlers_csharp.csproj`) would otherwise linger —
+  // `dotnet publish` then sees two .csproj and fails with MSB1011.
+  rmSync(outDir, { recursive: true, force: true });
   mkdirSync(outDir, { recursive: true });
   const ext = libExt();
   const moduleName = `ce_handlers_${lang}`;
