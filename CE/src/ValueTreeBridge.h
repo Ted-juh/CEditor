@@ -78,6 +78,10 @@ private:
     // Set a property via dot-notation path (e.g., "Text.Fill.colour")
     void setPropertyFromPath (const juce::String& path, const juce::var& value);
 
+    // Start a scripting-toolchain provision ("ensure") or "remove" run for payload.languages, streaming
+    // progress to the WebView. Implemented in ValueTreeBridgeHandlers.cpp.
+    void runToolchainJob (const juce::var& payload, const juce::String& subcommand);
+
     // Build the dot-notation path for a property change
     juce::String buildPath (const juce::ValueTree& node, const juce::Identifier& prop) const;
 
@@ -93,5 +97,8 @@ private:
     // VstBuildJob (it lives in the handlers .cpp). Timer has a virtual destructor, so deleting
     // through the base correctly tears down the real job. Busy-state is read via isTimerRunning().
     std::unique_ptr<juce::Timer> buildJob;
+    // Active scripting-toolchain provision/remove job (Settings → Scripting Toolchains), held as its
+    // Timer base for the same reason as buildJob (the concrete ToolchainJob lives in the handlers .cpp).
+    std::unique_ptr<juce::Timer> toolchainJob;
     ceditor::device::DeviceProfileService deviceProfileService;
 };

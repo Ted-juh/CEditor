@@ -111,6 +111,41 @@ export function buildVst3(panelId, data, guid, productName) {
   });
 }
 
+// --- Scripting Toolchains (Settings → Scripting Toolchains) ---------------------------------------
+/** Ask C++ for per-language toolchain status. C++ replies with the 'toolchainStatus' event. */
+export function requestToolchainStatus() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('toolchainStatus', {});
+}
+/** Subscribe to toolchain status ({ languages: [...] }). Returns an unsubscribe fn. */
+export function onToolchainStatus(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainStatus', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+/** Install the toolchains for the given language ids (array). Streams 'toolchainProgress', ends 'toolchainDone'. */
+export function provisionToolchains(languages) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('provisionToolchains', { languages });
+}
+/** Remove the (exclusive) toolchains for the given language ids (array). Ends with 'toolchainDone'. */
+export function removeToolchains(languages) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('removeToolchains', { languages });
+}
+/** Subscribe to toolchain provision/remove progress lines ({ line }). Returns an unsubscribe fn. */
+export function onToolchainProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+/** Subscribe to toolchain job completion ({ ok, code }). Returns an unsubscribe fn. */
+export function onToolchainDone(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainDone', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Request an "Open" dialog. C++ will emit 'panelOpened' on success. */
 export function openPanel() {
   if (!isJuceAvailable()) {

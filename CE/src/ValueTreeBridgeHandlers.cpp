@@ -118,6 +118,119 @@ private:
     juce::String pending, exportPath;
 };
 
+/**
+ * Streams a `node tools/toolchains/languages.mjs ensure|remove <lang...>` run (Settings → Scripting
+ * Toolchains). Each line -> "toolchainProgress" { line }; terminal -> "toolchainDone" { ok, code }.
+ * The JS side then re-requests "toolchainStatus" to refresh the panel. Mirrors VstBuildJob.
+ */
+class ToolchainJob : public juce::Timer
+{
+public:
+    ToolchainJob (juce::WebBrowserComponent* browserToUse, const juce::StringArray& command)
+        : browser (browserToUse)
+    {
+        emitLine ("$ " + command.joinIntoString (" "));
+        if (! process.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
+        {
+            emitDone (false, -1);
+            return;
+        }
+        startTimerHz (8);
+    }
+
+private:
+    void timerCallback() override
+    {
+        char buffer[1 << 14];
+        for (;;)
+        {
+            const int n = process.readProcessOutput (buffer, (int) sizeof (buffer));
+            if (n <= 0) break;
+            pending += juce::String::fromUTF8 (buffer, n);
+        }
+        flushLines (false);
+        if (! process.isRunning())
+        {
+            flushLines (true);
+            stopTimer();
+            const int code = process.getExitCode();
+            emitDone (code == 0, code);
+        }
+    }
+
+    void flushLines (bool flushRemainder)
+    {
+        for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; )
+        {
+            emitLine (pending.substring (0, nl).trimEnd());
+            pending = pending.substring (nl + 1);
+        }
+        if (flushRemainder && pending.trim().isNotEmpty()) { emitLine (pending.trimEnd()); pending.clear(); }
+    }
+
+    void emitLine (const juce::String& line)
+    {
+        if (browser == nullptr || line.isEmpty()) return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("line", line);
+        browser->emitEventIfBrowserIsVisible ("toolchainProgress", juce::var (obj));
+    }
+
+    void emitDone (bool ok, int code)
+    {
+        if (browser == nullptr) return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("ok", ok);
+        obj->setProperty ("code", code);
+        browser->emitEventIfBrowserIsVisible ("toolchainDone", juce::var (obj));
+    }
+
+    juce::WebBrowserComponent* browser = nullptr;
+    juce::ChildProcess process;
+    juce::String pending;
+};
+
+// Resolve the repo source root the same way the VST3 exporter handler does (compile-time define, else cwd).
+static juce::File ceditorSourceRoot()
+{
+   #if defined (CEDITOR_SOURCE_ROOT)
+    return juce::File (CEDITOR_SOURCE_ROOT);
+   #else
+    return juce::File::getCurrentWorkingDirectory();
+   #endif
+}
+
+// Start a languages.mjs `ensure`/`remove` run for the languages in payload.languages (an array of ids),
+// streaming progress to the UI. Refuses if a toolchain job is already running.
+void ValueTreeBridge::runToolchainJob (const juce::var& payload, const juce::String& subcommand)
+{
+    if (browser == nullptr) return;
+
+    auto emitDone = [this] (bool ok, int code)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("ok", ok);
+        o->setProperty ("code", code);
+        browser->emitEventIfBrowserIsVisible ("toolchainDone", juce::var (o));
+    };
+
+    if (toolchainJob != nullptr && toolchainJob->isTimerRunning()) { emitDone (false, -1); return; }
+
+    juce::StringArray langs;
+    if (auto* obj = payload.getDynamicObject())
+        if (auto* arr = obj->getProperty ("languages").getArray())
+            for (const auto& v : *arr) langs.add (v.toString());
+    if (langs.isEmpty()) { emitDone (false, -1); return; }
+
+    const auto node   = findNodeExecutable();
+    const auto script = ceditorSourceRoot().getChildFile ("tools").getChildFile ("toolchains").getChildFile ("languages.mjs");
+    if (node == juce::File() || ! script.existsAsFile()) { emitDone (false, -1); return; }
+
+    juce::StringArray command { node.getFullPathName(), script.getFullPathName(), subcommand };
+    command.addArray (langs);
+    toolchainJob = std::make_unique<ToolchainJob> (browser, command);
+}
+
 juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::WebBrowserComponent::Options& base)
 {
     deviceProfileService.setEventCallback ([this] (const juce::String& eventName, const juce::var& payload)
@@ -941,6 +1054,33 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });
+        })
+        // --- Scripting Toolchains (Settings panel): status / provision / remove, all via
+        //     tools/toolchains/languages.mjs (the same engine the exporter's on-demand provisioning uses).
+        .withEventListener ("toolchainStatus", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr) return;
+                const auto node   = findNodeExecutable();
+                const auto script = ceditorSourceRoot().getChildFile ("tools").getChildFile ("toolchains").getChildFile ("languages.mjs");
+                if (node == juce::File() || ! script.existsAsFile()) return;
+                juce::ChildProcess proc;
+                if (! proc.start (juce::StringArray { node.getFullPathName(), script.getFullPathName(), "status" }))
+                    return;
+                const auto out = proc.readAllProcessOutput();   // `status` is a fast dir scan; OK to block briefly
+                const auto parsed = juce::JSON::parse (out);
+                if (parsed.isObject())
+                    browser->emitEventIfBrowserIsVisible ("toolchainStatus", parsed);
+            });
+        })
+        .withEventListener ("provisionToolchains", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]() { runToolchainJob (payload, "ensure"); });
+        })
+        .withEventListener ("removeToolchains", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]() { runToolchainJob (payload, "remove"); });
         });
 
     options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,
