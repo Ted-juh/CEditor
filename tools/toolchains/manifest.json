@@ -33,6 +33,20 @@
         "darwin-x64": { "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip", "sizeMB": 1, "strip": 0 }
       }
     },
+    "dotnet": {
+      "desc": "Portable .NET SDK (Roslyn + MSBuild + publish). Dev-side: compiles the user's C# handlers to a managed ce_managed.dll and self-contained-publishes a CoreCLR beside it (see nativeHandlers/csharp). Installed via Microsoft's dotnet-install script into tools/toolchains/dotnet/ — NO admin, NO Visual Studio. The shipped plugin embeds only the (MIT) CoreCLR, never the SDK.",
+      "version": "10.0",
+      "license": "MIT",
+      "bin": ".",
+      "install": "dotnet-install",
+      "channel": "10.0",
+      "platforms": {
+        "win32-x64":   { "script": "https://dot.net/v1/dotnet-install.ps1", "sizeMB": 230 },
+        "linux-x64":   { "script": "https://dot.net/v1/dotnet-install.sh",  "sizeMB": 230 },
+        "darwin-arm64":{ "script": "https://dot.net/v1/dotnet-install.sh",  "sizeMB": 230 },
+        "darwin-x64":  { "script": "https://dot.net/v1/dotnet-install.sh",  "sizeMB": 230 }
+      }
+    },
     "jdk": {
       "desc": "Temurin JDK 21 (LTS). Dev-side javac+jlink: compile Java handlers to bytecode and emit a ~30-50MB trimmed JRE shipped INTO the plugin (JNI). Pinned to 21 because JDK 24+ drops jmods/ (JEP 493), breaking cross-platform jlink.",
       "version": "21.0.5+11",

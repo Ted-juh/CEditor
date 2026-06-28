@@ -46,6 +46,24 @@ function extract(archive, outDir, strip) {
   execFileSync('tar', a, { stdio: 'inherit' });
 }
 
+const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
+
+// .NET SDK is installed via Microsoft's dotnet-install script (auto-resolves the latest patch of a
+// channel into a folder — no admin, no Visual Studio), not a single pinned archive. The script itself
+// downloads the SDK from Microsoft's CDN; honours $HTTPS_PROXY via curl, same as everything else here.
+function provisionDotnet(tc, entry, outDir) {
+  const scriptPath = path.join(tmpdir(), `ce-dotnet-install-${process.pid}${process.platform === 'win32' ? '.ps1' : '.sh'}`);
+  download(entry.script, scriptPath);
+  if (process.platform === 'win32') {
+    execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath,
+      '-Channel', tc.channel, '-InstallDir', outDir, '-Architecture', arch, '-NoPath'], { stdio: 'inherit' });
+  } else {
+    execFileSync('bash', [scriptPath, '--channel', tc.channel, '--install-dir', outDir,
+      '--architecture', arch, '--no-path'], { stdio: 'inherit' });
+  }
+  rmSync(scriptPath, { force: true });
+}
+
 let provisioned = 0, skipped = 0, failed = 0;
 for (const [id, tc] of Object.entries(manifest)) {
   if (want.length && !want.includes(id)) continue;
@@ -57,6 +75,13 @@ for (const [id, tc] of Object.entries(manifest)) {
   console.log(`↓ ${id} ${tc.version} (~${entry.sizeMB} MB) for ${platform}...`);
   try {
     if (force) rmSync(outDir, { recursive: true, force: true });
+    if (tc.install === 'dotnet-install') {
+      mkdirSync(outDir, { recursive: true });
+      provisionDotnet(tc, entry, outDir);
+      console.log(`  ✓ ${id}: SDK ${tc.channel} -> ${path.relative(process.cwd(), outDir)}`);
+      provisioned++;
+      continue;
+    }
     const tmp = path.join(tmpdir(), `ce-tc-${id}-${process.pid}${path.extname(new URL(entry.url).pathname) || '.bin'}`);
     const n = download(entry.url, tmp);
     extract(tmp, outDir, entry.strip ?? 0);

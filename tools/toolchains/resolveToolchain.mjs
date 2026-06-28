@@ -48,6 +48,14 @@ export function jdkHome() { return toolchainDir('jdk'); }
 /** Path to the bundled CPython embeddable runtime (bundled INTO exported plugins) or null. */
 export function pythonEmbedDir() { return toolchainDir('python-embed'); }
 
+/** Path to the bundled .NET SDK `dotnet` driver (Roslyn + publish for the C# handler path), or the
+ *  system one, or null. Prefers tools/toolchains/dotnet/ provisioned by provision.mjs. */
+export function dotnetExe() {
+  const d = toolchainDir('dotnet');
+  if (d) { const p = path.join(d, exe('dotnet')); if (existsSync(p)) return p; }
+  return has('dotnet') ? 'dotnet' : null;
+}
+
 /** The bundled LLD linker (lld-link) — backs the C# NativeAOT link step with no MSVC. */
 export function lldLink() {
   const m = toolchainDir('llvm-mingw');

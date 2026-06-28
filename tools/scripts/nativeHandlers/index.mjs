@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cppCompiler } from '../../toolchains/resolveToolchain.mjs';
+import { cppCompiler, dotnetExe } from '../../toolchains/resolveToolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../CE/src/Scripting'); // holds NativeHandlerAbi.h
@@ -77,15 +77,19 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
       // ce_managed.dll + a self-contained CoreCLR (no MSVC / no Windows SDK), and a tiny C shim
       // (CeHost.c, built with the bundled clang) boots it via hostfxr. The whole self-contained `pub/`
       // dir ships next to the plugin binary.
-      if (!have('dotnet')) return { ok: false, lang, error: 'dotnet SDK not found — provision the .NET SDK (tools/toolchains)' };
+      const dotnet = dotnetExe();
+      if (!dotnet) return { ok: false, lang, error: 'dotnet SDK not found — run: node tools/toolchains/provision.mjs dotnet' };
       const tc = cppCompiler();
       if (!tc) return { ok: false, lang, error: 'no C compiler for the C# host shim — run: node tools/toolchains/provision.mjs llvm-mingw' };
       const { generateCsharpModule } = await import('./csharp/genCsharp.mjs');
       const gen = generateCsharpModule({ scripts, outDir, abiInfo: { dir: ABI_DIR } });
-      // 1) Roslyn → self-contained CoreCLR + ce_managed.dll in outDir/pub.
-      execSync(gen.publishCommand(dotnetRid()), {
-        cwd: outDir, stdio: 'inherit',
-        env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' },
+      // 1) Roslyn → self-contained CoreCLR + ce_managed.dll in outDir/pub. Use the resolved dotnet
+      //    (bundled if provisioned, else system) rather than assuming `dotnet` is on PATH. For a bundled
+      //    SDK (absolute path) also point DOTNET_ROOT at it so it finds its own runtime.
+      const dnEnv = { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1', DOTNET_NOLOGO: '1' };
+      if (path.isAbsolute(dotnet)) dnEnv.DOTNET_ROOT = path.dirname(dotnet);
+      execSync(`"${dotnet}" ${gen.publishCommand(dotnetRid()).replace(/^dotnet\s+/, '')}`, {
+        cwd: outDir, stdio: 'inherit', env: dnEnv,
       });
       const pubDir = path.join(outDir, gen.publishSubdir);
       if (!existsSync(path.join(pubDir, `${gen.managedName}.dll`))) return { ok: false, lang, error: 'C# publish produced no ce_managed.dll' };
