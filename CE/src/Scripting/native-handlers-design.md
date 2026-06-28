@@ -1,8 +1,11 @@
 # Compile-at-export native handlers (C++ / C# / Java)
 
-**Status: PARTIALLY IMPLEMENTED.** This document is the design; the contract + host loader + all three
-generators now exist. The C++ path is verified end-to-end (no JUCE needed); the C#/Java paths are
-written but build-unverified (no .NET-AOT / GraalVM toolchain in this environment).
+**Status: IMPLEMENTED + VERIFIED (per-language build + dispatch).** This document is the design; the
+contract + host loader + all three generators exist and each is verified end-to-end on a real toolchain:
+C++ (clang + JUCE), C# (Roslyn + self-contained CoreCLR via hostfxr), Java (javac + jlink JRE via JNI).
+All three avoid Visual Studio entirely and ship only redistributable runtimes. The remaining gap is the
+in-DAW end-to-end load test of a fully-bundled VST3 (the per-language modules + the host loader are each
+proven; the export-pipeline wiring is exercised by the verifiers).
 
 ### Implementation status (this branch)
 | Piece | File | Status |
@@ -15,12 +18,12 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | C# generator (hosted-CoreCLR) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,CeHost.c,genCsharp.mjs,hosting/*.h}` | ✅ **FULLY verified on .NET 10 (linux-x64)**: `verify-csharp.mjs` runs the real build — Roslyn `dotnet publish --self-contained` → `ce_managed.dll` + a CoreCLR; the C shim `CeHost.c` (built with the bundled clang, **no MSVC**) is compiled into the publish dir; the shared host harness loads `ce_handlers_csharp.so`, the shim boots CoreCLR via `hostfxr` (command-line init, which supports self-contained), and a C# handler dispatches + calls back into the host (`out=21`, `log='ran'`). **Replaced NativeAOT** — that path needs non-redistributable MSVC/WinSDK import libs on Windows (researched 2026-06, see §C#). Self-contained layout ~80 MB untrimmed (proven baseline); size-trim is a tracked follow-up. |
 | Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ all three per-language build paths exercised by the verifiers; the VST3-bundling wrapper + a DAW load test are the remaining end-to-end gap. |
 
-Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` — each check runs the **real AOT build +
-dispatch** when its toolchain is present (clang/JUCE for C++, .NET 10 NativeAOT for C#, GraalVM
-native-image for Java), else degrades to a type/structural check. **Building all three for real caught
-nine bugs** the type-checks couldn't — including the load-bearing ABI fix: the host vtable passed
-`CeStr`/`CeBytes` *by value*, which GraalVM `@CStruct` (a pointer type) cannot express, so the callbacks
-now pass them **by pointer** across every side. C# added four more (duplicate `Compile` items; a static
+Run everything: `node tools/scripts/nativeHandlers/verify-all.mjs` — each check runs the **real build +
+dispatch** when its toolchain is present (clang/JUCE for C++, Roslyn + self-contained CoreCLR for C#,
+javac + jlink + JNI for Java), else degrades to a type/structural check. **Building all three for real
+caught the bugs** the type-checks couldn't — including the load-bearing ABI fix: the host vtable passed
+`CeStr`/`CeBytes` *by value*, which the GraalVM `@CStruct` prototype (a pointer type) could not express,
+so the callbacks now pass them **by pointer** across every side (this also suits the C/JNI shims). C# added four more (duplicate `Compile` items; a static
 class can't hold the user's instance handler; PascalCase vs the camelCase cross-language API; a private
 handler unreachable by the registry → partial self-register). **All three languages build and dispatch
 end to end.** The only remaining gap is wiring the compiled modules into a real `.vst3` and loading that
@@ -245,19 +248,23 @@ languages' handlers.
    KB, ~1 s builds. Build `NativeHandlerEngine` (host loader + marshalling), the C++ glue generator,
    and the exporter step behind `CEDITOR_NATIVE_HANDLERS` (default OFF). This proves the whole ABI end
    to end with the cheapest language.
-3. **C# second** — reuses the same host engine + ABI unchanged; adds a `.csproj` generator + the
-   `dotnet publish` step + the .NET SDK preflight. Accept the multi-MB size + per-OS build.
-4. **Java last, gated on a decision** — same host engine, but adds GraalVM as an export dependency with
-   **minutes-long, 8–16 GB builds every export** and a ~8–15 MB module. This is a real burden; see §9.
+3. **C# second** *(done)* — reuses the same host engine + ABI unchanged; Roslyn → a managed DLL + a
+   self-contained CoreCLR shipped in the plugin, booted by the `CeHost.c` shim via hostfxr. Provisioned
+   portable .NET SDK; **no Visual Studio**.
+4. **Java third** *(done)* — same host engine; javac → bytecode + a `jlink`'d JRE shipped in the plugin,
+   booted by the `ce_java_shim.c` JNI shim. **Replaced GraalVM** (the old minutes-long, 8–16 GB
+   per-export rebuild) — now `javac`-fast.
 
-Per-platform build machines are mandatory for C#/Java (no cross-OS AOT). C++ also can't cross-OS but
-already lives within the existing per-OS plugin build.
+Per-platform shipping artifacts (the runtime + shim) are still per-OS, but the *user's code* is portable
+(IL / bytecode / transpiled JS) — only the small shim + the runtime are per-OS, and the runtime is
+downloaded/`jlink`'d per-OS, never a native compile of the handler.
 
 ## 9. Open decisions for the user
 
-- **Java worth it?** GraalVM adds a heavy export dependency (minutes + 8–16 GB RAM per export, ~8–15 MB
-  per module, closed-world reflection limits). If few users write Java handlers, the cost/benefit is
-  poor. Option: ship C++ + C#, leave Java as preview-only with an honest label.
+- **Java cost is now modest** (resolved). The hosted-JVM path dropped GraalVM's minutes-long/​8–16 GB
+  per-export rebuild — Java is now `javac`-fast, shipping a one-time ~40 MB jlink'd JRE per plugin
+  (shared across all Java handlers). No closed-world reflection limits. The only residual cost is the
+  ~40 MB JRE in the bundle, same "ship a runtime" trade as C# (~80 MB CoreCLR) and Python (~11 MB).
 - **Crash-safety appetite.** Accept best-effort (catch + disable + warn) and ship the disclaimer, or
   invest in out-of-process isolation (large, out of current scope)?
 - **Build-time UX.** C#/Java AOT make export noticeably slower; acceptable, or gate them behind an
