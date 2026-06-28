@@ -6,6 +6,7 @@
 !provision.mjs
 !provision.cmd
 !provision.sh
+!languages.mjs
 !resolveToolchain.mjs
 !*.cmake
 !README.md
