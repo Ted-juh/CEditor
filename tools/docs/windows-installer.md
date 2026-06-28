@@ -145,3 +145,35 @@ The built Release executable depends on:
 - Microsoft Visual C++ runtime (`MSVCP140.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`)
 
 That is why the installer supports bundling both prerequisite installers.
+
+## Scripting-language components
+
+The installer offers a **Select Components** page (Inno `[Types]`/`[Components]`):
+
+- **Standard** — Lua, JavaScript, TypeScript (built in; no toolchain).
+- **Full** — adds Python, C++, C#, Java scripting.
+- **Custom** — pick languages individually.
+
+Each non-builtin component runs `{app}\tools\toolchains\provision.cmd <ids>` (best-effort,
+`skipifdoesntexist`) to download its toolchain: Python `python-embed` (~11 MB), C++/C#/Java the
+`llvm-mingw`+`ninja` build toolchain, C# `dotnet` (~230 MB), Java `jdk` (~195 MB). These can also be
+installed later from the app (**Settings → Scripting Toolchains**) or fetched automatically the first
+time you export a panel that uses them. `package-installer.ps1` stages `tools/` (the export + provision
+scripts only — toolchain binaries are downloaded on demand, never bundled).
+
+### Important: export needs the C++ build environment
+
+The installed `CEditor.exe` is the **panel designer** + toolchain manager. A full **VST3 export** still
+requires the C++ build environment — the player source, JUCE, CMake, and a compiler — because each
+exported VST3 needs a **unique compile-time identity (FUID)**; a single prebuilt binary can't serve
+multiple panels without DAW session collisions (see
+`docs/scripting-language-options-and-shippable-export.md` §3a). So:
+
+- A GUI-only install can **manage/provision toolchains** but cannot by itself export a VST3.
+- Full VST3 export runs from a **source checkout** (or a future "developer install" that stages the
+  whole build tree).
+- A **compiler-free path exists only for standalone/CLAP** (no FUID contract) — future work.
+
+The app locates the exporter via `ceditorSourceRoot()`, which checks the executable's directory (and its
+parent) and the working dir, so the same binary works from a source checkout or an install that staged
+`tools/`.

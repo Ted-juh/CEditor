@@ -115,28 +115,36 @@ are thin front-ends over `provision.mjs`.
 Language options are moot until the installed app can export. Today export needs a full source/build
 tree. The fix has two independent wins; the first is large and unlocks the common case.
 
-### 3a. Decouple the base plugin from a per-panel native compile (the big one)
+### 3a. Reduce per-export cost — what's actually feasible (corrected after a code audit)
 
-Today every export **recompiles the native player** because the plugin **identity** (GUID, plugin code,
-product name) is **baked in at compile time**, so each panel needs its own binary.
+The original hope was "one prebuilt template binary, identity loaded from a sidecar, zero compiler."
+**A code audit of the player + JUCE killed the single-template-for-VST3 idea**, but found the per-panel
+build is already cheap and the real waste is elsewhere:
 
-**Make the player a runtime-parameterized template.** Ship ONE prebuilt player binary per format
-(VST3 / standalone / CLAP) inside the install. To export a panel:
-1. **Copy** the template binary into the `.vst3` bundle (no compile).
-2. Write the panel's **identity + `.cepanel` + assets** as **resources beside the binary** (the player
-   already loads `.cepanel`/web from disk at runtime — extend that to identity).
-3. Bundle Python / native-handler modules as today (these are separate files the player `dlopen`s).
+- **VST3 FUID is compile-time.** JUCE derives the VST3 class id (FUID) from `PLUGIN_CODE` +
+  `MANUFACTURER_CODE` (`#define`s baked at link time, `CMakeLists.txt` → `juce_add_plugin`; the FUID is a
+  `const` in the VST3 wrapper). A single template binary would report the **same FUID for every panel**,
+  so a DAW would treat all exported panels as one plugin and **break session loading**. Each VST3 product
+  genuinely needs a **unique compile-time identity** → a per-panel link is unavoidable for VST3.
+- **But the per-panel build is already incremental.** Panel **data** is already runtime-loaded — the
+  player reads the `.cepanel` from a path at load (`CEDITOR_PLAYER_PANEL_PATH`) and the web UI is embedded
+  once. Only a handful of identity-dependent translation units change per panel, so CMake recompiles ~1–2
+  files and relinks (the real export log shows `[51/52] Linking` — i.e. just the relink). Minutes-long
+  exports were **not** the C++ build.
+- **The avoidable cost was the web bundle.** Every export ran an ~18 s `vite build` of a
+  **panel-independent** bundle. **Done:** the exporter now skips the Vite build when `CE/web/dist` is
+  newer than the web sources (`forceWebBuild`/`CE_FORCE_WEB=1` overrides). Re-exports drop to the relink.
 
-Result: exporting a **Lua / JS / TS / Python** panel needs **no C++ compiler and no `vite build`** — the
-web bundle is panel-independent and already prebuilt as `web/dist` (reuse it; stop rebuilding per
-export). This covers the majority of users with a **compiler-free, seconds-long** export from the
-installed app.
-
-Caveat: VST3/AU/CLAP each require a *unique, stable* plugin ID per product. Runtime-loaded identity is
-fine for the host's plugin-instance routing **as long as the ID is stable per product** — which it is
-(derived from the panel GUID, as the exporter already does). Hosts cache by the binary's reported ID, so
-the template must report the *panel's* ID at load, read from the sidecar resource. This is the one real
-engineering risk to validate per format.
+So the realistic picture: **VST3 export needs the C++ build environment** (source + CMake + a compiler),
+because of the unique-FUID requirement — there is no compiler-free VST3 path. Two genuine future wins
+remain, both validated against the player build, not done here:
+- **Standalone / CLAP templating.** A *standalone* app has no FUID contract, so a single prebuilt
+  standalone binary + a sidecar `.cepanel` + identity **is** viable — a compiler-free path for users who
+  only need the standalone. (CLAP ids are strings and could also be sidecar-loaded.)
+- **Sidecar FUID via a custom VST3 factory.** The VST3 class id is whatever the module's factory reports;
+  JUCE hard-codes it, but a patched factory could read it from a sidecar at module load. This removes the
+  per-panel link for VST3 too — but it means maintaining a fork of JUCE's VST3 client wrapper (fragile;
+  needs careful per-host validation). High-value, high-risk; deferred.
 
 ### 3b. Native handlers still compile per-panel (unavoidable, and that's fine)
 
@@ -206,3 +214,21 @@ and adding a language later is automatic. The recommendation is the **hybrid** (
 the engine, with the installer page + an in-app Settings panel as thin, optional front-ends over the
 same `provision.mjs`. Either way, only **C#** (~230 MB) and **Java** (~195 MB) are heavy; Python is
 ~11 MB and C++ rides on the base build toolchain.
+
+---
+
+## 7. Implementation status (this branch)
+
+| Step | What | Status |
+|---|---|---|
+| 1 | **On-demand provisioning** | ✅ `tools/toolchains/languages.mjs` (lang→toolchain map, status, preflight, ensure/remove) + the exporter installs only the toolchains a panel's languages need, when missing (`autoProvisionToolchains` opt-out). Node-side verified (status/preflight + freshness checks run). |
+| 1/3 | **Skip the panel-independent Vite build** | ✅ exporter rebuilds `dist` only when web sources changed (`webBundleFresh`); `forceWebBuild`/`CE_FORCE_WEB=1` overrides. Verified fresh↔stale flips. |
+| 2 | **In-app Scripting Toolchains panel** | ✅ Settings → Scripting Toolchains (Installed / Install / Remove per language). C++ bridge (`toolchainStatus`/`provisionToolchains`/`removeToolchains` via a `ToolchainJob` mirroring `VstBuildJob`) + `bridge.js` wrappers + `ToolchainsSettings.svelte`. Web bundle builds clean; C++ compiles with the app. |
+| 3 | **Template player** | ◑ Reframed (§3a): single-template VST3 is blocked by the compile-time FUID; the per-panel build is already an incremental relink and the avoidable cost (Vite) is removed. Standalone/CLAP templating + a sidecar-FUID JUCE-factory fork are the remaining wins (deferred — need the player build to validate). |
+| 4 | **Installer language options + staging** | ✅ `CEditor.iss` `[Types]`/`[Components]` (Python/C++/C#/Java) with per-component `provision.cmd` `[Run]`; `package-installer.ps1` stages `tools/` (scripts only, binaries on demand); the app resolves the exporter from the install dir (`ceditorSourceRoot()` checks the exe dir). Inno/PowerShell not runnable in CI — needs a Windows packaging run to validate. |
+
+**Caveat carried by 3 + 4:** a GUI-only install can *manage toolchains* (Settings panel) and the
+installer can *provision* them, but a full **VST3 export still needs the C++ build environment** (source
++ CMake + a compiler) because each panel needs a unique compile-time FUID. A compiler-free path exists
+only for **standalone/CLAP** (future 3a work). This is a JUCE/VST3 ecosystem constraint, not a CEditor
+limitation.

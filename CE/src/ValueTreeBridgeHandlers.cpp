@@ -190,9 +190,32 @@ private:
     juce::String pending;
 };
 
-// Resolve the repo source root the same way the VST3 exporter handler does (compile-time define, else cwd).
+// Resolve the root that holds the export pipeline (tools/scripts/export-panel-vst3.mjs). A dev build
+// runs from a source checkout (CEDITOR_SOURCE_ROOT / cwd); an installed build has tools/ staged beside
+// the executable. Try, in order: the compile-time source root, the executable's dir (and its parent),
+// then the current working dir — returning the first that actually contains the exporter, so the same
+// binary works in both layouts. Falls back to the compile-time root / cwd if none match.
 static juce::File ceditorSourceRoot()
 {
+    const auto hasExporter = [] (const juce::File& d)
+    {
+        return d.getChildFile ("tools").getChildFile ("scripts")
+                .getChildFile ("export-panel-vst3.mjs").existsAsFile();
+    };
+
+    juce::Array<juce::File> candidates;
+   #if defined (CEDITOR_SOURCE_ROOT)
+    candidates.add (juce::File (CEDITOR_SOURCE_ROOT));
+   #endif
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    candidates.add (exeDir);
+    candidates.add (exeDir.getParentDirectory());
+    candidates.add (juce::File::getCurrentWorkingDirectory());
+
+    for (const auto& c : candidates)
+        if (c != juce::File() && hasExporter (c))
+            return c;
+
    #if defined (CEDITOR_SOURCE_ROOT)
     return juce::File (CEDITOR_SOURCE_ROOT);
    #else
@@ -1013,11 +1036,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
                 }
 
-               #if defined (CEDITOR_SOURCE_ROOT)
-                const juce::File sourceRoot (CEDITOR_SOURCE_ROOT);
-               #else
-                const auto sourceRoot = juce::File::getCurrentWorkingDirectory();
-               #endif
+                const auto sourceRoot = ceditorSourceRoot();   // dev checkout OR installed tools/ beside the exe
 
                 const auto script = sourceRoot.getChildFile ("tools")
                                               .getChildFile ("scripts")

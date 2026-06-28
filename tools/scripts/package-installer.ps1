@@ -156,6 +156,28 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
     }
 }
 
+function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
+    # Stage the export pipeline + toolchain provisioning SCRIPTS (never the provisioned binaries — those
+    # are downloaded on demand). This makes Settings -> Scripting Toolchains work in the installed app and
+    # gives the installer's language components something to provision into. NOTE: a full VST3 export also
+    # needs the C++ build environment (source + CMake + a compiler); that is a separate "developer install"
+    # and is not staged here — see tools/docs/windows-installer.md.
+    $toolsSrc = Join-Path $RepoRoot "tools"
+    $toolsDst = Join-Path $StageDir "tools"
+
+    $scriptsDst = Join-Path $toolsDst "scripts"
+    New-Item -ItemType Directory -Path $scriptsDst -Force | Out-Null
+    Copy-Item (Join-Path $toolsSrc "scripts\*") -Destination $scriptsDst -Recurse -Force
+
+    # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
+    # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).
+    $tcDst = Join-Path $toolsDst "toolchains"
+    New-Item -ItemType Directory -Path $tcDst -Force | Out-Null
+    Get-ChildItem (Join-Path $toolsSrc "toolchains") -File | Copy-Item -Destination $tcDst -Force
+
+    Write-Host "Staged export pipeline + toolchain scripts -> $toolsDst"
+}
+
 function Copy-OptionalPrerequisites([string]$RepoRoot, [string]$StageDir, [string]$WebView2InstallerPath) {
     $vcRedist = Find-VcRedist
     if ($vcRedist) {
@@ -208,6 +230,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Build-Frontend -RepoRoot $repoRoot
 Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
+Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
 Copy-OptionalPrerequisites -RepoRoot $repoRoot -StageDir $stageDir -WebView2InstallerPath $WebView2InstallerPath
 
 if ($StageOnly) {
