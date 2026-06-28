@@ -32,6 +32,16 @@ export function cppCompiler() {
   return null;
 }
 
+/** The bundled LLVM-MinGW dir (for the CMake toolchain file), or null. */
+export function llvmMingwDir() { return toolchainDir('llvm-mingw'); }
+
+/** Path to the ninja generator (bundled, else system), or null. */
+export function ninjaExe() {
+  const n = toolchainDir('ninja');
+  if (n) { const p = path.join(n, exe('ninja')); if (existsSync(p)) return p; }
+  return has('ninja') ? 'ninja' : null;
+}
+
 /** Path to the bundled JDK (javac + jlink) or null — used by the Java ship-a-JRE export path. */
 export function jdkHome() { return toolchainDir('jdk'); }
 

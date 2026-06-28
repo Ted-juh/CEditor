@@ -29,9 +29,18 @@ function download(url, dest) {
   return statSync(dest).size;
 }
 
+function hasCmd(c) {
+  try { execFileSync(process.platform === 'win32' ? 'where' : 'command', process.platform === 'win32' ? [c] : ['-v', c], { stdio: 'ignore', shell: process.platform !== 'win32' }); return true; }
+  catch { return false; }
+}
 function extract(archive, outDir, strip) {
   mkdirSync(outDir, { recursive: true });
-  // `tar` handles .zip, .tar.gz and .tar.xz on Windows 10+ (bsdtar), macOS and Linux.
+  // GNU tar (Linux) cannot read .zip; bsdtar (Win10+/macOS) can. Use `unzip` for zips with no strip
+  // (Linux), and `tar` for tarballs + for strip>0 zips (bsdtar supports --strip-components).
+  if (archive.toLowerCase().endsWith('.zip') && (strip ?? 0) === 0 && hasCmd('unzip')) {
+    execFileSync('unzip', ['-o', '-q', archive, '-d', outDir], { stdio: 'inherit' });
+    return;
+  }
   const a = ['-xf', archive, '-C', outDir];
   if (strip > 0) a.push(`--strip-components=${strip}`);
   execFileSync('tar', a, { stdio: 'inherit' });

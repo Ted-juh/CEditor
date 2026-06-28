@@ -213,20 +213,47 @@ function findVcvars() {
     const c = path.join(root, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
     if (existsSync(c)) return c;
   }
-  throw new Error('Could not locate vcvars64.bat — install Visual Studio with the "Desktop development with C++" workload.');
+  return null; // not found — caller falls back to the bundled LLVM-MinGW toolchain
 }
-const vcvars = findVcvars();
-console.log('Using Visual Studio:', vcvars);
-const cfg = `cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
+
+// Common CMake cache vars (identity + feature flags), generator-agnostic.
+const cacheVars = `-DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
   + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
   + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
   + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
   + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
   + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
-const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+
+// Pick the build backend: a system Visual Studio if present (default, fully battle-tested), else the
+// bundled self-contained LLVM-MinGW (the "done at install" path — no VS required). EXPERIMENTAL on the
+// MinGW path until validated on Windows (JUCE software renderer; VST3 wrapper link tweak).
+const { llvmMingwDir, ninjaExe } = await import(pathToFileURL(path.join(repo, 'tools/toolchains/resolveToolchain.mjs')).href);
+const vcvars = findVcvars();
+const mingw = vcvars ? null : llvmMingwDir();
+let runBuild, runRestore;
+if (vcvars) {
+  console.log('Build backend: Visual Studio —', vcvars);
+  const cfg = `cmake -S "${repo}" -B "${build}" ${cacheVars}`;
+  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+  runBuild = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
+  runRestore = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
+} else if (mingw) {
+  const ninja = ninjaExe();
+  if (!ninja) throw new Error('Ninja not found — run: node tools/toolchains/provision.mjs ninja');
+  console.log('Build backend: bundled LLVM-MinGW (no Visual Studio) —', mingw, '[EXPERIMENTAL]');
+  const tcFile = path.join(repo, 'tools/toolchains/llvm-mingw-win.cmake');
+  const cfg = `cmake -S "${repo}" -B "${build}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninja}"`
+    + ` -DCMAKE_TOOLCHAIN_FILE="${tcFile}" -DCE_LLVM_MINGW_DIR="${mingw}" -DCMAKE_BUILD_TYPE=Release ${cacheVars}`;
+  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3`;
+  runBuild = () => { execSync(cfg, { stdio: 'inherit' }); execSync(bld, { stdio: 'inherit' }); };
+  runRestore = () => execSync(`cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=ON`, { stdio: 'inherit' });
+} else {
+  throw new Error('No C++ build toolchain found. Install Visual Studio (Desktop C++) OR run: node tools/toolchains/provision.mjs llvm-mingw ninja');
+}
+
 console.log('Configuring + building the plugin...');
 try {
-  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
+  runBuild();
 
   const built = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'VST3', `${productName}.vst3`);
   const dest = path.join(outDir, `${productName}.vst3`);
@@ -250,5 +277,5 @@ try {
   else console.error('Build artifact not found:', built);
 } finally {
   // Always restore dev mode so the editor's normal build keeps loading the Vite dev server.
-  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
+  runRestore();
 }

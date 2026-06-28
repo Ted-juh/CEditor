@@ -21,6 +21,18 @@
         "win32-x64": { "url": "https://www.python.org/ftp/python/3.13.1/python-3.13.1-embed-amd64.zip", "sizeMB": 11, "strip": 0 }
       }
     },
+    "ninja": {
+      "desc": "Ninja build tool — the generator used to build the JUCE plugin with the bundled LLVM-MinGW Clang (CMake's MSVC generator isn't available without Visual Studio). Tiny.",
+      "version": "1.12.1",
+      "license": "Apache-2.0",
+      "bin": ".",
+      "platforms": {
+        "win32-x64":  { "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-win.zip", "sizeMB": 1, "strip": 0 },
+        "linux-x64":  { "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip", "sizeMB": 1, "strip": 0 },
+        "darwin-arm64": { "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip", "sizeMB": 1, "strip": 0 },
+        "darwin-x64": { "url": "https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-mac.zip", "sizeMB": 1, "strip": 0 }
+      }
+    },
     "jdk": {
       "desc": "Temurin JDK 21 (LTS). Dev-side javac+jlink: compile Java handlers to bytecode and emit a ~30-50MB trimmed JRE shipped INTO the plugin (JNI). Pinned to 21 because JDK 24+ drops jmods/ (JEP 493), breaking cross-platform jlink.",
       "version": "21.0.5+11",
