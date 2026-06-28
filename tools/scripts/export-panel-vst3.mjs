@@ -79,6 +79,63 @@ const nativeLangs = ['cpp', 'csharp', 'java'].filter((l) => panelScriptLanguages
 const compileNative = nhMode === 'on' || (nhMode === 'auto' && nativeLangs.length > 0);
 console.log(`Native handlers: mode=${nhMode}, panel uses [${nativeLangs.join(', ') || 'none'}] -> ${compileNative ? 'COMPILE (toolchain permitting)' : 'skip'}`);
 
+// --- On-demand toolchain provisioning ---
+// Install ONLY the toolchains the languages THIS panel actually compiles need, and only if missing —
+// the "download what you script in" model (see docs/scripting-language-options-and-shippable-export.md).
+// Default on; set exportSettings.autoProvisionToolchains=false to manage toolchains yourself (Settings →
+// Scripting Toolchains). Failures here are non-fatal: the per-language build below warns + skips.
+if ((es.autoProvisionToolchains ?? true) && (compileNative || embedPython)) {
+  const langsToBuild = [...(compileNative ? nativeLangs : []), ...(embedPython ? ['python'] : [])];
+  try {
+    const lm = await import(pathToFileURL(path.join(repo, 'tools/toolchains/languages.mjs')).href);
+    const missing = [...lm.requiredToolchains(langsToBuild)].filter((t) => !lm.toolchainProvisioned(t));
+    if (missing.length) {
+      console.log(`Toolchains: panel needs [${langsToBuild.join(', ')}]; installing missing: ${missing.join(', ')} (one-time)...`);
+      lm.provisionForLanguages(langsToBuild);
+    }
+  } catch (e) {
+    console.warn(`  ⚠ On-demand toolchain provisioning failed (${e?.message ?? e}); any language without its toolchain will be skipped.`);
+  }
+}
+
+// True when CE/web/dist is newer than every web source/config file — i.e. a rebuild would be identical.
+// Walks src + the build config; compares the newest source mtime against the oldest dist artifact mtime.
+function webBundleFresh(webDir, dist) {
+  const indexHtml = path.join(dist, 'index.html');
+  if (!existsSync(indexHtml)) return false;
+  const newest = (p, skip) => {
+    let m = 0;
+    const walk = (d) => {
+      let ents; try { ents = readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        if (skip && skip(e.name)) continue;
+        const fp = path.join(d, e.name);
+        if (e.isDirectory()) walk(fp);
+        else { try { const t = statSync(fp).mtimeMs; if (t > m) m = t; } catch { /* ignore */ } }
+      }
+    };
+    if (existsSync(p)) { const st = statSync(p); st.isDirectory() ? walk(p) : (m = st.mtimeMs); }
+    return m;
+  };
+  // Newest input: src tree + the build config files (node_modules/.bin excluded — not inputs).
+  const srcNewest = newest(path.join(webDir, 'src'));
+  let cfgNewest = 0;
+  for (const f of ['vite.config.js', 'vite.config.ts', 'svelte.config.js', 'package.json', 'index.html'])
+    cfgNewest = Math.max(cfgNewest, newest(path.join(webDir, f)));
+  const inputNewest = Math.max(srcNewest, cfgNewest);
+  // Oldest dist artifact (if ANY output predates an input, the bundle is stale).
+  let distOldest = Infinity;
+  const walkDist = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const fp = path.join(d, e.name);
+      if (e.isDirectory()) walkDist(fp);
+      else { try { const t = statSync(fp).mtimeMs; if (t < distOldest) distOldest = t; } catch { /* ignore */ } }
+    }
+  };
+  walkDist(dist);
+  return distOldest >= inputNewest;
+}
+
 // --- size + python-bundling helpers ---
 const mb = (bytes) => (bytes / 1048576).toFixed(1);
 function dirSize(p) {
@@ -204,9 +261,21 @@ writeFileSync(bakedPanel, JSON.stringify(panelDoc, null, 2));
 const panelAbs = bakedPanel.replace(/\\/g, '/');
 console.log(`Baked ${panelDoc.exportParameters.length} parameters into ${bakedPanel}`);
 
-// 2. Build the web bundle (the self-contained UI embedded into the plugin).
-console.log('Building web bundle...');
-execSync('npm run build', { cwd: path.join(repo, 'CE', 'web'), stdio: 'inherit' });
+// 2. Build the web bundle (the self-contained UI embedded into the plugin). The bundle is
+//    PANEL-INDEPENDENT (the .cepanel is loaded at runtime, not baked into the JS), so we only rebuild
+//    it when the web sources changed since the last `dist/` — otherwise every export paid an ~18 s Vite
+//    build for an identical bundle. Set exportSettings.forceWebBuild=true (or env CE_FORCE_WEB=1) to force.
+{
+  const webDir = path.join(repo, 'CE', 'web');
+  const dist = path.join(webDir, 'dist');
+  const forceWeb = es.forceWebBuild === true || process.env.CE_FORCE_WEB === '1';
+  if (!forceWeb && webBundleFresh(webDir, dist)) {
+    console.log('Web bundle: up-to-date (sources unchanged since last build) — skipping Vite build.');
+  } else {
+    console.log('Building web bundle...');
+    execSync('npm run build', { cwd: webDir, stdio: 'inherit' });
+  }
+}
 
 // 3. Configure (DEV_MODE OFF -> bundled UI, not localhost) with this panel's identity, build the
 //    VST3 wrapper, copy to export-out, then restore DEV_MODE ON so the dev build dir is unchanged.
