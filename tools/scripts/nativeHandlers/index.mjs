@@ -10,7 +10,7 @@ import { execSync } from 'node:child_process';
 import { existsSync, mkdirSync, cpSync, statSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cppCompiler, dotnetExe } from '../../toolchains/resolveToolchain.mjs';
+import { cppCompiler, dotnetExe, jdkTools } from '../../toolchains/resolveToolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ABI_DIR = path.resolve(HERE, '../../../CE/src/Scripting'); // holds NativeHandlerAbi.h
@@ -109,21 +109,35 @@ async function buildLanguage(lang, scripts, { workRoot, binDir }) {
       }
       return { ok: true, lang, bytes };
     } else if (lang === 'java') {
-      if (!have('native-image')) return { ok: false, lang, error: 'GraalVM native-image not found on PATH' };
+      // Hosted-JVM path (NOT GraalVM native-image — see java/genJava.mjs): javac compiles handlers to
+      // bytecode, jlink ships a ~40 MB JRE inside the plugin, and a JNI shim (ce_java_shim.c, built with
+      // the bundled clang) boots it. Ships ce_handlers_java.<ext> + the jar + jre/ beside the plugin.
+      const jdk = jdkTools();
+      if (!jdk) return { ok: false, lang, error: 'JDK not found — run: node tools/toolchains/provision.mjs jdk' };
+      if (!jdk.jniIncludeDir) return { ok: false, lang, error: 'JDK include/ (JNI headers) not found — provision the bundled JDK (tools/toolchains)' };
+      const tc = cppCompiler();
+      if (!tc) return { ok: false, lang, error: 'no C compiler for the Java host shim — run: node tools/toolchains/provision.mjs llvm-mingw' };
       const { generateJavaModule } = await import('./java/genJava.mjs');
       const gen = generateJavaModule({ scripts, outDir, abiInfo: { dir: ABI_DIR } });
-      // buildSteps groups the native-image compile + rename, then the C-shim compile+link (proven on
-      // GraalVM CE 21; see genJava.mjs + the emitted BUILD.md). Linux-shaped; on win/mac follow BUILD.md.
-      const steps = [...(gen.buildSteps?.nativeImage ?? []), ...(gen.buildSteps?.shimCompileLink ?? [])];
-      for (const step of steps) execSync(step, { cwd: outDir, stdio: 'inherit' });
-      // Java ships TWO files: the shim (ce_handlers_java.<ext>, what the host opens) + its native-image
-      // sibling lib<name>_svm.<ext>. Copy every declared artifact next to the plugin binary.
+      const plan = gen.buildPlan({ javac: jdk.javac, jar: jdk.jar, jlink: jdk.jlink, cc: tc.cxx, jniIncludeDir: jdk.jniIncludeDir, abiDir: ABI_DIR, ext });
+      for (const step of [...plan.compile, ...plan.jlink, ...plan.shim]) execSync(step, { cwd: outDir, stdio: 'inherit' });
       let bytes = 0;
-      for (const art of gen.buildSteps?.artifacts ?? [`${moduleName}${ext}`]) {
-        const src = path.join(outDir, art);
-        if (!existsSync(src)) return { ok: false, lang, error: `Java build missing artifact ${art}` };
-        cpSync(src, path.join(binDir, art));
-        bytes += statSync(path.join(binDir, art)).size;
+      // Files (shim + jar) beside the plugin binary.
+      for (const f of plan.artifacts.files) {
+        const src = path.join(outDir, f);
+        if (!existsSync(src)) return { ok: false, lang, error: `Java build missing artifact ${f}` };
+        cpSync(src, path.join(binDir, f));
+        bytes += statSync(path.join(binDir, f)).size;
+      }
+      // Dirs (the jlink'd jre/) preserving the relative layout (shim self-locates jre/ beside it).
+      for (const d of plan.artifacts.dirs) {
+        for (const file of readdirRec(path.join(outDir, d))) {
+          const rel = path.relative(outDir, file);
+          const dest = path.join(binDir, rel);
+          mkdirSync(path.dirname(dest), { recursive: true });
+          cpSync(file, dest);
+          bytes += statSync(dest).size;
+        }
       }
       return { ok: true, lang, bytes };
     }

@@ -11,7 +11,7 @@ written but build-unverified (no .NET-AOT / GraalVM toolchain in this environmen
 | Host loader (`ScriptEngine`) | `NativeHandlerEngine.cpp` (+ `ScriptRuntime`/CMake wiring, `CEDITOR_NATIVE_HANDLERS` off by default) | ✅ **verified against real JUCE 8**: `node tools/scripts/nativeHandlers/cpp/verify-host.mjs` builds the loader + `juce_core` + a generated module and asserts load→init→hasHandler→dispatch→host callbacks. (Building it caught two real bugs: a `juce::DynamicLibrary` move-assignment and a dangling-`CeStr` lifetime.) |
 | C++ user surface | `tools/scripts/nativeHandlers/cpp/ce_runtime.h` | ✅ |
 | C++ generator | `tools/scripts/nativeHandlers/cpp/genCpp.mjs` | ✅ **verified**: `node tools/scripts/nativeHandlers/cpp/verify.mjs` compiles a generated module + a JUCE-free host harness and asserts the full round-trip (load → init → dispatch → host callbacks) |
-| Java generator (GraalVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,harness.c,genJava.mjs}` | ✅ **FULLY verified on GraalVM CE 21.0.2**: `verify-java.mjs` runs the real `native-image --shared` build + the C-shim isolate link, loads the 14 MB module, and dispatches a Java handler that calls back into the host (`out=21`, `log='ran'`). Falls back to a javac-against-`graal-sdk` type-check where native-image is absent. |
+| Java generator (hosted-JVM) | `tools/scripts/nativeHandlers/java/{CeRuntime.java,ce_java_shim.c,genJava.mjs}` | ✅ **FULLY verified on JDK 21 (linux-x64)**: `verify-java.mjs` runs the real build — `javac` the handlers, `jar` them, `jlink` a ~39 MB JRE, and clang the JNI shim `ce_java_shim.c` (bundled clang, **no MSVC**) — then the shared host harness loads `ce_handlers_java.so`, the shim boots the JVM via the JNI Invocation API, and a Java handler dispatches + calls back into the host (`out=21`, `log='ran'`). **Replaced GraalVM native-image** (multi-GB/​multi-minute closed-world rebuild per export). |
 | C# generator (hosted-CoreCLR) | `tools/scripts/nativeHandlers/csharp/{CeRuntime.cs,CeHost.c,genCsharp.mjs,hosting/*.h}` | ✅ **FULLY verified on .NET 10 (linux-x64)**: `verify-csharp.mjs` runs the real build — Roslyn `dotnet publish --self-contained` → `ce_managed.dll` + a CoreCLR; the C shim `CeHost.c` (built with the bundled clang, **no MSVC**) is compiled into the publish dir; the shared host harness loads `ce_handlers_csharp.so`, the shim boots CoreCLR via `hostfxr` (command-line init, which supports self-contained), and a C# handler dispatches + calls back into the host (`out=21`, `log='ran'`). **Replaced NativeAOT** — that path needs non-redistributable MSVC/WinSDK import libs on Windows (researched 2026-06, see §C#). Self-contained layout ~80 MB untrimmed (proven baseline); size-trim is a tracked follow-up. |
 | Export orchestration | `tools/scripts/nativeHandlers/index.mjs` + `export-panel-vst3.mjs` (opt-in `compileNativeHandlers: 'on'`) | ⚠️ all three per-language build paths exercised by the verifiers; the VST3-bundling wrapper + a DAW load test are the remaining end-to-end gap. |
 
@@ -164,20 +164,37 @@ dead-end. Kept only as an optional path for users who *do* have the C++ build to
   cross-OS link problem** — the managed DLL is platform-neutral IL; only the tiny shim + the shipped
   runtime are per-OS, and the runtime is just downloaded per-OS, never linked by us.
 
-### Java — GraalVM native-image (`--shared`, isolates)
-- **Build**: `native-image --shared -o ce_handlers_<panel>_java -cp handlers.jar com.ce.Handlers`,
-  emitting the lib + `graal_isolate.h`. **No JVM shipped.**
-- **Entry points**: `@CEntryPoint(name="ce_handler_dispatch")` static methods whose **first parameter
-  is an `IsolateThread`**. The host calls `graal_create_isolate` once (on the message thread), threads
-  the `IsolateThread` token through every call, and `graal_attach_thread` for any other calling thread.
-  Host callbacks via `@CFunction`/`CFunctionPointer`.
-- **Constraints (the real ones)**: **closed-world** — the handler must be fully reachable at build
-  time; any reflection needs reachability metadata captured at export. Disable the SVM segfault handler
-  for a library so it doesn't fight the DAW's crash handler.
-- **Cost**: **~8–15 MB** per module; **build 30 s–5 min and 8–16 GB RAM** — *every export re-runs
-  native-image* because the user's code is baked in. This is the dominant UX cost.
-- **Toolchain at export**: GraalVM/Liberica NIK JDK 21+ with `native-image` **+** a per-OS C toolchain.
-  **No cross-OS build.**
+### Java — hosted JVM (javac bytecode + jlink'd JRE + JNI shim)  *(was: GraalVM native-image)*
+
+**Why hosted-JVM and not GraalVM.** native-image needs an **8–16 GB / 30 s–5 min closed-world rebuild
+on every export** (the user's code is baked into the image) plus the whole GraalVM JDK on the dev
+machine — the dominant UX cost of the old path. The hosted-JVM path keeps the same "ship a runtime"
+model as C#/Python and is **seconds** to build.
+
+- **Build (no native toolchain for the Java side)**: `javac` compiles the user's handlers + `CeRuntime`
+  + the generated registry to ordinary **bytecode** → `jar`; `jlink --add-modules java.base` emits a
+  **~40 MB trimmed JRE**. No native-image, no closed-world analysis, no reflection ban.
+- **Host shim** `ce_handlers_java.<dll|so|dylib>`: the **C** shim `ce_java_shim.c` (built with the
+  bundled **llvm-mingw clang** — no MSVC) exports the flat C ABI. In `ce_handler_init` it `dlopen`s the
+  **shipped** `libjvm` (discovered beside the plugin), boots it via the **JNI Invocation API**
+  (`JNI_CreateJavaVM`), `RegisterNatives` for the host-callback methods, and resolves the static entry
+  points `CeRuntime.init/has/dispatch/shutdown`. Host callbacks: Java calls `static native` methods the
+  shim implements (forwarding to the cached `CeHostVtable`). The incoming `CeValue*` payload is passed
+  to Java as a `long`; Java reads fields via the shim's `nP*` accessors — so **the C side owns all
+  CeValue marshalling** and the Java side is plain JNI (no GraalVM `@CStruct`).
+- **Ship into the plugin**: the shim + `ce_handlers_java.jar` + the `jre/` dir. All redistributable
+  (OpenJDK is GPLv2 **+ Classpath Exception** — linking/shipping is permitted).
+- **Mechanism proven (2026-06, linux-x64)**: javac → jar → jlink (~39 MB) → clang the shim; the shared
+  host harness boots the JVM and dispatches a Java handler that calls back into the host — **E2E PASS**.
+- **Crash safety / threading**: dispatch runs on the host message thread; the shim `GetEnv`s (or
+  `AttachCurrentThread`s) the JVM. A handler exception is caught at the JNI frame and turned into a
+  non-zero status — never rethrown across `extern "C"`. The JVM stays up for process lifetime (an
+  in-process JVM cannot be recreated; matches the C# "no real unload").
+- **Cost**: a **one-time ~40 MB JRE** shipped per plugin (shared across every Java handler); the jar is
+  KBs. Build is `javac`-fast.
+- **Toolchain at export**: a JDK 21 (`javac`/`jar`/`jlink`, provisioned like before) **+** the bundled
+  clang for the shim. **No cross-OS build** (the jar is portable bytecode, but the JRE + shim are
+  per-OS — the JRE is just `jlink`'d per-OS, never a native compile of the user's code).
 
 ## 5. Crash safety — the blunt verdict (applies to all three)
 

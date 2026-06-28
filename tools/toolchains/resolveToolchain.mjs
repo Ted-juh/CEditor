@@ -45,6 +45,26 @@ export function ninjaExe() {
 /** Path to the bundled JDK (javac + jlink) or null — used by the Java ship-a-JRE export path. */
 export function jdkHome() { return toolchainDir('jdk'); }
 
+/** Resolve the JDK tools the hosted-JVM Java path needs (javac/jar/jlink + the JNI include dir).
+ *  Prefers the bundled JDK (tools/toolchains/jdk), then $JAVA_HOME, then a system JDK on PATH. Returns
+ *  null if no JDK with javac is found. */
+export function jdkTools() {
+  const fromHome = (home) => {
+    if (!home) return null;
+    const javac = path.join(home, 'bin', exe('javac'));
+    if (!existsSync(javac)) return null;
+    return {
+      home,
+      javac,
+      jar: path.join(home, 'bin', exe('jar')),
+      jlink: path.join(home, 'bin', exe('jlink')),
+      jniIncludeDir: path.join(home, 'include'),
+    };
+  };
+  return fromHome(jdkHome()) || fromHome(process.env.JAVA_HOME) ||
+    (has('javac') ? { home: null, javac: 'javac', jar: 'jar', jlink: 'jlink', jniIncludeDir: null } : null);
+}
+
 /** Path to the bundled CPython embeddable runtime (bundled INTO exported plugins) or null. */
 export function pythonEmbedDir() { return toolchainDir('python-embed'); }
 

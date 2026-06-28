@@ -1,30 +1,29 @@
-// genJava.mjs — generate a buildable GraalVM native-image handler module from a panel's Java scripts.
-// Mirrors genCpp.mjs: each script's source is wrapped in its own class (so two controls can both define
-// onValueChanged), and a generated registry routes (scriptId, event) to the right class method. The
-// module is built into ce_handlers_java.<dll|dylib|so> — the exact name the host's NativeHandlerEngine
-// (moduleFileName("java")) looks for.
+// genJava.mjs — generate a buildable Java handler module from a panel's Java scripts, using the
+// HOSTED-JVM path (javac bytecode + a jlink'd JRE shipped in the plugin + a JNI shim), NOT GraalVM
+// native-image. See native-handlers-design.md §Java.
 //
-// ============================================================================================
-// BUILD-UNVERIFIED. This generator and its emitted Java/C were written WITHOUT a GraalVM toolchain.
-// Requirements to actually build the output:
-//   • GraalVM or Liberica NIK, JDK 21+, with the `native-image` tool installed (gu install native-image,
-//     or NIK ships it). The org.graalvm.nativeimage / org.graalvm.word APIs (@CEntryPoint, @CStruct,
-//     @CFunction, StackValue, CTypeConversion) come from the native-image SDK on the compile classpath.
-//   • A per-OS C/C++ toolchain native-image shells out to: MSVC (Windows), clang/Xcode CLT (macOS),
-//     gcc/clang + glibc headers (Linux). NO cross-OS build — you must build each target on its own OS.
-//   • native-image --shared is SLOW (~30s to 5min per module) and MEMORY-HUNGRY (8-16 GB RAM); it does
-//     whole-program closed-world analysis. CLOSED-WORLD means NO runtime reflection / dynamic class
-//     loading — handlers are wired by direct method references this generator emits, never reflectively.
-//   • Output module is ~8-15 MB (the Substrate VM + GC are baked in).
-// ============================================================================================
+// Why hosted-JVM and not GraalVM native-image: native-image needs a 8–16 GB / 30 s–5 min closed-world
+// rebuild on EVERY export plus the whole GraalVM JDK on the dev machine. Instead the user's handlers
+// compile to ordinary bytecode with `javac` (seconds), and a small ~40 MB JRE produced by `jlink` ships
+// INSIDE the plugin. The native shim `ce_java_shim.c` (built with the bundled clang) boots that JRE via
+// the JNI Invocation API and forwards the flat C ABI. This mirrors the C# hosted-CoreCLR path.
 //
-// THE ISOLATE/ABI BRIDGE (see ce_java_shim.c + CeRuntime.java for the full rationale):
-// native-image @CEntryPoint methods require an IsolateThread first parameter, but the host calls the
-// flat ABI with no isolate. So CeRuntime.java exports cej_* entry points (IsolateThread-first) and the
-// hand-written C shim (ce_java_shim.c) exports the real flat ABI, owns the process-global isolate, and
-// forwards. The shim is compiled and linked INTO the same shared library (see buildSteps below).
+// Output (<outDir>):
+//   • CeRuntime.java            — runtime + JNI interop + flat-ABI entry points (copied from this dir)
+//   • Script_<id>.java (each)   — the user's handler wrapped in `final class Script_<id>`
+//   • GeneratedRegistry.java    — <clinit> registers each (scriptId, event) -> handler
+//   • ce_java_shim.c            — the JNI hosting shim (copied)
+//   • NativeHandlerAbi.h        — copied next to the shim so its #include resolves
+// Build (run by index.mjs / verify-java.mjs via buildPlan(tools)):
+//   1) javac the sources -> classes/         2) jar -> ce_handlers_java.jar
+//   3) jlink a minimal JRE -> jre/            4) clang the shim -> ce_handlers_java.<ext>
+// then the shim + jar + jre/ ship next to the plugin (the shim self-locates jre/ + the jar beside it).
+//
+// VERIFIED 2026-06 on JDK 21 (linux-x64): the emitted sources compile, jlink yields a ~39 MB JRE, and
+// the shared host harness loads ce_handlers_java.so, boots the JVM, and dispatches a Java handler that
+// calls back into the host (out=21, log='ran').
 
-import { mkdirSync, writeFileSync, copyFileSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -34,141 +33,15 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 function sanitize(id) {
   return String(id).replace(/[^A-Za-z0-9_]/g, '_');
 }
-// Java string literal escaping for the registry table (JSON escaping is valid for our ids/event names).
+// Java string literal escaping (JSON escaping is valid for our ASCII ids/event names).
 function jstr(s) {
   return JSON.stringify(String(s));
 }
-
-/**
- * generateJavaModule({ scripts, outDir, abiInfo })
- *   scripts : [{ id, name?, event, source, enabled?, language? }]  (source is the user's handler body,
- *             e.g. `void onValueChanged(CeContext ctx, CeEvent e) { ... }`)
- *   outDir  : directory to emit the buildable module into
- *   abiInfo : { abiHeaderDir, abiVersion }  — abiHeaderDir holds NativeHandlerAbi.h (copied next to the
- *             shim so the native-image C compile + the shim compile both see it)
- * Returns { dir, moduleName, handlerCount, buildSteps }.
- */
-export function generateJavaModule({ scripts, outDir, abiInfo = {} }) {
-  mkdirSync(outDir, { recursive: true });
-
-  const usable = (scripts ?? []).filter(
-    (s) => s?.enabled !== false && typeof s?.source === 'string' && s.source.trim() && s.event,
-  );
-
-  // 1) Per-script wrapper classes. The user writes a method like
-  //      void onValueChanged(CeContext ctx, CeEvent e) { ... }
-  //    We wrap it in `class Script_<id> { <source> }`. The method is referenced as
-  //    Script_<id>::<event> (an instance method ref needs an instance, so we make a singleton).
-  const scriptClasses = usable
-    .map(
-      (s) => `// ${s.name ?? s.id}
-final class Script_${sanitize(s.id)} {
-    static final Script_${sanitize(s.id)} INSTANCE = new Script_${sanitize(s.id)}();
-${indent(s.source, 4)}
-}`,
-    )
-    .join('\n\n');
-
-  // 2) Generated registry: a class whose static initializer registers every (scriptId, event) -> handler.
-  //    CeRuntime.ensureRegistryLoaded() forces this class to load (Class.forName("GeneratedRegistry")),
-  //    running this <clinit>. Each handler is a direct method reference (closed-world friendly).
-  const registrations = usable
-    .map(
-      (s) =>
-        `        CeRuntime.register(${jstr(s.id)}, ${jstr(s.event)}, ` +
-        `Script_${sanitize(s.id)}.INSTANCE::${s.event});`,
-    )
-    .join('\n');
-
-  const generatedJava = `// GENERATED by genJava.mjs — do not edit. Per-panel Java handler scripts + dispatch registry.
-//
-// Each handler signature mirrors the C++ surface:  void onValueChanged(CeContext ctx, CeEvent e) { ... }
-// CeContext / CeEvent / CeRuntime.Handler come from CeRuntime.java (the runtime in this same module).
-// Closed-world: handlers are wired by direct method references below — no runtime reflection.
-
-// CeContext / CeEvent / CeRuntime are top-level package-private types in this same (default) package,
-// so the handler signatures below name them unqualified with NO imports (the default package cannot be
-// imported from anyway). The user writes:  void onValueChanged(CeContext ctx, CeEvent e) { ... }
-
-${scriptClasses}
-
-final class GeneratedRegistry {
-    // Static-init registers all handlers. CeRuntime.ensureRegistryLoaded() triggers this via
-    // Class.forName("GeneratedRegistry") inside cej_init.
-    static {
-        register();
-    }
-    static void register() {
-${registrations || '        // (no handlers in this panel)'}
-    }
-    private GeneratedRegistry() {}
-}
-`;
-
-  // 3) The native-image entry-point owner needs a Main with a no-op main() so `native-image --shared`
-  //    has a class to anchor reachability from. The cej_* @CEntryPoint methods live in CeRuntime; we
-  //    reference both CeRuntime and GeneratedRegistry from Main so the analysis includes them.
-  const mainJava = `// GENERATED by genJava.mjs — do not edit. native-image --shared anchor.
-// --shared still wants a Main on the classpath to seed reachability; the @CEntryPoint methods in
-// CeRuntime are the real exports. We touch GeneratedRegistry so closed-world analysis includes it.
-public final class Main {
-    public static void main(String[] args) {
-        // Never invoked in --shared mode; present only to anchor the image.
-        if (args.length == Integer.MAX_VALUE) {
-            GeneratedRegistry.register();
-        }
-    }
-    private Main() {}
-}
-`;
-
-  // --- write Java sources ---
-  writeFileSync(path.join(outDir, 'GeneratedHandlers.java'), generatedJava);
-  writeFileSync(path.join(outDir, 'Main.java'), mainJava);
-
-  // --- copy the runtime (CeRuntime.java) + the C shim (ce_java_shim.c) next to the generated sources ---
-  copyAlongside('CeRuntime.java', outDir);
-  copyAlongside('ce_java_shim.c', outDir);
-
-  // --- copy NativeHandlerAbi.h next to the shim so the shim's #include "NativeHandlerAbi.h" resolves,
-  //     and native-image's C compile of the @CStruct("CeValue") types finds the same header. ---
-  const abiHeaderDir = abiInfo.abiHeaderDir ?? abiInfo.dir; // accept either key from the caller
-  if (abiHeaderDir && existsSync(path.join(abiHeaderDir, 'NativeHandlerAbi.h'))) {
-    copyFileSync(path.join(abiHeaderDir, 'NativeHandlerAbi.h'), path.join(outDir, 'NativeHandlerAbi.h'));
-  }
-
-  // --- @CContext directives: tell native-image which C header defines the ABI structs. We bake the
-  //     ABSOLUTE path to the copied header so the generated query .c (compiled in a temp dir) resolves
-  //     it without an -I. Generated (not the static CeRuntime.java) because the path is build-specific. ---
-  const headerAbs = path.join(outDir, 'NativeHandlerAbi.h').replace(/\\/g, '/');
-  writeFileSync(path.join(outDir, 'CeAbiDirectives.java'), `// GENERATED by genJava.mjs — do not edit.
-import org.graalvm.nativeimage.c.CContext;
-import java.util.List;
-public final class CeAbiDirectives implements CContext.Directives {
-    @Override public List<String> getHeaderFiles() { return List.of("\\"${headerAbs}\\""); }
-}
-`);
-
-  const moduleName = 'ce_handlers_java';
-  const buildSteps = makeBuildSteps({ outDir, moduleName });
-
-  // Emit the build steps as a runnable-ish script + README so the build machine has them inline.
-  writeFileSync(path.join(outDir, 'BUILD.md'), buildStepsMarkdown(buildSteps, moduleName));
-
-  return { dir: outDir, moduleName, handlerCount: usable.length, buildSteps };
-}
-
-// Indent every line of `src` by `n` spaces (for nesting the user method inside a class).
+// Indent every line of `src` by `n` spaces (to nest the user method inside a class).
 function indent(src, n) {
   const pad = ' '.repeat(n);
-  return String(src)
-    .split('\n')
-    .map((line) => (line.length ? pad + line : line))
-    .join('\n');
+  return String(src).split('\n').map((l) => (l.length ? pad + l : l)).join('\n');
 }
-
-// Copy a sibling file (CeRuntime.java / ce_java_shim.c) from this generator's dir into outDir, unless
-// outDir already IS this dir (e.g. running in place).
 function copyAlongside(name, outDir) {
   const src = path.join(HERE, name);
   const dst = path.join(outDir, name);
@@ -176,61 +49,119 @@ function copyAlongside(name, outDir) {
   if (existsSync(src)) copyFileSync(src, dst);
 }
 
-// The explicit native-image + shim compile/link invocation. Two stages because the shim is plain C that
-// must link against the native-image-produced library's cej_* symbols + the graal_isolate API.
-function makeBuildSteps({ outDir, moduleName }) {
-  // VERIFIED on GraalVM CE 21.0.2 (linux-x64): this exact recipe builds + loads + dispatches. The
-  // ext/compiler swaps for macOS (.dylib/clang) and Windows (.dll/cl) are noted; the shape is identical.
-  const cls = path.join(outDir, 'classes');
-  const svm = `lib${moduleName}_svm`; // the native-image lib, renamed so the shim can -l it and the
-                                       // final ce_handlers_java.so (the shim) doesn't collide with it.
+const MODULE = 'ce_handlers_java';
+const JAR = `${MODULE}.jar`;
+
+export function generateJavaModule({ scripts, outDir, abiInfo = {} }) {
+  mkdirSync(outDir, { recursive: true });
+
+  const usable = (scripts ?? []).filter(
+    (s) => s?.enabled !== false && typeof s?.source === 'string' && s.source.trim() && s.event,
+  );
+
+  // 1) Per-script wrapper classes — each user method wrapped in `final class Script_<id>` with a
+  //    singleton INSTANCE so the registry can take an instance method reference (closed-world-free; this
+  //    is now ordinary bytecode, but keeping the shape matches the C++/C# generators).
+  const sources = [];
+  for (const s of usable) {
+    const cls = `Script_${sanitize(s.id)}`;
+    const body = `// GENERATED by genJava.mjs — do not edit. Script: ${s.name ?? s.id}
+// CeContext / CeEvent / CeRuntime are top-level package-private types in this same (default) package,
+// so the handler names them unqualified:  void onValueChanged(CeContext ctx, CeEvent e) { ... }
+final class ${cls} {
+    static final ${cls} INSTANCE = new ${cls}();
+${indent(s.source, 4)}
+}
+`;
+    writeFileSync(path.join(outDir, `${cls}.java`), body);
+    sources.push(`${cls}.java`);
+  }
+
+  // 2) Generated registry: <clinit> registers every (scriptId, event) -> handler. CeRuntime.init()
+  //    forces it to load via Class.forName("GeneratedRegistry").
+  const registrations = usable
+    .map((s) => `        CeRuntime.register(${jstr(s.id)}, ${jstr(s.event)}, Script_${sanitize(s.id)}.INSTANCE::${s.event});`)
+    .join('\n');
+  writeFileSync(
+    path.join(outDir, 'GeneratedRegistry.java'),
+    `// GENERATED by genJava.mjs — do not edit. Dispatch registry.
+final class GeneratedRegistry {
+    static { register(); }
+    static void register() {
+${registrations || '        // (no handlers in this panel)'}
+    }
+    private GeneratedRegistry() {}
+}
+`,
+  );
+
+  // 3) Copy the runtime + the JNI shim, and NativeHandlerAbi.h next to the shim (its #include resolves).
+  copyAlongside('CeRuntime.java', outDir);
+  copyAlongside('ce_java_shim.c', outDir);
+  const abiHeaderDir = abiInfo.abiHeaderDir ?? abiInfo.dir;
+  if (abiHeaderDir && existsSync(path.join(abiHeaderDir, 'NativeHandlerAbi.h'))) {
+    copyFileSync(path.join(abiHeaderDir, 'NativeHandlerAbi.h'), path.join(outDir, 'NativeHandlerAbi.h'));
+  }
+
+  writeFileSync(path.join(outDir, 'BUILD.md'), buildMarkdown());
+
   return {
-    // Stage 1: javac the sources (GraalVM JDK provides org.graalvm.nativeimage/word as modules), then
-    // native-image --shared. --initialize-at-run-time keeps CeRuntime's handler registry + cached host
-    // vtable out of build-time init (the @CStruct interfaces stay build-time via their @CContext).
-    // native-image emits ce_handlers_java.so + ce_handlers_java.h (cej_* prototypes) + graal_isolate.h.
-    nativeImage: [
-      `javac --add-modules org.graalvm.nativeimage,org.graalvm.word -d "${cls}" ` +
-        `"${path.join(outDir, 'CeRuntime.java')}" "${path.join(outDir, 'CeAbiDirectives.java')}" ` +
-        `"${path.join(outDir, 'GeneratedHandlers.java')}" "${path.join(outDir, 'Main.java')}"`,
-      `native-image --shared -o ${moduleName} -H:Name=${moduleName} -H:+UnlockExperimentalVMOptions ` +
-        `--initialize-at-run-time=CeRuntime,CeContext,CeEvent,GeneratedHandlers -cp "${cls}" Main`,
-      // Rename the native-image lib so (a) the shim can link it with -l and (b) the final module (the
-      // shim) can take the canonical name ce_handlers_java.so without overwriting it. Keep its .h.
-      `mv "${path.join(outDir, moduleName + '.so')}" "${path.join(outDir, svm + '.so')}"`,
-    ],
-    // Stage 2: compile + link the C shim into the FINAL ce_handlers_java.so (exports the flat ABI;
-    // depends on lib<moduleName>_svm.so for cej_*/graal_*, resolved via $ORIGIN rpath). The host opens
-    // ce_handlers_java.so; the loader pulls the _svm sibling automatically. BOTH ship beside the plugin.
-    shimCompileLink: [
-      `cc -fPIC -shared -I"${outDir}" -o "${path.join(outDir, moduleName + '.so')}" ` +
-        `"${path.join(outDir, 'ce_java_shim.c')}" -L"${outDir}" -l${moduleName}_svm -Wl,-rpath,'$ORIGIN'`,
-    ],
-    // The two artifacts the exporter must bundle next to the plugin binary.
-    artifacts: [`${moduleName}.so`, `${svm}.so`],
-    notes: [
-      'VERIFIED on GraalVM CE 21.0.2 linux-x64 (build + load + dispatch round-trip).',
-      'No cross-OS build — run on the target OS. macOS: .dylib + clang -dynamiclib + @loader_path rpath; ' +
-        'Windows: .dll + cl/link against the import lib native-image emits.',
-      'native-image is slow (~30-40s here) and memory-hungry (multi-GB); closed-world (no runtime reflection).',
-      'Ships TWO files: ce_handlers_java.so (the shim, what the host opens) + lib<name>_svm.so (the ' +
-        'native-image lib it depends on). Both go beside the plugin binary.',
-    ],
+    dir: outDir,
+    moduleName: MODULE,
+    jarName: JAR,
+    handlerCount: usable.length,
+    javaSources: ['CeRuntime.java', 'GeneratedRegistry.java', ...sources],
+
+    /**
+     * Build commands for this module, given resolved tool paths.
+     *   tools = { javac, jar, jlink, cc, jniIncludeDir, abiDir, ext, modules? }
+     * Returns { compile:[...], jlink:[...], shim:[...], artifacts:{ files:[...], dirs:[...] } }.
+     * Run compile -> jlink -> shim in order (jlink + shim are independent and may run in parallel).
+     */
+    buildPlan(tools) {
+      const ext = tools.ext || (process.platform === 'win32' ? '.dll' : process.platform === 'darwin' ? '.dylib' : '.so');
+      const osInc = process.platform === 'win32' ? 'win32' : process.platform === 'darwin' ? 'darwin' : 'linux';
+      const jniInc = tools.jniIncludeDir;
+      const q = (p) => `"${p}"`;
+      const srcs = this.javaSources.map((f) => q(path.join(outDir, f))).join(' ');
+      // java.base covers Collections/String/Math/regex/time — enough for typical handlers. Extra modules
+      // can be added by the caller (tools.modules) if a panel needs them.
+      const modules = tools.modules || 'java.base';
+      const cflags = process.platform === 'win32' ? '' : '-fPIC';
+      const ldl = process.platform === 'win32' ? '' : '-ldl';
+      return {
+        compile: [
+          `${q(tools.javac)} -d ${q(path.join(outDir, 'classes'))} ${srcs}`,
+          `${q(tools.jar)} --create --file ${q(path.join(outDir, JAR))} -C ${q(path.join(outDir, 'classes'))} .`,
+        ],
+        jlink: [
+          `${q(tools.jlink)} --add-modules ${modules} --output ${q(path.join(outDir, 'jre'))} ` +
+            `--strip-debug --no-header-files --no-man-pages --compress zip-6`,
+        ],
+        shim: [
+          `${q(tools.cc)} -x c -shared ${cflags} -O2 -fvisibility=hidden ` +
+            `-I ${q(tools.abiDir)} -I ${q(jniInc)} -I ${q(path.join(jniInc, osInc))} ` +
+            `${q(path.join(outDir, 'ce_java_shim.c'))} -o ${q(path.join(outDir, MODULE + ext))} ${ldl}`,
+        ],
+        artifacts: { files: [`${MODULE}${ext}`, JAR], dirs: ['jre'] },
+      };
+    },
   };
 }
 
-function buildStepsMarkdown(steps, moduleName) {
-  const block = (title, lines) => `### ${title}\n\n\`\`\`sh\n${lines.join('\n')}\n\`\`\`\n`;
-  return `# Building ${moduleName} (BUILD-UNVERIFIED)
+function buildMarkdown() {
+  return `# Building ${MODULE} (hosted-JVM: javac + jlink + JNI shim)
 
-GraalVM / Liberica NIK, JDK 21+, native-image installed, plus a per-OS C toolchain.
-native-image is slow (30s-5min) and memory-hungry (8-16 GB). Closed-world: no runtime reflection.
-Output is ~8-15 MB and must ship as \`${moduleName}.<dll|dylib|so>\` next to the plugin binary.
+JDK 21 (\`javac\` + \`jar\` + \`jlink\`) + a C compiler (the bundled llvm-mingw clang). NO GraalVM,
+no native-image, no multi-GB closed-world rebuild. The user's handlers are ordinary bytecode; a small
+jlink'd JRE (~40 MB) ships inside the plugin and the shim boots it via JNI.
 
-${block('Stage 1 — compile Java + native-image --shared', steps.nativeImage)}
-${block('Stage 2 — compile + link the C shim into the same library', steps.shimCompileLink)}
-### Notes
+Ships next to the plugin: \`${MODULE}.<ext>\` (the shim, what the host opens) + \`${JAR}\` (handler
+bytecode) + \`jre/\` (the jlink'd runtime). The shim self-locates \`jre/\` + the jar beside itself.
 
-${steps.notes.map((n) => `- ${n}`).join('\n')}
+1. \`javac -d classes *.java\`
+2. \`jar --create --file ${JAR} -C classes .\`
+3. \`jlink --add-modules java.base --output jre --strip-debug --no-header-files --no-man-pages --compress=2\`
+4. \`clang -x c -shared -fPIC -I <abi> -I <jdk>/include -I <jdk>/include/<os> ce_java_shim.c -o ${MODULE}.<ext>\`
 `;
 }
