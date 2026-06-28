@@ -504,7 +504,7 @@ namespace Ce
                 if (host == null || host->abi_version != Abi.Version)
                     return -1;
 
-                s_host = host;
+                s_host = host; // marks "initialized"; NOT used by dispatch (see below)
 
                 // Populate the dispatch registry once (forces GC/type-system bring-up now, not on the
                 // first dispatch — deterministic, matches the design intent for C# AOT modules).
@@ -514,9 +514,9 @@ namespace Ce
                     s_registered = true;
                 }
 
-                // out_state is opaque + handler-owned; the host only passes it back to dispatch/shutdown.
-                // We're effectively stateless (the vtable is cached statically), but the host asserts
-                // *out_state != null on success, so hand back a non-null sentinel (the vtable pointer).
+                // out_state IS this instance's host vtable — the host passes it back to dispatch so two
+                // plugin instances sharing this (process-global) module each call into their OWN host.
+                // (A single cached static would route the 2nd instance's callbacks to the 1st's host.)
                 if (outState != null)
                     *outState = host;
 
@@ -551,7 +551,10 @@ namespace Ce
         {
             try
             {
-                if (s_host == null)
+                // The `state` handle is THIS instance's CeHostVtable* (set in Init via *out_state), so
+                // callbacks reach the right plugin instance — not a shared global.
+                var host = (CeHostVtable*)state;
+                if (host == null)
                     return -1;
 
                 string sid = Utf8.Decode(scriptId);
@@ -560,7 +563,7 @@ namespace Ce
                 if (!HandlerRegistry.TryGet(sid, ev, out var fn) || fn == null)
                     return 0; // no such handler is NOT an error (parity with the C++ glue)
 
-                var ctx = new CeContext(s_host);
+                var ctx = new CeContext(host);
                 var evt = new CeEvent(payload);
 
                 // Value-returning handlers (e.g. onDawSaveState) are a TODO — see design §4. We leave

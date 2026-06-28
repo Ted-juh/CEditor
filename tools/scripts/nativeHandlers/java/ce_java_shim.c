@@ -46,8 +46,10 @@
   static int   ce_exists(const ch_t* p){ struct stat st; return stat(p, &st) == 0; }
 #endif
 
-/* ----------------------------------------------------------------- shim state */
-static const CeHostVtable* gHost = NULL;
+/* ----------------------------------------------------------------- shim state
+ * The JVM is process-global (one per process, created once, reused by every plugin instance). The host
+ * vtable is NOT global — it is per-instance and threaded through dispatch via the ABI `state` handle, so
+ * two instances of the plugin in one DAW each call back into their own host. */
 static JavaVM* gVm   = NULL;
 static jclass  gCls  = NULL;   /* global ref to CeRuntime */
 static jmethodID mInit, mHas, mDispatch, mShutdown;
@@ -82,105 +84,107 @@ static double ce_as_double(const CeValue* v) {
     }
 }
 
-/* ----------------------------------------------------------------- JNI native impls (Java -> host vtable) */
+/* ----------------------------------------------------------------- JNI native impls (Java -> host vtable)
+ * The leading `jlong host` is THIS instance's CeHostVtable* (threaded from dispatch), so two plugin
+ * instances sharing the process-global JVM each reach their own host. */
 
-static void JNICALL n_setD(JNIEnv* e, jclass c, jstring key, jdouble v) {
-    (void)c; if (!gHost || !gHost->set) return;
+static void JNICALL n_setD(JNIEnv* e, jclass c, jlong host, jstring key, jdouble v) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_DOUBLE; val.u.d = v;
-    gHost->set(gHost->host_ctx, &ks, &val, NULL);
+    vt->set(vt->host_ctx, &ks, &val, NULL);
     (*e)->ReleaseStringUTFChars(e, key, k);
 }
-static void JNICALL n_setS(JNIEnv* e, jclass c, jstring key, jstring s) {
-    (void)c; if (!gHost || !gHost->set) return;
+static void JNICALL n_setS(JNIEnv* e, jclass c, jlong host, jstring key, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
-    gHost->set(gHost->host_ctx, &ks, &val, NULL);
+    vt->set(vt->host_ctx, &ks, &val, NULL);
     (*e)->ReleaseStringUTFChars(e, s, sv);
     (*e)->ReleaseStringUTFChars(e, key, k);
 }
-static void JNICALL n_setB(JNIEnv* e, jclass c, jstring key, jboolean b) {
-    (void)c; if (!gHost || !gHost->set) return;
+static void JNICALL n_setB(JNIEnv* e, jclass c, jlong host, jstring key, jboolean b) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->set) return;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     CeStr ks = ce_str(k); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_BOOL; val.u.b = b ? 1 : 0;
-    gHost->set(gHost->host_ctx, &ks, &val, NULL);
+    vt->set(vt->host_ctx, &ks, &val, NULL);
     (*e)->ReleaseStringUTFChars(e, key, k);
 }
-static jint JNICALL n_getKind(JNIEnv* e, jclass c, jstring key, jstring form) {
-    (void)c; if (!gHost || !gHost->get) return CE_NULL;
+static jint JNICALL n_getKind(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return CE_NULL;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     const char* f = (*e)->GetStringUTFChars(e, form, NULL);
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
-    gHost->get(gHost->host_ctx, &ks, &fs, &out);
+    vt->get(vt->host_ctx, &ks, &fs, &out);
     jint t = out.tag;
-    if (gHost->free_value) gHost->free_value(gHost->host_ctx, &out);
+    if (vt->free_value) vt->free_value(vt->host_ctx, &out);
     (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
     return t;
 }
-static jdouble JNICALL n_getD(JNIEnv* e, jclass c, jstring key, jstring form) {
-    (void)c; if (!gHost || !gHost->get) return 0;
+static jdouble JNICALL n_getD(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return 0;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     const char* f = (*e)->GetStringUTFChars(e, form, NULL);
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
-    gHost->get(gHost->host_ctx, &ks, &fs, &out);
+    vt->get(vt->host_ctx, &ks, &fs, &out);
     double d = ce_as_double(&out);
-    if (gHost->free_value) gHost->free_value(gHost->host_ctx, &out);
+    if (vt->free_value) vt->free_value(vt->host_ctx, &out);
     (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
     return d;
 }
-static jstring JNICALL n_getS(JNIEnv* e, jclass c, jstring key, jstring form) {
-    (void)c; if (!gHost || !gHost->get) return (*e)->NewStringUTF(e, "");
+static jstring JNICALL n_getS(JNIEnv* e, jclass c, jlong host, jstring key, jstring form) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->get) return (*e)->NewStringUTF(e, "");
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
     const char* f = (*e)->GetStringUTFChars(e, form, NULL);
     CeStr ks = ce_str(k), fs = ce_str(f); CeValue out; memset(&out, 0, sizeof out);
-    gHost->get(gHost->host_ctx, &ks, &fs, &out);
+    vt->get(vt->host_ctx, &ks, &fs, &out);
     jstring r;
     if (out.tag == CE_STRING && out.u.s.ptr) {
         char* tmp = (char*)malloc((size_t)out.u.s.len + 1);
         memcpy(tmp, out.u.s.ptr, (size_t)out.u.s.len); tmp[out.u.s.len] = 0;
         r = (*e)->NewStringUTF(e, tmp); free(tmp);
     } else { r = (*e)->NewStringUTF(e, ""); }
-    if (gHost->free_value) gHost->free_value(gHost->host_ctx, &out);
+    if (vt->free_value) vt->free_value(vt->host_ctx, &out);
     (*e)->ReleaseStringUTFChars(e, form, f); (*e)->ReleaseStringUTFChars(e, key, k);
     return r;
 }
-static void JNICALL n_ccD(JNIEnv* e, jclass c, jint ch, jint cc, jdouble v) {
-    (void)e; (void)c; if (!gHost || !gHost->send_cc) return;
+static void JNICALL n_ccD(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jdouble v) {
+    (void)e; (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_cc) return;
     CeValue val; memset(&val, 0, sizeof val); val.tag = CE_DOUBLE; val.u.d = v;
-    gHost->send_cc(gHost->host_ctx, ch, cc, &val);
+    vt->send_cc(vt->host_ctx, ch, cc, &val);
 }
-static void JNICALL n_ccS(JNIEnv* e, jclass c, jint ch, jint cc, jstring s) {
-    (void)c; if (!gHost || !gHost->send_cc) return;
+static void JNICALL n_ccS(JNIEnv* e, jclass c, jlong host, jint ch, jint cc, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->send_cc) return;
     const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
     CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
-    gHost->send_cc(gHost->host_ctx, ch, cc, &val);
+    vt->send_cc(vt->host_ctx, ch, cc, &val);
     (*e)->ReleaseStringUTFChars(e, s, sv);
 }
-static void JNICALL n_log(JNIEnv* e, jclass c, jint level, jstring msg) {
-    (void)c; if (!gHost || !gHost->log) return;
+static void JNICALL n_log(JNIEnv* e, jclass c, jlong host, jint level, jstring msg) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->log) return;
     const char* m = (*e)->GetStringUTFChars(e, msg, NULL);
     CeStr ms = ce_str(m);
-    gHost->log(gHost->host_ctx, level, &ms);
+    vt->log(vt->host_ctx, level, &ms);
     (*e)->ReleaseStringUTFChars(e, msg, m);
 }
-static void JNICALL n_emitD(JNIEnv* e, jclass c, jstring name, jdouble v) {
-    (void)c; if (!gHost || !gHost->emit) return;
+static void JNICALL n_emitD(JNIEnv* e, jclass c, jlong host, jstring name, jdouble v) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
     const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
     CeStr ns = ce_str(nm); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_DOUBLE; val.u.d = v;
-    gHost->emit(gHost->host_ctx, &ns, &val);
+    vt->emit(vt->host_ctx, &ns, &val);
     (*e)->ReleaseStringUTFChars(e, name, nm);
 }
-static void JNICALL n_emitS(JNIEnv* e, jclass c, jstring name, jstring s) {
-    (void)c; if (!gHost || !gHost->emit) return;
+static void JNICALL n_emitS(JNIEnv* e, jclass c, jlong host, jstring name, jstring s) {
+    (void)c; const CeHostVtable* vt = (const CeHostVtable*)(intptr_t)host; if (!vt || !vt->emit) return;
     const char* nm = (*e)->GetStringUTFChars(e, name, NULL);
     const char* sv = (*e)->GetStringUTFChars(e, s, NULL);
     CeStr ns = ce_str(nm); CeValue val; memset(&val, 0, sizeof val); val.tag = CE_STRING; val.u.s = ce_str(sv);
-    gHost->emit(gHost->host_ctx, &ns, &val);
+    vt->emit(vt->host_ctx, &ns, &val);
     (*e)->ReleaseStringUTFChars(e, s, sv);
     (*e)->ReleaseStringUTFChars(e, name, nm);
 }
-/* payload accessors: p = (CeValue*) address */
+/* payload accessors: p = (CeValue*) address (no host needed) */
 static jint JNICALL n_pKind(JNIEnv* e, jclass c, jlong p, jstring key) {
     (void)c;
     const char* k = (*e)->GetStringUTFChars(e, key, NULL);
@@ -209,17 +213,17 @@ static jstring JNICALL n_pS(JNIEnv* e, jclass c, jlong p, jstring key) {
 }
 
 static const JNINativeMethod kNatives[] = {
-    { "nSetD",   "(Ljava/lang/String;D)V",                      (void*)n_setD   },
-    { "nSetS",   "(Ljava/lang/String;Ljava/lang/String;)V",     (void*)n_setS   },
-    { "nSetB",   "(Ljava/lang/String;Z)V",                      (void*)n_setB   },
-    { "nGetKind","(Ljava/lang/String;Ljava/lang/String;)I",     (void*)n_getKind},
-    { "nGetD",   "(Ljava/lang/String;Ljava/lang/String;)D",     (void*)n_getD   },
-    { "nGetS",   "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)n_getS },
-    { "nCCd",    "(IID)V",                                       (void*)n_ccD    },
-    { "nCCs",    "(IILjava/lang/String;)V",                      (void*)n_ccS    },
-    { "nLog",    "(ILjava/lang/String;)V",                       (void*)n_log    },
-    { "nEmitD",  "(Ljava/lang/String;D)V",                       (void*)n_emitD  },
-    { "nEmitS",  "(Ljava/lang/String;Ljava/lang/String;)V",      (void*)n_emitS  },
+    { "nSetD",   "(JLjava/lang/String;D)V",                      (void*)n_setD   },
+    { "nSetS",   "(JLjava/lang/String;Ljava/lang/String;)V",     (void*)n_setS   },
+    { "nSetB",   "(JLjava/lang/String;Z)V",                      (void*)n_setB   },
+    { "nGetKind","(JLjava/lang/String;Ljava/lang/String;)I",     (void*)n_getKind},
+    { "nGetD",   "(JLjava/lang/String;Ljava/lang/String;)D",     (void*)n_getD   },
+    { "nGetS",   "(JLjava/lang/String;Ljava/lang/String;)Ljava/lang/String;", (void*)n_getS },
+    { "nCCd",    "(JIID)V",                                      (void*)n_ccD    },
+    { "nCCs",    "(JIILjava/lang/String;)V",                     (void*)n_ccS    },
+    { "nLog",    "(JILjava/lang/String;)V",                      (void*)n_log    },
+    { "nEmitD",  "(JLjava/lang/String;D)V",                      (void*)n_emitD  },
+    { "nEmitS",  "(JLjava/lang/String;Ljava/lang/String;)V",     (void*)n_emitS  },
     { "nPKind",  "(JLjava/lang/String;)I",                       (void*)n_pKind  },
     { "nPD",     "(JLjava/lang/String;)D",                       (void*)n_pD     },
     { "nPS",     "(JLjava/lang/String;)Ljava/lang/String;",      (void*)n_pS     },
@@ -298,58 +302,66 @@ CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void) { return CE_ABI_VERSION;
 
 CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state) {
     if (!host || host->abi_version != CE_ABI_VERSION) return -1;
-    gHost = host;
 
-    ch_t selfdir[4096];
-    if (!ce_self_dir(selfdir, 4096)) { fprintf(stderr, "[ce-java] cannot locate own module dir\n"); return -2; }
-    ch_t jvmPath[4096];
-    if (!ce_find_jvm(jvmPath, 4096, selfdir)) { fprintf(stderr, "[ce-java] libjvm not found (ship a jlink'd jre/)\n"); return -2; }
+    /* The JVM is process-global: created once, reused by every plugin instance (a process can host only
+     * ONE JVM, and it cannot be recreated). A second instance reuses the existing JVM + class/methods —
+     * only the per-instance host vtable differs, and that is threaded through dispatch, not stored here. */
+    if (gVm == NULL) {
+        ch_t selfdir[4096];
+        if (!ce_self_dir(selfdir, 4096)) { fprintf(stderr, "[ce-java] cannot locate own module dir\n"); return -2; }
+        ch_t jvmPath[4096];
+        if (!ce_find_jvm(jvmPath, 4096, selfdir)) { fprintf(stderr, "[ce-java] libjvm not found (ship a jlink'd jre/)\n"); return -2; }
 
-    void* jvmLib = ce_dlopen(jvmPath);
-    if (!jvmLib) { fprintf(stderr, "[ce-java] cannot load libjvm\n"); return -2; }
-    CreateJavaVM_t createVm = (CreateJavaVM_t)ce_dlsym(jvmLib, "JNI_CreateJavaVM");
-    if (!createVm) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM not found\n"); return -2; }
+        void* jvmLib = ce_dlopen(jvmPath);
+        if (!jvmLib) { fprintf(stderr, "[ce-java] cannot load libjvm\n"); return -2; }
+        CreateJavaVM_t createVm = (CreateJavaVM_t)ce_dlsym(jvmLib, "JNI_CreateJavaVM");
+        if (!createVm) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM not found\n"); return -2; }
 
-    /* classpath = <selfdir>/ce_handlers_java.jar */
-    char cp[5000];
+        /* classpath = <selfdir>/ce_handlers_java.jar */
+        char cp[5000];
 #ifdef _WIN32
-    /* selfdir is wide; build the classpath option in narrow UTF-8 for JNI (paths are ASCII here). */
-    char sd[4096]; size_t cv = 0; wcstombs_s(&cv, sd, sizeof(sd), selfdir, _TRUNCATE);
-    snprintf(cp, sizeof(cp), "-Djava.class.path=%s\\ce_handlers_java.jar", sd);
+        /* selfdir is wide; build the classpath option in narrow UTF-8 for JNI (paths are ASCII here). */
+        char sd[4096]; size_t cv = 0; wcstombs_s(&cv, sd, sizeof(sd), selfdir, _TRUNCATE);
+        snprintf(cp, sizeof(cp), "-Djava.class.path=%s\\ce_handlers_java.jar", sd);
 #else
-    snprintf(cp, sizeof(cp), "-Djava.class.path=%s/ce_handlers_java.jar", selfdir);
+        snprintf(cp, sizeof(cp), "-Djava.class.path=%s/ce_handlers_java.jar", selfdir);
 #endif
 
-    JavaVMOption opts[1];
-    opts[0].optionString = cp;
-    JavaVMInitArgs args;
-    memset(&args, 0, sizeof args);
-    args.version = JNI_VERSION_1_8;
-    args.nOptions = 1;
-    args.options = opts;
-    args.ignoreUnrecognized = JNI_FALSE;
+        JavaVMOption opts[1];
+        opts[0].optionString = cp;
+        JavaVMInitArgs args;
+        memset(&args, 0, sizeof args);
+        args.version = JNI_VERSION_1_8;
+        args.nOptions = 1;
+        args.options = opts;
+        args.ignoreUnrecognized = JNI_FALSE;
 
-    JNIEnv* env = NULL;
-    if (createVm(&gVm, (void**)&env, &args) != JNI_OK || !env) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM failed\n"); return -2; }
+        JavaVM* vm = NULL; JNIEnv* env = NULL;
+        if (createVm(&vm, (void**)&env, &args) != JNI_OK || !env) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM failed\n"); return -2; }
 
-    jclass cls = (*env)->FindClass(env, "CeRuntime");
-    if (!cls) { (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] CeRuntime class not found on classpath\n"); return -2; }
-    gCls = (*env)->NewGlobalRef(env, cls);
+        jclass cls = (*env)->FindClass(env, "CeRuntime");
+        if (!cls) { (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] CeRuntime class not found on classpath\n"); return -2; }
+        gCls = (*env)->NewGlobalRef(env, cls);
 
-    if ((*env)->RegisterNatives(env, gCls, kNatives, (jint)(sizeof(kNatives)/sizeof(kNatives[0]))) != 0) {
-        (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] RegisterNatives failed\n"); return -2;
+        if ((*env)->RegisterNatives(env, gCls, kNatives, (jint)(sizeof(kNatives)/sizeof(kNatives[0]))) != 0) {
+            (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] RegisterNatives failed\n"); return -2;
+        }
+
+        mInit     = (*env)->GetStaticMethodID(env, gCls, "init", "()I");
+        mHas      = (*env)->GetStaticMethodID(env, gCls, "has", "(Ljava/lang/String;Ljava/lang/String;)I");
+        mDispatch = (*env)->GetStaticMethodID(env, gCls, "dispatch", "(Ljava/lang/String;Ljava/lang/String;JJ)I");
+        mShutdown = (*env)->GetStaticMethodID(env, gCls, "shutdown", "()V");
+        if (!mInit || !mHas || !mDispatch || !mShutdown) { fprintf(stderr, "[ce-java] entry-point method IDs missing\n"); return -2; }
+
+        jint r = (*env)->CallStaticIntMethod(env, gCls, mInit);
+        if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return -3; }
+        gVm = vm; /* publish only after full, successful bring-up */
+        if (r != 0) return (int)r;
     }
 
-    mInit     = (*env)->GetStaticMethodID(env, gCls, "init", "()I");
-    mHas      = (*env)->GetStaticMethodID(env, gCls, "has", "(Ljava/lang/String;Ljava/lang/String;)I");
-    mDispatch = (*env)->GetStaticMethodID(env, gCls, "dispatch", "(Ljava/lang/String;Ljava/lang/String;J)I");
-    mShutdown = (*env)->GetStaticMethodID(env, gCls, "shutdown", "()V");
-    if (!mInit || !mHas || !mDispatch || !mShutdown) { fprintf(stderr, "[ce-java] entry-point method IDs missing\n"); return -2; }
-
-    jint r = (*env)->CallStaticIntMethod(env, gCls, mInit);
-    if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); return -3; }
-    if (out_state) *out_state = gVm;
-    return (int)r;
+    /* The ABI `state` handle IS this instance's host vtable — dispatch threads it back to the natives. */
+    if (out_state) *out_state = (void*)host;
+    return 0;
 }
 
 CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_id) {
@@ -364,10 +376,13 @@ CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_i
 
 CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr event_id,
                                           const CeValue* payload, CeValue* out_result) {
-    (void)state; (void)out_result; if (!gVm || !gCls) return -1;
+    (void)out_result; if (!gVm || !gCls) return -1;
     JNIEnv* e = ce_env(); if (!e) return -1;
     jstring js = ce_jstr(e, script_id), jev = ce_jstr(e, event_id);
-    jint r = (*e)->CallStaticIntMethod(e, gCls, mDispatch, js, jev, (jlong)(intptr_t)payload);
+    /* state is this instance's CeHostVtable* (from ce_handler_init) — thread it to Java so callbacks
+     * reach THIS instance's host. */
+    jint r = (*e)->CallStaticIntMethod(e, gCls, mDispatch, js, jev,
+                                       (jlong)(intptr_t)payload, (jlong)(intptr_t)state);
     if ((*e)->ExceptionCheck(e)) { (*e)->ExceptionClear(e); r = -1; }
     (*e)->DeleteLocalRef(e, js); (*e)->DeleteLocalRef(e, jev);
     return (int)r;
@@ -375,11 +390,7 @@ CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr ev
 
 CE_EXPORT void CE_CALL ce_handler_shutdown(void* state) {
     (void)state;
-    if (gVm && gCls) {
-        JNIEnv* e = ce_env();
-        if (e) { (*e)->CallStaticVoidMethod(e, gCls, mShutdown); if ((*e)->ExceptionCheck(e)) (*e)->ExceptionClear(e); }
-    }
-    /* Leave the JVM running for process lifetime (DestroyJavaVM blocks until all threads exit and a JVM
-     * cannot be recreated in-process) — matches the C# "no real unload" note. */
-    gHost = NULL;
+    /* Per-instance teardown only — the JVM stays up for process lifetime (DestroyJavaVM blocks until all
+     * threads exit and a JVM cannot be recreated in-process; other instances may still be live). The Java
+     * shutdown() clears the registry, so we DON'T call it here (it would break sibling instances). */
 }
