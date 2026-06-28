@@ -4,6 +4,8 @@
 !.gitignore
 !manifest.json
 !provision.mjs
+!provision.cmd
+!provision.sh
 !resolveToolchain.mjs
 !*.cmake
 !README.md
