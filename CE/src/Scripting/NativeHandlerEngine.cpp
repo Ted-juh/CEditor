@@ -211,6 +211,19 @@ juce::String moduleFileName (const juce::String& language)
     return "ce_handlers_" + language + ext;
 }
 
+// Keep a C#/Java module's DLL mapped for the PROCESS lifetime. Taking the plugin offline destroys this
+// engine + its DynamicLibrary, unloading the module; but the in-process CoreCLR/JVM it hosts cannot be
+// recreated. Pinning an extra (intentionally leaked) handle keeps the DLL — and the shim's cached runtime
+// state — resident, so online again reuses the live runtime instead of failing to re-bootstrap it.
+static void pinModuleResident (const juce::String& fullPath)
+{
+    static juce::StringArray pinned;            // message-thread only; no lock needed
+    if (pinned.contains (fullPath)) return;
+    auto* keep = new juce::DynamicLibrary();     // leaked on purpose: never closed for the process lifetime
+    if (keep->open (fullPath)) pinned.add (fullPath);
+    else delete keep;
+}
+
 } // namespace
 
 // ------------------------------------------------------------------------------------------------
@@ -371,6 +384,9 @@ private:
             return nullptr;
         }
         m.ok = true;
+        // C#/Java host an un-recreatable in-process runtime — keep their DLL resident across offline/online.
+        if (language == "csharp" || language == "java")
+            pinModuleResident (file.getFullPathName());
         Module* raw = mp.get();
         modules[language] = std::move (mp);
         return raw;
