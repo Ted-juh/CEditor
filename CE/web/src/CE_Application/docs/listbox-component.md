@@ -93,4 +93,10 @@ Defer until the single-select MVP lands; it's a meaningful extension, not a twea
 - This is the template for other list/selection-style components; the
   Combobox↔Listbox split (shared data model, divergent renderer/interaction) is
   the pattern.
+- **Preset selector use case:** a Listbox/Combobox with
+  `choiceSource: devicePresets` bound to the DPD preset-recall action becomes a
+  preset browser that recalls patches on selection — see
+  [preset-model.md](./preset-model.md) §"Displaying & selecting presets". The
+  always-visible Listbox is the natural patch browser; the Combobox the compact
+  picker.
 - Reuse `segmentStyle` per-row overrides (as radio groups do) so rows are themable.

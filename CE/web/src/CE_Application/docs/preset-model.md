@@ -52,6 +52,48 @@ Consistent with "Workbench operates, DPD models":
   user banks — **consuming** the DPD preset model so it knows which slots are
   factory (read-only) vs user (writable).
 
+## Displaying & selecting presets — the selector UI
+
+A **preset selector** is a Combobox (compact) or Listbox (always-visible browser)
+whose choices *are* the device's presets; selecting one emits the recall message.
+It is **not a new component** — it's a binding/data-source mode on the existing
+selection components (see [combobox]/[listbox-component.md](./listbox-component.md)).
+
+It maps almost 1:1 onto the existing `Value.rows` model
+(`{ displayText, internalValue, sendValue, receiveValue }`) + the `selectedChoice`
+port (CHOICE/ENUM, `onCommit`):
+- `displayText` = preset name · `sendValue` = slot/program · `receiveValue` =
+  what the device reports when that preset becomes active.
+
+Two pieces are missing to make it *integrated* (vs hand-authored rows):
+
+1. **Recall message in the DPD (device-specific).** "Select preset N" is one of:
+   - **Program Change** (`0xC0`, 0–127),
+   - **Bank Select** (CC0 MSB + CC32 LSB) **+ Program Change**, or
+   - a **SysEx patch-recall** template.
+   Model it as a parameterized **"recall slot S (bank B)" action** in the preset
+   model, compiled like `compileParameterMessage` / `compileRawMidiAction`. The
+   selector just says "recall slot 12"; the DPD emits the right bytes per device.
+
+2. **Dynamic choice source on Combobox/Listbox.** Add
+   `choiceSource: static | devicePresets | factoryCatalog`:
+   - `devicePresets` → rows mirror the live scan (`latestPresetListScan`),
+   - `factoryCatalog` → the shipped factory names (once modeled),
+   - `static` → today's hand-authored rows.
+
+Round-trip & structure:
+- **Inbound feedback** — device changes preset (sends PC) → selector reflects it
+  via `receiveValue` / port feedback / `onParameterReceived` (that inbound event
+  isn't wired in the live runtime yet — see
+  [scripting-runtime-gaps.md](./scripting-runtime-gaps.md)).
+- **Factory/user grouping** — the slot map lets a Listbox section the browser
+  ("Factory A/B", "User") and a Combobox group its dropdown. Writability matters
+  only for *saving*, not *selecting* (ROM banks are selectable).
+
+**Scope note:** this is the **runtime / end-user** path (picking a sound on a
+finished panel, standalone *or* plugin) — distinct from the authoring **Workbench
+Preset Librarian** (managing/saving banks). Same model, two consumers.
+
 ## To-do
 
 - [ ] Formalize `presetBrowser` in `dpd.schema.json` (it's currently informal).
@@ -60,6 +102,10 @@ Consistent with "Workbench operates, DPD models":
 - [ ] Optional: a **factory preset catalog** (shipped names) per profile/family.
 - [ ] Wire `PATCH_NAME` through (Text Input binding + patch-name SysEx emit).
 - [ ] Workbench Preset Librarian reads the slot map; blocks writes to ROM slots.
+- [ ] Add a **preset-recall action** to the model (PC / bank+PC / SysEx template).
+- [ ] Add `choiceSource: static | devicePresets | factoryCatalog` to Combobox /
+  Listbox so a selector can mirror live/factory presets instead of static rows.
+- [ ] Wire inbound preset-change feedback so selectors reflect the device.
 
 ## Notes
 
