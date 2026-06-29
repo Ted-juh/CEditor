@@ -280,6 +280,20 @@ static int ce_find_jvm(ch_t* out, size_t cap, const ch_t* selfdir) {
     return 0;
 }
 
+/* Pin THIS shared library resident for the process lifetime (see the C# shim for the rationale): the
+ * plugin going offline makes the host unload us, but the in-process JVM can't be recreated. */
+static void ce_pin_self(void) {
+#ifdef _WIN32
+    HMODULE self = NULL;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                       (LPCWSTR)(void*)&ce_handler_abi_version, &self);
+#else
+    Dl_info info;
+    if (dladdr((void*)&ce_handler_abi_version, &info) && info.dli_fname)
+        dlopen(info.dli_fname, RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
+#endif
+}
+
 static JNIEnv* ce_env(void) {
     JNIEnv* e = NULL;
     if (!gVm) return NULL;
@@ -303,6 +317,7 @@ CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void) { return CE_ABI_VERSION;
 
 CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state) {
     if (!host || host->abi_version != CE_ABI_VERSION) return -1;
+    ce_pin_self();   /* stay mapped across the plugin going offline/online */
 
     /* The JVM is process-global: created once, reused by every plugin instance (a process can host only
      * ONE JVM, and it cannot be recreated). A second instance reuses the existing JVM + class/methods —

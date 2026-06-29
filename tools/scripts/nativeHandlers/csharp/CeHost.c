@@ -159,11 +159,29 @@ static int ce_find_hostfxr(ch_t* out, size_t cap, const ch_t* selfdir) {
     return 0;
 }
 
+/* Pin THIS shared library so it is never unloaded for the process lifetime. Taking the plugin offline
+ * makes the host dlclose/FreeLibrary us; but we host an in-process CoreCLR that CANNOT be recreated, so
+ * if the DLL unloaded we'd lose the runtime + our cached state and online-again would fail. Pinning
+ * keeps the DLL (and its statics) resident, so online-again reuses the live runtime. Uses the OS's
+ * purpose-built "pin module" mechanisms (Win32 GET_MODULE_HANDLE_EX_FLAG_PIN / glibc RTLD_NODELETE). */
+static void ce_pin_self(void) {
+#ifdef _WIN32
+    HMODULE self = NULL;
+    GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                       (LPCWSTR)(void*)&ce_handler_abi_version, &self);
+#else
+    Dl_info info;
+    if (dladdr((void*)&ce_handler_abi_version, &info) && info.dli_fname)
+        dlopen(info.dli_fname, RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE);
+#endif
+}
+
 /* ----------------------------------------------------------------- CoreCLR bootstrap (once) */
 
 static int ce_bootstrap(void) {
     if (s_boot_tried) return s_boot_ok;
     s_boot_tried = 1;
+    ce_pin_self();   /* keep us mapped across the plugin going offline/online */
 
     ch_t selfdir[4096];
     if (!ce_self_dir(selfdir, 4096)) { fprintf(stderr, "[ce-csharp] cannot locate own module dir\n"); return 0; }
