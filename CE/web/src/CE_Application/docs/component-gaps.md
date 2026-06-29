@@ -38,8 +38,14 @@ but deserves a first-class version.
 
 ## Tier 2 — synth / controller domain
 
-- **XY Pad** `[new]` — 2D control (cutoff/res, vector).
-- **Envelope (ADSR) editor** `[ready-made]` — draggable breakpoints.
+- **XY Pad** `[ready-made]` — 2D control. The custom creator **already has**
+  `xy-pad` behavior + `xy` hit-zone primitives, so ship a set XY pad as a
+  **library preset**, not a new engine. See
+  [ready-made-vs-custom.md](./ready-made-vs-custom.md).
+- **Envelope (ADSR) editor** `[new]` — **genuinely missing** (no envelope editor
+  even in the custom creator; the "breakpoint"/"envelope" code is debugger
+  breakpoints / package envelopes). Needs real new capability — draggable nodes,
+  segment curves. See [ready-made-vs-custom.md](./ready-made-vs-custom.md).
 - **Mod / routing matrix** `[ready-made]` — rows×cols of toggles/values.
 - **Meter / Bargraph / LED indicator** `[new]` — output feedback (also in the
   backlog parking lot).
