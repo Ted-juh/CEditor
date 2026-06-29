@@ -23,7 +23,8 @@ but deserves a first-class version.
 
 - **Knob / Rotary** `[preset]` — the synth staple. The slider family already
   supports circular geometry (`Behavior.geometry` / `startAngle` / `sweepAngle` /
-  `circularDiameter`); mostly a missing palette preset → cheap, high-impact.
+  `circularDiameter`); cheap, high-impact. **Integration spec ready →
+  [knob-component.md](./knob-component.md)** (new `controlType`, 4 files change).
 - **Number field / Stepper** `[new]` — type or increment a numeric value.
 - **Text input** `[new]` — editable text (patch names). `Label` is static-only.
 - **On-screen Piano Keyboard** `[new]` — build/test a controller without hardware.
