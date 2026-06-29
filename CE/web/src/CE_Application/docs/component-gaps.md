@@ -27,6 +27,9 @@ but deserves a first-class version.
   [knob-component.md](./knob-component.md)** (new `controlType`, 4 files change).
 - **Number field / Stepper** `[new]` — type or increment a numeric value.
 - **Text input** `[new]` — editable text (patch names). `Label` is static-only.
+  **Integration spec ready → [text-input-component.md](./text-input-component.md)**
+  (new `controlType`; introduces `valueType:'text'`, first TEXT/PATCH_NAME port,
+  keyboard entry, non-automatable device-bound value path).
 - **On-screen Piano Keyboard** `[new]` — build/test a controller without hardware.
 
 ## Tier 2 — synth / controller domain

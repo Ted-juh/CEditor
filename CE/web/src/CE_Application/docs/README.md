@@ -31,6 +31,7 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 | Component gaps | Survey | 💡 backlog | Missing placeable components for a MIDI/synth editor (Knob, Listbox, Number/Text input, XY pad, ADSR, mod matrix, Meter, Keyboard); many are presets over existing engine support. | [component-gaps.md](./component-gaps.md) |
 | Knob component | Component | 📝 ready to build | New `controlType` reusing the slider family's circular geometry. Integration spec: 4 files change (`componentTypes`, `interactionDefaults`, `componentPorts`, `IconPanel`), ~19 touchpoints unchanged. | [knob-component.md](./knob-component.md) |
 | Listbox component | Component | 📝 spec (single-select MVP) | New `controlType` sharing Combobox's data model but needing a new `ListboxRenderer`. ~1 new file + ~7 edits; multi-select deferred (new port + export strategy). | [listbox-component.md](./listbox-component.md) |
+| Text Input component | Component | 📝 spec (single-line MVP) | New `controlType`; introduces `valueType:'text'`, the first TEXT/PATCH_NAME port, keyboard text entry, and a non-automatable device-bound (SysEx patch-name) value path. | [text-input-component.md](./text-input-component.md) |
 
 ## Parking lot (not yet doc'd — promote when fleshed out)
 
