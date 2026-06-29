@@ -34,6 +34,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
+
+/* Opt-in diagnostics: when the env var CE_HANDLER_LOG is set, append a line to
+ * <temp>/ce_handlers_csharp.log on each ABI call (init/has/dispatch). Off by default (no overhead, no
+ * file). Used to pin down why a handler fires once but not on a later window-open. */
+static void ce_log(const char* fmt, ...) {
+    if (getenv("CE_HANDLER_LOG") == NULL) return;
+    char path[4096];
+#ifdef _WIN32
+    wchar_t tmpW[2048]; DWORD n = GetTempPathW(2048, tmpW);
+    char tmpA[4096]; size_t cv = 0; if (n == 0) return; wcstombs_s(&cv, tmpA, sizeof tmpA, tmpW, _TRUNCATE);
+    snprintf(path, sizeof path, "%sce_handlers_csharp.log", tmpA);
+#else
+    const char* t = getenv("TMPDIR"); if (t == NULL || !*t) t = "/tmp";
+    snprintf(path, sizeof path, "%s/ce_handlers_csharp.log", t);
+#endif
+    FILE* f = fopen(path, "a"); if (!f) return;
+    va_list ap; va_start(ap, fmt); vfprintf(f, fmt, ap); va_end(ap); fputc('\n', f); fclose(f);
+}
 
 #ifdef _WIN32
   #include <windows.h>
@@ -204,21 +223,30 @@ CE_EXPORT uint32_t CE_CALL ce_handler_abi_version(void) {
 }
 
 CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state) {
-    if (!ce_bootstrap()) return -1;
-    return s_init(host, out_state);
+    if (!ce_bootstrap()) { ce_log("init: bootstrap FAILED"); return -1; }
+    int rc = s_init(host, out_state);
+    ce_log("init host=%p -> rc=%d state=%p", (void*)host, rc, out_state ? *out_state : NULL);
+    return rc;
 }
 
 CE_EXPORT int CE_CALL ce_handler_has(void* state, CeStr script_id, CeStr event_id) {
-    if (!s_boot_ok) return 0;
-    return s_has(state, script_id, event_id);
+    if (!s_boot_ok) { ce_log("has: not booted"); return 0; }
+    int r = s_has(state, script_id, event_id);
+    ce_log("has '%.*s'/'%.*s' state=%p -> %d", (int)script_id.len, script_id.ptr ? script_id.ptr : "",
+           (int)event_id.len, event_id.ptr ? event_id.ptr : "", state, r);
+    return r;
 }
 
 CE_EXPORT int CE_CALL ce_handler_dispatch(void* state, CeStr script_id, CeStr event_id,
                                           const CeValue* payload, CeValue* out_result) {
-    if (!s_boot_ok) return -1;
-    return s_disp(state, script_id, event_id, payload, out_result);
+    if (!s_boot_ok) { ce_log("dispatch: not booted"); return -1; }
+    int rc = s_disp(state, script_id, event_id, payload, out_result);
+    ce_log("dispatch '%.*s'/'%.*s' state=%p -> rc=%d", (int)script_id.len, script_id.ptr ? script_id.ptr : "",
+           (int)event_id.len, event_id.ptr ? event_id.ptr : "", state, rc);
+    return rc;
 }
 
 CE_EXPORT void CE_CALL ce_handler_shutdown(void* state) {
+    ce_log("shutdown state=%p", state);
     if (s_boot_ok && s_shut) s_shut(state);
 }
