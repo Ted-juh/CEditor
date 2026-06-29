@@ -88,10 +88,13 @@ if ((es.autoProvisionToolchains ?? true) && (compileNative || embedPython)) {
   const langsToBuild = [...(compileNative ? nativeLangs : []), ...(embedPython ? ['python'] : [])];
   try {
     const lm = await import(pathToFileURL(path.join(repo, 'tools/toolchains/languages.mjs')).href);
-    const missing = [...lm.requiredToolchains(langsToBuild)].filter((t) => !lm.toolchainProvisioned(t));
+    // Only provision for languages that aren't already exportable (e.g. Python via a system python, or a
+    // toolchain already provisioned) — so we never download an unused runtime.
+    const notReady = langsToBuild.filter((l) => !lm.languageInstalled(l));
+    const missing = [...lm.requiredToolchains(notReady)].filter((t) => !lm.toolchainProvisioned(t));
     if (missing.length) {
-      console.log(`Toolchains: panel needs [${langsToBuild.join(', ')}]; installing missing: ${missing.join(', ')} (one-time)...`);
-      lm.provisionForLanguages(langsToBuild);
+      console.log(`Toolchains: panel needs [${notReady.join(', ')}]; installing missing: ${missing.join(', ')} (one-time)...`);
+      lm.provisionForLanguages(notReady);
     }
   } catch (e) {
     console.warn(`  ⚠ On-demand toolchain provisioning failed (${e?.message ?? e}); any language without its toolchain will be skipped.`);

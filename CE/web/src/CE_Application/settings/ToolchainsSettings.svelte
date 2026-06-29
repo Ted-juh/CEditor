@@ -67,8 +67,10 @@
         </div>
         <div class="actions">
           {#if !lang.builtin}
-            {#if lang.installed}
+            {#if lang.installed && lang.removable}
               <button class="btn ghost" disabled={!!busyLang} onclick={() => remove(lang)}>Remove</button>
+            {:else if lang.installed}
+              <span class="hint-sys">system</span>
             {:else}
               <button class="btn" disabled={!!busyLang} onclick={() => install(lang)}>
                 {busyLang === lang.id ? 'Installing…' : 'Install'}
@@ -103,6 +105,7 @@
          background: #3a6df0; color: #fff; cursor: pointer; }
   .btn.ghost { background: transparent; border-color: #444; color: #cbd0d6; }
   .btn:disabled { opacity: 0.5; cursor: default; }
+  .hint-sys { font-size: 10.5px; color: #7f8a99; font-style: italic; }
   .log { margin-top: 14px; max-height: 220px; overflow: auto; background: #0e0f12; color: #b7bdc6;
          font: 11px/1.5 ui-monospace, Menlo, Consolas, monospace; padding: 10px 12px; border-radius: 8px;
          white-space: pre-wrap; }

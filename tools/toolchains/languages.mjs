@@ -13,6 +13,12 @@
 
 import { readFileSync, existsSync, rmSync, readdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+// Does the export host have a usable system `python`? The Windows exporter bundles Python from whatever
+// `python -c ...` resolves (see export-panel-vst3.mjs pythonInfo), NOT from the bundled embeddable — so
+// "is Python available?" means "is there a system python", until the embeddable is wired into the bundler.
+function systemPython() {
+  try { execFileSync('python', ['--version'], { stdio: 'ignore' }); return true; } catch { return false; }
+}
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -41,7 +47,7 @@ export const LANGUAGES = [
   { id: 'javascript', label: 'JavaScript', builtin: true,  toolchains: [],                          exclusive: [],            installed: () => true },
   { id: 'typescript', label: 'TypeScript', builtin: true,  toolchains: [],                          exclusive: [],            installed: () => true },
   { id: 'python',     label: 'Python',     builtin: false, toolchains: ['python-embed'],            exclusive: ['python-embed'],
-    installed: () => !!pythonEmbedDir() },
+    installed: () => systemPython() || !!pythonEmbedDir() },
   { id: 'cpp',        label: 'C++',        builtin: false, toolchains: ['llvm-mingw', 'ninja'],     exclusive: [],
     installed: () => !!cppCompiler() },
   { id: 'csharp',     label: 'C#',         builtin: false, toolchains: ['dotnet', 'llvm-mingw', 'ninja'], exclusive: ['dotnet'],
@@ -71,15 +77,24 @@ export function toolchainProvisioned(id) {
   try { return !!d && readdirSync(d).length > 0; } catch { return false; }
 }
 
-/** Status of every selectable language: installed?, what it needs, and its incremental download size
- *  (sum of its toolchains NOT already provisioned + not satisfied by a system tool). */
+/** Is a language ready to export now (resolver says yes — bundled toolchain, or a system tool like a
+ *  system Python / Visual Studio)? */
+export function languageInstalled(id) {
+  const l = BY_ID.get(normLang(id));
+  return l ? !!l.installed() : false;
+}
+
+/** Status of every selectable language: installed?, what it needs, its incremental download size, and
+ *  whether it's removable (only when we actually provisioned its exclusive toolchain — so a Python that's
+ *  "installed" purely via a SYSTEM python is not offered a meaningless Remove). */
 export function languageStatus() {
   return LANGUAGES.map((l) => {
     const installed = !!l.installed();
     const missing = l.toolchains.filter((t) => !toolchainProvisioned(t));
     const downloadMB = installed ? 0 : missing.reduce((s, t) => s + tcSizeMB(t), 0);
+    const removable = l.exclusive.length > 0 && l.exclusive.some((t) => toolchainProvisioned(t));
     return {
-      id: l.id, label: l.label, builtin: l.builtin, installed,
+      id: l.id, label: l.label, builtin: l.builtin, installed, removable,
       toolchains: l.toolchains, missingToolchains: missing, downloadMB,
     };
   });
