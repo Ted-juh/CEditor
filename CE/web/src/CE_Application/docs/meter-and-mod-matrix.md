@@ -21,12 +21,14 @@ Mostly a **configuration of existing engines**, not a new primitive:
 
 ## Mod Matrix
 
-**Buildable in the custom creator today:**
+**Buildable on existing engines:**
 - Generators already emit grid cells (`rows × columns`, `parts = rows*columns` —
   `sections/CustomGeneratorsEditor.svelte`), so a routing grid is generatable;
   per-cell controls bind via Bindings / ValueChannels.
-- So a "set" mod matrix is a **library preset** (like the XY pad), not a new
-  engine. **Missing piece:** the **binding fan-out** — N×M cells → N×M routing
+- So a "set" Mod Matrix reuses the Generator-grid engine, **shipped as its own
+  palette entry / `controlType`** (chosen directly — not a preset of another
+  component; see [ready-made-vs-custom.md](./ready-made-vs-custom.md)).
+  **Missing piece:** the **binding fan-out** — N×M cells → N×M routing
   parameters.
 
 ## The synthesis — two cross-cutting capabilities
@@ -47,10 +49,13 @@ LCD's bound fields all become cheap presets/configs over existing engines.
 
 ## Recommendation
 
-- **Meter** → `[ready-made]`: read-only slider (analog) or Generator grid (LED),
-  gated on the read-only/value-driven display mode.
-- **Mod matrix** → `[ready-made]`: Generator-grid library preset, gated on
-  fan-out binding.
+- **Meter** → its own palette `controlType` reusing the slider fill engine
+  (analog) or Generator grid (LED); gated on the read-only/value-driven display
+  mode.
+- **Mod matrix** → its own palette `controlType` reusing the Generator-grid
+  engine; gated on fan-out binding.
+- Both are **separate components** (chosen directly), reusing engines — not
+  presets of Slider/etc.
 - **Prioritize the two cross-cutting capabilities** as their own backlog items —
   they unlock multiple components (Meter, Mod matrix, Envelope, LCD) at once.
 

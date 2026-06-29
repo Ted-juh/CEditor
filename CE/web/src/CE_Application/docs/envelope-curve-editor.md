@@ -35,9 +35,19 @@ editor over a 2D area with per-segment curve shapes** — differing only in:
 - looping / tempo-sync,
 - how points map to parameters.
 
-So the "ready-made but flexible" answer is **one Envelope/Curve editor** whose
-**presets are** ADSR, AR, DAHDSR, LFO-shape, velocity-curve, MSEG, step. Build
-the breakpoint engine once; ship the presets.
+So the "ready-made but flexible" answer is **one breakpoint engine** reused
+across these. But apply the shared-engine-separate-components principle
+([ready-made-vs-custom.md](./ready-made-vs-custom.md)):
+
+- **Envelope shapes are genuinely one category** (ADSR / AR / AD / DAHDSR / MSEG /
+  step are all "an envelope") → one **Envelope** component with these as internal
+  presets. ✅ legitimate preset use.
+- **LFO** and **transfer/response curve** are arguably *different kinds* of
+  control (cyclic modulator; input→output map) even though they share the
+  breakpoint engine → lean toward **separate palette components** (LFO, Curve)
+  that reuse the same engine, rather than folding them into "Envelope".
+
+Build the breakpoint engine once; decide grouping by category, not by engine.
 
 ## Reusable vs genuinely new
 

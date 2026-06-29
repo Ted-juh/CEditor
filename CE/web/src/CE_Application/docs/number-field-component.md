@@ -26,46 +26,39 @@ The existing **Range** control is a spinbox, not a min–max slider:
 2. **No bare (stepper-less) variant** in the palette.
 3. **Default size** is 180×40 (wide for a number box).
 
-## Recommended path — Range presets (cheap, like the Knob)
+## Recommended path — a `Number` controlType reusing the Range engine
 
-Reuse Range entirely; add palette presets + clearer labels.
+Per the **shared-engine-separate-components** principle
+([ready-made-vs-custom.md](./ready-made-vs-custom.md)), Number is its **own
+palette entry / `controlType`**, chosen directly — not a preset toggled inside
+Range. It *reuses* the Range engine under the hood.
 
-### Files to change (2)
-
-1. **`layout/IconPanel.svelte`** — add palette entries:
-   - **"Number"** → Range, compact (~90×34), steppers on.
-   - **"Number (plain)"** → same, with steppers hidden (see below).
-   - Consider relabeling the existing Range entry to "Number / Spinbox" so it's
-     discoverable.
-2. **`models/componentTypes.js`** *(optional)* — if presets need distinct
-   default overrides, add `Number` / `NumberPlain` preset entries that reuse the
-   Range sections with:
-   - `Transform: { width: 90, height: 34 }`,
-   - for the plain variant, `Parts.decrement.visible = false` +
-     `Parts.increment.visible = false` (the renderer already honors
-     `part.visible !== false`).
+### Files to change
+1. **`models/componentTypes.js`** — add a `Number` `controlType`: reuse the Range
+   sections, `Transform: { width: 90, height: 34 }`. A `showSteppers` Behavior
+   flag (default on) hides the `decrement`/`increment` parts for a bare field —
+   that's an in-category preset, fine.
+2. **`models/interactionDefaults.js`** — `Number` branch: same spinbox behavior
+   as Range (or trimmed to valueField-only when steppers off).
+3. **`models/componentPorts.js`** — `Number`: same `value` port as Range.
+4. **`layout/IconPanel.svelte`** — a "Number" palette entry (own button). Also
+   consider relabeling **Range → "Number / Spinbox"** for discoverability, since
+   that's what it actually is.
 
 ### Reused — no change
 
 `InteractivePartRenderer.svelte` (editable input), `rangeBehavior.js`,
 `CanvasControl.svelte` (parts rendering), `PanelPreviewSurface.svelte` (range
-handlers), `componentPorts.js` (`value` port), `exportParameters.js` (numeric).
+handlers), `exportParameters.js` (numeric).
 
-## Alternative — a dedicated `Number` controlType
-
-Only if the shared-with-Range behavior becomes awkward. A new `Number` type
-reusing the same machinery but with a **valueField-only** parts set and a
-numeric-only behavior (drop drag/track/wheel cruft), ~80×34 default. Files:
-`componentTypes.js`, `interactionDefaults.js` (Number branches for behavior /
-parts / states), `componentPorts.js`, optional `NumberEditor.svelte`. Cleaner
-palette semantics, slightly more code.
-
-**Recommendation:** start with **Range presets**; promote to a controlType only
-if needed.
+> Note: steppers on/off *is* a legitimate within-component preset (both are "a
+> number field"). What we avoid is making Number a hidden mode of the *Range*
+> component — it's its own entry.
 
 ## Verification checklist
 
-1. Insert "Number" → compact box with +/- steppers; "Number (plain)" → bare box.
+1. Insert "Number" from the palette → compact box with +/- steppers;
+   `showSteppers: false` → bare box.
 2. Type a value + Enter, or arrow/page/wheel/steppers → value changes, snaps to
    step, clamps to min/max.
 3. Bind the `value` port to a numeric device parameter → two-way works.

@@ -4,7 +4,26 @@
 > letting users build it in the custom creator. Part of the
 > [panel parts backlog](./README.md).
 
-## The principle
+## Principle: shared engine, separate components
+
+Code reuse and user-facing identity are **different decisions**:
+
+- **One engine** (slider / breakpoint / generator code) is an implementation
+  detail — reuse freely.
+- **Component identity is user-facing** — each distinct control is its **own
+  palette/menu entry, chosen directly**. Never reach a control by inserting a
+  different component and flipping a preset/mode (no "Slider → circular = Knob",
+  no "Range → hide steppers = Number"). The sidebar already lets users pick
+  components directly; keep it that way.
+- **Collapse variants into one component with internal presets ONLY when they
+  genuinely form one category** — e.g. envelope shapes (ADSR / AR / DAHDSR) are
+  all "an envelope"; button subtypes are all "a button". Different *kinds* of
+  control are not presets of each other.
+
+So Knob, Number, XY Pad, Meter, Mod matrix are each their own `controlType` /
+palette entry that *reuses* a shared engine — not a preset of Slider/Range/etc.
+
+## When ready-made beats the custom creator
 
 The custom component creator is **maximally flexible** but has a steep floor
 (behaviors, hit zones, value channels, generators, links, parts). A **set
@@ -32,10 +51,12 @@ The custom creator already has first-class XY support:
 - a ready `xyPad` behavior module (`utils/customComponentFactory.js`),
 - an `xy` hit-zone geometry (dual-axis "face").
 
-So a "set XY Pad" needs **no new engine** — author one good XY pad in the custom
-creator, save it to the library, and ship it as a palette default. Benefit over
-the raw custom route: speed, correct X/Y ports out of the box, discoverability,
-central upgrades.
+So a "set XY Pad" needs **no new engine** — it reuses the existing xy-pad
+primitives. But it must ship as **its own palette entry** ("XY Pad", chosen
+directly), not as a preset the user toggles inside another component. Implement
+it as its own `controlType` (or a library component surfaced directly in the
+palette) that reuses the xy-pad engine. Benefit over the raw custom route:
+speed, correct X/Y ports out of the box, discoverability, central upgrades.
 
 ### ADSR / Envelope — genuinely missing (not a wrapper)
 There is **no envelope editor anywhere**. The `breakpoint` references are
