@@ -232,6 +232,7 @@ static const JNINativeMethod kNatives[] = {
 /* ----------------------------------------------------------------- JVM bootstrap */
 
 typedef jint (JNICALL *CreateJavaVM_t)(JavaVM**, void**, void*);
+typedef jint (JNICALL *GetCreatedJavaVMs_t)(JavaVM**, jsize, jsize*);
 
 static int ce_self_dir(ch_t* out, size_t cap) {
 #ifdef _WIN32
@@ -316,6 +317,7 @@ CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state
         if (!jvmLib) { fprintf(stderr, "[ce-java] cannot load libjvm\n"); return -2; }
         CreateJavaVM_t createVm = (CreateJavaVM_t)ce_dlsym(jvmLib, "JNI_CreateJavaVM");
         if (!createVm) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM not found\n"); return -2; }
+        GetCreatedJavaVMs_t getCreatedVms = (GetCreatedJavaVMs_t)ce_dlsym(jvmLib, "JNI_GetCreatedJavaVMs");
 
         /* classpath = <selfdir>/ce_handlers_java.jar */
         char cp[5000];
@@ -337,7 +339,20 @@ CE_EXPORT int CE_CALL ce_handler_init(const CeHostVtable* host, void** out_state
         args.ignoreUnrecognized = JNI_FALSE;
 
         JavaVM* vm = NULL; JNIEnv* env = NULL;
-        if (createVm(&vm, (void**)&env, &args) != JNI_OK || !env) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM failed\n"); return -2; }
+        // A process can host only ONE JVM and it cannot be recreated. If this module was unloaded and
+        // reloaded (e.g. all plugin instances were removed, dropping the DLL refcount, then a new one was
+        // added) the original JVM is still alive in the process — recover and reuse it instead of trying
+        // to create a second one (which would fail). NativeHandlerEngine::reset() now keeps this module
+        // resident to avoid the unload in the first place; this is the belt-and-suspenders path.
+        jsize nvms = 0;
+        if (getCreatedVms && getCreatedVms(&vm, 1, &nvms) == JNI_OK && nvms > 0 && vm != NULL) {
+            if ((*vm)->GetEnv(vm, (void**)&env, JNI_VERSION_1_8) != JNI_OK)
+                (*vm)->AttachCurrentThread(vm, (void**)&env, NULL);
+        } else {
+            vm = NULL; env = NULL;
+            if (createVm(&vm, (void**)&env, &args) != JNI_OK || !env) { fprintf(stderr, "[ce-java] JNI_CreateJavaVM failed\n"); return -2; }
+        }
+        if (!env) { fprintf(stderr, "[ce-java] no JNIEnv after VM bring-up\n"); return -2; }
 
         jclass cls = (*env)->FindClass(env, "CeRuntime");
         if (!cls) { (*env)->ExceptionClear(env); fprintf(stderr, "[ce-java] CeRuntime class not found on classpath\n"); return -2; }

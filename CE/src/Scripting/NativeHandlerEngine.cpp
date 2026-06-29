@@ -273,14 +273,30 @@ public:
 
     void reset() override
     {
-        for (auto& kv : modules)
+        // C#/Java host an IN-PROCESS runtime (CoreCLR via hostfxr, JVM via JNI) that CANNOT be torn down
+        // and recreated in the same process. reset() runs on every reload (e.g. the panel window
+        // closing/reopening), so closing those modules' library would drop the DLL refcount, lose the
+        // shim's handle to the still-alive runtime, and make the NEXT load's init fail (JNI_CreateJavaVM
+        // refuses a second VM) — which is exactly why C#/Java fired on the first window-open but went
+        // silent on the second. So we keep the hosted-runtime modules RESIDENT + initialised for the
+        // process lifetime (their handlers are compiled-in and immutable anyway); ensureModule's
+        // short-circuit reuses them on the next load. Only the runtime-less modules (C++) are torn down.
+        for (auto it = modules.begin(); it != modules.end(); )
         {
-            auto& m = kv.second;
-            if (m == nullptr) continue;
-            if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
-            m->lib.close();
+            const bool keepResident = (it->first == "csharp" || it->first == "java");
+            if (keepResident && it->second != nullptr && it->second->ok)
+            {
+                ++it; // leave loaded + inited; reused via ensureModule on the next loadScript
+                continue;
+            }
+            auto& m = it->second;
+            if (m != nullptr)
+            {
+                if (m->ok && m->shutdown != nullptr && m->state != nullptr) m->shutdown (m->state);
+                m->lib.close();
+            }
+            it = modules.erase (it);
         }
-        modules.clear();
         scriptLang.clear();
     }
 
