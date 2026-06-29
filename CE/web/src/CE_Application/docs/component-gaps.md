@@ -48,9 +48,12 @@ but deserves a first-class version.
   envelope primitives today, but the gradient stop-editor + flow-path bezier
   editing are reusable; the real lift is multi-parameter (per-node) binding. See
   [envelope-curve-editor.md](./envelope-curve-editor.md).
-- **Mod / routing matrix** `[ready-made]` — rows×cols of toggles/values.
-- **Meter / Bargraph / LED indicator** `[new]` — output feedback (also in the
-  backlog parking lot).
+- **Mod / routing matrix** `[ready-made]` — Generator grid (rows×cols) is
+  buildable in the custom creator today → ship as a library preset; real lift is
+  per-cell **fan-out binding**. See [meter-and-mod-matrix.md](./meter-and-mod-matrix.md).
+- **Meter / Bargraph / LED indicator** `[ready-made]` — analog = read-only
+  slider (value→`bodyTrackFill`); LED = Generator grid. Gated on a **read-only /
+  value-driven display mode**. See [meter-and-mod-matrix.md](./meter-and-mod-matrix.md).
 - **Step sequencer / drum-pad grid** `[ready-made]` — partly covered by the
   `Grid` section + the custom arpeggiator.
 - **Pitch / Mod wheel** `[preset]` — a slider preset.
@@ -66,6 +69,19 @@ but deserves a first-class version.
 - **Image display** `[preset]` — `Icon` is a section, not a standalone placeable.
 - **Progress bar** `[preset]`, **scroll area** `[new]`, **shape primitives**
   (partly present via the designer's vector shapes).
+
+## Two cross-cutting capabilities (higher leverage than any widget)
+
+Investigating the synth tier surfaced two foundational capabilities that unlock
+*multiple* components at once (see
+[meter-and-mod-matrix.md](./meter-and-mod-matrix.md)):
+
+1. **Value-driven display / read-only output mode** — shows an inbound device
+   value instead of being user-driven. Unlocks **Meter** + the **LCD** fields.
+2. **Multi-parameter / fan-out binding** — one component bound to many device
+   params. Unlocks the **Envelope** (per-node) + **Mod matrix** (per-cell).
+
+Building these two is higher-leverage than widget-by-widget work.
 
 ## Recommended first picks
 
