@@ -28,6 +28,8 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 | JUCE capabilities | Survey | 💡 backlog | Broad sweep of JUCE classes/modules a no-audio MIDI editor could use (OSC, MIDI 2.0/UMP, Bluetooth MIDI, ThreadPool, ZipFile, crypto, ValueTreeSynchroniser, …); most live in already-linked modules. | [juce-capabilities.md](./juce-capabilities.md) |
 | MIDI Workbench | Workspace | 🟡 mostly-plumbed | First-class `tabType: 'midi'` workspace, 3 tabs: Connections · Console (monitor+test+learn) · Dumps (analyzer+presets). Foundational live-MIDI session the DPD derives from. Backend (~70%) exists; gap is the unified UI. | [midi-workbench.md](./midi-workbench.md) |
 
+| Component gaps | Survey | 💡 backlog | Missing placeable components for a MIDI/synth editor (Knob, Listbox, Number/Text input, XY pad, ADSR, mod matrix, Meter, Keyboard); many are presets over existing engine support. | [component-gaps.md](./component-gaps.md) |
+
 ## Parking lot (not yet doc'd — promote when fleshed out)
 
 Ideas that came up while designing the above and deserve their own row/doc later:

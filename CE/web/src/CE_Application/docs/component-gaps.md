@@ -1,0 +1,60 @@
+# Component Catalog — Gaps
+
+> Status: **survey / backlog.** Placeable panel components that exist vs are
+> missing, for a MIDI control-surface / synth editor. Part of the
+> [panel parts backlog](./README.md).
+
+## Exists today
+
+From `models/componentTypes.js` (`COMPONENT_TYPES`) + the insert palette
+(`layout/IconPanel.svelte`):
+
+- **Buttons:** Momentary, Toggle, Radio Group, Cyclic, Timed, One-Shot
+- **Selection:** Combobox
+- **Value:** Range, Slider
+- **Layout / static:** Label, Container, Background, TestBox
+- **Extensible:** CustomComponent (+ LCD Display, in design)
+
+Tags below: `[new]` genuinely new · `[preset]` engine already supports it, only a
+palette preset is missing · `[ready-made]` buildable via CustomComponent today
+but deserves a first-class version.
+
+## Tier 1 — core, surprising they're absent
+
+- **Knob / Rotary** `[preset]` — the synth staple. The slider family already
+  supports circular geometry (`Behavior.geometry` / `startAngle` / `sweepAngle` /
+  `circularDiameter`); mostly a missing palette preset → cheap, high-impact.
+- **Number field / Stepper** `[new]` — type or increment a numeric value.
+- **Text input** `[new]` — editable text (patch names). `Label` is static-only.
+- **On-screen Piano Keyboard** `[new]` — build/test a controller without hardware.
+
+## Tier 2 — synth / controller domain
+
+- **XY Pad** `[new]` — 2D control (cutoff/res, vector).
+- **Envelope (ADSR) editor** `[ready-made]` — draggable breakpoints.
+- **Mod / routing matrix** `[ready-made]` — rows×cols of toggles/values.
+- **Meter / Bargraph / LED indicator** `[new]` — output feedback (also in the
+  backlog parking lot).
+- **Step sequencer / drum-pad grid** `[ready-made]` — partly covered by the
+  `Grid` section + the custom arpeggiator.
+- **Pitch / Mod wheel** `[preset]` — a slider preset.
+
+## Tier 3 — general UI / layout
+
+- **Listbox** `[new]` — always-visible scrollable list; natural preset/patch
+  browser (distinct from the Combobox dropdown).
+- **Tabbed container / pages** `[new]` — organize a panel into pages.
+- **Group / Frame with title** `[preset]` — `Container` without titled chrome.
+- **Image display** `[preset]` — `Icon` is a section, not a standalone placeable.
+- **Progress bar** `[preset]`, **scroll area** `[new]`, **shape primitives**
+  (partly present via the designer's vector shapes).
+
+## Recommended first picks
+
+1. **Knob** — engine-ready, just a preset; biggest perceived gap.
+2. **Data-entry trio: Listbox · Number field · Text input** — basic and missing.
+3. **Synth-specific (make it feel purpose-built): XY Pad · ADSR · Mod matrix ·
+   Meter** — the ones that distinguish CEditor from a generic UI builder.
+
+## Add ideas below
+<!-- New component gaps go here. -->
