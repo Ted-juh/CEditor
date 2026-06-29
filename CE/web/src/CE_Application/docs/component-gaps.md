@@ -25,7 +25,11 @@ but deserves a first-class version.
   supports circular geometry (`Behavior.geometry` / `startAngle` / `sweepAngle` /
   `circularDiameter`); cheap, high-impact. **Integration spec ready →
   [knob-component.md](./knob-component.md)** (new `controlType`, 4 files change).
-- **Number field / Stepper** `[new]` — type or increment a numeric value.
+- **Number field / Stepper** `[preset]` — **largely already exists**: the Range
+  control is a spinbox (type-in + steppers via `rangeBehavior.js`). The gap is
+  naming/discoverability + a bare variant. **Spec →
+  [number-field-component.md](./number-field-component.md)** (Range presets,
+  ~2 files).
 - **Text input** `[new]` — editable text (patch names). `Label` is static-only.
   **Integration spec ready → [text-input-component.md](./text-input-component.md)**
   (new `controlType`; introduces `valueType:'text'`, first TEXT/PATCH_NAME port,
