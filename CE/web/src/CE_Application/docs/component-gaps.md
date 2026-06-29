@@ -42,10 +42,12 @@ but deserves a first-class version.
   `xy-pad` behavior + `xy` hit-zone primitives, so ship a set XY pad as a
   **library preset**, not a new engine. See
   [ready-made-vs-custom.md](./ready-made-vs-custom.md).
-- **Envelope (ADSR) editor** `[new]` — **genuinely missing** (no envelope editor
-  even in the custom creator; the "breakpoint"/"envelope" code is debugger
-  breakpoints / package envelopes). Needs real new capability — draggable nodes,
-  segment curves. See [ready-made-vs-custom.md](./ready-made-vs-custom.md).
+- **Envelope / Curve editor** `[new]` — ADSR is just one preset of a big family
+  (AR/AD/DAHDSR/MSEG/LFO-shape/step/velocity & response curves). The flexible
+  answer is **one breakpoint-curve engine + presets**, not N fixed widgets. No
+  envelope primitives today, but the gradient stop-editor + flow-path bezier
+  editing are reusable; the real lift is multi-parameter (per-node) binding. See
+  [envelope-curve-editor.md](./envelope-curve-editor.md).
 - **Mod / routing matrix** `[ready-made]` — rows×cols of toggles/values.
 - **Meter / Bargraph / LED indicator** `[new]` — output feedback (also in the
   backlog parking lot).
