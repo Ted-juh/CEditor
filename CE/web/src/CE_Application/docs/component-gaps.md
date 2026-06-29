@@ -43,7 +43,9 @@ but deserves a first-class version.
 ## Tier 3 — general UI / layout
 
 - **Listbox** `[new]` — always-visible scrollable list; natural preset/patch
-  browser (distinct from the Combobox dropdown).
+  browser (distinct from the Combobox dropdown). **Integration spec ready →
+  [listbox-component.md](./listbox-component.md)** (new `controlType` + renderer;
+  ~1 new file + ~7 edits; single-select MVP, multi-select later).
 - **Tabbed container / pages** `[new]` — organize a panel into pages.
 - **Group / Frame with title** `[preset]` — `Container` without titled chrome.
 - **Image display** `[preset]` — `Icon` is a section, not a standalone placeable.
