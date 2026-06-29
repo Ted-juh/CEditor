@@ -215,6 +215,11 @@ A patch librarian + device backup:
 - **Save / restore banks** to disk as `.syx`.
 - **Whole-device backup & restore** (capture all dumps to a file, restore later).
 
+> Consumes the DPD **preset model** (factory vs user slot ranges, writability) —
+> see [preset-model.md](./preset-model.md). That model is a gap today: the
+> profile has a `presetBrowser` scan recipe but no factory/user slot map, so the
+> librarian can't yet know which slots are read-only ROM vs writable user.
+
 ## What else — candidate sub-tabs (ranked)
 
 1. **Device snapshot / backup & restore** — one-click full backup to file
