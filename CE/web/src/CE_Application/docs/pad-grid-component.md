@@ -30,10 +30,10 @@ the performance-triggering domain — one component, several *pad modes*:
   `Grid` section. Reuse for the pad layout.
 - **Note emit:** reuse the arpeggiator note model + MIDI helpers
   (`utils/customComponentArpeggiator.js`) + the runtime MIDI-out path.
-- **Velocity:** from click **position** (e.g. y within the pad), **pressure**
-  (where supported), or **fixed**; optional accent.
+- **Velocity & expression:** see the dedicated section below (radial/positional
+  velocity, zones, rolls, held expression).
 - **Pad behavior:** momentary · toggle · one-shot; **choke groups** (one pad in a
-  group silences the others); latch; optional **roll/repeat** (Timer-driven).
+  group silences the others); latch.
 - **Banks / pages:** a bank selector remaps the whole grid's assignment → one grid
   covers many pad sets (4 drum kits, octave shifts, scene pages).
 - **Pad LED feedback:** incoming MIDI lights pads (Launchpad-style) — this is the
@@ -42,6 +42,36 @@ the performance-triggering domain — one component, several *pad modes*:
 - **Rendering/styling:** per-pad label / color / icon via per-cell overrides
   (like radio-group `segmentStyle`); pressed/active/lit states.
 
+## Velocity & expression (per-pad)
+
+Turn a flat pad into an **expressive surface** — hit position drives dynamics.
+All from the pointer/touch point + pad geometry (no audio needed).
+
+- **Velocity source** (`velocityMode`):
+  - `fixed` — constant.
+  - `vertical` — y within the pad (top/bottom = loud/soft).
+  - **`radial`** — distance from the pad **center**: center = loud → edge = soft,
+    or **inverted** (edge = loud). Mimics striking a real drum head. Just
+    `distance(hit, center)` normalized over the pad radius.
+  - `pressure` — where the input supports it.
+  - plus a **velocity curve** (linear / exp / log) applied to the source.
+- **Positional zones** (optional, real-drum-like): split a pad into **center vs
+  rim** (or more zones) → different note and/or velocity per zone (snare head vs
+  rim-shot, bell vs bow). Radial position selects the zone.
+- **Roll / retrigger:** hold a pad → **repeat** the note at a rate (Timer-driven).
+  - **Roll dynamics:** constant · crescendo · decrescendo · **follow position**
+    (move toward center mid-roll → louder).
+  - **Roll rate** can be fixed, or driven by **radial position / pressure** (closer
+    to center / harder = faster roll) — expressive buzz-roll.
+  - *Caveat:* the timer is wall-clock ms (no tempo-sync — see
+    [timer-system.md](./timer-system.md)); tempo-locked rolls need a clock source.
+- **Held expression** (optional): while a pad is held, map position/pressure to
+  **aftertouch** or a **CC** (continuous), so a held pad keeps modulating.
+
+These are per-pad, configurable, and default off (a plain pad just sends a fixed
+or vertical velocity). Feasibility: radial = simple distance math; zones = radius
+threshold; roll = Timer retrigger; held expression = pointer-move → CC/AT.
+
 ## Where (integration)
 
 - **controlType:** `PadGrid`; **palette:** its own entry (generative-MIDI family).
@@ -49,17 +79,21 @@ the performance-triggering domain — one component, several *pad modes*:
   trigger-action binding · shared key/scale context · Timer (roll).
 - **Files to change:**
   - `models/componentTypes.js` — `PadGrid` entry.
-  - `models/interactionDefaults.js` — pad behavior (mode/velocity/choke/banks) +
-    cell generation.
+  - `models/interactionDefaults.js` — pad behavior (mode / velocity & expression /
+    choke / banks) + cell generation.
   - Generators / `Grid` — the cell layout.
   - `models/componentPorts.js` — per-pad **note/trigger outputs** (generative /
     fan-out), a **bank-select input**, optional per-pad **lit input**
-    (device→pad LED).
+    (device→pad LED), and (for held expression) **aftertouch / CC outputs**.
   - `layout/IconPanel.svelte` — "Pad Grid" palette button.
-  - `editor/PanelPreviewSurface.svelte` — pad press/velocity/emit + choke + lit.
+  - `editor/PanelPreviewSurface.svelte` — pad press / velocity-from-position /
+    emit + choke + lit + roll retrigger + held expression.
 - **Schema:** `padMode` (drum/melodic/trigger), `velocityMode`
-  (position/pressure/fixed), `behavior` (momentary/toggle/oneShot), `chokeGroup`,
-  `layout` (manual/chromatic/scale/isomorphic), `keySource`, banks.
+  (fixed/vertical/**radial**/pressure) + `velocityInvert` + `velocityCurve`,
+  `zones` (center/rim → note+velocity), `roll` (`{ enabled, rate, rateSource,
+  dynamics }`), `heldExpression` (`{ target: none/aftertouch/cc, source }`),
+  `behavior` (momentary/toggle/oneShot), `chokeGroup`, `layout`
+  (manual/chromatic/scale/isomorphic), `keySource`, banks.
 
 ## When
 
@@ -81,8 +115,9 @@ The versatile PadGrid leans on all three enablers from the backlog:
 
 ## Properties (editor)
 
-rows/cols · `padMode` · per-pad assignment (note / trigger / label / color /
-velocity) · `velocityMode` · pad `behavior` + `chokeGroup` + roll · `layout` +
+rows/cols · `padMode` · per-pad assignment (note / trigger / label / color) ·
+**velocity & expression** (`velocityMode` incl. radial + invert + curve · zones ·
+roll + dynamics · held expression) · pad `behavior` + `chokeGroup` · `layout` +
 `keySource` (shared key/scale) · banks/pages · styling.
 
 ## States
@@ -93,6 +128,8 @@ pad pressed · active/held · **lit** (from incoming note) · focused · disable
 
 1. Insert → grid of pads (configurable rows×cols).
 2. Drum mode: press → note-on with velocity; release → note-off; choke groups cut.
+   Radial velocity: hits near center are louder (or inverted); zones swap
+   note/velocity center vs rim. Hold → roll at rate; dynamics ramp the velocity.
 3. Melodic mode: scale-locked layout plays in the panel's key; change key → re-maps.
 4. Trigger mode: pad fires CC/PC/SysEx/action.
 5. Banks: switching bank remaps the grid.

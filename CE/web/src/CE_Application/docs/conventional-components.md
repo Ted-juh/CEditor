@@ -35,7 +35,9 @@ patch snapshot to each corner → morph the whole device state** (Snapshot-Morph
 **versatile** grid of pads (rows×cols) reusing the generator-grid engine +
 note-emit substrate. Pad modes: **drum** (note+velocity), **melodic/scale-locked**
 (shared key/scale, isomorphic layouts), **trigger** (CC/PC/SysEx/action). Plus
-velocity modes, choke groups, banks, and **pad-LED feedback**. Separate component
+**expressive velocity** (radial center↔edge, zones, curve), **rolls** (rate +
+dynamics), held expression (aftertouch/CC), choke groups, banks, and **pad-LED
+feedback**. Separate component
 from the Mod matrix / Step sequencer (same engine, different kinds). Touches all
 three enablers: note-emit · fan-out binding · read-only display.
 
