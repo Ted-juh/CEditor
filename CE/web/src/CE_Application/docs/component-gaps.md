@@ -69,6 +69,11 @@ inside a *different* component.
 - **Pitch / Mod wheel** `[engine-reuse]` — its own component reusing the slider
   engine (spring-return for pitch).
 
+> Tiers 1–3 items not given their own doc are spec'd as mini-specs in
+> [remaining-components.md](./remaining-components.md) (Keyboard, Step Sequencer,
+> Pitch/Mod wheel, Tabbed container, Group/Frame, Scroll area, Progress bar,
+> Image, Shape primitives).
+
 ## Tier 3 — general UI / layout
 
 - **Listbox** `[new]` — always-visible scrollable list; natural preset/patch
