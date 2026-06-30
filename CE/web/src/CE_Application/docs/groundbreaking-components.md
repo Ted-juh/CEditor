@@ -20,6 +20,12 @@ not DSP:
 - **Dump Analyzer** (see [midi-workbench.md](./midi-workbench.md)) → structural
   diffing.
 
+> Each now has a full design doc: **Macro & Snapshot-Morph**
+> ([macro-and-morph.md](./macro-and-morph.md)) · **Node-graph**
+> ([node-graph.md](./node-graph.md)) · **Auto-Panel** ([auto-panel.md](./auto-panel.md))
+> · **Patch Diff/Compare** ([patch-diff.md](./patch-diff.md)) · **Randomizer**
+> ([randomizer.md](./randomizer.md)).
+
 ## The ideas
 
 ### 1. Macro control → Snapshot Morph (headline)
