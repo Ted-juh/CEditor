@@ -72,6 +72,41 @@ These are per-pad, configurable, and default off (a plain pad just sends a fixed
 or vertical velocity). Feasibility: radial = simple distance math; zones = radius
 threshold; roll = Timer retrigger; held expression = pointer-move → CC/AT.
 
+## Fire modes / shot patterns (per-pad)
+
+Everything a single press can produce *over time*. Modeled as one **fire pattern**
+= an ordered list of events `{ timeOffset, velocity (or curve-driven), pitchOffset,
+probability }` + repeat/loop settings — driven by the [Timer](./timer-system.md),
+with velocity shaping optionally from the **breakpoint-curve engine**
+([envelope-curve-editor.md](./envelope-curve-editor.md)).
+
+Because these are all "how a press fires" (one category), they ship as **in-pad
+presets**, not separate components:
+
+- **Single** — one note (default).
+- **Flam / Drag / Ruff** — 2 / 3 / N rapid grace-hits before the main note
+  (drum rudiments); configurable spacing + velocity ramp.
+- **N-shot (double / triple…)** — N evenly-spaced hits on one press.
+- **Ratchet / Burst** — a fixed count of subdivided hits (sequencer-style).
+- **Roll** — sustained repeat while held (rate fixed or radial/pressure-driven).
+- **Crescendo / Decrescendo / Swell** — a multi-hit run whose velocity **ramps**
+  (up / down / up-then-down) via a curve over a duration.
+- **Strum / Spread** — stagger the notes of a chord (reuses the
+  [chord generator](./chord-generator.md)).
+- **Phrase** — a short note sequence/pattern per press (reuses the arpeggiator).
+- **Round-robin** — successive presses cycle through alternate notes (realism).
+- **Stutter / Gate** — rapid on/off gating while held.
+
+**Modifiers (any pattern):** humanize (timing/velocity jitter) · per-hit
+**probability** · accent pattern · rate (ms — wall-clock; tempo-lock needs a clock
+source). All default to **Single**.
+
+> This makes the pad fire pattern a tiny per-pad event generator — and the
+> convergence point of nearly every engine: **Timer** (timing), **note-emit**,
+> **breakpoint-curve** (velocity ramps), **chord** (strum), **arpeggiator**
+> (phrase). One more reason it's the best proof-of-value for the shared
+> foundations.
+
 ## Where (integration)
 
 - **controlType:** `PadGrid`; **palette:** its own entry (generative-MIDI family).
@@ -90,8 +125,10 @@ threshold; roll = Timer retrigger; held expression = pointer-move → CC/AT.
     emit + choke + lit + roll retrigger + held expression.
 - **Schema:** `padMode` (drum/melodic/trigger), `velocityMode`
   (fixed/vertical/**radial**/pressure) + `velocityInvert` + `velocityCurve`,
-  `zones` (center/rim → note+velocity), `roll` (`{ enabled, rate, rateSource,
-  dynamics }`), `heldExpression` (`{ target: none/aftertouch/cc, source }`),
+  `zones` (center/rim → note+velocity), `firePattern` (`{ preset:
+  single/flam/drag/nShot/ratchet/roll/crescendo/swell/strum/phrase/roundRobin/
+  stutter, events[], rate, rateSource, velocityCurve, humanize, probability }`),
+  `heldExpression` (`{ target: none/aftertouch/cc, source }`),
   `behavior` (momentary/toggle/oneShot), `chokeGroup`, `layout`
   (manual/chromatic/scale/isomorphic), `keySource`, banks.
 
@@ -117,8 +154,9 @@ The versatile PadGrid leans on all three enablers from the backlog:
 
 rows/cols · `padMode` · per-pad assignment (note / trigger / label / color) ·
 **velocity & expression** (`velocityMode` incl. radial + invert + curve · zones ·
-roll + dynamics · held expression) · pad `behavior` + `chokeGroup` · `layout` +
-`keySource` (shared key/scale) · banks/pages · styling.
+held expression) · **fire pattern** (single/flam/N-shot/ratchet/roll/crescendo/
+swell/strum/phrase/round-robin/stutter + humanize/probability) · pad `behavior` +
+`chokeGroup` · `layout` + `keySource` (shared key/scale) · banks/pages · styling.
 
 ## States
 
@@ -129,11 +167,14 @@ pad pressed · active/held · **lit** (from incoming note) · focused · disable
 1. Insert → grid of pads (configurable rows×cols).
 2. Drum mode: press → note-on with velocity; release → note-off; choke groups cut.
    Radial velocity: hits near center are louder (or inverted); zones swap
-   note/velocity center vs rim. Hold → roll at rate; dynamics ramp the velocity.
-3. Melodic mode: scale-locked layout plays in the panel's key; change key → re-maps.
-4. Trigger mode: pad fires CC/PC/SysEx/action.
-5. Banks: switching bank remaps the grid.
-6. Pad-LED: incoming notes light the matching pads.
+   note/velocity center vs rim.
+3. Fire patterns: a press fires single / flam / N-shot / ratchet; hold → roll;
+   crescendo/swell ramps velocity; strum spreads a chord; round-robin cycles
+   notes across presses; humanize/probability vary it.
+4. Melodic mode: scale-locked layout plays in the panel's key; change key → re-maps.
+5. Trigger mode: pad fires CC/PC/SysEx/action.
+6. Banks: switching bank remaps the grid.
+7. Pad-LED: incoming notes light the matching pads.
 
 ## Open questions / future
 
