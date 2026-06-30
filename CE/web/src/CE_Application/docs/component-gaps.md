@@ -116,9 +116,11 @@ Building these is higher-leverage than widget-by-widget work.
 
 Plus shared behaviors that several components reuse:
 **4. Return-to-rest** (spring-back) — [return-to-rest.md](./return-to-rest.md)
-(ribbon / vector pad / pitch wheel). **5. Shared key/scale context** — chord gen /
-pad grid / keyboard. **6. Blend/morph** (position→weights→targets) — crossfader +
-vector pad (largely covered by the Mapper + snapshots math).
+(ribbon / vector pad / pitch wheel). **5. Shared key/scale context** —
+[musical-context.md](./musical-context.md) (chord gen / pad grid / keyboard /
+arp). **6. Blend/morph** (position→weights→targets) —
+[blend-morph.md](./blend-morph.md): mostly a tiny weight helper + the Mapper +
+snapshots; no separate engine.
 
 **Fan-out has three authoring faces over one routing engine:** the
 properties-panel link (exists) · a placeable **Link Mapper** component
