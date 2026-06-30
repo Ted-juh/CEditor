@@ -103,7 +103,9 @@ Investigating the synth tier surfaced two foundational capabilities that unlock
 [meter-and-mod-matrix.md](./meter-and-mod-matrix.md)):
 
 1. **Value-driven display / read-only output mode** — shows an inbound device
-   value instead of being user-driven. Unlocks **Meter** + the **LCD** fields.
+   value instead of being user-driven ([value-driven-display.md](./value-driven-display.md)).
+   The feedback direction of binding + a read-only toggle. Unlocks **Meter**,
+   **LCD** fields, **pad LEDs**. Depends on wiring `onParameterReceived`.
 2. **Multi-parameter / fan-out binding** — one component bound to many device
    params. Unlocks the **Envelope** (per-node) + **Mod matrix** (per-cell).
 3. **Value-layer snapshots / morph** — capture/recall/interpolate full device
