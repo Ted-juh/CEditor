@@ -8,6 +8,10 @@ appending a row and (when it grows past a paragraph) spinning out a doc.
 > This started as the LCD display brainstorm and grew into a general backlog.
 > Keep design notes here so they travel with the codebase and can be extended.
 
+> **Start here:** [roadmap.md](./roadmap.md) sequences everything by dependency
+> (engines → capabilities → components → features) and names the two prerequisites
+> that gate the most (inbound MIDI wiring + Timer backing).
+
 ## Status legend
 
 | Mark | Meaning |
