@@ -1,0 +1,74 @@
+# Groundbreaking Components — Ideas
+
+> Status: **ideation.** Novel components that would *differentiate* a no-audio
+> MIDI device editor, leveraging its unique substrate. Part of the
+> [panel parts backlog](./README.md); the conventional gaps live in
+> [component-gaps.md](./component-gaps.md).
+
+## Why these are feasible here (no audio needed)
+
+The app's substrate is what makes these possible — all parameter math + MIDI,
+not DSP:
+
+- **Value layer** (`Player/PanelValueModel.h`) — full live device state →
+  snapshots, morph, diff.
+- **DPD** — semantic per-parameter range/type/enum → correct interpolation,
+  constrained randomize, auto-layout, semantic diff.
+- **Routing layer** (`utils/panelCustomComponentLinks.js`) + **fan-out binding**
+  (see [meter-and-mod-matrix.md](./meter-and-mod-matrix.md)) → one control drives
+  many params.
+- **Dump Analyzer** (see [midi-workbench.md](./midi-workbench.md)) → structural
+  diffing.
+
+## The ideas
+
+### 1. Macro control → Snapshot Morph (headline)
+- **Macro:** one knob drives **many** device parameters with per-target curves
+  (modern soft-synth macros; rare in hardware editors).
+- **Snapshot Morph:** a control that **interpolates the entire patch between two
+  saved snapshots (A↔B)** using DPD ranges — stepping enums, skipping
+  non-interpolatables. Turns a static editor into a performance instrument.
+- Substrate: value layer (snapshots) + fan-out binding + DPD ranges.
+
+### 2. Modulation node-graph (patch-cord canvas)
+- Visual wiring of **sources** (LFO / envelope / macro / MIDI in) to
+  **destinations** (any parameter) with cables + depth. The modular paradigm as a
+  panel object.
+- Substrate: routing layer + fan-out binding + the breakpoint/LFO engine
+  ([envelope-curve-editor.md](./envelope-curve-editor.md)).
+
+### 3. Auto-Panel generator ("instant editor")
+- Drop a device profile → **generate a complete, grouped editor panel** (one
+  control per parameter, sectioned by DPD structure, control type chosen by
+  parameter type). Hours of layout → seconds. *Feature more than a single widget.*
+- Substrate: the DPD (it already knows the device) + `componentTypes` factory.
+- Biggest **adoption** unlock.
+
+### 4. Patch Diff / Compare
+- A/B **"what changed"** between current and stored patch (or two snapshots) — the
+  hardware "Compare" button + a visual semantic diff.
+- Substrate: value layer + DPD (semantic) + Dump Analyzer (byte-level pairing).
+- Daily driver for sound design *and* reverse-engineering.
+
+### 5. Constrained Randomizer / "Generate"
+- Generate new patches **within DPD ranges and user locks** ("randomize all
+  except the filter"). Only musical/safe because the DPD constrains it.
+- Substrate: DPD ranges + value layer + per-param lock flags.
+
+## Also missing (conventional, `[engine-reuse]`, each its own palette entry)
+
+Ribbon / touch-strip · vector joystick (4-corner morph) · drum/performance pad
+grid · crossfader · chord/scale trigger pad.
+
+## Ranking
+
+- **Define the product:** Macro / Snapshot-Morph (performance) + Auto-Panel
+  generator (setup speed) — the two reasons to pick CEditor over a generic editor.
+- **Flashiest:** Modulation node-graph.
+- **Sound-designer daily drivers:** Patch Diff/Compare + Randomizer.
+
+## Notes
+
+- All five lean on two enablers already identified as high-leverage: **snapshots
+  of the value layer** and **fan-out (multi-parameter) binding**. Building those
+  unlocks most of this list — same conclusion as the synth-tier investigation.

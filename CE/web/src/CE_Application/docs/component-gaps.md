@@ -77,6 +77,20 @@ inside a *different* component.
 - **Progress bar** `[engine-reuse]`, **scroll area** `[new]`, **shape primitives**
   (partly present via the designer's vector shapes).
 
+## Tier 4 — differentiated / groundbreaking
+
+Novel components that would distinguish CEditor (no audio needed; all parameter
+math + MIDI). See [groundbreaking-components.md](./groundbreaking-components.md):
+
+- **Macro control → Snapshot Morph** — one control drives many params / morphs
+  the whole patch between A↔B snapshots.
+- **Modulation node-graph** — visual patch-cord routing of sources→destinations.
+- **Auto-Panel generator** — a DPD → a complete editor panel instantly.
+- **Patch Diff / Compare** — A/B "what changed" (semantic + byte-level).
+- **Constrained Randomizer** — generate patches within DPD ranges + locks.
+- Conventional adds: ribbon/touch-strip · vector joystick · drum-pad grid ·
+  crossfader · chord/scale pad.
+
 ## Two cross-cutting capabilities (higher leverage than any widget)
 
 Investigating the synth tier surfaced two foundational capabilities that unlock
