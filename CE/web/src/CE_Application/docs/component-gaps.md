@@ -109,6 +109,11 @@ Investigating the synth tier surfaced two foundational capabilities that unlock
 
 Building these two is higher-leverage than widget-by-widget work.
 
+**Fan-out has three authoring faces over one routing engine:** the
+properties-panel link (exists) · a placeable **Link Mapper** component
+([link-mapper-component.md](./link-mapper-component.md)) · the full **node-graph**
+(groundbreaking). The Mapper is also the Macro control's brain.
+
 ## Recommended first picks
 
 1. **Knob** — its own component reusing the circular-slider engine; biggest
