@@ -41,15 +41,12 @@ three enablers: note-emit · fan-out binding · read-only display.
 
 ## 4. Crossfader
 
-- **What:** an A↔B blend fader (bipolar, center-origin) — drives two targets
-  inversely (A up as B down), or a morph position.
-- **Engine:** slider (linear, bipolar, `fillOrigin: center`).
-- **New:** **A/B dual-target binding** (one fades up as the other fades down) —
-  fan-out (2 inverse targets). Visually close to a bipolar slider.
-- **Ports:** A + B outputs (fan-out), or a single `blend` value (downstream math).
-- **Files:** `componentTypes` (Crossfader), `interactionDefaults` (bipolar slider
-  behavior), `componentPorts`, `IconPanel`.
-- **Ties to:** fan-out binding / morph.
+**Full design → [crossfader-component.md](./crossfader-component.md).** In brief:
+an A↔B blend fader (bipolar slider engine) with crossfade curves (linear/
+constant-power/sharp), center detent, optional N-way, and a **morph mode**
+(snapshot A↔B). The **1D sibling of the Vector Joystick**; both share a
+position→weights→targets blend/morph capability. New: blend math + inverse
+**fan-out** A/B binding.
 
 ## 5. Chord / Scale Trigger Pad
 
