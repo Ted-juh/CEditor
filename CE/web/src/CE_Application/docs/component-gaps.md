@@ -106,8 +106,11 @@ Investigating the synth tier surfaced two foundational capabilities that unlock
    value instead of being user-driven. Unlocks **Meter** + the **LCD** fields.
 2. **Multi-parameter / fan-out binding** — one component bound to many device
    params. Unlocks the **Envelope** (per-node) + **Mod matrix** (per-cell).
+3. **Value-layer snapshots / morph** — capture/recall/interpolate full device
+   states ([snapshots-morph.md](./snapshots-morph.md)). Unlocks Macro/Snapshot-
+   Morph, Vector pad corners, Crossfader morph, scene launch, Diff, Randomizer.
 
-Building these two is higher-leverage than widget-by-widget work.
+Building these is higher-leverage than widget-by-widget work.
 
 **Fan-out has three authoring faces over one routing engine:** the
 properties-panel link (exists) · a placeable **Link Mapper** component
