@@ -92,8 +92,9 @@ math + MIDI). See [groundbreaking-components.md](./groundbreaking-components.md)
 - **Auto-Panel generator** — a DPD → a complete editor panel instantly.
 - **Patch Diff / Compare** — A/B "what changed" (semantic + byte-level).
 - **Constrained Randomizer** — generate patches within DPD ranges + locks.
-- Conventional adds: ribbon/touch-strip · vector joystick · drum-pad grid ·
-  crossfader · chord/scale pad.
+- Conventional adds (spec'd in [conventional-components.md](./conventional-components.md)):
+  ribbon/touch-strip · vector joystick · drum-pad grid · crossfader · chord/scale
+  pad (= chord generator form 1).
 
 ## Two cross-cutting capabilities (higher leverage than any widget)
 
