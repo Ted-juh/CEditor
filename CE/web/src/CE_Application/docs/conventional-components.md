@@ -14,16 +14,12 @@ and sometimes `editor/PanelPreviewSurface.svelte` (interaction).
 
 ## 1. Ribbon / Touch-strip
 
-- **What:** a thin 1D continuous controller — touch *anywhere* jumps to that
-  position (not drag-from-handle); optional spring-return-to-center or latch;
-  a position indicator rather than a grabbable handle.
-- **Engine:** slider (linear geometry) — `SliderFamilyRenderer`, `sliderBehavior`.
-- **New:** an **absolute-jump-on-touch** interaction mode + a **return mode**
-  (`none` / `center` / `latch`). Mostly a behavior option on the slider engine.
-- **Port:** `value` (numeric, continuous).
-- **Files:** `componentTypes` (Ribbon), `interactionDefaults` (Ribbon behavior:
-  linear + `absoluteJump` + `returnMode`), `componentPorts`, `IconPanel`,
-  `PanelPreviewSurface` (absolute-jump + spring-return).
+**Full design → [ribbon-component.md](./ribbon-component.md).** In brief: a thin
+1D touch-to-position controller (absolute, no handle, optional spring-return),
+reusing the slider engine. New work: absolute-jump-on-press (reuses the existing
+pointer→value math) + a spring **return mode** (genuinely new — no return exists
+in the slider engine). Own `controlType`; `value` port (+ optional `touch`
+gate).
 
 ## 2. Vector Joystick (4-corner morph)
 
