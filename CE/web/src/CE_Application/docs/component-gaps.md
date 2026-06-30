@@ -41,6 +41,10 @@ inside a *different* component.
   (new `controlType`; introduces `valueType:'text'`, first TEXT/PATCH_NAME port,
   keyboard entry, non-automatable device-bound value path).
 - **On-screen Piano Keyboard** `[new]` — build/test a controller without hardware.
+- **Generative MIDI family** — **Chord generator** (chord pad / scale-locked
+  strip / harmonizer), **Arpeggiator** (exists in custom components), Keyboard.
+  These *produce* MIDI and share a note-emit substrate + a proposed shared panel
+  **key/scale context**. See [chord-generator.md](./chord-generator.md).
 
 ## Tier 2 — synth / controller domain
 
