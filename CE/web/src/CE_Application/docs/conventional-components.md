@@ -23,18 +23,11 @@ gate).
 
 ## 2. Vector Joystick (4-corner morph)
 
-- **What:** a 2D pad whose position is a **blend of 4 corner sources** (vector
-  synthesis); spring-return-to-center; 4 labeled corner targets.
-- **Engine:** xy-pad (2D position) — the existing `xy-pad` behavior + `xy` hit
-  zone.
-- **New:** position → **4-corner weight** math + spring-return + **4 outputs**
-  (needs fan-out binding) or 2 outputs (x/y) with downstream math.
-- **Ports:** 4 corner weights (fan-out) — or `x`/`y` continuous.
-- **Files:** `componentTypes` (VectorPad), `interactionDefaults`/custom behavior
-  (xy + return + corner mix), `componentPorts`, `IconPanel`, preview (return).
-- **Ties to:** fan-out binding; and **Snapshot-Morph** (4 snapshots at the
-  corners → a vector morph pad). See
-  [groundbreaking-components.md](./groundbreaking-components.md).
+**Full design → [vector-joystick-component.md](./vector-joystick-component.md).**
+In brief: a 2D pad whose position → **4 corner blend weights** (vector synthesis),
+reusing the XY-pad engine + the Ribbon's return behavior. New: corner-weight math
+(bilinear/radial) + spring-return + 4 fan-out outputs. Flagship use: **assign a
+patch snapshot to each corner → morph the whole device state** (Snapshot-Morph).
 
 ## 3. Drum / Performance Pad Grid
 
