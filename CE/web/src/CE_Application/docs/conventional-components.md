@@ -31,16 +31,13 @@ patch snapshot to each corner → morph the whole device state** (Snapshot-Morph
 
 ## 3. Drum / Performance Pad Grid
 
-- **What:** a grid of velocity-sensitive **momentary pads that emit notes**;
-  part of the generative-MIDI family.
-- **Engine:** generator-grid (rows×cols, `parts = rows*columns`) + the note-emit
-  substrate (`utils/customComponentArpeggiator.js`) + runtime MIDI out.
-- **New:** per-pad note assignment, **velocity from click position/pressure**,
-  momentary note-on/off, optional latch / choke groups.
-- **Ports:** note/trigger outputs (generative); target-aware MIDI out.
-- **Files:** `componentTypes` (PadGrid), `interactionDefaults` (pad behavior),
-  Generators (grid), `componentPorts`, `IconPanel`, preview (velocity + emit).
-- **Family:** generative MIDI (with chord generator, arpeggiator, keyboard).
+**Full design → [pad-grid-component.md](./pad-grid-component.md).** In brief: a
+**versatile** grid of pads (rows×cols) reusing the generator-grid engine +
+note-emit substrate. Pad modes: **drum** (note+velocity), **melodic/scale-locked**
+(shared key/scale, isomorphic layouts), **trigger** (CC/PC/SysEx/action). Plus
+velocity modes, choke groups, banks, and **pad-LED feedback**. Separate component
+from the Mod matrix / Step sequencer (same engine, different kinds). Touches all
+three enablers: note-emit · fan-out binding · read-only display.
 
 ## 4. Crossfader
 
