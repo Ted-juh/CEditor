@@ -7,11 +7,11 @@
 #endif
 
 #ifndef MySourceDir
-  #define MySourceDir "..\\..\\build\\package-stage\\CEditor"
+  #define MySourceDir "..\\..\\build\\package\\stage\\CEditor"
 #endif
 
 #ifndef MyOutputDir
-  #define MyOutputDir "..\\..\\build\\installer"
+  #define MyOutputDir "..\\..\\build\\package\\installer"
 #endif
 
 [Setup]

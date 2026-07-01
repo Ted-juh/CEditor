@@ -138,7 +138,7 @@ function Build-Frontend([string]$RepoRoot) {
 function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$Configuration) {
     $vcvars = Find-VcVars64
     Write-Host "Using vcvars: $vcvars"
-    $buildDir = Join-Path $RepoRoot "build\package-native"
+    $buildDir = Join-Path $RepoRoot "build\package\build"
 
     Reset-Directory $buildDir
 
@@ -235,8 +235,12 @@ function Compile-InnoInstaller([string]$RepoRoot, [string]$StageDir, [string]$Ou
 }
 
 $repoRoot = Get-RepoRoot
-$stageDir = Join-Path $repoRoot "build\package-stage\CEditor"
-$outputDir = Join-Path $repoRoot "build\installer"
+# All installer-pipeline artifacts live under build\package\ (kept apart from build\native, the dev tree):
+#   build\package\build          - the cmake/compiler work tree (DEV_MODE=OFF; wiped each run)
+#   build\package\stage\CEditor  - the assembled install tree (exactly what ships)
+#   build\package\installer      - the final CEditor-Setup-<ver>.exe
+$stageDir = Join-Path $repoRoot "build\package\stage\CEditor"
+$outputDir = Join-Path $repoRoot "build\package\installer"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = Get-ProjectVersion

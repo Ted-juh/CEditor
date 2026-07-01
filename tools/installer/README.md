@@ -42,17 +42,12 @@ From the repo root:
 powershell -ExecutionPolicy Bypass -File .\tools\scripts\package-installer.ps1
 ```
 
-Or just double-click:
-
-- `build-installer.cmd` to build and compile the Inno installer
-- `stage-installer.cmd` to rebuild/stage the app without compiling Inno
-
 What the script does:
 
 1. Runs `npm run build` in `CE/web`.
 2. Configures CMake with `CEDITOR_DEV_MODE=OFF`.
 3. Builds the Release native app.
-4. Stages the install tree into `build\package-stage\CEditor` using `cmake --install`.
+4. Stages the install tree into `build\package\stage\CEditor` using `cmake --install`.
 5. Copies `vc_redist.x64.exe` into the staging folder if Visual Studio provides it locally.
 6. Copies `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` into the staging folder if you placed it in `tools\installer\thirdparty\`.
 7. Compiles `tools/installer/CEditor.iss` with Inno Setup 6 if `ISCC.exe` is installed.
@@ -111,7 +106,7 @@ Configure and build the native app for installed mode:
 ```powershell
 cmake --preset native -DCEDITOR_DEV_MODE=OFF
 cmake --build --preset native-release
-cmake --install build/native --config Release --prefix ".\build\package\CEditor"
+cmake --install build/native --config Release --prefix ".\build\package\stage\CEditor"
 ```
 
 Compile the Inno installer:
@@ -119,8 +114,8 @@ Compile the Inno installer:
 ```powershell
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
   "/DMyAppVersion=0.1.0" `
-  "/DMySourceDir=C:\dev\Projects\CEditor\build\package\CEditor" `
-  "/DMyOutputDir=C:\dev\Projects\CEditor\build\installer" `
+  "/DMySourceDir=C:\dev\Projects\CEditor\build\package\stage\CEditor" `
+  "/DMyOutputDir=C:\dev\Projects\CEditor\build\package\installer" `
   "C:\dev\Projects\CEditor\tools\installer\CEditor.iss"
 ```
 
@@ -130,7 +125,7 @@ Best option:
 
 1. Test on a clean Windows VM.
 2. Ensure the VM does not already have your local source tree, build tools, or dev server running.
-3. Run the generated installer from `build\installer`.
+3. Run the generated installer from `build\package\installer`.
 4. Launch from the Start Menu shortcut, not from your repo folder.
 5. Confirm the UI loads without `localhost:5173`.
 6. Confirm `%APPDATA%\CEditor` is created after the first run and settings persist between launches.
@@ -139,7 +134,7 @@ Best option:
 Good local smoke test:
 
 1. Run `tools/scripts/package-installer.ps1 -StageOnly`.
-2. Launch `build\package-stage\CEditor\CEditor.exe`.
+2. Launch `build\package\stage\CEditor\CEditor.exe`.
 3. Verify it opens without the Vite dev server running.
 
 ## Current external prerequisites

@@ -111,10 +111,10 @@ java=26. Put the plugin on a **second track** too → CC 25/26 fire there as wel
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\tools\scripts\package-installer.ps1
 ```
-**Expected:** builds the frontend + native app (DEV_MODE OFF), stages to `build\package-stage\CEditor`
-(including `tools\` — verify `build\package-stage\CEditor\tools\toolchains\languages.mjs` exists and that
+**Expected:** builds the frontend + native app (DEV_MODE OFF), stages to `build\package\stage\CEditor`
+(including `tools\` — verify `build\package\stage\CEditor\tools\toolchains\languages.mjs` exists and that
 `tools\toolchains\` has **no** `llvm-mingw/dotnet/jdk` binary subdirs), and compiles
-`build\installer\CEditor-Setup-0.2.0.exe` (needs Inno Setup 6; otherwise it stops at "staged").
+`build\package\installer\CEditor-Setup-0.2.0.exe` (needs Inno Setup 6; otherwise it stops at "staged").
 
 **Proves:** Step 4 staging (the export pipeline + toolchain scripts are in the install tree; binaries are
 not bundled).
