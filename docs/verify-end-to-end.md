@@ -124,9 +124,10 @@ not bundled).
 Run `CEditor-Setup-0.2.0.exe`. On **Select Components**, choose **Custom** and tick e.g. **C#** only (or
 **Full**).
 
-**Expected:** install completes; if Node is on PATH you'll see "Installing .NET scripting toolchain…"
-during install (best-effort — if it's skipped, it's fetched on demand later). Installed tree under
-`%ProgramFiles%\CEditor` contains `CEditor.exe`, `web\dist\`, and `tools\`.
+**Expected:** install completes; you'll see "Installing .NET scripting toolchain…" during install (the
+installer runs the **bundled** Node, so this works with no system Node; best-effort — if a download fails
+it's fetched on demand later). Installed tree under `%ProgramFiles%\CEditor` contains `CEditor.exe`,
+`web\dist\`, and `tools\` (including `tools\node\node.exe`).
 
 **Proves:** the installer language-component page provisions the chosen toolchain.
 
@@ -135,8 +136,10 @@ during install (best-effort — if it's skipped, it's fetched on demand later). 
 Launch the installed CEditor → **Settings → Scripting Toolchains**.
 
 **Expected:** the languages you ticked show "Installed"; others "Not installed" with working Install
-buttons. (This is the same panel as A2, now running from the install dir — proving `ceditorSourceRoot()`
-finds `tools\` beside the exe.)
+buttons. Install/Remove work for a **standard (non-elevated)** user because runtime provisioning writes to
+`%LOCALAPPDATA%\CEditor\toolchains` (the per-user dir set via `CEDITOR_TOOLCHAIN_DIR`), not Program Files.
+(Same panel as A2, now from the install dir — proving `ceditorSourceRoot()` finds `tools\` beside the exe
+and the bundled `tools\node\node.exe` runs.)
 
 **Proves:** the installed app manages toolchains.
 
@@ -153,7 +156,7 @@ finds `tools\` beside the exe.)
 |---|---|
 | `verify-all` fails | the named sub-check under `tools/scripts/nativeHandlers/**` |
 | App won't build | `ValueTreeBridgeHandlers.cpp` / `ValueTreeBridge.h` compiler error |
-| Toolchain panel empty | Node not on PATH, or `tools\toolchains\languages.mjs` missing from the run dir |
+| Toolchain panel empty | Node missing (bundled `tools\node\node.exe` absent + none on PATH → panel shows a "Node not found" note), or `tools\toolchains\languages.mjs` missing from the run dir |
 | A language skipped at export | the `⚠ <lang>: NOT built — <reason>` console line |
 | Re-export still rebuilds Vite | a `CE/web/src` file changed (expected); else check `forceWebBuild` |
 | CC 25/26 missing in DAW | the export console's csharp/java lines; multi-instance → confirm the build is post-`650530f` |

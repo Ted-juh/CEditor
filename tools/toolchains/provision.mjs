@@ -11,9 +11,14 @@ import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { writableToolchainsRoot } from './resolveToolchain.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const manifest = JSON.parse(readFileSync(path.join(HERE, 'manifest.json'), 'utf8')).toolchains;
+// Where to WRITE provisioned toolchains: the per-user dir (CEDITOR_TOOLCHAIN_DIR) when the app set it
+// at runtime, else the bundled tools/toolchains dir (HERE) — used by the elevated installer + source
+// checkout. Lookups still also see the bundled dir, so install-time toolchains are never re-downloaded.
+const OUT_ROOT = writableToolchainsRoot();
 
 const args = process.argv.slice(2);
 const force = args.includes('--force');
@@ -33,17 +38,35 @@ function hasCmd(c) {
   try { execFileSync(process.platform === 'win32' ? 'where' : 'command', process.platform === 'win32' ? [c] : ['-v', c], { stdio: 'ignore', shell: process.platform !== 'win32' }); return true; }
   catch { return false; }
 }
+// Resolve a tar that can read BOTH tarballs AND .zip with --strip-components. On Windows that means
+// bsdtar (libarchive), shipped at %SystemRoot%\System32\tar.exe — NOT whatever `tar` happens to be first
+// on PATH. Git for Windows / MSYS2 / Cygwin put a GNU tar ahead of System32; GNU tar cannot open a .zip
+// at all and aborts the extract, so the strip>0 .zip toolchains (llvm-mingw, jdk) would silently fail to
+// provision. Pinning System32 makes extraction deterministic regardless of PATH ordering.
+function resolveTar() {
+  if (process.platform === 'win32') {
+    const sys32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+    if (existsSync(sys32)) return sys32;
+  }
+  return 'tar';
+}
+
 function extract(archive, outDir, strip) {
   mkdirSync(outDir, { recursive: true });
   // GNU tar (Linux) cannot read .zip; bsdtar (Win10+/macOS) can. Use `unzip` for zips with no strip
-  // (Linux), and `tar` for tarballs + for strip>0 zips (bsdtar supports --strip-components).
+  // (Linux), and bsdtar/tar for tarballs + for strip>0 zips (libarchive tar supports --strip-components).
   if (archive.toLowerCase().endsWith('.zip') && (strip ?? 0) === 0 && hasCmd('unzip')) {
     execFileSync('unzip', ['-o', '-q', archive, '-d', outDir], { stdio: 'inherit' });
-    return;
+  } else {
+    const a = ['-xf', archive, '-C', outDir];
+    if (strip > 0) a.push(`--strip-components=${strip}`);
+    execFileSync(resolveTar(), a, { stdio: 'inherit' });
   }
-  const a = ['-xf', archive, '-C', outDir];
-  if (strip > 0) a.push(`--strip-components=${strip}`);
-  execFileSync('tar', a, { stdio: 'inherit' });
+  // Fail loudly if the extract produced nothing (e.g. a tar that opened the archive but mis-stripped):
+  // otherwise provision.mjs reports success and the resolvers later report the toolchain "not installed"
+  // for no visible reason.
+  if (!readdirSync(outDir).length)
+    throw new Error(`extraction produced no files in ${outDir} (archive: ${path.basename(archive)})`);
 }
 
 const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
@@ -68,9 +91,12 @@ let provisioned = 0, skipped = 0, failed = 0;
 for (const [id, tc] of Object.entries(manifest)) {
   if (want.length && !want.includes(id)) continue;
   const entry = pick(tc);
-  const outDir = path.join(HERE, id);
+  const outDir = path.join(OUT_ROOT, id);
+  const bundledDir = path.join(HERE, id);
   if (!entry) { console.log(`- ${id}: no build for ${platform} — skipped`); continue; }
-  if (!force && existsSync(outDir) && readdirSync(outDir).length) { console.log(`= ${id}: already provisioned`); skipped++; continue; }
+  const present = (d) => { try { return existsSync(d) && readdirSync(d).length > 0; } catch { return false; } };
+  // Already provisioned in EITHER the per-user dir or the bundled (installer) dir.
+  if (!force && (present(outDir) || present(bundledDir))) { console.log(`= ${id}: already provisioned`); skipped++; continue; }
 
   console.log(`↓ ${id} ${tc.version} (~${entry.sizeMB} MB) for ${platform}...`);
   try {

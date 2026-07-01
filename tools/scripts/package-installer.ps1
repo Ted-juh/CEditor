@@ -178,6 +178,23 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     Write-Host "Staged export pipeline + toolchain scripts -> $toolsDst"
 }
 
+function Stage-NodeRuntime([string]$StageDir) {
+    # Bundle a Node runtime beside the app (tools\node\node.exe). The app's findNodeExecutable() and the
+    # installer's provision.cmd both prefer it, so toolchain provisioning + management work on a clean
+    # machine with NO system Node. Windows node.exe is self-contained (depends only on system DLLs), so a
+    # single-file copy of the build machine's node is sufficient and pins the bundled Node to the build's.
+    $node = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if (-not $node) {
+        Write-Warning "node.exe was not found on PATH; the installer will NOT bundle Node. Toolchain management on a clean machine will then require the user to install Node.js."
+        return
+    }
+
+    $nodeDst = Join-Path $StageDir "tools\node"
+    New-Item -ItemType Directory -Path $nodeDst -Force | Out-Null
+    Copy-Item -LiteralPath $node -Destination (Join-Path $nodeDst "node.exe") -Force
+    Write-Host "Bundled Node runtime: $node -> $nodeDst\node.exe"
+}
+
 function Copy-OptionalPrerequisites([string]$RepoRoot, [string]$StageDir, [string]$WebView2InstallerPath) {
     $vcRedist = Find-VcRedist
     if ($vcRedist) {
@@ -231,6 +248,7 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 Build-Frontend -RepoRoot $repoRoot
 Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
 Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
+Stage-NodeRuntime -StageDir $stageDir
 Copy-OptionalPrerequisites -RepoRoot $repoRoot -StageDir $stageDir -WebView2InstallerPath $WebView2InstallerPath
 
 if ($StageOnly) {

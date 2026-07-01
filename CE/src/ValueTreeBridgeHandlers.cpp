@@ -2,6 +2,8 @@
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 
+#include <cstdlib>
+
 namespace
 {
 juce::String perfFileLabel (const juce::String& path)
@@ -9,10 +11,36 @@ juce::String perfFileLabel (const juce::String& path)
     return juce::File (path).getFileName().isNotEmpty() ? juce::File (path).getFileName() : path;
 }
 
-// Locate node.exe for the in-app VST3 build. GUI processes inherit the system PATH, so a PATH
-// scan covers the common case; fall back to the default installer location. Empty file = not found.
+// The per-user, writable toolchain root the Node scripts provision into at runtime. The bundled dir
+// (tools/toolchains beside the exe) is under Program Files for an installed build and is not writable by
+// the non-elevated app, so resolveToolchain.mjs / provision.mjs honour CEDITOR_TOOLCHAIN_DIR and we point
+// it at a per-user path here. Lookups still also see the bundled dir, so install-time toolchains resolve.
+// Idempotent — cheap to call before every node spawn.
+void setToolchainDirEnv()
+{
+    const auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                        .getChildFile ("CEditor").getChildFile ("toolchains");
+    dir.createDirectory();
+   #if JUCE_WINDOWS
+    _wputenv_s (L"CEDITOR_TOOLCHAIN_DIR", dir.getFullPathName().toWideCharPointer());
+   #else
+    setenv ("CEDITOR_TOOLCHAIN_DIR", dir.getFullPathName().toRawUTF8(), 1);
+   #endif
+}
+
+// Locate node.exe for the in-app VST3 build + toolchain management. Prefer a Node bundled beside the app
+// (installed builds ship tools/node/node.exe so a clean machine needs no system Node); then a Node on the
+// inherited PATH (source-checkout / dev case); then the default installer locations. Empty file = none.
 juce::File findNodeExecutable()
 {
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    for (const auto& base : { exeDir, exeDir.getParentDirectory() })
+    {
+        const auto bundled = base.getChildFile ("tools").getChildFile ("node").getChildFile ("node.exe");
+        if (bundled.existsAsFile())
+            return bundled;
+    }
+
     const auto pathVar = juce::SystemStats::getEnvironmentVariable ("PATH", {});
     for (auto& dir : juce::StringArray::fromTokens (pathVar, ";", "\""))
     {
@@ -256,6 +284,9 @@ void ValueTreeBridge::runToolchainJob (const juce::var& payload, const juce::Str
 
 juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::WebBrowserComponent::Options& base)
 {
+    // Point the Node toolchain scripts at a per-user, writable provisioning dir before any node spawn.
+    setToolchainDirEnv();
+
     deviceProfileService.setEventCallback ([this] (const juce::String& eventName, const juce::var& payload)
     {
         juce::MessageManager::callAsync ([this, eventName, payload]()
@@ -1047,10 +1078,26 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
                 }
 
+                // A full VST3 export AOT-compiles a unique-identity plugin, which needs the C++ build
+                // environment (player source + CMake + a compiler). A GUI-only install ships the exporter
+                // script + toolchains but not the source tree, so fail with a clear message instead of the
+                // raw node module-resolution error from the exporter's source-tree imports.
+                const bool hasBuildEnv = sourceRoot.getChildFile ("CMakeLists.txt").existsAsFile()
+                                       && sourceRoot.getChildFile ("CE").getChildFile ("web")
+                                                    .getChildFile ("src").isDirectory();
+                if (! hasBuildEnv)
+                {
+                    emitFail ("Full VST3 export needs the C++ build environment (the player source, CMake "
+                              "and a compiler), which isn't part of this install. Run exports from a source "
+                              "checkout. This install can still design panels and manage scripting toolchains.");
+                    return;
+                }
+
                 const auto node = findNodeExecutable();
                 if (node == juce::File())
                 {
-                    emitFail ("Node.js (node.exe) was not found on PATH. Install Node.js, then relaunch CEditor.");
+                    emitFail ("Node.js (node.exe) was not found. Reinstall CEditor (it bundles Node) or "
+                              "install Node.js, then relaunch.");
                     return;
                 }
 
@@ -1083,7 +1130,16 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                 if (browser == nullptr) return;
                 const auto node   = findNodeExecutable();
                 const auto script = ceditorSourceRoot().getChildFile ("tools").getChildFile ("toolchains").getChildFile ("languages.mjs");
-                if (node == juce::File() || ! script.existsAsFile()) return;
+                if (node == juce::File() || ! script.existsAsFile())
+                {
+                    // Surface the cause instead of leaving the panel mysteriously empty. Installed builds
+                    // bundle Node (tools/node), so this is mainly a bare source-checkout safeguard.
+                    auto* o = new juce::DynamicObject();
+                    o->setProperty ("nodeMissing", node == juce::File());
+                    o->setProperty ("languages", juce::var (juce::Array<juce::var>{}));
+                    browser->emitEventIfBrowserIsVisible ("toolchainStatus", juce::var (o));
+                    return;
+                }
                 juce::ChildProcess proc;
                 if (! proc.start (juce::StringArray { node.getFullPathName(), script.getFullPathName(), "status" }))
                     return;

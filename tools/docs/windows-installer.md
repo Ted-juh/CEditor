@@ -161,6 +161,23 @@ installed later from the app (**Settings → Scripting Toolchains**) or fetched 
 time you export a panel that uses them. `package-installer.ps1` stages `tools/` (the export + provision
 scripts only — toolchain binaries are downloaded on demand, never bundled).
 
+### Bundled Node + per-user toolchain dir
+
+Provisioning and export shell out to Node. The installer **bundles a Node runtime** at
+`{app}\tools\node\node.exe` (a single self-contained `node.exe`, staged by `package-installer.ps1` from
+the build machine's Node), so a clean machine needs **no** system Node install — both `provision.cmd` and
+the app's `findNodeExecutable()` prefer the bundled Node, falling back to a system Node for source
+checkouts. If Node is somehow absent, the Scripting Toolchains panel shows a clear "Node not found" note
+instead of an empty list.
+
+Install-time provisioning ([Run] steps, elevated) writes toolchains into `{app}\tools\toolchains`. The
+installed app runs non-elevated and cannot write under Program Files, so **runtime** Install/Remove (and
+on-demand provisioning at first export) writes to a per-user dir instead:
+`%LOCALAPPDATA%\CEditor\toolchains`. The app sets `CEDITOR_TOOLCHAIN_DIR` to that path before launching
+Node; `resolveToolchain.mjs` checks the per-user dir first, then the bundled `{app}` dir, so toolchains
+installed either way resolve. (Removing an install-time-provisioned toolchain under Program Files needs
+elevation and is left in place by the in-app Remove.)
+
 ### Important: export needs the C++ build environment
 
 The installed `CEditor.exe` is the **panel designer** + toolchain manager. A full **VST3 export** still

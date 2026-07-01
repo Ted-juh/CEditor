@@ -22,7 +22,7 @@ function systemPython() {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  cppCompiler, dotnetExe, jdkTools, pythonEmbedDir, ninjaExe, toolchainDir,
+  cppCompiler, dotnetExe, jdkTools, pythonEmbedDir, ninjaExe, toolchainDir, writableToolchainsRoot,
 } from './resolveToolchain.mjs';
 import { panelScriptLanguages } from '../scripts/pythonEmbed.mjs';
 
@@ -128,12 +128,15 @@ export function provisionForLanguages(langs, { force = false } = {}) {
 /** Remove a language's EXCLUSIVE toolchains (never the shared llvm-mingw/ninja). Returns removed ids. */
 export function removeLanguages(langs) {
   const removed = [];
+  // Only remove from the writable (per-user) root — the bundled dir under Program Files is read-only to
+  // the non-elevated app, and an install-time-provisioned toolchain there stays put.
+  const root = writableToolchainsRoot();
   for (const l of langs) {
     const def = BY_ID.get(normLang(l));
     if (!def) continue;
     for (const t of def.exclusive) {
-      const d = toolchainDir(t);
-      if (d && existsSync(d)) { rmSync(d, { recursive: true, force: true }); removed.push(t); }
+      const d = path.join(root, t);
+      if (existsSync(d)) { rmSync(d, { recursive: true, force: true }); removed.push(t); }
     }
   }
   return removed;

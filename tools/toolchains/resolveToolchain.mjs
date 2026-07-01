@@ -14,8 +14,25 @@ function has(cmd) {
   catch { return false; }
 }
 
-/** Path to a provisioned toolchain dir, or null. */
-export function toolchainDir(id) { const d = path.join(HERE, id); return existsSync(d) ? d : null; }
+// Toolchain roots. The bundled root (HERE = tools/toolchains, beside the app) is where the elevated
+// installer's [Run] step provisions and where a source checkout keeps its toolchains; for the installed,
+// non-elevated app it is READ-ONLY (it lives under Program Files). CEDITOR_TOOLCHAIN_DIR — set by the app
+// at runtime to a per-user writable path (e.g. %LOCALAPPDATA%\CEditor\toolchains) — is where runtime
+// provisioning writes. Lookups check the per-user root FIRST, then the bundled root; writes go to the
+// writable root.
+export function userToolchainsRoot() { return process.env.CEDITOR_TOOLCHAIN_DIR || null; }
+export function bundledToolchainsRoot() { return HERE; }
+export function writableToolchainsRoot() { return userToolchainsRoot() || HERE; }
+
+/** Path to a provisioned toolchain dir (per-user root first, then the bundled root), or null. */
+export function toolchainDir(id) {
+  for (const root of [userToolchainsRoot(), HERE]) {
+    if (!root) continue;
+    const d = path.join(root, id);
+    if (existsSync(d)) return d;
+  }
+  return null;
+}
 
 /** The C/C++ compiler to build the handler module (and, on Windows, the JUCE plugin). Prefers the
  *  bundled self-contained LLVM-MinGW Clang (NO Visual Studio / Windows SDK needed). The triple wrapper

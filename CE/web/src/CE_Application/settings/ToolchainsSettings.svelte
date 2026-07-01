@@ -12,6 +12,7 @@
   let languages = $state([]);     // [{ id, label, builtin, installed, toolchains, downloadMB }]
   let busyLang = $state(null);    // id currently provisioning/removing
   let log = $state([]);           // streamed progress lines
+  let nodeMissing = $state(false);// no Node found (bundled or system) — can't manage toolchains
   let unsub = [];
 
   const fmtSize = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb} MB`);
@@ -30,7 +31,10 @@
   }
 
   onMount(() => {
-    unsub.push(onToolchainStatus((s) => { languages = (s && s.languages) || []; }));
+    unsub.push(onToolchainStatus((s) => {
+      languages = (s && s.languages) || [];
+      nodeMissing = !!(s && s.nodeMissing);
+    }));
     unsub.push(onToolchainProgress((p) => { if (p && p.line) log = [...log.slice(-200), p.line]; }));
     unsub.push(onToolchainDone(() => { busyLang = null; refresh(); }));
     refresh();
@@ -50,6 +54,9 @@
 
   {#if !isJuceAvailable()}
     <div class="note">Toolchain management is only available in the desktop app.</div>
+  {:else if nodeMissing}
+    <div class="note">Node.js was not found, so scripting toolchains can’t be managed. Reinstall CEditor
+      (it bundles Node) or install Node.js from nodejs.org, then relaunch.</div>
   {/if}
 
   <ul class="lang-list">
