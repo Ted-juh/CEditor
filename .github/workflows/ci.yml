@@ -1,0 +1,61 @@
+# CEditor CI — Windows build + full test suite.
+#
+# Everything the build needs is in the repo (vendored JUCE 8.0.7 install incl. juceaide,
+# WebView2 SDK in CE/thirdparty), except Lua/sol2 which FetchContent pulls at configure time.
+# The web bundle must be built BEFORE CMake configure: CMakeLists globs CE/web/dist into
+# PlayerWebData (the embedded player UI).
+#
+# Not covered yet (candidates for a follow-up job): the per-panel VST3 smoke export
+# (tools/scripts/export-panel-vst3.mjs) and the installer packaging scripts.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: CE/web/package-lock.json
+
+      - name: Install web dependencies
+        working-directory: CE/web
+        run: npm ci
+
+      - name: Web tests (node --test + script-export validation)
+        working-directory: CE/web
+        run: npm run test:all
+
+      - name: Build web bundle (required by CMake PlayerWebData glob)
+        working-directory: CE/web
+        run: npm run build
+
+      - name: Set up MSVC environment (Ninja generator)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure (scripting ON, dev-mode OFF)
+        run: cmake --preset native -DCEDITOR_SCRIPTING=ON -DCEDITOR_DEV_MODE=OFF
+
+      - name: Build (Release, all targets)
+        run: cmake --build --preset native-release
+
+      - name: C++ tests (CTest)
+        run: ctest --test-dir build/native -C Release --output-on-failure
