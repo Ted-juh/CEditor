@@ -5,6 +5,8 @@
   import { deepClone } from '../utils/deepClone.js';
   import { getNextEnumValue } from '../utils/enumBehavior.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import { numberOr, clamp } from '../utils/primitives.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -95,15 +97,6 @@
     patchSession: (_controlId, patch) => patchSession(patch),
   });
 
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
   function patchSession(patch = {}) {
     onpatchsession?.(patch);
     emitDeviceBindingsForPatch(patch);
@@ -155,7 +148,7 @@
       if (value === undefined) continue;
       commitDeviceParameter({
         requestId: `surface_${control?._children?.Core?.id ?? 'control'}_${Date.now()}`,
-        deviceRole: binding.deviceRole || 'mainSynth',
+        deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
         parameterId: binding.parameterId,
         value,
         interactionPhase: patch.dragging === true ? 'continuous' : 'commit',

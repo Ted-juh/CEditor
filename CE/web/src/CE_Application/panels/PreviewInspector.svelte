@@ -11,11 +11,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
+  import { numberOr } from '../utils/primitives.js';
 
   function boolLabel(value) {
     return value ? 'On' : 'Off';

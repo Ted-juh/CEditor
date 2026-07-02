@@ -1,5 +1,6 @@
 import { commandDescriptor } from './scriptCommandRegistry.js';
 import { evaluateExpression, readPath } from './scriptExpressions.js';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 const DEFAULT_GUARDRAILS = {
   maxCommandsPerEvent: 512,
@@ -298,7 +299,7 @@ function runStep(step, context, output, index) {
       type: 'deviceRequest',
       request,
       profileId: String(args.profileId ?? context.device?.profileId ?? ''),
-      deviceRole: String(args.deviceRole ?? context.device?.role ?? 'mainSynth'),
+      deviceRole: String(args.deviceRole ?? context.device?.role ?? DEFAULT_DEVICE_ROLE),
       phase,
       queued: !shouldEmit,
     };

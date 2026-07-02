@@ -1,5 +1,6 @@
 import { get, writable } from 'svelte/store';
 import { normalizeDeviceSession } from './appSettingsSchema.js';
+import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 export const PROJECT_DEVICE_SESSION_SCHEMA_VERSION = 1;
 const pendingRestoreRequests = [];
@@ -65,7 +66,7 @@ export function setProjectDeviceSession(session = {}) {
 
 export function mergeProjectDeviceRoleMapping(mapping, overrides = {}) {
   const current = get(projectDeviceSession);
-  const role = String(mapping?.role ?? 'mainSynth');
+  const role = String(mapping?.role ?? DEFAULT_DEVICE_ROLE);
   const snapshot = createProjectDeviceSessionSnapshot({
     ...current,
     ...overrides,

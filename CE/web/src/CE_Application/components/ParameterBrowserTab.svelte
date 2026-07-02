@@ -41,6 +41,7 @@
   import { enrichBindingWithDpd } from '../utils/dpdMergeOnDrop.js';
   import dpdRuntime from '../generated/roland.gaia.runtime.json';
   import dpdProfileMap from '../generated/dpdProfileMap.json';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
   let query = $state('');
   let showAllIssues = $state(false);
@@ -87,7 +88,7 @@
   let selectedProfileName = $derived(
     selectedProfile?.name || selectedProfileId
   );
-  let panelProfileRequirement = $derived(getPanelRequiredProfile($activePanel, 'mainSynth'));
+  let panelProfileRequirement = $derived(getPanelRequiredProfile($activePanel, DEFAULT_DEVICE_ROLE));
   let panelRequiredProfileId = $derived(panelProfileRequirement?.profileId ?? '');
   let panelRequiredProfileLoaded = $derived(
     !panelRequiredProfileId
@@ -157,7 +158,7 @@
 
   function handleProfileChange(profileId) {
     refreshProfileParameters(profileId);
-    mapDeviceRole('mainSynth', profileId, {
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, profileId, {
       midiDestination: findDestination(selectedDestinationId),
       midiInput: findInput(selectedInputId),
       syncDirection: selectedDirection,
@@ -170,7 +171,7 @@
   }
 
   function handleDestinationChange(destinationId) {
-    mapDeviceRole('mainSynth', selectedProfileId, {
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, selectedProfileId, {
       midiDestination: findDestination(destinationId),
       midiInput: findInput(selectedInputId),
       syncDirection: selectedDirection,
@@ -178,7 +179,7 @@
   }
 
   function handleInputChange(inputId) {
-    mapDeviceRole('mainSynth', selectedProfileId, {
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, selectedProfileId, {
       midiDestination: findDestination(selectedDestinationId),
       midiInput: findInput(inputId),
       syncDirection: selectedDirection,
@@ -186,7 +187,7 @@
   }
 
   function handleSyncDirectionChange(syncDirection) {
-    mapDeviceRole('mainSynth', selectedProfileId, {
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, selectedProfileId, {
       midiDestination: findDestination(selectedDestinationId),
       midiInput: findInput(selectedInputId),
       syncDirection,
@@ -199,7 +200,7 @@
 
   function handleAcceptIdentityMismatch() {
     overrideDeviceIdentityMismatch({
-      deviceRole: 'mainSynth',
+      deviceRole: DEFAULT_DEVICE_ROLE,
       profileId: selectedProfileId,
       reason: `Accepted for panel role mainSynth with profile ${selectedProfileId}`,
     });
@@ -208,7 +209,7 @@
   function handlePullFromSynth() {
     startDeviceSync({
       profileId: selectedProfileId,
-      deviceRole: 'mainSynth',
+      deviceRole: DEFAULT_DEVICE_ROLE,
       syncDirection: selectedDirection,
       dryRun: false,
     });
@@ -217,7 +218,7 @@
   function handleScanPresets() {
     startPresetListScan({
       profileId: selectedProfileId,
-      deviceRole: 'mainSynth',
+      deviceRole: DEFAULT_DEVICE_ROLE,
       dryRun: false,
     });
   }
@@ -260,7 +261,7 @@
     return '';
   }
 
-  function getPanelRequiredProfile(panel, role = 'mainSynth') {
+  function getPanelRequiredProfile(panel, role = DEFAULT_DEVICE_ROLE) {
     const requiredProfiles = Array.isArray(panel?.requiredProfiles) ? panel.requiredProfiles : [];
     return requiredProfiles.find((entry) => entry?.role === role) ?? null;
   }
@@ -496,16 +497,16 @@
   function getCurrentIdentityMismatch(mismatch, session, profileId) {
     if (session?.identityStatus === 'mismatch') {
       return {
-        deviceRole: 'mainSynth',
+        deviceRole: DEFAULT_DEVICE_ROLE,
         profileId,
         message: session.identityMessage || session.message || 'Identity reply did not match this profile.',
       };
     }
 
     if (!mismatch) return null;
-    const mismatchRole = String(mismatch.deviceRole ?? 'mainSynth');
+    const mismatchRole = String(mismatch.deviceRole ?? DEFAULT_DEVICE_ROLE);
     const mismatchProfile = String(mismatch.profileId ?? '');
-    if (mismatchRole !== 'mainSynth') return null;
+    if (mismatchRole !== DEFAULT_DEVICE_ROLE) return null;
     if (mismatchProfile && profileId && mismatchProfile !== profileId) return null;
 
     return {
@@ -630,7 +631,7 @@
   function usePanelRequiredProfile() {
     if (!panelRequiredProfileId || !panelRequiredProfileLoaded) return;
     refreshProfileParameters(panelRequiredProfileId);
-    mapDeviceRole('mainSynth', panelRequiredProfileId, {
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, panelRequiredProfileId, {
       midiDestination: findDestination(selectedDestinationId),
     });
   }
@@ -640,9 +641,9 @@
     if (!panel?.id || !selectedProfileId) return;
 
     const requiredProfiles = Array.isArray(panel.requiredProfiles) ? [...panel.requiredProfiles] : [];
-    const existingIndex = requiredProfiles.findIndex((entry) => entry?.role === 'mainSynth');
+    const existingIndex = requiredProfiles.findIndex((entry) => entry?.role === DEFAULT_DEVICE_ROLE);
     const requiredProfile = {
-      role: 'mainSynth',
+      role: DEFAULT_DEVICE_ROLE,
       profileId: selectedProfileId,
       version: '*',
     };
@@ -680,7 +681,7 @@
     const parameterByRole = new Map();
 
     for (const required of requiredProfiles) {
-      const role = String(required?.role ?? 'mainSynth');
+      const role = String(required?.role ?? DEFAULT_DEVICE_ROLE);
       const profileId = String(required?.profileId ?? '');
       const mappedProfileId = String($deviceRoleMappings?.[role]?.profileId ?? selectedProfileId);
 
@@ -719,7 +720,7 @@
       for (const binding of bindings) {
         if (binding?.kind !== 'deviceParameter') continue;
 
-        const role = String(binding.deviceRole ?? 'mainSynth');
+        const role = String(binding.deviceRole ?? DEFAULT_DEVICE_ROLE);
         const parameterId = String(binding.parameterId ?? '');
         const mappedProfileId = String($deviceRoleMappings?.[role]?.profileId ?? selectedProfileId);
 
@@ -875,7 +876,7 @@
     const nextBinding = enrichBindingWithDpd({
       kind: 'deviceParameter',
       port: compatibility.port.id,
-      deviceRole: 'mainSynth',
+      deviceRole: DEFAULT_DEVICE_ROLE,
       parameterId: parameter.id,
       parameterType: parameter.type,
       adoptMetadata: true,
@@ -909,9 +910,9 @@
     if (!panel?.id || !parameter?.id) return;
 
     const requiredProfiles = Array.isArray(panel.requiredProfiles) ? [...panel.requiredProfiles] : [];
-    const existingIndex = requiredProfiles.findIndex((entry) => entry?.role === 'mainSynth');
+    const existingIndex = requiredProfiles.findIndex((entry) => entry?.role === DEFAULT_DEVICE_ROLE);
     const requiredProfile = {
-      role: 'mainSynth',
+      role: DEFAULT_DEVICE_ROLE,
       profileId: selectedProfileId,
       version: '*',
     };

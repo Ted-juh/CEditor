@@ -4,14 +4,10 @@ import {
   snapCustomChannelValue,
 } from './customComponentInteraction.js';
 import { syncCustomArpeggiatorValues } from './customComponentArpeggiator.js';
+import { numberOr } from './primitives.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
-}
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function controlName(control) {

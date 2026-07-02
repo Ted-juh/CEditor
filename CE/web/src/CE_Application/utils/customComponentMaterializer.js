@@ -1,15 +1,7 @@
 import { createBackground, createPartNode, createText } from './customComponentFactory.js';
 import { getCustomArpeggiator, noteNameFromMidi } from './customComponentArpeggiator.js';
 import { deepClone } from './deepClone.js';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+import { numberOr, clamp } from './primitives.js';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 

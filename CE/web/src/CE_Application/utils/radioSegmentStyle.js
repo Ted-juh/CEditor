@@ -1,4 +1,5 @@
 import { deepClone } from './deepClone.js';
+import { numberOr } from './primitives.js';
 
 const TRANSPARENT_COLOUR = '00000000';
 const DEFAULT_FILL_ORDER = ['solid', 'gradient', 'image', 'overlay'];
@@ -75,11 +76,6 @@ const DEFAULT_SEGMENT_CORNERS = Object.freeze({
   bottomLeft: { radius: 9, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 1, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: '66FFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
   bottomRight: { radius: 9, borderEnabled: true, style: 'rounded', direction: 'outward', borderStyle: 'solid', thickness: 1, dotRadius: 2, doubleGap: 2, doubleAnchor: 'center', doubleDirection: 'outward', colour: '66FFFFFF', fillSolid: true, fillGradient: false, fillImage: false, fillOverlay: false, imageSrc: '', overlaySrc: '', gradient: null, gradientFlow: 'across', cornerGradientMode: 'radial', cornerGradientFlip: false, cornerGradientInheritSide: 'A' },
 });
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
 
 function normalizeKey(value) {
   return String(value ?? '').trim().toLowerCase();

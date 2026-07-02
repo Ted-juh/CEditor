@@ -65,6 +65,8 @@
   } from '../utils/customComponentInteraction.js';
   import { runPanelPreviewScriptsForPatch } from '../scripting/scriptBindings.js';
   import { dispatchInteraction } from '../scripting/panelRuntime.js';
+  import { numberOr } from '../utils/primitives.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
   let {
     panel,
@@ -121,11 +123,6 @@
 
   function getBehavior(control) {
     return control?._children?.Behavior ?? null;
-  }
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
   }
 
   function sessionFor(control) {
@@ -438,7 +435,7 @@
       if (value === undefined) continue;
       commitDeviceParameter({
         requestId: `panel_preview_${controlId || 'control'}_${interactionPhase}_${Date.now()}`,
-        deviceRole: binding.deviceRole || 'mainSynth',
+        deviceRole: binding.deviceRole || DEFAULT_DEVICE_ROLE,
         parameterId: binding.parameterId,
         value,
         interactionPhase,

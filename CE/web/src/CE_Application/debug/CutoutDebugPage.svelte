@@ -1,4 +1,5 @@
 <script>
+  import { numberOr } from '../utils/primitives.js';
   let text = $state('Envelope');
   let fontFamily = $state('Arial');
   let fontSize = $state(68);
@@ -27,11 +28,6 @@
     { value: 'strikethrough', label: 'Strikethrough' },
     { value: 'overline', label: 'Overline' },
   ];
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
 
   let textCenterX = $derived(surfaceWidth / 2);
   let textCenterY = $derived(surfaceHeight / 2);

@@ -1,3 +1,4 @@
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 export const SCRIPT_TARGETS = [
   { id: 'ce', label: 'CE Script', family: 'portable', extension: 'ce' },
   { id: 'json', label: 'JSON Graph', family: 'portable', extension: 'json' },
@@ -297,7 +298,7 @@ export const SCRIPT_COMMANDS = [
     args: [
       { name: 'request', type: 'string', required: true },
       { name: 'profileId', type: 'string', default: '' },
-      { name: 'deviceRole', type: 'string', default: 'mainSynth' },
+      { name: 'deviceRole', type: 'string', default: DEFAULT_DEVICE_ROLE },
       { name: 'phase', type: 'string', default: 'commit' },
     ],
     description: 'Trigger a named device-profile dump request, such as an SH-201 RQ1 bulk request.',

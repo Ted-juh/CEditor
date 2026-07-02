@@ -5,6 +5,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
   let { control = null } = $props();
 
@@ -57,7 +58,7 @@
       {
         kind: 'deviceParameter',
         port,
-        deviceRole: 'mainSynth',
+        deviceRole: DEFAULT_DEVICE_ROLE,
         parameterId: '',
         parameterType: '',
         adoptMetadata: true,

@@ -1,11 +1,7 @@
-export function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
+import { numberOr, clamp } from './primitives.js';
 
-export function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+// Re-exported so existing `from './rangeBehavior.js'` importers keep working.
+export { numberOr, clamp };
 
 export function isRangeBehavior(behavior = null) {
   return String(behavior?.family ?? '') === 'range';

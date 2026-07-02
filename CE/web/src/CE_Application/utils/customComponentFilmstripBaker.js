@@ -3,19 +3,11 @@ import { denormalizeCustomChannelValue, seedCustomValues } from './customCompone
 import { normalizeCorner } from './cornerNormalization.js';
 import { buildFillClipPath } from './cornerPaths.js';
 import { buildBorderSegments, getDoubleGap } from './borderSegments.js';
+import { numberOr, clamp } from './primitives.js';
 
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
 export const FILMSTRIP_BAKE_MAX_PIXELS = 96_000_000;
 export const FILMSTRIP_BAKE_MAX_DIMENSION = 32_767;
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function argbToRgba(colour, fallback = 'rgba(0,0,0,0)') {
   const text = String(colour ?? '').replace(/^#/, '').trim();

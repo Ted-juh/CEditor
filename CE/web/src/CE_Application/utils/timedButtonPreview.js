@@ -1,13 +1,9 @@
+import { numberOr } from './primitives.js';
 const DEFAULT_HOLD_DURATION = 1200;
 const DEFAULT_REQUIRED_CLICKS = 2;
 const DEFAULT_CLICK_WINDOW = 350;
 
 export const TIMED_BUTTON_EXECUTION_FEEDBACK_MS = 900;
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
 
 function clearScheduledTimeout(handle, clearTimeoutFn) {
   if (handle != null) {

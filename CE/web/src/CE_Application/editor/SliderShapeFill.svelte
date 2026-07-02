@@ -1,6 +1,7 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { deepClone } from '../utils/deepClone.js';
+  import { numberOr } from '../utils/primitives.js';
 
   let {
     background = null,
@@ -12,11 +13,6 @@
     opacity = 1,
     style = '',
   } = $props();
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
 
   function normalizeMaskedBackground(source) {
     if (!source) return null;

@@ -4,15 +4,7 @@ import {
   syncCustomArpeggiatorValues,
 } from './customComponentArpeggiator.js';
 import { resolvePartPixelRect } from './customComponentLayout.js';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+import { numberOr, clamp } from './primitives.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};

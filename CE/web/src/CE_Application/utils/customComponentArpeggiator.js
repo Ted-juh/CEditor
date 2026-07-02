@@ -1,17 +1,9 @@
+import { numberOr, clamp } from './primitives.js';
 export const CUSTOM_ARP_NOTE_MIN = 0;
 export const CUSTOM_ARP_NOTE_MAX = 127;
 export const CUSTOM_ARP_DEFAULT_STEP_COUNT = 32;
 export const CUSTOM_ARP_MAX_STEP_COUNT = 256;
 export const CUSTOM_ARP_RUNTIME_KEY = '__arpeggiator';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function objectChildren(section) {
   return section?._children ?? {};

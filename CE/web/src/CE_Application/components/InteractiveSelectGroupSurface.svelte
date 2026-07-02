@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import CanvasControl from '../editor/CanvasControl.svelte';
   import { deepClone } from '../utils/deepClone.js';
+  import { numberOr, clamp } from '../utils/primitives.js';
 
   let {
     controls = [],
@@ -20,15 +21,6 @@
   let pointerActiveElement = $state(null);
   let keyboardFocusControlId = $state('');
   let lastInputMode = $state('pointer');
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
 
   function getControlId(control) {
     return String(control?._children?.Core?.id ?? '');

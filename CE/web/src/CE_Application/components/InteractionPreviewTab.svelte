@@ -8,6 +8,7 @@
   import { normalizeEnumValues, resolveEnumDefaultValue } from '../utils/enumBehavior.js';
   import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
   import { adjustRangeValue, getCurrentRangeValue, getRangeMax, getRangeMin, snapRangeValue } from '../utils/rangeBehavior.js';
+  import { numberOr } from '../utils/primitives.js';
   import {
     formatSliderNumericValue,
     getSliderValueMode,
@@ -24,11 +25,6 @@
   function getValueRows(control) {
     const rows = control?._children?.Value?.rows;
     return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
-  }
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
   }
 
   function createPreviewSession(control) {

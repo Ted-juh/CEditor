@@ -2,6 +2,7 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
+  import { numberOr } from '../utils/primitives.js';
 
   let {
     part = null,
@@ -15,11 +16,6 @@
     oneditablefocus = null,
     oneditableblur = null,
   } = $props();
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
 
   function clampNumber(value, min, max) {
     return Math.max(min, Math.min(max, numberOr(value, min)));

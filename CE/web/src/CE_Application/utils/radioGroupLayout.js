@@ -1,8 +1,4 @@
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
+import { numberOr } from './primitives.js';
 function normalizeKey(value) {
   return String(value ?? '').trim();
 }

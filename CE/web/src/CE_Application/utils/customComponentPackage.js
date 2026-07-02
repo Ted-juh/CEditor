@@ -1,6 +1,7 @@
 import { deepClone } from './deepClone.js';
 import { materializedCustomComponentSnapshot } from './customComponentMaterializer.js';
 import { summarizeCustomArpeggiator } from './customComponentArpeggiator.js';
+import { numberOr } from './primitives.js';
 
 export const CUSTOM_COMPONENT_PACKAGE_FORMAT = 'ceditor-component';
 export const CUSTOM_COMPONENT_PACKAGE_VERSION = 1;
@@ -40,11 +41,6 @@ function slugify(value, fallback = 'component') {
 
 function objectChildren(section) {
   return section?._children ?? {};
-}
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
 }
 
 function resolveUnit(value, unit, total) {

@@ -1,5 +1,6 @@
 import { SCRIPT_TARGETS, commandDescriptor, portabilityForScript } from './scriptCommandRegistry.js';
 import { expressionToText } from './scriptExpressions.js';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 function indent(text, spaces = 2) {
   const pad = ' '.repeat(spaces);
@@ -87,7 +88,7 @@ function emitLuaStep(step, lines) {
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
-  else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump(${quoted(args.request)}, ${quoted(args.profileId ?? '')}, ${quoted(args.deviceRole ?? 'mainSynth')})`);
+  else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump(${quoted(args.request)}, ${quoted(args.profileId ?? '')}, ${quoted(args.deviceRole ?? DEFAULT_DEVICE_ROLE)})`);
   else if (command === 'buildSysex') {
     const expression = `buildSysex(${luaBytes(args.bytes)})`;
     lines.push(args.target ? `  setValue(${quoted(args.target)}, ${expression})` : `  local sysexBytes = ${expression}`);
@@ -120,7 +121,7 @@ function ceStep(step) {
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
-  if (command === 'requestDeviceDump') return `requestDeviceDump request=${args.request} profile=${args.profileId ?? ''} role=${args.deviceRole ?? 'mainSynth'}`;
+  if (command === 'requestDeviceDump') return `requestDeviceDump request=${args.request} profile=${args.profileId ?? ''} role=${args.deviceRole ?? DEFAULT_DEVICE_ROLE}`;
   if (command === 'buildSysex') return `buildSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
   if (command === 'checksum') return `checksum ${args.type} bytes=[${(args.bytes ?? []).join(', ')}]`;
   if (command === 'to14Bit') return `to14Bit ${valueText(args.value, 'ce')}`;
@@ -159,7 +160,7 @@ function emitJsLike(script, target) {
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);
-    else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump({ request: "${args.request ?? ''}", profileId: "${args.profileId ?? ''}", deviceRole: "${args.deviceRole ?? 'mainSynth'}" });`);
+    else if (command === 'requestDeviceDump') lines.push(`  requestDeviceDump({ request: "${args.request ?? ''}", profileId: "${args.profileId ?? ''}", deviceRole: "${args.deviceRole ?? DEFAULT_DEVICE_ROLE}" });`);
     else if (command === 'buildSysex') lines.push(`  const sysexBytes = buildSysex([${(args.bytes ?? []).join(', ')}]);`);
     else if (command === 'checksum') lines.push(`  const checksum = checksumBytes("${args.type}", [${(args.bytes ?? []).join(', ')}]);`);
     else if (command === 'to14Bit') lines.push(`  const value14 = split14Bit(${valueText(args.value, target)});`);
@@ -193,7 +194,7 @@ function emitPython(script) {
     else if (step.command === 'sendCC') lines.push(`    send_cc(channel=${args.channel}, cc=${args.cc}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendNRPN') lines.push(`    send_nrpn(channel=${args.channel}, parameter_msb=${args.parameterMsb}, parameter_lsb=${args.parameterLsb}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendSysex') lines.push(`    send_sysex([${(args.bytes ?? []).join(', ')}])`);
-    else if (step.command === 'requestDeviceDump') lines.push(`    request_device_dump(request="${args.request ?? ''}", profile_id="${args.profileId ?? ''}", device_role="${args.deviceRole ?? 'mainSynth'}")`);
+    else if (step.command === 'requestDeviceDump') lines.push(`    request_device_dump(request="${args.request ?? ''}", profile_id="${args.profileId ?? ''}", device_role="${args.deviceRole ?? DEFAULT_DEVICE_ROLE}")`);
     else lines.push(`    # ${ceStep(step)}`);
   }
   return lines.join('\n');
@@ -472,7 +473,7 @@ function emitNative(script, target) {
     else if (step.command === 'sendCC') lines.push(`  ${cfg.sendCC}(${Number(args.channel) || 1}, ${Number(args.cc) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendNRPN') lines.push(`  ${cfg.sendNRPN}(${Number(args.channel) || 1}, ${Number(args.parameterMsb) || 0}, ${Number(args.parameterLsb) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendSysex') lines.push(`  ${cfg.sendSysex}(${cfg.bytes(args.bytes ?? [])})${cfg.lineEnd}`);
-    else if (step.command === 'requestDeviceDump') lines.push(`  ${cfg.requestDeviceDump}(${cfg.string(args.request ?? '')}, ${cfg.string(args.profileId ?? '')}, ${cfg.string(args.deviceRole ?? 'mainSynth')})${cfg.lineEnd}`);
+    else if (step.command === 'requestDeviceDump') lines.push(`  ${cfg.requestDeviceDump}(${cfg.string(args.request ?? '')}, ${cfg.string(args.profileId ?? '')}, ${cfg.string(args.deviceRole ?? DEFAULT_DEVICE_ROLE)})${cfg.lineEnd}`);
     else if (step.command === 'buildSysex') lines.push(`  ${cfg.declare('sysexBytes', `${cfg.buildSysex}(${cfg.bytes(args.bytes ?? [])})`)}`);
     else if (step.command === 'checksum') lines.push(`  ${cfg.declare('checksum', `${cfg.checksum}(${cfg.string(args.type)}, ${cfg.bytes(args.bytes ?? [])})`)}`);
     else if (step.command === 'to14Bit') lines.push(`  ${cfg.declare('value14', `${cfg.to14Bit}(${nativeExpression(args.value, cfg, target)})`)}`);

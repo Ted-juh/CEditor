@@ -28,6 +28,7 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -173,7 +174,7 @@ const helpers = {
 // host (e.g. a plain browser tab) the call is a no-op and we trace what *would* have gone out.
 // Origin/transmit gating for shipped panels is owned by the C++ runtime (Model 2).
 
-const DEFAULT_ROLE = 'mainSynth';
+const DEFAULT_ROLE = DEFAULT_DEVICE_ROLE;
 
 function midiInt(v, lo, hi) { v = Math.round(Number(v) || 0); return v < lo ? lo : v > hi ? hi : v; }
 function toByteArray(input) {

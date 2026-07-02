@@ -7,6 +7,7 @@
   import NumberInput from './NumberInput.svelte';
   import BackgroundEditor from './BackgroundEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
+  import { numberOr } from '../utils/primitives.js';
 
   let { control = null } = $props();
 
@@ -28,11 +29,6 @@
     { value: 'center', label: 'center' },
     { value: 'bottom', label: 'bottom' },
   ];
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
 
   function set(path, value) {
     const controlId = getSection(control, 'Core')?.id;

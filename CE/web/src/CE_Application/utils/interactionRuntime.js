@@ -17,6 +17,7 @@ import {
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { constrainCustomValues } from './customComponentInteraction.js';
+import { clamp } from './primitives.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -79,10 +80,6 @@ function normalizeRange(value, min, max) {
   const span = max - min;
   if (!Number.isFinite(span) || Math.abs(span) < 0.000001) return 0;
   return (value - min) / span;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function easingToCss(name) {
