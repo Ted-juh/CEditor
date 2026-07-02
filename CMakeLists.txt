@@ -4,6 +4,10 @@ project(CEditor VERSION 0.2.0)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
+
+# Register the test executables below with CTest so `ctest --test-dir <build> -C <config>` (and CI)
+# discovers and runs them all; each exe returns non-zero on failure.
+enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
 # JUCE 8.0.7 from local install
@@ -44,6 +48,12 @@ target_sources(CEditor PRIVATE
     "${CE_ROOT}/src/Main.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     "${CE_ROOT}/src/WebViewHost.cpp"
@@ -93,6 +103,12 @@ target_sources(CEditorPlayer PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
@@ -134,7 +150,13 @@ set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plug
 set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
 set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
 set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
-set(CE_VST_PANEL_PATH   "C:/tmp/gaia-filter.cepanel" CACHE STRING "Panel document the plugin loads")
+# Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
+# A plugin built without it loads no panel (blank player) — warn so a manual build isn't confusing.
+set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
+if (CE_VST_PANEL_PATH STREQUAL "")
+    message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
+                    "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+endif()
 
 juce_add_plugin(CEditorPlayerVST
     PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
@@ -155,6 +177,12 @@ target_sources(CEditorPlayerVST PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
@@ -194,6 +222,12 @@ target_link_libraries(CEditorPlayerVST PRIVATE
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/tests/DeviceProfileEngineTests.cpp"
 )
@@ -213,6 +247,8 @@ target_link_libraries(CEditorDeviceProfileTests PRIVATE
     juce::juce_midi_ci
 )
 
+add_test(NAME DeviceProfileEngine COMMAND CEditorDeviceProfileTests)
+
 # --- Export pipeline: compile-per-panel identity (Phase D1) ---
 add_executable(CEditorExportIdentityTests
     "${CE_ROOT}/tests/PanelExportIdentityTests.cpp"
@@ -225,6 +261,8 @@ target_include_directories(CEditorExportIdentityTests PRIVATE
 target_link_libraries(CEditorExportIdentityTests PRIVATE
     juce::juce_core
 )
+
+add_test(NAME PanelExportIdentity COMMAND CEditorExportIdentityTests)
 
 # --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
 # Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS
@@ -242,6 +280,8 @@ target_include_directories(CEditorPanelValueTests PRIVATE
 target_link_libraries(CEditorPanelValueTests PRIVATE
     juce::juce_core
 )
+
+add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
 
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
 # OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
@@ -270,6 +310,10 @@ if (CEDITOR_SCRIPTING)
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
     # Lua 5.4 — CMake-friendly mirror (provides the `lua_static` target). Adjust tag/source as needed.
+    # Its own test registration is switched off: with enable_testing() on, it would add upstream's
+    # full interpreter testsuite (lua-testsuite) to OUR ctest run — not a CEditor test, and it fails
+    # when run outside upstream's harness.
+    set(LUA_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(lua
         GIT_REPOSITORY https://github.com/walterschell/Lua.git
         GIT_TAG        v5.4.5)
@@ -311,6 +355,15 @@ if (CEDITOR_SCRIPTING)
         add_executable(CEditorPythonScriptTests "${CE_ROOT}/tests/PythonScriptEngineTests.cpp")
         target_link_libraries(CEditorPythonScriptTests PRIVATE ceditor_scripting juce::juce_core)
         target_include_directories(CEditorPythonScriptTests PRIVATE "${CE_ROOT}/src")
+        add_test(NAME PythonScriptEngine COMMAND CEditorPythonScriptTests)
+        # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
+        # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
+        # (its runtime-DLL dir is the install root on Windows).
+        if (Python3_RUNTIME_LIBRARY_DIRS)
+            list(GET Python3_RUNTIME_LIBRARY_DIRS 0 _ce_python_home)
+            set_tests_properties(PythonScriptEngine PROPERTIES
+                ENVIRONMENT "CEDITOR_PYTHONHOME=${_ce_python_home}")
+        endif()
     endif()
 
     # --- Optional: compile-at-export native handler loader (C++/C#/Java) ---
@@ -326,11 +379,13 @@ if (CEDITOR_SCRIPTING)
     add_executable(CEditorScriptingTests "${CE_ROOT}/tests/ScriptRuntimeTests.cpp")
     target_link_libraries(CEditorScriptingTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorScriptingTests PRIVATE "${CE_ROOT}/src")
+    add_test(NAME ScriptRuntime COMMAND CEditorScriptingTests)
 
     # Window-closed integration: panel -> gathered scripts -> runtime -> dispatch -> API callbacks.
     add_executable(CEditorPlayerScriptTests "${CE_ROOT}/tests/PlayerScriptIntegrationTests.cpp")
     target_link_libraries(CEditorPlayerScriptTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorPlayerScriptTests PRIVATE "${CE_ROOT}/src")
+    add_test(NAME PlayerScriptIntegration COMMAND CEditorPlayerScriptTests)
 
     # Window-closed scripts in the exported plugin: link the runtime into the VST/standalone player.
     # Gated so the default (scripting OFF) player build is unchanged; PluginProcessor.h guards its
