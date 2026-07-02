@@ -2,7 +2,7 @@
 
 > Companion to `cc-properties-panel-review.md` (the diagnosis) and successor to the phasing
 > sketch in its §6. This document is the implementation plan: four stages, each independently
-> shippable and revertible, with scope, files, acceptance criteria, and open decisions.
+> shippable and revertible, with scope, files, acceptance criteria, and resolved decisions (§6).
 > **Nothing here changes the data model or removes capability** — every stage is view-layer
 > regrouping, consistent with the redesign plan's principles (progressive disclosure, one home
 > per concept, backward compatible).
@@ -147,8 +147,8 @@ stage is mostly *moving* existing blocks verbatim — refactor after the move, n
   toggles from `CustomValueChannelsEditor`'s "Public API" section; replace with a read-only
   "published as *name*" chip + jump-link to Publish. The channel flags themselves are kept in the
   data and **maintained by write-through** whenever Publish entries change, so the package format
-  and any runtime/validation readers are untouched. *(Open decision §6-D1 covers the alternative
-  of retiring the flags outright.)*
+  and any runtime/validation readers are untouched. *(Decided — §6.1: write-through; retiring
+  the flags outright stays a possible later cleanup.)*
 
 ### Files
 
@@ -231,9 +231,9 @@ Advanced mode is the always-on escape hatch, zero schema changes, and C2 guarant
   Matrix's live values), **Hit-Zone Probe**, **Performance Budget**, **Generated Output**, and
   the relocated **Preview Workbench** (from B6). Drop: Readiness (gone in B2), Interaction
   Routes, Public Link Surface, State/Animation/Binding previews, Enum Groups, State Coverage,
-  Specialized Inspectors — they restate other tabs' content. *(Open decision §6-D3: the plan
-  §12.6 "persistent live preview instead of a Test Bench mode" is the eventual destination;
-  this diet keeps the tab but makes it small enough to fold later.)*
+  Specialized Inspectors — they restate other tabs' content. *(Decided — §6.3: diet now; the
+  plan-§12.6 "persistent live preview instead of a Test Bench mode" remains the eventual
+  destination, and the diet makes the tab small enough to fold into it later.)*
 - **D3. Presets/templates move to add-time.** The permanent preset/template card walls
   (Channels 8, Behaviors 8, Hit Zones 7 — now inside Interact's Advanced lists — plus Links 8+
   and Variants presets) become the content of each "+ Add ▾" popover picker. Editors keep only
@@ -267,19 +267,24 @@ Writers today: `CustomTestBenchEditor` (many), `CustomDesignSurfaceEditor`,
 
 Rule from Stage A onward: any focus request targeting an author tab opens the workspace first.
 
-## 6. Open decisions (need sign-off before the stage that consumes them)
+## 6. Resolved decisions (signed off 2026-07-02)
 
-1. **(before B9)** Channel `publicInput`/`publicOutput` flags: keep with write-through from
-   Publish entries (proposed — package format untouched), or retire the flags and migrate
-   readers. Write-through is safer; retiring is cleaner.
-2. **(before B1)** Variant *definitions* home: **Publish** (proposed — variants are the
-   consumer-facing preset surface) vs React (variants-as-state-patches). Review doc argues
-   Publish.
-3. **(before D2)** Test Bench end-state: slimmed tab (this plan) now, persistent live preview
-   (plan §12.6) later — or jump straight to persistent preview and skip the diet. Plan assumes
-   diet-now.
-4. **(before A1)** Scripts audience: proposed `both` (panel scripting is used at instance level;
-   authors open it from the workspace Look bar too). Confirm.
+1. **Channel `publicInput`/`publicOutput` flags (B9): write-through.** The Publish tab is the
+   only *editing* UI; toggling a published entry writes the channel flags automatically, and the
+   Channels editor shows a read-only "published as *name*" chip with a jump-link. Grounding: the
+   flags are load-bearing beyond the contract — `deriveExportParameters`
+   (`utils/exportParameters.js`) reads them directly to decide which channels become plugin
+   parameters on export, independent of `PublishedProperties`. Write-through keeps the export
+   path and package format untouched; retiring the flags stays a possible later cleanup once
+   `exportParameters` derives from the contract.
+2. **Variant definitions live in Publish (B1).** Variants are the consumer-facing preset
+   surface, grouped with the API contract and package/library ("everything the outside world
+   sees"). The active-variant *picker* moves to the instance Properties tab (Stage A4).
+3. **Test Bench: diet now, persistent preview later (D2).** Stage D slims the bench to ~6
+   test-only sections; folding it into a persistent live preview (redesign plan §12.6) remains
+   the roadmap end-state, made cheaper by the diet.
+4. **Scripts tab: audience `both` (A1).** Panel-level scripting is used on placed instances, and
+   authors also reach the script doc via the workspace Look bar — the tab stays in both contexts.
 
 ## 7. Cross-cutting
 
