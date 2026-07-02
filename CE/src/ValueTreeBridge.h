@@ -75,8 +75,9 @@ private:
     void emitDebugLog (const juce::String& level, const juce::String& message) const;
     void emitPerfDebug (const juce::String& message) const;
 
-    // Set a property via dot-notation path (e.g., "Text.Fill.colour")
-    void setPropertyFromPath (const juce::String& path, const juce::var& value);
+    // Set a property via dot-notation path (e.g., "Text.Fill.colour"). Validates the path and
+    // returns a failure (reported to the JS console by the caller) instead of silently no-oping.
+    juce::Result setPropertyFromPath (const juce::String& path, const juce::var& value);
 
     // Start a scripting-toolchain provision ("ensure") or "remove" run for payload.languages, streaming
     // progress to the WebView. Implemented in ValueTreeBridgeHandlers.cpp.

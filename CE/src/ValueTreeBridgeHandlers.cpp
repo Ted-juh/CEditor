@@ -304,12 +304,23 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 auto path = obj->getProperty ("path").toString();
                 auto value = obj->getProperty ("value");
+                auto requestId = obj->getProperty ("requestId");
 
-                juce::MessageManager::callAsync ([this, path, value]()
+                juce::MessageManager::callAsync ([this, path, value, requestId]()
                 {
                     suppressOutgoing = true;
-                    setPropertyFromPath (path, value);
+                    auto result = setPropertyFromPath (path, value);
                     suppressOutgoing = false;
+                    if (result.failed() && browser != nullptr)
+                    {
+                        // Tell JS the write never landed so it can resync (bridge.js listens for
+                        // this, logs it, and re-requests the full state).
+                        auto* rejection = new juce::DynamicObject();
+                        rejection->setProperty ("requestId", requestId);
+                        rejection->setProperty ("path", path);
+                        rejection->setProperty ("message", result.getErrorMessage());
+                        browser->emitEventIfBrowserIsVisible ("setPropertyRejected", juce::var (rejection));
+                    }
                 });
             }
         })

@@ -440,8 +440,14 @@ private:
 
         const auto loaded = ceditor::gatherPanelScripts (scriptValues.panel());
         scriptRuntime->loadScripts (loaded);
+        for (const auto& f : scriptRuntime->failedScripts())
+            scriptLogLine ("[script-error] script '" + (f.name.isNotEmpty() ? f.name : f.id)
+                           + "' (" + f.language + ") is INACTIVE — " + f.message);
         scriptRuntime->onPanelLoad();   // window-closed init phase (before any GUI exists)
-        scriptLogLine ("runtime ready — " + juce::String (loaded.size()) + " script(s) loaded (window-closed active)");
+        const auto failedCount = (int) scriptRuntime->failedScripts().size();
+        scriptLogLine ("runtime ready — " + juce::String (scriptRuntime->loadedScriptCount()) + " script(s) loaded"
+                       + (failedCount > 0 ? ", " + juce::String (failedCount) + " FAILED" : juce::String())
+                       + " (window-closed active)");
     }
 
     ceditor::PanelValueModel scriptValues;

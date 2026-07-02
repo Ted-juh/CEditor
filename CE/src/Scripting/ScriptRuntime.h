@@ -58,6 +58,16 @@ struct ScriptDefinition
 /** Reported when a script throws or a guard trips. Never crashes the panel (Q11). */
 using ScriptErrorSink = std::function<void (const juce::String& scriptId, const juce::String& message)>;
 
+/** A script that failed to load (or has no engine in this build) and is therefore inactive.
+    Kept by ScriptRuntime so hosts can tell the user instead of degrading silently. */
+struct FailedScript
+{
+    juce::String id;
+    juce::String name;
+    juce::String language;
+    juce::String message;
+};
+
 // ----------------------------------------------------------------------------------------------
 /** What a script can ask the host to do. Implemented by the app once (BridgeScriptHost), adapting
     ValueTreeBridge (values) + DeviceProfileService (MIDI/dumps). All calls happen on the message
@@ -153,6 +163,13 @@ public:
         sections). Re-installs the API and reloads every enabled script. */
     void loadScripts (const juce::var& scriptArray);
 
+    /** Scripts that were enabled but did NOT load (compile error, missing engine in this build).
+        They receive no events; surface these to the user rather than failing silently. */
+    const std::vector<FailedScript>& failedScripts() const { return failed; }
+
+    /** Number of scripts that loaded successfully and are live. */
+    int loadedScriptCount() const { return (int) scripts.size(); }
+
     // --- Lifecycle (task 6) ---
     void onPanelLoad();
     void onPanelReady (bool firstTime);
@@ -195,6 +212,7 @@ private:
     std::unique_ptr<ScriptEngine> python;   // null unless CEDITOR_PYTHON — python scripts no-op if absent
     std::unique_ptr<ScriptEngine> native;   // null unless CEDITOR_NATIVE_HANDLERS — cpp/csharp/java no-op if absent
     std::vector<ScriptDefinition> scripts;
+    std::vector<FailedScript> failed;
     std::function<void (const juce::String&)> errorLogger;
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default

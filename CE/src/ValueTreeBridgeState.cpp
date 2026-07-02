@@ -96,13 +96,22 @@ juce::var ValueTreeBridge::treeToVar (const juce::ValueTree& t)
     return juce::var (obj);
 }
 
-void ValueTreeBridge::setPropertyFromPath (const juce::String& path, const juce::var& value)
+juce::Result ValueTreeBridge::setPropertyFromPath (const juce::String& path, const juce::var& value)
 {
+    // Paths come straight from JS — validate before walking so a malformed or stale path is a
+    // reported error, not a silent no-op (silent drops let JS and C++ state diverge unnoticed).
+    if (path.isEmpty() || path.startsWithChar ('.') || path.endsWithChar ('.') || path.contains (".."))
+        return juce::Result::fail ("malformed property path '" + path + "'");
+
     juce::StringArray parts;
     parts.addTokens (path, ".", "");
 
     if (parts.isEmpty())
-        return;
+        return juce::Result::fail ("empty property path");
+
+    for (const auto& part : parts)
+        if (! juce::Identifier::isValidIdentifier (part))
+            return juce::Result::fail ("invalid segment '" + part + "' in property path '" + path + "'");
 
     auto node = tree;
 
@@ -112,13 +121,14 @@ void ValueTreeBridge::setPropertyFromPath (const juce::String& path, const juce:
         auto child = node.getChildWithName (childType);
 
         if (! child.isValid())
-            return;
+            return juce::Result::fail ("property path '" + path + "' does not exist (no child '" + parts[i] + "')");
 
         node = child;
     }
 
     auto propName = juce::Identifier (parts[parts.size() - 1]);
     node.setProperty (propName, value, &undoManager);
+    return juce::Result::ok();
 }
 
 juce::String ValueTreeBridge::buildPath (const juce::ValueTree& node, const juce::Identifier& prop) const

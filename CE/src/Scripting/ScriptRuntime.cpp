@@ -1,7 +1,18 @@
 #include "ScriptRuntime.h"
 
+#include <juce_events/juce_events.h>
+
 namespace ceditor::scripting
 {
+
+// Every public ScriptRuntime method must run on the JUCE message thread (see the header). This
+// catches violations in debug builds. Headless tests without a MessageManager are exempt; in the
+// app/plugin one always exists long before scripts load.
+static void assertMessageThread()
+{
+    [[maybe_unused]] auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    jassert (mm == nullptr || mm->isThisTheMessageThread());
+}
 
 ScriptDefinition ScriptDefinition::fromVar (const juce::var& v)
 {
@@ -59,6 +70,7 @@ void ScriptRuntime::reportError (const juce::String& scriptId, const juce::Strin
 
 void ScriptRuntime::loadScripts (const juce::var& scriptArray)
 {
+    assertMessageThread();
     scripts.clear();
     if (lua)    lua->reset();
     if (js)     js->reset();
@@ -71,7 +83,7 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     if (python) python->installApi (host);
     if (native) native->installApi (host);
 
-    const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+    failed.clear();
 
     if (auto* arr = scriptArray.getArray())
     {
@@ -79,11 +91,29 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
         {
             auto def = ScriptDefinition::fromVar (item);
             if (! def.enabled) continue;
-            if (auto* eng = engineFor (def.language))
+
+            auto* eng = engineFor (def.language);
+            if (eng == nullptr)
             {
-                if (eng->loadScript (def, onError))
-                    scripts.push_back (def);
+                auto msg = "language '" + def.language + "' is not available in this build — script is inactive";
+                failed.push_back ({ def.id, def.name, def.language, msg });
+                reportError (def.id, msg);
+                continue;
             }
+
+            // Capture the engine's load-error detail so failedScripts() can carry it to the UI.
+            juce::String loadError;
+            const ScriptErrorSink onLoadError = [this, &loadError] (const juce::String& id, const juce::String& msg)
+            {
+                loadError = msg;
+                reportError (id, msg);
+            };
+
+            if (eng->loadScript (def, onLoadError))
+                scripts.push_back (def);
+            else
+                failed.push_back ({ def.id, def.name, def.language,
+                                    loadError.isNotEmpty() ? loadError : juce::String ("failed to load") });
         }
     }
 }
@@ -104,11 +134,13 @@ void ScriptRuntime::dispatchTo (const ScriptDefinition& def, const juce::String&
 
 void ScriptRuntime::onPanelLoad()
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelLoad") dispatchTo (s, "onPanelLoad", juce::var());
 }
 
 void ScriptRuntime::onPanelReady (bool firstTime)
 {
+    assertMessageThread();
     auto* o = new juce::DynamicObject();
     o->setProperty ("firstTime", firstTime);
     const juce::var info (o);
@@ -117,11 +149,13 @@ void ScriptRuntime::onPanelReady (bool firstTime)
 
 void ScriptRuntime::onPanelClose()
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelClose") dispatchTo (s, "onPanelClose", juce::var());
 }
 
 void ScriptRuntime::onDawSaveState (juce::var& store)
 {
+    assertMessageThread();
     if (store.getDynamicObject() == nullptr) store = juce::var (new juce::DynamicObject());
     auto* dest = store.getDynamicObject();
     for (auto& s : scripts)
@@ -142,6 +176,7 @@ void ScriptRuntime::onDawSaveState (juce::var& store)
 
 void ScriptRuntime::onDawRestoreState (const juce::var& store)
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onDawRestoreState") dispatchTo (s, "onDawRestoreState", store);
 }
 
@@ -157,6 +192,7 @@ static bool matchesTarget (const ScriptDefinition& def, const juce::String& targ
 
 void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload)
 {
+    assertMessageThread();
     // 1) Named-function handlers: a script that runs on `event` and is attached to `target`.
     for (auto& s : scripts)
         if (s.event == event && matchesTarget (s, target))

@@ -4,6 +4,7 @@
  * C++ registers event listeners for: setProperty, requestFullState, undo, redo
  * C++ emits events: fullState, propUpdate
  */
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /** Check if we're running inside a JUCE WebView with native integration */
 export function isJuceAvailable() {
@@ -12,13 +13,31 @@ export function isJuceAvailable() {
          window.__JUCE__.backend;
 }
 
+let nextSetPropertyRequestId = 1;
+let setPropertyRejectionListenerInstalled = false;
+
+// C++ validates every setProperty path and emits 'setPropertyRejected' when a write did NOT land
+// (malformed or non-existent path). Without this, JS would keep local state the C++ tree never
+// accepted — surface the failure and pull the authoritative state back to resync.
+function ensureSetPropertyRejectionListener() {
+  if (setPropertyRejectionListenerInstalled) return;
+  setPropertyRejectionListenerInstalled = true;
+  window.__JUCE__.backend.addEventListener('setPropertyRejected', (payload) => {
+    console.error(
+      `[bridge] setProperty #${payload?.requestId ?? '?'} rejected: ${payload?.message ?? 'unknown error'}`
+    );
+    requestFullState();
+  });
+}
+
 /** Send a property change to C++ */
 export function setProperty(path, value) {
   if (!isJuceAvailable()) {
     console.warn('[bridge] No JUCE backend — setProperty ignored:', path, value);
     return;
   }
-  window.__JUCE__.backend.emitEvent('setProperty', { path, value });
+  ensureSetPropertyRejectionListener();
+  window.__JUCE__.backend.emitEvent('setProperty', { path, value, requestId: nextSetPropertyRequestId++ });
 }
 
 /** Request the full ValueTree state from C++ */
@@ -389,7 +408,7 @@ export function getDeviceDiagnostics() {
   window.__JUCE__.backend.emitEvent('getDeviceDiagnostics', {});
 }
 
-export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
+export function requestMidiCiDiscovery(deviceRole = DEFAULT_DEVICE_ROLE) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('requestMidiCiDiscovery', { deviceRole });
 }

@@ -180,8 +180,19 @@ export function serializePanel(panel, options = {}) {
   return JSON.stringify(data, null, 2);
 }
 
+/** Returns the panel object, or null if the document is corrupted / not a valid panel. */
 export function deserializePanel(json, filePath, name) {
-  const data = JSON.parse(json);
+  let data;
+  try {
+    data = JSON.parse(json);
+  } catch (error) {
+    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file is not valid JSON: ${error.message}`);
+    return null;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file does not contain a panel document`);
+    return null;
+  }
   const id = nextId++;
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);
