@@ -182,6 +182,10 @@ This one change removes the worst editing journey in the tool (dial retune = 3 t
 
 ## 6. Phasing
 
+> Superseded by the detailed staged plan in `cc-properties-panel-restructure-stages.md`
+> (per-stage scope, files, acceptance criteria, focus-id remap table, open decisions).
+> The table below remains as the one-glance summary.
+
 | Phase | Change | Effort / risk |
 |---|---|---|
 | **A. Context-gate the tabs** | Instance context shows the §3.1 short list; authoring tabs only render while the Designer workspace is open (`componentWorkspaceMode === 'surface'`). Delete the `surface` tab. | Small — tab filtering in `PropertiesPanel.svelte`. Ships alone, delivers most of the perceived relief. |
