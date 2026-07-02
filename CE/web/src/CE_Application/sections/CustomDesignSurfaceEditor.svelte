@@ -21,7 +21,7 @@
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activateGradientTarget } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { isPolygonKind, clipPathForKind } from '../utils/shapeGeometry.js';
+  import { clipPathForKind } from '../utils/shapeGeometry.js';
   import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
@@ -40,17 +40,67 @@
     createValueChannel,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
-  import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
+  import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
+  import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
+  import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
+  import { numberOr } from '../utils/primitives.js';
   import {
     angleFromCenter,
     computeResizedRect,
     computeRotation,
     normalizeRotation,
   } from '../utils/transformMath.js';
+  import {
+    arcPointStyle,
+    boundsForFrames,
+    clampNumber,
+    defaultDrawSize,
+    draftRect as draftRectBase,
+    feedbackLabelStyle as feedbackLabelStyleBase,
+    frameCenter,
+    frameReadout,
+    isTinyFrame,
+    partFrame as partFrameBase,
+    patchFromFrameForLayer as patchFromFrameForLayerBase,
+    patchFromZoneFrameFor as patchFromZoneFrameForBase,
+    pointInArtboardFromElement,
+    roundLayoutValue,
+    selectionBoundsStyle,
+    snapGuides as snapGuidesBase,
+    zoneFrame as zoneFrameBase,
+  } from '../utils/customDesignSurfaceGeometry.js';
+  import {
+    alphaFromColour,
+    cloneValue,
+    colourFromInput,
+    drawPreviewClip,
+    generatedSourceForNode,
+    generatorNameForEntry,
+    handleStyle,
+    hitZoneStyle as hitZoneStyleBase,
+    inlineTextEditorStyle as inlineTextEditorStyleBase,
+    isArcCenterPart,
+    isEditablePart,
+    isEditableZone,
+    isGeneratedPart,
+    kitIdFor,
+    layerKind,
+    layerKindClass,
+    layerKindLabel,
+    layerThumbPartStyle as layerThumbPartStyleBase,
+    numericInputValue,
+    partOverlayStyle as partOverlayStyleBase,
+    previewSignals,
+    stopSelectionAction,
+    swatchCss,
+    uniqueNodeName,
+    valueControlStyleLabel,
+    zoneThumbPartStyle as zoneThumbPartStyleBase,
+  } from '../utils/customDesignSurfaceHelpers.js';
 
   let { control = null } = $props();
 
@@ -199,7 +249,6 @@
   let lastDrawCreatedAt = 0;
   let zoneDisplayMode = $state('selected');
   let arpTool = $state('draw');
-  let arpDraftBlock = $state(null);
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
   let surfaceScrollEl = $state(null);
@@ -441,7 +490,6 @@
   let arpStepCount = $derived(Math.max(1, Math.min(256, Math.round(numberOr(arpeggiator?.stepCount, 32)))));
   let arpViewNote = $derived(Math.max(0, Math.min(116, Math.round(numberOr(arpeggiator?.viewNote, 60)))));
   let arpSelectedBlock = $derived(String(arpeggiator?.selectedBlock ?? ''));
-  let arpVisibleNotes = $derived(Array.from({ length: 12 }, (_, index) => arpViewNote + 11 - index));
   let zoneOverlayEntries = $derived.by(() => {
     if (!showHitZones) return [];
     if (zoneDisplayMode === 'selected') {
@@ -516,43 +564,8 @@
     setActiveTool('interactive');
   }
 
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function clampNumber(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function noteName(note) {
-    return noteNameFromMidi(note);
-  }
-
   function normalizeArpeggiator(value = {}) {
     return normalizeCustomArpeggiator(value);
-  }
-
-  function nextArpBlockId(blocks = arpBlocks) {
-    let index = blocks.length + 1;
-    const names = new Set(blocks.map((block) => block.id));
-    while (names.has(`note${index}`)) index += 1;
-    return `note${index}`;
-  }
-
-  function arpCellFromEvent(event) {
-    const stage = event.currentTarget?.closest?.('.arp-grid-stage') ?? event.currentTarget;
-    const rect = stage?.getBoundingClientRect?.();
-    return arpCellFromRect(event, rect);
-  }
-
-  function arpCellFromRect(event, rect) {
-    if (!rect) return { step: 0, note: arpViewNote };
-    const x = clampNumber((event.clientX - rect.left) / Math.max(1, rect.width), 0, 0.999999);
-    const y = clampNumber((event.clientY - rect.top) / Math.max(1, rect.height), 0, 0.999999);
-    const step = Math.max(0, Math.min(arpStepCount - 1, Math.floor(x * arpStepCount)));
-    const row = Math.max(0, Math.min(11, Math.floor(y * 12)));
-    return { step, note: arpViewNote + 11 - row };
   }
 
   function withArpPatch(patch = {}) {
@@ -595,124 +608,9 @@
     withArpPatch({ selectedBlock: String(id ?? '') });
   }
 
-  function arpBlockStyle(block) {
-    const left = (block.step / arpStepCount) * 100;
-    const width = (block.length / arpStepCount) * 100;
-    const row = arpViewNote + 11 - block.note;
-    const top = (row / 12) * 100;
-    const height = 100 / 12;
-    return `left:${left}%;top:${top}%;width:${width}%;height:${height}%;`;
-  }
-
-  function arpVelocityStyle(block) {
-    return `height:${(clampNumber(numberOr(block?.velocity, 1), 1, 127) / 127) * 100}%;`;
-  }
-
-  function beginArpDraw(event) {
-    if (arpTool !== 'draw' || !arpeggiatorEnabled || event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    const block = {
-      id: nextArpBlockId(),
-      note: start.note,
-      step: start.step,
-      length: 1,
-      velocity: 96,
-    };
-    arpDraftBlock = block;
-    interaction = {
-      type: 'arpDraw',
-      start,
-      block,
-      stageRect: event.currentTarget?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpBlockMove(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    selectArpBlock(block.id);
-    interaction = {
-      type: 'arpMove',
-      id: block.id,
-      start,
-      block,
-      stageRect: event.currentTarget?.closest?.('.arp-grid-stage')?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpBlockResize(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    selectArpBlock(block.id);
-    interaction = {
-      type: 'arpResize',
-      id: block.id,
-      start,
-      block,
-      stageRect: event.currentTarget?.closest?.('.arp-grid-stage')?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpVelocityDrag(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    selectArpBlock(block.id);
-    interaction = { type: 'arpVelocity', id: block.id, block };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-    updateArpVelocityFromEvent(block.id, event);
-  }
-
-  function handleArpBlockPointer(block, event) {
-    if (!block || event.button !== 0) return;
-    if (arpTool === 'draw' || arpTool === 'select') {
-      event.stopPropagation();
-      selectArpBlock(block.id);
-      return;
-    }
-    if (arpTool === 'resize') {
-      beginArpBlockResize(block, event);
-      return;
-    }
-    if (arpTool === 'velocity') {
-      beginArpVelocityDrag(block, event);
-      return;
-    }
-    beginArpBlockMove(block, event);
-  }
-
-  function updateArpVelocityFromEvent(id, event) {
-    const blockEl = event.currentTarget?.closest?.('.arp-block') ?? document.querySelector(`.arp-block[data-block-id="${id}"]`);
-    const rect = blockEl?.getBoundingClientRect?.();
-    if (!rect) return;
-    const normalized = clampNumber(1 - ((event.clientY - rect.top) / Math.max(1, rect.height)), 0, 1);
-    const velocity = Math.max(1, Math.min(127, Math.round(normalized * 127)));
-    setArpBlocks(arpBlocks.map((block) => block.id === id ? { ...block, velocity } : block), id);
-  }
-
   function removeSelectedArpBlock() {
     if (!arpSelectedBlock) return;
     setArpBlocks(arpBlocks.filter((block) => block.id !== arpSelectedBlock), '');
-  }
-
-  function previewSignals(value = {}) {
-    return {
-      valueNormalized: Math.max(0, Math.min(1, numberOr(value?.testValue, 0.5))),
-      customChannels: {},
-    };
   }
 
   $effect(() => {
@@ -742,68 +640,12 @@
     };
   }
 
-  function resolveUnit(value, unit, total) {
-    const numeric = numberOr(value, 0);
-    return String(unit ?? 'px') === 'percent' ? (total * numeric) / 100 : numeric;
-  }
-
-  function anchorOffset(anchor, size) {
-    switch (String(anchor ?? 'center')) {
-      case 'left':
-      case 'top':
-        return 0;
-      case 'right':
-      case 'bottom':
-        return size;
-      default:
-        return size / 2;
-    }
-  }
-
   function partFrame(part) {
-    const layout = part?._children?.Layout ?? {};
-    if (String(layout.mode ?? 'absolute') === 'fill') {
-      return { left: 0, top: 0, width: artboardWidth, height: artboardHeight };
-    }
-
-    const width = resolveUnit(layout.width, layout.widthUnit, artboardWidth);
-    const height = resolveUnit(layout.height, layout.heightUnit, artboardHeight);
-    const x = resolveUnit(layout.x, layout.xUnit, artboardWidth);
-    const y = resolveUnit(layout.y, layout.yUnit, artboardHeight);
-    return {
-      left: x - anchorOffset(layout.anchorX, width) + numberOr(layout.offsetX, 0),
-      top: y - anchorOffset(layout.anchorY, height) + numberOr(layout.offsetY, 0),
-      width,
-      height,
-    };
-  }
-
-  function isEditablePart(part) {
-    if (!part) return false;
-    if (part?.locked === true || part?.meta?.locked === true) return false;
-    if (part?.generated === true || part?.meta?.generated === true) {
-      return !!(part?.detachedFromGenerator || part?.meta?.detachedFromGenerator);
-    }
-    return true;
-  }
-
-  function isGeneratedPart(part) {
-    return part?.generated === true || part?.meta?.generated === true;
+    return partFrameBase(part, artboardWidth, artboardHeight);
   }
 
   function canManagePartName(name) {
     return !!authoredParts?._children?.[name];
-  }
-
-  function generatorNameForEntry(part) {
-    return String(part?.meta?.generatedBy ?? part?.generatedBy ?? '').trim();
-  }
-
-  function generatedSourceForNode(node) {
-    const source = String(node?.meta?.generatedBy ?? node?.generatedBy ?? '').trim();
-    if (source) return source;
-    if (node?.generated === true || node?.meta?.generated === true) return 'generated';
-    return '';
   }
 
   function isGeneratedSourceCollapsed(source) {
@@ -870,10 +712,6 @@
     });
   }
 
-  function kitIdFor(node) {
-    return String(node?.meta?.kitId ?? '');
-  }
-
   function kitFrame(kit) {
     if (!kit?.layerNames?.length) return null;
     return boundsForFrames(
@@ -883,90 +721,24 @@
     );
   }
 
-  function isEditableZone(zone) {
-    if (!zone) return false;
-    if (zone?.locked === true || zone?.meta?.locked === true) return false;
-    if (zone?.generated === true || zone?.meta?.generated === true) {
-      return !!(zone?.detachedFromGenerator || zone?.meta?.detachedFromGenerator);
-    }
-    return true;
-  }
-
-  function cloneValue(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
   function nextPartName(base) {
-    const safeBase = String(base || 'layer').replace(/[^a-zA-Z0-9_]/g, '') || 'layer';
-    let name = safeBase;
-    let index = 1;
-    const existing = new Set(authoredPartNames);
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(authoredPartNames), 'layer');
   }
 
   function nextHitZoneName(base = 'hitZone') {
-    const existing = new Set(Object.keys(authoredHitZones?._children ?? {}));
-    const safeBase = String(base || 'hitZone').replace(/[^a-zA-Z0-9_]/g, '') || 'hitZone';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(authoredHitZones?._children ?? {})), 'hitZone');
   }
 
   function nextValueChannelName(base = 'valueControl') {
-    const existing = new Set(Object.keys(valueChannels?._children ?? {}));
-    const safeBase = String(base || 'valueControl').replace(/[^a-zA-Z0-9_]/g, '') || 'valueControl';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(valueChannels?._children ?? {})), 'valueControl');
   }
 
   function nextBehaviorName(base = 'valueDrag') {
-    const existing = new Set(Object.keys(behaviors?._children ?? {}));
-    const safeBase = String(base || 'valueDrag').replace(/[^a-zA-Z0-9_]/g, '') || 'valueDrag';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(behaviors?._children ?? {})), 'valueDrag');
   }
 
   function nextKitName(base = 'kit') {
-    const existing = new Set(kitEntries.map((entry) => entry.id));
-    const safeBase = String(base || 'kit').replace(/[^a-zA-Z0-9_]/g, '') || 'kit';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
-  }
-
-  function valueControlStyleLabel(style = 'dial') {
-    if (style === 'horizontal') return 'Horizontal Scale';
-    if (style === 'vertical') return 'Vertical Scale';
-    return 'Dial Control';
-  }
-
-  function defaultDrawSize(tool = activeTool) {
-    if (tool === 'text') return { width: 96, height: 28 };
-    if (tool === 'hitZone') return { width: 96, height: 52 };
-    if (['ellipse', 'ring', 'arcTrack'].includes(tool)) return { width: 72, height: 72 };
-    return { width: 72, height: 52 };
+    return uniqueNodeName(base, new Set(kitEntries.map((entry) => entry.id)), 'kit');
   }
 
   function frameFromClick(point, tool = activeTool) {
@@ -979,19 +751,11 @@
     });
   }
 
-  function emptySection(type) {
-    return { _type: type, _children: {} };
-  }
-
   function frameForPart(name, part) {
     if (activeLayerFrames?.[name]) return activeLayerFrames[name];
     return activeSelectionKind === 'layer' && name === selectedLayer && activeFrame
       ? activeFrame
       : partFrame(part);
-  }
-
-  function isTinyFrame(frame) {
-    return !!frame && (frame.width < 28 || frame.height < 18);
   }
 
   function isTinyPart(name, part) {
@@ -1026,21 +790,6 @@
     };
   }
 
-  function isArcCenterPart(part) {
-    const kind = String(part?.kind ?? '').trim();
-    return kind === 'arcTrack'
-      || kind === 'valueArc'
-      || !!part?.meta?.arcTrack
-      || !!part?.meta?.valueArc;
-  }
-
-  function frameCenter(frame) {
-    return {
-      x: numberOr(frame?.left, 0) + (numberOr(frame?.width, 0) / 2),
-      y: numberOr(frame?.top, 0) + (numberOr(frame?.height, 0) / 2),
-    };
-  }
-
   function nearestArcPivotTarget() {
     if (activeSelectionKind !== 'layer' || !selectedPart || !selectedFrame) return null;
     const selectedCenter = frameCenter(selectedFrame);
@@ -1058,45 +807,6 @@
       })
       .sort((left, right) => left.distance - right.distance);
     return candidates[0] ?? null;
-  }
-
-  const STATE_ACCENTS = ['#14B8A6', '#5B9BD5', '#E5A029', '#9B7FEA', '#70C08F', '#E26D6D'];
-
-  function hashIndex(value, size) {
-    const text = String(value ?? '');
-    let hash = 0;
-    for (let index = 0; index < text.length; index += 1) {
-      hash = ((hash << 5) - hash) + text.charCodeAt(index);
-      hash |= 0;
-    }
-    return Math.abs(hash) % Math.max(1, size);
-  }
-
-  function stateLabel(name, state, base = false) {
-    if (base) return 'Base';
-    return String(state?.label ?? state?.name ?? name ?? 'State');
-  }
-
-  function stateDescription(name, state, base = false) {
-    if (base) return 'Default component look';
-    const flags = Object.entries(state?.when ?? {})
-      .filter(([, value]) => value === true)
-      .map(([key]) => key);
-    if (flags.length) return flags.join(' + ');
-    return state?.description || state?.group || name;
-  }
-
-  function statePatchCount(state) {
-    const patches = state?.patches ?? {};
-    return Object.values(patches).reduce((total, patch) => {
-      if (!patch || typeof patch !== 'object') return total;
-      return total + Object.keys(patch).length;
-    }, 0);
-  }
-
-  function stateCardStyle(name, index = 0) {
-    const accent = STATE_ACCENTS[(hashIndex(name, STATE_ACCENTS.length) + index) % STATE_ACCENTS.length];
-    return `--state-accent:${accent};`;
   }
 
   function statePreviewCard(entry, index = 0) {
@@ -1121,20 +831,6 @@
     };
   }
 
-  function statePreviewStageStyle(entry) {
-    const previewWidth = Math.max(1, numberOr(entry?.previewWidth, artboardWidth));
-    const previewHeight = Math.max(1, numberOr(entry?.previewHeight, artboardHeight));
-    const scale = Math.min(44 / previewWidth, 30 / previewHeight);
-    const left = Math.max(0, (44 - (previewWidth * scale)) / 2);
-    const top = Math.max(0, (30 - (previewHeight * scale)) / 2);
-    return [
-      `width:${previewWidth}px`,
-      `height:${previewHeight}px`,
-      `transform:translate(${left}px, ${top}px) scale(${scale})`,
-      'transform-origin:top left',
-    ].join(';');
-  }
-
   function selectStateCard(name) {
     if (!core?.id) return;
     const stateName = String(name || 'base');
@@ -1143,16 +839,7 @@
   }
 
   function nextStateName(base = 'State') {
-    const existing = new Set(Object.keys(states?._children ?? {}));
-    const safeBase = String(base || 'State').replace(/[^a-zA-Z0-9_]/g, '') || 'State';
-    if (!existing.has(safeBase)) return safeBase;
-    let index = 2;
-    let name = `${safeBase}_${index}`;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(states?._children ?? {})), 'State');
   }
 
   function addQuickState(event = null) {
@@ -1182,20 +869,6 @@
     updateControlProperty(core.id, `States.${stateName}.when.${flag}`, value);
   }
 
-  function stateTriggerLabel(state, base = false) {
-    if (base) return '';
-    const when = state?.when ?? {};
-    if (when.hover) return 'Hover';
-    if (when.pressed) return 'Pressed';
-    if (when.disabled) return 'Disabled';
-    if (when.focused) return 'Focused';
-    if (when.dragging) return 'Dragging';
-    if (when.checked) return 'Checked';
-    const flags = Object.entries(when).filter(([, v]) => v === true).map(([k]) => k);
-    if (flags.length) return flags[0];
-    return 'No trigger';
-  }
-
   function duplicateStateCard(name, state, event = null) {
     event?.stopPropagation?.();
     if (!core?.id) return;
@@ -1219,83 +892,12 @@
     if (designer?.preview?.state === name) selectStateCard('base');
   }
 
-  function partBackground(part) {
-    return part?._children?.Background ?? {};
-  }
-
-  function partFillColour(part, fallback = '#14B8A6') {
-    return colorInputValue(partBackground(part)?._children?.Fill?.colour, fallback);
-  }
-
-  function partStrokeColour(part, fallback = '#DCEBFA') {
-    return colorInputValue(partBackground(part)?._children?.Border?.colour, fallback);
-  }
-
-  function partCornerRadius(part) {
-    return numberOr(partBackground(part)?._children?.Corners?.radius, 4);
-  }
-
-  function layerKind(part) {
-    return String(part?.kind ?? part?.role ?? 'part');
-  }
-
-  function layerKindLabel(part) {
-    const kind = layerKind(part);
-    const labels = {
-      roundedRectangle: 'Rounded',
-      rectangle: 'Rect',
-      circle: 'Circle',
-      ellipse: 'Ellipse',
-      text: 'Text',
-      arcTrack: 'Arc',
-      valueArc: 'Arc',
-      capsule: 'Capsule',
-      ring: 'Ring',
-      viewport: 'View',
-    };
-    return labels[kind] ?? kind;
-  }
-
-  function layerKindClass(part) {
-    const kind = layerKind(part);
-    if (['circle', 'ellipse', 'ring'].includes(kind)) return 'ellipse';
-    if (['arcTrack', 'valueArc'].includes(kind)) return 'arc';
-    if (kind === 'text') return 'text';
-    if (kind === 'capsule') return 'capsule';
-    return 'rect';
-  }
-
   function layerThumbPartStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const left = clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100);
-    const top = clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100);
-    const width = clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 6, 110);
-    const height = clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 6, 110);
-    const radius = ['circle', 'ellipse', 'ring'].includes(layerKind(part))
-      ? 999
-      : Math.min(999, Math.max(2, partCornerRadius(part) / 3));
-    return [
-      `left:${left}%`,
-      `top:${top}%`,
-      `width:${width}%`,
-      `height:${height}%`,
-      `border-radius:${radius}px`,
-      `background:${partFillColour(part, '#23323B')}`,
-      `border-color:${partStrokeColour(part, '#5B9BD5')}`,
-      `opacity:${clampNumber(numberOr(part?.opacity, 1), 0.18, 1)}`,
-    ].join(';');
+    return layerThumbPartStyleBase(frameForPart(name, part), part, artboardWidth, artboardHeight);
   }
 
   function zoneThumbPartStyle(name, zone) {
-    const frame = zoneFrame(zone);
-    const shape = String(zone?.shape ?? 'rectangle');
-    return [
-      `left:${clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100)}%`,
-      `top:${clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100)}%`,
-      `width:${clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 8, 110)}%`,
-      `height:${clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 8, 110)}%`,
-      `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
-    ].join(';');
+    return zoneThumbPartStyleBase(zoneFrame(zone), zone, artboardWidth, artboardHeight);
   }
 
   function isLayerSelected(name) {
@@ -1306,15 +908,6 @@
     return selectedLayerNames
       .map((name) => [name, authoredParts?._children?.[name], parts?._children?.[name]])
       .filter(([, authoredPart, part]) => part && isEditablePart(authoredPart));
-  }
-
-  function boundsForFrames(frames = []) {
-    if (!frames.length) return null;
-    const left = Math.min(...frames.map((frame) => frame.left));
-    const top = Math.min(...frames.map((frame) => frame.top));
-    const right = Math.max(...frames.map((frame) => frame.left + frame.width));
-    const bottom = Math.max(...frames.map((frame) => frame.top + frame.height));
-    return { left, top, width: right - left, height: bottom - top };
   }
 
   function multiSelectionBounds() {
@@ -1330,7 +923,7 @@
     const artboard = event.currentTarget?.classList?.contains?.('artboard')
       ? event.currentTarget
       : event.currentTarget?.closest?.('.artboard');
-    return pointInArtboardFromElement(event, artboard);
+    return pointInArtboardFromElement(event, artboard, artboardWidth, artboardHeight, surfaceZoom);
   }
 
   function snapValue(value, event = null) {
@@ -1350,22 +943,7 @@
   }
 
   function draftRect(draft = drawDraft) {
-    if (!draft) return null;
-    let x2 = draft.current.x;
-    let y2 = draft.current.y;
-    if (draft.constrain) {
-      const size = Math.max(Math.abs(x2 - draft.start.x), Math.abs(y2 - draft.start.y));
-      x2 = draft.start.x + Math.sign(x2 - draft.start.x || 1) * size;
-      y2 = draft.start.y + Math.sign(y2 - draft.start.y || 1) * size;
-      x2 = Math.max(0, Math.min(artboardWidth, x2));
-      y2 = Math.max(0, Math.min(artboardHeight, y2));
-    }
-    return {
-      left: Math.min(draft.start.x, x2),
-      top: Math.min(draft.start.y, y2),
-      width: Math.abs(x2 - draft.start.x),
-      height: Math.abs(y2 - draft.start.y),
-    };
+    return draftRectBase(draft, artboardWidth, artboardHeight);
   }
 
   function drawPreviewStyle() {
@@ -1374,28 +952,8 @@
     return `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`;
   }
 
-  // Clip the drag preview to the shape being drawn (polygons + a thin line bar).
-  function drawPreviewClip(tool) {
-    if (tool === 'line') return 'polygon(0% 42%, 100% 42%, 100% 58%, 0% 58%)';
-    if (isPolygonKind(tool)) return clipPathForKind(tool);
-    return 'none';
-  }
-
-  function frameReadout(frame = feedbackFrame) {
-    if (!frame) return '';
-    return `${Math.round(frame.width)} x ${Math.round(frame.height)}  X ${Math.round(frame.left)}  Y ${Math.round(frame.top)}`;
-  }
-
   function feedbackLabelStyle(frame = feedbackFrame) {
-    if (!frame) return '';
-    const left = Math.max(4, Math.min(artboardWidth - 118, frame.left + frame.width + 8));
-    const top = Math.max(4, Math.min(artboardHeight - 24, frame.top + frame.height + 8));
-    return `left:${left}px;top:${top}px;`;
-  }
-
-  function selectionBoundsStyle(frame = activeSelectionFrame) {
-    if (!frame) return '';
-    return `left:${frame.left}px;top:${frame.top}px;width:${frame.width}px;height:${frame.height}px;`;
+    return feedbackLabelStyleBase(frame, artboardWidth, artboardHeight);
   }
 
   function pulseSelection(target) {
@@ -1409,11 +967,6 @@
     });
   }
 
-  function stopSelectionAction(event) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-  }
-
   function showDrawNotice(message) {
     drawNotice = message;
     if (drawNoticeTimer) clearTimeout(drawNoticeTimer);
@@ -1422,37 +975,13 @@
     }, 3000);
   }
 
-  function pointInArtboardFromElement(event, element) {
-    const rect = element?.getBoundingClientRect?.();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: Math.max(0, Math.min(artboardWidth, (event.clientX - rect.left) / surfaceZoom)),
-      y: Math.max(0, Math.min(artboardHeight, (event.clientY - rect.top) / surfaceZoom)),
-    };
-  }
-
   function focusOnMount(node) {
     requestAnimationFrame(() => node?.focus?.());
     return {};
   }
 
   function snapGuides(frame = feedbackFrame) {
-    if (!frame || !snapEnabled) return [];
-    const size = Math.max(1, numberOr(snapSize, 10));
-    const candidates = [
-      { axis: 'x', value: frame.left },
-      { axis: 'x', value: frame.left + frame.width },
-      { axis: 'y', value: frame.top },
-      { axis: 'y', value: frame.top + frame.height },
-    ];
-    return candidates
-      .filter((guide) => Math.abs(guide.value - Math.round(guide.value / size) * size) < 0.01)
-      .map((guide) => ({
-        ...guide,
-        style: guide.axis === 'x'
-          ? `left:${guide.value}px;top:0;height:${artboardHeight}px;`
-          : `top:${guide.value}px;left:0;width:${artboardWidth}px;`,
-      }));
+    return snapGuidesBase(frame, snapEnabled, snapSize, artboardWidth, artboardHeight);
   }
 
   function makeDrawnPart(kind, rect) {
@@ -1943,101 +1472,26 @@
   }
 
   function partOverlayStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const layout = part?._children?.Layout ?? {};
-    const rotation = numberOr(layout.rotation, 0);
-    const scale = Math.max(0.01, numberOr(layout.scale, 1));
-    const transforms = [];
-    if (Math.abs(rotation) > 0.001) transforms.push(`rotate(${rotation}deg)`);
-    if (Math.abs(scale - 1) > 0.001) transforms.push(`scale(${scale})`);
-
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${frame.width}px`,
-      `height:${frame.height}px`,
-      `z-index:${1000 + numberOr(part?.zIndex, 0)}`,
-      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout.pivotX, 50)}% ${numberOr(layout.pivotY, 50)}%` : '',
-    ].filter(Boolean).join(';');
+    return partOverlayStyleBase(frameForPart(name, part), part);
   }
 
   function zoneFrame(zone) {
-    const bounds = zone?.bounds ?? {};
-    const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : '%';
-    const x = numberOr(bounds.x, 0);
-    const y = numberOr(bounds.y, 0);
-    const width = Math.max(0, numberOr(bounds.width, 100));
-    const height = Math.max(0, numberOr(bounds.height, 100));
-    return unit === 'px'
-      ? { left: x, top: y, width, height }
-      : {
-        left: (artboardWidth * x) / 100,
-        top: (artboardHeight * y) / 100,
-        width: (artboardWidth * width) / 100,
-        height: (artboardHeight * height) / 100,
-      };
+    return zoneFrameBase(zone, artboardWidth, artboardHeight);
   }
 
   function hitZoneStyle(name, zone) {
     const frame = activeSelectionKind === 'hitZone' && name === selectedHitZone && activeZoneFrame
       ? activeZoneFrame
       : zoneFrame(zone);
-    const shape = String(zone?.shape ?? 'rectangle');
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${Math.max(0, frame.width)}px`,
-      `height:${Math.max(0, frame.height)}px`,
-      `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
-      `z-index:${1800 + numberOr(zone?.priority, 0)}`,
-    ].join(';');
+    return hitZoneStyleBase(frame, zone);
   }
 
   function patchFromZoneFrameFor(name, zone, frame) {
-    const unit = String(zone?.bounds?.unit ?? 'percent') === 'px' ? 'px' : 'percent';
-    const left = Math.max(0, frame.left);
-    const top = Math.max(0, frame.top);
-    const width = Math.max(1, frame.width);
-    const height = Math.max(1, frame.height);
-    return {
-      [`HitZones.${name}.bounds.x`]: unit === 'px' ? roundLayoutValue(left) : roundLayoutValue((left / artboardWidth) * 100),
-      [`HitZones.${name}.bounds.y`]: unit === 'px' ? roundLayoutValue(top) : roundLayoutValue((top / artboardHeight) * 100),
-      [`HitZones.${name}.bounds.width`]: unit === 'px' ? roundLayoutValue(width) : roundLayoutValue((width / artboardWidth) * 100),
-      [`HitZones.${name}.bounds.height`]: unit === 'px' ? roundLayoutValue(height) : roundLayoutValue((height / artboardHeight) * 100),
-      [`HitZones.${name}.bounds.unit`]: unit,
-    };
+    return patchFromZoneFrameForBase(name, zone, frame, artboardWidth, artboardHeight);
   }
 
   function patchFromZoneFrame(zone, frame) {
     return patchFromZoneFrameFor(selectedHitZone, zone, frame);
-  }
-
-  function handleStyle(id) {
-    const offset = -4;
-    const middle = 'calc(50% - 4px)';
-    const positions = {
-      tl: `left:${offset}px;top:${offset}px;`,
-      t: `left:${middle};top:${offset}px;`,
-      tr: `right:${offset}px;top:${offset}px;`,
-      r: `right:${offset}px;top:${middle};`,
-      br: `right:${offset}px;bottom:${offset}px;`,
-      b: `left:${middle};bottom:${offset}px;`,
-      bl: `left:${offset}px;bottom:${offset}px;`,
-      l: `left:${offset}px;top:${middle};`,
-    };
-    return positions[id] ?? '';
-  }
-
-  function roundLayoutValue(value) {
-    return Math.round(value * 1000) / 1000;
-  }
-
-  function colorInputValue(value, fallback = '#5B9BD5') {
-    const raw = String(value ?? '').trim();
-    if (/^[0-9a-f]{8}$/i.test(raw)) return `#${raw.slice(2)}`;
-    if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
-    if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
-    return fallback;
   }
 
   const DEFAULT_LAYER_GRADIENT = {
@@ -2045,26 +1499,6 @@
     radiusX: 50, radiusY: 50, edge: 0,
     stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
   };
-
-  function swatchCss(value, fallback = '5B9BD5') {
-    const raw = String(value ?? '').trim().replace(/^#/, '');
-    if (/^[0-9a-f]{8}$/i.test(raw)) {
-      const a = parseInt(raw.slice(0, 2), 16) / 255;
-      const rgb = raw.slice(2);
-      // Opaque: just paint the solid colour.
-      if (a >= 0.999) return `background:#${rgb}`;
-      // Semi-transparent: layer the colour over a checkerboard so alpha shows.
-      // The colour must be a linear-gradient() to be a valid background-image layer.
-      const r = parseInt(raw.slice(2, 4), 16);
-      const g = parseInt(raw.slice(4, 6), 16);
-      const b = parseInt(raw.slice(6, 8), 16);
-      const c = `rgba(${r},${g},${b},${a})`;
-      return `background-image:linear-gradient(${c},${c}),repeating-conic-gradient(#555 0% 25%,#333 0% 50%);background-size:auto,8px 8px`;
-    }
-    // 6-digit RRGGBB (no alpha) — fully opaque.
-    if (/^[0-9a-f]{6}$/i.test(raw)) return `background:#${raw}`;
-    return `background:#${fallback}`;
-  }
 
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
@@ -2100,21 +1534,6 @@
     const next = !selectedFill?.gradientEnabled;
     setLayerProperty('Background.Fill.gradientEnabled', next);
     if (next) openLayerGradient();
-  }
-
-  function alphaFromColour(value, fallback = 'FF') {
-    const raw = String(value ?? '').trim();
-    return /^[0-9a-f]{8}$/i.test(raw) ? raw.slice(0, 2).toUpperCase() : fallback;
-  }
-
-  function colourFromInput(value, alpha = 'FF', fallback = '5B9BD5') {
-    const raw = String(value ?? '').replace('#', '').trim();
-    return /^[0-9a-f]{6}$/i.test(raw) ? `${alpha}${raw.toUpperCase()}` : `${alpha}${fallback}`;
-  }
-
-  function numericInputValue(event, fallback = 0) {
-    const numeric = Number(event?.target?.value);
-    return Number.isFinite(numeric) ? numeric : fallback;
   }
 
   function setZoom(value) {
@@ -2172,25 +1591,8 @@
     });
   }
 
-  function valueFromPx(px, unit, total) {
-    return String(unit ?? 'px') === 'percent'
-      ? roundLayoutValue(total > 0 ? (px / total) * 100 : 0)
-      : roundLayoutValue(px);
-  }
-
   function patchFromFrameForLayer(name, part, frame) {
-    const layout = part?._children?.Layout ?? {};
-    const width = Math.max(1, frame.width);
-    const height = Math.max(1, frame.height);
-    const coordinateX = frame.left + anchorOffset(layout.anchorX, width) - numberOr(layout.offsetX, 0);
-    const coordinateY = frame.top + anchorOffset(layout.anchorY, height) - numberOr(layout.offsetY, 0);
-
-    return {
-      [`Parts.${name}.Layout.x`]: valueFromPx(coordinateX, layout.xUnit, artboardWidth),
-      [`Parts.${name}.Layout.y`]: valueFromPx(coordinateY, layout.yUnit, artboardHeight),
-      [`Parts.${name}.Layout.width`]: valueFromPx(width, layout.widthUnit, artboardWidth),
-      [`Parts.${name}.Layout.height`]: valueFromPx(height, layout.heightUnit, artboardHeight),
-    };
+    return patchFromFrameForLayerBase(name, part, frame, artboardWidth, artboardHeight);
   }
 
   function patchFromFrame(part, frame) {
@@ -2259,21 +1661,7 @@
   }
 
   function inlineTextEditorStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const text = part?._children?.Text ?? {};
-    const font = text?._children?.Font ?? {};
-    const fill = text?._children?.Fill ?? {};
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${frame.width}px`,
-      `height:${frame.height}px`,
-      `z-index:${2500 + numberOr(part?.zIndex, 0)}`,
-      `color:#${String(fill?.colour ?? 'FFFFFFFF').slice(-6)}`,
-      `font-family:${font?.family ?? 'Arial'}`,
-      `font-size:${numberOr(font?.size, 12)}px`,
-      `font-weight:${numberOr(font?.weightValue, 600)}`,
-    ].join(';');
+    return inlineTextEditorStyleBase(frameForPart(name, part), part);
   }
 
   function renameSelectedLayer(event) {
@@ -2782,16 +2170,6 @@
     window.addEventListener('mouseup', handleInteractionEnd);
   }
 
-  function arcPointStyle(frame, angleDeg) {
-    if (!frame) return '';
-    const radians = (numberOr(angleDeg, 0) * Math.PI) / 180;
-    const rx = frame.width / 2;
-    const ry = frame.height / 2;
-    const x = rx + Math.cos(radians) * rx;
-    const y = ry + Math.sin(radians) * ry;
-    return `left:${x - 6}px;top:${y - 6}px;`;
-  }
-
   function beginArcHandleDrag(handle, event) {
     if (event.button !== 0 || !selectedIsArc || !selectedFrame) return;
     event.stopPropagation();
@@ -2810,43 +2188,6 @@
 
   function handleInteractionMove(event) {
     if (!interaction) return;
-    if (interaction.type === 'arpDraw') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      const step = Math.min(interaction.start.step, current.step);
-      const endStep = Math.max(interaction.start.step, current.step);
-      arpDraftBlock = {
-        ...interaction.block,
-        note: current.note,
-        step,
-        length: Math.max(1, endStep - step + 1),
-      };
-      return;
-    }
-    if (interaction.type === 'arpMove') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      const stepDelta = current.step - interaction.start.step;
-      const noteDelta = current.note - interaction.start.note;
-      setArpBlocks(arpBlocks.map((block) => {
-        if (block.id !== interaction.id) return block;
-        const step = clampNumber(interaction.block.step + stepDelta, 0, Math.max(0, arpStepCount - interaction.block.length));
-        const note = clampNumber(interaction.block.note + noteDelta, 0, 127);
-        return { ...block, step, note };
-      }), interaction.id);
-      return;
-    }
-    if (interaction.type === 'arpResize') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      setArpBlocks(arpBlocks.map((block) => {
-        if (block.id !== interaction.id) return block;
-        const endStep = Math.max(block.step, current.step);
-        return { ...block, length: clampNumber(endStep - block.step + 1, 1, arpStepCount - block.step) };
-      }), interaction.id);
-      return;
-    }
-    if (interaction.type === 'arpVelocity') {
-      updateArpVelocityFromEvent(interaction.id, event);
-      return;
-    }
     if (interaction.type === 'move') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
@@ -3022,19 +2363,6 @@
     if (!interaction) return;
     window.removeEventListener('mousemove', handleInteractionMove);
     window.removeEventListener('mouseup', handleInteractionEnd);
-
-    if (interaction.type === 'arpDraw') {
-      const block = arpDraftBlock;
-      arpDraftBlock = null;
-      if (block) setArpBlocks([...arpBlocks, block], block.id);
-      interaction = null;
-      return;
-    }
-    if (['arpMove', 'arpResize', 'arpVelocity'].includes(interaction.type)) {
-      arpDraftBlock = null;
-      interaction = null;
-      return;
-    }
 
     if ((interaction.type === 'move' || interaction.type === 'resize') && activeFrame && selectedAuthoredPart) {
       applyLayerPatch(patchFromFrame(selectedAuthoredPart, activeFrame));
@@ -4100,71 +3428,17 @@
             {/each}
 
             {#if !designerPreviewing && arpeggiatorEnabled}
-              <div class="arp-editor" style={`--arp-steps:${arpStepCount};`} onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
-                <div class="arp-tool-strip" role="toolbar" aria-label="Arpeggiator edit tools">
-                  {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool}
-                    <button type="button" class:active={arpTool === tool} onclick={() => { arpTool = tool; }} title={`Arpeggiator ${tool} tool`}>
-                      {tool}
-                    </button>
-                  {/each}
-                </div>
-                <div class="arp-ruler">
-                  <span></span>
-                  {#each Array.from({ length: arpStepCount }, (_, index) => index) as step (step)}
-                    <strong class:bar-start={step % 4 === 0}>{step + 1}</strong>
-                  {/each}
-                </div>
-                <div class="arp-note-labels">
-                  {#each arpVisibleNotes as note (note)}
-                    <span class:black-key={noteName(note).includes('#')}>{noteName(note)}</span>
-                  {/each}
-                </div>
-                <div
-                  class="arp-grid-stage"
-                  style={`--arp-steps:${arpStepCount};`}
-                  onmousedown={beginArpDraw}
-                  aria-label="Arpeggiator pattern grid"
-                >
-                  {#each arpVisibleNotes as note (note)}
-                    <span class="arp-row" class:black-key={noteName(note).includes('#')}></span>
-                  {/each}
-                  {#each Array.from({ length: arpStepCount }, (_, index) => index) as step (step)}
-                    <span class="arp-step" class:bar-start={step % 4 === 0}></span>
-                  {/each}
-                  {#each arpBlocks.filter((block) => block.note >= arpViewNote && block.note < arpViewNote + 12) as block (block.id)}
-                    <button
-                      type="button"
-                      class="arp-block"
-                      class:selected={arpSelectedBlock === block.id}
-                      data-block-id={block.id}
-                      style={arpBlockStyle(block)}
-                      title={`${noteName(block.note)} · step ${block.step + 1} · length ${block.length} · velocity ${block.velocity}`}
-                      onmousedown={(event) => handleArpBlockPointer(block, event)}
-                      onclick={(event) => { event.stopPropagation(); selectArpBlock(block.id); }}
-                    >
-                      <span class="arp-velocity-fill" style={arpVelocityStyle(block)}></span>
-                      <strong>{noteName(block.note)}</strong>
-                      <em>{block.velocity}</em>
-                      <span
-                        class="arp-velocity-handle"
-                        title="Drag up/down for velocity"
-                        onmousedown={(event) => beginArpVelocityDrag(block, event)}
-                      ></span>
-                      <span
-                        class="arp-resize-handle"
-                        title="Drag to change duration"
-                        onmousedown={(event) => beginArpBlockResize(block, event)}
-                      ></span>
-                    </button>
-                  {/each}
-                  {#if arpDraftBlock && arpDraftBlock.note >= arpViewNote && arpDraftBlock.note < arpViewNote + 12}
-                    <div class="arp-block draft" style={arpBlockStyle(arpDraftBlock)}>
-                      <span class="arp-velocity-fill" style={arpVelocityStyle(arpDraftBlock)}></span>
-                      <strong>{noteName(arpDraftBlock.note)}</strong>
-                    </div>
-                  {/if}
-                </div>
-              </div>
+              <CustomArpeggiatorEditor
+                {arpeggiatorEnabled}
+                {arpBlocks}
+                {arpStepCount}
+                {arpViewNote}
+                {arpSelectedBlock}
+                {arpTool}
+                onArpToolChange={(tool) => { arpTool = tool; }}
+                {setArpBlocks}
+                {selectArpBlock}
+              />
             {/if}
 
             {#if !designerPreviewing}
@@ -5202,80 +4476,20 @@
     {/if}
 
     {#if !designerPreviewing}
-    <div class="state-filmstrip" class:collapsed={filmstripCollapsed} aria-label="Component states">
-      <div class="state-title">
-        <button type="button" class="filmstrip-collapse-btn" onclick={() => { filmstripCollapsed = !filmstripCollapsed; }} title={filmstripCollapsed ? 'Expand states' : 'Collapse states'}>
-          <strong>States</strong>
-          <span>{Math.max(1, stateFilmstripEntries.length)}</span>
-        </button>
-      </div>
-      <div class="state-chip-row">
-        {#each statePreviewCards as entry (entry.name)}
-          <div
-            class="state-card"
-            class:active={(designer?.preview?.state ?? 'base') === entry.name}
-            class:base={entry.base}
-            style={stateCardStyle(entry.name, entry.index)}
-            title={stateDescription(entry.name, entry.state, entry.base)}
-          >
-            <button
-              type="button"
-              class="state-main"
-              onclick={() => selectStateCard(entry.name)}
-            >
-              <span class="state-thumb" aria-hidden="true">
-                <span class="state-preview-stage" style={statePreviewStageStyle(entry)}>
-                  {#each entry.previewParts as [partName, part] (partName)}
-                    <InteractivePartRenderer
-                      part={part}
-                      parentWidth={entry.previewWidth}
-                      parentHeight={entry.previewHeight}
-                    />
-                  {/each}
-                </span>
-              </span>
-              <span class="state-copy">
-                <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
-                <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
-              </span>
-              <div class="state-count-trigger">
-                <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
-                {#if !entry.base}
-                  <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean)}>{stateTriggerLabel(entry.state, entry.base)}</span>
-                {/if}
-              </div>
-            </button>
-            <div class="state-actions" aria-label={`${entry.name} state actions`}>
-              {#if !entry.base}
-                <div class="when-toggles">
-                  {#each [['hover','H'],['pressed','P'],['disabled','D']] as [flag, label] (flag)}
-                    <button type="button"
-                      class:active={entry.state?.when?.[flag] === true}
-                      onclick={(e) => { e.stopPropagation(); setFilmstripStateWhen(entry.name, flag, !(entry.state?.when?.[flag] === true)); }}
-                      title={flag}
-                    >{label}</button>
-                  {/each}
-                </div>
-              {/if}
-              <button type="button" onclick={(event) => { event.stopPropagation(); inspectorTab = 'states'; selectStateCard(entry.name); }} title="Edit state">
-                Edit
-              </button>
-              <button type="button" onclick={(event) => duplicateStateCard(entry.name, entry.state, event)} title={entry.base ? 'Create state from base' : 'Duplicate state'}>
-                Copy
-              </button>
-              {#if !entry.base}
-                <button type="button" class="danger" onclick={(event) => removeStateCard(entry.name, event)} title="Delete state">
-                  Del
-                </button>
-              {/if}
-            </div>
-          </div>
-        {/each}
-        <button type="button" class="add-state" title="Add state" onclick={addQuickState}>
-          +
-        </button>
-      </div>
-    </div>
+    <CustomStateFilmstrip
+      {statePreviewCards}
+      activeStateName={designer?.preview?.state ?? 'base'}
+      {artboardWidth}
+      {artboardHeight}
+      {filmstripCollapsed}
+      onToggleCollapsed={() => { filmstripCollapsed = !filmstripCollapsed; }}
+      {selectStateCard}
+      onEditState={(name) => { inspectorTab = 'states'; selectStateCard(name); }}
+      {setFilmstripStateWhen}
+      {duplicateStateCard}
+      {removeStateCard}
+      {addQuickState}
+    />
     {/if}
 
     {#if !designerPreviewing && !displayDockHidden}
@@ -5310,7 +4524,6 @@
   .palette-panel { grid-area: palette; }
   .surface-viewport { grid-area: canvas; }
   .surface-dock { grid-area: dock; }
-  .state-filmstrip { grid-area: states; }
   .surface-display-dock { grid-area: display; }
   /* The floating tool-strip overlaps the bottom of the canvas cell. */
   .tool-strip { grid-area: canvas; align-self: end; }
@@ -7056,212 +6269,6 @@
     cursor: crosshair;
   }
 
-  .arp-editor {
-    position: absolute;
-    inset: 12px;
-    z-index: 1850;
-    display: grid;
-    grid-template-columns: 46px 1fr;
-    grid-template-rows: 28px 24px 1fr;
-    overflow: hidden;
-    border: 1px solid #344653;
-    border-radius: 4px;
-    background: #10151A;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
-    color: #D9E7F0;
-    user-select: none;
-  }
-
-  .arp-tool-strip {
-    grid-column: 1 / 3;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-    padding: 4px;
-    border-bottom: 1px solid #2D3A43;
-    background: #12191F;
-  }
-
-  .arp-tool-strip button {
-    min-width: 0;
-    border: 1px solid #2E3C46;
-    border-radius: 3px;
-    background: #1B252C;
-    color: #AFC0CB;
-    cursor: pointer;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: capitalize;
-  }
-
-  .arp-tool-strip button.active,
-  .arp-tool-strip button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #FFFFFF;
-  }
-
-  .arp-ruler {
-    grid-column: 1 / 3;
-    display: grid;
-    grid-template-columns: 46px repeat(var(--arp-steps, 32), minmax(12px, 1fr));
-    border-bottom: 1px solid #2D3A43;
-    background: #151C22;
-  }
-
-  .arp-ruler strong {
-    display: grid;
-    place-items: center;
-    min-width: 0;
-    border-left: 1px solid #24313A;
-    color: #8498A8;
-    font-size: 9px;
-    font-weight: 700;
-  }
-
-  .arp-ruler strong.bar-start {
-    color: #E5C06B;
-    background: rgba(229, 192, 107, 0.08);
-  }
-
-  .arp-note-labels {
-    display: grid;
-    grid-template-rows: repeat(12, 1fr);
-    border-right: 1px solid #2D3A43;
-    background: #141A1F;
-  }
-
-  .arp-note-labels span {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 0 7px 0 3px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    color: #AABBC8;
-    font-size: 10px;
-    font-weight: 700;
-  }
-
-  .arp-note-labels span.black-key {
-    background: #0F1418;
-    color: #7F929F;
-  }
-
-  .arp-grid-stage {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(var(--arp-steps, 32), minmax(12px, 1fr));
-    grid-template-rows: repeat(12, 1fr);
-    overflow: hidden;
-    cursor: crosshair;
-    touch-action: none;
-  }
-
-  .arp-row,
-  .arp-step {
-    pointer-events: none;
-  }
-
-  .arp-row {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-  }
-
-  .arp-row.black-key {
-    background: rgba(0, 0, 0, 0.18);
-  }
-
-  .arp-step {
-    grid-row: 1 / -1;
-    border-left: 1px solid rgba(255, 255, 255, 0.045);
-  }
-
-  .arp-step.bar-start {
-    border-left-color: rgba(229, 192, 107, 0.34);
-    background: rgba(229, 192, 107, 0.025);
-  }
-
-  .arp-block {
-    position: absolute;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    min-width: 12px;
-    margin: 1px;
-    padding: 0 13px 0 7px;
-    border: 1px solid rgba(125, 196, 243, 0.72);
-    border-radius: 3px;
-    background: rgba(45, 108, 146, 0.78);
-    color: #F2FAFF;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
-    cursor: move;
-    overflow: hidden;
-    font: inherit;
-    text-align: left;
-    touch-action: none;
-  }
-
-  .arp-block.selected {
-    border-color: #FFE08A;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.75),
-      0 0 0 4px rgba(229, 192, 107, 0.16),
-      0 2px 8px rgba(0, 0, 0, 0.32);
-  }
-
-  .arp-block.draft {
-    border-style: dashed;
-    opacity: 0.82;
-    pointer-events: none;
-  }
-
-  .arp-block strong,
-  .arp-block em {
-    position: relative;
-    z-index: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 9px;
-    line-height: 1;
-  }
-
-  .arp-block em {
-    color: #CFEAFF;
-    font-style: normal;
-    font-weight: 700;
-  }
-
-  .arp-velocity-fill {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(0deg, rgba(229, 192, 107, 0.58), rgba(125, 196, 243, 0.1));
-    pointer-events: none;
-  }
-
-  .arp-velocity-handle {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: ns-resize;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .arp-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 10px;
-    cursor: ew-resize;
-    background: rgba(255, 255, 255, 0.14);
-  }
 
   .part-bound,
   .hit-zone {
@@ -8512,267 +7519,6 @@
   .dock-field input[type='checkbox'],
   .dock-field input[type='range'] {
     accent-color: #14B8A6;
-  }
-
-  .state-filmstrip {
-    display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: stretch;
-    min-height: 86px;
-    border-top: 1px solid #2A3741;
-    background: linear-gradient(180deg, #151E25, #10171D);
-  }
-
-  .state-filmstrip.collapsed .state-chip-row {
-    display: none;
-  }
-
-  .state-filmstrip.collapsed {
-    min-height: 0;
-  }
-
-  .filmstrip-collapse-btn {
-    display: grid;
-    gap: 4px;
-    align-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    padding: 0 14px;
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-  }
-
-  .state-count-trigger {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    font-size: 9px;
-  }
-
-  .state-trigger-badge {
-    padding: 1px 5px;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 3px;
-    background: rgba(255,255,255,0.06);
-    color: #8FEDE3;
-    font-size: 9px;
-    white-space: nowrap;
-  }
-
-  .state-trigger-badge.no-trigger {
-    color: #6B7A86;
-    border-color: rgba(255,255,255,0.06);
-  }
-
-  .when-toggles {
-    display: flex;
-    gap: 2px;
-  }
-
-  .when-toggles button {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid #2E3B45;
-    border-radius: 3px;
-    background: #1A242D;
-    color: #6B7A86;
-    font-size: 9px;
-    font-weight: 800;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  .when-toggles button.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.22);
-    color: #8FEDE3;
-  }
-
-  .state-title {
-    display: grid;
-    align-content: stretch;
-    gap: 0;
-    align-items: stretch;
-    padding: 0;
-    border-right: 1px solid #2A3741;
-    color: #D8E6EE;
-    font-size: 11px;
-    font-weight: 900;
-  }
-
-  .state-title strong,
-  .state-title span {
-    display: block;
-  }
-
-  .state-title span {
-    width: max-content;
-    min-width: 24px;
-    padding: 2px 6px;
-    border: 1px solid #31404A;
-    border-radius: 999px;
-    background: #10181E;
-    color: #8FEDE3;
-    font-size: 10px;
-    text-align: center;
-  }
-
-  .state-chip-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-    overflow-x: auto;
-    padding: 9px 12px;
-  }
-
-  .state-card {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) 22px;
-    flex: 0 0 160px;
-    height: 68px;
-    overflow: hidden;
-    border: 1px solid #2E3B45;
-    border-radius: 6px;
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--state-accent) 12%, #1A252D), #141D24 62%),
-      #1A252D;
-    color: #C9D6DF;
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--state-accent) 82%, #FFFFFF);
-  }
-
-  .state-card.active {
-    border-color: var(--state-accent);
-    box-shadow:
-      inset 3px 0 0 var(--state-accent),
-      inset 0 0 0 1px color-mix(in srgb, var(--state-accent) 34%, transparent),
-      0 0 18px color-mix(in srgb, var(--state-accent) 16%, transparent);
-  }
-
-  .state-main {
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    padding: 7px 8px 5px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-  }
-
-  .state-thumb {
-    position: relative;
-    width: 46px;
-    height: 32px;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--state-accent) 46%, #31404A);
-    border-radius: 4px;
-    background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-      #0B1116;
-    background-size: 7px 7px;
-  }
-
-  .state-preview-stage {
-    position: absolute;
-    left: 0;
-    top: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .state-copy {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .state-count {
-    align-self: start;
-    padding: 2px 5px;
-    border: 1px solid color-mix(in srgb, var(--state-accent) 34%, #2E3B45);
-    border-radius: 999px;
-    background: rgba(8, 13, 17, 0.48);
-    color: color-mix(in srgb, var(--state-accent) 72%, #FFFFFF);
-    font-size: 8px;
-    font-weight: 900;
-    white-space: nowrap;
-  }
-
-  .state-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 7px 6px 57px;
-  }
-
-  .state-actions button {
-    height: 18px;
-    padding: 0 6px;
-    border: 1px solid #33434E;
-    border-radius: 3px;
-    background: rgba(11, 17, 22, 0.62);
-    color: #9FB2BF;
-    cursor: pointer;
-    font: inherit;
-    font-size: 9px;
-    font-weight: 800;
-  }
-
-  .state-actions button:hover {
-    border-color: var(--state-accent);
-    color: #F0FFFC;
-  }
-
-  .state-actions button.danger:hover {
-    border-color: #E26D6D;
-    color: #FFD2D2;
-  }
-
-  .state-chip-row button.add-state {
-    flex: 0 0 44px;
-    min-width: 44px;
-    height: 68px;
-    place-items: center;
-    border: 1px solid #2E3B45;
-    border-radius: 6px;
-    background: #172129;
-    color: #8FEDE3;
-    cursor: pointer;
-    font-size: 20px;
-    font-weight: 300;
-  }
-
-  .state-copy strong,
-  .state-copy em {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .state-copy strong {
-    color: #F2F8FB;
-    font-size: 11px;
-    font-weight: 800;
-  }
-
-  .state-copy em {
-    color: #8FA4B0;
-    font-size: 10px;
-    font-style: normal;
   }
 
   @media (max-width: 1380px) {
