@@ -1,0 +1,859 @@
+// Local (JUCE-less / draft-source) profile engine: hex parsing, parameter/request/identity
+// compilation, dump parsing + collection, preset-scan building and source validation.
+// Pure logic — its only store dependency is reading profileSources as a source-text fallback.
+import { get } from 'svelte/store';
+import { isJuceAvailable } from '../bridge/bridge.js';
+import { profileSources } from './deviceProfileStores.js';
+import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
+
+export function bytesToHex(bytes = []) {
+  return (bytes ?? [])
+    .map((byte) => Number(byte).toString(16).padStart(2, '0').toUpperCase())
+    .join(' ');
+}
+
+export function clampInt(value, min, max) {
+  const number = Math.round(Number(value));
+  if (!Number.isFinite(number)) return min;
+  return Math.min(max, Math.max(min, number));
+}
+
+export function normalizeHex(value = '') {
+  return String(value ?? '').trim().toUpperCase().split(/[\s,]+/).filter(Boolean).join(' ');
+}
+
+export function parseRawMidiHexText(value = '') {
+  const tokens = normalizeHex(value).split(' ').filter(Boolean);
+  if (tokens.length === 0) return { ok: false, error: 'Bulk dump hex is required', bytes: [] };
+
+  const bytes = [];
+  for (const token of tokens) {
+    if (!/^[0-9A-F]{1,2}$/.test(token)) {
+      return { ok: false, error: `Invalid MIDI byte: ${token}`, bytes: [] };
+    }
+    const byte = parseInt(token, 16);
+    if (!Number.isFinite(byte) || byte < 0 || byte > 255) {
+      return { ok: false, error: `Invalid MIDI byte: ${token}`, bytes: [] };
+    }
+    bytes.push(byte);
+  }
+
+  if (bytes[0] === 0xf0 && bytes.at(-1) !== 0xf7) {
+    return { ok: false, error: 'SysEx raw MIDI message must end with F7', bytes: [] };
+  }
+
+  return { ok: true, bytes };
+}
+
+export function parseProfileSourceText(profileId, source = '') {
+  const text = String(source || get(profileSources)?.[profileId]?.source || '').trim();
+  if (!text) return { ok: false, error: 'No profile source loaded.' };
+  try {
+    const profile = JSON.parse(text);
+    if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+      return { ok: false, error: 'Profile source must be a JSON object.' };
+    }
+    return { ok: true, profile, source: text };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Profile source is not valid JSON.' };
+  }
+}
+
+export function localProfileMode(profileId, source = '') {
+  return !isJuceAvailable() || !!String(source ?? '').trim() || get(profileSources)?.[profileId]?.localDraft === true;
+}
+
+function recipeNumber(value, variables = {}, fallback = 0) {
+  if (typeof value === 'string' && value.startsWith('$')) {
+    const key = value.slice(1);
+    return Number(variables[key] ?? fallback);
+  }
+  return Number(value ?? fallback);
+}
+
+function encodeParameterValue(parameter, value) {
+  const encoding = String(parameter?.encoding?.type ?? 'u7');
+  if (encoding === 'boolean-u7') {
+    const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
+    return { bytes: [on ? 127 : 0], number: on ? 127 : 0, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
+  }
+  if (encoding === 'u14' || encoding === '14bit') {
+    const number = clampInt(value, 0, 16383);
+    return { bytes: [(number >> 7) & 0x7f, number & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
+  const number = clampInt(value, 0, 127);
+  return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
+}
+
+export function localCompileParameter(profile, request = {}) {
+  const parameterId = String(request.parameterId ?? '');
+  const parameter = (profile.parameters ?? []).find((item) => String(item?.id ?? '') === parameterId);
+  if (!parameter) return { ok: false, error: `Parameter "${parameterId}" is not in this profile.` };
+
+  const recipeId = String(parameter.messageRecipe ?? '');
+  const recipe = (profile.messageRecipes ?? []).find((item) => String(item?.id ?? '') === recipeId);
+  if (!recipe) return { ok: false, error: `Recipe "${recipeId}" was not found for ${parameterId}.` };
+
+  const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}), ...(request.variables ?? {}) };
+  const encoded = encodeParameterValue(parameter, request.value);
+  const channel = clampInt(recipeNumber(recipe.channel, variables, variables.channel ?? 1), 1, 16);
+  const status = 0xb0 + channel - 1;
+  const kind = String(recipe.kind ?? 'cc');
+  let bytes = [];
+
+  if (kind === 'cc') {
+    bytes = [status, clampInt(recipe.controller, 0, 127), encoded.bytes[0] ?? 0];
+  } else if (kind === 'nrpn') {
+    const value14 = encoded.bytes.length > 1
+      ? encoded
+      : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+    bytes = [
+      status, 99, clampInt(recipe.parameterMsb, 0, 127),
+      status, 98, clampInt(recipe.parameterLsb, 0, 127),
+      status, 6, value14.bytes[0] ?? 0,
+    ];
+    if ((value14.bytes[1] ?? 0) !== 0 || value14.number > 127) {
+      bytes.push(status, 38, value14.bytes[1] ?? 0);
+    }
+  } else if (kind === 'sysex') {
+    const template = Array.isArray(recipe.template) ? recipe.template : [];
+    for (const token of template) {
+      const text = String(token ?? '');
+      if (text === '$deviceId') bytes.push(clampInt(variables.deviceId, 0, 127));
+      else if (text === '$encodedValue') bytes.push(...encoded.bytes);
+      else if (text === '$checksum') bytes.push(clampInt(bytes.reduce((sum, byte) => sum + byte, 0), 0, 127));
+      else if (/^[0-9a-f]{1,2}$/i.test(text)) bytes.push(parseInt(text, 16));
+    }
+  } else {
+    return { ok: false, error: `Unsupported recipe kind "${kind}".` };
+  }
+
+  const hex = bytesToHex(bytes);
+  return {
+    ok: true,
+    profileId: profile.id,
+    deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    parameterId,
+    hex,
+    transaction: {
+      transactionId: request.requestId ?? 'local_dry_tx',
+      deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+      parameterId,
+      semanticValue: request.value,
+      displayedValue: encoded.displayed,
+      normalizedValue: encoded.normalized,
+      encodedValueHex: bytesToHex(encoded.bytes),
+      checksumStatus: kind === 'sysex' ? 'local' : 'none',
+      hex,
+      messages: [{ kind, hex, bytes }],
+      policy: {
+        mode: parameter?.sendPolicy?.mode ?? 'continuous',
+        coalesce: parameter?.sendPolicy?.coalesce !== false,
+        minIntervalMs: Number(parameter?.sendPolicy?.minIntervalMs ?? profile?.timing?.minDelayBetweenMessagesMs ?? 0),
+        sendFinalOnRelease: parameter?.sendPolicy?.sendFinalOnRelease !== false,
+        realtimeSafe: parameter?.access?.realtimeSafe !== false,
+      },
+    },
+  };
+}
+
+function localDefaultStartupRequestId(profile) {
+  const sync = Array.isArray(profile?.startup?.sync) ? profile.startup.sync : [];
+  for (const step of sync) {
+    if (typeof step === 'string' && step.trim()) return step.trim();
+    const request = String(step?.request ?? '').trim();
+    if (request) return request;
+  }
+  return String(profile?.requests?.[0]?.id ?? '').trim();
+}
+
+function localResolveByteToken(token, variables = {}) {
+  const text = String(token ?? '').trim();
+  if (text.startsWith('$')) return clampInt(variables[text.slice(1)], 0, 127);
+  return /^[0-9a-f]{1,2}$/i.test(text) ? parseInt(text, 16) : 0;
+}
+
+function localPatternBytes(value, variables = {}) {
+  const tokens = Array.isArray(value)
+    ? value
+    : String(value ?? '').split(/[\s,]+/).filter(Boolean);
+  return tokens.map((token) => localResolveByteToken(token, variables));
+}
+
+export function localCompileIdentityRequest(profile, request = {}) {
+  const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}), ...(request.variables ?? {}) };
+  const deviceId = localResolveByteToken(profile.identity?.requestDeviceId ?? '7F', variables);
+  const bytes = [0xf0, 0x7e, deviceId, 0x06, 0x01, 0xf7];
+  const hex = bytesToHex(bytes);
+  return {
+    ok: true,
+    requestId: request.correlationId ?? `local_identity_${Date.now()}`,
+    deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    profileId: profile.id,
+    deviceRequestId: 'identityRequest',
+    expectedResponseKind: 'identity',
+    status: 'Preview',
+    pending: false,
+    local: true,
+    transaction: {
+      transactionId: 'request_identityRequest',
+      deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+      parameterId: 'identityRequest',
+      semanticValue: true,
+      displayedValue: 'Identity Request',
+      normalizedValue: 1,
+      encodedValueHex: hex,
+      checksumStatus: 'none',
+      hex,
+      messages: [{ kind: 'sysex', hex, bytes }],
+      policy: { mode: 'request', coalesce: false, minIntervalMs: 0, sendFinalOnRelease: true, realtimeSafe: false },
+    },
+  };
+}
+
+export function localMatchIdentityReply(profile, inputHex = '') {
+  const bytes = normalizeHex(inputHex).split(' ').filter(Boolean).map((token) => parseInt(token, 16));
+  if (bytes.length < 11 || bytes[0] !== 0xf0 || bytes[1] !== 0x7e || bytes[3] !== 0x06 || bytes[4] !== 0x02 || bytes.at(-1) !== 0xf7) {
+    return { ok: false, matched: false, error: 'Not an identity reply.', values: {} };
+  }
+  const manufacturerLength = bytes[5] === 0 ? 3 : 1;
+  const familyOffset = 5 + manufacturerLength;
+  const modelOffset = familyOffset + 2;
+  const revisionOffset = modelOffset + 2;
+  const actual = {
+    'identity.deviceId': bytesToHex([bytes[2]]),
+    'identity.manufacturerId': bytesToHex(bytes.slice(5, 5 + manufacturerLength)),
+    'identity.familyCode': bytesToHex(bytes.slice(familyOffset, familyOffset + 2)),
+    'identity.modelNumber': bytesToHex(bytes.slice(modelOffset, modelOffset + 2)),
+    'identity.revision': bytesToHex(bytes.slice(revisionOffset, -1)),
+  };
+  const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}) };
+  const expected = {
+    'identity.manufacturerId': bytesToHex(localPatternBytes(profile.identity?.manufacturerId, variables)),
+    'identity.familyCode': bytesToHex(localPatternBytes(profile.identity?.familyCode, variables)),
+    'identity.modelNumber': bytesToHex(localPatternBytes(profile.identity?.modelNumber, variables)),
+    'identity.revision': bytesToHex(localPatternBytes(profile.identity?.revision, variables)),
+  };
+  for (const [key, expectedValue] of Object.entries(expected)) {
+    if (expectedValue && actual[key] !== expectedValue) {
+      return { ok: false, matched: false, error: `${key} expected ${expectedValue} but got ${actual[key]}`, values: actual };
+    }
+  }
+  return { ok: true, matched: true, values: actual };
+}
+
+export function localDumpDiagnostics(code, message, dumpId = '') {
+  return [{ level: 'error', code, message, ...(dumpId ? { dumpId } : {}) }];
+}
+
+function localBytesStartWith(bytes = [], prefix = []) {
+  return prefix.length <= bytes.length && prefix.every((byte, index) => bytes[index] === byte);
+}
+
+function localBytesEndWith(bytes = [], suffix = []) {
+  if (suffix.length > bytes.length) return false;
+  const offset = bytes.length - suffix.length;
+  return suffix.every((byte, index) => bytes[offset + index] === byte);
+}
+
+function normalizeTextCodec(codec = '') {
+  const value = String(codec || 'u7');
+  if (value === 'ascii' || value === 'fixed-ascii') return 'text-ascii';
+  if (value === 'nibbled-ascii' || value === 'packed-nibbled-ascii') return 'text-nibbled-ascii';
+  return value;
+}
+
+function trimRightPad(text = '', padByte = 32) {
+  let value = String(text ?? '');
+  const pad = Number(padByte);
+  if (!Number.isFinite(pad) || pad < 0 || pad > 127) return value.trimEnd();
+  const padChar = String.fromCharCode(pad);
+  while (value.endsWith(padChar)) value = value.slice(0, -1);
+  return value.trimEnd();
+}
+
+function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecOverride = null) {
+  if (offset < 0 || offset >= bytes.length) {
+    return { ok: false, error: `Dump value offset is outside message for ${parameter?.id ?? ''}` };
+  }
+
+  const type = String(parameter?.type ?? '');
+  const encoding = codecOverride && typeof codecOverride === 'object'
+    ? codecOverride
+    : (parameter?.encoding && typeof parameter.encoding === 'object' ? parameter.encoding : {});
+  let encodingType = String(encoding?.type ?? 'u7');
+
+  if (type === 'text') {
+    encodingType = normalizeTextCodec(encodingType);
+    const length = Number(encoding?.length ?? 1);
+    const pad = Number(encoding?.pad ?? 32);
+
+    if (encodingType === 'text-ascii') {
+      if (length <= 0 || offset + length > bytes.length) {
+        return { ok: false, error: `Text dump value is outside message for ${parameter?.id ?? ''}` };
+      }
+      let text = '';
+      for (let index = 0; index < length; index += 1) {
+        const byte = bytes[offset + index];
+        if (byte < 32 || byte > 127) {
+          return { ok: false, error: `Text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
+        }
+        text += String.fromCharCode(byte);
+      }
+      return { ok: true, value: trimRightPad(text, pad) };
+    }
+
+    if (encodingType === 'text-nibbled-ascii') {
+      const nibbles = Number(encoding?.nibbles ?? length * 2);
+      if (length <= 0 || nibbles < length * 2 || offset + nibbles > bytes.length) {
+        return { ok: false, error: `Nibbled text dump value is outside message for ${parameter?.id ?? ''}` };
+      }
+      let text = '';
+      for (let index = 0; index < length; index += 1) {
+        const high = bytes[offset + (index * 2)] & 0x0f;
+        const low = bytes[offset + (index * 2) + 1] & 0x0f;
+        const byte = (high << 4) | low;
+        if (byte < 32 || byte > 127) {
+          return { ok: false, error: `Nibbled text dump value contains non-ASCII byte for ${parameter?.id ?? ''}` };
+        }
+        text += String.fromCharCode(byte);
+      }
+      return { ok: true, value: trimRightPad(text, pad) };
+    }
+
+    return { ok: false, error: `Unsupported text dump codec: ${encodingType} for ${parameter?.id ?? ''}` };
+  }
+
+  let numeric = bytes[offset];
+  if (encodingType === 'u14-msb-lsb' || encodingType === 'u14' || encodingType === '14bit') {
+    if (offset + 1 >= bytes.length) return { ok: false, error: `14-bit dump value requires two bytes for ${parameter?.id ?? ''}` };
+    numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
+  } else if (encodingType === 'nibbled') {
+    const nibbles = Number(encoding?.nibbles ?? 2);
+    if (nibbles <= 0 || offset + nibbles > bytes.length) {
+      return { ok: false, error: `Nibbled dump value is outside message for ${parameter?.id ?? ''}` };
+    }
+    numeric = 0;
+    for (let index = 0; index < nibbles; index += 1) {
+      numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
+    }
+  }
+
+  if (type === 'choice' || type === 'enum') {
+    const choice = (Array.isArray(parameter?.choices) ? parameter.choices : [])
+      .find((item) => Number(item?.value) === numeric);
+    if (choice) return { ok: true, value: String(choice.id ?? '') };
+  }
+
+  if (type === 'boolean' || type === 'momentary') {
+    return { ok: true, value: numeric === Number(parameter?.trueValue ?? 1) };
+  }
+
+  return { ok: true, value: numeric };
+}
+
+function localParseDumpWithDefinition(profile, dump, bytes = []) {
+  const variables = { channel: 1, deviceId: 16, ...(profile?.variables ?? {}) };
+  const dumpId = String(dump?.id ?? '');
+  const dumpName = String(dump?.name ?? '');
+  const prefix = localPatternBytes(dump?.matcher?.prefix, variables);
+  const suffix = localPatternBytes(dump?.matcher?.suffix, variables);
+  const payloadOffset = Number(dump?.payload?.offset ?? prefix.length);
+  const payloadSize = Number(dump?.payload?.size ?? 0);
+  const completion = dump?.completion && typeof dump.completion === 'object' ? dump.completion : {};
+  const expectedMessageCount = Number(completion.expectedMessages ?? completion.expectedMessageCount ?? 1);
+  let expectedBytes = Number(completion.expectedBytes ?? completion.byteCount ?? 0);
+  let minimumBytes = Number(completion.minBytes ?? completion.minimumBytes ?? expectedBytes);
+  const maximumBytes = Number(completion.maxBytes ?? completion.maximumBytes ?? 0);
+
+  if (prefix.length && !localBytesStartWith(bytes, prefix)) {
+    return { ok: false, error: `Dump prefix did not match ${dumpId}`, matchStatus: 'noMatch', receivedBytes: bytes.length };
+  }
+
+  if (suffix.length && !localBytesEndWith(bytes, suffix)) {
+    const error = `Dump suffix did not match ${dumpId}`;
+    return {
+      ok: false,
+      error,
+      dumpId,
+      dumpName,
+      checksumStatus: 'none',
+      matchStatus: 'partial',
+      complete: false,
+      expectedMessageCount,
+      receivedMessageCount: 1,
+      expectedBytes,
+      receivedBytes: bytes.length,
+      completion,
+      diagnostics: localDumpDiagnostics('partial', error, dumpId),
+      partialFailures: localDumpDiagnostics('partial', error, dumpId),
+    };
+  }
+
+  const checksum = dump?.checksum && typeof dump.checksum === 'object' ? dump.checksum : null;
+  if (payloadSize > 0 && !expectedBytes) {
+    let requiredDataEnd = payloadOffset + payloadSize;
+    if (checksum) requiredDataEnd = Math.max(requiredDataEnd, Number(checksum.byteOffset ?? requiredDataEnd) + 1);
+    expectedBytes = requiredDataEnd + suffix.length;
+    minimumBytes = expectedBytes;
+  }
+
+  const failMatched = (matchStatus, error, checksumStatus = 'none') => ({
+    ok: false,
+    error,
+    dumpId,
+    dumpName,
+    checksumStatus,
+    values: {},
+    matchStatus,
+    complete: false,
+    expectedMessageCount,
+    receivedMessageCount: 1,
+    expectedBytes,
+    receivedBytes: bytes.length,
+    completion,
+    diagnostics: localDumpDiagnostics(matchStatus, error, dumpId),
+    ...(matchStatus === 'partial' ? { partialFailures: localDumpDiagnostics(matchStatus, error, dumpId) } : {}),
+  });
+
+  if (minimumBytes > 0 && bytes.length < minimumBytes) {
+    return failMatched('partial', `Partial dump ${dumpId}: expected at least ${minimumBytes} byte(s), got ${bytes.length}`);
+  }
+  if (maximumBytes > 0 && bytes.length > maximumBytes) {
+    return failMatched('noMatch', `Dump byte count for ${dumpId} is outside the expected range`);
+  }
+
+  let checksumStatus = 'none';
+  if (checksum) {
+    const fromOffset = Number(checksum.fromOffset ?? 0);
+    const toOffset = Number(checksum.toOffset ?? bytes.length - 2);
+    const byteOffset = Number(checksum.byteOffset ?? bytes.length - 2);
+    if (fromOffset < 0 || toOffset >= bytes.length || fromOffset > toOffset || byteOffset < 0 || byteOffset >= bytes.length) {
+      return failMatched('partial', 'Dump checksum range is outside message', 'error');
+    }
+    let expected = 0;
+    for (let index = fromOffset; index <= toOffset; index += 1) expected = (expected + bytes[index]) & 0x7f;
+    const type = String(checksum.type ?? '');
+    if (type === 'roland-7bit') expected = (128 - expected) & 0x7f;
+    else if (type !== 'sum-7bit') return failMatched('unsupportedChecksum', `Unsupported dump checksum type: ${type}`, 'error');
+    if (bytes[byteOffset] !== expected) {
+      return failMatched(
+        'checksumFailed',
+        `Dump checksum failed; expected ${bytesToHex([expected])} but got ${bytesToHex([bytes[byteOffset]])}`,
+        'error'
+      );
+    }
+    checksumStatus = 'ok';
+  }
+
+  const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
+  if (mappings.length === 0) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
+
+  const values = {};
+  for (const mapping of mappings) {
+    const parameterId = String(mapping?.parameter ?? '');
+    const parameter = (profile?.parameters ?? []).find((item) => String(item?.id ?? '') === parameterId);
+    if (!parameter) return failMatched('invalidDefinition', `Dump mapping references unknown parameter: ${parameterId}`, checksumStatus);
+
+    const decoded = localDecodeDumpParameterValue(
+      parameter,
+      bytes,
+      payloadOffset + Number(mapping?.offset ?? 0),
+      mapping?.codec ?? mapping?.nameCodec ?? null
+    );
+    if (!decoded.ok) {
+      const status = String(decoded.error ?? '').startsWith('Unsupported') ? 'unsupportedCodec' : 'partial';
+      return failMatched(status, decoded.error, checksumStatus);
+    }
+    values[parameterId] = decoded.value;
+  }
+
+  return {
+    ok: true,
+    error: '',
+    dumpId,
+    dumpName,
+    checksumStatus,
+    values,
+    matchStatus: 'ok',
+    complete: true,
+    expectedMessageCount,
+    receivedMessageCount: 1,
+    expectedBytes,
+    receivedBytes: bytes.length,
+    completion,
+    diagnostics: [],
+    partialFailures: [],
+  };
+}
+
+export function localParseDumpMessage(profile, inputHex = '') {
+  const parsed = parseRawMidiHexText(inputHex);
+  if (!parsed.ok) {
+    return {
+      ok: false,
+      error: parsed.error,
+      values: {},
+      checksumStatus: 'none',
+      matchStatus: parsed.error.includes('end with F7') ? 'partial' : 'invalidMidiData',
+      diagnostics: localDumpDiagnostics(parsed.error.includes('end with F7') ? 'partial' : 'invalidMidiData', parsed.error),
+    };
+  }
+
+  const bytes = parsed.bytes;
+  for (let index = 1; index < bytes.length - 1; index += 1) {
+    if (bytes[0] === 0xf0 && (bytes[index] < 0 || bytes[index] > 127)) {
+      const error = `SysEx data byte outside 0-127: ${bytesToHex([bytes[index]])}`;
+      return { ok: false, error, values: {}, checksumStatus: 'none', matchStatus: 'invalidMidiData', diagnostics: localDumpDiagnostics('invalidMidiData', error) };
+    }
+  }
+
+  const dumps = Array.isArray(profile?.dumpDefinitions) ? profile.dumpDefinitions : [];
+  if (dumps.length === 0) {
+    return { ok: false, error: 'Profile has no dump definitions', values: {}, checksumStatus: 'none', matchStatus: 'noDefinitions', diagnostics: localDumpDiagnostics('noDefinitions', 'Profile has no dump definitions') };
+  }
+
+  let best = null;
+  let bestRank = -1;
+  for (const dump of dumps) {
+    const parsedDump = localParseDumpWithDefinition(profile, dump, bytes);
+    if (parsedDump.ok) return parsedDump;
+    const rank = ['checksumFailed', 'unsupportedCodec'].includes(parsedDump.matchStatus)
+      ? 4
+      : parsedDump.matchStatus === 'partial'
+        ? 3
+        : parsedDump.dumpId
+          ? 2
+          : parsedDump.matchStatus === 'noMatch'
+            ? 1
+            : 0;
+    if (rank >= bestRank) {
+      best = parsedDump;
+      bestRank = rank;
+    }
+  }
+  return best ?? { ok: false, error: 'No dump definition matched message', values: {}, checksumStatus: 'none', matchStatus: 'noMatch', diagnostics: localDumpDiagnostics('noMatch', 'No dump definition matched message') };
+}
+
+function rangesForMissingCoverage(expectedBytes = 0, covered = new Set()) {
+  const ranges = [];
+  let start = -1;
+  for (let offset = 0; offset < expectedBytes; offset += 1) {
+    const missing = !covered.has(offset);
+    if (missing && start < 0) start = offset;
+    if ((!missing || offset === expectedBytes - 1) && start >= 0) {
+      const end = missing && offset === expectedBytes - 1 ? offset : offset - 1;
+      ranges.push({ label: 'missing', start, length: end - start + 1, end });
+      start = -1;
+    }
+  }
+  return ranges;
+}
+
+export function localCollectDumpMessages(profile, hexMessages = []) {
+  const values = {};
+  const messages = [];
+  const receivedRanges = [];
+  const duplicateRanges = [];
+  const diagnostics = [];
+  const covered = new Set();
+  let collectionId = '';
+  let expectedMessageCount = 0;
+  let expectedBytes = 0;
+  let parsedMessageCount = 0;
+  let failedMessageCount = 0;
+
+  for (const hex of hexMessages) {
+    const parsed = localParseDumpMessage(profile, hex);
+    messages.push({
+      ok: parsed.ok,
+      dumpId: parsed.dumpId,
+      dumpName: parsed.dumpName,
+      matchStatus: parsed.matchStatus,
+      complete: parsed.complete,
+      expectedBytes: parsed.expectedBytes,
+      receivedBytes: parsed.receivedBytes,
+      checksumStatus: parsed.checksumStatus,
+      error: parsed.error,
+    });
+
+    diagnostics.push(...(parsed.diagnostics ?? []));
+    if (!parsed.ok) {
+      failedMessageCount += 1;
+      continue;
+    }
+
+    parsedMessageCount += 1;
+    const completion = parsed.completion && typeof parsed.completion === 'object' ? parsed.completion : {};
+    const parsedCollectionId = String(completion.collectionId ?? '');
+    if (!collectionId) collectionId = parsedCollectionId || String(parsed.dumpId ?? '');
+    else if (parsedCollectionId && parsedCollectionId !== collectionId) {
+      diagnostics.push(...localDumpDiagnostics('mixedCollection', `Dump message belongs to a different collection: ${parsedCollectionId}`, parsed.dumpId));
+    }
+
+    expectedMessageCount = Math.max(expectedMessageCount, Number(completion.expectedMessages ?? completion.expectedMessageCount ?? parsed.expectedMessageCount ?? 0));
+    const collectionBytes = Number(completion.collectionBytes ?? completion.totalBytes ?? completion.expectedCollectionBytes ?? 0);
+    if (collectionBytes > 0) expectedBytes = Math.max(expectedBytes, collectionBytes);
+    else if (!expectedBytes) expectedBytes = Math.max(expectedBytes, Number(parsed.expectedBytes ?? 0));
+
+    const addressRange = completion.addressRange ?? completion.range ?? {};
+    const start = Number(addressRange.start ?? covered.size);
+    const length = Number(addressRange.length ?? parsed.expectedBytes ?? parsed.receivedBytes ?? 0);
+    const label = String(addressRange.label ?? parsed.dumpId ?? 'range');
+    receivedRanges.push({ label, start, length, end: start + Math.max(0, length) - 1, sourceId: parsed.dumpId });
+    for (let offset = start; offset < start + length; offset += 1) {
+      if (covered.has(offset)) duplicateRanges.push({ label: 'duplicate', start: offset, length: 1, end: offset, sourceId: parsed.dumpId });
+      covered.add(offset);
+    }
+
+    Object.assign(values, parsed.values ?? {});
+  }
+
+  if (!expectedMessageCount) expectedMessageCount = hexMessages.length;
+  const missingRanges = expectedBytes > 0 ? rangesForMissingCoverage(expectedBytes, covered) : [];
+  const complete = failedMessageCount === 0 && hexMessages.length >= expectedMessageCount && missingRanges.length === 0;
+  const ok = failedMessageCount === 0;
+  const status = complete ? 'complete' : ok ? 'partial' : 'error';
+  const error = complete ? '' : failedMessageCount > 0 ? `${failedMessageCount} dump message(s) failed` : 'Dump collection incomplete';
+  if (!complete) diagnostics.push(...localDumpDiagnostics(status, error, collectionId));
+
+  return {
+    ok,
+    complete,
+    status,
+    error,
+    collectionId,
+    expectedMessageCount,
+    receivedMessageCount: hexMessages.length,
+    parsedMessageCount,
+    failedMessageCount,
+    expectedBytes,
+    receivedBytes: covered.size,
+    values,
+    messages,
+    receivedRanges,
+    missingRanges,
+    duplicateRanges,
+    diagnostics,
+    local: true,
+  };
+}
+
+export function localCompileDeviceRequest(profile, request = {}) {
+  const requestId = String(request.request || request.deviceRequestId || localDefaultStartupRequestId(profile)).trim();
+  if (!requestId) return { ok: false, error: 'Profile has no startup request.' };
+
+  const deviceRequest = (profile.requests ?? []).find((item) => String(item?.id ?? '') === requestId);
+  if (!deviceRequest) return { ok: false, error: `Device request "${requestId}" was not found.` };
+
+  const variables = { channel: 1, deviceId: 16, ...(profile.variables ?? {}), ...(request.variables ?? {}) };
+  const bytes = [];
+  for (const token of Array.isArray(deviceRequest.template) ? deviceRequest.template : []) {
+    const text = String(token ?? '').trim();
+    if (text.startsWith('$') || /^[0-9a-f]{1,2}$/i.test(text)) bytes.push(localResolveByteToken(text, variables));
+  }
+
+  const kind = String(deviceRequest.kind ?? (bytes[0] === 0xf0 ? 'sysex' : 'raw'));
+  const expectedDumpId = String(deviceRequest.response?.dump ?? (String(deviceRequest.response?.kind ?? '') === 'bulkDump' ? deviceRequest.response?.collectionId : undefined) ?? deviceRequest.expectedDump ?? '');
+  const continueRequestId = String(deviceRequest.response?.continueRequest ?? deviceRequest.continueRequest ?? '');
+  const expectedResponseKind = deviceRequest.response?.identity === true || String(deviceRequest.response?.kind ?? '') === 'identity'
+    ? 'identity'
+    : 'dump';
+  const hex = bytesToHex(bytes);
+  return {
+    ok: true,
+    requestId: request.correlationId ?? `local_sync_${Date.now()}`,
+    deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    profileId: profile.id,
+    deviceRequestId: requestId,
+    expectedResponseKind,
+    expectedDumpId,
+    continueRequestId,
+    status: 'Preview',
+    pending: false,
+    local: true,
+    transaction: {
+      transactionId: `request_${requestId}`,
+      deviceRole: request.deviceRole ?? DEFAULT_DEVICE_ROLE,
+      parameterId: requestId,
+      semanticValue: true,
+      displayedValue: deviceRequest.name ?? requestId,
+      normalizedValue: 1,
+      encodedValueHex: hex,
+      checksumStatus: 'none',
+      hex,
+      messages: [{ kind, hex, bytes }],
+      policy: {
+        mode: 'request',
+        coalesce: false,
+        minIntervalMs: Number(deviceRequest.minIntervalMs ?? 0),
+        sendFinalOnRelease: true,
+        realtimeSafe: false,
+      },
+    },
+    pendingRequests: [],
+  };
+}
+
+function presetScanSlots(presetBrowser = {}) {
+  if (Array.isArray(presetBrowser.slots)) return presetBrowser.slots.map((slot) => Number(slot)).filter(Number.isFinite);
+  const start = Number(presetBrowser.startSlot ?? 0);
+  const count = Number(presetBrowser.slotCount ?? 0);
+  const end = Number(presetBrowser.endSlot ?? (count > 0 ? start + count - 1 : start - 1));
+  const slots = [];
+  for (let slot = start; slot <= end; slot += 1) slots.push(slot);
+  return slots;
+}
+
+export function localBuildPresetListScan(profile, options = {}) {
+  const presetBrowser = profile?.presetBrowser ?? {};
+  const request = String(options.request || presetBrowser.request || presetBrowser.nameRequest || '').trim();
+  const slotVariable = String(options.slotVariable || presetBrowser.slotVariable || 'slot');
+  if (!request) return { ok: false, error: 'Preset browser needs a request id.' };
+
+  const scanSlots = Array.isArray(options.slots)
+    ? options.slots.map((slot) => Number(slot)).filter(Number.isFinite)
+    : presetScanSlots(presetBrowser);
+  if (scanSlots.length === 0) return { ok: false, error: 'Preset browser has no slots to scan.' };
+
+  const entries = scanSlots.map((slot) => {
+    const compiled = localCompileDeviceRequest(profile, {
+      correlationId: `preset_scan_${slot}`,
+      deviceRole: options.deviceRole ?? DEFAULT_DEVICE_ROLE,
+      profileId: profile.id,
+      request,
+      variables: { [slotVariable]: slot },
+    });
+    return {
+      slot,
+      request,
+      requestHex: compiled?.transaction?.hex ?? '',
+      ok: compiled.ok === true,
+      error: compiled.error ?? '',
+      status: compiled.ok === true ? 'ready' : 'error',
+    };
+  });
+
+  return {
+    ok: entries.every((entry) => entry.ok),
+    profileId: profile.id,
+    deviceRole: options.deviceRole ?? DEFAULT_DEVICE_ROLE,
+    request,
+    total: entries.length,
+    pending: 0,
+    entries,
+    local: true,
+  };
+}
+
+export function validateLocalProfileSource(profileId, source = '') {
+  const parsed = parseProfileSourceText(profileId, source);
+  if (!parsed.ok) {
+    return { profileId, ok: false, error: parsed.error, validation: [{ level: 'error', path: '$', message: parsed.error }] };
+  }
+
+  const profile = parsed.profile;
+  const validation = [];
+  const parameters = Array.isArray(profile.parameters) ? profile.parameters : [];
+  const recipes = Array.isArray(profile.messageRecipes) ? profile.messageRecipes : [];
+  const tests = Array.isArray(profile.tests) ? profile.tests : [];
+  const dumps = Array.isArray(profile.dumpDefinitions) ? profile.dumpDefinitions : [];
+  const parameterIds = new Set();
+  const recipeIds = new Set();
+  const requestIds = new Set((Array.isArray(profile.requests) ? profile.requests : []).map((request) => String(request?.id ?? '')));
+  const dumpIds = new Set(dumps.map((dump) => String(dump?.id ?? '')));
+
+  if (!profile.id) validation.push({ level: 'error', path: 'id', message: 'Profile id is required.' });
+  if (parameters.length === 0) validation.push({ level: 'error', path: 'parameters', message: 'Add at least one parameter.' });
+  if (recipes.length === 0) validation.push({ level: 'error', path: 'messageRecipes', message: 'Add at least one message recipe.' });
+  if (tests.length === 0) validation.push({ level: 'warning', path: 'tests', message: 'Add at least one test vector.' });
+
+  for (const [index, parameter] of parameters.entries()) {
+    const id = String(parameter?.id ?? '').trim();
+    if (!id) validation.push({ level: 'error', path: `parameters.${index}.id`, message: 'Parameter id is required.' });
+    else if (parameterIds.has(id)) validation.push({ level: 'error', path: `parameters.${index}.id`, message: `Duplicate parameter id "${id}".` });
+    parameterIds.add(id);
+  }
+
+  for (const [index, recipe] of recipes.entries()) {
+    const id = String(recipe?.id ?? '').trim();
+    if (!id) validation.push({ level: 'error', path: `messageRecipes.${index}.id`, message: 'Recipe id is required.' });
+    else if (recipeIds.has(id)) validation.push({ level: 'error', path: `messageRecipes.${index}.id`, message: `Duplicate recipe id "${id}".` });
+    recipeIds.add(id);
+  }
+
+  for (const [index, request] of (Array.isArray(profile.requests) ? profile.requests : []).entries()) {
+    const id = String(request?.id ?? '').trim();
+    if (!id) validation.push({ level: 'error', path: `requests.${index}.id`, message: 'Device request id is required.' });
+    if (!Array.isArray(request?.template) || request.template.length === 0) {
+      validation.push({ level: 'error', path: `requests.${index}.template`, message: 'Device request requires a template.' });
+    }
+    const responseDump = String(request?.response?.dump ?? request?.expectedDump ?? '').trim();
+    if (responseDump && !dumpIds.has(responseDump)) {
+      validation.push({ level: 'error', path: `requests.${index}.response.dump`, message: `Unknown dump definition "${responseDump}".` });
+    }
+  }
+
+  for (const [index, step] of (Array.isArray(profile.startup?.sync) ? profile.startup.sync : []).entries()) {
+    const request = typeof step === 'string' ? step : String(step?.request ?? '');
+    if (request && !requestIds.has(request)) {
+      validation.push({ level: 'error', path: `startup.sync.${index}.request`, message: `Unknown startup request "${request}".` });
+    }
+  }
+
+  const presetRequest = String(profile.presetBrowser?.request ?? profile.presetBrowser?.nameRequest ?? '');
+  if (presetRequest && !requestIds.has(presetRequest)) {
+    validation.push({ level: 'error', path: 'presetBrowser.request', message: `Unknown preset request "${presetRequest}".` });
+  }
+
+  for (const [index, parameter] of parameters.entries()) {
+    const recipeId = String(parameter?.messageRecipe ?? '').trim();
+    if (recipeId && !recipeIds.has(recipeId)) {
+      validation.push({ level: 'error', path: `parameters.${index}.messageRecipe`, message: `Recipe "${recipeId}" does not exist.` });
+    }
+  }
+
+  for (const [index, dump] of dumps.entries()) {
+    const id = String(dump?.id ?? '').trim();
+    if (!id) validation.push({ level: 'error', path: `dumpDefinitions.${index}.id`, message: 'Dump definition id is required.' });
+    const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
+    if (mappings.length === 0) {
+      validation.push({ level: 'warning', path: `dumpDefinitions.${index}.mappings`, message: 'Dump definition has no mappings.' });
+    }
+    for (const [mappingIndex, mapping] of mappings.entries()) {
+      const parameterId = String(mapping?.parameter ?? '').trim();
+      if (!parameterIds.has(parameterId)) {
+        validation.push({
+          level: 'error',
+          path: `dumpDefinitions.${index}.mappings.${mappingIndex}.parameter`,
+          message: `Parameter "${parameterId}" does not exist.`,
+        });
+      }
+    }
+  }
+
+  for (const [index, test] of tests.entries()) {
+    const kind = String(test?.kind ?? 'parameter');
+    if (kind === 'request' || kind === 'identityRequest' || kind === 'identityReply' || kind === 'dumpParse') {
+      if (!normalizeHex(test?.expectedHex) && (kind === 'request' || kind === 'identityRequest')) {
+        validation.push({ level: 'error', path: `tests.${index}.expectedHex`, message: 'Expected hex is required.' });
+      }
+      if (kind === 'identityReply' && !normalizeHex(test?.inputHex)) {
+        validation.push({ level: 'error', path: `tests.${index}.inputHex`, message: 'Identity reply input hex is required.' });
+      }
+      continue;
+    }
+    const parameterId = String(test?.parameter ?? '').trim();
+    if (!parameterIds.has(parameterId)) validation.push({ level: 'error', path: `tests.${index}.parameter`, message: `Parameter "${parameterId}" does not exist.` });
+    if (!normalizeHex(test?.expectedHex)) validation.push({ level: 'error', path: `tests.${index}.expectedHex`, message: 'Expected hex is required.' });
+  }
+
+  const ok = validation.every((item) => item.level !== 'error');
+  return {
+    profileId,
+    detectedProfileId: profile.id ?? '',
+    ok,
+    error: ok ? '' : 'Validation failed',
+    validation,
+  };
+}
