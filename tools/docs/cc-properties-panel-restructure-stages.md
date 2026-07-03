@@ -3,6 +3,12 @@
 > Companion to `cc-properties-panel-review.md` (the diagnosis) and successor to the phasing
 > sketch in its §6. This document is the implementation plan: four stages, each independently
 > shippable and revertible, with scope, files, acceptance criteria, and resolved decisions (§6).
+>
+> **Sequencing update:** `cc-designer-workspace-review.md` found that the workspace chrome
+> rebuild regressed previously-shipped features — including the canvas readiness strip that
+> Stage B2 assumes exists and the Make Interactive tool Stage C builds on. Its proposed
+> **Stage W0 (workspace restoration + decomposition)** should run before Stage B; Stage A is
+> unaffected.
 > **Nothing here changes the data model or removes capability** — every stage is view-layer
 > regrouping, consistent with the redesign plan's principles (progressive disclosure, one home
 > per concept, backward compatible).
