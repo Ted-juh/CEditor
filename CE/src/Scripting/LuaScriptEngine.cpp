@@ -138,6 +138,35 @@ public:
 
     juce::String language() const override { return "lua"; }
 
+    // Anti-flood / loop guard (scripting-redesign §7 keep-list): a count hook
+    // aborts any single entry into Lua after a generous instruction budget, so
+    // `while true do end` in a handler errors out instead of freezing the DAW.
+    // The budget is per outermost entry; nested entries (a handler that emits an
+    // event which dispatches back into Lua) share the outer installation.
+    static constexpr int kInstructionBudget = 20'000'000;
+
+    struct Watchdog
+    {
+        explicit Watchdog (LuaScriptEngine& engineIn) : engine (engineIn)
+        {
+            if (engine.watchdogDepth++ == 0)
+                lua_sethook (engine.lua.lua_state(), &Watchdog::onBudgetExceeded, LUA_MASKCOUNT, kInstructionBudget);
+        }
+
+        ~Watchdog()
+        {
+            if (--engine.watchdogDepth == 0)
+                lua_sethook (engine.lua.lua_state(), nullptr, 0, 0);
+        }
+
+        static void onBudgetExceeded (lua_State* L, lua_Debug*)
+        {
+            luaL_error (L, "script exceeded its instruction budget (possible infinite loop) — aborted by the runtime guard");
+        }
+
+        LuaScriptEngine& engine;
+    };
+
     bool installApi (ScriptHostApi& h) override
     {
         host = &h;
@@ -204,6 +233,7 @@ public:
             { return varToSol (lua, host->getValue (prefix (p), form ? juce::String (*form) : juce::String ("value"))); });
         env["self"] = self;
 
+        const Watchdog guard (*this); // top-level statements obey the instruction budget too
         auto result = lua.safe_script (def.source.toStdString(), env, sol::script_pass_on_error);
         if (! result.valid())
         {
@@ -230,6 +260,7 @@ public:
         if (it == envs.end()) return {};
         sol::protected_function f = it->second[fn.toStdString()];
         if (! f.valid()) return {};
+        const Watchdog guard (*this);
         auto r = f (varToSol (lua, payload));
         if (! r.valid()) { sol::error e = r; onError (scriptId, juce::String (e.what())); return {}; }
         return r.return_count() > 0 ? solToVar (r) : juce::var();
@@ -238,6 +269,7 @@ public:
     void deliverEvent (const juce::String& target, const juce::String& event,
                        const juce::var& payload, const ScriptErrorSink& onError) override
     {
+        const Watchdog guard (*this);
         for (auto& l : listeners)
         {
             if (l.event != event) continue;
@@ -261,6 +293,7 @@ private:
     std::map<juce::String, sol::environment> envs;
     std::vector<Listener> listeners;
     ScriptHostApi* host = nullptr;
+    int watchdogDepth = 0;
 };
 
 } // namespace

@@ -60,12 +60,15 @@ public:
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");
+        // Under a MIDI flood the value still applies locally — only the synth send is dropped.
+        if (transmit && ! midiSendAllowed())
+            transmit = false;
         if (callbacks.setValue) callbacks.setValue (path, value, transmit);
     }
 
-    void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC) callbacks.sendCC (ch, cc, v); }
-    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN) callbacks.sendNRPN (ch, msb, lsb, v); }
-    void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex) callbacks.sendSysex (bytes); }
+    void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
+    void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
+    void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (bytes); }
     void requestDump (const juce::String& kind) override             { if (callbacks.requestDump) callbacks.requestDump (kind); }
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
@@ -75,9 +78,43 @@ public:
     void log (const juce::String& message, const juce::var& value) override { if (callbacks.log) callbacks.log (message, value); }
 
 private:
+    // Anti-flood backstop (scripting-redesign §7 keep-list): scripts may not push
+    // more than this many MIDI messages (CC/NRPN/sysex + transmitting setValues)
+    // per rolling second. Excess sends are dropped — local value writes still
+    // apply — and one notice per burst goes to the log so the author finds out.
+    // Generous by design: a dump→panel pass sends a few hundred messages; only a
+    // runaway send loop hits this.
+    static constexpr int maxMidiSendsPerSecond = 1000;
+
+    bool midiSendAllowed()
+    {
+        const double now = juce::Time::getMillisecondCounterHiRes();
+        if (now - floodWindowStartMs >= 1000.0)
+        {
+            floodWindowStartMs = now;
+            floodSendsInWindow = 0;
+            floodNoticeSent = false;
+        }
+        if (++floodSendsInWindow <= maxMidiSendsPerSecond)
+            return true;
+        if (! floodNoticeSent)
+        {
+            floodNoticeSent = true;
+            if (callbacks.log)
+                callbacks.log ("[guard] MIDI flood from script '" + (context.id.isNotEmpty() ? context.id : juce::String ("<unknown>"))
+                               + "': over " + juce::String (maxMidiSendsPerSecond)
+                               + " sends/second — dropping further sends this second", juce::var());
+        }
+        return false;
+    }
+
     Callbacks callbacks;
     ScriptRuntime* runtime = nullptr;
     ScriptContext context;
+
+    double floodWindowStartMs = 0.0;
+    int    floodSendsInWindow = 0;
+    bool   floodNoticeSent = false;
 };
 
 } // namespace ceditor::scripting

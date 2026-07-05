@@ -456,6 +456,12 @@ public:
         return f != nullptr && PyCallable_Check (f);
     }
 
+    // NOTE (anti-flood guard): unlike Lua (instruction-count hook) and JS
+    // (QuickJS interrupt via maximumExecutionTime), embedded CPython has no
+    // cheap in-thread execution budget — interrupting a runaway handler needs
+    // a watchdog thread calling PyErr_SetInterrupt. Until that exists, a
+    // Python handler CAN block the message thread; the MIDI flood guard in
+    // BridgeScriptHost still caps what it can send while it runs.
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
                         const juce::var& payload, const ScriptErrorSink& onError) override
     {

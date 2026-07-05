@@ -179,7 +179,11 @@ public:
 
     // --- Events / phase 3 (task 5) ---
     /** Fire `event` for `target`. Scripts whose (event,target/scope) match are dispatched.
-        `payload` is passed to the handler. */
+        `payload` is passed to the handler.
+
+        Guarded against feedback loops (anti-flood, redesign §7): a handler that emits an
+        event which dispatches a handler that emits again … is cut off (and reported) once
+        the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
 
     // --- Origin tracking for transmit-by-default (Q2) ---
@@ -218,6 +222,9 @@ private:
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)
     std::vector<int> transmitStack; // nested noTransmit/transmit blocks
+
+    static constexpr int maxDispatchDepth = 16; // emit→dispatch→emit feedback-loop backstop
+    int dispatchDepth = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ScriptRuntime)
 };

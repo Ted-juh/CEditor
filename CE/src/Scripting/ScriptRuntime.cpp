@@ -193,6 +193,18 @@ static bool matchesTarget (const ScriptDefinition& def, const juce::String& targ
 void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload)
 {
     assertMessageThread();
+
+    // Feedback-loop backstop: a handler that emit()s an event whose handler emit()s again …
+    // gets cut off (and reported) at a fixed depth instead of recursing until the stack dies.
+    if (dispatchDepth >= maxDispatchDepth)
+    {
+        reportError ("runtime", "event '" + event + "' dropped: dispatch depth exceeded "
+                     + juce::String (maxDispatchDepth) + " (emit/dispatch feedback loop?)");
+        return;
+    }
+    ++dispatchDepth;
+    struct DepthScope { int& d; ~DepthScope() { --d; } } depthScope { dispatchDepth };
+
     // 1) Named-function handlers: a script that runs on `event` and is attached to `target`.
     for (auto& s : scripts)
         if (s.event == event && matchesTarget (s, target))

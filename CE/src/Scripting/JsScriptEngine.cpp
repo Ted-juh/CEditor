@@ -133,6 +133,10 @@ public:
         const juce::String code = def.compiledSource.isNotEmpty() ? def.compiledSource : def.source;
 
         auto eng = std::make_unique<juce::JavascriptEngine>();
+        // Anti-flood / loop guard (scripting-redesign §7 keep-list): QuickJS's
+        // interrupt handler aborts any evaluate/callFunction that runs longer
+        // than this, so `while (true) {}` in a handler can't freeze the DAW.
+        eng->maximumExecutionTime = juce::RelativeTime::seconds (2.0);
         eng->registerNativeObject ("__api", makeApi (host, def.owner).get());
 
         // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
