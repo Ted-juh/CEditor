@@ -1,6 +1,7 @@
 import { deepClone } from './deepClone.js';
 import { materializedCustomComponentSnapshot } from './customComponentMaterializer.js';
 import { summarizeCustomArpeggiator } from './customComponentArpeggiator.js';
+import { migrateCustomComponentPlan } from './customComponentMigrations.js';
 import { numberOr } from './primitives.js';
 
 export const CUSTOM_COMPONENT_PACKAGE_FORMAT = 'ceditor-component';
@@ -807,11 +808,17 @@ export function createCustomComponentExportEnvelope(control, metadata = {}) {
 }
 
 export function normalizeCustomComponentEnvelope(value) {
-  const envelope = value?.format === CUSTOM_COMPONENT_PACKAGE_FORMAT ? value : value?.envelope;
-  if (!envelope || envelope.format !== CUSTOM_COMPONENT_PACKAGE_FORMAT || !envelope.component?._children) {
+  const rawEnvelope = value?.format === CUSTOM_COMPONENT_PACKAGE_FORMAT ? value : value?.envelope;
+  if (!rawEnvelope || rawEnvelope.format !== CUSTOM_COMPONENT_PACKAGE_FORMAT || !rawEnvelope.component?._children) {
     return null;
   }
+  // Upgrade older plan versions before deriving anything from the component.
+  const migration = migrateCustomComponentPlan(rawEnvelope.component);
+  const envelope = migration.component === rawEnvelope.component
+    ? rawEnvelope
+    : { ...rawEnvelope, component: migration.component };
   const validation = validateCustomComponentPackage(envelope.component);
+  validation.warnings = uniqueList([...(validation.warnings ?? []), ...migration.warnings]);
   const summary = summarizeCustomComponent(envelope.component);
   const fingerprint = fingerprintCustomComponent(envelope.component);
   const thumbnail = createCustomComponentThumbnail(envelope.component);
@@ -821,6 +828,12 @@ export function normalizeCustomComponentEnvelope(value) {
   const assetManifest = summarizeCustomComponentAssets(envelope.component);
   return {
     ...envelope,
+    migration: {
+      fromVersion: migration.fromVersion,
+      toVersion: migration.toVersion,
+      applied: migration.applied,
+      warnings: migration.warnings,
+    },
     formatVersion: Number(envelope.formatVersion ?? CUSTOM_COMPONENT_PACKAGE_VERSION),
     compatibility: {
       ...(envelope.compatibility ?? {}),
