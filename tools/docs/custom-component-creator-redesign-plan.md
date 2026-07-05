@@ -234,3 +234,16 @@ Generators already emit N parts *and* per-instance hit zones (`customComponentMa
 - **Fold into existing phases:** §12.6 terminology → §4; auto-fix readiness → §6/§8; persistent preview → §4/§5.
 - **New scoped phases (post-redesign):** §12.2–§12.4 component-class diversity + `PointSet` primitive + indexed repeats (sequence after §5, since the display class depends on reactive bindings); §12.5 decomposition runs continuously alongside.
 - **Track as roadmap, not this pass:** §12.7 migration seam (do the seam now, the gallery later).
+
+### 12.9 Status update (2026-07-05)
+Shipped from this section (branch `claude/scripting-custom-component-editor-2op8oa`):
+- ✅ **Phase 0 / §12.1** verified wired end-to-end (history store ↔ componentDocuments ↔ Ctrl+Z/menu/toolbar).
+- ✅ **Phase 4 (§7)** actually landed in this repo (the earlier ✅ predated the repo import): smart guides, align/distribute toolbar, measure readouts, `?` cheatsheet, window-level shortcuts.
+- ✅ **Phase 6 remnant**: readiness nudge strip on the design surface.
+- ✅ **§11.2** global Simple/Advanced toggle (persisted; hides Channels/Behaviors/HitZones/Bindings/Links/Variants tabs in Simple).
+- ✅ **§12.2 display class**: Segment Level Meter, Status Lamp, Value Readout starters (output-only, binding-driven).
+- ✅ **§12.6**: copy/paste of parts + following hit zones (cross-component session clipboard); glossary overlay (terminology *explanation*; the rename pass remains open); auto-fixable readiness steps.
+- ✅ **§12.7 seam**: versioned plan-migration pipeline on every load path (gallery still roadmap).
+- ✅ QA future-polish trio: state rules for non-enum compound conditions, waveform/envelope presets, arp tool shortcuts.
+
+Still open from §12: **PointSet/array-channel primitive (§12.3)**, **indexed per-instance repeat bindings (§12.4)**, multi-point/container starters, persistent live preview (§12.6), terminology rename pass, responsive anchors/theme tokens, sharing gallery (§12.7), continued decomposition (§12.5).
