@@ -7,6 +7,10 @@
 
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
+  let designer = $derived(getSection(control, 'Designer'));
+  let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
+  let designWidth = $derived(Number(designer?.designWidth) || 0);
+  let designHeight = $derived(Number(designer?.designHeight) || 0);
 
   function set(prop, value) {
     if (!core?.id) return;
@@ -76,6 +80,22 @@
         {transform.aspectLock ? 'On' : 'Off'}
       </button>
     </div>
+    {#if isCustomComponent}
+      <div class="prop-row" title={designWidth > 0 ? `Design size ${Math.round(designWidth)}×${Math.round(designHeight)}. Stretch keeps px-sized internals at their authored size; Scale internals scales them with the instance.` : 'Scale internals needs a design size — open the component in the designer and re-save/instantiate to stamp it.'}>
+        <span class="lbl">Resize</span>
+        <button
+          class="toggle-val"
+          class:on={transform.contentScaleMode === 'scaleInternals'}
+          disabled={designWidth <= 0 || designHeight <= 0}
+          onclick={() => set('contentScaleMode', transform.contentScaleMode === 'scaleInternals' ? 'stretch' : 'scaleInternals')}
+        >
+          {transform.contentScaleMode === 'scaleInternals' ? 'Scale internals' : 'Stretch'}
+        </button>
+        {#if designWidth > 0}
+          <span class="design-hint">base {Math.round(designWidth)}×{Math.round(designHeight)}</span>
+        {/if}
+      </div>
+    {/if}
   </div>
 {/if}
 
@@ -92,4 +112,6 @@
   }
   .toggle-val:hover { background: #333; color: #CCC; }
   .toggle-val.on { background: #094771; color: #5B9BD5; }
+  .toggle-val:disabled { opacity: 0.45; cursor: default; }
+  .design-hint { color: #666; font-size: 10px; margin-left: auto; }
 </style>

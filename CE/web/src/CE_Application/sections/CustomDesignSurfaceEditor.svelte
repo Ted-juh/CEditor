@@ -4535,6 +4535,17 @@
                       {/if}
                     </div>
                     {#if activeSelectionKind === 'layer'}
+                      <label class="dock-field" title="Pin size: with the instance resize policy 'Scale internals', this part keeps its authored size and font (position still tracks the scale) — for labels and readouts.">
+                        <span>Pin size</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedAuthoredPart?._children?.Layout?.pinned === true}
+                          disabled={!selectedPartEditable}
+                          onchange={(event) => setLayerLayoutProperty('pinned', event.currentTarget.checked)}
+                        />
+                      </label>
+                    {/if}
+                    {#if activeSelectionKind === 'layer'}
                       <div class="dock-section-subtitle">Rotation Pivot</div>
                       <div class="pivot-actions">
                         <button

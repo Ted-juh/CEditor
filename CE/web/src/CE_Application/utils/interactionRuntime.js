@@ -16,6 +16,7 @@ import {
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
+import { applyCustomInternalScale } from './customComponentScale.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 
@@ -747,6 +748,12 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   for (const [, state] of activeStates) {
     applyStatePatches(resolved, state);
   }
+
+  // Resize policy: with Transform.contentScaleMode === 'scaleInternals',
+  // px-unit internals (parts, zones) scale to the instance size relative to
+  // the stamped design size. Applied last so materialization, bindings, and
+  // state patches all keep authoring in design space.
+  if (isCustomComponent) applyCustomInternalScale (resolved);
 
   const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
 

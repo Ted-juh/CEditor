@@ -935,6 +935,9 @@ export function instantiateCustomComponentPackageControl(value, options = {}) {
     packageFingerprint: envelope.fingerprint ?? '',
     packageImportedAt: provenance?.importedAt ?? '',
     sourcePackage: provenance,
+    // Authored size, the reference for the scaleInternals resize policy.
+    designWidth: numberOr(children.Transform?.width, 260),
+    designHeight: numberOr(children.Transform?.height, 120),
   };
   children.ExternalAPI = {
     ...(children.ExternalAPI ?? {}),
