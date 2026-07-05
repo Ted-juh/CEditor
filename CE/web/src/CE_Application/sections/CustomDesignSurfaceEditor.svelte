@@ -46,6 +46,13 @@
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
   import ConditionBuilder from './ConditionBuilder.svelte';
+  import {
+    ENVELOPE_SHAPE_PRESETS,
+    RENDERER_COLOR_PRESETS,
+    WAVEFORM_SHAPES,
+    envelopePathPresetPatch,
+    waveformIconPresetPatch,
+  } from '../utils/customComponentRendererPresets.js';
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
@@ -567,6 +574,24 @@
   let shapeToolActive = $derived(SHAPE_TOOL_IDS.has(activeTool));
   let selectedArcMeta = $derived(selectedAuthoredPart?.meta?.arcTrack ?? null);
   let selectedIsArc = $derived(activeSelectionKind === 'layer' && selectedPartEditable && !!selectedArcMeta);
+  // Waveform-icon / envelope-path parts get preset strips (color + shape).
+  let selectedIsWaveformIcon = $derived(
+    activeSelectionKind === 'layer' && selectedPartEditable
+    && (String(selectedPart?.kind ?? '').toLowerCase() === 'waveformicon'
+      || String(selectedPart?.meta?.renderer ?? '').toLowerCase() === 'waveformicon')
+  );
+  let selectedIsEnvelopePath = $derived(
+    activeSelectionKind === 'layer' && selectedPartEditable
+    && (String(selectedPart?.kind ?? '').toLowerCase() === 'envelopepath'
+      || String(selectedPart?.meta?.renderer ?? '').toLowerCase() === 'envelopepath')
+  );
+  let selectedWaveformMeta = $derived(selectedAuthoredPart?.meta?.waveformIcon ?? selectedPart?.meta?.waveformIcon ?? null);
+  let selectedEnvelopeMeta = $derived(selectedAuthoredPart?.meta?.envelopePath ?? selectedPart?.meta?.envelopePath ?? null);
+
+  function applyRendererPreset(patch) {
+    if (!core?.id || !selectedLayer || !Object.keys(patch ?? {}).length) return;
+    applyControlPatch(core.id, patch);
+  }
   let selectedArcPivotTarget = $derived.by(() => nearestArcPivotTarget());
   let arpeggiator = $derived.by(() => normalizeArpeggiator(designer?.arpeggiator));
   let arpeggiatorEnabled = $derived(arpeggiator?.enabled === true);
@@ -3292,6 +3317,63 @@
       </div>
     {/if}
 
+    {#if !designerPreviewing && selectedIsWaveformIcon}
+      <div class="arc-strip" aria-label="Waveform presets">
+        <strong>Waveform</strong>
+        <div class="arc-toggle-group">
+          {#each WAVEFORM_SHAPES as shape (shape.id)}
+            <button
+              type="button"
+              class:active={String(selectedWaveformMeta?.type ?? 'sine') === shape.id}
+              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { shape }))}
+              title={`${shape.label} waveform`}
+            >{shape.label}</button>
+          {/each}
+        </div>
+        <span class="preset-label">Colour</span>
+        <div class="preset-swatches">
+          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
+            <button
+              type="button"
+              class="mini-swatch-btn"
+              class:active={String(selectedWaveformMeta?.stroke ?? '') === preset.stroke}
+              style={swatchCss(preset.stroke, 'EAF0F6')}
+              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { colorPreset: preset }))}
+              title={`${preset.label} colour preset`}
+            ></button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if !designerPreviewing && selectedIsEnvelopePath}
+      <div class="arc-strip" aria-label="Envelope presets">
+        <strong>Envelope</strong>
+        <div class="arc-toggle-group">
+          {#each ENVELOPE_SHAPE_PRESETS as shape (shape.id)}
+            <button
+              type="button"
+              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { shape }))}
+              title={`${shape.label}: A ${shape.attack} D ${shape.decay} S ${shape.sustain} R ${shape.release}`}
+            >{shape.label}</button>
+          {/each}
+        </div>
+        <span class="preset-label">Colour</span>
+        <div class="preset-swatches">
+          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
+            <button
+              type="button"
+              class="mini-swatch-btn"
+              class:active={String(selectedEnvelopeMeta?.stroke ?? '') === preset.stroke}
+              style={swatchCss(preset.stroke, '65E6A0')}
+              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { colorPreset: preset }))}
+              title={`${preset.label} colour preset`}
+            ></button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <div class="surface-options-strip" aria-label="Surface view + zoom options">
       <div class="surface-toolbar-left">
       <label class="toggle-option">
@@ -5501,6 +5583,23 @@
     background: #171C20;
     color: #B9C8D4;
     overflow-x: auto;
+  }
+
+  .preset-label {
+    font-size: 9px;
+    color: #7A8894;
+    text-transform: uppercase;
+  }
+
+  .preset-swatches {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .preset-swatches .mini-swatch-btn.active {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
   }
 
   .arc-strip > strong {
