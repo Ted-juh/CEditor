@@ -157,6 +157,32 @@ export const CUSTOM_COMPONENT_STARTERS = [
     creates: ['filmstrip asset', 'frame generator', 'dial hit zone', 'public API'],
     dimensions: { width: 126, height: 126 },
   },
+  // Display / output-only class: driven by bindings from public inputs, no
+  // pointer surface — meters, status lamps, readouts (§12.2 diversity).
+  {
+    id: 'starter.segmentLevelMeter',
+    group: 'Display',
+    label: 'Segment Level Meter',
+    summary: 'An output-only 16-segment level meter driven by a public level input.',
+    creates: ['LED generator', 'level input', 'live fill binding', 'public API'],
+    dimensions: { width: 220, height: 64 },
+  },
+  {
+    id: 'starter.statusLamp',
+    group: 'Display',
+    label: 'Status Lamp',
+    summary: 'A boolean status LED with an on/off colour rule and a caption.',
+    creates: ['status LED', 'bool input', 'rule-driven state', 'public API'],
+    dimensions: { width: 120, height: 72 },
+  },
+  {
+    id: 'starter.valueReadout',
+    group: 'Display',
+    label: 'Value Readout',
+    summary: 'A large live numeric readout bound to a public value input with unit suffix.',
+    creates: ['readout text', 'value input', 'format binding', 'public API'],
+    dimensions: { width: 160, height: 76 },
+  },
 ];
 
 export function createPartNode(name, {
@@ -1957,6 +1983,315 @@ function createFilmstripKnobStarterPatch() {
   };
 }
 
+// --- Display / output-only starters (§12.2) -------------------------------
+// No behaviors or hit zones on purpose: these are driven entirely by their
+// public inputs (panel links, scripts, DAW automation) through live bindings.
+
+function createSegmentLevelMeterStarterPatch() {
+  const channels = {
+    level: createValueChannel('level', {
+      label: 'Level',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.62,
+      format: { precision: 0, suffix: '%', unit: 'percent' },
+    }),
+  };
+  return {
+    'Core.name': 'Segment Level Meter',
+    'Transform.width': 220,
+    'Transform.height': 64,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('LEVEL', 'FF12181D'),
+        meterWell: createPartNode('meterWell', {
+          role: 'track',
+          kind: 'roundedRectangle',
+          zIndex: 1,
+          layout: { x: 50, y: 62, width: 88, height: 22, widthUnit: 'percent', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('FF0B0F13', { borderColour: '332B3742', radius: 6 }),
+          },
+        }),
+        levelReadout: createPartNode('levelReadout', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 12,
+          layout: { x: 88, y: 12, width: 44, height: 14, widthUnit: 'px', heightUnit: 'px' },
+          sections: { Text: createText('62%', { size: 9, weight: 700 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        meterLeds: {
+          _type: 'Generator',
+          name: 'meterLeds',
+          type: 'repeated-leds',
+          enabled: true,
+          geometry: 'linear',
+          count: 16,
+          ledSize: 8,
+          zIndex: 6,
+          activeColour: 'FF65E6A0',
+          inactiveColour: '33212B31',
+          valueSource: 'level',
+          activationMode: 'cumulative',
+          bounds: { x: 8, y: 44, width: 84, height: 40 },
+          generatedPartPrefix: 'meterLed',
+          generatedHitZones: false,
+        },
+      },
+    },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        levelReadoutText: {
+          _type: 'Binding',
+          name: 'levelReadoutText',
+          enabled: true,
+          source: 'channel.level.raw',
+          mapMode: 'format',
+          target: 'Parts.levelReadout.Text.content',
+          multiplier: 100,
+          offset: 0,
+          precision: 0,
+          prefix: '',
+          suffix: '%',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('segmentLevelMeter', [{ id: 'levelChange', label: 'Level Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'meterWell',
+      selectedValueChannel: 'level',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'meterLeds',
+      notes: 'Output-only level meter: drive the level input from the panel, a script, or automation.',
+    },
+  };
+}
+
+function createStatusLampStarterPatch() {
+  const channels = {
+    active: createValueChannel('active', {
+      label: 'Active',
+      type: 'bool',
+      min: 0,
+      max: 1,
+      step: 1,
+      defaultValue: 0,
+      format: { precision: 0 },
+    }),
+  };
+  return {
+    'Core.name': 'Status Lamp',
+    'Transform.width': 120,
+    'Transform.height': 72,
+    Animations: createStarterAnimations(),
+    States: {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: ['lampOn', 'disabled'],
+      _children: {
+        LampOn: {
+          _type: 'State',
+          name: 'LampOn',
+          group: 'value',
+          description: 'Lights the lamp and caption while the active input is on.',
+          enabled: true,
+          // Rule-driven (non-enum): a compound condition over the bool channel.
+          rule: 'active >= 1',
+          when: {},
+          patches: {
+            component: {},
+            parts: {
+              lamp: {
+                'Background.Fill.colour': 'FF65E6A0',
+                'Background.Border.colour': '9965E6A0',
+              },
+              caption: { 'Text.Fill.colour': 'FFB9F2CF' },
+            },
+          },
+        },
+        Disabled: {
+          _type: 'State',
+          name: 'Disabled',
+          group: 'system',
+          description: 'Dims the full custom component.',
+          enabled: true,
+          when: { disabled: true },
+          patches: {
+            component: { 'Transform.opacity': 0.55 },
+            parts: {},
+          },
+        },
+      },
+    },
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('STATUS', 'FF14191E'),
+        lamp: createPartNode('lamp', {
+          role: 'indicator',
+          kind: 'circle',
+          zIndex: 4,
+          layout: { x: 32, y: 58, width: 22, height: 22, widthUnit: 'px', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('FF23313B', { borderColour: '55344551', borderThickness: 2, radius: 999 }),
+          },
+        }),
+        caption: createPartNode('caption', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 66, y: 58, width: 56, height: 14, widthUnit: 'percent', heightUnit: 'px' },
+          sections: { Text: createText('OFF', { size: 11, weight: 800 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: createCustomComponentBlankGeneratorsDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        captionText: {
+          _type: 'Binding',
+          name: 'captionText',
+          enabled: true,
+          source: 'channel.active.raw',
+          mapMode: 'boolean',
+          target: 'Parts.caption.Text.content',
+          trueValue: 'ON',
+          falseValue: 'OFF',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('statusLamp', [{ id: 'activeChange', label: 'Active Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'lamp',
+      selectedValueChannel: 'active',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      notes: 'Boolean status lamp: the LampOn state is rule-driven (active >= 1); drive the input externally.',
+    },
+  };
+}
+
+function createValueReadoutStarterPatch() {
+  const channels = {
+    value: createValueChannel('value', {
+      label: 'Value',
+      min: 0,
+      max: 127,
+      step: 1,
+      defaultValue: 64,
+      format: { precision: 0 },
+    }),
+  };
+  return {
+    'Core.name': 'Value Readout',
+    'Transform.width': 160,
+    'Transform.height': 76,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('VALUE', 'FF11161B'),
+        readout: createPartNode('readout', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 50, y: 56, width: 90, height: 30, widthUnit: 'percent', heightUnit: 'px' },
+          sections: { Text: createText('64', { size: 24, weight: 800 }) },
+        }),
+        unit: createPartNode('unit', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 88, y: 66, width: 30, height: 12, widthUnit: 'px', heightUnit: 'px' },
+          sections: { Text: createText('cc', { size: 9, weight: 600 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: createCustomComponentBlankGeneratorsDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        readoutText: {
+          _type: 'Binding',
+          name: 'readoutText',
+          enabled: true,
+          source: 'channel.value.raw',
+          mapMode: 'format',
+          target: 'Parts.readout.Text.content',
+          multiplier: 1,
+          offset: 0,
+          precision: 0,
+          prefix: '',
+          suffix: '',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+        unit: { path: 'Parts.unit.Text.content', label: 'Unit', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('valueReadout', [{ id: 'valueChange', label: 'Value Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'readout',
+      selectedValueChannel: 'value',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      notes: 'Live numeric readout: bind or link the value input; the text follows via a format binding.',
+    },
+  };
+}
+
 export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.blankCanvas') {
     return {
@@ -1988,6 +2323,9 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.scrollPianoBar') return createScrollPianoBarStarterPatch();
   if (starterId === 'starter.tripleValueSlider') return createTripleValueSliderStarterPatch();
   if (starterId === 'starter.filmstripKnob') return createFilmstripKnobStarterPatch();
+  if (starterId === 'starter.segmentLevelMeter') return createSegmentLevelMeterStarterPatch();
+  if (starterId === 'starter.statusLamp') return createStatusLampStarterPatch();
+  if (starterId === 'starter.valueReadout') return createValueReadoutStarterPatch();
   return {};
 }
 
