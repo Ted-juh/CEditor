@@ -69,3 +69,27 @@ export function applyGradientToTarget(newGradient) {
 export function clearGradientTarget() {
   gradientTarget.set(null);
 }
+
+/**
+ * Shared seed helper for the fill editors (Background / Text / custom-surface —
+ * previously three near-identical copies): returns the fill's gradient when it
+ * is usable (>= 2 stops), otherwise clones `defaultGradient` and hands it to
+ * `seedGradient` so the caller can persist it through its own write primitive
+ * (which may be state-scoped or path-prefixed).
+ */
+export function ensureFillGradientSeeded({ fill, defaultGradient, seedGradient }) {
+  if (fill?.gradient?.stops?.length >= 2) return fill.gradient;
+  const seeded = JSON.parse(JSON.stringify(defaultGradient));
+  seedGradient?.(seeded);
+  return seeded;
+}
+
+/**
+ * Seed-and-open in one step: ensure the Fill has a usable gradient, then
+ * activate the gradient target at `targetPath` (the Fill node's path).
+ */
+export function openFillGradientEditor({ controlId, targetPath, fill, defaultGradient, seedGradient }) {
+  if (!controlId || !targetPath) return null;
+  const gradient = ensureFillGradientSeeded({ fill, defaultGradient, seedGradient });
+  return activateGradientTarget({ type: 'control', controlId, path: targetPath }, gradient);
+}

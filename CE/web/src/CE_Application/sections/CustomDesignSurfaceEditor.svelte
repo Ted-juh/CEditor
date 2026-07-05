@@ -19,7 +19,7 @@
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
-  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { openFillGradientEditor } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { clipPathForKind } from '../utils/shapeGeometry.js';
   import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
@@ -1628,16 +1628,13 @@
 
   function openLayerGradient() {
     if (!core?.id || !selectedLayer || !selectedFill) return;
-    const gradient = selectedFill.gradient?.stops?.length >= 2
-      ? selectedFill.gradient
-      : DEFAULT_LAYER_GRADIENT;
-    if (!selectedFill.gradient?.stops?.length) {
-      setLayerProperty('Background.Fill.gradient', gradient);
-    }
-    activateGradientTarget(
-      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.Background.Fill` },
-      gradient
-    );
+    openFillGradientEditor({
+      controlId: core.id,
+      targetPath: `Parts.${selectedLayer}.Background.Fill`,
+      fill: selectedFill,
+      defaultGradient: DEFAULT_LAYER_GRADIENT,
+      seedGradient: (seeded) => setLayerProperty('Background.Fill.gradient', seeded),
+    });
   }
 
   function toggleFillGradient() {
