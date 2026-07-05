@@ -601,6 +601,144 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
   }
 }
 
+// Value labels along a scale (linear, vertical, or circular). Explicit
+// `labels` win; otherwise numbers interpolate min..max with `precision` and
+// an optional `suffix`.
+function materializeLabels(parts, generator, prefix, generatorName = '') {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 5)));
+  const geometry = String(generator?.geometry ?? 'linear').trim().toLowerCase();
+  const zIndex = numberOr(generator?.zIndex, 7);
+  const bounds = generatorBounds(generator);
+  const colour = generator?.colour ?? 'CCB9C8D4';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const explicitLabels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const min = numberOr(generator?.min, 0);
+  const max = numberOr(generator?.max, 100);
+  const precision = Math.max(0, Math.min(4, Math.round(numberOr(generator?.precision, 0))));
+  const suffix = String(generator?.suffix ?? '');
+  const denominator = Math.max(1, count - 1);
+
+  for (let index = 0; index < count; index += 1) {
+    const normalized = count === 1 ? 0.5 : index / denominator;
+    const text = explicitLabels?.[index] !== undefined && explicitLabels?.[index] !== null
+      ? String(explicitLabels[index])
+      : `${(min + ((max - min) * normalized)).toFixed(precision)}${suffix}`;
+
+    let x = 6 + (normalized * 88);
+    let y = 85;
+    if (geometry === 'vertical') {
+      x = 14;
+      y = 90 - (normalized * 80);
+    } else if (geometry === 'circular' || geometry === 'ring') {
+      const radius = numberOr(generator?.radius, 42);
+      const { startAngle, endAngle } = circularGeneratorAngles(generator, -135, 135);
+      const angle = startAngle + ((endAngle - startAngle) * normalized);
+      const radians = (dialAngleToCanvasAngle(angle) * Math.PI) / 180;
+      x = 50 + (Math.cos(radians) * radius);
+      y = 50 + (Math.sin(radians) * radius);
+    }
+
+    addPart(parts, `${prefix}_label_${index + 1}`, createPartNode(`${prefix}_label_${index + 1}`, {
+      role: 'generatedLabel',
+      kind: 'text',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, x),
+        y: mapGeneratorY(bounds, y),
+        width: 34,
+        height: 12,
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'px',
+        heightUnit: 'px',
+      },
+      sections: { Text: createText(text, { size: fontSize, weight: 600, colour }) },
+      meta: { generatedLabel: true, index, normalized },
+    }), generatorName);
+  }
+}
+
+// A bank of N buttons: one part per button plus (by default) a generated
+// setValue zone per button carrying its index/value payload. The button
+// matching the target channel's current raw value renders highlighted, so
+// the bank behaves like a segmented selector with zero hand wiring.
+function materializeButtons(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 4)));
+  const geometry = String(generator?.geometry ?? 'linear').trim().toLowerCase();
+  const vertical = geometry === 'vertical';
+  const zIndex = numberOr(generator?.zIndex, 7);
+  const bounds = generatorBounds(generator);
+  const labels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const values = Array.isArray(generator?.values) ? generator.values : null;
+  const activeColour = generator?.activeColour ?? 'FF5B9BD5';
+  const inactiveColour = generator?.inactiveColour ?? generator?.colour ?? 'FF232C34';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const gap = clamp(numberOr(generator?.gap, 8), 0, 60); // % of one cell kept as spacing
+
+  const channelName = String(generator?.targetValueChannel ?? generator?.valueSource ?? '').trim();
+  const currentRaw = signals?.customChannels?.[`channel.${channelName}.raw`];
+  const denominator = Math.max(1, count - 1);
+  const cell = 100 / count;
+  const size = cell * (1 - (gap / 100));
+
+  for (let index = 0; index < count; index += 1) {
+    const value = values?.[index] !== undefined ? values[index] : index;
+    const label = labels?.[index] !== undefined && labels?.[index] !== null ? String(labels[index]) : String(value);
+    const active = currentRaw !== undefined && String(currentRaw) === String(value);
+    const center = (index + 0.5) * cell;
+    const buttonName = `${prefix}_${index + 1}`;
+
+    addPart(parts, buttonName, createPartNode(buttonName, {
+      role: 'generatedButton',
+      kind: 'roundedRectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, vertical ? 50 : center),
+        y: mapGeneratorY(bounds, vertical ? center : 50),
+        width: mapGeneratorWidth(bounds, vertical ? 88 : size),
+        height: mapGeneratorHeight(bounds, vertical ? size : 76),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: {
+        Background: createBackground(active ? activeColour : inactiveColour, {
+          borderEnabled: true,
+          borderColour: active ? '99DFF3FF' : '332B3742',
+          borderThickness: 1,
+          radius: 4,
+        }),
+        Text: createText(label, { size: fontSize, weight: 700, colour: active ? 'FF10161B' : 'CCB9C8D4' }),
+      },
+      meta: { generatedButton: true, index, value, active },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && channelName) {
+      addHitZone(hitZones, `${prefix}_zone_${index + 1}`, {
+        shape: 'rectangle',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: channelName,
+        action: generator?.hitZoneAction ?? 'setValue',
+        payload: {
+          type: 'bankButton',
+          index,
+          number: index + 1,
+          value,
+          normalized: count === 1 ? 0 : index / denominator,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: vertical ? 0 : index * cell,
+          y: vertical ? index * cell : 0,
+          width: vertical ? 100 : cell,
+          height: vertical ? cell : 100,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
 // Indexed per-instance repeats (§12.4): one bar per item of an ARRAY channel.
 // Bar i's height follows item i live (through the channel signals), and the
 // generated zone for column i writes item i back (action setItemValue), so
@@ -931,6 +1069,10 @@ export function materializeCustomComponent(control, signals = {}) {
       materializeLeds(parts, generator, prefix, generatorName, hitZones, signals);
     } else if (type === 'step-bars' || type === 'steps') {
       materializeStepBars(parts, resolved, signals, generator, prefix, generatorName, hitZones);
+    } else if (type === 'labels') {
+      materializeLabels(parts, generator, prefix, generatorName);
+    } else if (type === 'repeated-buttons' || type === 'buttons') {
+      materializeButtons(parts, resolved, signals, generator, prefix, generatorName, hitZones);
     } else if (type === 'grid' || type === 'meter-bars' || type === 'segmented-ring') {
       materializeGrid(parts, generator, prefix, generatorName, hitZones);
     } else if (type === 'piano-keys' || type === 'piano') {

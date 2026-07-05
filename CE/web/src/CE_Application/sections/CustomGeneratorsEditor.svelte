@@ -44,7 +44,7 @@
     'segmented-ring': 'Segmented ring',
     labels: 'Value labels',
     'meter-bars': 'Meter bars',
-    'scrollable-content': 'Scrollable content',
+    'scrollable-content': 'Scrollable content (not materialized yet)',
     'filmstrip-frames': 'Filmstrip frames',
   };
 
