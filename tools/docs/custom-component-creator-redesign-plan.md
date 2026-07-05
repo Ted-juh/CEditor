@@ -247,3 +247,11 @@ Shipped from this section (branch `claude/scripting-custom-component-editor-2op8
 - ✅ QA future-polish trio: state rules for non-enum compound conditions, waveform/envelope presets, arp tool shortcuts.
 
 Still open from §12: **PointSet/array-channel primitive (§12.3)**, **indexed per-instance repeat bindings (§12.4)**, multi-point/container starters, persistent live preview (§12.6), terminology rename pass, responsive anchors/theme tokens, sharing gallery (§12.7), continued decomposition (§12.5).
+
+### 12.10 Status update (2026-07-05, second pass)
+- ✅ **§12.3 array-channel primitive**: `ValueChannel` type `'array'` (`createArrayChannel`) — N items sharing min/max/step, per-item clamp/snap/seed, channel signals expose `channel.<n>.items` + `channel.<n>.<i>.raw/.normalized` (per-index bindings work through the existing binding machinery unchanged). Test Bench renders arrays as a per-item slider strip.
+- ✅ **§12.4 indexed repeats**: `step-bars` generator — one bar per item, height live from item *i*, generated full-column zones write item *i* back (`setItemValue` + `payload.index`). Zero hand wiring.
+- ✅ First consumer: **Step Sequencer starter** (16 steps, published array input/output, validates as a package).
+- ✅ **§12.6 persistent live preview**: a "Live" dock tab hosts the interactive runtime component while editing, sharing the preview session.
+- Resize policies (stress notes): stretch/fixed-aspect/min-max already exist for every control (`Transform.aspectLock/minWidth/maxWidth`, honored by canvas resize + shown in the Transform inspector). Still open: a `scaleInternals` mode (render px-unit internals scaled to the instance box) and label pinning — needs coordinated renderer/player/hit-test work.
+- Still open: re-express the **arpeggiator** on the array primitive; container/tab-group starters; terminology *rename* pass (glossary shipped; renames need an owner decision); responsive anchors/theme tokens; sharing gallery; Python execution budget (watchdog thread); debugger native line-stepping.
