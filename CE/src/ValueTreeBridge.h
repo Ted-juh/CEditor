@@ -13,6 +13,18 @@ class AppSettings;
  * JS -> C++:  receives "setProperty", "undo", "redo" via event listeners
  *             receives "savePanelAs", "savePanel", "openPanel",
  *             "loadOpenPanels", "updateOpenPanels" for file operations
+ *
+ * LIFETIME INVARIANT (load-bearing — do not break): the event listeners
+ * registered in buildOptions() and the MessageManager::callAsync bodies they
+ * queue capture `this` raw. That is safe only while
+ *   1. the WebBrowserComponent built from these Options is destroyed BEFORE
+ *      this bridge (owners must declare the browser after the bridge, or
+ *      reset it first), and
+ *   2. both are destroyed on the message thread (so no queued callAsync body
+ *      can run after ~ValueTreeBridge mid-teardown).
+ * If either ordering ever has to change, switch the captures to a
+ * weak alive-token (std::weak_ptr member) checked at the top of each lambda
+ * instead of loosening this contract.
  */
 class ValueTreeBridge : public juce::ValueTree::Listener
 {

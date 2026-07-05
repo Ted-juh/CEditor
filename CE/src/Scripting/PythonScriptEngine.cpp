@@ -39,6 +39,7 @@
 
 #include "ScriptRuntime.h"
 
+#include <atomic>
 #include <map>
 #include <vector>
 
@@ -440,6 +441,7 @@ public:
             Py_XDECREF (owner);
         }
 
+        const WatchdogScope guard (*this); // module-level statements obey the execution budget too
         if (! exec (kPrelude, ns)) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
         if (! exec (def.source.toRawUTF8(), ns)) { onError (def.id, "load error: " + fetchPyError()); Py_DECREF (ns); return false; }
 
@@ -456,12 +458,11 @@ public:
         return f != nullptr && PyCallable_Check (f);
     }
 
-    // NOTE (anti-flood guard): unlike Lua (instruction-count hook) and JS
-    // (QuickJS interrupt via maximumExecutionTime), embedded CPython has no
-    // cheap in-thread execution budget — interrupting a runaway handler needs
-    // a watchdog thread calling PyErr_SetInterrupt. Until that exists, a
-    // Python handler CAN block the message thread; the MIDI flood guard in
-    // BridgeScriptHost still caps what it can send while it runs.
+    // Anti-flood / loop guard (parity with Lua's instruction hook and JS's
+    // QuickJS interrupt): a watchdog thread calls PyErr_SetInterrupt() when a
+    // single entry into Python overruns its wall-clock budget, which raises
+    // KeyboardInterrupt in the interpreter and aborts the runaway handler.
+    // The error surfaces through the normal error sink via fetchPyError().
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
                         const juce::var& payload, const ScriptErrorSink& onError) override
     {
@@ -473,6 +474,7 @@ public:
 
         PyObject* arg = varToPy (payload);
         if (arg == nullptr) { onError (scriptId, "failed to convert payload: " + fetchPyError()); return {}; }
+        const WatchdogScope guard (*this);
         PyObject* result = PyObject_CallFunctionObjArgs (f, arg, nullptr);
         Py_DECREF (arg);
 
@@ -488,6 +490,7 @@ public:
         g_host = host; g_engine = this; // route api_* calls during delivery to THIS instance
         PyObject* arg = varToPy (payload);              // convert ONCE; the call borrows it
         if (arg == nullptr) { onError ("on:" + event, "failed to convert payload: " + fetchPyError()); return; }
+        const WatchdogScope guard (*this);
         for (auto& l : listeners)
         {
             if (l.event != event) continue;
@@ -514,6 +517,75 @@ public:
 
 private:
     struct Listener { juce::String target, event; PyObject* fn; };
+
+    // Wall-clock execution budget per outermost entry into Python (matches the
+    // JS engine's 2s maximumExecutionTime).
+    static constexpr double executionBudgetSeconds = 2.0;
+
+    // PyErr_SetInterrupt() is documented as callable from any thread without
+    // the GIL — it simulates SIGINT, making the interpreter raise
+    // KeyboardInterrupt in the main thread mid-execution.
+    class Watchdog : private juce::Thread
+    {
+    public:
+        Watchdog() : juce::Thread ("ce-python-watchdog") {}
+        ~Watchdog() override { stopThread (2000); }
+
+        void beginDispatch (double budgetSeconds)
+        {
+            fired.store (false);
+            deadlineMs.store (juce::Time::getMillisecondCounterHiRes() + (budgetSeconds * 1000.0));
+            if (! isThreadRunning()) startThread();
+            notify();
+        }
+
+        void endDispatch()   { deadlineMs.store (0.0); }
+        bool firedThisRun()  { return fired.exchange (false); }
+
+    private:
+        void run() override
+        {
+            while (! threadShouldExit())
+            {
+                const double deadline = deadlineMs.load();
+                if (deadline > 0.0 && juce::Time::getMillisecondCounterHiRes() > deadline)
+                {
+                    PyErr_SetInterrupt();   // -> KeyboardInterrupt in the interpreter thread
+                    fired.store (true);
+                    deadlineMs.store (0.0); // fire once per dispatch
+                }
+                wait (50);
+            }
+        }
+
+        std::atomic<double> deadlineMs { 0.0 };
+        std::atomic<bool>   fired { false };
+    };
+
+    // Depth-shared like the Lua watchdog: only the outermost entry arms the
+    // deadline, so nested dispatches (handler -> emit -> handler) don't reset
+    // or prematurely clear it. On exit, absorb an interrupt that raced in
+    // AFTER Python returned, so it can't leak into the next dispatch.
+    struct WatchdogScope
+    {
+        explicit WatchdogScope (PythonScriptEngine& engineIn) : engine (engineIn)
+        {
+            if (engine.watchdogDepth++ == 0)
+                engine.watchdog.beginDispatch (executionBudgetSeconds);
+        }
+
+        ~WatchdogScope()
+        {
+            if (--engine.watchdogDepth == 0)
+            {
+                engine.watchdog.endDispatch();
+                if (engine.watchdog.firedThisRun() && PyErr_CheckSignals() != 0)
+                    PyErr_Clear(); // late interrupt with no Python running — swallow it
+            }
+        }
+
+        PythonScriptEngine& engine;
+    };
 
     bool exec (const char* code, PyObject* ns)
     {
@@ -624,6 +696,8 @@ private:
     juce::String initInfo;                        // why init failed (or where the stdlib was found) — for the log
     std::map<juce::String, PyObject*> namespaces; // scriptId -> namespace dict (owned ref)
     std::vector<Listener> listeners;
+    Watchdog watchdog;
+    int watchdogDepth = 0;
 };
 
 namespace

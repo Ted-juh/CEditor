@@ -292,8 +292,9 @@ panel, still hand-built.
       assets from it by basename (filesystem dist kept as dev fallback). **Self-contained &
       host-path-independent — fixes the blank panel in a DAW** (the old filesystem path resolved
       to the host, not the plugin). Verified: VST Standalone built with the embedded bundle renders
-      the 12-slider GAIA panel with no `dist` on disk. *(Per-instance WebView user-data folder still
-      TODO for the two-instance case.)*
+      the 12-slider GAIA panel with no `dist` on disk. *(Per-instance WebView user-data folder:
+      ✅ done — `PlayerHost` derives a unique temp folder per instance from hi-res ticks + an
+      instance counter; the two-instance TEST (C5) is still the open item.)*
 - [ ] C5. **Two-instance test** + real-DAW scan/load. **Deferred** (needs a DAW — yours).
 
 **Exit proof:** ✅ **VST3 builds, loads in Reaper, and its panel UI PAINTS inside the host**

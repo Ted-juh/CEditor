@@ -93,10 +93,9 @@ Backstops so a bad script can't freeze the DAW or spam MIDI. All invisible in no
 |-------|-------|-------|---------|
 | Lua instruction budget | `LuaScriptEngine` (`lua_sethook`, `LUA_MASKCOUNT`) | 20M instructions per outermost entry | Lua error → reported to the error sink, handler aborted |
 | JS execution time | `JsScriptEngine` (`JavascriptEngine::maximumExecutionTime`) | 2 s per call | QuickJS interrupt → error reported, handler aborted |
+| Python execution time | `PythonScriptEngine` (watchdog thread → `PyErr_SetInterrupt`) | 2 s per outermost entry | `KeyboardInterrupt` in the handler → error reported, handler aborted; a late interrupt that races past the call is absorbed so the next dispatch runs clean |
 | Dispatch depth | `ScriptRuntime::dispatchEvent` | 16 nested dispatches | event dropped + reported (emit→dispatch feedback loop) |
 | MIDI send rate | `BridgeScriptHost` | 1000 sends / rolling second (CC+NRPN+sysex+transmitting `set`) | excess sends dropped, local value writes still apply, one log notice per burst |
 
-Known gap: embedded **Python** has no cheap in-thread execution budget (interrupting needs a
-watchdog thread + `PyErr_SetInterrupt`) — a runaway Python handler can still block the message
-thread. The MIDI rate guard still applies to everything it sends. See the note in
-`PythonScriptEngine.cpp::dispatch`.
+Caveat: a Python handler that swallows `KeyboardInterrupt` (`except: pass` in the loop) can still
+run away — the watchdog fires once per entry. The MIDI rate guard still bounds what it can send.

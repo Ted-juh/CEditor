@@ -103,6 +103,30 @@ int main()
     runtime.onPanelReady (true);
     check (host.logs.contains ("stdlib 7 42"), "FULL STDLIB: import json + re worked window-closed");
 
+    // Anti-flood guard: a runaway Python loop must be aborted by the watchdog
+    // (PyErr_SetInterrupt -> KeyboardInterrupt) instead of hanging the host.
+    juce::StringArray errors;
+    runtime.setErrorLogger ([&errors] (const juce::String& line)
+        { errors.add (line); std::cout << "  [error] " << line << "\n"; });
+    juce::Array<juce::var> guardScripts;
+    guardScripts.add (makeScript ("pyloop", "onRunaway", "*",
+        "def onRunaway(value):\n"
+        "    while True:\n"
+        "        pass\n"));
+    guardScripts.add (makeScript ("pyAfter", "onAfter", "*",
+        "def onAfter(value):\n"
+        "    log(\"after ok\")\n"));
+    runtime.loadScripts (juce::var (guardScripts));
+
+    runtime.dispatchEvent ("onRunaway", "panel", juce::var());
+    check (errors.joinIntoString ("\n").contains ("pyloop"),
+           "Guard: runaway Python loop aborted by the execution watchdog");
+
+    // The interrupt must not leak into the next, well-behaved dispatch.
+    host.logs.clear();
+    runtime.dispatchEvent ("onAfter", "panel", juce::var());
+    check (host.logs.contains ("after ok"), "Guard: next dispatch runs clean after a watchdog trip");
+
     std::cout << "-----------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

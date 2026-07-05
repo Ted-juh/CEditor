@@ -220,8 +220,19 @@ static void pinModuleResident (const juce::String& fullPath)
     static juce::StringArray pinned;            // message-thread only; no lock needed
     if (pinned.contains (fullPath)) return;
     auto* keep = new juce::DynamicLibrary();     // leaked on purpose: never closed for the process lifetime
-    if (keep->open (fullPath)) pinned.add (fullPath);
-    else delete keep;
+    if (keep->open (fullPath))
+    {
+        pinned.add (fullPath);
+        juce::Logger::writeToLog ("[native handlers] pinned module resident: " + fullPath);
+    }
+    else
+    {
+        delete keep;
+        // A failed pin reproduces the exact "second open is dead" symptom this
+        // mechanism exists to prevent — say so instead of staying silent.
+        juce::Logger::writeToLog ("[native handlers] WARNING: failed to pin module resident"
+                                  " (offline/online may lose the hosted runtime): " + fullPath);
+    }
 }
 
 } // namespace
