@@ -45,6 +45,7 @@
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { creatorMode } from '../stores/creatorMode.js';
   import ConditionBuilder from './ConditionBuilder.svelte';
   import {
     ENVELOPE_SHAPE_PRESETS,
@@ -3376,6 +3377,10 @@
 
     <div class="surface-options-strip" aria-label="Surface view + zoom options">
       <div class="surface-toolbar-left">
+      <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows the full component graph">
+        <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
+        <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
+      </div>
       <label class="toggle-option">
         <input type="checkbox" checked={snapEnabled} onchange={(event) => { snapEnabled = event.currentTarget.checked; }} />
         <span>Snap</span>

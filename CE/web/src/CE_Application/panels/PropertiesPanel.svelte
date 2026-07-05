@@ -6,6 +6,7 @@
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
+  import { creatorMode, CREATOR_SIMPLE_HIDDEN_TABS } from '../stores/creatorMode.js';
   import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
@@ -147,7 +148,9 @@
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
   ];
 
-  // Only show tabs for sections that exist on the selected component
+  // Only show tabs for sections that exist on the selected component.
+  // Simple creator mode additionally hides the raw-graph list managers for
+  // custom components (§11.2) — same data, progressively disclosed.
   let componentTabs = $derived(
     $selectedControl
       ? allComponentTabs.filter((tab) => (
@@ -155,6 +158,7 @@
           || hasSection($selectedControl, tab.section)
           || (tab.id === 'devicebindings' && getComponentPorts($selectedControl).length > 0))
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
+        && !(selectedIsCustomComponent && $creatorMode === 'simple' && CREATOR_SIMPLE_HIDDEN_TABS.has(tab.id))
       ))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
@@ -373,6 +377,23 @@
     {/if}
 
     {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
+      <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
+        <button
+          type="button"
+          class:active={$creatorMode === 'simple'}
+          onclick={() => creatorMode.set('simple')}
+          title="Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back."
+        >Simple</button>
+        <button
+          type="button"
+          class:active={$creatorMode === 'advanced'}
+          onclick={() => creatorMode.set('advanced')}
+          title="Expose the full component graph."
+        >Advanced</button>
+      </div>
+    {/if}
+
+    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
       <div class="property-search">
         <input
           type="text"
@@ -527,6 +548,36 @@
   .component-designer-entry:hover {
     border-color: #5B9BD5;
     background: #20344B;
+  }
+
+  .creator-mode-toggle {
+    flex: 0 0 auto;
+    display: flex;
+    margin: 6px 8px 0 8px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .creator-mode-toggle button {
+    flex: 1;
+    padding: 4px 0;
+    border: none;
+    background: #1A1A1A;
+    color: #8A949E;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .creator-mode-toggle button.active {
+    background: #173449;
+    color: #C7D9EA;
+  }
+
+  .creator-mode-toggle button:hover:not(.active) {
+    color: #C6CDD4;
   }
 
   .property-search {
