@@ -16,7 +16,7 @@ import {
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
-import { constrainCustomValues } from './customComponentInteraction.js';
+import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 
 function getNodeChild(node, key) {
@@ -266,8 +266,27 @@ function stateSignalValue(key, signals) {
   }
 }
 
+// Flat name -> value map for state rules: bare channel names carry their raw
+// values, interaction flags come along so rules like `hover == true` work.
+function stateRuleValues(signals) {
+  const values = {};
+  for (const [key, value] of Object.entries(signals?.customChannels ?? {})) {
+    const match = /^channel\.([^.]+)\.raw$/.exec(key);
+    if (match) values[match[1]] = value;
+  }
+  for (const flag of ['hover', 'pressed', 'focused', 'dragging', 'disabled', 'checked', 'mixed']) {
+    values[flag] = signals?.[flag] === true;
+  }
+  return values;
+}
+
 function evaluateState(state, signals) {
   if (!state || state.enabled === false) return false;
+  // Optional compound condition over channels/flags (`level > 0.5 && mode == 'A'`),
+  // evaluated with the same language links and hit zones use. ANDed with `when`
+  // so flag toggles and a rule can be combined.
+  const rule = String(state.rule ?? '').trim();
+  if (rule && !customConditionMatches(rule, stateRuleValues(signals))) return false;
   const when = state.when ?? {};
   return Object.entries(when).every(([key, expected]) => {
     const actual = stateSignalValue(key, signals);

@@ -427,6 +427,10 @@ function conditionMatches(condition, values) {
   );
 }
 
+// Shared with state rules (interactionRuntime) so links, hit zones, and
+// visual states all evaluate the same condition language.
+export { conditionMatches as customConditionMatches };
+
 function resolveSwitchLinkValue(link, values) {
   const sourceName = String(link?.source ?? '').trim();
   const sourceValue = values?.[sourceName];

@@ -45,6 +45,7 @@
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import ConditionBuilder from './ConditionBuilder.svelte';
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
   import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
   import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
@@ -348,6 +349,13 @@
   let bindingEntries = $derived(Object.entries(bindings?._children ?? {}));
   let generatorEntries = $derived(Object.entries(generators?._children ?? {}));
   let stateEntries = $derived(Object.entries(states?._children ?? {}));
+  // The state whose rule is editable in the States inspector tab — follows
+  // the filmstrip's previewed state.
+  let selectedInspectorStateName = $derived.by(() => {
+    const name = String(designer?.preview?.state ?? 'base');
+    return name !== 'base' && states?._children?.[name] ? name : '';
+  });
+  let selectedInspectorState = $derived(selectedInspectorStateName ? states?._children?.[selectedInspectorStateName] : null);
   let stateFilmstripEntries = $derived([
     { name: 'base', state: null, base: true },
     ...stateEntries.map(([name, state]) => ({ name, state, base: false })),
@@ -4619,15 +4627,33 @@
                 <div class="dock-section-title">States</div>
                 <div class="mini-list">
                   {#each stateEntries.slice(0, 8) as [name, state] (name)}
-                    <div>
+                    <button
+                      type="button"
+                      class="mini-state-row"
+                      class:active={String(designer?.preview?.state ?? 'base') === name}
+                      onclick={() => selectStateCard(name)}
+                      title={`Preview ${name}`}
+                    >
                       <strong>{name}</strong>
-                      <span>{state?.label ?? state?.trigger ?? 'state'}</span>
-                    </div>
+                      <span>{String(state?.rule ?? '').trim() || state?.label || state?.trigger || 'state'}</span>
+                    </button>
                   {:else}
                     <div><span>No states authored yet</span></div>
                   {/each}
                 </div>
               </div>
+              {#if selectedInspectorState}
+                <div class="dock-section">
+                  <div class="dock-section-title">Rule — {selectedInspectorStateName}</div>
+                  <div class="dock-hint">Activate this state from channel values — compound conditions welcome (e.g. level &gt; 0.5 and mode is A). Combined with the filmstrip's flag toggles.</div>
+                  <ConditionBuilder
+                    value={selectedInspectorState?.rule ?? ''}
+                    channels={valueChannelEntries.map(([name]) => name)}
+                    placeholder="no rule — flags only"
+                    onChange={(next) => updateControlProperty(core.id, `States.${selectedInspectorStateName}.rule`, next)}
+                  />
+                </div>
+              {/if}
             {:else if inspectorTab === 'device'}
               <div class="dock-section">
                 <div class="dock-section-title">Component API</div>
@@ -6178,6 +6204,40 @@
 
   .mini-list strong {
     color: #D4DEE7;
+  }
+
+  .mini-list .mini-state-row {
+    display: grid;
+    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
+    gap: 8px;
+    align-items: center;
+    min-height: 27px;
+    padding: 5px 7px;
+    border: 1px solid #2A3036;
+    border-radius: 4px;
+    background: #15191D;
+    color: #87939E;
+    font-size: 10px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .mini-list .mini-state-row:hover {
+    border-color: #5B9BD5;
+  }
+
+  .mini-list .mini-state-row.active {
+    border-color: #5B9BD5;
+    background: #173449;
+    color: #C7D9EA;
+  }
+
+  .dock-hint {
+    margin-bottom: 6px;
+    color: #6E7B87;
+    font-size: 9.5px;
+    line-height: 1.45;
   }
 
   .list-row {

@@ -147,6 +147,7 @@ export function stateTriggerLabel(state, base = false) {
   if (when.checked) return 'Checked';
   const flags = Object.entries(when).filter(([, v]) => v === true).map(([k]) => k);
   if (flags.length) return flags[0];
+  if (String(state?.rule ?? '').trim()) return `Rule: ${String(state.rule).trim()}`;
   return 'No trigger';
 }
 

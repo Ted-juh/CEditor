@@ -72,7 +72,7 @@
           <div class="state-count-trigger">
             <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
             {#if !entry.base}
-              <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean)}>{stateTriggerLabel(entry.state, entry.base)}</span>
+              <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean) && !String(entry.state?.rule ?? '').trim()}>{stateTriggerLabel(entry.state, entry.base)}</span>
             {/if}
           </div>
         </button>
