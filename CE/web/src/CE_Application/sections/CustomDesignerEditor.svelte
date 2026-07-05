@@ -26,6 +26,7 @@
     summarizeCustomComponent,
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
+  import { readinessAutoFix } from '../utils/customComponentReadinessFixes.js';
   import { deepClone } from '../utils/deepClone.js';
 
   let { control = null } = $props();
@@ -105,6 +106,22 @@
   ]);
   let readiness = $derived(control ? analyzeCustomComponentReadiness(control) : { ok: false, score: 0, steps: [] });
   let readinessOpenSteps = $derived(readiness.steps.filter((step) => !step.done));
+  // One-click fixes for steps that can be scaffolded mechanically.
+  let readinessFixes = $derived.by(() => {
+    const fixes = new Map();
+    for (const step of readiness.steps) {
+      if (step.done) continue;
+      const fix = readinessAutoFix(control, step.id);
+      if (fix) fixes.set(step.id, fix);
+    }
+    return fixes;
+  });
+
+  function applyReadinessFix(step) {
+    const fix = readinessFixes.get(step.id);
+    if (!fix || !core?.id) return;
+    applyControlPatch(core.id, fix.patch);
+  }
   let filteredLibraryEntries = $derived(filterLibraryEntries(libraryEntries, librarySearch, libraryValidity, libraryKind, librarySort));
   let selectedLibrarySummaryItems = $derived(summaryItems(selectedLibraryEntry?.summary));
   let selectedLibrarySurfaceItems = $derived(publicSurfaceItems(selectedLibraryEntry?.publicApiSummary ?? selectedLibraryEntry?.publicApi));
@@ -1075,16 +1092,23 @@
     <PropertyCell label="Checklist" span={4} hint="Authoring checklist for reusable, linkable, shareable custom components.">
       <div class="readiness-list">
         {#each readiness.steps as step}
-          <button
-            class:done={step.done}
-            class:required={step.severity === 'required'}
-            type="button"
-            onclick={() => focusReadinessStep(step)}
-          >
-            <span>{step.done ? 'done' : step.severity}</span>
-            <strong>{step.label}</strong>
-            <em>{step.detail}</em>
-          </button>
+          <div class="readiness-item" class:has-fix={readinessFixes.has(step.id)}>
+            <button
+              class:done={step.done}
+              class:required={step.severity === 'required'}
+              type="button"
+              onclick={() => focusReadinessStep(step)}
+            >
+              <span>{step.done ? 'done' : step.severity}</span>
+              <strong>{step.label}</strong>
+              <em>{step.detail}</em>
+            </button>
+            {#if readinessFixes.has(step.id)}
+              <button type="button" class="readiness-fix" onclick={() => applyReadinessFix(step)} title={readinessFixes.get(step.id).label}>
+                Fix
+              </button>
+            {/if}
+          </div>
         {/each}
       </div>
     </PropertyCell>
@@ -1096,6 +1120,11 @@
               <strong>{step.label}</strong>
               <span>{step.detail}</span>
             </button>
+            {#if readinessFixes.has(step.id)}
+              <button type="button" class="readiness-fix" onclick={() => applyReadinessFix(step)} title={readinessFixes.get(step.id).label}>
+                Fix: {readinessFixes.get(step.id).label}
+              </button>
+            {/if}
           {/each}
         </div>
       </PropertyCell>
@@ -2050,6 +2079,34 @@
 
   .readiness-list {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .readiness-item {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+  }
+
+  .readiness-item > button:first-child {
+    width: 100%;
+  }
+
+  .readiness-list .readiness-fix,
+  .readiness-next .readiness-fix {
+    min-height: 0;
+    padding: 3px 7px;
+    border-color: #2F573E;
+    background: #14261B;
+    color: #7FD79B;
+    font-size: 10px;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .readiness-list .readiness-fix:hover,
+  .readiness-next .readiness-fix:hover {
+    border-color: #48A868;
+    color: #C6F2D4;
   }
 
   .readiness-next {

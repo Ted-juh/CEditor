@@ -40,6 +40,7 @@
     createValueChannel,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
+  import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
@@ -171,6 +172,13 @@
   let helpOverlayOpen = $state(false);
   let helpOverlayTab = $state('shortcuts');
   let surfaceShellEl = $state(null);
+  // Inline readiness nudge: open required/recommended steps, dismissible.
+  let readinessNudgeDismissed = $state(false);
+  let readinessNudgeSteps = $derived.by(() => {
+    if (!control) return [];
+    return analyzeCustomComponentReadiness(control).steps
+      .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity));
+  });
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -3614,6 +3622,15 @@
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
         {/if}
+        {#if !designerPreviewing && !readinessNudgeDismissed && readinessNudgeSteps.length}
+          <div class="readiness-nudge" role="status">
+            <strong>Not reusable yet:</strong>
+            {#each readinessNudgeSteps as step (step.id)}
+              <span class={`nudge-step ${step.severity}`}>{step.label} — {step.detail}</span>
+            {/each}
+            <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
+          </div>
+        {/if}
         <div class="surface-pad">
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -6535,6 +6552,61 @@
     font-weight: 800;
     pointer-events: none;
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
+  }
+
+  .readiness-nudge {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    z-index: 2590;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: calc(100% - 48px);
+    padding: 5px 8px;
+    border: 1px solid rgba(120, 130, 150, 0.4);
+    border-radius: 6px;
+    background: rgba(28, 30, 38, 0.95);
+    color: rgba(222, 228, 238, 0.9);
+    font-size: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .readiness-nudge strong {
+    color: rgba(232, 192, 138, 0.95);
+    font-size: 10px;
+  }
+
+  .readiness-nudge .nudge-step {
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(106, 87, 57, 0.6);
+    background: rgba(33, 29, 25, 0.9);
+    color: #E8C08A;
+  }
+
+  .readiness-nudge .nudge-step.required {
+    border-color: rgba(106, 57, 57, 0.7);
+    background: rgba(37, 23, 23, 0.9);
+    color: #E8A0A0;
+  }
+
+  .readiness-nudge button {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.7);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .readiness-nudge button:hover {
+    background: rgba(220, 90, 90, 0.3);
   }
 
   .surface-scroll.space-pan {
