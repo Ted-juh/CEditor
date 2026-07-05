@@ -4034,6 +4034,7 @@
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
               <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
+              <button type="button" class:active={dockTab === 'live'} role="tab" aria-selected={dockTab === 'live'} onclick={() => { dockTab = 'live'; }} title="Persistent live preview — what you build is what runs">Live</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
@@ -4233,6 +4234,24 @@
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
               <CustomGeneratorsEditor {control} />
+            </div>
+          {:else if dockTab === 'live'}
+            <!-- Persistent live preview (§12.6): the runtime component, always
+                 interactive while editing — shares the session the full-canvas
+                 preview mode uses, so values scrubbed here carry over. -->
+            <div class="dock-live-preview">
+              <InteractiveTestSurface
+                {control}
+                session={livePreviewSession ?? createInteractionPreviewSession(control)}
+                onpatchsession={patchLivePreviewSession}
+                compact={true}
+              />
+              <button
+                type="button"
+                class="dock-live-reset"
+                onclick={() => { livePreviewSession = createInteractionPreviewSession(control); }}
+                title="Reset the live session to the component defaults"
+              >Reset session</button>
             </div>
           {:else}
             <div class="dock-empty dock-empty-tab">
@@ -5984,6 +6003,33 @@
 
   .dock-empty-tab {
     margin: 10px;
+  }
+
+  .dock-live-preview {
+    min-height: 0;
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    gap: 6px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .dock-live-reset {
+    justify-self: end;
+    padding: 3px 9px;
+    border: 1px solid #2E3C46;
+    border-radius: 4px;
+    background: #1B252C;
+    color: #AFC0CB;
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .dock-live-reset:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
   }
 
   .inspector-head {
