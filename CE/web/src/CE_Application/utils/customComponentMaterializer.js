@@ -601,6 +601,110 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
   }
 }
 
+// Indexed per-instance repeats (§12.4): one bar per item of an ARRAY channel.
+// Bar i's height follows item i live (through the channel signals), and the
+// generated zone for column i writes item i back (action setItemValue), so
+// "16 step buttons from a count" needs zero hand wiring.
+function materializeStepBars(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const channels = control?._children?.ValueChannels?._children ?? {};
+  const channelName = String(generator?.valueSource ?? generator?.targetValueChannel ?? '')
+    .replace(/^channel\./, '')
+    .replace(/\..*$/, '')
+    .trim();
+  const channel = channels[channelName] ?? null;
+  const liveItems = signals?.customChannels?.[`channel.${channelName}.items`];
+  const items = Array.isArray(liveItems)
+    ? liveItems
+    : (Array.isArray(channel?.items) ? channel.items : []);
+  const count = Math.max(1, Math.round(numberOr(generator?.count, items.length || 16)));
+  const zIndex = numberOr(generator?.zIndex, 6);
+  const bounds = generatorBounds(generator);
+  const barColour = generator?.activeColour ?? generator?.colour ?? 'FF5B9BD5';
+  const wellColour = generator?.inactiveColour ?? '22212B31';
+  const gap = clamp(numberOr(generator?.gap, 18), 0, 80); // % of one column kept as spacing
+  const minBar = clamp(numberOr(generator?.minBarHeight, 3), 0, 100); // % so a zero item stays visible
+
+  const itemMin = numberOr(channel?.min, 0);
+  const itemMax = Math.max(itemMin, numberOr(channel?.max, itemMin + 1));
+  const span = Math.max(0.000001, itemMax - itemMin);
+
+  const columnWidth = 100 / count;
+  const barWidth = columnWidth * (1 - (gap / 100));
+
+  for (let index = 0; index < count; index += 1) {
+    const centerX = (index + 0.5) * columnWidth;
+    const normalized = clamp((numberOr(items[index], itemMin) - itemMin) / span, 0, 1);
+    const heightPct = Math.max(minBar, normalized * 100);
+
+    // A faint full-height well behind each bar so empty steps still read as steps.
+    addPart(parts, `${prefix}_well_${index + 1}`, createPartNode(`${prefix}_well_${index + 1}`, {
+      role: 'generatedStepWell',
+      kind: 'rectangle',
+      zIndex: zIndex - 0.1,
+      layout: {
+        x: mapGeneratorX(bounds, centerX),
+        y: mapGeneratorY(bounds, 50),
+        width: mapGeneratorWidth(bounds, barWidth),
+        height: mapGeneratorHeight(bounds, 100),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: { Background: createBackground(wellColour, { borderEnabled: false, radius: 2 }) },
+      meta: { stepWell: true, index },
+    }), generatorName);
+
+    // The value bar, bottom-anchored inside the generator bounds.
+    addPart(parts, `${prefix}_${index + 1}`, createPartNode(`${prefix}_${index + 1}`, {
+      role: 'generatedStepBar',
+      kind: 'rectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, centerX),
+        y: mapGeneratorY(bounds, 100),
+        width: mapGeneratorWidth(bounds, barWidth),
+        height: mapGeneratorHeight(bounds, heightPct),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+        anchorY: 'bottom',
+      },
+      sections: { Background: createBackground(barColour, { borderEnabled: false, radius: 2 }) },
+      meta: {
+        stepBar: true,
+        index,
+        valueSource: channelName,
+        itemNormalized: normalized,
+      },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && channelName) {
+      addHitZone(hitZones, `${prefix}_zone_${index + 1}`, {
+        shape: 'rectangle',
+        cursor: 'ns-resize',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: channelName,
+        action: 'setItemValue',
+        payload: {
+          type: 'stepBar',
+          index,
+          number: index + 1,
+          count,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: index * columnWidth,
+          y: 0,
+          width: columnWidth,
+          height: 100,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
 function materializeGrid(parts, generator, prefix, generatorName = '', hitZones = null) {
   const rows = Math.max(1, Math.round(numberOr(generator?.rows, 4)));
   const columns = Math.max(1, Math.round(numberOr(generator?.columns, 4)));
@@ -825,6 +929,8 @@ export function materializeCustomComponent(control, signals = {}) {
       materializeTicks(parts, generator, prefix, generatorName);
     } else if (type === 'repeated-leds') {
       materializeLeds(parts, generator, prefix, generatorName, hitZones, signals);
+    } else if (type === 'step-bars' || type === 'steps') {
+      materializeStepBars(parts, resolved, signals, generator, prefix, generatorName, hitZones);
     } else if (type === 'grid' || type === 'meter-bars' || type === 'segmented-ring') {
       materializeGrid(parts, generator, prefix, generatorName, hitZones);
     } else if (type === 'piano-keys' || type === 'piano') {

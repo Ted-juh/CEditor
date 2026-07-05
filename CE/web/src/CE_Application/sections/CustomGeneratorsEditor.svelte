@@ -31,7 +31,7 @@
   let gridPreviewRows = $derived(Math.max(1, Math.round(Number(selected?.rows ?? 4))));
   let gridPreviewColumns = $derived(Math.max(1, Math.round(Number(selected?.columns ?? 4))));
 
-  const TYPES = ['ticks', 'grid', 'piano-keys', 'repeated-buttons', 'repeated-leds', 'radial-markers', 'segmented-ring', 'labels', 'meter-bars', 'scrollable-content', 'filmstrip-frames'];
+  const TYPES = ['ticks', 'grid', 'piano-keys', 'repeated-buttons', 'repeated-leds', 'step-bars', 'radial-markers', 'segmented-ring', 'labels', 'meter-bars', 'scrollable-content', 'filmstrip-frames'];
   const GEOMETRIES = ['linear', 'vertical', 'circular', 'grid', 'piano', 'free'];
   const TYPE_LABELS = {
     ticks: 'Scale marks',
@@ -39,6 +39,7 @@
     'piano-keys': 'Piano keys',
     'repeated-buttons': 'Button bank',
     'repeated-leds': 'LED row',
+    'step-bars': 'Step bars (array channel)',
     'radial-markers': 'Radial marks',
     'segmented-ring': 'Segmented ring',
     labels: 'Value labels',
@@ -97,6 +98,9 @@
     } else if (type === 'segmented-ring' || type === 'radial-markers' || type === 'meter-bars' || type === 'repeated-leds') {
       parts = count;
       label = `${count} segments`;
+    } else if (type === 'step-bars') {
+      parts = count * 2; // bar + well per step
+      label = `${count} step bars from '${generator.valueSource ?? generator.targetValueChannel ?? 'array channel'}'`;
     } else if (type === 'filmstrip-frames') {
       parts = 1;
       label = generator.assetName ? `asset ${generator.assetName}` : 'choose filmstrip asset';
@@ -117,6 +121,7 @@
     if (type === 'piano-keys') return 'piano';
     if (type === 'segmented-ring' || type === 'radial-markers') return 'ring';
     if (type === 'repeated-leds') return 'leds';
+    if (type === 'step-bars') return 'meter';
     if (type === 'repeated-buttons') return 'buttons';
     if (type === 'meter-bars') return 'meter';
     if (type === 'scrollable-content') return 'scroll';

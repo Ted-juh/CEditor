@@ -475,7 +475,7 @@ function resolveSliderInteractionContext(control, previewSession = {}) {
 function normalizeCustomChannelValue(channel = null, rawValue = 0) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   if (type === 'bool' || type === 'boolean') return rawValue === true ? 1 : 0;
-  if (type === 'enum' || type === 'text' || type === 'note') return 0;
+  if (type === 'enum' || type === 'text' || type === 'note' || type === 'array') return 0;
 
   const min = numberOr(channel?.min, 0);
   const max = Math.max(min, numberOr(channel?.max, min + 1));
@@ -488,7 +488,7 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
   const channels = getValueChannels(control);
   const constrainedCustomValues = constrainCustomValues(control, previewSession?.customValues ?? {});
   const mainChannel = channels.mainValue
-    ?? Object.values(channels).find((channel) => String(channel?.type ?? '').trim().toLowerCase() !== 'enum')
+    ?? Object.values(channels).find((channel) => ! ['enum', 'array'].includes(String(channel?.type ?? '').trim().toLowerCase()))
     ?? Object.values(channels)[0]
     ?? null;
   const modeChannel = channels.mode ?? null;
@@ -507,6 +507,20 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
     channelSignals[`channel.${name}.display`] = String(channelRaw ?? '');
+    // Array channels (§12.3) additionally expose their items — whole and
+    // per-index — so generators and bindings can target item i directly
+    // (`channel.<name>.items`, `channel.<name>.<i>.raw|.normalized`).
+    if (String(channel?.type ?? '').trim().toLowerCase() === 'array') {
+      const items = Array.isArray(channelRaw) ? channelRaw : (Array.isArray(channel?.items) ? channel.items : []);
+      channelSignals[`channel.${name}.items`] = items;
+      const itemMin = numberOr(channel?.min, 0);
+      const itemMax = Math.max(itemMin, numberOr(channel?.max, itemMin + 1));
+      const span = Math.max(0.000001, itemMax - itemMin);
+      items.forEach((item, index) => {
+        channelSignals[`channel.${name}.${index}.raw`] = item;
+        channelSignals[`channel.${name}.${index}.normalized`] = clamp((numberOr(item, itemMin) - itemMin) / span, 0, 1);
+      });
+    }
   }
 
   return {

@@ -1091,6 +1091,26 @@
                     <option value={seededValues?.[channel.name] ?? ''}>{seededValues?.[channel.name] ?? 'value'}</option>
                   {/if}
                 </select>
+              {:else if type === 'array'}
+                <div class="rig-array" title="Drag a slider to drive one item of the array channel">
+                  {#each (Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? [])) as item, index (index)}
+                    <input
+                      type="range"
+                      min={Number(definition?.min ?? 0)}
+                      max={Number(definition?.max ?? 1)}
+                      step={Number(definition?.step ?? 0.01)}
+                      value={Number(item) || 0}
+                      aria-label={`${channel.name} item ${index + 1}`}
+                      title={`Item ${index + 1}: ${Number(item).toFixed(2)}`}
+                      oninput={(event) => {
+                        const source = Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? []);
+                        const items = [...source];
+                        items[index] = Number(event.currentTarget.value);
+                        setChannelTestValue(channel.name, items);
+                      }}
+                    />
+                  {/each}
+                </div>
               {:else}
                 <NumberInput
                   value={Number(seededValues?.[channel.name] ?? definition?.defaultValue ?? 0)}
@@ -1643,6 +1663,17 @@
   }
   .rig-control {
     min-width: 0;
+  }
+  .rig-array {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 3px 6px;
+  }
+  .rig-array input[type='range'] {
+    width: 100%;
+    min-width: 0;
+    height: 14px;
+    accent-color: #5B9BD5;
   }
   .rig-row em {
     color: #DDE6EC;

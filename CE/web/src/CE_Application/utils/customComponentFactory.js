@@ -183,6 +183,15 @@ export const CUSTOM_COMPONENT_STARTERS = [
     creates: ['readout text', 'value input', 'format binding', 'public API'],
     dimensions: { width: 160, height: 76 },
   },
+  // Multi-point class (§12.3/§12.4): array channel + indexed step-bar repeats.
+  {
+    id: 'starter.stepSequencer',
+    group: 'Sequencer',
+    label: 'Step Sequencer',
+    summary: 'A 16-step value sequencer: one array channel, generated bars per step, drag a column to set its step.',
+    creates: ['array channel', 'step-bar generator', '16 indexed zones', 'public API'],
+    dimensions: { width: 240, height: 110 },
+  },
 ];
 
 export function createPartNode(name, {
@@ -337,6 +346,54 @@ export function createValueChannel(name, {
       normalizedMin: 0,
       normalizedMax: 1,
       ...constraints,
+    },
+  };
+}
+
+/**
+ * Array channel (PointSet primitive, §12.3): N scalar items sharing one
+ * min/max/step. The runtime value in customValues is a plain array; the
+ * 'step-bars' generator renders one part per item and generated zones write
+ * items back by index (action 'setItemValue'). First consumer: the Step
+ * Sequencer starter.
+ */
+export function createArrayChannel(name, {
+  label = '',
+  size = 16,
+  min = 0,
+  max = 1,
+  step = 0.01,
+  defaultValue = 0,
+  defaultItems = null,
+  publicInput = true,
+  publicOutput = true,
+  format = {},
+} = {}) {
+  const itemCount = Math.max(1, Math.round(size));
+  const items = Array.from({ length: itemCount }, (_, index) => {
+    const item = Array.isArray(defaultItems) ? defaultItems[index] : undefined;
+    return typeof item === 'number' ? item : defaultValue;
+  });
+  return {
+    _type: 'ValueChannel',
+    name,
+    label: label || name,
+    type: 'array',
+    size: itemCount,
+    items,
+    min,
+    max,
+    step,
+    defaultValue,
+    publicInput,
+    publicOutput,
+    deviceBindable: false,
+    format: {
+      precision: 2,
+      prefix: '',
+      suffix: '',
+      unit: '',
+      ...format,
     },
   };
 }
@@ -2292,6 +2349,86 @@ function createValueReadoutStarterPatch() {
   };
 }
 
+function createStepSequencerStarterPatch() {
+  const channels = {
+    steps: createArrayChannel('steps', {
+      label: 'Steps',
+      size: 16,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0,
+      defaultItems: [0.8, 0.2, 0.5, 0.2, 0.9, 0.2, 0.5, 0.35, 0.8, 0.2, 0.6, 0.2, 0.9, 0.45, 0.65, 0.3],
+    }),
+  };
+  return {
+    'Core.name': 'Step Sequencer',
+    'Transform.width': 240,
+    'Transform.height': 110,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('STEPS', 'FF10161B'),
+        seqWell: createPartNode('seqWell', {
+          role: 'track',
+          kind: 'roundedRectangle',
+          zIndex: 1,
+          layout: { x: 50, y: 62, width: 90, height: 62, widthUnit: 'percent', heightUnit: 'percent' },
+          sections: {
+            Background: createBackground('FF0B0F13', { borderColour: '332B3742', radius: 6 }),
+          },
+        }),
+      },
+    },
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        stepBars: {
+          _type: 'Generator',
+          name: 'stepBars',
+          type: 'step-bars',
+          enabled: true,
+          geometry: 'linear',
+          count: 16,
+          zIndex: 6,
+          activeColour: 'FF5B9BD5',
+          inactiveColour: '22212B31',
+          gap: 24,
+          minBarHeight: 4,
+          valueSource: 'steps',
+          targetValueChannel: 'steps',
+          generatedHitZones: true,
+          bounds: { x: 7, y: 34, width: 86, height: 54 },
+          generatedPartPrefix: 'step',
+        },
+      },
+    },
+    Bindings: createCustomComponentBlankBindingsDefaults(),
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: { steps: { channel: 'steps', label: 'Steps', type: 'array', enabled: true } },
+      outputs: { steps: { channel: 'steps', label: 'Steps', type: 'array', enabled: true } },
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('stepSequencer', [{ id: 'stepsChange', label: 'Steps Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'seqWell',
+      selectedValueChannel: 'steps',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'stepBars',
+      notes: 'Multi-point starter: the steps array channel drives one generated bar per item; dragging a column writes that item back (indexed repeats).',
+    },
+  };
+}
+
 export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.blankCanvas') {
     return {
@@ -2326,6 +2463,7 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.segmentLevelMeter') return createSegmentLevelMeterStarterPatch();
   if (starterId === 'starter.statusLamp') return createStatusLampStarterPatch();
   if (starterId === 'starter.valueReadout') return createValueReadoutStarterPatch();
+  if (starterId === 'starter.stepSequencer') return createStepSequencerStarterPatch();
   return {};
 }
 
