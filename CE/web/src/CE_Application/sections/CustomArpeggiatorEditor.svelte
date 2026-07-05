@@ -218,9 +218,10 @@
 
 <div class="arp-editor" style={`--arp-steps:${arpStepCount};`} onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
   <div class="arp-tool-strip" role="toolbar" aria-label="Arpeggiator edit tools">
-    {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool}
-      <button type="button" class:active={arpTool === tool} onclick={() => { onArpToolChange(tool); }} title={`Arpeggiator ${tool} tool`}>
+    {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool, index}
+      <button type="button" class:active={arpTool === tool} onclick={() => { onArpToolChange(tool); }} title={`Arpeggiator ${tool} tool (${index + 1})`}>
         {tool}
+        <kbd>{index + 1}</kbd>
       </button>
     {/each}
   </div>
@@ -327,6 +328,21 @@
     border-color: #5B9BD5;
     background: #173449;
     color: #FFFFFF;
+  }
+
+  .arp-tool-strip button kbd {
+    margin-left: 3px;
+    padding: 0 3px;
+    border-radius: 2px;
+    background: #2E3C46;
+    color: #8FA5B4;
+    font: inherit;
+    font-size: 9px;
+  }
+
+  .arp-tool-strip button.active kbd {
+    background: #2B577A;
+    color: #E4F0FA;
   }
 
   .arp-ruler {

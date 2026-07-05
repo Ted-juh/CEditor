@@ -55,24 +55,36 @@
     normalizeRotation,
   } from '../utils/transformMath.js';
   import {
+    alignFramesWithinSelection,
+    applySmartSnap,
     arcPointStyle,
     boundsForFrames,
     clampNumber,
     defaultDrawSize,
+    distributeFramesWithinSelection,
     draftRect as draftRectBase,
     feedbackLabelStyle as feedbackLabelStyleBase,
     frameCenter,
     frameReadout,
     isTinyFrame,
+    measurementLinesBetween,
     partFrame as partFrameBase,
     patchFromFrameForLayer as patchFromFrameForLayerBase,
     patchFromZoneFrameFor as patchFromZoneFrameForBase,
     pointInArtboardFromElement,
     roundLayoutValue,
     selectionBoundsStyle,
+    smartGuideStyle,
+    smartSnapTargets,
     snapGuides as snapGuidesBase,
     zoneFrame as zoneFrameBase,
   } from '../utils/customDesignSurfaceGeometry.js';
+  import {
+    buildPastePatch,
+    getPartClipboard,
+    hasPartClipboard,
+    setPartClipboard,
+  } from '../utils/customComponentClipboard.js';
   import {
     alphaFromColour,
     cloneValue,
@@ -149,6 +161,16 @@
   let surfaceZoom = $state(1);
   let snapEnabled = $state(true);
   let snapSize = $state(10);
+  // Object-relative smart guides: snap moves to other parts' edges/centers
+  // and the artboard edges/center; Alt bypasses, grid snap is the fallback.
+  let smartSnapEnabled = $state(true);
+  let activeSmartGuides = $state([]);
+  // Distance readouts between exactly two selected layers.
+  let measureEnabled = $state(false);
+  // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
+  let helpOverlayOpen = $state(false);
+  let helpOverlayTab = $state('shortcuts');
+  let surfaceShellEl = $state(null);
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -215,6 +237,15 @@
         : (selectedSurfaceKind === 'hitZone' && selectedZone ? 'hitZone' : 'layer'))
   );
   let multiSelectionActive = $derived(activeSelectionKind === 'layer' && selectedLayerNames.length > 1);
+  // Distance readouts between exactly two selected layers ("Measure" toggle).
+  let measurementLines = $derived.by(() => {
+    if (!measureEnabled || designerPreviewing) return [];
+    if (activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
+    const [frameA, frameB] = selectedLayerNames.map((name) => (
+      parts?._children?.[name] ? partFrame(parts._children[name]) : null
+    ));
+    return measurementLinesBetween(frameA, frameB);
+  });
   let selectedPartEditable = $derived(isEditablePart(selectedAuthoredPart));
   let selectedZoneEditable = $derived(isEditableZone(selectedAuthoredZone));
   let selectedBackground = $derived(selectedAuthoredPart?._children?.Background ?? null);
@@ -406,6 +437,43 @@
     { id: 'chevron', label: 'Chevron', key: '' },
     { id: 'arrow', label: 'Arrow', key: '' },
     { id: 'plus', label: 'Plus', key: '' },
+  ];
+  // Arpeggiator tool modes and their 1–5 shortcuts (shown in the toolbar +
+  // cheatsheet; handled in handleSurfaceKeydown while an arp surface is active).
+  const ARP_TOOLS = ['select', 'draw', 'move', 'resize', 'velocity'];
+  const ARP_TOOL_KEYS = Object.fromEntries(ARP_TOOLS.map((tool, index) => [String(index + 1), tool]));
+
+  const SHORTCUT_CHEATSHEET = [
+    { keys: 'V R U O G A C H T L', action: 'Draw tools: Select, Rectangle, Rounded, Ellipse, Ring, Arc, Capsule, Hit Zone, Text, Line' },
+    { keys: 'Esc', action: 'Cancel draw → back to Select → clear selection (closes this overlay first)' },
+    { keys: 'Tab / Shift+Tab', action: 'Cycle layers (Alt+Tab cycles hit zones)' },
+    { keys: 'Arrows / Shift+Arrows', action: 'Nudge selection by 1px / 10px' },
+    { keys: 'Ctrl+D', action: 'Duplicate selected layer(s)' },
+    { keys: 'Ctrl+C / Ctrl+X / Ctrl+V', action: 'Copy / cut / paste layers, including hit zones that follow them (works across components)' },
+    { keys: 'Delete / Backspace', action: 'Remove selected layer, hit zone, or kit' },
+    { keys: 'Space + drag', action: 'Pan the surface' },
+    { keys: 'Alt while dragging', action: 'Bypass grid and smart snapping' },
+    { keys: 'Shift while resizing', action: 'Lock aspect ratio' },
+    { keys: 'Shift while rotating', action: 'Snap rotation to 15° steps' },
+    { keys: '1 2 3 4 5', action: 'Arpeggiator tools: Select, Draw, Move, Resize, Velocity' },
+    { keys: '?', action: 'Toggle this overlay' },
+  ];
+
+  // Plain-language glossary for the creator's bespoke vocabulary.
+  const GLOSSARY = [
+    ['Part (layer)', 'One visual building block — a shape, text, or icon drawn on the artboard. Parts stack by z-order in the layer tree.'],
+    ['Value Channel', 'A named value the component carries, like "cutoff" or "mode" — its range, step, default, and current value. Everything interactive reads or writes a channel.'],
+    ['Behavior', 'How pointer input changes a channel: slider drags, dial rotation, button cycling, XY pads. A behavior connects gestures to a value channel.'],
+    ['Hit Zone', 'The clickable/draggable area. It can be independent, cover the whole face, or follow a part (grown by an inflate margin) so a small handle still has a comfortable grab area.'],
+    ['Generator', 'A rule that produces many parts at once — tick marks, LED rows, grids, piano keys, arpeggiator lanes. Edit the generator, not the generated copies.'],
+    ['Binding', 'A live wire from a value channel to a part property: "pointer rotation follows cutoff", "fill width follows level". Bindings re-apply whenever the channel changes.'],
+    ['Link', 'A rule between channels or to a condition: "show this layer when mode == 2". Built with the condition builder.'],
+    ['State', 'A named look variant (hover, on/off, enum values). A state patches part properties while it is active; the State Coverage matrix shows what each state changes.'],
+    ['Variant', 'A saved override set for a component instance — same component, different skin/values per placement.'],
+    ['Public API', 'What a placed instance exposes to the panel: editable properties (inputs) and published values (outputs). Panels script against this, never the internals.'],
+    ['Kit', 'A ready-made group (dial, scale, arpeggiator) inserted as one object. Expand it to edit internals; it stays selectable as a unit until then.'],
+    ['Archetype (Make Interactive)', 'A one-action scaffold — Dial, Slider, Button, Toggle, XY, Range — that creates the channel, behavior, and hit zone pre-wired with sensible defaults.'],
+    ['Test Bench / Live Test Surface', 'The runtime simulator: drag the component like a user, watch channels, zones, and states update live.'],
   ];
   const POLYGON_TOOL_IDS = ['triangle', 'rightTriangle', 'parallelogram', 'trapezoid', 'diamond', 'pentagon', 'hexagon', 'star', 'chevron', 'arrow', 'plus'];
   // "Lines & Polygons" palette section: line first, then the flat polygons.
@@ -2006,6 +2074,88 @@
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
   }
 
+  function smartTargetsExcluding(excludedNames = []) {
+    const excluded = new Set(excludedNames);
+    const frames = partEntries
+      .filter(([name]) => !excluded.has(name))
+      .map(([, part]) => partFrame(part));
+    return smartSnapTargets(frames, artboardWidth, artboardHeight);
+  }
+
+  // Align the selected layers to each other (the selection's bounding box);
+  // alignSelection() above keeps aligning to the artboard.
+  function alignSelectedLayers(mode) {
+    if (!core?.id || selectedLayerNames.length < 2) return;
+    const entries = selectedEditableLayerEntries();
+    const aligned = alignFramesWithinSelection(
+      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      mode
+    );
+    const patch = {};
+    for (const [name, authoredPart] of entries) {
+      const frame = aligned.get(name);
+      if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  function distributeSelectedLayers(axis) {
+    if (!core?.id || selectedLayerNames.length < 3) return;
+    const entries = selectedEditableLayerEntries();
+    const distributed = distributeFramesWithinSelection(
+      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      axis
+    );
+    const patch = {};
+    for (const [name, authoredPart] of entries) {
+      const frame = distributed.get(name);
+      if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  function copySelectedLayers() {
+    const copiedParts = selectedLayerNames
+      .map((name) => authoredParts?._children?.[name])
+      .filter(Boolean);
+    if (!copiedParts.length) return;
+    const partSet = new Set(selectedLayerNames);
+    const followingZones = Object.values(authoredHitZones?._children ?? {}).filter((zone) => {
+      const followed = /^part:(.+)$/.exec(String(zone?.source ?? ''));
+      return followed && partSet.has(followed[1]);
+    });
+    setPartClipboard(copiedParts, followingZones);
+    showDrawNotice(`Copied ${copiedParts.length} layer${copiedParts.length === 1 ? '' : 's'}`);
+  }
+
+  function cutSelectedLayers() {
+    if (!canManageLayer && !multiSelectionActive) return;
+    copySelectedLayers();
+    removeSelectedLayer();
+  }
+
+  function pasteClipboardLayers() {
+    if (!core?.id || !hasPartClipboard()) return;
+    const result = buildPastePatch(
+      getPartClipboard(),
+      Object.keys(authoredParts?._children ?? {}),
+      Object.keys(authoredHitZones?._children ?? {}),
+      maxLayerZIndex()
+    );
+    if (!result?.partNames?.length) return;
+    localSelectedLayerNames = result.partNames;
+    applyControlPatch(core.id, {
+      ...result.patch,
+      'Designer.selectedLayer': result.partNames[0],
+      'Designer.selectedLayers': result.partNames,
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+      'Designer.selectedKit': '',
+    });
+    pulseSelection(`layer:${result.partNames[0]}`);
+    showDrawNotice(`Pasted ${result.partNames.length} layer${result.partNames.length === 1 ? '' : 's'}`);
+  }
+
   function setPreviewFlag(path, value) {
     if (!core?.id) return;
     updateControlProperty(core.id, `Designer.preview.${path}`, value);
@@ -2110,6 +2260,8 @@
           name,
           startMouse: { x: event.clientX, y: event.clientY },
           startFrames,
+          startBounds: boundsForFrames(Object.values(startFrames)),
+          smartTargets: smartTargetsExcluding(Object.keys(startFrames)),
         };
         activeLayerFrames = startFrames;
         window.addEventListener('mousemove', handleInteractionMove);
@@ -2122,6 +2274,7 @@
       name,
       startMouse: { x: event.clientX, y: event.clientY },
       startFrame: frame,
+      smartTargets: smartTargetsExcluding([name]),
     };
     activeFrame = frame;
     window.addEventListener('mousemove', handleInteractionMove);
@@ -2191,24 +2344,53 @@
     if (interaction.type === 'move') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeFrame = snapFrame({
+      const raw = {
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, event);
+      };
+      const gridded = snapFrame(raw, event);
+      if (smartSnapEnabled && !event.altKey) {
+        const snapped = applySmartSnap(raw, gridded, interaction.smartTargets);
+        activeFrame = snapped.frame;
+        activeSmartGuides = snapped.guides;
+      } else {
+        activeFrame = gridded;
+        activeSmartGuides = [];
+      }
       return;
     }
 
     if (interaction.type === 'groupMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
+      // Snap the selection's bounding box as a whole so the layers keep
+      // their relative offsets while dragging.
+      const startBounds = interaction.startBounds
+        ?? boundsForFrames(Object.values(interaction.startFrames ?? {}));
+      let boundsDx = dx;
+      let boundsDy = dy;
+      if (startBounds) {
+        const rawBounds = { ...startBounds, left: startBounds.left + dx, top: startBounds.top + dy };
+        const griddedBounds = snapFrame(rawBounds, event);
+        let finalBounds = griddedBounds;
+        if (smartSnapEnabled && !event.altKey) {
+          const snapped = applySmartSnap(rawBounds, griddedBounds, interaction.smartTargets);
+          finalBounds = snapped.frame;
+          activeSmartGuides = snapped.guides;
+        } else {
+          activeSmartGuides = [];
+        }
+        boundsDx = finalBounds.left - startBounds.left;
+        boundsDy = finalBounds.top - startBounds.top;
+      }
       const nextFrames = {};
       for (const [name, startFrame] of Object.entries(interaction.startFrames ?? {})) {
-        nextFrames[name] = snapFrame({
+        nextFrames[name] = {
           ...startFrame,
-          left: startFrame.left + dx,
-          top: startFrame.top + dy,
-        }, event);
+          left: startFrame.left + boundsDx,
+          top: startFrame.top + boundsDy,
+        };
       }
       activeLayerFrames = nextFrames;
       return;
@@ -2382,6 +2564,7 @@
     activeFrame = null;
     activeLayerFrames = {};
     activeZoneFrame = null;
+    activeSmartGuides = [];
   }
 
   function nudgeSelected(dx, dy) {
@@ -2600,10 +2783,26 @@
     selectHitZone(names[nextIndex]);
   }
 
-  function handleSurfaceKeydown(event) {
-    if (event.defaultPrevented) return;
+  // Window-level so nudge/delete/duplicate/tool keys keep working when focus
+  // drifts off the surface — guarded so form fields and other focused editor
+  // regions (e.g. the panel canvas) still receive their own keys.
+  function surfaceKeyEventAllowed(event) {
+    if (core?.controlType !== 'CustomComponent') return false;
+    if (event.defaultPrevented) return false;
     const targetTag = String(event.target?.tagName ?? '').toLowerCase();
-    if (['input', 'select', 'textarea'].includes(targetTag)) return;
+    if (['input', 'select', 'textarea'].includes(targetTag) || event.target?.isContentEditable) return false;
+    const active = document.activeElement;
+    if (active && active !== document.body && surfaceShellEl && !surfaceShellEl.contains(active)) return false;
+    return true;
+  }
+
+  function handleSurfaceKeydown(event) {
+    if (!surfaceKeyEventAllowed(event)) return;
+    if (event.key === '?' && !(event.ctrlKey || event.metaKey || event.altKey)) {
+      event.preventDefault();
+      helpOverlayOpen = !helpOverlayOpen;
+      return;
+    }
     if (event.code === 'Space') {
       event.preventDefault();
       spacePanActive = true;
@@ -2611,6 +2810,10 @@
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (helpOverlayOpen) {
+        helpOverlayOpen = false;
+        return;
+      }
       if (inlineTextEditLayer) {
         finishInlineTextEdit();
         return;
@@ -2628,6 +2831,30 @@
         return;
       }
       clearSurfaceSelection();
+      return;
+    }
+    // Arpeggiator tool modes: 1–5 while an arpeggiator surface is active.
+    if (arpeggiatorEnabled && !designerPreviewing && !(event.ctrlKey || event.metaKey || event.altKey)) {
+      const nextArpTool = ARP_TOOL_KEYS[event.key];
+      if (nextArpTool) {
+        event.preventDefault();
+        arpTool = nextArpTool;
+        return;
+      }
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'c' && activeSelectionKind === 'layer' && selectedLayerNames.length) {
+      event.preventDefault();
+      copySelectedLayers();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'x' && activeSelectionKind === 'layer' && selectedLayerNames.length) {
+      event.preventDefault();
+      cutSelectedLayers();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'v' && hasPartClipboard()) {
+      event.preventDefault();
+      pasteClipboardLayers();
       return;
     }
     if (event.key === 'Tab') {
@@ -2676,12 +2903,15 @@
   }
 
   function handleSurfaceKeyup(event) {
+    if (core?.controlType !== 'CustomComponent') return;
     if (event.code === 'Space') {
       spacePanActive = false;
       endSurfacePan();
     }
   }
 </script>
+
+<svelte:window onkeydown={handleSurfaceKeydown} onkeyup={handleSurfaceKeyup} />
 
 {#if core?.controlType === 'CustomComponent'}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -2695,8 +2925,7 @@
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
-    onkeydown={handleSurfaceKeydown}
-    onkeyup={handleSurfaceKeyup}
+    bind:this={surfaceShellEl}
   >
     {#if !designerPreviewing}
     <div class="surface-lookbar" aria-label="Component look bar">
@@ -3065,6 +3294,14 @@
           onchange={(event) => setSnapSize(event.currentTarget.value)}
         />
       </label>
+      <label class="toggle-option" title="Snap moves to other parts' edges/centers and the artboard (Alt bypasses)">
+        <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
+        <span>Smart</span>
+      </label>
+      <label class="toggle-option" title="Show pixel gaps between two selected layers">
+        <input type="checkbox" checked={measureEnabled} onchange={(event) => { measureEnabled = event.currentTarget.checked; }} />
+        <span>Measure</span>
+      </label>
       <label class="toggle-option">
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
         <span>Bounds</span>
@@ -3106,6 +3343,7 @@
       <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
       <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
+      <button type="button" class="surface-command" class:accent={helpOverlayOpen} onclick={() => { helpOverlayOpen = !helpOverlayOpen; }} title="Shortcuts &amp; glossary (?)">?</button>
       </div>
 
       <div class="surface-zoombar" aria-label="Zoom controls">
@@ -3514,6 +3752,25 @@
               <div class="multi-selection-bound" style={selectionBoundsStyle(activeSelectionFrame)}>
                 <span>{selectedLayerNames.length} layers</span>
               </div>
+              {#if !interaction}
+                <div
+                  class="align-toolbar"
+                  style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${Math.max(2, activeSelectionFrame.top - 30)}px;`}
+                  role="toolbar"
+                  aria-label="Align and distribute selection"
+                  onmousedown={stopSelectionAction}
+                >
+                  <button type="button" onclick={() => alignSelectedLayers('left')} title="Align left edges">⇤</button>
+                  <button type="button" onclick={() => alignSelectedLayers('centerX')} title="Align horizontal centers">⇹</button>
+                  <button type="button" onclick={() => alignSelectedLayers('right')} title="Align right edges">⇥</button>
+                  <button type="button" onclick={() => alignSelectedLayers('top')} title="Align top edges">⤒</button>
+                  <button type="button" onclick={() => alignSelectedLayers('centerY')} title="Align vertical centers">⇳</button>
+                  <button type="button" onclick={() => alignSelectedLayers('bottom')} title="Align bottom edges">⤓</button>
+                  <span class="align-divider"></span>
+                  <button type="button" onclick={() => distributeSelectedLayers('x')} disabled={selectedLayerNames.length < 3} title="Distribute horizontally (3+ layers)">⇸</button>
+                  <button type="button" onclick={() => distributeSelectedLayers('y')} disabled={selectedLayerNames.length < 3} title="Distribute vertically (3+ layers)">⇊</button>
+                </div>
+              {/if}
             {/if}
 
             {#each partEntries as [name, part] (name)}
@@ -3588,6 +3845,22 @@
                 <span>{frameReadout(feedbackFrame)}</span>
               </div>
             {/if}
+
+            {#if !designerPreviewing}
+              {#each activeSmartGuides as guide, index (`${guide.axis}-${guide.value}-${index}`)}
+                <span class={`smart-guide ${guide.axis}`} style={smartGuideStyle(guide, artboardWidth, artboardHeight)}></span>
+              {/each}
+              {#each measurementLines as line, index (`${line.axis}-${index}`)}
+                <div
+                  class={`measure-line ${line.axis}`}
+                  style={line.axis === 'x'
+                    ? `left:${line.left}px;top:${line.top}px;width:${line.length}px;`
+                    : `left:${line.left}px;top:${line.top}px;height:${line.length}px;`}
+                >
+                  <span>{line.label}</span>
+                </div>
+              {/each}
+            {/if}
           </div>
         </div>
         {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
@@ -3603,6 +3876,12 @@
             {#if activeSelectionKind === 'layer'}
               <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
                 <Copy size={13} aria-hidden="true" />
+              </button>
+              <button type="button" class="quick-text" onclick={copySelectedLayers} disabled={!selectedLayerNames.length} title="Copy layers (Ctrl+C)">
+                C
+              </button>
+              <button type="button" class="quick-text" onclick={pasteClipboardLayers} disabled={!hasPartClipboard()} title="Paste layers (Ctrl+V)">
+                P
               </button>
               <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
                 <ArrowUp size={13} aria-hidden="true" />
@@ -4494,6 +4773,41 @@
 
     {#if !designerPreviewing && !displayDockHidden}
       <div class="surface-display-dock"><DisplayPanel /></div>
+    {/if}
+
+    {#if helpOverlayOpen}
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="help-overlay" onclick={() => { helpOverlayOpen = false; }}>
+        <div class="help-panel" role="dialog" aria-label="Shortcuts and glossary" onclick={(event) => event.stopPropagation()}>
+          <div class="help-header">
+            <div class="help-tabs" role="tablist">
+              <button type="button" role="tab" aria-selected={helpOverlayTab === 'shortcuts'} class:active={helpOverlayTab === 'shortcuts'} onclick={() => { helpOverlayTab = 'shortcuts'; }}>Shortcuts</button>
+              <button type="button" role="tab" aria-selected={helpOverlayTab === 'glossary'} class:active={helpOverlayTab === 'glossary'} onclick={() => { helpOverlayTab = 'glossary'; }}>Glossary</button>
+            </div>
+            <button type="button" class="help-close" onclick={() => { helpOverlayOpen = false; }} title="Close (Esc)">×</button>
+          </div>
+          {#if helpOverlayTab === 'shortcuts'}
+            <div class="help-body">
+              {#each SHORTCUT_CHEATSHEET as row (row.keys)}
+                <div class="help-row">
+                  <kbd>{row.keys}</kbd>
+                  <span>{row.action}</span>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div class="help-body">
+              {#each GLOSSARY as [term, explanation] (term)}
+                <div class="help-row glossary">
+                  <strong>{term}</strong>
+                  <span>{explanation}</span>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
     {/if}
   </div>
 {:else}
@@ -6759,6 +7073,194 @@
 
   .snap-guide.y {
     height: 1px;
+  }
+
+  /* Object-relative smart guides — magenta, so they read differently from grid snaps. */
+  .smart-guide {
+    position: absolute;
+    z-index: 2385;
+    pointer-events: none;
+    background: rgba(236, 72, 153, 0.92);
+    box-shadow: 0 0 7px rgba(236, 72, 153, 0.5);
+  }
+
+  .smart-guide.x {
+    width: 1px;
+  }
+
+  .smart-guide.y {
+    height: 1px;
+  }
+
+  .measure-line {
+    position: absolute;
+    z-index: 2395;
+    pointer-events: none;
+  }
+
+  .measure-line.x {
+    height: 0;
+    border-top: 1px dashed rgba(250, 204, 21, 0.95);
+  }
+
+  .measure-line.y {
+    width: 0;
+    border-left: 1px dashed rgba(250, 204, 21, 0.95);
+  }
+
+  .measure-line span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(30, 30, 36, 0.92);
+    border: 1px solid rgba(250, 204, 21, 0.6);
+    color: rgba(250, 224, 120, 0.98);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .align-toolbar {
+    position: absolute;
+    z-index: 2420;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: 6px;
+    background: rgba(30, 30, 36, 0.94);
+    border: 1px solid rgba(120, 130, 150, 0.4);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .align-toolbar button {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 3px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.92);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .align-toolbar button:hover:not(:disabled) {
+    background: rgba(91, 155, 213, 0.3);
+  }
+
+  .align-toolbar button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .align-divider {
+    width: 1px;
+    height: 14px;
+    margin: 0 2px;
+    background: rgba(120, 130, 150, 0.4);
+  }
+
+  .help-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 3200;
+    display: grid;
+    place-items: center;
+    background: rgba(10, 12, 16, 0.55);
+  }
+
+  .help-panel {
+    width: min(560px, calc(100% - 48px));
+    max-height: min(520px, calc(100% - 48px));
+    display: grid;
+    grid-template-rows: auto 1fr;
+    border-radius: 10px;
+    background: rgba(28, 30, 38, 0.98);
+    border: 1px solid rgba(120, 130, 150, 0.45);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+  }
+
+  .help-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(120, 130, 150, 0.3);
+  }
+
+  .help-tabs {
+    display: flex;
+    gap: 4px;
+  }
+
+  .help-tabs button {
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.8);
+    font-size: 11px;
+    cursor: pointer;
+  }
+
+  .help-tabs button.active {
+    background: rgba(91, 155, 213, 0.24);
+    border-color: rgba(91, 155, 213, 0.5);
+    color: rgba(235, 242, 252, 0.98);
+  }
+
+  .help-close {
+    width: 22px;
+    height: 22px;
+    border: none;
+    border-radius: 5px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.75);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .help-close:hover {
+    background: rgba(220, 90, 90, 0.3);
+  }
+
+  .help-body {
+    overflow-y: auto;
+    padding: 10px 12px;
+    display: grid;
+    gap: 6px;
+    align-content: start;
+  }
+
+  .help-row {
+    display: grid;
+    grid-template-columns: 172px 1fr;
+    gap: 10px;
+    align-items: baseline;
+    font-size: 11px;
+    color: rgba(210, 218, 230, 0.9);
+  }
+
+  .help-row kbd {
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(60, 65, 78, 0.7);
+    border: 1px solid rgba(120, 130, 150, 0.4);
+    color: rgba(235, 242, 252, 0.95);
+    font-family: inherit;
+    font-size: 10px;
+    justify-self: start;
+  }
+
+  .help-row.glossary strong {
+    color: rgba(151, 199, 247, 0.95);
+    font-size: 11px;
   }
 
   .measure-badge {

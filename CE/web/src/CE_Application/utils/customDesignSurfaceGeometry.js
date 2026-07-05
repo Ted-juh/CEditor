@@ -200,3 +200,176 @@ export function selectionBoundsStyle(frame) {
   if (!frame) return '';
   return `left:${frame.left}px;top:${frame.top}px;width:${frame.width}px;height:${frame.height}px;`;
 }
+
+// --- Object-relative smart guides ---------------------------------------
+// Snap a moving frame to other parts' edges/centers and the artboard
+// edges/center. Grid snap is the per-axis fallback when no object line is
+// within the threshold.
+
+export function smartSnapTargets(otherFrames = [], artboardWidth, artboardHeight) {
+  const xs = new Set([0, roundLayoutValue(artboardWidth / 2), artboardWidth]);
+  const ys = new Set([0, roundLayoutValue(artboardHeight / 2), artboardHeight]);
+  for (const frame of otherFrames) {
+    if (!frame) continue;
+    xs.add(roundLayoutValue(frame.left));
+    xs.add(roundLayoutValue(frame.left + frame.width / 2));
+    xs.add(roundLayoutValue(frame.left + frame.width));
+    ys.add(roundLayoutValue(frame.top));
+    ys.add(roundLayoutValue(frame.top + frame.height / 2));
+    ys.add(roundLayoutValue(frame.top + frame.height));
+  }
+  return { xs: [...xs], ys: [...ys] };
+}
+
+function bestAxisSnap(edges, targets, threshold) {
+  let best = null;
+  for (const target of targets) {
+    for (const edge of edges) {
+      const delta = target - edge;
+      if (Math.abs(delta) <= threshold && (!best || Math.abs(delta) < Math.abs(best.delta))) {
+        best = { delta, target };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Per-axis: snap `rawFrame` to the nearest object/artboard line within
+ * `threshold`; where no line matches, fall back to that axis of
+ * `fallbackFrame` (the grid-snapped frame). Returns the resolved frame plus
+ * the matched guide lines for rendering.
+ */
+export function applySmartSnap(rawFrame, fallbackFrame, targets, threshold = 6) {
+  if (!rawFrame) return { frame: rawFrame, guides: [] };
+  const fallback = fallbackFrame ?? rawFrame;
+  const guides = [];
+
+  const xSnap = bestAxisSnap(
+    [rawFrame.left, rawFrame.left + rawFrame.width / 2, rawFrame.left + rawFrame.width],
+    targets?.xs ?? [],
+    threshold
+  );
+  const ySnap = bestAxisSnap(
+    [rawFrame.top, rawFrame.top + rawFrame.height / 2, rawFrame.top + rawFrame.height],
+    targets?.ys ?? [],
+    threshold
+  );
+
+  const left = xSnap ? rawFrame.left + xSnap.delta : fallback.left;
+  const top = ySnap ? rawFrame.top + ySnap.delta : fallback.top;
+  if (xSnap) guides.push({ axis: 'x', value: xSnap.target });
+  if (ySnap) guides.push({ axis: 'y', value: ySnap.target });
+
+  return {
+    frame: { left, top, width: rawFrame.width, height: rawFrame.height },
+    guides,
+  };
+}
+
+export function smartGuideStyle(guide, artboardWidth, artboardHeight) {
+  return guide.axis === 'x'
+    ? `left:${guide.value}px;top:0;height:${artboardHeight}px;`
+    : `top:${guide.value}px;left:0;width:${artboardWidth}px;`;
+}
+
+// --- Align & distribute within a multi-selection -------------------------
+
+/**
+ * entries: array of [name, frame]. Returns a Map name -> new frame with the
+ * layers aligned inside the selection's bounding box.
+ */
+export function alignFramesWithinSelection(entries, mode) {
+  const frames = entries.map(([, frame]) => frame).filter(Boolean);
+  const bounds = boundsForFrames(frames);
+  if (!bounds) return new Map();
+  const result = new Map();
+  for (const [name, frame] of entries) {
+    if (!frame) continue;
+    const next = { ...frame };
+    if (mode === 'left') next.left = bounds.left;
+    if (mode === 'centerX') next.left = bounds.left + (bounds.width - frame.width) / 2;
+    if (mode === 'right') next.left = bounds.left + bounds.width - frame.width;
+    if (mode === 'top') next.top = bounds.top;
+    if (mode === 'centerY') next.top = bounds.top + (bounds.height - frame.height) / 2;
+    if (mode === 'bottom') next.top = bounds.top + bounds.height - frame.height;
+    result.set(name, next);
+  }
+  return result;
+}
+
+/**
+ * entries: array of [name, frame]. Distributes the layers along `axis`
+ * ('x' | 'y') with equal gaps between them, keeping the outermost two in
+ * place. Needs 3+ frames to do anything.
+ */
+export function distributeFramesWithinSelection(entries, axis) {
+  const usable = entries.filter(([, frame]) => frame);
+  if (usable.length < 3) return new Map();
+  const posKey = axis === 'x' ? 'left' : 'top';
+  const sizeKey = axis === 'x' ? 'width' : 'height';
+  const sorted = [...usable].sort((a, b) => a[1][posKey] - b[1][posKey]);
+  const first = sorted[0][1];
+  const last = sorted[sorted.length - 1][1];
+  const span = (last[posKey] + last[sizeKey]) - first[posKey];
+  const totalSize = sorted.reduce((sum, [, frame]) => sum + frame[sizeKey], 0);
+  const gap = (span - totalSize) / (sorted.length - 1);
+  const result = new Map();
+  let cursor = first[posKey];
+  for (const [name, frame] of sorted) {
+    result.set(name, { ...frame, [posKey]: roundLayoutValue(cursor) });
+    cursor += frame[sizeKey] + gap;
+  }
+  return result;
+}
+
+// --- Distance readouts between two frames --------------------------------
+
+/**
+ * Returns dashed-connector descriptors for the horizontal and vertical pixel
+ * gaps between two frames: [{ axis, left, top, length, label }]. A line is
+ * emitted only when the frames actually have a gap on that axis.
+ */
+export function measurementLinesBetween(frameA, frameB) {
+  if (!frameA || !frameB) return [];
+  const lines = [];
+
+  const aRight = frameA.left + frameA.width;
+  const bRight = frameB.left + frameB.width;
+  const aBottom = frameA.top + frameA.height;
+  const bBottom = frameB.top + frameB.height;
+
+  // Horizontal gap (one frame fully to the left of the other).
+  const leftFrame = aRight <= frameB.left ? frameA : (bRight <= frameA.left ? frameB : null);
+  if (leftFrame) {
+    const rightFrame = leftFrame === frameA ? frameB : frameA;
+    const gapStart = leftFrame.left + leftFrame.width;
+    const gap = rightFrame.left - gapStart;
+    if (gap > 0.5) {
+      const overlapTop = Math.max(frameA.top, frameB.top);
+      const overlapBottom = Math.min(aBottom, bBottom);
+      const at = overlapBottom > overlapTop
+        ? (overlapTop + overlapBottom) / 2
+        : (frameCenter(frameA).y + frameCenter(frameB).y) / 2;
+      lines.push({ axis: 'x', left: gapStart, top: at, length: gap, label: `${Math.round(gap)}px` });
+    }
+  }
+
+  // Vertical gap (one frame fully above the other).
+  const topFrame = aBottom <= frameB.top ? frameA : (bBottom <= frameA.top ? frameB : null);
+  if (topFrame) {
+    const bottomFrame = topFrame === frameA ? frameB : frameA;
+    const gapStart = topFrame.top + topFrame.height;
+    const gap = bottomFrame.top - gapStart;
+    if (gap > 0.5) {
+      const overlapLeft = Math.max(frameA.left, frameB.left);
+      const overlapRight = Math.min(aRight, bRight);
+      const at = overlapRight > overlapLeft
+        ? (overlapLeft + overlapRight) / 2
+        : (frameCenter(frameA).x + frameCenter(frameB).x) / 2;
+      lines.push({ axis: 'y', left: at, top: gapStart, length: gap, label: `${Math.round(gap)}px` });
+    }
+  }
+
+  return lines;
+}
