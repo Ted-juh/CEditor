@@ -1824,10 +1824,6 @@
     transform: rotate(-28deg);
   }
 
-  .motion-stage.animating .motion-pointer {
-    animation: preview-rotate 1.7s ease-in-out infinite alternate;
-  }
-
   .motion-copy {
     display: flex;
     flex-direction: column;

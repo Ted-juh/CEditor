@@ -216,6 +216,8 @@
   }
 </script>
 
+<!-- svelte-ignore a11y_click_events_have_key_events -->
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="arp-editor" style={`--arp-steps:${arpStepCount};`} onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
   <div class="arp-tool-strip" role="toolbar" aria-label="Arpeggiator edit tools">
     {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool, index}
@@ -236,6 +238,7 @@
       <span class:black-key={noteName(note).includes('#')}>{noteName(note)}</span>
     {/each}
   </div>
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     class="arp-grid-stage"
     style={`--arp-steps:${arpStepCount};`}
@@ -262,11 +265,13 @@
         <span class="arp-velocity-fill" style={arpVelocityStyle(block)}></span>
         <strong>{noteName(block.note)}</strong>
         <em>{block.velocity}</em>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           class="arp-velocity-handle"
           title="Drag up/down for velocity"
           onmousedown={(event) => beginArpVelocityDrag(block, event)}
         ></span>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
         <span
           class="arp-resize-handle"
           title="Drag to change duration"

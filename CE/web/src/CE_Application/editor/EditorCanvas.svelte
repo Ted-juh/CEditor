@@ -963,61 +963,6 @@
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   }
 
-  .panel-starter {
-    position: absolute;
-    top: 12px;
-    left: 50%;
-    z-index: 125;
-    display: grid;
-    gap: 6px;
-    min-width: min(380px, calc(100% - 36px));
-    padding: 10px 12px;
-    border: 1px solid rgba(91, 155, 213, 0.34);
-    border-radius: 6px;
-    background: rgba(25, 31, 37, 0.94);
-    box-shadow: 0 10px 26px rgba(0, 0, 0, 0.26);
-    color: #AAB7C2;
-    text-align: center;
-    transform: translateX(-50%);
-  }
-
-  .panel-starter span {
-    color: #72AEEB;
-    font-size: 10px;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-
-  .panel-starter strong {
-    color: #EEF6FC;
-    font-size: 13px;
-  }
-
-  .panel-starter div {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 6px;
-  }
-
-  .panel-starter button {
-    height: 24px;
-    padding: 0 9px;
-    border: 1px solid #3A4650;
-    border-radius: 4px;
-    background: #202A32;
-    color: #DCEBFA;
-    font-size: 11px;
-    font-weight: 800;
-    cursor: pointer;
-  }
-
-  .panel-starter button:hover {
-    border-color: #5B9BD5;
-    background: #26384B;
-    color: #FFF;
-  }
-
   .canvas-viewport {
     position: absolute;
     top: 0;
@@ -1184,12 +1129,6 @@
       order: 10;
       width: 100%;
       max-width: none;
-    }
-
-    .panel-starter {
-      top: 8px;
-      min-width: min(320px, calc(100% - 20px));
-      padding: 9px;
     }
 
     .workspace-empty-state {

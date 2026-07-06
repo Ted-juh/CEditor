@@ -46,7 +46,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="help-overlay" onclick={onclose}>
-    <div class="help-panel" role="dialog" aria-label="Shortcuts and glossary" onclick={(event) => event.stopPropagation()}>
+    <div class="help-panel" role="dialog" tabindex="-1" aria-modal="true" aria-label="Shortcuts and glossary" onclick={(event) => event.stopPropagation()}>
       <div class="help-header">
         <div class="help-tabs" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'shortcuts'} class:active={tab === 'shortcuts'} onclick={() => { tab = 'shortcuts'; }}>Shortcuts</button>

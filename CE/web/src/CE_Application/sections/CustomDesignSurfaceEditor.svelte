@@ -3890,6 +3890,7 @@
                   class="align-toolbar"
                   style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${Math.max(2, activeSelectionFrame.top - 30)}px;`}
                   role="toolbar"
+                  tabindex="-1"
                   aria-label="Align and distribute selection"
                   onmousedown={stopSelectionAction}
                 >
@@ -5015,7 +5016,6 @@
     border-color: #3D6688;
   }
 
-  .surface-shell > .paint-strip,
   .surface-shell > .layer-action-strip,
   .surface-shell > .precision-strip,
   .surface-shell > .arc-strip {
@@ -5740,11 +5740,6 @@
     border-color: rgba(229, 160, 41, 0.5);
     background: rgba(229, 160, 41, 0.16);
     color: #FFE6B2;
-  }
-
-  .surface-options-strip input[type='range'] {
-    width: 92px;
-    accent-color: #5B9BD5;
   }
 
   .surface-options-strip input[type='checkbox'] {
@@ -7673,7 +7668,6 @@
     color: #BFFAF2;
   }
 
-  .surface-options-strip input[type='range'],
   .surface-options-strip input[type='checkbox'] {
     accent-color: #14B8A6;
   }
@@ -8005,7 +7999,6 @@
   }
 
   .palette-swatch-row code,
-  .palette-swatch-row strong,
   .palette-stepper strong,
   .palette-corner strong {
     min-width: 0;

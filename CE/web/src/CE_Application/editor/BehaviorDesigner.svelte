@@ -149,7 +149,7 @@
   // persist (kept in localStorage — empty folders are an editing convenience, so they don't
   // travel with the exported document the way `group` labels on real scripts do).
   const LIFECYCLES = ['startup', 'ready', 'runtime', 'dawstate', 'shutdown'];
-  const panelKey = String(panelId ?? 'debug');
+  let panelKey = $derived(String(panelId ?? 'debug'));
   const FOLDERS_KEY = 'ce-script-folders';
   function loadFolderReg() {
     const reg = {}; for (const lc of LIFECYCLES) reg[lc] = [];
@@ -717,7 +717,9 @@
         onclick={() => addScript(node.event, node.scope)}>+</button>
     </div>
     {#if expanded.has(node.id)}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class={['tgkids', dropTarget === folderKey(node.id, '') && 'drop']}
+        role="group"
         ondragover={(e) => onDropZoneOver(node.id, '', e)}
         ondragleave={() => onDropZoneLeave(node.id, '')}
         ondrop={(e) => onDropZoneDrop(node.id, '', e)}>
@@ -727,7 +729,9 @@
           {#each folders as fname (fname)}
             {@const fscripts = scriptsInFolder(node.scripts, fname)}
             {@const open = !collapsedFolders.has(folderKey(node.id, fname))}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div class={['tgfolderwrap', dropTarget === folderKey(node.id, fname) && 'drop']}
+              role="group"
               ondragover={(e) => onDropZoneOver(node.id, fname, e)}
               ondragleave={() => onDropZoneLeave(node.id, fname)}
               ondrop={(e) => onDropZoneDrop(node.id, fname, e)}>
