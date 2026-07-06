@@ -177,6 +177,22 @@
   // and the artboard edges/center; Alt bypasses, grid snap is the fallback.
   let smartSnapEnabled = $state(true);
   let activeSmartGuides = $state([]);
+  // Split active guides per ruler axis, tagging the artboard-center guide so
+  // both the ruler and the on-canvas line can draw it distinctly.
+  let smartGuideCenterEps = 0.75;
+  function taggedGuide(guide, centerValue) {
+    return { value: guide.value, kind: Math.abs(guide.value - centerValue) <= smartGuideCenterEps ? 'center' : 'edge' };
+  }
+  let rulerMarkersX = $derived(
+    activeSmartGuides.filter((g) => g.axis === 'x').map((g) => taggedGuide(g, artboardWidth / 2))
+  );
+  let rulerMarkersY = $derived(
+    activeSmartGuides.filter((g) => g.axis === 'y').map((g) => taggedGuide(g, artboardHeight / 2))
+  );
+  function isCenterGuide(guide) {
+    const centerValue = guide.axis === 'x' ? artboardWidth / 2 : artboardHeight / 2;
+    return Math.abs(guide.value - centerValue) <= smartGuideCenterEps;
+  }
   // Distance readouts between exactly two selected layers.
   let measureEnabled = $state(false);
   // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
@@ -3681,6 +3697,7 @@
           contentOffset={boardOffsetX}
           scale={surfaceZoom}
           gridStep={snapSize}
+          markers={rulerMarkersX}
         />
         <EditorRuler
           orientation="vertical"
@@ -3689,6 +3706,7 @@
           contentOffset={boardOffsetY}
           scale={surfaceZoom}
           gridStep={snapSize}
+          markers={rulerMarkersY}
         />
         {/if}
         <div
@@ -3951,7 +3969,7 @@
 
             {#if !designerPreviewing}
               {#each activeSmartGuides as guide, index (`${guide.axis}-${guide.value}-${index}`)}
-                <span class={`smart-guide ${guide.axis}`} style={smartGuideStyle(guide, artboardWidth, artboardHeight)}></span>
+                <span class={`smart-guide ${guide.axis}`} class:center={isCenterGuide(guide)} style={smartGuideStyle(guide, artboardWidth, artboardHeight)}></span>
               {/each}
               {#each measurementLines as line, index (`${line.axis}-${index}`)}
                 <div
@@ -7341,6 +7359,20 @@
 
   .smart-guide.y {
     height: 1px;
+  }
+
+  /* Artboard-centre guide reads distinct (amber) so "centered" is obvious. */
+  .smart-guide.center {
+    background: rgba(250, 204, 21, 0.95);
+    box-shadow: 0 0 8px rgba(250, 204, 21, 0.55);
+  }
+
+  .smart-guide.center.x {
+    width: 2px;
+  }
+
+  .smart-guide.center.y {
+    height: 2px;
   }
 
   .measure-line {

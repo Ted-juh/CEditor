@@ -12,6 +12,10 @@
     scale = 1,
     gridStep = 0,
     onGuideCreate = null,
+    // Transient guide markers along this ruler's axis, in content coords, e.g.
+    // the custom-design surface's live smart guides. Each: { value, kind }
+    // where kind 'center' draws distinct from a plain snap.
+    markers = [],
   } = $props();
 
   let canvasEl = $state(null);
@@ -147,6 +151,26 @@
           ctx.restore();
         }
       }
+    }
+
+    // Transient smart-guide markers: a full-depth tick in magenta (or amber for
+    // the artboard-center guide) so an active snap shows in the ruler too.
+    for (const marker of markers) {
+      const value = typeof marker === 'number' ? marker : marker?.value;
+      if (value == null) continue;
+      const isCenter = marker?.kind === 'center';
+      const screenPos = value * scale - scrollOffset + contentOffset;
+      ctx.strokeStyle = isCenter ? '#FACC15' : '#EC4899';
+      ctx.lineWidth = isCenter ? 2 : 1.5;
+      ctx.beginPath();
+      if (isHorizontal) {
+        const x = Math.round(screenPos) + 0.5;
+        ctx.moveTo(x, 0); ctx.lineTo(x, h);
+      } else {
+        const y = Math.round(screenPos) + 0.5;
+        ctx.moveTo(0, y); ctx.lineTo(w, y);
+      }
+      ctx.stroke();
     }
   });
 

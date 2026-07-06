@@ -2381,6 +2381,7 @@
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
   class:hidden-component={!isVisible}
   class:locked={editorInteractionEnabled && isEditorLocked}
+  class:custom-component-hint={editorInteractionEnabled && isCustomComponent && !panelLocked}
   class:preview-surface={!editorInteractionEnabled}
   class:preview-interactive={previewInteractive}
   class:preview-disabled={previewInteractive && previewAriaDisabled === true}
@@ -4074,6 +4075,40 @@
   .canvas-control.hidden-component {
     opacity: 0.25 !important;
     outline: 1px dashed #666;
+  }
+
+  /* A custom component with no visible background renders transparent, so in
+     edit mode it would be invisible until hovered/selected. This faint,
+     edit-only dashed box + corner tag shows where it is. Suppressed once the
+     control is selected (the selection outline takes over) and never present
+     in preview/export (preview-surface). */
+  .canvas-control.custom-component-hint:not(.selected):not(.preview-surface)::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    outline: 1px dashed rgba(120, 160, 210, 0.55);
+    outline-offset: -1px;
+    background: rgba(91, 155, 213, 0.04);
+    z-index: 1;
+  }
+
+  .canvas-control.custom-component-hint:not(.selected):not(.preview-surface)::after {
+    content: 'component';
+    position: absolute;
+    left: 0;
+    top: 0;
+    transform: translateY(-100%);
+    pointer-events: none;
+    padding: 0 4px;
+    font-size: 8px;
+    line-height: 1.5;
+    letter-spacing: 0.03em;
+    color: rgba(200, 220, 240, 0.75);
+    background: rgba(30, 42, 56, 0.85);
+    border-radius: 2px 2px 0 0;
+    white-space: nowrap;
+    z-index: 1;
   }
 
   .canvas-control.locked {

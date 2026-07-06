@@ -562,48 +562,51 @@
 <style>
   .display-panel {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     height: 100%;
     background: #1E1E1E;
   }
 
+  /* Horizontal tab strip along the top (was a vertical rail on the left). */
   .studio-rail {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    align-items: stretch;
     gap: 3px;
-    width: 42px;
-    padding: 5px 4px;
+    width: 100%;
+    padding: 4px 5px;
     background: #1A1A1A;
     flex-shrink: 0;
-    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
     box-sizing: border-box;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .studio-tab {
-    width: 32px;
-    min-height: 32px;
+    min-width: 40px;
+    height: 32px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 1px;
+    gap: 4px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
     color: #888;
-    font-size: 8px;
+    font-size: 9px;
     line-height: 1;
-    padding: 3px 0;
+    padding: 0 8px;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .studio-tab span {
-    max-width: 30px;
+    max-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
