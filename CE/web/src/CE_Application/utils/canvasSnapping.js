@@ -17,9 +17,11 @@ const SNAP_THRESHOLD = 5;
  *   rulerGuides   — { horizontal: number[], vertical: number[] }
  *   getSection    — (ctrl, name) => section (injected so utility stays pure)
  */
-export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection) {
+export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getSection, panelSize = null) {
   const { x, y, w, h } = rect;
   const result = { x, y, guides: [] };
+  let xIsCenter = false;
+  let yIsCenter = false;
 
   // Our edges by axis
   const myXEdges = [
@@ -106,13 +108,41 @@ export function findAlignmentSnap(rect, selfId, otherControls, rulerGuides, getS
     }
   }
 
+  // Snap to the panel's own edges + center (parity with the component
+  // editor's artboard targets). Panel targets are checked last so they win
+  // ties; the center is tagged so callers can draw it distinctly.
+  if (panelSize && panelSize.width > 0 && panelSize.height > 0) {
+    const xTargets = [
+      { pos: 0, center: false },
+      { pos: panelSize.width / 2, center: true },
+      { pos: panelSize.width, center: false },
+    ];
+    const yTargets = [
+      { pos: 0, center: false },
+      { pos: panelSize.height / 2, center: true },
+      { pos: panelSize.height, center: false },
+    ];
+    for (const t of xTargets) {
+      for (const myEdge of myXEdges) {
+        const dist = Math.abs(myEdge.val - t.pos);
+        if (dist < bestDx) { bestDx = dist; bestSnapX = t.pos - myEdge.offset; xGuidePos = t.pos; xIsCenter = t.center; }
+      }
+    }
+    for (const t of yTargets) {
+      for (const myEdge of myYEdges) {
+        const dist = Math.abs(myEdge.val - t.pos);
+        if (dist < bestDy) { bestDy = dist; bestSnapY = t.pos - myEdge.offset; yGuidePos = t.pos; yIsCenter = t.center; }
+      }
+    }
+  }
+
   if (bestSnapX !== null) {
     result.x = bestSnapX;
-    result.guides.push({ type: 'vertical', pos: xGuidePos });
+    result.guides.push({ type: 'vertical', pos: xGuidePos, center: xIsCenter });
   }
   if (bestSnapY !== null) {
     result.y = bestSnapY;
-    result.guides.push({ type: 'horizontal', pos: yGuidePos });
+    result.guides.push({ type: 'horizontal', pos: yGuidePos, center: yIsCenter });
   }
 
   return result;

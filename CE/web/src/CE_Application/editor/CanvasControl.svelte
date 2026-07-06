@@ -12,6 +12,7 @@
   import { guides } from '../stores/guides.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances } from '../utils/canvasSnapping.js';
+  import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
@@ -277,7 +278,14 @@
   // computeDistances additionally filters out co-selected siblings and
   // only runs for the dragged (key-object) component.
   function alignSnap(x, y, w, h) {
-    return findAlignmentSnap({ x, y, w, h }, core?.id, allControls, $guides, getSection);
+    const align = findAlignmentSnap(
+      { x, y, w, h }, core?.id, allControls, $guides, getSection,
+      { width: panelWidth, height: panelHeight },
+    );
+    // Publish the live guides so the panel rulers can mirror them (parity with
+    // the component editor). Cleared on drag/resize end.
+    setActivePanelSnapGuides(align.guides);
+    return align;
   }
 
   function distancesFor(x, y, w, h) {
@@ -589,6 +597,7 @@
     transientY = null;
     snapGuides = [];
     distanceLabels = [];
+    clearActivePanelSnapGuides();
     onDragEnd?.();
     // Swallow the click only if it lands on the canvas (prevents deselect),
     // but let clicks on menus/toolbar pass through
@@ -677,6 +686,7 @@
     transientH = null;
     snapGuides = [];
     distanceLabels = [];
+    clearActivePanelSnapGuides();
     // Swallow the click only if it lands on the canvas (prevents deselect),
     // but let clicks on menus/toolbar pass through
     window.addEventListener('click', (ev) => {

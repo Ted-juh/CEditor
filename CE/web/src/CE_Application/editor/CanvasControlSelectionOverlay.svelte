@@ -41,6 +41,7 @@
       class="snap-guide"
       class:vertical={guide.type === 'vertical'}
       class:horizontal={guide.type === 'horizontal'}
+      class:center={guide.center === true}
       style="{guide.type === 'vertical'
         ? `left:${guide.pos - overlayOffsetX}px;`
         : `top:${guide.pos - overlayOffsetY}px;`}"
@@ -135,6 +136,16 @@
     right: 0;
     height: 1px;
     border-top: 1px dashed #5B9BD5;
+  }
+
+  /* Panel-centre alignment reads distinct (amber, solid) — matches the
+     component editor's centre guide. */
+  .snap-guide.center.vertical {
+    border-left: 2px solid #FACC15;
+  }
+
+  .snap-guide.center.horizontal {
+    border-top: 2px solid #FACC15;
   }
 
   .dist-line {

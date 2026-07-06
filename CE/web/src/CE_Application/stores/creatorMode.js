@@ -11,10 +11,12 @@ import { writable } from 'svelte/store';
 const STORAGE_KEY = 'ceditor.creatorMode';
 
 function initialMode() {
+  // Default to Simple so a new component opens decluttered (the whole point of
+  // the progressive-disclosure pass); once a user picks Advanced it persists.
   try {
-    return localStorage.getItem(STORAGE_KEY) === 'simple' ? 'simple' : 'advanced';
+    return localStorage.getItem(STORAGE_KEY) === 'advanced' ? 'advanced' : 'simple';
   } catch {
-    return 'advanced';
+    return 'simple';
   }
 }
 

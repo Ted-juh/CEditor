@@ -23,6 +23,7 @@
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
+  import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
@@ -37,6 +38,16 @@
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
+
+  // Mirror the live alignment snap guides (published by the dragging control)
+  // as ruler tick markers — vertical guides mark the horizontal (X) ruler,
+  // horizontal guides mark the vertical (Y) ruler; centre guides tagged amber.
+  let rulerSnapMarkersX = $derived(
+    $activePanelSnapGuides.filter((g) => g.type === 'vertical').map((g) => ({ value: g.pos, kind: g.center ? 'center' : 'edge' }))
+  );
+  let rulerSnapMarkersY = $derived(
+    $activePanelSnapGuides.filter((g) => g.type === 'horizontal').map((g) => ({ value: g.pos, kind: g.center ? 'center' : 'edge' }))
+  );
   // The script editor is bound to a specific panel via the document's panelId, so the Paths
   // picker shows THAT panel's controls (not the ambiguous "active panel").
   let scriptDoc = $derived(
@@ -649,8 +660,8 @@
           </div>
         </div>
         {#if $showRulers}
-          <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
-          <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
+          <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} markers={rulerSnapMarkersX} onGuideCreate={(o, p) => addGuide(o, p)} />
+          <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} markers={rulerSnapMarkersY} onGuideCreate={(o, p) => addGuide(o, p)} />
           <div class="ruler-corner"></div>
         {/if}
         {#if !$previewModeEnabled}
