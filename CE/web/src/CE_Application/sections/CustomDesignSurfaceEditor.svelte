@@ -339,8 +339,6 @@
   let surfaceGridCols = $derived(
     `${paletteCollapsed ? '--palette-w:46px;' : ''}${dockHidden ? '--dock-w:0px;' : ''}`
   );
-  let rulerScrollX = $state(0);
-  let rulerScrollY = $state(0);
   let rulerViewWidth = $state(0);
   let rulerViewHeight = $state(0);
   // Rendered top-left of the (centered, zoomed) artboard within the scroll content.
@@ -358,15 +356,17 @@
     if (!board) return;
     const b = board.getBoundingClientRect();
     const s = surfaceScrollEl.getBoundingClientRect();
-    boardOffsetX = b.left - s.left + surfaceScrollEl.scrollLeft;
-    boardOffsetY = b.top - s.top + surfaceScrollEl.scrollTop;
-    // Sync the ruler scroll offsets to the ACTUAL scroll position. They only
-    // updated on scroll *events* before, so the initial (or centering-induced)
-    // scroll left them at 0 — which shifted whichever axis overflowed
-    // (usually vertical) off the artboard so the ruler didn't match the
-    // component's real coordinates.
-    rulerScrollX = surfaceScrollEl.scrollLeft;
-    rulerScrollY = surfaceScrollEl.scrollTop;
+    // Measure the artboard's LIVE VISUAL top-left relative to the scroll
+    // viewport's top-left. Both rulers are inset 20px and the scroll area is
+    // inset 20px too, so each ruler's 0 sits exactly on the scroll viewport's
+    // corner — which makes this delta the on-screen pixel where ruler-0 must
+    // land. getBoundingClientRect already folds in centering, the zoom
+    // transform, AND the current scroll, so we pass scrollOffset=0 to the
+    // rulers and just re-measure this (cheap) on scroll. The old approach
+    // added scrollLeft/Top back in and subtracted it again in the ruler, which
+    // drifted whenever the board was flex-centered rather than scrolled.
+    boardOffsetX = b.left - s.left;
+    boardOffsetY = b.top - s.top;
   }
 
   $effect(() => {
@@ -2779,9 +2779,10 @@
     window.addEventListener('mouseup', endSurfacePan);
   }
 
-  function handleSurfaceScroll(event) {
-    rulerScrollX = event.currentTarget.scrollLeft;
-    rulerScrollY = event.currentTarget.scrollTop;
+  function handleSurfaceScroll() {
+    // Re-measure the board's visual corner: since the rulers hold scrollOffset
+    // at 0, the contentOffset itself must move as the content scrolls.
+    measureBoardOffset();
   }
 
   function handleSurfaceScrollMouseDown(event) {
@@ -3704,7 +3705,7 @@
         <EditorRuler
           orientation="horizontal"
           length={rulerViewWidth}
-          scrollOffset={rulerScrollX}
+          scrollOffset={0}
           contentOffset={boardOffsetX}
           scale={surfaceZoom}
           gridStep={snapSize}
@@ -3713,7 +3714,7 @@
         <EditorRuler
           orientation="vertical"
           length={rulerViewHeight}
-          scrollOffset={rulerScrollY}
+          scrollOffset={0}
           contentOffset={boardOffsetY}
           scale={surfaceZoom}
           gridStep={snapSize}
