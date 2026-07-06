@@ -1619,6 +1619,27 @@
     surfaceZoom = Math.max(0.25, Math.min(5, numberOr(value, 1)));
   }
 
+  // Wheel zoom on the design canvas (parity with the panel editor). Ctrl/Cmd
+  // + wheel, or a trackpad pinch (which arrives as ctrlKey wheel), zooms
+  // toward the cursor; a plain wheel keeps native scrolling. Holding the zoom
+  // point fixed keeps the part under the cursor put while zooming.
+  function handleSurfaceWheel(event) {
+    if (!(event.ctrlKey || event.metaKey) || !surfaceScrollEl) return;
+    event.preventDefault();
+    const rect = surfaceScrollEl.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left + surfaceScrollEl.scrollLeft;
+    const pointerY = event.clientY - rect.top + surfaceScrollEl.scrollTop;
+    const before = surfaceZoom;
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    setZoom(before * factor);
+    const ratio = surfaceZoom / before;
+    if (ratio !== 1) {
+      // Keep the cursor's content point stationary after the scale change.
+      surfaceScrollEl.scrollLeft += (pointerX * ratio) - pointerX;
+      surfaceScrollEl.scrollTop += (pointerY * ratio) - pointerY;
+    }
+  }
+
   // Bottom zoom bar helpers (percent-based, like the Panel Designer's ZoomBar).
   function zoomStep(deltaPercent) {
     setZoom(surfaceZoom + deltaPercent / 100);
@@ -3682,6 +3703,7 @@
           bind:clientHeight={rulerViewHeight}
           onscroll={handleSurfaceScroll}
           onmousedown={handleSurfaceScrollMouseDown}
+          onwheel={handleSurfaceWheel}
         >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>

@@ -602,18 +602,6 @@
             </button>
           </div>
         {/if}
-        {#if panelHasNoControls && !$previewModeEnabled}
-          <aside class="panel-starter" aria-label="Panel starter controls">
-            <span>Start panel</span>
-            <strong>Add the first control</strong>
-            <div>
-              <button type="button" onclick={() => addStarterControl('Label')}>Label</button>
-              <button type="button" onclick={() => addStarterControl('MomentaryButton')}>Button</button>
-              <button type="button" onclick={() => addStarterControl('Slider')}>Slider</button>
-              <button type="button" onclick={() => addStarterControl('CustomComponent')}>Component</button>
-            </div>
-          </aside>
-        {/if}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
         <div class="canvas-viewport" class:with-rulers={$showRulers} use:bindViewport class:panel-active={canvasPanel}

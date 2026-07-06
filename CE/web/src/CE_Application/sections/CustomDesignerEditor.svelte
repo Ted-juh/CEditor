@@ -1502,7 +1502,7 @@
     </PropertyCell>
     <PropertyCell label="Moving" span={2} hint="Bindings and animations that currently target the selected layer.">
       <div class="motion-card">
-        <div class="motion-stage" class:animating={preview.animationsEnabled !== false}>
+        <div class="motion-stage">
           <span class="motion-track"></span>
           <span class="motion-pointer"></span>
         </div>
@@ -1553,7 +1553,7 @@
 
     {#if selectedStarter}
       <div class="starter-selected">
-        <div class={`starter-preview ${starterPreviewKind(selectedStarter)}`} class:animating={preview.animationsEnabled !== false}>
+        <div class={`starter-preview ${starterPreviewKind(selectedStarter)}`}>
           <span class="starter-item a"></span>
           <span class="starter-item b"></span>
           <span class="starter-item c"></span>
@@ -1617,7 +1617,7 @@
 
     {#if selectedRecipe}
       <div class="selected-recipe">
-        <div class={`assistant-preview ${recipePreviewKind(selectedRecipe)}`} class:animating={preview.animationsEnabled !== false}>
+        <div class={`assistant-preview ${recipePreviewKind(selectedRecipe)}`}>
           <span class="preview-stage">
             <span class="preview-item a"></span>
             <span class="preview-item b"></span>
