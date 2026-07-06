@@ -365,49 +365,6 @@
       ontogglepreview={togglePreviewMode}
     />
 
-    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
-      <button
-        type="button"
-        class="component-designer-entry"
-        data-testid="properties-component-designer-launch"
-        onclick={handleOpenComponentDesigner}
-      >
-        Open Component Designer
-      </button>
-    {/if}
-
-    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
-      <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
-        <button
-          type="button"
-          class:active={$creatorMode === 'simple'}
-          onclick={() => creatorMode.set('simple')}
-          title="Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back."
-        >Simple</button>
-        <button
-          type="button"
-          class:active={$creatorMode === 'advanced'}
-          onclick={() => creatorMode.set('advanced')}
-          title="Expose the full component graph."
-        >Advanced</button>
-      </div>
-    {/if}
-
-    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
-      <div class="property-search">
-        <input
-          type="text"
-          placeholder="Search properties…"
-          value={$propertyFilter}
-          oninput={(event) => propertyFilter.set(event.currentTarget.value)}
-          aria-label="Search properties"
-        />
-        {#if $propertyFilter}
-          <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
-        {/if}
-      </div>
-    {/if}
-
     {#if $previewModeEnabled}
       <div class="preview-wrapper">
         <PreviewInspector />
@@ -516,6 +473,49 @@
         <span class="info-text">{$propertyHint || 'Hover a property for details'}</span>
       </div>
     {/if}
+
+    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
+      <!-- Custom-component footer: search + Simple/Advanced + the prominent
+           designer launch, docked at the bottom of the panel (was at the top). -->
+      <div class="component-footer">
+        <div class="component-footer-row">
+          <div class="property-search">
+            <input
+              type="text"
+              placeholder="Search properties…"
+              value={$propertyFilter}
+              oninput={(event) => propertyFilter.set(event.currentTarget.value)}
+              aria-label="Search properties"
+            />
+            {#if $propertyFilter}
+              <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
+            {/if}
+          </div>
+          <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
+            <button
+              type="button"
+              class:active={$creatorMode === 'simple'}
+              onclick={() => creatorMode.set('simple')}
+              title="Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back."
+            >Simple</button>
+            <button
+              type="button"
+              class:active={$creatorMode === 'advanced'}
+              onclick={() => creatorMode.set('advanced')}
+              title="Expose the full component graph."
+            >Advanced</button>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="component-designer-entry"
+          data-testid="properties-component-designer-launch"
+          onclick={handleOpenComponentDesigner}
+        >
+          Open Component Designer
+        </button>
+      </div>
+    {/if}
   {:else}
     <div class="empty-panel">
       <span class="empty-text">No panel open</span>
@@ -533,9 +533,38 @@
     border-left: 1px solid #1A1A1A;
   }
 
+  /* Docked footer at the bottom of the panel for a selected custom component. */
+  .component-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-top: 1px solid #2A2A2A;
+    background: #1B1B1B;
+  }
+
+  .component-footer-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .component-footer-row .property-search {
+    flex: 1;
+    margin: 0;
+  }
+
+  .component-footer-row .creator-mode-toggle {
+    margin: 0;
+    flex: 0 0 auto;
+    width: 132px;
+  }
+
   .component-designer-entry {
-    flex: 0 0 32px;
-    margin: 6px 8px 0 58px;
+    flex: 0 0 34px;
+    height: 34px;
+    margin: 0;
     border: 1px solid #335371;
     border-radius: 4px;
     background: #142538;
