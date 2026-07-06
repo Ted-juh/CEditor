@@ -360,13 +360,24 @@
     const s = surfaceScrollEl.getBoundingClientRect();
     boardOffsetX = b.left - s.left + surfaceScrollEl.scrollLeft;
     boardOffsetY = b.top - s.top + surfaceScrollEl.scrollTop;
+    // Sync the ruler scroll offsets to the ACTUAL scroll position. They only
+    // updated on scroll *events* before, so the initial (or centering-induced)
+    // scroll left them at 0 — which shifted whichever axis overflowed
+    // (usually vertical) off the artboard so the ruler didn't match the
+    // component's real coordinates.
+    rulerScrollX = surfaceScrollEl.scrollLeft;
+    rulerScrollY = surfaceScrollEl.scrollTop;
   }
 
   $effect(() => {
     // Re-measure whenever anything that repositions or rescales the artboard changes.
     const deps = `${surfaceZoom}:${artboardWidth}:${artboardHeight}:${rulerViewWidth}:${rulerViewHeight}`;
     void deps;
-    measureBoardOffset();
+    // Defer to after layout/paint so flex-centering + scrollbars have settled;
+    // measuring synchronously catches a pre-centering position that never
+    // corrects itself.
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(measureBoardOffset);
+    else measureBoardOffset();
   });
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
