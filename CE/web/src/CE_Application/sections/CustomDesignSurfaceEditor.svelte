@@ -38,6 +38,7 @@
     createPartNode,
     createText,
     createValueChannel,
+    createArpPatternChannel,
   } from '../utils/customComponentFactory.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
@@ -1234,11 +1235,13 @@
       [`ValueChannels.arpNote`]: createValueChannel('arpNote', { label: 'Arp Note', type: 'int', defaultValue: 60, min: 0, max: 127, step: 1 }),
       [`ValueChannels.arpVelocity`]: createValueChannel('arpVelocity', { label: 'Arp Velocity', type: 'int', defaultValue: 0, min: 0, max: 127, step: 1 }),
       [`ValueChannels.arpGate`]: createValueChannel('arpGate', { label: 'Arp Gate', type: 'bool', defaultValue: false, min: 0, max: 1, step: 1 }),
+      [`ValueChannels.arpPattern`]: createArpPatternChannel(),
       'PublishedProperties.inputs.arpCurrentStep': { channel: 'arpCurrentStep', label: 'Arp Step In', type: 'int', enabled: true, min: 0, max: 31, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpCurrentStep': { channel: 'arpCurrentStep', label: 'Arp Step', type: 'int', enabled: true, min: 0, max: 31, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpNote': { channel: 'arpNote', label: 'Arp Note', type: 'int', enabled: true, min: 0, max: 127, step: 1, defaultValue: 60 },
       'PublishedProperties.outputs.arpVelocity': { channel: 'arpVelocity', label: 'Arp Velocity', type: 'int', enabled: true, min: 0, max: 127, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpGate': { channel: 'arpGate', label: 'Arp Gate', type: 'bool', enabled: true, defaultValue: false },
+      'PublishedProperties.outputs.arpPattern': { channel: 'arpPattern', label: 'Arp Pattern', type: 'array', enabled: true },
       'PublishedProperties.editableProperties.arpSteps': { path: 'Designer.arpeggiator.stepCount', label: 'Arp Steps', type: 'int', enabled: true, min: 1, max: 256, step: 1, defaultValue: 32 },
       'ExternalAPI.events': [
         ...(Array.isArray(control?._children?.ExternalAPI?.events) ? control._children.ExternalAPI.events : []),

@@ -511,15 +511,21 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     // Array channels (§12.3) additionally expose their items — whole and
     // per-index — so generators and bindings can target item i directly
     // (`channel.<name>.items`, `channel.<name>.<i>.raw|.normalized`).
+    // Object-item channels (itemFields) get `.items`, `.count`, and per-index
+    // raw objects; per-index normalization only applies to scalar items.
     if (String(channel?.type ?? '').trim().toLowerCase() === 'array') {
       const items = Array.isArray(channelRaw) ? channelRaw : (Array.isArray(channel?.items) ? channel.items : []);
       channelSignals[`channel.${name}.items`] = items;
+      channelSignals[`channel.${name}.count`] = items.length;
+      const objectItems = !!channel?.itemFields;
       const itemMin = numberOr(channel?.min, 0);
       const itemMax = Math.max(itemMin, numberOr(channel?.max, itemMin + 1));
       const span = Math.max(0.000001, itemMax - itemMin);
       items.forEach((item, index) => {
         channelSignals[`channel.${name}.${index}.raw`] = item;
-        channelSignals[`channel.${name}.${index}.normalized`] = clamp((numberOr(item, itemMin) - itemMin) / span, 0, 1);
+        if (!objectItems) {
+          channelSignals[`channel.${name}.${index}.normalized`] = clamp((numberOr(item, itemMin) - itemMin) / span, 0, 1);
+        }
       });
     }
   }

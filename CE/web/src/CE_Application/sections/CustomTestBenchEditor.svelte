@@ -1091,6 +1091,11 @@
                     <option value={seededValues?.[channel.name] ?? ''}>{seededValues?.[channel.name] ?? 'value'}</option>
                   {/if}
                 </select>
+              {:else if type === 'array' && definition?.itemFields}
+                <!-- Object-item array (e.g. arpPattern): published read-only view. -->
+                <div class="rig-object-array" title={JSON.stringify(seededValues?.[channel.name] ?? definition?.items ?? []).slice(0, 800)}>
+                  {(Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? [])).length} item(s) · {Object.keys(definition.itemFields).join(' / ')}
+                </div>
               {:else if type === 'array'}
                 <div class="rig-array" title="Drag a slider to drive one item of the array channel">
                   {#each (Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? [])) as item, index (index)}
@@ -1674,6 +1679,17 @@
     min-width: 0;
     height: 14px;
     accent-color: #5B9BD5;
+  }
+  .rig-object-array {
+    padding: 4px 7px;
+    border: 1px solid #2A3036;
+    border-radius: 4px;
+    background: #15191D;
+    color: #87939E;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .rig-row em {
     color: #DDE6EC;

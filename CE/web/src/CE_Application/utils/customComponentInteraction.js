@@ -41,18 +41,46 @@ export function isArrayValueChannel(channel) {
   return String(channel?.type ?? '').trim().toLowerCase() === 'array';
 }
 
+/** Object-item array channel: items are objects clamped per `itemFields`. */
+export function isObjectArrayChannel(channel) {
+  return isArrayValueChannel(channel) && !!channel?.itemFields && typeof channel.itemFields === 'object';
+}
+
 function clampArrayItem(channel, itemValue) {
   const min = numberOr(channel?.min, 0);
   const max = Math.max(min, numberOr(channel?.max, min + 1));
   return clamp(numberOr(itemValue, numberOr(channel?.defaultValue, min)), min, max);
 }
 
-/** The channel's items as a fresh, clamped, fixed-size array. `rawValue` (the
-    live customValues entry) wins over the authored `items` defaults. */
+function clampObjectArrayItem(channel, item) {
+  const clamped = {};
+  for (const [field, spec] of Object.entries(channel?.itemFields ?? {})) {
+    const min = numberOr(spec?.min, 0);
+    const max = Math.max(min, numberOr(spec?.max, min + 1));
+    const fieldStep = Math.abs(numberOr(spec?.step, 0));
+    let value = clamp(numberOr(item?.[field], numberOr(spec?.default, min)), min, max);
+    if (fieldStep > 0) value = clamp(min + (Math.round((value - min) / fieldStep) * fieldStep), min, max);
+    clamped[field] = value;
+  }
+  // Non-schema fields (like a block id) pass through untouched.
+  for (const [key, value] of Object.entries(item ?? {})) {
+    if (!(key in clamped)) clamped[key] = value;
+  }
+  return clamped;
+}
+
+/** The channel's items as a fresh, clamped array. Scalar channels are
+    fixed-size (padded from the default); object-item channels keep the
+    source length, capped at `size`. `rawValue` (the live customValues entry)
+    wins over the authored `items` defaults. */
 export function arrayChannelItems(channel, rawValue = undefined) {
   const authored = Array.isArray(channel?.items) ? channel.items : [];
-  const size = Math.max(1, Math.round(numberOr(channel?.size, authored.length || 16)));
   const source = Array.isArray(rawValue) ? rawValue : authored;
+  if (isObjectArrayChannel(channel)) {
+    const cap = Math.max(1, Math.round(numberOr(channel?.size, source.length || 1)));
+    return source.slice(0, cap).map((item) => clampObjectArrayItem(channel, item));
+  }
+  const size = Math.max(1, Math.round(numberOr(channel?.size, authored.length || 16)));
   return Array.from({ length: size }, (_, index) => clampArrayItem(channel, source[index]));
 }
 
@@ -425,7 +453,7 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
     nextValues[channelName] = nextCustomEnumValue(channel, currentValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
-  } else if (action === 'setitemvalue' && isArrayValueChannel(channel)) {
+  } else if (action === 'setitemvalue' && isArrayValueChannel(channel) && !isObjectArrayChannel(channel)) {
     const index = Math.round(numberOr(hitZone?.payload?.index, -1));
     const items = arrayChannelItems(channel, currentValue);
     if (index >= 0 && index < items.length) {
@@ -841,9 +869,10 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
     normalized = nextValue ? 1 : 0;
-  } else if (action === 'setitemvalue' && isArrayValueChannel(channel)) {
-    // Indexed repeats (§12.4): the zone edits ONE item of an array channel.
-    // Vertical position inside the zone is the item value (top = max).
+  } else if (action === 'setitemvalue' && isArrayValueChannel(channel) && !isObjectArrayChannel(channel)) {
+    // Indexed repeats (§12.4): the zone edits ONE item of a scalar array
+    // channel. Vertical position inside the zone is the item value (top =
+    // max). Object-item channels have their own editors (e.g. the arp grid).
     const index = Math.round(numberOr(hitZone?.payload?.index, -1));
     const items = arrayChannelItems(channel, previousValues[channelName]);
     if (index >= 0 && index < items.length) {

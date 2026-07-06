@@ -351,11 +351,18 @@ export function createValueChannel(name, {
 }
 
 /**
- * Array channel (PointSet primitive, §12.3): N scalar items sharing one
- * min/max/step. The runtime value in customValues is a plain array; the
+ * Array channel (PointSet primitive, §12.3): N items sharing one schema.
+ *
+ * Scalar form (default): items are numbers sharing min/max/step. The
  * 'step-bars' generator renders one part per item and generated zones write
  * items back by index (action 'setItemValue'). First consumer: the Step
  * Sequencer starter.
+ *
+ * Object form (`itemFields`): items are objects, each field with its own
+ * {min, max, step, default} clamp — e.g. the arpeggiator pattern's
+ * {note, step, length, velocity} blocks. Object-array channels are variable
+ * length (`size` is a cap, not a fill target) since point sets grow and
+ * shrink as the user draws.
  */
 export function createArrayChannel(name, {
   label = '',
@@ -365,16 +372,19 @@ export function createArrayChannel(name, {
   step = 0.01,
   defaultValue = 0,
   defaultItems = null,
+  itemFields = null,
   publicInput = true,
   publicOutput = true,
   format = {},
 } = {}) {
   const itemCount = Math.max(1, Math.round(size));
-  const items = Array.from({ length: itemCount }, (_, index) => {
-    const item = Array.isArray(defaultItems) ? defaultItems[index] : undefined;
-    return typeof item === 'number' ? item : defaultValue;
-  });
-  return {
+  const items = itemFields
+    ? (Array.isArray(defaultItems) ? defaultItems : [])
+    : Array.from({ length: itemCount }, (_, index) => {
+      const item = Array.isArray(defaultItems) ? defaultItems[index] : undefined;
+      return typeof item === 'number' ? item : defaultValue;
+    });
+  const channel = {
     _type: 'ValueChannel',
     name,
     label: label || name,
@@ -396,6 +406,30 @@ export function createArrayChannel(name, {
       ...format,
     },
   };
+  if (itemFields && typeof itemFields === 'object') channel.itemFields = itemFields;
+  return channel;
+}
+
+/**
+ * The arpeggiator pattern as an object-item array channel — the arp
+ * re-expressed on the PointSet primitive (§12.3), read side. The runtime
+ * publishes the normalized block list into this channel on every sync
+ * (see syncCustomArpeggiatorValues); publicInput stays false until the
+ * write-side precedence vs. live grid edits gets its own design pass.
+ */
+export function createArpPatternChannel() {
+  return createArrayChannel('arpPattern', {
+    label: 'Arp Pattern',
+    size: 512, // cap: blocks can exceed steps (polyphony), not a fill target
+    publicInput: false,
+    publicOutput: true,
+    itemFields: {
+      note: { min: 0, max: 127, step: 1, default: 60 },
+      step: { min: 0, max: 255, step: 1, default: 0 },
+      length: { min: 1, max: 256, step: 1, default: 1 },
+      velocity: { min: 1, max: 127, step: 1, default: 96 },
+    },
+  });
 }
 
 export function createBehaviorModule(name, {
