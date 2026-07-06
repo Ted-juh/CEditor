@@ -109,15 +109,22 @@
   // Re-measure panel-surface offset when zoom or panel size changes — the
   // panel surface uses a CSS transform so its layout box doesn't resize, so
   // the ResizeObserver above won't fire on zoom. We trigger it manually.
+  // Use getBoundingClientRect (not offsetLeft/offsetTop): the zoom container is
+  // centred with margins and its vertical margin collapses through the stage
+  // wrapper, so offsetTop reads 0 and the vertical ruler's 0 sticks to the
+  // viewport top. The rect-based delta is collapse-immune and matches the
+  // shared trackViewportMetrics measurement.
   $effect(() => {
     scale;
     canvasPanel?.width;
     canvasPanel?.height;
     metrics.width;
     metrics.height;
-    if (zoomContainerEl) {
-      metrics.contentLeft = zoomContainerEl.offsetLeft;
-      metrics.contentTop  = zoomContainerEl.offsetTop;
+    if (zoomContainerEl && viewportEl) {
+      const cr = zoomContainerEl.getBoundingClientRect();
+      const er = viewportEl.getBoundingClientRect();
+      metrics.contentLeft = cr.left - er.left + viewportEl.scrollLeft;
+      metrics.contentTop  = cr.top - er.top + viewportEl.scrollTop;
     }
   });
 
