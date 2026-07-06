@@ -407,15 +407,15 @@
   }
 
   const tabs = [
-    { id: 'colors',   label: 'Colors',   icon: Palette,     short: 'Col' },
-    { id: 'gradient', label: 'Gradient', icon: SwatchBook,  short: 'Grd' },
-    { id: 'effects',  label: 'Effects',  icon: Sparkles,    short: 'Fx' },
-    { id: 'notepad',  label: 'Notepad',  icon: StickyNote,  short: 'Nte' },
-    { id: 'viewer',   label: 'Viewer',   icon: Image,       short: 'Img' },
-    { id: 'align',    label: 'Align',    icon: AlignCenter, short: 'Aln' },
-    { id: 'device',   label: 'Device',   icon: Cable,       short: 'Dev' },
-    { id: 'preview',  label: 'Preview',  icon: Play,        short: 'Prv' },
-    { id: 'console',  label: 'Console',  icon: Terminal,    short: 'Con' },
+    { id: 'colors',   label: 'Colors',   icon: Palette },
+    { id: 'gradient', label: 'Gradient', icon: SwatchBook },
+    { id: 'effects',  label: 'Effects',  icon: Sparkles },
+    { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
+    { id: 'viewer',   label: 'Viewer',   icon: Image },
+    { id: 'align',    label: 'Align',    icon: AlignCenter },
+    { id: 'device',   label: 'Device',   icon: Cable },
+    { id: 'preview',  label: 'Preview',  icon: Play },
+    { id: 'console',  label: 'Console',  icon: Terminal },
   ];
 </script>
 
@@ -430,7 +430,7 @@
         onclick={() => handleTabClick(tab.id)}
       >
         <tab.icon size={15} strokeWidth={1.6} />
-        <span>{tab.short}</span>
+        <span>{tab.label}</span>
       </button>
     {/each}
   </div>
@@ -595,9 +595,9 @@
     border: 1px solid transparent;
     border-radius: 4px;
     color: #888;
-    font-size: 9px;
+    font-size: 11px;
     line-height: 1;
-    padding: 0 8px;
+    padding: 0 10px;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.1s;
