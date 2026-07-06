@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import { creatorMode } from '../stores/creatorMode.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import {
     CUSTOM_ASSISTANT_RECIPES,
@@ -1025,6 +1026,15 @@
 
 {#if designer}
   <PropertySection title="Workshop">
+    <PropertyCell label="Ready" span={4} hint="Whether this component is complete enough to reuse. Full checklist is under Advanced.">
+      <div class="readiness-hint" class:ok={readiness.ok}>
+        <strong>{readiness.ok ? '✓ Ready to reuse' : `${readiness.requiredOpenCount} required item${readiness.requiredOpenCount === 1 ? '' : 's'} left`}</strong>
+        {#if !readiness.ok && readinessOpenSteps.length}
+          <span>next: {readinessOpenSteps[0].label}</span>
+        {/if}
+      </div>
+    </PropertyCell>
+    {#if $creatorMode === 'advanced'}
     <PropertyCell label="Mode" span={2} hint="Custom components are authored as reusable mini-instruments.">
       <input class="val" type="text" value={designer.mode ?? 'workshop'} onchange={(event) => setDesigner('mode', event.target.value)} />
     </PropertyCell>
@@ -1047,8 +1057,10 @@
         {/each}
       </select>
     </PropertyCell>
+    {/if}
   </PropertySection>
 
+  {#if $creatorMode === 'advanced'}
   <PropertySection title="Component Map">
     <PropertyCell label="Layers" span={1} hint="Visible parts/layers currently inside this component.">
       <div class="metric">{partNames.length}</div>
@@ -1130,9 +1142,10 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+  {/if}
 
   <PropertySection title="Library">
-    {#if currentSourcePackage}
+    {#if $creatorMode === 'advanced' && currentSourcePackage}
       <PropertyCell label="Source" span={4} hint="Package provenance kept when this component was inserted or loaded from a reusable package.">
         <div class="source-package" class:changed={!currentPackageMatchesSource}>
           <strong>{currentSourcePackage.name} {currentSourcePackage.version}</strong>
@@ -1152,7 +1165,7 @@
         <em>{packageFingerprint}</em>
       </div>
     </PropertyCell>
-    {#if packageIssueList.length}
+    {#if $creatorMode === 'advanced' && packageIssueList.length}
       <PropertyCell label="Validation" span={4} hint="Current package issues and warnings before save, export, or upload.">
         <div class="package-issues">
           {#each packageIssueList.slice(0, 6) as item}
@@ -1167,6 +1180,7 @@
         </div>
       </PropertyCell>
     {/if}
+    {#if $creatorMode === 'advanced'}
     <PropertyCell label="Manifest" span={4} hint="What will be saved into the reusable custom component package.">
       <div class="manifest-grid">
         {#each packageSummaryItems as [label, value]}
@@ -1174,12 +1188,14 @@
         {/each}
       </div>
     </PropertyCell>
+    {/if}
     <PropertyCell label="Name" span={2} hint="Package display name used in the local and shared component library.">
       <input class="val" type="text" bind:value={packageName} placeholder={core?.name ?? 'Custom Component'} />
     </PropertyCell>
     <PropertyCell label="Version" span={1} hint="Package version. Saving the same name/version replaces the previous local package.">
       <input class="val" type="text" bind:value={packageVersion} />
     </PropertyCell>
+    {#if $creatorMode === 'advanced'}
     <PropertyCell label="Author" span={1} hint="Optional author name for shared libraries.">
       <input class="val" type="text" bind:value={packageAuthor} />
     </PropertyCell>
@@ -1202,9 +1218,11 @@
     <PropertyCell label="Description" span={4} hint="Short package description shown in local and shared libraries.">
       <textarea class="val package-text" rows="2" bind:value={packageDescription} placeholder="what this component is useful for"></textarea>
     </PropertyCell>
+    {/if}
     <PropertyCell label="Save" span={2} hint="Save or replace this custom component definition in the local component library.">
       <button class="library-btn" type="button" onclick={saveToLibrary}>Save Local Package</button>
     </PropertyCell>
+    {#if $creatorMode === 'advanced'}
     <PropertyCell label="Export" span={1} hint="Create portable JSON for upload/download later.">
       <button class="library-btn" type="button" onclick={copyPackageJson}>Package JSON</button>
     </PropertyCell>
@@ -1217,6 +1235,7 @@
     <PropertyCell label="Download All" span={1} hint="Download the complete local custom component library as one portable JSON file.">
       <button class="library-btn" type="button" onclick={downloadLibraryJson} disabled={!libraryEntries.length}>Library File</button>
     </PropertyCell>
+    {/if}
     <PropertyCell label="Find" span={1} hint="Search saved package names, tags, authors, IDs, capabilities, and fingerprints.">
       <input class="val" type="text" bind:value={librarySearch} placeholder="search library" />
     </PropertyCell>
@@ -1470,6 +1489,7 @@
     {/if}
   </PropertySection>
 
+  {#if $creatorMode === 'advanced'}
   <PropertySection title="Preview Aids">
     <PropertyCell label="Hit Zones" span={1} hint="Show hit zones while designing.">
       <PropertyToggle value={preview.showHitZones === true} onchange={() => setPreview('showHitZones', !(preview.showHitZones === true))} />
@@ -1526,6 +1546,7 @@
       </div>
     </PropertyCell>
   </PropertySection>
+  {/if}
 
   <PropertySection title="Quick Shapes">
     <PropertyCell label="Add" span={4} hint="Create real layers in Parts so states, bindings, and animations can target them.">
@@ -2045,6 +2066,31 @@
     gap: 3px;
     padding: 6px 8px;
     box-sizing: border-box;
+  }
+
+  /* Compact one-line readiness signal shown in both Simple and Advanced. */
+  .readiness-hint {
+    width: 100%;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 5px 8px;
+    border-radius: 5px;
+    border: 1px solid #57402B;
+    background: #241D17;
+    color: #E8C08A;
+    font-size: 11px;
+  }
+
+  .readiness-hint.ok {
+    border-color: #2F573E;
+    background: #162219;
+    color: #A9DCB8;
+  }
+
+  .readiness-hint span {
+    color: #9AA6AF;
+    font-size: 10px;
   }
 
   .readiness-score.ok,
@@ -2777,30 +2823,46 @@
     background: transparent;
   }
 
+  /* Concentric, centred rings (was inset-based → elliptical + off-centre in a
+     non-square preview box). */
+  .starter-preview.starter-rings .starter-item.a,
+  .starter-preview.starter-rings .starter-item.b,
+  .starter-preview.starter-rings .starter-item.c {
+    left: 50%;
+    top: 50%;
+  }
+
   .starter-preview.starter-rings .starter-item.a {
-    inset: 14px 42px;
+    width: 68px;
+    height: 68px;
+    margin: -34px 0 0 -34px;
     border: 7px solid #60A7D8;
   }
 
   .starter-preview.starter-rings .starter-item.b {
-    inset: 25px 53px;
+    width: 48px;
+    height: 48px;
+    margin: -24px 0 0 -24px;
     border: 7px solid #E5C06B;
   }
 
   .starter-preview.starter-rings .starter-item.c {
-    inset: 36px 64px;
+    width: 28px;
+    height: 28px;
+    margin: -14px 0 0 -14px;
     border: 7px solid #70C08F;
   }
 
   .starter-preview.starter-rings .starter-item.d {
-    left: 73px;
-    top: 18px;
-    width: 5px;
-    height: 42px;
+    left: 50%;
+    top: 50%;
+    width: 4px;
+    height: 34px;
+    margin-left: -2px;
     border-radius: 999px;
     background: #EAF6FF;
-    transform-origin: 3px 48px;
-    transform: rotate(-42deg);
+    transform-origin: 2px 34px;
+    transform: translateY(-34px) rotate(-32deg);
   }
 
   .starter-preview.starter-rings.animating .starter-item.d {
