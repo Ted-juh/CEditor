@@ -44,7 +44,7 @@
     'segmented-ring': 'Segmented ring',
     labels: 'Value labels',
     'meter-bars': 'Meter bars',
-    'scrollable-content': 'Scrollable content (not materialized yet)',
+    'scrollable-content': 'Scroll list (windowed)',
     'filmstrip-frames': 'Filmstrip frames',
   };
 
@@ -105,8 +105,8 @@
       parts = 1;
       label = generator.assetName ? `asset ${generator.assetName}` : 'choose filmstrip asset';
     } else if (type === 'scrollable-content') {
-      parts = rows * columns;
-      label = `${columns} x ${rows} virtual items`;
+      parts = Math.min(count, rows);
+      label = `${count} virtual items, ${Math.min(count, rows)} visible (scroll: ${generator.valueSource || 'set a scroll channel'})`;
     }
 
     return {

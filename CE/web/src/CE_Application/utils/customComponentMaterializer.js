@@ -739,6 +739,97 @@ function materializeButtons(parts, control, signals, generator, prefix, generato
   }
 }
 
+// Windowed virtual list: `count` virtual items, `rows` visible at once.
+// A scroll channel (valueSource, normalized 0..1) picks the window's first
+// item; the generator re-materializes live as the channel moves, so no
+// renderer clipping is needed — edge rows snap in/out rather than clip.
+// Optional `targetValueChannel` turns rows into a selector: clicking a row
+// sets that channel to the row's item index (or its `values[i]` payload),
+// and the matching row renders highlighted.
+function materializeScrollList(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 12)));
+  const visibleRows = Math.max(1, Math.min(count, Math.round(numberOr(generator?.rows, 4))));
+  const zIndex = numberOr(generator?.zIndex, 6);
+  const bounds = generatorBounds(generator);
+  const labels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const values = Array.isArray(generator?.values) ? generator.values : null;
+  const activeColour = generator?.activeColour ?? 'FF5B9BD5';
+  const inactiveColour = generator?.inactiveColour ?? generator?.colour ?? 'FF1B242C';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const gap = clamp(numberOr(generator?.gap, 10), 0, 60);
+
+  const scrollSource = generator?.valueSource ?? generator?.scrollChannel ?? '';
+  const scrollNormalized = normalizedSignalForValueSource(signals, scrollSource);
+  const maxFirst = Math.max(0, count - visibleRows);
+  const firstIndex = clamp(Math.round(scrollNormalized * maxFirst), 0, maxFirst);
+
+  const selectChannel = String(generator?.targetValueChannel ?? '').trim();
+  const selectedRaw = selectChannel ? signals?.customChannels?.[`channel.${selectChannel}.raw`] : undefined;
+
+  const rowCell = 100 / visibleRows;
+  const rowSize = rowCell * (1 - (gap / 100));
+
+  for (let slot = 0; slot < visibleRows; slot += 1) {
+    const itemIndex = firstIndex + slot;
+    const value = values?.[itemIndex] !== undefined ? values[itemIndex] : itemIndex;
+    const label = labels?.[itemIndex] !== undefined && labels?.[itemIndex] !== null
+      ? String(labels[itemIndex])
+      : `Item ${itemIndex + 1}`;
+    const active = selectedRaw !== undefined && String(selectedRaw) === String(value);
+    const rowName = `${prefix}_row_${slot + 1}`; // slot-stable names; meta carries the virtual index
+
+    addPart(parts, rowName, createPartNode(rowName, {
+      role: 'generatedListRow',
+      kind: 'roundedRectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, 50),
+        y: mapGeneratorY(bounds, (slot + 0.5) * rowCell),
+        width: mapGeneratorWidth(bounds, 96),
+        height: mapGeneratorHeight(bounds, rowSize),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: {
+        Background: createBackground(active ? activeColour : inactiveColour, {
+          borderEnabled: true,
+          borderColour: active ? '99DFF3FF' : '22344551',
+          borderThickness: 1,
+          radius: 3,
+        }),
+        Text: createText(label, { size: fontSize, weight: 600, colour: active ? 'FF10161B' : 'CCB9C8D4' }),
+      },
+      meta: { generatedListRow: true, slot, itemIndex, value, active, firstIndex, count },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && selectChannel) {
+      addHitZone(hitZones, `${prefix}_rowZone_${slot + 1}`, {
+        shape: 'rectangle',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: selectChannel,
+        action: generator?.hitZoneAction ?? 'setValue',
+        payload: {
+          type: 'listRow',
+          slot,
+          index: itemIndex,
+          number: itemIndex + 1,
+          value,
+          normalized: count > 1 ? itemIndex / (count - 1) : 0,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: 0,
+          y: slot * rowCell,
+          width: 100,
+          height: rowCell,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
 // Indexed per-instance repeats (§12.4): one bar per item of an ARRAY channel.
 // Bar i's height follows item i live (through the channel signals), and the
 // generated zone for column i writes item i back (action setItemValue), so
@@ -1073,6 +1164,8 @@ export function materializeCustomComponent(control, signals = {}) {
       materializeLabels(parts, generator, prefix, generatorName);
     } else if (type === 'repeated-buttons' || type === 'buttons') {
       materializeButtons(parts, resolved, signals, generator, prefix, generatorName, hitZones);
+    } else if (type === 'scrollable-content' || type === 'scroll-list') {
+      materializeScrollList(parts, resolved, signals, generator, prefix, generatorName, hitZones);
     } else if (type === 'grid' || type === 'meter-bars' || type === 'segmented-ring') {
       materializeGrid(parts, generator, prefix, generatorName, hitZones);
     } else if (type === 'piano-keys' || type === 'piano') {

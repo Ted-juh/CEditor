@@ -192,6 +192,15 @@ export const CUSTOM_COMPONENT_STARTERS = [
     creates: ['array channel', 'step-bar generator', '16 indexed zones', 'public API'],
     dimensions: { width: 240, height: 110 },
   },
+  // Container class (§12.2): tabbed pages from a button bank + rule-driven states.
+  {
+    id: 'starter.tabGroup',
+    group: 'Container',
+    label: 'Tab Group',
+    summary: 'Three tabbed pages: a generated tab bank drives an enum channel; rule-driven states swap the visible page.',
+    creates: ['tab enum channel', 'button-bank generator', '3 pages', 'rule states'],
+    dimensions: { width: 260, height: 160 },
+  },
 ];
 
 export function createPartNode(name, {
@@ -2463,6 +2472,134 @@ function createStepSequencerStarterPatch() {
   };
 }
 
+// Container class (§12.2): a tab group built entirely from existing
+// machinery — a repeated-buttons generator drives the enum channel, and
+// rule-driven states (state.rule over the channel) swap which page layer is
+// visible. Page ONE is the base look; TabTwo/TabThree states patch
+// `visible` while their rule holds.
+function createTabGroupStarterPatch() {
+  const channels = {
+    tab: createValueChannel('tab', {
+      label: 'Tab',
+      type: 'enum',
+      min: 0,
+      max: 2,
+      step: 1,
+      defaultValue: 'one',
+      format: { precision: 0 },
+    }),
+  };
+  channels.tab.values = ['one', 'two', 'three'];
+
+  const page = (name, text, colour, visible) => createPartNode(name, {
+    role: 'page',
+    kind: 'roundedRectangle',
+    zIndex: 3,
+    visible,
+    layout: { x: 50, y: 62, width: 90, height: 58, widthUnit: 'percent', heightUnit: 'percent' },
+    sections: {
+      Background: createBackground(colour, { borderColour: '332B3742', radius: 6 }),
+      Text: createText(text, { size: 12, weight: 700 }),
+    },
+  });
+
+  const tabState = (name, value, patches) => ({
+    _type: 'State',
+    name,
+    group: 'value',
+    description: `Shows page ${value} while the tab channel is '${value}'.`,
+    enabled: true,
+    rule: `tab == '${value}'`,
+    when: {},
+    patches: { component: {}, parts: patches },
+  });
+
+  return {
+    'Core.name': 'Tab Group',
+    'Transform.width': 260,
+    'Transform.height': 160,
+    Animations: createStarterAnimations(),
+    States: {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: ['tabTwo', 'tabThree', 'disabled'],
+      _children: {
+        TabTwo: tabState('TabTwo', 'two', {
+          pageOne: { visible: false },
+          pageTwo: { visible: true },
+        }),
+        TabThree: tabState('TabThree', 'three', {
+          pageOne: { visible: false },
+          pageThree: { visible: true },
+        }),
+        Disabled: {
+          _type: 'State',
+          name: 'Disabled',
+          group: 'system',
+          description: 'Dims the full custom component.',
+          enabled: true,
+          when: { disabled: true },
+          patches: { component: { 'Transform.opacity': 0.55 }, parts: {} },
+        },
+      },
+    },
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('TABS', 'FF10161B'),
+        pageOne: page('pageOne', 'PAGE ONE', 'FF1B2A38', true),
+        pageTwo: page('pageTwo', 'PAGE TWO', 'FF20301F', false),
+        pageThree: page('pageThree', 'PAGE THREE', 'FF33251B', false),
+      },
+    },
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        tabButtons: {
+          _type: 'Generator',
+          name: 'tabButtons',
+          type: 'repeated-buttons',
+          enabled: true,
+          geometry: 'linear',
+          count: 3,
+          zIndex: 8,
+          labels: ['TAB 1', 'TAB 2', 'TAB 3'],
+          values: ['one', 'two', 'three'],
+          targetValueChannel: 'tab',
+          generatedHitZones: true,
+          gap: 10,
+          fontSize: 9,
+          bounds: { x: 5, y: 17, width: 90, height: 15 },
+          generatedPartPrefix: 'tabBtn',
+        },
+      },
+    },
+    Bindings: createCustomComponentBlankBindingsDefaults(),
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: { tab: { channel: 'tab', label: 'Tab', type: 'enum', enabled: true } },
+      outputs: { tab: { channel: 'tab', label: 'Tab', type: 'enum', enabled: true } },
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('tabGroup', [{ id: 'tabChange', label: 'Tab Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'pageOne',
+      selectedValueChannel: 'tab',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'tabButtons',
+      notes: 'Container starter: the generated tab bank sets the enum channel; rule states show the matching page. Add controls onto each page layer.',
+    },
+  };
+}
+
 export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.blankCanvas') {
     return {
@@ -2498,6 +2635,7 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.statusLamp') return createStatusLampStarterPatch();
   if (starterId === 'starter.valueReadout') return createValueReadoutStarterPatch();
   if (starterId === 'starter.stepSequencer') return createStepSequencerStarterPatch();
+  if (starterId === 'starter.tabGroup') return createTabGroupStarterPatch();
   return {};
 }
 
