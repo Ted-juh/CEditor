@@ -32,9 +32,9 @@ const LAZY_COMPONENT_LOADERS = {
   bindings: () => import('../sections/BindingsEditor.svelte'),
   devicebindings: () => import('../sections/DeviceBindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
-  valuechannels: () => import('../sections/CustomValueChannelsEditor.svelte'),
-  behaviors: () => import('../sections/CustomBehaviorsEditor.svelte'),
-  hitzones: () => import('../sections/CustomHitZonesEditor.svelte'),
+  // Interact = Channels + Behaviors + Hit Zones as cluster cards (Stage C);
+  // the flat editors live inside it as the Advanced escape hatch.
+  interact: () => import('../sections/CustomInteractEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
   links: () => import('../sections/CustomLinksEditor.svelte'),
   // Publish = contract + variant definitions + package/library (Stage B1);

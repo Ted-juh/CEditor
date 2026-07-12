@@ -31,15 +31,11 @@ creatorMode.subscribe((mode) => {
 });
 
 // Property-panel tabs Simple mode hides for custom components. These are the
-// component-wide raw-graph list managers; the per-object inspector, API,
-// Assets, Test Bench, and the surface itself stay.
+// remaining raw-graph list managers; Interact/Publish handle the common path
+// (Interact additionally gates its own flat lists on Advanced).
 export const CREATOR_SIMPLE_HIDDEN_TABS = new Set([
-  'valuechannels',
-  'behaviors',
-  'hitzones',
   'bindings',
   'links',
-  'variants',
 ]);
 
 export function toggleCreatorMode() {

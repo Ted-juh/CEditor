@@ -78,7 +78,7 @@ export function sanitizeTabSelection({ singleTab, multiTabs, validIds, fallback 
 // clobbers the other side's selection.
 export const PROPERTIES_UI_STATE_KEY_V1 = 'ce.propertiesPanel.uiState.v1';
 export const PROPERTIES_UI_STATE_KEY_V2 = 'ce.propertiesPanel.uiState.v2';
-export const DEFAULT_AUTHOR_TAB = 'valuechannels';
+export const DEFAULT_AUTHOR_TAB = 'interact';
 
 export function migratePropertiesUiState(storedV2, storedV1 = null) {
   const source = storedV2 && typeof storedV2 === 'object' ? storedV2 : (storedV1 ?? {});

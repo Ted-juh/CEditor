@@ -245,7 +245,7 @@
     if (!name) return;
     focusDesigner({
       'Designer.selectedValueChannel': name,
-      'Designer.focusSection': 'valuechannels',
+      'Designer.focusSection': 'interact',
     });
   }
 
@@ -320,7 +320,7 @@
       'Designer.selectedBehavior': zone?.targetBehavior ?? '',
       'Designer.selectedValueChannel': zone?.targetValueChannel ?? '',
       'Designer.selectedGenerator': detachedSource,
-      'Designer.focusSection': 'hitzones',
+      'Designer.focusSection': 'interact',
       'Designer.preview.showHitZones': true,
     });
   }
@@ -367,7 +367,7 @@
       'Designer.selectedGenerator': generatorName,
       'Designer.selectedLayer': partEntries[0]?.[0] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedHitZone': zoneEntries[0]?.[0] ?? (designer?.selectedHitZone ?? ''),
-      'Designer.focusSection': partEntries.length ? '' : 'hitzones',
+      'Designer.focusSection': partEntries.length ? '' : 'interact',
       'Designer.focusSurfaceDock': partEntries.length ? 'layers' : '',
       'Designer.preview.showHitZones': zoneEntries.length > 0,
       'Designer.preview.showBounds': true,
@@ -527,7 +527,7 @@
     const behaviorTypes = Object.values(behaviors?._children ?? {}).map((behavior) => `${behavior?.type ?? ''} ${behavior?.role ?? ''} ${behavior?.geometry ?? ''}`.toLowerCase());
     const generatorTypes = Object.values(generators?._children ?? {}).map((generator) => String(generator?.type ?? '').toLowerCase());
     if ((channelKeys.has('x') && channelKeys.has('y')) || behaviorTypes.some((entry) => entry.includes('xy'))) {
-      found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'behaviors' }) });
+      found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'interact' }) });
     }
     if (generatorTypes.includes('repeated-leds') || generatorTypes.includes('meter-bars')) {
       found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true }) });
@@ -539,7 +539,7 @@
       found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'layers' }) });
     }
     if (['attack', 'decay', 'sustain', 'release'].some((name) => channelKeys.has(name))) {
-      found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'valuechannels' }) });
+      found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'interact' }) });
     }
     return found;
   }
