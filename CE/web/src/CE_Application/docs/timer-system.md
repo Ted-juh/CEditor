@@ -174,25 +174,23 @@ Remaining is implementation, not design — see below.
 
 ## Implementation TODO
 
-⚠️ **The live C++ backing does not exist yet and must be built.** Today
-`startTimer` / `stopTimer` / `onTimer` only live in the JS preview simulator
-(`scriptRuntime.js`) and the code exporters (`scriptEmitters.js`) — nothing in
-`CE/src/Scripting/*` actually runs them at runtime. Until this is wired, timers
-are a no-op in the real app.
+✅ **Live C++ backing implemented** (unverified by build — no toolchain in the
+authoring environment). `startTimer(id, ms)` / `stopTimer(id)` now run real timers
+and dispatch `onTimer({ id })`.
 
-- [ ] **Build `TimerManager`** (C++, message thread) over a single
-  `juce::Timer`, implementing the Repeat & scheduling and Lifecycle specs above.
-- [ ] **Wire it into the live script runtime** (`CE/src/Scripting/*`,
-  `ScriptRuntime.cpp` / `BridgeScriptHost.h`) so `startTimer` / `stopTimer` fire
-  real callbacks and dispatch `onTimer` / `onTimerDone` back to scripts.
-- [ ] **Expose the additive commands** (`pauseTimer` / `resumeTimer` /
-  `restartTimer` / `resetTimer` / `setTimerInterval`, queries, options form of
-  `startTimer`) across the registry, emitters, and runtime.
-- [ ] **Serialize timer definitions** in the ValueTree; keep runtime state out.
-- [ ] **Mirror the spec in the preview simulator** so design-time matches
-  runtime.
-- [ ] **(Optional)** declarative Timer **section** + routing-layer event so
-  non-scripted parts (e.g. LCD scroll) can use it.
+- [x] **`TimerManager`** (`CE/src/Scripting/TimerManager.h`) — one `juce::Timer`
+  multiplexing named timers on the message thread; repeating; fixed-rate with
+  drift compensation (coalesce, never burst); reentrancy-safe.
+- [x] **Wired into the runtime** — `startTimer`/`stopTimer` added to
+  `ScriptHostApi` (default no-op) + `BridgeScriptHost` callbacks; registered as
+  globals in the JS (`JsScriptEngine`) and Lua (`LuaScriptEngine`) engines; wired
+  in `PluginProcessor::setupScripting`, which dispatches `onTimer` on the message
+  thread and stops all timers on teardown.
+- [ ] **Additive commands** (`pauseTimer` / `resumeTimer` / `restartTimer` /
+  `resetTimer` / `setTimerInterval`, queries, options form, `onTimerDone`) — not
+  yet; MVP is repeating start/stop + `onTimer`.
+- [ ] **Serialize timer definitions** (declarative Timer section) — not yet.
+- [ ] **Python engine** registration + editor-preview parity — not yet.
 
 ## Add your ideas below
 <!-- New timer ideas go here; promote into the sections above once fleshed out. -->

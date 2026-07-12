@@ -32,12 +32,16 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 ## Advertised in `panelApi.js` but NOT wired in C++
 
 ### Inbound events (no `dispatchEvent` for these)
-- `onParameterReceived` — the **decoded** DPD event (`panelApi.js` calls it
-  "90% of use"). Highest value to wire.
-- `onMidiIn`, `onCcIn`, `onSysexIn` — raw MIDI.
-- `onDeviceConnected`, `onDeviceDisconnected`.
-- `onControlChanged`, `onPanelStateChanged` — panel events.
-- `onTimer` — see [timer-system.md](./timer-system.md).
+- ✅ **WIRED** (Player runtime, unverified by build): `onParameterReceived`
+  (per decoded dump value), `onMidiIn`, `onCcIn`, `onSysexIn` — routed by
+  extending `installScriptDeviceCallback` in `PluginProcessor.h` (branches on the
+  existing `midiInputMessage` / `sysexInputMessage` / `dumpMessageParsed` events;
+  hex→bytes). No `DeviceProfileService` change was needed.
+- ✅ **WIRED**: `onTimer` — via the new `TimerManager` (see
+  [timer-system.md](./timer-system.md)).
+- Still open: `onDeviceConnected` / `onDeviceDisconnected`,
+  `onControlChanged` / `onPanelStateChanged`; and the **editor-preview (JS)** side
+  of the raw inbound events (this wired the C++ Player runtime only).
 
 ### Outbound host API
 - `startTimer` / `stopTimer` — needs a `juce::Timer`-backed `TimerManager`

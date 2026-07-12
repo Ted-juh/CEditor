@@ -166,6 +166,9 @@ public:
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
 
+        g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
+        g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });
+
         g.set_function ("run",  [this] (std::string target, sol::optional<sol::object> args)
             { return varToSol (lua, host->runAction (juce::String (target), args ? solToVar (*args) : juce::var())); });
         g.set_function ("emit", [this] (std::string name, sol::optional<sol::object> data)

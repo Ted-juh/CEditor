@@ -24,6 +24,7 @@
 #if CEDITOR_SCRIPTING
  #include "PanelValueModel.h"
  #include "Scripting/BridgeScriptHost.h"
+ #include "Scripting/TimerManager.h"
 #endif
 
 /**
@@ -67,6 +68,7 @@ public:
         stopTimer();
        #if CEDITOR_SCRIPTING
         deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime
+        scriptTimers.stopAll();                    // stop script timers before the runtime is destroyed
        #endif
     }
 #endif
@@ -297,8 +299,42 @@ private:
         deviceService.setEventCallback ([this] (const juce::String& name, const juce::var& payload)
         {
             if (getActiveEditor() != nullptr || scriptRuntime == nullptr) return;  // window open -> JS handles it
-            if (name != "dumpMessageParsed") return;
             auto* o = payload.getDynamicObject();
+
+            // Raw inbound taps (observational). onMidiIn for every message; onCcIn/onSysexIn refine it.
+            if (name == "midiInputMessage")
+            {
+                if (o == nullptr) return;
+                const auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
+                const juce::String messageType = o->getProperty ("messageType").toString();
+                const int status = bytes.size() > 0 ? (int) bytes.getReference (0) : 0;
+
+                auto* mo = new juce::DynamicObject();
+                mo->setProperty ("bytes", juce::var (bytes));
+                mo->setProperty ("status", status);
+                mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
+                scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
+
+                if (messageType == "cc" && bytes.size() >= 3)
+                {
+                    auto* co = new juce::DynamicObject();
+                    co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
+                    co->setProperty ("cc", (int) bytes.getReference (1));
+                    co->setProperty ("value", (int) bytes.getReference (2));
+                    scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
+                }
+                return;
+            }
+
+            if (name == "sysexInputMessage")
+            {
+                if (o == nullptr) return;
+                const auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
+                scriptRuntime->dispatchEvent ("onSysexIn", "", juce::var (bytes));  // bare byte array
+                return;
+            }
+
+            if (name != "dumpMessageParsed") return;
             if (o == nullptr) return;
 
             const auto values = o->getProperty ("values");
@@ -315,14 +351,36 @@ private:
                     if (it != scriptDumpParamPaths.end()) scriptValues.setValue (it->second, prop.value);
                 }
 
-            // onDumpReceived({ values, kind, role }) — inbound, so a set() inside is silent by default.
+            // Inbound: set()s inside these handlers are silent by default.
+            ceditor::scripting::InboundScope inbound (*scriptRuntime);
+
+            // onDumpReceived({ values, kind, role }).
             auto* sp = new juce::DynamicObject();
             sp->setProperty ("values", values);
             sp->setProperty ("kind", kind);
             sp->setProperty ("role", role);
-            ceditor::scripting::InboundScope inbound (*scriptRuntime);
             scriptRuntime->dispatchEvent ("onDumpReceived", "", juce::var (sp));
+
+            // onParameterReceived({ parameter, value }) — one per decoded parameter (the DPD payoff).
+            if (auto* vobj = values.getDynamicObject())
+                for (const auto& prop : vobj->getProperties())
+                {
+                    auto* pp = new juce::DynamicObject();
+                    pp->setProperty ("parameter", prop.name.toString());
+                    pp->setProperty ("value", prop.value);
+                    scriptRuntime->dispatchEvent ("onParameterReceived", "", juce::var (pp));
+                }
         });
+    }
+
+    // Parse a hex string (spaced or unspaced, e.g. "B0 4A 64") into an array of byte values.
+    static juce::Array<juce::var> hexToByteVarArray (const juce::String& hexIn)
+    {
+        juce::Array<juce::var> out;
+        const juce::String h = hexIn.removeCharacters (" ");
+        for (int i = 0; i + 1 < h.length(); i += 2)
+            out.add ((int) h.substring (i, i + 2).getHexValue32());
+        return out;
     }
    #endif
 
@@ -420,11 +478,22 @@ private:
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));
         };
+        cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };
+        cb.stopTimer  = [this] (const juce::String& id) { scriptTimers.stop (id); };
 
         scriptHost = std::make_unique<BridgeScriptHost> (std::move (cb));
         scriptRuntime = std::make_unique<ScriptRuntime> (*scriptHost);
         scriptHost->attachRuntime (scriptRuntime.get());
         scriptRuntime->setErrorLogger ([] (const juce::String& line) { scriptLogLine ("[script-error] " + line); });
+
+        // Fire onTimer({ id }) on the message thread when a script timer elapses.
+        scriptTimers.setFireCallback ([this] (const juce::String& id)
+        {
+            if (scriptRuntime == nullptr) return;
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", id);
+            scriptRuntime->dispatchEvent ("onTimer", "", juce::var (info));
+        });
 
        #if CEDITOR_VALUE_LAYER
         // Map control script-path <-> bound parameter, both directions: setValue routes bound writes to
@@ -447,6 +516,9 @@ private:
     ceditor::PanelValueModel scriptValues;
     std::unique_ptr<ceditor::scripting::BridgeScriptHost> scriptHost;
     std::unique_ptr<ceditor::scripting::ScriptRuntime> scriptRuntime;
+    // Declared after scriptRuntime so it is destroyed FIRST (stops its juce::Timer before the
+    // runtime the fire callback references goes away).
+    ceditor::scripting::TimerManager scriptTimers;
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged

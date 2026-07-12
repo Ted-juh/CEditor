@@ -24,9 +24,18 @@ out cheaply. Two engine-level prerequisites gate the most — do them early.
 
 ## Phases
 
-### Phase 0 — prerequisites
-The two above. Plus confirm/extend the routing model
-([link-mapper-component.md](./link-mapper-component.md)) for fan-out.
+### Phase 0 — prerequisites — ✅ DONE (code written, unverified by build)
+- [x] **Inbound MIDI wiring** — `onParameterReceived` / `onMidiIn` / `onCcIn` /
+  `onSysexIn` dispatched from `PluginProcessor::installScriptDeviceCallback`
+  (Player runtime). See [scripting-runtime-gaps.md](./scripting-runtime-gaps.md).
+- [x] **Timer C++ backing** — `TimerManager` + runtime wiring. See
+  [timer-system.md](./timer-system.md).
+- [ ] Still to confirm/extend the routing model for fan-out
+  ([link-mapper-component.md](./link-mapper-component.md)).
+
+> ⚠️ These are JUCE C++ changes written to match existing patterns but **not
+> compiled/tested** (no build toolchain in the authoring environment). Needs a
+> build pass + on-device verification.
 
 ### Phase 1 — quick wins (zero new foundations) — ✅ DONE (model layer)
 Shipped, pure engine-reuse:
