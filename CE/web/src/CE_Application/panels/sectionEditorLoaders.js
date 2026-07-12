@@ -38,7 +38,10 @@ const LAZY_COMPONENT_LOADERS = {
   hitzones: () => import('../sections/CustomHitZonesEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
   links: () => import('../sections/CustomLinksEditor.svelte'),
-  published: () => import('../sections/CustomApiEditor.svelte'),
+  // Author context edits the contract; the instance-facing "Values" half lives
+  // in the `properties` tab (Stage A audience split).
+  published: () => import('../sections/CustomPublishedPropertiesEditor.svelte'),
+  properties: () => import('../sections/CustomInstancePropertiesEditor.svelte'),
   variants: () => import('../sections/CustomVariantsEditor.svelte'),
   testbench: () => import('../sections/CustomTestBenchEditor.svelte'),
 };

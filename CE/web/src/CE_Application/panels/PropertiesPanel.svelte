@@ -19,31 +19,31 @@
   import { setSegmentEditScopeAll } from '../stores/segmentEditScope.js';
   import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
   import { propertiesTabRequest } from '../stores/propertiesTab.js';
-  import { openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { componentWorkspaceMode, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { getComponentPorts } from '../models/componentPorts.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
+  import {
+    PROPERTIES_UI_STATE_KEY_V1,
+    PROPERTIES_UI_STATE_KEY_V2,
+    migratePropertiesUiState,
+    tabAllowedForAudience,
+    tabAudience,
+  } from '../utils/propertiesTabAudience.js';
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
-  const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
   const PREVIEW_INFO_TEXT = 'Preview is active. The canvas is running panel behavior; debug inspection is optional.';
 
   function readStoredUiState() {
-    const stored = readStoredJson(UI_STATE_STORAGE_KEY, {});
+    const state = migratePropertiesUiState(
+      readStoredJson(PROPERTIES_UI_STATE_KEY_V2, null),
+      readStoredJson(PROPERTIES_UI_STATE_KEY_V1, null)
+    );
     return {
-      viewMode: stored?.viewMode === 'multi' ? 'multi' : 'single',
-      pinPanelProps: stored?.pinPanelProps === true,
-      singleTab: String(stored?.singleTab ?? 'core'),
-      multiTabs: new Set(Array.isArray(stored?.multiTabs) && stored.multiTabs.length > 0 ? stored.multiTabs : ['core']),
-      pinnedPanelTab: String(stored?.pinnedPanelTab ?? 'core'),
-      pinnedPanelMultiTabs: new Set(
-        Array.isArray(stored?.pinnedPanelMultiTabs) && stored.pinnedPanelMultiTabs.length > 0
-          ? stored.pinnedPanelMultiTabs
-          : ['core']
-      ),
-      collapsedCards: stored?.collapsedCards && typeof stored.collapsedCards === 'object'
-        ? stored.collapsedCards
-        : {},
+      ...state,
+      multiTabs: new Set(state.multiTabs),
+      authorMultiTabs: new Set(state.authorMultiTabs),
+      pinnedPanelMultiTabs: new Set(state.pinnedPanelMultiTabs),
     };
   }
 
@@ -79,9 +79,30 @@
   // Pin panel properties — show panel props at top even when a component is selected
   let pinPanelProps = $state(storedUiState.pinPanelProps);
 
-  // Main tab state (component tabs, or panel tabs when contextMode === 'panel')
+  // Main tab state (component tabs, or panel tabs when contextMode === 'panel').
+  // Custom components keep two selections — instance vs author context — so
+  // opening/closing the Designer workspace never clobbers the other side.
   let singleTab = $state(storedUiState.singleTab);
   let multiTabs = $state(storedUiState.multiTabs);
+  let authorSingleTab = $state(storedUiState.authorSingleTab);
+  let authorMultiTabs = $state(storedUiState.authorMultiTabs);
+
+  // Audience context (Stage A): authoring tabs render only while the Designer
+  // workspace is open; instance tabs only while it is closed.
+  let audienceContext = $derived($componentWorkspaceMode === 'surface' ? 'author' : 'instance');
+  let useAuthorTabState = $derived(selectedIsCustomComponent && audienceContext === 'author');
+  let activeSingleTab = $derived(useAuthorTabState ? authorSingleTab : singleTab);
+  let activeMultiTabs = $derived(useAuthorTabState ? authorMultiTabs : multiTabs);
+
+  function setActiveSingleTab(value) {
+    if (useAuthorTabState) authorSingleTab = value;
+    else singleTab = value;
+  }
+
+  function setActiveMultiTabs(value) {
+    if (useAuthorTabState) authorMultiTabs = value;
+    else multiTabs = value;
+  }
 
   // Pinned-panel tab state (only used when showPinnedPanel is true)
   let pinnedPanelTab = $state(storedUiState.pinnedPanelTab);
@@ -90,8 +111,8 @@
   // Controllers — closures bind to the state vars above. handleClick/isActive
   // are used by both the main tab bar and the pinned panel tab bar.
   const main = createTabViewState({
-    getSingle: () => singleTab, setSingle: (v) => singleTab = v,
-    getMulti:  () => multiTabs, setMulti:  (v) => multiTabs = v,
+    getSingle: () => activeSingleTab, setSingle: setActiveSingleTab,
+    getMulti:  () => activeMultiTabs, setMulti:  setActiveMultiTabs,
     getViewMode: () => viewMode, setViewMode: (v) => viewMode = v,
   });
   const pinnedPanel = createTabViewState({
@@ -136,7 +157,7 @@
     { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
     { id: 'designer',   icon: LayoutDashboard, label: 'Designer', section: 'Designer' },
-    { id: 'surface',    icon: Frame,           label: 'Surface',  section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
+    { id: 'properties', icon: SlidersHorizontal, label: 'Properties', section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
     { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
     { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },
@@ -149,8 +170,10 @@
   ];
 
   // Only show tabs for sections that exist on the selected component.
-  // Simple creator mode additionally hides the raw-graph list managers for
-  // custom components (§11.2) — same data, progressively disclosed.
+  // Custom components are additionally audience-gated (Stage A): instance
+  // context hides authoring tabs, author context hides instance ones. Simple
+  // creator mode further hides the raw-graph list managers (§11.2) — same
+  // data, progressively disclosed.
   let componentTabs = $derived(
     $selectedControl
       ? allComponentTabs.filter((tab) => (
@@ -158,6 +181,7 @@
           || hasSection($selectedControl, tab.section)
           || (tab.id === 'devicebindings' && getComponentPorts($selectedControl).length > 0))
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
+        && tabAllowedForAudience(tab.id, audienceContext, selectedIsCustomComponent)
         && !(selectedIsCustomComponent && $creatorMode === 'simple' && CREATOR_SIMPLE_HIDDEN_TABS.has(tab.id))
       ))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
@@ -193,19 +217,17 @@
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
   let tabs = $derived(contextMode === 'panel' ? panelTabs : componentTabs);
-  let contentTabs = $derived(tabs.filter((tab) => tab.id !== 'surface'));
-  let componentContentTabs = $derived(componentTabs.filter((tab) => tab.id !== 'surface'));
 
   let visibleTabs = $derived(
     viewMode === 'single'
-      ? contentTabs.filter(t => t.id === singleTab)
-      : contentTabs.filter(t => multiTabs.has(t.id))
+      ? tabs.filter(t => t.id === activeSingleTab)
+      : tabs.filter(t => activeMultiTabs.has(t.id))
   );
 
   let visibleComponentTabs = $derived(
     viewMode === 'single'
-      ? componentContentTabs.filter(t => t.id === singleTab)
-      : componentContentTabs.filter(t => multiTabs.has(t.id))
+      ? componentTabs.filter(t => t.id === activeSingleTab)
+      : componentTabs.filter(t => activeMultiTabs.has(t.id))
   );
 
   let visiblePinnedPanelTabs = $derived(
@@ -215,21 +237,21 @@
   );
 
   function ensureValidMainTabs() {
-    const validIds = new Set(contentTabs.map((tab) => tab.id));
+    const validIds = new Set(tabs.map((tab) => tab.id));
     if (validIds.size === 0) return;
 
-    if (!validIds.has(singleTab)) {
-      singleTab = tabs[0]?.id ?? 'core';
+    if (!validIds.has(activeSingleTab)) {
+      setActiveSingleTab(tabs[0]?.id ?? 'core');
     }
 
-    const filteredMultiTabs = [...multiTabs].filter((id) => validIds.has(id));
-    const nextMultiTabs = filteredMultiTabs.length > 0 ? filteredMultiTabs : [singleTab];
-    const currentMultiTabs = [...multiTabs];
+    const filteredMultiTabs = [...activeMultiTabs].filter((id) => validIds.has(id));
+    const nextMultiTabs = filteredMultiTabs.length > 0 ? filteredMultiTabs : [activeSingleTab];
+    const currentMultiTabs = [...activeMultiTabs];
     if (
       nextMultiTabs.length !== currentMultiTabs.length
       || nextMultiTabs.some((id, index) => id !== currentMultiTabs[index])
     ) {
-      multiTabs = new Set(nextMultiTabs);
+      setActiveMultiTabs(new Set(nextMultiTabs));
     }
   }
 
@@ -256,7 +278,7 @@
     if (!req?.tabId) return;
     if (contextMode === 'component' && componentTabs.some((tab) => tab.id === req.tabId)) {
       if (viewMode !== 'single') viewMode = 'single';
-      singleTab = req.tabId;
+      setActiveSingleTab(req.tabId);
     }
     propertiesTabRequest.set(null);
   });
@@ -270,11 +292,13 @@
   });
 
   $effect(() => {
-    writeStoredJson(UI_STATE_STORAGE_KEY, {
+    writeStoredJson(PROPERTIES_UI_STATE_KEY_V2, {
       viewMode,
       pinPanelProps,
       singleTab,
       multiTabs: [...multiTabs],
+      authorSingleTab,
+      authorMultiTabs: [...authorMultiTabs],
       pinnedPanelTab,
       pinnedPanelMultiTabs: [...pinnedPanelMultiTabs],
       collapsedCards,
@@ -306,18 +330,31 @@
       return;
     }
 
-    activeComponentPropertiesTab.set(String(singleTab ?? ''));
+    activeComponentPropertiesTab.set(String(activeSingleTab ?? ''));
   });
 
   $effect(() => {
     const focusTab = String(designerFocusSection ?? '').trim();
     if (contextMode !== 'component' || !selectedControlId || !focusTab) return;
-    if (!componentTabs.some((tab) => tab.id === focusTab)) return;
+    if (!componentTabs.some((tab) => tab.id === focusTab)) {
+      // A focus request can target an author tab while the workspace is
+      // closed (Stage A6): open the workspace first — this effect re-runs
+      // once the tab becomes visible and finishes the focus.
+      if (
+        selectedIsCustomComponent
+        && audienceContext === 'instance'
+        && tabAudience(focusTab) === 'author'
+        && allComponentTabs.some((tab) => tab.id === focusTab)
+      ) {
+        openComponentSurfaceWorkspace();
+      }
+      return;
+    }
 
     if (viewMode === 'single') {
-      singleTab = focusTab;
-    } else if (!multiTabs.has(focusTab)) {
-      multiTabs = new Set([...multiTabs, focusTab]);
+      setActiveSingleTab(focusTab);
+    } else if (!activeMultiTabs.has(focusTab)) {
+      setActiveMultiTabs(new Set([...activeMultiTabs, focusTab]));
     }
 
     updateControlProperty(selectedControlId, 'Designer.focusSection', '');
@@ -326,23 +363,15 @@
   function toggleViewMode() {
     if (viewMode === 'single') {
       viewMode = 'multi';
-      multiTabs = new Set([singleTab]);
+      setActiveMultiTabs(new Set([activeSingleTab]));
     } else {
       viewMode = 'single';
-      if (multiTabs.size > 0) singleTab = [...multiTabs][0];
+      if (activeMultiTabs.size > 0) setActiveSingleTab([...activeMultiTabs][0]);
     }
   }
 
   function toggleCollapse(id) {
     collapsedCards = { ...collapsedCards, [id]: !collapsedCards[id] };
-  }
-
-  function handleComponentTabClick(id, event) {
-    if (id === 'surface') {
-      openComponentSurfaceWorkspace();
-      return;
-    }
-    main.handleClick(id, event);
   }
 
   function handleOpenComponentDesigner(event) {
@@ -407,14 +436,14 @@
           <TabIconBar
             tabs={componentTabs}
             isActive={main.isActive}
-            onclick={handleComponentTabClick}
+            onclick={main.handleClick}
           />
           <div class="split-content-area">
             <TabContentArea
               {viewMode}
               tabs={componentTabs}
               visibleTabs={visibleComponentTabs}
-              singleTabId={singleTab}
+              singleTabId={activeSingleTab}
               contextMode="component"
               control={$selectedControl}
               scopedControl={scopedComponentControl}
@@ -435,7 +464,7 @@
         <TabIconBar
           {tabs}
           isActive={main.isActive}
-          onclick={contextMode === 'component' ? handleComponentTabClick : main.handleClick}
+          onclick={main.handleClick}
         />
 
         <div class="card-area">
@@ -444,7 +473,7 @@
               {viewMode}
               {tabs}
               {visibleTabs}
-              singleTabId={singleTab}
+              singleTabId={activeSingleTab}
               {contextMode}
               control={$selectedControl}
               scopedControl={contextMode === 'component' ? scopedComponentControl : null}
