@@ -99,6 +99,7 @@
     [
       { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
       { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
+      { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
       { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },
     ],
   ];

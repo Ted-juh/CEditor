@@ -1,8 +1,16 @@
 # Knob — Component Integration Spec
 
-> Status: **ready to implement.** A Knob is a new `controlType` that reuses the
-> slider family's existing circular geometry. Part of the
+> Status: **implemented** (model layer; reuses the existing circular slider
+> renderer/interaction — no renderer changes). A Knob is a new `controlType` that
+> reuses the slider family's circular geometry. Part of the
 > [panel parts backlog](./README.md); see [component-gaps.md](./component-gaps.md).
+>
+> Done in 4 files: `models/componentTypes.js` (Knob entry, 100×100),
+> `models/interactionDefaults.js` (Slider branches now serve Knob +
+> `geometry: 'circular'`), `models/componentPorts.js` (`value` port),
+> `layout/IconPanel.svelte` (palette entry). Verified: `createControl('Knob')` →
+> circular, family=range/role=slider, value port. Visual QA pending a running
+> build (no `node_modules` in this environment).
 
 ## Decision
 

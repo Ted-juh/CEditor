@@ -100,6 +100,14 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  Knob: [
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+  ],
   CustomComponent: [
     {
       id: 'mainValue',

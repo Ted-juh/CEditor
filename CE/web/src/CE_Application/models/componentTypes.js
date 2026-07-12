@@ -368,6 +368,16 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Knob: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Knob'),
+    defaultOverrides: {
+      Transform: { width: 100, height: 100 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Knob'),
+    },
+  },
+
   CustomComponent: {
     sections: [
       'Background',

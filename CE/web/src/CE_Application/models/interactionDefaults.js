@@ -361,8 +361,8 @@ export function createBehaviorDefaults(type) {
     };
   }
 
-  if (type === 'Slider') {
-    return {
+  if (type === 'Slider' || type === 'Knob') {
+    const behavior = {
       _type: 'Behavior',
       family: 'range',
       role: 'slider',
@@ -427,6 +427,8 @@ export function createBehaviorDefaults(type) {
       emitValueChange: true,
       emitStateChange: true,
     };
+    if (type === 'Knob') behavior.geometry = 'circular';
+    return behavior;
   }
 
   if (type === 'Range') {
@@ -551,7 +553,7 @@ export function createStatesDefaults(type) {
     };
   }
 
-  if (type === 'Slider') {
+  if (type === 'Slider' || type === 'Knob') {
     return {
       _type: 'States',
       enabled: true,
@@ -755,7 +757,7 @@ export function createStatesDefaults(type) {
 }
 
 export function createBindingsDefaults(type) {
-  if (type === 'Slider') {
+  if (type === 'Slider' || type === 'Knob') {
     return {
       _type: 'Bindings',
       enabled: true,
@@ -789,7 +791,7 @@ export function createBindingsDefaults(type) {
 }
 
 export function createAnimationsDefaults(type) {
-  if (type === 'Slider') {
+  if (type === 'Slider' || type === 'Knob') {
     return {
       _type: 'Animations',
       enabled: true,
@@ -887,7 +889,7 @@ export function createPartsDefaults(type) {
     return rangeParts();
   }
 
-  if (type === 'Slider') {
+  if (type === 'Slider' || type === 'Knob') {
     return createSliderSemanticParts();
   }
 
