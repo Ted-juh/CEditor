@@ -6,6 +6,18 @@
 > Everything below is verified against the current code (`CustomDesignSurfaceEditor.svelte`,
 > ~8.8k lines; `EditorCanvas.svelte` component-workspace host) and git history.
 
+> **STATUS UPDATE (2026-07-12, re-audited on main after the scripting branch merge):**
+> **Tier 0 (§1 regressions) is almost entirely restored** by branch
+> `claude/scripting-custom-component-editor-2op8oa` (now on main): smart guides + align/
+> distribute + measure + `?` cheatsheet + window-level keys (`95760e1`), readiness nudge strip
+> (`e8c8751`), Make Interactive wiring + `I` shortcut + grab-area halo (`5c5e0fd`). Also since
+> shipped from the Tier 1 list: wheel zoom (`cfe94a5`) and cross-component copy/paste of parts
+> (`customComponentClipboard.js`). The per-row table below is annotated. **Still open:** kit
+> expansion/per-part selection (§1 last row), bugs §2.1 (hidden-dock case), §2.2, §2.3 (dead
+> strips confirmed still present), §2.4, §2.5 (unverified), and the rest of Tier 1–3 (marquee,
+> context menu, multi-select edits, layer search/rename, resizable dock, groups, image fill,
+> colour tokens). §5 decomposition remains open and remains the priority.
+
 ---
 
 ## 1. Headline finding: the chrome rebuild silently regressed shipped features
@@ -18,14 +30,14 @@ dropped ruler infrastructure") — proving the pattern — but most are still go
 
 | Feature | Shipped in | Status today |
 |---|---|---|
-| Make Interactive **tool wiring** (Phase 1E) | `030e0e7` | **Broken.** Flyout renders, but `setActiveTool('interactive')` early-returns (`'interactive'` isn't in `DRAW_TOOLS`, guard at `:477`), so the tool never activates and the advertised **(I)** shortcut is dead. `makeInteractive()` itself lives on in the factory (tests green) — only the surface entry point is severed. |
-| Grab-area halo (Phase 1F) | `030e0e7`-era | **Gone** (only a CSS comment noting a halo band was removed). |
-| Object-relative smart guides (Phase 4) | `e6c434b` | **Gone.** `smartSnapCandidates`/`applyMoveSnap`: zero matches. Today's "guides" are grid-line flashes only — no object-edge/center snapping, no Alt-bypass toggle UI ("Smart" checkbox gone). |
-| Align & distribute toolbar (Phase 4) | `e6c434b` | **Gone.** `alignSelectedLayers`/`distributeSelectedLayers`: zero matches. Six align buttons survive only inside a **hidden** dead strip (§4) and in the dock; **distribute exists nowhere**. |
-| Two-selection measurement readouts (Phase 4) | `e6c434b` | **Gone** (`measurementLines`: zero matches). A draw/move `measure-badge` remains. |
-| `?` shortcut cheatsheet + window-level key handling (Phase 4) | `e6c434b` | **Gone.** Keydown is back on the shell `<div>` (`:3370`) — shortcuts die when focus drifts, the exact bug Phase 4 fixed. |
-| Readiness nudge strip (Phase 6/8) | `86f2ab2` | **Gone** (`analyzeCustomComponentReadiness`: zero matches in the surface). Readiness now renders **nowhere** except the Designer tab + Test Bench — which Stage B plans to delete on the assumption the canvas strip exists. **Stage B2 depends on restoring this.** |
-| Expandable kit rows + per-part selection | `b4269ec` | **Gone** (`kitPartOverlayEntries` etc.: zero matches). Kits are opaque single-bound objects again; only Edit (materialize) / Delete remain. |
+| Make Interactive **tool wiring** (Phase 1E) | `030e0e7` | ~~Broken~~ **RESTORED `5c5e0fd` (2026-07-12)** — was: **Broken.** Flyout renders, but `setActiveTool('interactive')` early-returns (`'interactive'` isn't in `DRAW_TOOLS`, guard at `:477`), so the tool never activates and the advertised **(I)** shortcut is dead. `makeInteractive()` itself lives on in the factory (tests green) — only the surface entry point is severed. |
+| Grab-area halo (Phase 1F) | `030e0e7`-era | **RESTORED `5c5e0fd` (2026-07-12)** — was: **Gone** (only a CSS comment noting a halo band was removed). |
+| Object-relative smart guides (Phase 4) | `e6c434b` | **RESTORED `95760e1`** — was: **Gone.** `smartSnapCandidates`/`applyMoveSnap`: zero matches. Today's "guides" are grid-line flashes only — no object-edge/center snapping, no Alt-bypass toggle UI ("Smart" checkbox gone). |
+| Align & distribute toolbar (Phase 4) | `e6c434b` | **RESTORED `95760e1`** — was: **Gone.** `alignSelectedLayers`/`distributeSelectedLayers`: zero matches. Six align buttons survive only inside a **hidden** dead strip (§4) and in the dock; **distribute exists nowhere**. |
+| Two-selection measurement readouts (Phase 4) | `e6c434b` | **RESTORED `95760e1`** — was: **Gone** (`measurementLines`: zero matches). A draw/move `measure-badge` remains. |
+| `?` shortcut cheatsheet + window-level key handling (Phase 4) | `e6c434b` | **RESTORED `95760e1`** (cheatsheet now in `SurfaceHelpOverlay.svelte`) — was: **Gone.** Keydown is back on the shell `<div>` (`:3370`) — shortcuts die when focus drifts, the exact bug Phase 4 fixed. |
+| Readiness nudge strip (Phase 6/8) | `86f2ab2` | **RESTORED `e8c8751`** (Stage B2 dependency satisfied) — was: **Gone** (`analyzeCustomComponentReadiness`: zero matches in the surface). Readiness now renders **nowhere** except the Designer tab + Test Bench — which Stage B plans to delete on the assumption the canvas strip exists. **Stage B2 depends on restoring this.** |
+| Expandable kit rows + per-part selection | `b4269ec` | **STILL OPEN (2026-07-12)** — **Gone** (`kitPartOverlayEntries` etc.: zero matches). Kits are opaque single-bound objects again; only Edit (materialize) / Delete remain. |
 
 **Takeaway:** all the lost code is in git history and was written against this same data model —
 restoration is *re-porting onto the new chrome*, not re-invention. And the root cause is

@@ -9,6 +9,12 @@
 > Stage B2 assumes exists and the Make Interactive tool Stage C builds on. Its proposed
 > **Stage W0 (workspace restoration + decomposition)** should run before Stage B; Stage A is
 > unaffected.
+>
+> **Status (2026-07-12):** W0's *restoration* half is done — the readiness strip, smart guides,
+> align/distribute/measure, cheatsheet, and Make Interactive + halo are all back on main (see
+> the status banner in `cc-designer-workspace-review.md`); the *decomposition* half remains
+> open. **Stage B2's and Stage C's dependencies are satisfied. Stages A–D are all still
+> unimplemented** — the panel still shows the full ~20-tab pile in both contexts.
 > **Nothing here changes the data model or removes capability** — every stage is view-layer
 > regrouping, consistent with the redesign plan's principles (progressive disclosure, one home
 > per concept, backward compatible).
