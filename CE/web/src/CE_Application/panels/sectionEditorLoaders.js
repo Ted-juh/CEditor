@@ -32,17 +32,15 @@ const LAZY_COMPONENT_LOADERS = {
   bindings: () => import('../sections/BindingsEditor.svelte'),
   devicebindings: () => import('../sections/DeviceBindingsEditor.svelte'),
   animations: () => import('../sections/AnimationsEditor.svelte'),
-  designer: () => import('../sections/CustomDesignerEditor.svelte'),
   valuechannels: () => import('../sections/CustomValueChannelsEditor.svelte'),
   behaviors: () => import('../sections/CustomBehaviorsEditor.svelte'),
   hitzones: () => import('../sections/CustomHitZonesEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
   links: () => import('../sections/CustomLinksEditor.svelte'),
-  // Author context edits the contract; the instance-facing "Values" half lives
-  // in the `properties` tab (Stage A audience split).
-  published: () => import('../sections/CustomPublishedPropertiesEditor.svelte'),
+  // Publish = contract + variant definitions + package/library (Stage B1);
+  // the instance-facing "Values" half lives in the `properties` tab (Stage A).
+  publish: () => import('../sections/CustomPublishEditor.svelte'),
   properties: () => import('../sections/CustomInstancePropertiesEditor.svelte'),
-  variants: () => import('../sections/CustomVariantsEditor.svelte'),
   testbench: () => import('../sections/CustomTestBenchEditor.svelte'),
 };
 

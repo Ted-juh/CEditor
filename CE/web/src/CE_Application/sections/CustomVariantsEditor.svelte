@@ -5,7 +5,10 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
-  let { control = null } = $props();
+  // showActivePicker=false hides the instance-facing "Active" cell — inside
+  // the Publish tab only the definitions are edited (the picker lives on the
+  // instance Properties tab).
+  let { control = null, showActivePicker = true } = $props();
 
   let core = $derived(getSection(control, 'Core'));
   let variants = $derived(getSection(control, 'Variants'));
@@ -253,17 +256,19 @@
 
 {#if variants}
   <PropertySection title="Variants">
-    <PropertyCell label="Active" span={2} hint="Variant used by preview and normal panel properties.">
-      <select class="val" value={variants.active ?? 'default'} onchange={(event) => {
-        setRoot('active', event.target.value);
-        if (core?.id) updateControlProperty(core.id, 'Designer.activeVariant', event.target.value);
-      }}>
-        {#each names as name}
-          <option value={name}>{variants?._children?.[name]?.label ?? name}</option>
-        {/each}
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Selected" span={2} hint="Variant to inspect and edit.">
+    {#if showActivePicker}
+      <PropertyCell label="Active" span={2} hint="Variant used by preview and normal panel properties.">
+        <select class="val" value={variants.active ?? 'default'} onchange={(event) => {
+          setRoot('active', event.target.value);
+          if (core?.id) updateControlProperty(core.id, 'Designer.activeVariant', event.target.value);
+        }}>
+          {#each names as name}
+            <option value={name}>{variants?._children?.[name]?.label ?? name}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+    {/if}
+    <PropertyCell label="Selected" span={showActivePicker ? 2 : 4} hint="Variant to inspect and edit.">
       <select class="val" bind:value={selectedName}>
         {#each names as name}
           <option value={name}>{name}</option>

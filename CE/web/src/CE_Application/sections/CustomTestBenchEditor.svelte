@@ -17,8 +17,6 @@
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
   import {
-    analyzeCustomComponentReadiness,
-    validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
   import { applyCustomBindings } from '../utils/interactionRuntime.js';
 
@@ -39,8 +37,6 @@
   let published = $derived(getSection(control, 'PublishedProperties'));
   let variants = $derived(getSection(control, 'Variants'));
   let preview = $derived(designer?.preview ?? {});
-  let packageValidation = $derived(control ? validateCustomComponentPackage(control) : { ok: false, issues: [], warnings: [] });
-  let packageReadiness = $derived(control ? analyzeCustomComponentReadiness(control) : { ok: false, score: 0, steps: [] });
 
   let partNames = $derived(Object.keys(parts?._children ?? {}));
   let valueNames = $derived(Object.keys(values?._children ?? {}));
@@ -172,45 +168,6 @@
     { label: 'Debug', value: preview.testValue ?? 0.5, state: preview.state ?? 'base', overlays: true },
   ]);
 
-  let issues = $derived.by(() => {
-    const found = [];
-    if (partNames.length === 0) found.push('No visual layers/parts exist.');
-    if (valueNames.length === 0) found.push('No value channels exist.');
-    if (behaviorNames.length > 0 && hitZoneNames.length === 0) found.push('Behaviors exist, but no hit zones target them.');
-    if (publishedInputs.length === 0 && publishedOutputs.length === 0) found.push('No public inputs or outputs are exposed for panel-level linking.');
-    for (const [name, behavior] of Object.entries(behaviors?._children ?? {})) {
-      if (behavior?.enabled === false) continue;
-      if (behavior?.valueChannel && !values?._children?.[behavior.valueChannel]) {
-        found.push(`Behavior "${name}" targets missing value channel "${behavior.valueChannel}".`);
-      }
-    }
-    for (const [name, zone] of Object.entries(hitZones?._children ?? {})) {
-      if (zone?.enabled === false) continue;
-      if (zone?.targetBehavior && !behaviors?._children?.[zone.targetBehavior]) {
-        found.push(`Hit zone "${name}" targets missing behavior "${zone.targetBehavior}".`);
-      }
-      if (zone?.targetValueChannel && !values?._children?.[zone.targetValueChannel]) {
-        found.push(`Hit zone "${name}" targets missing value channel "${zone.targetValueChannel}".`);
-      }
-    }
-    for (const [name, zone] of Object.entries(materializedHitZones ?? {})) {
-      if (zone?.enabled === false || zone?.generated !== true) continue;
-      if (zone?.targetValueChannel && !values?._children?.[zone.targetValueChannel]) {
-        found.push(`Generated hit zone "${name}" targets missing value channel "${zone.targetValueChannel}".`);
-      }
-      if (zone?.targetValueChannelY && !values?._children?.[zone.targetValueChannelY]) {
-        found.push(`Generated hit zone "${name}" targets missing Y value channel "${zone.targetValueChannelY}".`);
-      }
-    }
-    for (const [name, filmstrip] of Object.entries(assets?.filmstrips ?? {})) {
-      if (!filmstrip?.source) found.push(`Filmstrip "${name}" has no source image yet.`);
-      if (!(Number(filmstrip?.frameCount) > 0)) found.push(`Filmstrip "${name}" needs a frame count.`);
-    }
-    return found;
-  });
-  let readinessIssues = $derived([...new Set([...(packageValidation.issues ?? []), ...issues])]);
-  let readinessWarnings = $derived(packageValidation.warnings ?? []);
-
   let performance = $derived({
     layers: partNames.length,
     hitZones: hitZoneNames.length,
@@ -295,68 +252,8 @@
   function focusPublicApi(channelName = '') {
     focusDesigner({
       'Designer.selectedValueChannel': channelName,
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     });
-  }
-
-  function focusReadinessStep(step) {
-    if (!step) return;
-    const firstChannel = valueNames[0] ?? '';
-    const firstPart = partNames[0] ?? '';
-    const target = String(step.target ?? 'overview');
-    if (target === 'shapes') {
-      focusLayer(firstPart);
-      return;
-    }
-    if (target === 'movement') {
-      focusDesigner({
-        'Designer.focusSection': behaviorNames.length ? 'behaviors' : 'hitzones',
-        'Designer.selectedBehavior': behaviorNames[0] ?? '',
-        'Designer.selectedHitZone': hitZoneNames[0] ?? '',
-        'Designer.selectedValueChannel': firstChannel,
-        'Designer.preview.showHitZones': true,
-      });
-      return;
-    }
-    if (target === 'links') {
-      focusPublicApi(firstChannel);
-      return;
-    }
-    if (target === 'states') {
-      focusDesigner({
-        'Designer.focusSection': 'states',
-        'Designer.selectedLayer': firstPart,
-      });
-      return;
-    }
-    if (target === 'assets') {
-      focusDesigner({ 'Designer.focusSection': 'assets' });
-      return;
-    }
-    focusDesigner({
-      'Designer.focusSection': target === 'overview' ? 'valuechannels' : target,
-      'Designer.selectedValueChannel': firstChannel,
-    });
-  }
-
-  function publishAllChannels() {
-    if (!core?.id || valueNames.length === 0) return;
-    const patch = {
-      'Designer.focusSection': 'published',
-      'Designer.selectedValueChannel': valueNames[0],
-    };
-    for (const channelName of valueNames) {
-      const channel = values?._children?.[channelName] ?? {};
-      const entry = {
-        channel: channelName,
-        label: channel?.label ?? channelName,
-        type: channel?.type ?? 'float',
-        enabled: true,
-      };
-      patch[`PublishedProperties.inputs.${channelName}`] = entry;
-      patch[`PublishedProperties.outputs.${channelName}`] = entry;
-    }
-    applyControlPatch(core.id, patch);
   }
 
   function focusPublicProperty(entry) {
@@ -364,7 +261,7 @@
     focusDesigner({
       'Designer.selectedLayer': partMatch?.[1] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedPublicProperty': entry?.name ?? '',
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     });
   }
 
@@ -379,7 +276,7 @@
     };
     const patch = {
       'Designer.selectedValueChannel': channelName,
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     };
     if (direction === 'input' || direction === 'both') {
       patch[`PublishedProperties.inputs.${channelName}`] = entry;
@@ -1003,53 +900,6 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Readiness">
-    <PropertyCell label="Status" span={4} hint="Validation status for saving/sharing this component.">
-      <div class="status-card" class:ok={readinessIssues.length === 0}>
-        <strong>{readinessIssues.length === 0 ? 'Component foundation looks valid' : `${readinessIssues.length} issue${readinessIssues.length === 1 ? '' : 's'} to review`}</strong>
-        <div class="readiness-meter">
-          <span style={`width: ${packageReadiness.score ?? 0}%`}></span>
-        </div>
-        <small>{packageReadiness.score ?? 0}% package-ready · {packageReadiness.doneCount ?? 0}/{packageReadiness.totalCount ?? 0} checks complete</small>
-        {#if readinessIssues.length === 0}
-          <span>{readinessWarnings.length ? `${readinessWarnings.length} warning${readinessWarnings.length === 1 ? '' : 's'} remain before sharing.` : 'It has enough structure to save, reuse, and keep extending.'}</span>
-          {#if readinessWarnings.length}
-            <ul>
-              {#each readinessWarnings as warning}
-                <li>{warning}</li>
-              {/each}
-            </ul>
-          {/if}
-        {:else}
-          <ul>
-            {#each readinessIssues as issue}
-              <li>{issue}</li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Checklist" span={4} hint="Package-readiness checks and shortcuts to the relevant designer area.">
-      <div class="readiness-checklist">
-        {#each packageReadiness.steps ?? [] as step (step.id)}
-          <button class="readiness-step" class:done={step.done} type="button" onclick={() => focusReadinessStep(step)}>
-            <span>{step.done ? '✓' : '!'}</span>
-            <strong>{step.label}</strong>
-            <em>{step.detail}</em>
-          </button>
-        {/each}
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Actions" span={4} hint="Common finishing actions before saving, exporting, or sharing this component.">
-      <div class="quick-actions">
-        <button type="button" onclick={publishAllChannels} disabled={valueNames.length === 0}>Publish all channels</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'links' })}>Review links</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'assets' })}>Review assets</button>
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
   <PropertySection title="Specialized Inspectors">
     <PropertyCell label="Detected" span={4} hint="Domain-specific helpers inferred from channels, behaviors, generators, and arpeggiator metadata.">
       <div class="specialized-list">
@@ -1484,16 +1334,6 @@
     background: #162219;
     color: #A9DCB8;
   }
-  .status-card strong {
-    display: block;
-    color: #FFF;
-    margin-bottom: 6px;
-  }
-  .status-card ul {
-    margin: 0;
-    padding-left: 18px;
-    line-height: 1.45;
-  }
   .readiness-meter {
     width: 100%;
     height: 6px;
@@ -1503,18 +1343,6 @@
     overflow: hidden;
     border: 1px solid #353535;
   }
-  .readiness-meter span {
-    display: block;
-    height: 100%;
-    min-width: 2px;
-    border-radius: inherit;
-    background: #65B87A;
-  }
-  .status-card small {
-    display: block;
-    margin-bottom: 6px;
-    color: #AAA;
-  }
   .readiness-checklist,
   .quick-actions {
     display: grid;
@@ -1522,8 +1350,7 @@
     gap: 6px;
     width: 100%;
   }
-  .readiness-step,
-  .quick-actions button {
+  .readiness-step {
     min-width: 0;
     border: 1px solid #383838;
     border-radius: 4px;
@@ -1541,47 +1368,9 @@
     padding: 7px;
     text-align: left;
   }
-  .readiness-step span {
-    grid-row: span 2;
-    width: 16px;
-    height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    background: #5A342B;
-    color: #FFD0C0;
-    font-weight: 700;
-  }
-  .readiness-step.done span {
-    background: #24492F;
-    color: #B9E8C4;
-  }
-  .readiness-step strong,
-  .readiness-step em {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .readiness-step strong {
-    color: #F2F2F2;
-  }
-  .readiness-step em {
-    color: #9E9E9E;
-    font-style: normal;
-  }
-  .readiness-step:hover,
-  .quick-actions button:hover:not(:disabled) {
+  .readiness-step:hover {
     border-color: #5B9BD5;
     color: #FFF;
-  }
-  .quick-actions button {
-    min-height: 28px;
-    padding: 5px 7px;
-  }
-  .quick-actions button:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
   .metric {
     min-height: 26px;

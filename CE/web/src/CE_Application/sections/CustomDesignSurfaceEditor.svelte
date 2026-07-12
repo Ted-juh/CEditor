@@ -29,12 +29,15 @@
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
+    CUSTOM_ASSISTANT_RECIPES,
+    CUSTOM_COMPONENT_STARTERS,
     createBackground,
     createBehaviorModule,
     createCustomComponentBlankBindingsDefaults,
     createCustomComponentBlankGeneratorsDefaults,
     createCustomComponentBlankHitZonesDefaults,
     createCustomComponentBlankPartsDefaults,
+    createCustomComponentStarterPatch,
     createHitZone,
     createPartNode,
     createText,
@@ -42,6 +45,7 @@
     createArpPatternChannel,
     makeInteractive,
   } from '../utils/customComponentFactory.js';
+  import { buildRecipePatch } from '../utils/customComponentRecipes.js';
   import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
@@ -50,7 +54,6 @@
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
   import { creatorMode } from '../stores/creatorMode.js';
-  import ConditionBuilder from './ConditionBuilder.svelte';
   import {
     ENVELOPE_SHAPE_PRESETS,
     RENDERER_COLOR_PRESETS,
@@ -310,6 +313,8 @@
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
   let interactiveFlyoutOpen = $state(false);
+  let starterFlyoutOpen = $state(false);
+  let assistantFlyoutOpen = $state(false);
   let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
@@ -388,13 +393,6 @@
   let bindingEntries = $derived(Object.entries(bindings?._children ?? {}));
   let generatorEntries = $derived(Object.entries(generators?._children ?? {}));
   let stateEntries = $derived(Object.entries(states?._children ?? {}));
-  // The state whose rule is editable in the States inspector tab — follows
-  // the filmstrip's previewed state.
-  let selectedInspectorStateName = $derived.by(() => {
-    const name = String(designer?.preview?.state ?? 'base');
-    return name !== 'base' && states?._children?.[name] ? name : '';
-  });
-  let selectedInspectorState = $derived(selectedInspectorStateName ? states?._children?.[selectedInspectorStateName] : null);
   let stateFilmstripEntries = $derived([
     { name: 'base', state: null, base: true },
     ...stateEntries.map(([name, state]) => ({ name, state, base: false })),
@@ -451,12 +449,13 @@
     return entries;
   });
 
+  // Dock inspector = per-object + spatial concerns only (Stage B8). The
+  // component-wide States/API/Bindings lists moved to their panel homes.
   const INSPECTOR_TABS = [
     { id: 'object', label: 'Object' },
     { id: 'display', label: 'Display' },
     { id: 'behavior', label: 'Behavior' },
-    { id: 'states', label: 'States' },
-    { id: 'device', label: 'Device' },
+    { id: 'states', label: 'Preview' },
   ];
 
   const RESIZE_HANDLES = [
@@ -653,6 +652,8 @@
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
     interactiveFlyoutOpen = false;
+    starterFlyoutOpen = false;
+    assistantFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
@@ -663,10 +664,45 @@
     event?.stopPropagation?.();
     interactiveFlyoutOpen = !interactiveFlyoutOpen;
     shapeFlyoutOpen = false;
+    starterFlyoutOpen = false;
+    assistantFlyoutOpen = false;
     if (interactiveFlyoutOpen && activeTool !== 'interactive') {
       setActiveTool('interactive');
       interactiveFlyoutOpen = true;
     }
+  }
+
+  // Starters + Assistant recipes moved here from the dissolved Designer tab
+  // (Stage B4) — creation flows live on the surface, not in a properties tab.
+  function toggleStarterFlyout(event) {
+    event?.stopPropagation?.();
+    starterFlyoutOpen = !starterFlyoutOpen;
+    assistantFlyoutOpen = false;
+    shapeFlyoutOpen = false;
+    interactiveFlyoutOpen = false;
+  }
+
+  function toggleAssistantFlyout(event) {
+    event?.stopPropagation?.();
+    assistantFlyoutOpen = !assistantFlyoutOpen;
+    starterFlyoutOpen = false;
+    shapeFlyoutOpen = false;
+    interactiveFlyoutOpen = false;
+  }
+
+  function applyStarterFromFlyout(event, starter) {
+    event?.stopPropagation?.();
+    starterFlyoutOpen = false;
+    if (!core?.id || !starter) return;
+    applyControlPatch(core.id, createCustomComponentStarterPatch(starter.id));
+  }
+
+  function applyRecipeFromFlyout(event, recipe) {
+    event?.stopPropagation?.();
+    assistantFlyoutOpen = false;
+    if (!core?.id || !recipe) return;
+    const patch = buildRecipePatch(control, recipe);
+    if (patch) applyControlPatch(core.id, patch);
   }
 
   function selectInteractiveArchetype(event, id) {
@@ -972,7 +1008,6 @@
       },
     });
     selectStateCard(name);
-    inspectorTab = 'states';
   }
 
   function setFilmstripStateWhen(stateName, flag, value) {
@@ -993,7 +1028,6 @@
       name: nextName,
     });
     selectStateCard(nextName);
-    inspectorTab = 'states';
   }
 
   function removeStateCard(name, event = null) {
@@ -4309,7 +4343,7 @@
                 {#if source.hasGenerator}
                   <button
                     type="button"
-                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source, 'Designer.focusSection': 'generators' }); }}
+                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
                     title={`Edit ${source.source} generator`}
                   >
                     Gen
@@ -4901,16 +4935,6 @@
                 {:else}
                   <div class="dock-note">Use hit zones to make artwork interactive. Selected artwork can still be animated by bindings and states.</div>
                 {/if}
-                <div class="mini-list">
-                  {#each behaviorEntries.slice(0, 6) as [name, behavior] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{behavior?.type ?? behavior?.role ?? 'behavior'} / {behavior?.valueChannel ?? 'no channel'}</span>
-                    </div>
-                  {:else}
-                    <div><span>No behaviors yet</span></div>
-                  {/each}
-                </div>
               </div>
             {:else if inspectorTab === 'states'}
               <div class="dock-section">
@@ -4935,77 +4959,7 @@
               </div>
               <div class="dock-section">
                 <div class="dock-section-title">States</div>
-                <div class="mini-list">
-                  {#each stateEntries.slice(0, 8) as [name, state] (name)}
-                    <button
-                      type="button"
-                      class="mini-state-row"
-                      class:active={String(designer?.preview?.state ?? 'base') === name}
-                      onclick={() => selectStateCard(name)}
-                      title={`Preview ${name}`}
-                    >
-                      <strong>{name}</strong>
-                      <span>{String(state?.rule ?? '').trim() || state?.label || state?.trigger || 'state'}</span>
-                    </button>
-                  {:else}
-                    <div><span>No states authored yet</span></div>
-                  {/each}
-                </div>
-              </div>
-              {#if selectedInspectorState}
-                <div class="dock-section">
-                  <div class="dock-section-title">Rule — {selectedInspectorStateName}</div>
-                  <div class="dock-hint">Activate this state from channel values — compound conditions welcome (e.g. level &gt; 0.5 and mode is A). Combined with the filmstrip's flag toggles.</div>
-                  <ConditionBuilder
-                    value={selectedInspectorState?.rule ?? ''}
-                    channels={valueChannelEntries.map(([name]) => name)}
-                    placeholder="no rule — flags only"
-                    onChange={(next) => updateControlProperty(core.id, `States.${selectedInspectorStateName}.rule`, next)}
-                  />
-                </div>
-              {/if}
-            {:else if inspectorTab === 'device'}
-              <div class="dock-section">
-                <div class="dock-section-title">Component API</div>
-                <label class="dock-field">
-                  <span>Selected Channel</span>
-                  <select value={designer?.selectedValueChannel ?? ''} onchange={(event) => updateControlProperty(core.id, 'Designer.selectedValueChannel', event.currentTarget.value)}>
-                    {#each valueChannelEntries as [name] (name)}
-                      <option value={name}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="dock-field">
-                  <span>Selected Behavior</span>
-                  <select value={designer?.selectedBehavior ?? ''} onchange={(event) => updateControlProperty(core.id, 'Designer.selectedBehavior', event.currentTarget.value)}>
-                    {#each behaviorEntries as [name] (name)}
-                      <option value={name}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <div class="mini-list">
-                  {#each valueChannelEntries.slice(0, 8) as [name, channel] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{channel?.type ?? 'value'} / {numberOr(channel?.min, 0)}-{numberOr(channel?.max, 127)}</span>
-                    </div>
-                  {:else}
-                    <div><span>No public channels yet</span></div>
-                  {/each}
-                </div>
-              </div>
-              <div class="dock-section">
-                <div class="dock-section-title">Bindings</div>
-                <div class="mini-list">
-                  {#each bindingEntries.slice(0, 6) as [name, binding] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{binding?.targetPart ?? binding?.part ?? 'target'} / {binding?.source ?? binding?.valueChannel ?? 'source'}</span>
-                    </div>
-                  {:else}
-                    <div><span>No bindings authored yet</span></div>
-                  {/each}
-                </div>
+                <div class="dock-note">States are authored on the filmstrip below the canvas and in the panel's States tab (rules, patches, coverage).</div>
               </div>
             {/if}
           </div>
@@ -5104,6 +5058,56 @@
           </div>
         {/if}
       </div>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          title="Starters — load a complete editable archetype into this component"
+          aria-haspopup="menu"
+          aria-expanded={starterFlyoutOpen}
+          onclick={toggleStarterFlyout}
+        >
+          <span class="tool-icon rectangle"></span>
+          <strong>Starters</strong>
+        </button>
+        {#if starterFlyoutOpen}
+          <div class="tool-flyout rich" role="menu" aria-label="Starter components">
+            {#each CUSTOM_COMPONENT_STARTERS as starter (starter.id)}
+              <button type="button" role="menuitem" title={starter.summary} onclick={(event) => applyStarterFromFlyout(event, starter)}>
+                <span class="rich-copy">
+                  <span>{starter.label}</span>
+                  <small>{starter.creates.join(' + ')}</small>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          title="Assistant — apply a setup recipe (uses the selected layer/channel)"
+          aria-haspopup="menu"
+          aria-expanded={assistantFlyoutOpen}
+          onclick={toggleAssistantFlyout}
+        >
+          <span class="tool-icon hitZone"></span>
+          <strong>Assistant</strong>
+        </button>
+        {#if assistantFlyoutOpen}
+          <div class="tool-flyout rich" role="menu" aria-label="Assistant recipes">
+            {#each CUSTOM_ASSISTANT_RECIPES as recipe (recipe.id)}
+              <button type="button" role="menuitem" title={recipe.summary} onclick={(event) => applyRecipeFromFlyout(event, recipe)}>
+                <span class="rich-copy">
+                  <span>{recipe.label}</span>
+                  <small>{recipe.group} · {recipe.creates.join(' + ')}</small>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
     {/if}
 
@@ -5116,7 +5120,7 @@
       {filmstripCollapsed}
       onToggleCollapsed={() => { filmstripCollapsed = !filmstripCollapsed; }}
       {selectStateCard}
-      onEditState={(name) => { inspectorTab = 'states'; selectStateCard(name); }}
+      onEditState={(name) => { selectStateCard(name); if (core?.id) updateControlProperty(core.id, 'Designer.focusSection', 'states'); }}
       {setFilmstripStateWhen}
       {duplicateStateCard}
       {removeStateCard}
@@ -5289,6 +5293,37 @@
     border-radius: 5px;
     background: #151B21;
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.42);
+  }
+
+  /* Starters/Assistant flyouts: two-line entries, scroll when long. */
+  .tool-flyout.rich {
+    width: 236px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+
+  .tool-flyout.rich button {
+    height: auto;
+    min-height: 36px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 5px 7px;
+  }
+
+  .rich-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .rich-copy small {
+    color: #7E8B98;
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   .tool-flyout button {
@@ -6519,33 +6554,6 @@
 
   .mini-list strong {
     color: #D4DEE7;
-  }
-
-  .mini-list .mini-state-row {
-    display: grid;
-    grid-template-columns: minmax(0, 0.85fr) minmax(0, 1fr);
-    gap: 8px;
-    align-items: center;
-    min-height: 27px;
-    padding: 5px 7px;
-    border: 1px solid #2A3036;
-    border-radius: 4px;
-    background: #15191D;
-    color: #87939E;
-    font-size: 10px;
-    font-family: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .mini-list .mini-state-row:hover {
-    border-color: #5B9BD5;
-  }
-
-  .mini-list .mini-state-row.active {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #C7D9EA;
   }
 
   .dock-hint {

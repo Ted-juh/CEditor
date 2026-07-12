@@ -210,13 +210,20 @@
 
   function openPublicApiEditor() {
     if (!core?.id) return;
-    // Switch the merged API editor to its contract (authoring) mode.
-    updateControlProperty(core.id, 'Designer.focusApiMode', 'contract');
+    // Jump to the author-side Publish tab in contract mode (opens the
+    // Designer workspace first when needed — Stage A6 rule).
+    applyControlPatch(core.id, {
+      'Designer.focusSection': 'publish',
+      'Designer.focusApiMode': 'contract',
+    });
   }
 
   function openDesignerEditor() {
     if (!core?.id) return;
-    updateControlProperty(core.id, 'Designer.focusSection', 'designer');
+    applyControlPatch(core.id, {
+      'Designer.focusSection': 'publish',
+      'Designer.focusApiMode': 'package',
+    });
   }
 </script>
 
