@@ -171,5 +171,6 @@ export function scrubRangeValue(behavior = null, startValue = 0, startClient = {
   }
 
   const stepDelta = Math.trunc(primaryDelta / pixelsPerStep);
-  return adjustRangeValue(behavior, startValue, 1, stepDelta);
+  if (stepDelta === 0) return snapRangeValue(behavior, startValue);
+  return adjustRangeValue(behavior, startValue, stepDelta < 0 ? -1 : 1, Math.abs(stepDelta));
 }

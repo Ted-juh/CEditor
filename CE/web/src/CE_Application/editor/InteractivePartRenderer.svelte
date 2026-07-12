@@ -575,6 +575,21 @@
     pointer-events: none;
   }
 
+  /* Editable value field — make editing visually obvious (caret + focus highlight). */
+  .interactive-part-input {
+    caret-color: currentColor;
+  }
+
+  .interactive-part-input:focus {
+    outline: 1px solid rgba(120, 180, 255, 0.9);
+    outline-offset: -1px;
+    background: rgba(120, 180, 255, 0.14) !important;
+  }
+
+  .interactive-part-input::selection {
+    background: rgba(120, 180, 255, 0.45);
+  }
+
   .interactive-value-arc {
     position: absolute;
     inset: 0;

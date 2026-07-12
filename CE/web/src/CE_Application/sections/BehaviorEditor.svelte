@@ -25,6 +25,10 @@
   let showSubtypeSelector = $derived(buttonType !== 'radio' && buttonType !== 'combobox');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
   let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
+  let isRangeSpinbox = $derived(
+    String(behavior?.family ?? '').trim().toLowerCase() === 'range'
+    && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox'
+  );
 
   function inferButtonType(controlType = '') {
     switch (String(controlType ?? '')) {
@@ -91,6 +95,23 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+
+  {#if isRangeSpinbox}
+    <PropertySection title="Value">
+      <PropertyCell label="Min" span={2} hint="Minimum value.">
+        <NumberInput value={behavior.min ?? 0} step={1} onchange={(value) => set('min', value)} />
+      </PropertyCell>
+      <PropertyCell label="Max" span={2} hint="Maximum value.">
+        <NumberInput value={behavior.max ?? 100} step={1} onchange={(value) => set('max', value)} />
+      </PropertyCell>
+      <PropertyCell label="Step" span={2} hint="Increment per step / stepper click.">
+        <NumberInput value={behavior.step ?? 1} step={1} min={0} onchange={(value) => set('step', value)} />
+      </PropertyCell>
+      <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
+        <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 
   {#if buttonType === 'momentary'}
     <PropertySection title="Momentary">

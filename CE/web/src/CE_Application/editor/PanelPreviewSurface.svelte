@@ -709,7 +709,7 @@
   function handleRangeFieldKeyDown(control, event) {
     event.stopPropagation();
 
-    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
       adjustRangeFromKey(control, event.key);
       return;
@@ -804,6 +804,12 @@
         case 'ArrowUp':
           nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01));
           break;
+        case 'PageDown':
+          nextValue = snapSliderValue(behavior, nextValue - numberOr(behavior?.step, 0.01) * 10);
+          break;
+        case 'PageUp':
+          nextValue = snapSliderValue(behavior, nextValue + numberOr(behavior?.step, 0.01) * 10);
+          break;
         default:
           return;
       }
@@ -828,6 +834,12 @@
       case 'ArrowRight':
       case 'ArrowUp':
         nextValue = adjustRangeValue(behavior, nextValue, 1);
+        break;
+      case 'PageDown':
+        nextValue = adjustRangeValue(behavior, nextValue, -1, 10);
+        break;
+      case 'PageUp':
+        nextValue = adjustRangeValue(behavior, nextValue, 1, 10);
         break;
       default:
         return;
@@ -1392,6 +1404,13 @@
         focused: true,
         hover: true,
       });
+      adjustRangeFromKey(control, event.key);
+    }
+
+    if ((event.key === 'PageUp' || event.key === 'PageDown') && isRangeControl(control) && !isCustomComponent(control)) {
+      event.preventDefault();
+      event.currentTarget?.focus?.();
+      patchControlSession(controlId, { focused: true, hover: true });
       adjustRangeFromKey(control, event.key);
     }
   }
