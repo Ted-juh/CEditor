@@ -13,8 +13,27 @@
 > **Status (2026-07-12):** W0's *restoration* half is done — the readiness strip, smart guides,
 > align/distribute/measure, cheatsheet, and Make Interactive + halo are all back on main (see
 > the status banner in `cc-designer-workspace-review.md`); the *decomposition* half remains
-> open. **Stage B2's and Stage C's dependencies are satisfied. Stages A–D are all still
-> unimplemented** — the panel still shows the full ~20-tab pile in both contexts.
+> open.
+>
+> **STATUS UPDATE (2026-07-12, later the same day): ALL FOUR STAGES SHIPPED** (commits
+> `c07cdfb` A · `15638c0` B · `1c1ece7` C · `18a9e82` D), browser-verified on the stress
+> panel. Target state achieved: instance context = 9 tabs incl. the new Properties tab;
+> author context = Interact · React · Assets · Publish · Test Bench (+ generic tabs, per A1's
+> explicit `both` assignments — §0's shorter author table was the summary). Deviations from
+> the letter of the plan, same intent:
+> - **Chrome prerequisite the plan missed:** owned-chrome workspaces hid the properties panel
+>   entirely, which would have made the author tab set unreachable — the component workspace
+>   now keeps (forces) the properties panel as the author inspector (`workspaceChrome.js`).
+> - **C2 partial:** cluster cards use their own compact field markup writing the same
+>   dot-paths; the Advanced flat lists embed the three original editors unchanged rather than
+>   being rebuilt over shared field components. Full field-group extraction rides §12.5.
+> - **B4:** starters + assistant recipes are tool-strip flyouts (patch builders extracted to
+>   `customComponentRecipes.js`), not a Make-Interactive-flyout group/toolbar popover.
+> - **B6:** the Preview Workbench was not moved verbatim — the bench's State Preview section
+>   (renamed "Preview Workbench") already covered its content.
+> - **D3:** preset/template walls collapse behind a "Show presets" disclosure beside Add,
+>   rather than a popover picker. `testbench` keeps its id and "Test Bench" label (rename was
+>   optional).
 > **Nothing here changes the data model or removes capability** — every stage is view-layer
 > regrouping, consistent with the redesign plan's principles (progressive disclosure, one home
 > per concept, backward compatible).
