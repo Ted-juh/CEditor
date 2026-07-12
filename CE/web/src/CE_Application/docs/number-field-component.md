@@ -1,8 +1,11 @@
 # Number Field / Stepper — Findings & Spec
 
-> Status: **spec — smaller than it looked.** Number entry + steppers is *already*
-> provided by the Range/spinbox; the gap is naming/discoverability and an optional
-> bare variant. Part of the [panel parts backlog](./README.md); see
+> Status: **implemented** (model layer). `Number` is a new `controlType` reusing
+> the Range/spinbox engine (family=range, role=spinbox, decrement/valueField/
+> increment parts) — no renderer/interaction changes. Done in `componentTypes.js`
+> (Number, 96×34), `interactionDefaults.js` (Range branches now serve Number),
+> `componentPorts.js` (value port), `IconPanel.svelte` (palette). Verified via
+> `createControl('Number')`. Part of the [panel parts backlog](./README.md); see
 > [component-gaps.md](./component-gaps.md).
 
 ## Key finding: Range already IS a number field with steppers

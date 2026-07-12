@@ -28,12 +28,13 @@ out cheaply. Two engine-level prerequisites gate the most — do them early.
 The two above. Plus confirm/extend the routing model
 ([link-mapper-component.md](./link-mapper-component.md)) for fan-out.
 
-### Phase 1 — quick wins (zero new foundations)
-Ship immediately, pure engine-reuse:
-- **Knob** (circular slider preset) · **Number** (Range engine) · **Group/Frame**
-  · **Image**. Each is a few files ([knob-component.md](./knob-component.md),
+### Phase 1 — quick wins (zero new foundations) — ✅ DONE (model layer)
+Shipped, pure engine-reuse:
+- **Knob** ✅ (circular slider) · **Number** ✅ (Range engine) · **Group/Frame** ✅
+  · **Image** ✅. ([knob-component.md](./knob-component.md),
   [number-field-component.md](./number-field-component.md),
-  [remaining-components.md](./remaining-components.md)).
+  [remaining-components.md](./remaining-components.md)). Visual QA pending a
+  running build (no `node_modules` in this environment).
 
 ### Phase 2 — capabilities (the unlocks)
 - **Fan-out binding / Link Mapper** → Macro, mod matrix, vector pad, crossfader,

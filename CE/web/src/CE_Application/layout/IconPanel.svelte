@@ -86,6 +86,8 @@
       { type: 'Background',      icon: Square,             label: 'Insert Background' },
       { type: 'Label',           icon: Type,               label: 'Insert Label' },
       { type: 'Container',       icon: Container,          label: 'Insert Container' },
+      { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
+      { type: 'Image',           icon: Square,             label: 'Insert Image' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
@@ -98,6 +100,7 @@
     ],
     [
       { type: 'Range',           icon: SlidersHorizontal,   label: 'Insert Range' },
+      { type: 'Number',          icon: RectangleHorizontal, label: 'Insert Number' },
       { type: 'Slider',          icon: SlidersVertical,     label: 'Insert Slider' },
       { type: 'Knob',            icon: CircleDot,           label: 'Insert Knob' },
       { type: 'CustomComponent', icon: Container,           label: 'Insert Custom Component' },

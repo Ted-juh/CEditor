@@ -358,6 +358,16 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Number: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Number'),
+    defaultOverrides: {
+      Transform: { width: 96, height: 34 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Number'),
+    },
+  },
+
   Slider: {
     sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
     ports: getComponentPorts('Slider'),
@@ -435,6 +445,44 @@ export const COMPONENT_TYPES = {
     defaultOverrides: {
       Transform: { width: 300, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },
+    },
+  },
+
+  Group: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Grid', 'Children'],
+    defaultOverrides: {
+      Transform: { width: 260, height: 180 },
+      Background: {
+        _children: {
+          Fill: { colour: '11FFFFFF' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      Text: { content: 'Group' },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'top',
+        paddingLeft: 10,
+        paddingRight: 10,
+        paddingTop: 4,
+        paddingBottom: 4,
+      },
+      Grid: { enabled: true, snap: true, size: 10 },
+    },
+  },
+
+  Image: {
+    sections: ['Background', 'Effects'],
+    defaultOverrides: {
+      Transform: { width: 160, height: 120 },
+      Background: {
+        _children: {
+          Fill: { solidEnabled: false, imageEnabled: true, imageFit: 'contain', colour: '00000000' },
+          Border: { enabled: false },
+        },
+      },
     },
   },
 

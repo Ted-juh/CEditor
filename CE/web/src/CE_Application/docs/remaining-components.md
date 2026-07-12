@@ -58,10 +58,14 @@ the cross-cutting capabilities. Tags: `[new]` = needs new code; `[engine-reuse]`
 - **Files:** `componentTypes` (TabContainer), Children/layout, `componentPorts`
   (pageIndex), `IconPanel`, renderer.
 
-### Group / Frame (titled) `[engine-reuse]`
+### Group / Frame (titled) `[engine-reuse]` — **implemented (model)**
 - **What:** a Container with a **titled border/chrome** (a labeled box).
 - **Reuse:** Container + Background/Border + a title label inset into the border.
 - **New:** title-chrome rendering. Its own entry reusing the Container engine.
+- **Done:** `Group` controlType (Background+Text+Icon+Effects+ContentLayout+Grid+
+  Children; border on, title "Group", top-left) + `IconPanel` entry. Title
+  inset-into-border chrome is a later renderer polish; the bordered titled box
+  works via existing sections.
 
 ### Scroll Area `[new]`
 - **What:** a clipping container with a scrollbar for oversized content.
@@ -78,12 +82,15 @@ the cross-cutting capabilities. Tags: `[new]` = needs new code; `[engine-reuse]`
   capability; effectively the **Meter in determinate mode**. Its own entry if
   wanted, else a Meter preset.
 
-### Image Display `[engine-reuse]`
+### Image Display `[engine-reuse]` — **implemented (model)**
 - **What:** a standalone image (logo, device photo, decoration).
 - **Reuse:** the existing image-fill rendering (`Background`/`Icon`,
   `ImageFileFormat`/`PNGImageFormat` in C++). `Icon` is a section today; surface a
   placeable Image.
 - **New:** just a placeable wrapper.
+- **Done:** `Image` controlType (Background+Effects; Fill `imageEnabled:true`,
+  `solidEnabled:false`, `imageFit:'contain'`, no border) + `IconPanel` entry. User
+  sets `imageSrc`.
 
 ### Shape Primitives `[engine-reuse / partly exists]`
 - **What:** vector shapes (rect / ellipse / line / polygon / path) for decoration

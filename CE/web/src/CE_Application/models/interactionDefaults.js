@@ -431,7 +431,7 @@ export function createBehaviorDefaults(type) {
     return behavior;
   }
 
-  if (type === 'Range') {
+  if (type === 'Range' || type === 'Number') {
     return {
       _type: 'Behavior',
       family: 'range',
@@ -648,7 +648,7 @@ export function createStatesDefaults(type) {
     };
   }
 
-  if (type === 'Range') {
+  if (type === 'Range' || type === 'Number') {
     return {
       _type: 'States',
       enabled: true,
@@ -766,7 +766,7 @@ export function createBindingsDefaults(type) {
     };
   }
 
-  if (type === 'Range') {
+  if (type === 'Range' || type === 'Number') {
     return {
       _type: 'Bindings',
       enabled: true,
@@ -829,7 +829,7 @@ export function createAnimationsDefaults(type) {
     };
   }
 
-  if (type === 'Range') {
+  if (type === 'Range' || type === 'Number') {
     return {
       _type: 'Animations',
       enabled: true,
@@ -885,7 +885,7 @@ export function createAnimationsDefaults(type) {
 }
 
 export function createPartsDefaults(type) {
-  if (type === 'Range') {
+  if (type === 'Range' || type === 'Number') {
     return rangeParts();
   }
 
