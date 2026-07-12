@@ -5018,7 +5018,7 @@
       {filmstripCollapsed}
       onToggleCollapsed={() => { filmstripCollapsed = !filmstripCollapsed; }}
       {selectStateCard}
-      onEditState={(name) => { selectStateCard(name); if (core?.id) updateControlProperty(core.id, 'Designer.focusSection', 'states'); }}
+      onEditState={(name) => { selectStateCard(name); if (core?.id) applyControlPatch(core.id, { 'Designer.focusSection': 'react', 'Designer.focusReactPane': 'states' }); }}
       {setFilmstripStateWhen}
       {duplicateStateCard}
       {removeStateCard}

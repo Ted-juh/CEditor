@@ -10,6 +10,10 @@
   // instance Properties tab).
   let { control = null, showActivePicker = true } = $props();
 
+  // Preset/template cards are an add-time aid (Stage D3): collapsed by
+  // default so the editor keeps only live content on screen.
+  let showPresetGrid = $state(false);
+
   let core = $derived(getSection(control, 'Core'));
   let variants = $derived(getSection(control, 'Variants'));
   let parts = $derived(getSection(control, 'Parts'));
@@ -297,6 +301,8 @@
       </div>
     </PropertyCell>
     <PropertyCell label="Starter Variants" span={4} hint="Create common variant patches without hand-writing JSON.">
+      <button class="preset-disclosure" type="button" onclick={() => showPresetGrid = !showPresetGrid}>{showPresetGrid ? "Hide" : "Show"} starter variants ▾</button>
+      {#if showPresetGrid}
       <div class="preset-grid">
         {#each variantPresets as preset}
           <button class="preset-btn" type="button" onclick={() => applyVariantPreset(preset)}>
@@ -305,6 +311,7 @@
           </button>
         {/each}
       </div>
+      {/if}
     </PropertyCell>
   </PropertySection>
 
@@ -401,4 +408,21 @@
   .preset-btn:hover { border-color: #5B9BD5; color: #FFF; }
   .preset-btn strong { color: #E0E0E0; }
   .preset-btn span { color: #999; line-height: 1.3; }
+  .preset-disclosure {
+    width: fit-content;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #BBB;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .preset-disclosure:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
 </style>

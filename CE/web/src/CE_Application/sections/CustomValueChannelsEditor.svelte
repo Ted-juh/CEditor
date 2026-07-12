@@ -9,6 +9,10 @@
 
   let { control = null } = $props();
 
+  // Preset/template cards are an add-time aid (Stage D3): collapsed by
+  // default so the editor keeps only live content on screen.
+  let showPresetGrid = $state(false);
+
   let core = $derived(getSection(control, 'Core'));
   let designer = $derived(getSection(control, 'Designer'));
   let channels = $derived(getSection(control, 'ValueChannels'));
@@ -233,6 +237,8 @@
         </div>
       </PropertyCell>
       <PropertyCell label="Presets" span={4} hint="Apply common channel shapes without manually setting type, min/max, step, and formatting.">
+        <button class="preset-disclosure" type="button" onclick={() => showPresetGrid = !showPresetGrid}>{showPresetGrid ? "Hide" : "Show"} channel presets ▾</button>
+        {#if showPresetGrid}
         <div class="preset-grid">
           {#each CHANNEL_PRESETS as preset}
             <button class="preset-card" type="button" onclick={() => applyPreset(preset)}>
@@ -242,6 +248,7 @@
             </button>
           {/each}
         </div>
+        {/if}
       </PropertyCell>
     </PropertySection>
 
@@ -627,4 +634,21 @@
   .action-btn:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
   .action-btn.danger:hover:not(:disabled) { border-color: #D56B6B; }
   .action-btn:disabled { opacity: 0.4; cursor: default; }
+  .preset-disclosure {
+    width: fit-content;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #BBB;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .preset-disclosure:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
 </style>

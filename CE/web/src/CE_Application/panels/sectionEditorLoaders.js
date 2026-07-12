@@ -35,8 +35,11 @@ const LAZY_COMPONENT_LOADERS = {
   // Interact = Channels + Behaviors + Hit Zones as cluster cards (Stage C);
   // the flat editors live inside it as the Advanced escape hatch.
   interact: () => import('../sections/CustomInteractEditor.svelte'),
+  // React = Bindings + Links + States + Animations under one sub-nav for
+  // custom components (Stage D1); the standalone editors stay for other
+  // controls and are embedded by CustomReactEditor.
+  react: () => import('../sections/CustomReactEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
-  links: () => import('../sections/CustomLinksEditor.svelte'),
   // Publish = contract + variant definitions + package/library (Stage B1);
   // the instance-facing "Values" half lives in the `properties` tab (Stage A).
   publish: () => import('../sections/CustomPublishEditor.svelte'),

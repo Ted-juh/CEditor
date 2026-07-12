@@ -30,13 +30,11 @@ creatorMode.subscribe((mode) => {
   }
 });
 
-// Property-panel tabs Simple mode hides for custom components. These are the
-// remaining raw-graph list managers; Interact/Publish handle the common path
-// (Interact additionally gates its own flat lists on Advanced).
-export const CREATOR_SIMPLE_HIDDEN_TABS = new Set([
-  'bindings',
-  'links',
-]);
+// Property-panel tabs Simple mode hides for custom components. After the
+// A–D restructure every raw-graph list manager lives inside Interact/React/
+// Publish, which gate their own advanced content — so no whole tabs hide
+// anymore. Kept as the hook for future coarse-grained hiding.
+export const CREATOR_SIMPLE_HIDDEN_TABS = new Set([]);
 
 export function toggleCreatorMode() {
   creatorMode.update((mode) => (mode === 'simple' ? 'advanced' : 'simple'));

@@ -43,6 +43,7 @@
     if (tabId === 'behavior') return { control };
     if (tabId === 'states') return { control };
     if (tabId === 'bindings') return { control };
+    if (tabId === 'react') return { control };
     if (tabId === 'devicebindings') return { control };
     if (tabId === 'animations') return { control };
     if (tabId === 'segments') return { control, stateTargetKey };
