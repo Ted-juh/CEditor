@@ -8,7 +8,7 @@
   let tab = $state('shortcuts');
 
   const SHORTCUT_CHEATSHEET = [
-    { keys: 'V R U O G A C H T L', action: 'Draw tools: Select, Rectangle, Rounded, Ellipse, Ring, Arc, Capsule, Hit Zone, Text, Line' },
+    { keys: 'V R U O G A C H I T L', action: 'Draw tools: Select, Rectangle, Rounded, Ellipse, Ring, Arc, Capsule, Hit Zone, Interactive, Text, Line' },
     { keys: 'Esc', action: 'Cancel draw → back to Select → clear selection (closes this overlay first)' },
     { keys: 'Tab / Shift+Tab', action: 'Cycle layers (Alt+Tab cycles hit zones)' },
     { keys: 'Arrows / Shift+Arrows', action: 'Nudge selection by 1px / 10px' },

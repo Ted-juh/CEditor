@@ -15,6 +15,7 @@
     Scissors,
     Trash2,
     Unlock,
+    Zap,
   } from 'lucide-svelte';
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
@@ -39,7 +40,9 @@
     createText,
     createValueChannel,
     createArpPatternChannel,
+    makeInteractive,
   } from '../utils/customComponentFactory.js';
+  import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
@@ -298,7 +301,7 @@
       && (selectedPart?.generated === true || selectedPart?.meta?.generated === true)
   );
   let selectedFrame = $derived(selectedPart ? partFrame(selectedPart) : null);
-  let selectedZoneFrame = $derived(selectedZone ? zoneFrame(selectedZone) : null);
+  let selectedZoneFrame = $derived(selectedZone ? displayZoneFrame(selectedZone) : null);
   let activeFrame = $state(null);
   let activeLayerFrames = $state({});
   let activeZoneFrame = $state(null);
@@ -475,6 +478,7 @@
     { id: 'arcTrack', label: 'Arc', key: 'A' },
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
+    { id: 'interactive', label: 'Interactive', key: 'I' },
     { id: 'text', label: 'Text', key: 'T' },
     // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
     { id: 'line', label: 'Line', key: 'L' },
@@ -1161,8 +1165,150 @@
     return zone;
   }
 
+  // "Make Interactive" scaffolding (§3 archetypes): one action creates the
+  // visual part(s) plus the channel + behavior + hit-zone set from
+  // makeInteractive(), pre-wired.
+  function nextInteractiveBaseName(archetypeId) {
+    const taken = [
+      ...authoredPartNames,
+      ...Object.keys(authoredHitZones?._children ?? {}),
+      ...Object.keys(valueChannels?._children ?? {}),
+      ...Object.keys(behaviors?._children ?? {}),
+    ];
+    // Reserve the whole generated-name family (base, baseValue, baseZone,
+    // baseMinHandle, ...) by refusing any base that prefixes an existing name.
+    let index = 1;
+    let candidate = archetypeId;
+    while (taken.some((name) => name === candidate || name.startsWith(candidate))) {
+      index += 1;
+      candidate = `${archetypeId}${index}`;
+    }
+    return candidate;
+  }
+
+  function interactivePixelLayout(frame) {
+    return {
+      x: Math.round(frame.x),
+      y: Math.round(frame.y),
+      width: Math.round(Math.max(8, frame.width)),
+      height: Math.round(Math.max(8, frame.height)),
+      xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px',
+      anchorX: 'left', anchorY: 'top',
+    };
+  }
+
+  function rangeHandleParts(base, frame, geometry, zIndexStart) {
+    const thickness = 12;
+    const frames = geometry === 'vertical'
+      ? [
+        { x: frame.x, y: frame.y + frame.height * 0.75 - thickness / 2, width: frame.width, height: thickness },
+        { x: frame.x, y: frame.y + frame.height * 0.25 - thickness / 2, width: frame.width, height: thickness },
+      ]
+      : [
+        { x: frame.x + frame.width * 0.25 - thickness / 2, y: frame.y, width: thickness, height: frame.height },
+        { x: frame.x + frame.width * 0.75 - thickness / 2, y: frame.y, width: thickness, height: frame.height },
+      ];
+    const handles = {};
+    [`${base}MinHandle`, `${base}MaxHandle`].forEach((name, index) => {
+      handles[name] = createPartNode(name, {
+        kind: 'rectangle',
+        role: 'handle',
+        zIndex: zIndexStart + index,
+        layout: interactivePixelLayout(frames[index]),
+        sections: {
+          Background: createBackground('FF5B9BD5', { borderEnabled: true, borderColour: '55FFFFFF', borderThickness: 1, radius: 3 }),
+        },
+      });
+    });
+    return handles;
+  }
+
+  // Build the patch for one interactive archetype. `frame` is the control's
+  // pixel rect; with `existingPartName` the scaffold wires onto that part
+  // instead of creating a new face part.
+  function buildInteractivePatch(archetypeId, frame, existingPartName = '') {
+    const base = nextInteractiveBaseName(archetypeId);
+    const geometry = ['slider', 'range'].includes(archetypeId)
+      ? (frame.height > frame.width ? 'vertical' : 'horizontal')
+      : undefined;
+
+    const newParts = {};
+    let zIndex = authoredPartNames.length + 1;
+    let partName = existingPartName;
+    if (!partName) {
+      partName = base;
+      const circle = archetypeId === 'dial';
+      newParts[partName] = createPartNode(partName, {
+        kind: circle ? 'circle' : 'rectangle',
+        role: archetypeId,
+        zIndex: zIndex++,
+        layout: interactivePixelLayout(frame),
+        sections: {
+          Background: createBackground('FF3A3F46', {
+            borderEnabled: true,
+            borderColour: 'FF5B9BD5',
+            borderThickness: 1,
+            radius: circle ? 999 : 6,
+          }),
+        },
+      });
+    }
+
+    const options = { name: base, partName, geometry };
+    if (archetypeId === 'range') {
+      Object.assign(newParts, rangeHandleParts(base, frame, geometry, zIndex));
+      options.minPart = `${base}MinHandle`;
+      options.maxPart = `${base}MaxHandle`;
+    }
+
+    const wired = makeInteractive(archetypeId, options);
+    if (!wired) return null;
+
+    const patch = {};
+    for (const [name, part] of Object.entries(newParts)) patch[`Parts.${name}`] = part;
+    for (const [name, channel] of Object.entries(wired.valueChannels)) patch[`ValueChannels.${name}`] = channel;
+    for (const [name, behavior] of Object.entries(wired.behaviors)) patch[`Behaviors.${name}`] = behavior;
+    for (const [name, zone] of Object.entries(wired.hitZones)) patch[`HitZones.${name}`] = zone;
+    return { patch, partName, base };
+  }
+
+  function commitInteractiveDraw(rect) {
+    const built = buildInteractivePatch(interactiveArchetype, { x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+    if (!built) return;
+    localSelectedLayerNames = [built.partName];
+    applyControlPatch(core.id, {
+      ...built.patch,
+      'Designer.selectedLayer': built.partName,
+      'Designer.selectedLayers': [built.partName],
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+      'Designer.preview.showHitZones': true,
+    });
+    activeTool = 'select';
+    zoneDisplayMode = 'all';
+    lastDrawCreatedAt = Date.now();
+    pulseSelection(`layer:${built.partName}`);
+  }
+
+  function makeSelectedLayerInteractive() {
+    if (!core?.id || !selectedLayer || !canManageLayer || !selectedFrame) return;
+    const frame = { x: selectedFrame.left, y: selectedFrame.top, width: selectedFrame.width, height: selectedFrame.height };
+    const built = buildInteractivePatch(interactiveArchetype, frame, selectedLayer);
+    if (!built) return;
+    applyControlPatch(core.id, {
+      ...built.patch,
+      'Designer.preview.showHitZones': true,
+    });
+    zoneDisplayMode = 'all';
+    pulseSelection(`layer:${selectedLayer}`);
+  }
+
   function commitDrawnFrame(tool, rect, event = null) {
     if (!core?.id || !rect) return;
+    if (tool === 'interactive') {
+      commitInteractiveDraw(rect);
+      return;
+    }
     if (tool === 'hitZone') {
       const zone = makeDrawnHitZone(rect, event?.shiftKey ? 'circle' : 'rectangle');
       applyControlPatch(core.id, {
@@ -1588,10 +1734,23 @@
     return zoneFrameBase(zone, artboardWidth, artboardHeight);
   }
 
+  function isFollowZone(zone) {
+    return String(zone?.source ?? 'independent') !== 'independent';
+  }
+
+  // Follow-mode zones live where their source part (or the face) is, grown by
+  // inflate/minTouch — the runtime ignores their authored bounds, so the
+  // surface must show the resolved grab area instead.
+  function displayZoneFrame(zone) {
+    if (!isFollowZone(zone)) return zoneFrame(zone);
+    const resolved = customHitZoneRect(zone, { width: artboardWidth, height: artboardHeight }, parts?._children ?? null);
+    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
+  }
+
   function hitZoneStyle(name, zone) {
     const frame = activeSelectionKind === 'hitZone' && name === selectedHitZone && activeZoneFrame
       ? activeZoneFrame
-      : zoneFrame(zone);
+      : displayZoneFrame(zone);
     return hitZoneStyleBase(frame, zone);
   }
 
@@ -2739,6 +2898,9 @@
     event.stopPropagation();
     selectHitZone(name);
     if (!isEditableZone(authoredHitZones?._children?.[name])) return;
+    // Follow-mode zones derive their rect from the source part — moving the
+    // overlay would be meaningless, so select-only.
+    if (isFollowZone(zone)) return;
     const frame = zoneFrame(zone);
     interaction = {
       type: 'zoneMove',
@@ -3942,16 +4104,17 @@
                   class:dimmed={zoneDisplayMode === 'dim' && !(activeSelectionKind === 'hitZone' && selectedHitZone === name)}
                   class:locked={activeSelectionKind === 'hitZone' && selectedHitZone === name && !selectedZoneEditable}
                   class:pulse={selectionPulseTarget === `zone:${name}`}
+                  class:follow={isFollowZone(zone)}
                   type="button"
                   style={hitZoneStyle(name, zone)}
-                  title={`${name}: ${zone?.action ?? 'action'}`}
+                  title={`${name}: ${zone?.action ?? 'action'}${isFollowZone(zone) ? ` — grab area follows ${String(zone.source) === 'face' ? 'the face' : String(zone.source).slice('part:'.length)}` : ''}`}
                   onclick={(event) => { event.stopPropagation(); selectHitZone(name); }}
                   onpointerenter={() => setSurfaceHover('hitZone', name)}
                   onpointerleave={() => clearSurfaceHover('hitZone', name)}
                   onmousedown={(event) => beginZoneMove(name, zone, event)}
                 >
                   <span class="selection-label">{name}</span>
-                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable}
+                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable && !isFollowZone(zone)}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       <span
                         class="resize-handle"
@@ -4028,6 +4191,14 @@
               </button>
               <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
                 B
+              </button>
+              <button
+                type="button"
+                onclick={makeSelectedLayerInteractive}
+                disabled={!canManageLayer}
+                title={`Make interactive: ${activeInteractiveMeta.label} — scaffold a wired channel + behavior + grab zone on this layer`}
+              >
+                <Zap size={13} aria-hidden="true" />
               </button>
               <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
                 {#if selectedAuthoredPart?.locked === true}
@@ -7097,6 +7268,32 @@
     border-color: rgba(229, 160, 41, 0.42);
     background: rgba(229, 160, 41, 0.045);
     opacity: 0.55;
+  }
+
+  /* Follow-mode zones show the resolved grab area (source part + inflate +
+     minTouch) as a teal halo — distinct from authored amber zones. */
+  .hit-zone.follow {
+    border: 1px dashed rgba(45, 212, 191, 0.9);
+    background: rgba(45, 212, 191, 0.07);
+    color: #C8FFF6;
+    box-shadow:
+      0 0 0 3px rgba(45, 212, 191, 0.12),
+      0 0 14px rgba(45, 212, 191, 0.18);
+  }
+
+  .hit-zone.follow.selected {
+    border-width: 2px;
+    background: rgba(45, 212, 191, 0.16);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.55),
+      0 0 0 4px rgba(45, 212, 191, 0.16),
+      0 0 18px rgba(45, 212, 191, 0.26);
+  }
+
+  .hit-zone.follow > .selection-label {
+    background: rgba(10, 56, 50, 0.96);
+    border-color: rgba(45, 212, 191, 0.4);
+    color: #C8FFF6;
   }
 
   .hit-zone.selected {
