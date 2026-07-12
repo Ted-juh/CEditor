@@ -362,7 +362,7 @@ export const COMPONENT_TYPES = {
     sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
     ports: getComponentPorts('Number'),
     defaultOverrides: {
-      Transform: { width: 96, height: 34 },
+      Transform: { width: 132, height: 38 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
       ...createDefaultInteractiveSections('Number'),
     },
