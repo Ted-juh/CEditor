@@ -198,6 +198,12 @@
       `justify-content:${justifyContentFor(textPosition?.justification)}`,
       'align-items:center',
       'display:flex',
+      // The part Background renders as position:absolute fill layers, which are
+      // positioned descendants. A non-positioned text block would be painted
+      // *under* them (CSS paint order), hiding the glyphs. Promote the text to
+      // its own positioned level so it always draws above the fill.
+      'position:relative',
+      'z-index:2',
       'height:100%',
       'line-height:1',
       'padding:0 8px',

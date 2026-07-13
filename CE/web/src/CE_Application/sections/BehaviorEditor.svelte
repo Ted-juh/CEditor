@@ -29,6 +29,10 @@
     String(behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox'
   );
+  let parts = $derived(getSection(control, 'Parts'));
+  let valueFontSize = $derived(
+    numberOr(parts?._children?.valueField?._children?.Text?._children?.Font?.size, 12)
+  );
 
   function inferButtonType(controlType = '') {
     switch (String(controlType ?? '')) {
@@ -42,6 +46,11 @@
     }
   }
 
+  function numberOr(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
   function set(prop, value) {
     if (!core?.id) return;
     const path = `Behavior.${prop}`;
@@ -49,6 +58,16 @@
       updateSelectedProperty(path, value);
     } else {
       updateControlProperty(core.id, path, value);
+    }
+  }
+
+  // The spinbox glyphs (−, value, +) live in separate parts. Keeping them a
+  // single uniform size is the sensible default; drive all three from one cell.
+  function setValueFontSize(value) {
+    if (!core?.id) return;
+    const size = Math.max(4, numberOr(value, 12));
+    for (const partName of ['decrement', 'valueField', 'increment']) {
+      updateControlProperty(core.id, `Parts.${partName}.Text.Font.size`, size);
     }
   }
 
@@ -109,6 +128,9 @@
       </PropertyCell>
       <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
         <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
+      </PropertyCell>
+      <PropertyCell label="Font Size" span={2} hint="Height (px) of the value and ± button glyphs.">
+        <NumberInput value={valueFontSize} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
       </PropertyCell>
     </PropertySection>
   {/if}
