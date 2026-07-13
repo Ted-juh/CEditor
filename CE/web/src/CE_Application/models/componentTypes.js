@@ -486,6 +486,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  LcdDisplay: {
+    sections: ['Background', 'Display', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('LcdDisplay'),
+    defaultOverrides: {
+      // A 16x2 character LCD in a dark bezel by default.
+      Transform: { width: 260, height: 96 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF161616' },
+          Border: { enabled: true, thickness: 2, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   TestBox: {
     sections: ['Background', 'Effects'],
     defaultOverrides: {

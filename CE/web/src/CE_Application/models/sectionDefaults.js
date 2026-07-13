@@ -528,6 +528,35 @@ export const SECTION_DEFAULTS = {
     padding: 0,
   },
 
+  /**
+   * Display — the LCD/segment screen surface. Panel technology, character grid,
+   * lit/unlit palette, backlight, contrast and glass realism. The text shown on
+   * the screen lives here (lines) so the LCD renders self-contained.
+   */
+  Display: {
+    _type: 'Display',
+    panelType: 'character',        // character | dotmatrix | segment (future)
+    palette: 'greenStn',           // preset palette id (see LcdDisplayRenderer)
+    rows: 2,
+    cols: 16,
+    lines: ['PATCH:INIT VOICE', 'VOL120  PAN C   '],
+    litColour: 'FF2BE86A',         // lit phosphor (foreground)
+    unlitColour: '242BE86A',       // faint unlit "ghost" segment
+    screenColour: 'FF06371C',      // screen substrate behind the pixels
+    backlightOn: true,
+    backlightColour: 'FF0E5A2E',   // backlight wash
+    brightness: 100,               // 0..100 (foreground intensity)
+    contrast: 55,                  // 0..100 (LCD trim-pot feel)
+    glassTint: '14FFFFFF',         // glass sheen overlay
+    showGhost: true,               // faint unlit cells behind the text
+    showScanlines: false,          // horizontal scanline overlay
+    showGrid: false,               // faint pixel/cell grid lines
+    charSpacing: 1,                // extra px between characters
+    lineSpacing: 3,                // extra px between rows
+    padding: 10,                   // inset from the bezel to the screen
+    fontScale: 1,                  // relative glyph size
+  },
+
   /** Behavior — interaction family, role, and value model. */
   Behavior: {
     _type: 'Behavior',

@@ -4,6 +4,7 @@
     CircleDot,
     Container,
     Library,
+    Monitor,
     Pin,
     Plus,
     Search,
@@ -88,6 +89,7 @@
       { type: 'Container',       icon: Container,          label: 'Insert Container' },
       { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
       { type: 'Image',           icon: Square,             label: 'Insert Image' },
+      { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

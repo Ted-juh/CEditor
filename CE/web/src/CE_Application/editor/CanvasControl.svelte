@@ -3,6 +3,7 @@
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -124,6 +125,7 @@
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
+  let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
   let previewSession = $derived(previewSessionOverride ?? null);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
@@ -4074,6 +4076,10 @@
   <div bind:this={controlContentElement} class="control-content" style="{filterCSS}">
     {#if background}
       <BackgroundRenderer {background} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isLcdDisplay}
+      <LcdDisplayRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
 
     {#if isSliderControl}
