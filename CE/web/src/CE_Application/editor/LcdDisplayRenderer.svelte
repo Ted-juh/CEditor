@@ -63,15 +63,88 @@
   // Monospace advance is ~0.6em, so fit the glyph to whichever axis is tighter.
   let fontSize = $derived(Math.max(4, Math.min(cellH * 0.92, (cellW - charSpacing) / 0.62) * fontScale));
 
-  // Pad/truncate each source line to exactly `cols` cells so the grid is stable.
-  let gridLines = $derived.by(() => {
-    const source = Array.isArray(display?.lines) ? display.lines : [];
-    const out = [];
-    for (let r = 0; r < rows; r += 1) {
-      const raw = String(source[r] ?? '');
+  // --- Motion (rAF ticker) ---
+  let frameTime = $state(0);
+  let scrollDir = $derived(String(display?.scroll ?? 'off').trim().toLowerCase());
+  let scrollSpeed = $derived(Math.max(0, numberOr(display?.scrollSpeed, 4)));
+  let scrollMode = $derived(String(display?.scrollMode ?? 'loop').trim().toLowerCase());
+  let scrollGap = $derived(Math.max(0, Math.round(numberOr(display?.scrollGap, 3))));
+  let scrolling = $derived((scrollDir === 'left' || scrollDir === 'right') && scrollSpeed > 0);
+  let blinkEnabled = $derived(display?.blink === true);
+  let cursorMode = $derived(String(display?.cursor ?? 'off').trim().toLowerCase());
+  let cursorBlinkEnabled = $derived(cursorMode !== 'off' && display?.cursorBlink !== false);
+  let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled);
+
+  $effect(() => {
+    if (!motionActive) {
+      frameTime = 0;
+      return;
+    }
+    let raf = 0;
+    const loop = (t) => {
+      frameTime = t;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  });
+
+  // Lit text is hidden on the "off" half of a blink cycle (ghost cells remain).
+  let blinkOn = $derived.by(() => {
+    if (!blinkEnabled) return true;
+    const rate = Math.max(60, numberOr(display?.blinkRate, 500));
+    return Math.floor(frameTime / rate) % 2 === 0;
+  });
+
+  let cursorVisible = $derived.by(() => {
+    if (cursorMode === 'off') return false;
+    if (display?.cursorBlink === false) return true;
+    return Math.floor(frameTime / 530) % 2 === 0;
+  });
+  let cursorRow = $derived(Math.max(0, Math.round(numberOr(display?.cursorRow, 0))));
+  let cursorCol = $derived(Math.max(0, Math.round(numberOr(display?.cursorCol, 0))));
+
+  // Visible characters for one row, applying marquee scroll when the source
+  // line is longer than the column count.
+  function visibleChars(raw, elapsedChars) {
+    if (!scrolling || raw.length <= cols) {
       const chars = [];
       for (let c = 0; c < cols; c += 1) chars.push(raw[c] ?? ' ');
-      out.push(chars);
+      return chars;
+    }
+
+    const chars = [];
+    if (scrollMode === 'bounce') {
+      const span = Math.max(1, raw.length - cols);
+      const period = span * 2;
+      const pos = elapsedChars % period;
+      let start = pos <= span ? pos : period - pos;   // ping-pong
+      if (scrollDir === 'right') start = span - start;
+      start = Math.round(clamp(start, 0, span));
+      for (let c = 0; c < cols; c += 1) chars.push(raw[start + c] ?? ' ');
+      return chars;
+    }
+
+    // loop: repeat the line with a blank gap and slide a window across it.
+    const track = raw + ' '.repeat(scrollGap);
+    const period = track.length;
+    let base = elapsedChars % period;
+    if (scrollDir === 'right') base = period - base;
+    base = Math.floor(base);
+    for (let c = 0; c < cols; c += 1) {
+      const idx = (((base + c) % period) + period) % period;
+      chars.push(track[idx] ?? ' ');
+    }
+    return chars;
+  }
+
+  // Pad/truncate (or scroll) each source line to exactly `cols` cells.
+  let gridLines = $derived.by(() => {
+    const source = Array.isArray(display?.lines) ? display.lines : [];
+    const elapsedChars = scrolling ? (frameTime / 1000) * scrollSpeed : 0;
+    const out = [];
+    for (let r = 0; r < rows; r += 1) {
+      out.push(visibleChars(String(source[r] ?? ''), elapsedChars));
     }
     return out;
   });
@@ -95,6 +168,8 @@
   let charStyle = $derived(
     `color:${litCss}; opacity:${(0.35 + brightness * 0.65).toFixed(3)}; text-shadow:0 0 ${Math.max(1, fontSize * 0.14).toFixed(1)}px ${litCss};`
   );
+  // Under a block cursor the glyph inverts to the screen colour.
+  let charInvertStyle = $derived(`color:${screenCss}; opacity:1; z-index:2; text-shadow:none;`);
   let ghostStyle = $derived(`color:${unlitCss}; opacity:${(contrast * 0.9).toFixed(3)};`);
   let scanlineStyle = $derived(
     `background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent ${Math.max(2, Math.round(cellH / 6))}px);`
@@ -114,11 +189,20 @@
       {#each gridLines as line, r (r)}
         <div class="lcd-line" style={lineStyle}>
           {#each line as ch, c (c)}
+            {@const isCursor = cursorVisible && r === cursorRow && c === cursorCol}
             <span class="lcd-cell" style={cellStyle}>
               {#if showGhost}
                 <span class="lcd-ghost" style={ghostStyle}>█</span>
               {/if}
-              <span class="lcd-char" style={charStyle}>{ch}</span>
+              {#if isCursor && cursorMode === 'block'}
+                <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
+              {/if}
+              {#if blinkOn}
+                <span class="lcd-char" style={isCursor && cursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
+              {/if}
+              {#if isCursor && cursorMode === 'underline'}
+                <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
+              {/if}
             </span>
           {/each}
         </div>
@@ -204,5 +288,22 @@
 
   .lcd-char {
     z-index: 1;
+  }
+
+  .lcd-cursor-block {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    border-radius: 1px;
+  }
+
+  .lcd-cursor-underline {
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    bottom: 4%;
+    height: 12%;
+    z-index: 3;
+    border-radius: 1px;
   }
 </style>

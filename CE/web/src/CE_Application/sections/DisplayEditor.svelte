@@ -103,6 +103,50 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Motion">
+    <PropertyCell label="Scroll" span={2} hint="Marquee a line that's longer than the column count.">
+      <select class="val" value={display.scroll ?? 'off'} onchange={(event) => set('scroll', event.target.value)}>
+        <option value="off">Off</option>
+        <option value="left">Left</option>
+        <option value="right">Right</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Scroll Mode" span={2} hint="Loop wraps around; bounce ping-pongs back and forth.">
+      <select class="val" value={display.scrollMode ?? 'loop'} onchange={(event) => set('scrollMode', event.target.value)}>
+        <option value="loop">Loop</option>
+        <option value="bounce">Bounce</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Speed" span={2} hint="Scroll speed in characters per second.">
+      <NumberInput value={display.scrollSpeed ?? 4} step={1} min={0} max={60} onchange={(value) => set('scrollSpeed', value)} />
+    </PropertyCell>
+    <PropertyCell label="Gap" span={2} hint="Blank characters between loop repeats.">
+      <NumberInput value={display.scrollGap ?? 3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
+    </PropertyCell>
+    <PropertyCell label="Blink" span={2} hint="Blink the lit text on and off.">
+      <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
+    </PropertyCell>
+    <PropertyCell label="Blink Rate" span={2} hint="Milliseconds per blink half-cycle.">
+      <NumberInput value={display.blinkRate ?? 500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
+    </PropertyCell>
+    <PropertyCell label="Cursor" span={2} hint="Show a cursor cell.">
+      <select class="val" value={display.cursor ?? 'off'} onchange={(event) => set('cursor', event.target.value)}>
+        <option value="off">Off</option>
+        <option value="block">Block</option>
+        <option value="underline">Underline</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Cursor Blink" span={2} hint="Blink the cursor.">
+      <PropertyToggle value={display.cursorBlink !== false} onchange={() => toggle('cursorBlink', true)} />
+    </PropertyCell>
+    <PropertyCell label="Cursor Row" span={2} hint="Cursor row (0-based).">
+      <NumberInput value={display.cursorRow ?? 0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
+    </PropertyCell>
+    <PropertyCell label="Cursor Col" span={2} hint="Cursor column (0-based).">
+      <NumberInput value={display.cursorCol ?? 0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
+    </PropertyCell>
+  </PropertySection>
+
   <PropertySection title="Layout">
     <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
       <NumberInput value={display.padding ?? 10} step={1} min={0} onchange={(value) => set('padding', value)} />

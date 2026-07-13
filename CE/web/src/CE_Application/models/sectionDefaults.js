@@ -555,6 +555,17 @@ export const SECTION_DEFAULTS = {
     lineSpacing: 3,                // extra px between rows
     padding: 10,                   // inset from the bezel to the screen
     fontScale: 1,                  // relative glyph size
+    // Motion (driven by a rAF ticker in the renderer)
+    scroll: 'off',                 // off | left | right (marquee for long lines)
+    scrollSpeed: 4,                // characters per second
+    scrollMode: 'loop',            // loop | bounce (ping-pong)
+    scrollGap: 3,                  // blank chars between loop repeats
+    blink: false,                  // blink the lit text on/off
+    blinkRate: 500,                // ms per blink half-cycle
+    cursor: 'off',                 // off | block | underline
+    cursorRow: 0,
+    cursorCol: 0,
+    cursorBlink: true,
   },
 
   /** Behavior — interaction family, role, and value model. */
