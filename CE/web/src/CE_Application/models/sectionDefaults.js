@@ -551,6 +551,9 @@ export const SECTION_DEFAULTS = {
     showGhost: true,               // faint unlit cells behind the text
     showScanlines: false,          // horizontal scanline overlay
     showGrid: false,               // faint pixel/cell grid lines
+    dotMatrix: false,              // render glyphs as a dot grid (dot-matrix look)
+    dotShape: 'round',             // round | square
+    dotPitch: 0,                   // dot cell size px (0 = auto from cell size)
     charSpacing: 1,                // extra px between characters
     lineSpacing: 3,                // extra px between rows
     padding: 10,                   // inset from the bezel to the screen

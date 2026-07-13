@@ -149,6 +149,32 @@
     return out;
   });
 
+  // Dot-matrix look: punch the lit/ghost layers into a repeating dot grid via a
+  // CSS mask. Cheap approximation of a real pixel grid (true free-pixel graphic
+  // mode is a later canvas increment).
+  let dotMatrix = $derived(display?.dotMatrix === true || String(display?.panelType ?? '').trim().toLowerCase() === 'dotmatrix');
+  let dotShape = $derived(String(display?.dotShape ?? 'round').trim().toLowerCase());
+  let dotPitchPx = $derived.by(() => {
+    const p = numberOr(display?.dotPitch, 0);
+    return p > 0 ? p : Math.max(2, cellW / 5);
+  });
+  let screenMaskStyle = $derived.by(() => {
+    if (!dotMatrix) return '';
+    const size = Math.max(2, dotPitchPx);
+    // Round dots use a soft radial; "square" uses a harder edge for a blockier cell.
+    const mask = dotShape === 'square'
+      ? 'radial-gradient(circle, #000 0 60%, transparent 61%)'
+      : 'radial-gradient(circle, #000 0 38%, transparent 46%)';
+    return [
+      `-webkit-mask-image:${mask}`,
+      `mask-image:${mask}`,
+      `-webkit-mask-size:${size}px ${size}px`,
+      `mask-size:${size}px ${size}px`,
+      '-webkit-mask-repeat:repeat',
+      'mask-repeat:repeat',
+    ].join('; ');
+  });
+
   let backlightOn = $derived(display?.backlightOn !== false);
   let showGhost = $derived(display?.showGhost !== false);
   let showScanlines = $derived(display?.showScanlines === true);
@@ -185,7 +211,7 @@
       <div class="lcd-layer" style={backlightStyle}></div>
     {/if}
 
-    <div class="lcd-screen">
+    <div class="lcd-screen" style={screenMaskStyle}>
       {#each gridLines as line, r (r)}
         <div class="lcd-line" style={lineStyle}>
           {#each line as ch, c (c)}
