@@ -24,6 +24,8 @@
   import {
     adjustRangeValue,
     adjustRangeHandleValue,
+    clampRangeHandleValue,
+    formatRangeValue,
     getCurrentRangeValue,
     getRangeActiveHandle,
     getRangeEndValue,
@@ -241,14 +243,127 @@
 
   function setSpinnerActiveHandle(control, handle) {
     const role = handle === 'end' ? 'end' : 'start';
+    // Note: does NOT clear valueInputActive — a click that focuses a field to
+    // type must not immediately cancel that edit.
     patchControlSession(getControlId(control), {
       activeHandle: role,
       valueInputRole: role,
-      valueInputActive: false,
-      valueInputBuffer: '',
       hover: true,
       focused: true,
     });
+  }
+
+  // --- Inline typing into the low/high fields -----------------------------
+  function spinnerHandleForRole(role) {
+    return role === 'highField' ? 'end' : 'start';
+  }
+
+  function spinnerFieldValue(control, role) {
+    const behavior = getBehavior(control);
+    const session = sessionFor(control);
+    const handle = spinnerHandleForRole(role);
+    if (session?.valueInputActive === true && getRangeActiveHandle(session) === handle) {
+      return String(session?.valueInputBuffer ?? '');
+    }
+    const value = handle === 'end' ? getRangeEndValue(behavior, session) : getRangeStartValue(behavior, session);
+    return formatRangeValue(behavior, value);
+  }
+
+  // Descriptor map consumed by CanvasControl to render lowField/highField as
+  // editable inputs (so they can be focused and typed into).
+  function spinnerEditableFields(control) {
+    if (!isTwoValueSpinner(control)) return null;
+    const behavior = getBehavior(control);
+    const base = {
+      disabled: isDisabled(control),
+      inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
+      tabIndex: -1,
+    };
+    return {
+      lowField: { ...base, value: spinnerFieldValue(control, 'lowField'), ariaLabel: 'Low value' },
+      highField: { ...base, value: spinnerFieldValue(control, 'highField'), ariaLabel: 'High value' },
+    };
+  }
+
+  function beginSpinnerFieldEdit(control, role) {
+    const handle = spinnerHandleForRole(role);
+    const behavior = getBehavior(control);
+    const session = sessionFor(control);
+    const current = handle === 'end' ? getRangeEndValue(behavior, session) : getRangeStartValue(behavior, session);
+    patchControlSession(getControlId(control), {
+      activeHandle: handle,
+      valueInputRole: handle,
+      valueInputActive: true,
+      valueInputBuffer: formatRangeValue(behavior, current),
+      focused: true,
+      hover: true,
+    });
+  }
+
+  function commitSpinnerField(control, role) {
+    const handle = spinnerHandleForRole(role);
+    const session = sessionFor(control);
+    const buffer = String(session?.valueInputBuffer ?? '');
+    const parsed = parseRangeInputValue(getBehavior(control), buffer);
+    patchControlSession(getControlId(control), {
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...(parsed === null ? {} : {
+        activeHandle: handle,
+        valueInputRole: handle,
+        [`${handle}ValueOverrideEnabled`]: true,
+        [`${handle}ValueOverride`]: clampRangeHandleValue(getBehavior(control), session, handle, parsed),
+      }),
+    });
+  }
+
+  function handleSpinnerFieldFocus(control, role, event) {
+    event.stopPropagation();
+    beginSpinnerFieldEdit(control, role);
+  }
+
+  function handleSpinnerFieldInput(control, role, event) {
+    event.stopPropagation();
+    const handle = spinnerHandleForRole(role);
+    const rawValue = String(event?.currentTarget?.value ?? '');
+    patchControlSession(getControlId(control), {
+      activeHandle: handle,
+      valueInputRole: handle,
+      valueInputActive: true,
+      valueInputBuffer: rawValue,
+    });
+  }
+
+  function handleSpinnerFieldKeyDown(control, role, event) {
+    event.stopPropagation();
+    const handle = spinnerHandleForRole(role);
+
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      // Ensure the edited field is the active handle, then reuse the key logic.
+      if (getRangeActiveHandle(sessionFor(control)) !== handle) {
+        patchControlSession(getControlId(control), { activeHandle: handle, valueInputRole: handle });
+      }
+      adjustRangeFromKey(control, event.key);
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitSpinnerField(control, role);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      patchControlSession(getControlId(control), { valueInputActive: false, valueInputBuffer: '' });
+    }
+  }
+
+  function handleSpinnerFieldBlur(control, role, event) {
+    event.stopPropagation();
+    commitSpinnerField(control, role);
+    patchControlSession(getControlId(control), { focused: false, pressed: false, dragging: false });
   }
 
   // Write a handle's value into the session (enables its override, keeps the
@@ -1667,13 +1782,14 @@
       previewAriaValueMin={isRangeControl(control) ? getRangeMin(getBehavior(control)) : undefined}
       previewAriaValueMax={isRangeControl(control) ? getRangeMax(getBehavior(control)) : undefined}
       previewAriaValueText={isRangeControl(control) ? resolveRangeDisplayValue(getBehavior(control), sessionFor(control)) : undefined}
-      previewValueField={previewRoleFor(control) === 'spinbutton' ? {
+      previewValueField={previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
         value: resolveRangeDisplayValue(getBehavior(control), sessionFor(control)),
         disabled: isDisabled(control),
         inputMode: String(getBehavior(control)?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
         ariaLabel: `${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Range'} value`,
         tabIndex: -1,
       } : null}
+      previewEditableFields={spinnerEditableFields(control)}
       previewKeyboardFocus={keyboardFocusControlId === getControlId(control)}
       previewHighlighted={$showPreviewSelectionRing && $previewInspectedControlId === getControlId(control)}
       onpreviewpointerenter={() => handlePointerEnter(control)}
@@ -1689,6 +1805,10 @@
       onpreviewvaluefieldkeydown={(event) => handleRangeFieldKeyDown(control, event)}
       onpreviewvaluefieldfocus={(event) => handleRangeFieldFocus(control, event)}
       onpreviewvaluefieldblur={(event) => handleRangeFieldBlur(control, event)}
+      onpreviewfieldinput={(role, event) => handleSpinnerFieldInput(control, role, event)}
+      onpreviewfieldkeydown={(role, event) => handleSpinnerFieldKeyDown(control, role, event)}
+      onpreviewfieldfocus={(role, event) => handleSpinnerFieldFocus(control, role, event)}
+      onpreviewfieldblur={(role, event) => handleSpinnerFieldBlur(control, role, event)}
     />
     {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
       <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">

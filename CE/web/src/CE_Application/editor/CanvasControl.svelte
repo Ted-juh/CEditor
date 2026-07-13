@@ -63,6 +63,7 @@
     previewAriaValueMax = undefined,
     previewAriaValueText = undefined,
     previewValueField = null,
+    previewEditableFields = null,
     previewKeyboardFocus = false,
     previewHighlighted = false,
     onpreviewpointerenter = null,
@@ -78,7 +79,46 @@
     onpreviewvaluefieldkeydown = null,
     onpreviewvaluefieldfocus = null,
     onpreviewvaluefieldblur = null,
+    onpreviewfieldinput = null,
+    onpreviewfieldkeydown = null,
+    onpreviewfieldfocus = null,
+    onpreviewfieldblur = null,
   } = $props();
+
+  // Editable value fields resolve per part role. `previewEditableFields` is a
+  // role→descriptor map (used by the two-value Range spinner for lowField /
+  // highField); the older single `previewValueField` still serves the
+  // `valueField` role (Number, InteractiveTestSurface).
+  function editableInputForPart(part) {
+    if (!previewInteractive) return null;
+    const role = part?.role;
+    if (previewEditableFields && previewEditableFields[role]) return previewEditableFields[role];
+    if (role === 'valueField') return previewValueField;
+    return null;
+  }
+
+  function editableHandlerForPart(part, kind) {
+    if (!previewInteractive) return null;
+    const role = part?.role;
+    if (previewEditableFields && previewEditableFields[role]) {
+      const roleAware = {
+        input: onpreviewfieldinput,
+        keydown: onpreviewfieldkeydown,
+        focus: onpreviewfieldfocus,
+        blur: onpreviewfieldblur,
+      }[kind];
+      return roleAware ? (event) => roleAware(role, event) : null;
+    }
+    if (role === 'valueField') {
+      return {
+        input: onpreviewvaluefieldinput,
+        keydown: onpreviewvaluefieldkeydown,
+        focus: onpreviewvaluefieldfocus,
+        blur: onpreviewvaluefieldblur,
+      }[kind];
+    }
+    return null;
+  }
 
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
@@ -4055,11 +4095,11 @@
           parentHeight={displayH}
           transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
           debug={interactionDebugEnabled}
-          editableInput={previewInteractive && previewValueField && part?.role === 'valueField' ? previewValueField : null}
-          oneditableinput={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldinput : null}
-          oneditablekeydown={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldkeydown : null}
-          oneditablefocus={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldfocus : null}
-          oneditableblur={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldblur : null}
+          editableInput={editableInputForPart(part)}
+          oneditableinput={editableHandlerForPart(part, 'input')}
+          oneditablekeydown={editableHandlerForPart(part, 'keydown')}
+          oneditablefocus={editableHandlerForPart(part, 'focus')}
+          oneditableblur={editableHandlerForPart(part, 'blur')}
         />
       {/each}
     {/if}
