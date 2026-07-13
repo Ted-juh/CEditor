@@ -64,26 +64,65 @@
   let fontSize = $derived(Math.max(4, Math.min(cellH * 0.92, (cellW - charSpacing) / 0.62) * fontScale));
 
   // --- Motion (rAF ticker) ---
+  // frameTime is milliseconds since the animation (re)started, not page load,
+  // so a finite repeat count can settle deterministically.
   let frameTime = $state(0);
   let scrollDir = $derived(String(display?.scroll ?? 'off').trim().toLowerCase());
   let scrollSpeed = $derived(Math.max(0, numberOr(display?.scrollSpeed, 4)));
   let scrollMode = $derived(String(display?.scrollMode ?? 'loop').trim().toLowerCase());
   let scrollGap = $derived(Math.max(0, Math.round(numberOr(display?.scrollGap, 3))));
+  let scrollRepeat = $derived(Math.max(0, Math.round(numberOr(display?.scrollRepeat, 0))));
   let scrolling = $derived((scrollDir === 'left' || scrollDir === 'right') && scrollSpeed > 0);
   let blinkEnabled = $derived(display?.blink === true);
   let cursorMode = $derived(String(display?.cursor ?? 'off').trim().toLowerCase());
   let cursorBlinkEnabled = $derived(cursorMode !== 'off' && display?.cursorBlink !== false);
   let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled);
 
+  // One full scroll cycle (in characters) for a line — 0 if it doesn't scroll.
+  function linePeriod(raw) {
+    if (raw.length <= cols) return 0;
+    if (scrollMode === 'bounce') return Math.max(1, raw.length - cols) * 2;
+    return raw.length + scrollGap;
+  }
+
+  // Longest per-line cycle — governs when the whole marquee has finished N reps.
+  let maxScrollPeriod = $derived.by(() => {
+    if (!scrolling) return 0;
+    const source = Array.isArray(display?.lines) ? display.lines : [];
+    let m = 0;
+    for (let r = 0; r < rows; r += 1) m = Math.max(m, linePeriod(String(source[r] ?? '')));
+    return m;
+  });
+
+  // Any change to a motion parameter restarts the animation from the top.
+  let motionSignature = $derived([
+    scrollDir, scrollSpeed, scrollMode, scrollGap, scrollRepeat,
+    blinkEnabled, numberOr(display?.blinkRate, 500),
+    cursorMode, display?.cursorBlink !== false,
+    rows, cols, (Array.isArray(display?.lines) ? display.lines.join('') : ''),
+  ].join('|'));
+
   $effect(() => {
+    // Reference the signature so a settings change re-runs (restarts) the loop.
+    void motionSignature;
     if (!motionActive) {
       frameTime = 0;
       return;
     }
     let raf = 0;
+    let origin = -1;
     const loop = (t) => {
-      frameTime = t;
-      raf = requestAnimationFrame(loop);
+      if (origin < 0) origin = t;
+      const elapsedMs = t - origin;
+      frameTime = elapsedMs;
+
+      const elapsedChars = scrolling ? (elapsedMs / 1000) * scrollSpeed : 0;
+      // scrollRepeat 0 = infinite; otherwise finish after N of the longest cycle.
+      const finiteDone = scrollRepeat > 0 && maxScrollPeriod > 0
+        && elapsedChars >= scrollRepeat * maxScrollPeriod;
+      const scrollNeedsMore = scrolling && !finiteDone;
+      const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore;
+      if (needMore) raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
@@ -111,6 +150,13 @@
       const chars = [];
       for (let c = 0; c < cols; c += 1) chars.push(raw[c] ?? ' ');
       return chars;
+    }
+
+    // With a finite repeat, cap this line's progress at N whole cycles, which
+    // lands the window back at the start (the settled resting position).
+    const cyclePeriod = linePeriod(raw);
+    if (scrollRepeat > 0 && cyclePeriod > 0) {
+      elapsedChars = Math.min(elapsedChars, scrollRepeat * cyclePeriod);
     }
 
     const chars = [];

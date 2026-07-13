@@ -563,6 +563,7 @@ export const SECTION_DEFAULTS = {
     scrollSpeed: 4,                // characters per second
     scrollMode: 'loop',            // loop | bounce (ping-pong)
     scrollGap: 3,                  // blank chars between loop repeats
+    scrollRepeat: 0,               // 0 = infinite; N = scroll N times then settle
     blink: false,                  // blink the lit text on/off
     blinkRate: 500,                // ms per blink half-cycle
     cursor: 'off',                 // off | block | underline

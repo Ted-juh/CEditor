@@ -135,6 +135,9 @@
     <PropertyCell label="Gap" span={2} hint="Blank characters between loop repeats.">
       <NumberInput value={display.scrollGap ?? 3} step={1} min={0} onchange={(value) => set('scrollGap', Math.round(value))} />
     </PropertyCell>
+    <PropertyCell label="Repeat" span={2} hint="Number of times to scroll, then settle. 0 = loop forever.">
+      <NumberInput value={display.scrollRepeat ?? 0} step={1} min={0} onchange={(value) => set('scrollRepeat', Math.round(value))} />
+    </PropertyCell>
     <PropertyCell label="Blink" span={2} hint="Blink the lit text on and off.">
       <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
     </PropertyCell>
