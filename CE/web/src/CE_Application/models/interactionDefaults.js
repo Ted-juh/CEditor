@@ -320,6 +320,135 @@ function rangeParts() {
   };
 }
 
+// Two-value min/max spinner: [ low ] [ − + ] [ high ].
+// The two numbers live in the outer fields; the steppers sit in the middle and
+// act on whichever field is "active" (default: low, shown with a brighter
+// border). Distinct from Number, which is a single-value stepper.
+function rangeSpinnerParts(lowContent = '40', highContent = '90') {
+  const buttonBackground = rootBackgroundClone();
+  buttonBackground._children.Fill.colour = 'FF343434';
+  buttonBackground._children.Border.enabled = true;
+  buttonBackground._children.Border.thickness = 1;
+  buttonBackground._children.Border.colour = '664C4C4C';
+  buttonBackground._children.Corners.radius = 8;
+
+  const fieldBackground = (active = false) => {
+    const bg = rootBackgroundClone();
+    bg._children.Fill.colour = 'FF151515';
+    bg._children.Border.enabled = true;
+    bg._children.Border.thickness = 1;
+    // Active field gets the accent border so it's clear which value the
+    // steppers (and typing) will change.
+    bg._children.Border.colour = active ? 'FF89C2FF' : '665B5B5B';
+    bg._children.Corners.radius = 8;
+    return bg;
+  };
+
+  const buttonText = (content) => {
+    const text = rootTextClone(content);
+    text._children.Font.size = 15;
+    text._children.Font.weightValue = 700;
+    text._children.Font.weight = 'Bold';
+    text._children.Position.justification = 'centred';
+    return text;
+  };
+
+  const valueText = (content) => {
+    const text = rootTextClone(content);
+    text._children.Font.size = 13;
+    text._children.Font.weightValue = 600;
+    text._children.Font.weight = 'SemiBold';
+    text._children.Position.justification = 'centred';
+    return text;
+  };
+
+  return {
+    _type: 'Parts',
+    _children: {
+      lowField: createPartNode('lowField', {
+        role: 'lowField',
+        zIndex: 0,
+        layout: {
+          x: 0,
+          y: 50,
+          width: 30,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'left',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: fieldBackground(true),
+          Text: valueText(lowContent),
+        },
+      }),
+      decrement: createPartNode('decrement', {
+        role: 'decrement',
+        zIndex: 1,
+        layout: {
+          x: 38,
+          y: 50,
+          width: 15,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'center',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: deepClone(buttonBackground),
+          Text: buttonText('−'),
+        },
+      }),
+      increment: createPartNode('increment', {
+        role: 'increment',
+        zIndex: 2,
+        layout: {
+          x: 62,
+          y: 50,
+          width: 15,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'center',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: deepClone(buttonBackground),
+          Text: buttonText('+'),
+        },
+      }),
+      highField: createPartNode('highField', {
+        role: 'highField',
+        zIndex: 3,
+        layout: {
+          x: 100,
+          y: 50,
+          width: 30,
+          height: 100,
+          xUnit: 'percent',
+          yUnit: 'percent',
+          widthUnit: 'percent',
+          heightUnit: 'percent',
+          anchorX: 'right',
+          anchorY: 'center',
+        },
+        sections: {
+          Background: fieldBackground(false),
+          Text: valueText(highContent),
+        },
+      }),
+    },
+  };
+}
+
 const BUTTON_PRIORITY = ['hover', 'focused', 'checked', 'mixed', 'pressed', 'disabled'];
 const SLIDER_PRIORITY = ['disabled', 'dragging', 'pressed', 'activehandlestart', 'activehandlecurrent', 'activehandleend', 'hover', 'focused'];
 const RANGE_PRIORITY = ['hover', 'focused', 'dragging', 'pressed', 'disabled'];
@@ -431,13 +560,57 @@ export function createBehaviorDefaults(type) {
     return behavior;
   }
 
-  if (type === 'Range' || type === 'Number') {
+  if (type === 'Number') {
     return {
       _type: 'Behavior',
       family: 'range',
       role: 'spinbox',
+      valueMode: 'single',
       valueType: 'int',
       defaultValue: 0,
+      selectionMode: 'none',
+      enumValues: [],
+      wrapEnum: false,
+      groupId: '',
+      allowMixed: false,
+      uncheckOnClick: false,
+      pressMode: 'pressRelease',
+      toggleOn: 'release',
+      orientation: 'horizontal',
+      direction: 'ltr',
+      min: 0,
+      max: 100,
+      step: 1,
+      keyboardEnabled: true,
+      focusable: true,
+      activationKeys: ['Enter', 'Space'],
+      arrowKeyAdjust: true,
+      pageKeyAdjust: true,
+      homeEndAdjust: true,
+      dragEnabled: true,
+      wheelEnabled: true,
+      reverseMouseDirection: false,
+      snapToStep: true,
+      emitClick: true,
+      emitValueChange: true,
+      emitStateChange: true,
+    };
+  }
+
+  if (type === 'Range') {
+    // Two-value min/max spinner. Shares the range/spinbox engine but carries a
+    // low (start) and high (end) value plus which one the steppers act on.
+    return {
+      _type: 'Behavior',
+      family: 'range',
+      role: 'spinbox',
+      variant: 'spinner',
+      valueMode: 'range',
+      valueType: 'int',
+      defaultValue: 0,
+      defaultStartValue: 40,
+      defaultEndValue: 90,
+      activeHandle: 'start',
       selectionMode: 'none',
       enumValues: [],
       wrapEnum: false,
@@ -648,7 +821,7 @@ export function createStatesDefaults(type) {
     };
   }
 
-  if (type === 'Range' || type === 'Number') {
+  if (type === 'Number') {
     return {
       _type: 'States',
       enabled: true,
@@ -716,6 +889,58 @@ export function createStatesDefaults(type) {
     };
   }
 
+  if (type === 'Range') {
+    return {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: RANGE_PRIORITY,
+      _children: {
+        Hover: createStateNode('Hover', {
+          description: 'Lift the step buttons and value fields while hovering.',
+          when: { hover: true },
+          parts: {
+            decrement: {
+              'Background.Fill.colour': 'FF3D3D3D',
+            },
+            increment: {
+              'Background.Fill.colour': 'FF3D3D3D',
+            },
+            lowField: {
+              'Background.Fill.colour': 'FF1B1B1B',
+            },
+            highField: {
+              'Background.Fill.colour': 'FF1B1B1B',
+            },
+          },
+        }),
+        Pressed: createStateNode('Pressed', {
+          description: 'Tighten the control while pressing.',
+          when: { pressed: true },
+          component: {
+            'Transform.scale': 0.99,
+          },
+          parts: {
+            decrement: {
+              'Background.Fill.colour': 'FF282828',
+            },
+            increment: {
+              'Background.Fill.colour': 'FF282828',
+            },
+          },
+        }),
+        Disabled: createStateNode('Disabled', {
+          group: 'system',
+          description: 'Dim the range control when disabled.',
+          when: { disabled: true },
+          component: {
+            'Transform.opacity': 0.55,
+          },
+        }),
+      },
+    };
+  }
+
   return {
     _type: 'States',
     enabled: true,
@@ -766,7 +991,7 @@ export function createBindingsDefaults(type) {
     };
   }
 
-  if (type === 'Range' || type === 'Number') {
+  if (type === 'Number') {
     return {
       _type: 'Bindings',
       enabled: true,
@@ -779,6 +1004,18 @@ export function createBindingsDefaults(type) {
           outputUnit: 'unitless',
         }),
       },
+    };
+  }
+
+  if (type === 'Range') {
+    // Live low/high text bindings are added in the interaction-runtime pass
+    // (they need value.low.display / value.high.display signals). Until then the
+    // static part content shows the defaults.
+    return {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {},
     };
   }
 
@@ -851,6 +1088,8 @@ export function createAnimationsDefaults(type) {
     };
   }
 
+  // (Range and Number share the same press animation above.)
+
   return {
     _type: 'Animations',
     enabled: true,
@@ -885,8 +1124,12 @@ export function createAnimationsDefaults(type) {
 }
 
 export function createPartsDefaults(type) {
-  if (type === 'Range' || type === 'Number') {
+  if (type === 'Number') {
     return rangeParts();
+  }
+
+  if (type === 'Range') {
+    return rangeSpinnerParts();
   }
 
   if (type === 'Slider' || type === 'Knob') {

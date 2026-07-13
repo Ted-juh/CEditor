@@ -29,10 +29,18 @@
     String(behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox'
   );
-  let parts = $derived(getSection(control, 'Parts'));
-  let valueFontSize = $derived(
-    numberOr(parts?._children?.valueField?._children?.Text?._children?.Font?.size, 12)
+  // Range = two-value min/max spinner; Number = single-value stepper.
+  let isTwoValueRange = $derived(
+    isRangeSpinbox && String(behavior?.valueMode ?? 'single').trim().toLowerCase() === 'range'
   );
+  let parts = $derived(getSection(control, 'Parts'));
+  // The value glyph size lives on whichever value part the control uses
+  // (valueField for Number, lowField for the two-value Range).
+  let valueFontSize = $derived(numberOr(
+    parts?._children?.valueField?._children?.Text?._children?.Font?.size
+    ?? parts?._children?.lowField?._children?.Text?._children?.Font?.size,
+    12
+  ));
 
   function inferButtonType(controlType = '') {
     switch (String(controlType ?? '')) {
@@ -61,13 +69,38 @@
     }
   }
 
-  // The spinbox glyphs (−, value, +) live in separate parts. Keeping them a
-  // single uniform size is the sensible default; drive all three from one cell.
+  // The spinbox glyphs live in separate parts (valueField/decrement/increment
+  // for Number; lowField/highField/decrement/increment for Range). Keeping them
+  // a single uniform size is the sensible default; drive whichever exist from
+  // one cell.
   function setValueFontSize(value) {
     if (!core?.id) return;
     const size = Math.max(4, numberOr(value, 12));
-    for (const partName of ['decrement', 'valueField', 'increment']) {
-      updateControlProperty(core.id, `Parts.${partName}.Text.Font.size`, size);
+    const present = parts?._children ?? {};
+    for (const partName of ['decrement', 'valueField', 'increment', 'lowField', 'highField']) {
+      if (present[partName]) {
+        updateControlProperty(core.id, `Parts.${partName}.Text.Font.size`, size);
+      }
+    }
+  }
+
+  // Editing a two-value default also refreshes the static field text so the
+  // editor (design view, where live bindings don't run) shows the new value.
+  function setStartValue(value) {
+    if (!core?.id) return;
+    const next = numberOr(value, 0);
+    set('defaultStartValue', next);
+    if (parts?._children?.lowField) {
+      updateControlProperty(core.id, 'Parts.lowField.Text.content', String(next));
+    }
+  }
+
+  function setEndValue(value) {
+    if (!core?.id) return;
+    const next = numberOr(value, 0);
+    set('defaultEndValue', next);
+    if (parts?._children?.highField) {
+      updateControlProperty(core.id, 'Parts.highField.Text.content', String(next));
     }
   }
 
@@ -117,10 +150,10 @@
 
   {#if isRangeSpinbox}
     <PropertySection title="Value">
-      <PropertyCell label="Min" span={2} hint="Minimum value.">
+      <PropertyCell label="Min" span={2} hint="Lower bound the values are clamped to.">
         <NumberInput value={behavior.min ?? 0} step={1} onchange={(value) => set('min', value)} />
       </PropertyCell>
-      <PropertyCell label="Max" span={2} hint="Maximum value.">
+      <PropertyCell label="Max" span={2} hint="Upper bound the values are clamped to.">
         <NumberInput value={behavior.max ?? 100} step={1} onchange={(value) => set('max', value)} />
       </PropertyCell>
       <PropertyCell label="Step" span={2} hint="Increment per step / stepper click.">
@@ -129,7 +162,15 @@
       <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
         <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
       </PropertyCell>
-      <PropertyCell label="Font Size" span={2} hint="Height (px) of the value and ± button glyphs.">
+      {#if isTwoValueRange}
+        <PropertyCell label="Low" span={2} hint="Default low (min) value of the range.">
+          <NumberInput value={behavior.defaultStartValue ?? behavior.min ?? 0} step={1} onchange={(value) => setStartValue(value)} />
+        </PropertyCell>
+        <PropertyCell label="High" span={2} hint="Default high (max) value of the range.">
+          <NumberInput value={behavior.defaultEndValue ?? behavior.max ?? 100} step={1} onchange={(value) => setEndValue(value)} />
+        </PropertyCell>
+      {/if}
+      <PropertyCell label="Font Size" span={2} hint="Height (px) of the value and ± glyphs.">
         <NumberInput value={valueFontSize} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
       </PropertyCell>
     </PropertySection>
