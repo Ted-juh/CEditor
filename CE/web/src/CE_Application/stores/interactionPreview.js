@@ -71,6 +71,13 @@ export function createInteractionPreviewSession(control = null) {
     next.activeHandle = String(behavior?.valueMode ?? 'single') === 'range' ? 'start' : 'current';
     next.valueInputRole = next.activeHandle;
   }
+  // Two-value range spinner starts with the low (start) field active.
+  if (String(behavior?.family ?? '') === 'range'
+    && String(behavior?.role ?? '') === 'spinbox'
+    && String(behavior?.valueMode ?? 'single') === 'range') {
+    next.activeHandle = 'start';
+    next.valueInputRole = 'start';
+  }
   return next;
 }
 

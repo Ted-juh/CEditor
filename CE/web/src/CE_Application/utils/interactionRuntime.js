@@ -1,6 +1,17 @@
 import { deepClone } from './deepClone.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
-import { getCurrentRangeValue, getRangeMax, getRangeMin, resolveRangeDisplayValue, snapRangeValue } from './rangeBehavior.js';
+import {
+  formatRangeValue,
+  getCurrentRangeValue,
+  getRangeActiveHandle,
+  getRangeEndValue,
+  getRangeMax,
+  getRangeMin,
+  getRangeStartValue,
+  isTwoValueRange,
+  resolveRangeDisplayValue,
+  snapRangeValue,
+} from './rangeBehavior.js';
 import {
   formatSliderNumericValue,
   formatSliderReadout,
@@ -164,6 +175,10 @@ function evaluateBindingSource(binding, signals) {
       return signals.endValueNormalized;
     case 'value.display':
       return signals.valueDisplay;
+    case 'value.start.display':
+      return signals.startValueDisplay;
+    case 'value.end.display':
+      return signals.endValueDisplay;
     case 'value.bool':
       return signals.checked;
     case 'value.enum':
@@ -623,6 +638,25 @@ export function resolveInteractionContext(control, previewSession = {}) {
     ? resolveRangeDisplayValue(behavior, previewSession)
     : (valueType === 'enum' ? String(valueRaw ?? '') : String(valueRaw ?? '')));
 
+  // Two-value (min/max) range spinner carries a low (start) and high (end)
+  // value plus which one is active. These extra signals feed the low/high text
+  // bindings and the active-field highlight state; single-value ranges (Number)
+  // leave them undefined and are unaffected.
+  let twoValueSignals = {};
+  if (isTwoValueRange(behavior)) {
+    const startValue = getRangeStartValue(behavior, previewSession);
+    const endValue = getRangeEndValue(behavior, previewSession);
+    twoValueSignals = {
+      startValueRaw: startValue,
+      endValueRaw: endValue,
+      startValueDisplay: formatRangeValue(behavior, startValue),
+      endValueDisplay: formatRangeValue(behavior, endValue),
+      startValueNormalized: clamp(normalizeRange(startValue, min, max), 0, 1),
+      endValueNormalized: clamp(normalizeRange(endValue, min, max), 0, 1),
+      activeHandle: getRangeActiveHandle(previewSession),
+    };
+  }
+
   return {
     family: String(behavior?.family ?? 'trigger'),
     role: String(behavior?.role ?? core?.controlType ?? 'custom'),
@@ -631,6 +665,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     valueDisplay,
     valueEnum: valueType === 'enum' ? String(valueRaw ?? '') : '',
     valueNormalized,
+    ...twoValueSignals,
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,
     focused: previewSession?.focused === true,

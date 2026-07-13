@@ -929,6 +929,30 @@ export function createStatesDefaults(type) {
             },
           },
         }),
+        ActiveLow: createStateNode('ActiveLow', {
+          description: 'Accent the low field while it is the active (edited) value.',
+          when: { activeHandle: 'start' },
+          parts: {
+            lowField: {
+              'Background.Border.colour': 'FF89C2FF',
+            },
+            highField: {
+              'Background.Border.colour': '665B5B5B',
+            },
+          },
+        }),
+        ActiveHigh: createStateNode('ActiveHigh', {
+          description: 'Accent the high field while it is the active (edited) value.',
+          when: { activeHandle: 'end' },
+          parts: {
+            highField: {
+              'Background.Border.colour': 'FF89C2FF',
+            },
+            lowField: {
+              'Background.Border.colour': '665B5B5B',
+            },
+          },
+        }),
         Disabled: createStateNode('Disabled', {
           group: 'system',
           description: 'Dim the range control when disabled.',
@@ -1008,14 +1032,27 @@ export function createBindingsDefaults(type) {
   }
 
   if (type === 'Range') {
-    // Live low/high text bindings are added in the interaction-runtime pass
-    // (they need value.low.display / value.high.display signals). Until then the
-    // static part content shows the defaults.
+    // Two-value spinner: the low field shows the start value, the high field
+    // shows the end value. In the editor (design view) the static part content
+    // shows the defaults; in preview these keep the fields live.
     return {
       _type: 'Bindings',
       enabled: true,
       debug: false,
-      _children: {},
+      _children: {
+        lowText: createBindingNode('lowText', {
+          source: 'value.start.display',
+          mapMode: 'direct',
+          target: 'Parts.lowField.Text.content',
+          outputUnit: 'unitless',
+        }),
+        highText: createBindingNode('highText', {
+          source: 'value.end.display',
+          mapMode: 'direct',
+          target: 'Parts.highField.Text.content',
+          outputUnit: 'unitless',
+        }),
+      },
     };
   }
 

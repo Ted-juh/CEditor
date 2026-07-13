@@ -57,6 +57,55 @@ export function getCurrentRangeValue(behavior = null, session = null) {
   return snapRangeValue(behavior, behavior?.defaultValue ?? getRangeMin(behavior));
 }
 
+// --- Two-value (min/max) range spinner -------------------------------------
+// The Range component carries a low (start) and high (end) value plus which one
+// the steppers act on. Number stays single-value and ignores all of this.
+
+export function isTwoValueRange(behavior = null) {
+  return isRangeBehavior(behavior)
+    && String(behavior?.valueMode ?? 'single').trim().toLowerCase() === 'range';
+}
+
+export function getRangeActiveHandle(session = null) {
+  return String(session?.activeHandle ?? 'start').trim().toLowerCase() === 'end' ? 'end' : 'start';
+}
+
+export function getRangeStartValue(behavior = null, session = null) {
+  const fallback = numberOr(behavior?.defaultStartValue, getRangeMin(behavior));
+  const raw = session?.startValueOverrideEnabled === true ? session?.startValueOverride : fallback;
+  return snapRangeValue(behavior, raw);
+}
+
+export function getRangeEndValue(behavior = null, session = null) {
+  const fallback = numberOr(behavior?.defaultEndValue, getRangeMax(behavior));
+  const raw = session?.endValueOverrideEnabled === true ? session?.endValueOverride : fallback;
+  return snapRangeValue(behavior, raw);
+}
+
+// The active handle's value, clamped so low never crosses high.
+export function getRangeHandleValue(behavior = null, session = null, handle = 'start') {
+  return handle === 'end' ? getRangeEndValue(behavior, session) : getRangeStartValue(behavior, session);
+}
+
+// Adjust one handle by `direction * step * multiplier`, keeping the pair ordered
+// (start <= end). Returns the new snapped value for that handle.
+export function adjustRangeHandleValue(behavior = null, session = null, handle = 'start', direction = 1, multiplier = 1) {
+  const start = getRangeStartValue(behavior, session);
+  const end = getRangeEndValue(behavior, session);
+  const next = adjustRangeValue(behavior, handle === 'end' ? end : start, direction, multiplier);
+  if (handle === 'end') return clamp(next, start, getRangeMax(behavior));
+  return clamp(next, getRangeMin(behavior), end);
+}
+
+// A parsed direct value for a handle, ordered against the other handle.
+export function clampRangeHandleValue(behavior = null, session = null, handle = 'start', rawValue = 0) {
+  const snapped = snapRangeValue(behavior, rawValue);
+  const start = getRangeStartValue(behavior, session);
+  const end = getRangeEndValue(behavior, session);
+  if (handle === 'end') return clamp(snapped, start, getRangeMax(behavior));
+  return clamp(snapped, getRangeMin(behavior), end);
+}
+
 export function adjustRangeValue(behavior = null, currentValue = 0, direction = 1, multiplier = 1) {
   const delta = getRangeStep(behavior) * numberOr(direction, 1) * Math.max(1, numberOr(multiplier, 1));
   return snapRangeValue(behavior, numberOr(currentValue, getRangeMin(behavior)) + delta);

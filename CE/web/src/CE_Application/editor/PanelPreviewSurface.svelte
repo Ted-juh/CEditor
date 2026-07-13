@@ -23,12 +23,17 @@
   } from '../utils/timedButtonPreview.js';
   import {
     adjustRangeValue,
+    adjustRangeHandleValue,
     getCurrentRangeValue,
+    getRangeActiveHandle,
+    getRangeEndValue,
     getRangeMax,
     getRangeMin,
+    getRangeStartValue,
     isRangeBehavior,
     isRangeTextInputKey,
     isSliderRangeBehavior,
+    isTwoValueRange,
     normalizedRangePointerValue,
     parseRangeInputValue,
     resolveRangeDisplayValue,
@@ -210,6 +215,63 @@
 
   function currentRangeValue(control) {
     return getCurrentRangeValue(getBehavior(control), sessionFor(control));
+  }
+
+  // --- Two-value min/max spinner ([ low ] [ − + ] [ high ]) ---------------
+  function isTwoValueSpinner(control) {
+    const behavior = getBehavior(control);
+    return isTwoValueRange(behavior)
+      && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox';
+  }
+
+  // Which of the four spinner regions a pointer x falls in. Matches the part
+  // layout: low 0–30%, decrement ~30–50%, increment ~50–70%, high 70–100%.
+  function resolveSpinnerZone(rect, clientX) {
+    if (!rect || rect.width <= 0) return 'low';
+    const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+    if (fraction < 0.30) return 'low';
+    if (fraction < 0.50) return 'decrement';
+    if (fraction < 0.70) return 'increment';
+    return 'high';
+  }
+
+  function spinnerActiveHandle(control) {
+    return getRangeActiveHandle(sessionFor(control));
+  }
+
+  function setSpinnerActiveHandle(control, handle) {
+    const role = handle === 'end' ? 'end' : 'start';
+    patchControlSession(getControlId(control), {
+      activeHandle: role,
+      valueInputRole: role,
+      valueInputActive: false,
+      valueInputBuffer: '',
+      hover: true,
+      focused: true,
+    });
+  }
+
+  // Write a handle's value into the session (enables its override, keeps the
+  // pair ordered) and marks it active.
+  function setSpinnerHandleValue(control, handle, nextValue, extraPatch = {}) {
+    const role = handle === 'end' ? 'end' : 'start';
+    patchControlSession(getControlId(control), {
+      activeHandle: role,
+      valueInputRole: role,
+      [`${role}ValueOverrideEnabled`]: true,
+      [`${role}ValueOverride`]: nextValue,
+      valueInputActive: false,
+      valueInputBuffer: '',
+      ...extraPatch,
+    });
+  }
+
+  function adjustSpinnerActiveHandle(control, direction, multiplier = 1) {
+    const behavior = getBehavior(control);
+    const session = sessionFor(control);
+    const handle = getRangeActiveHandle(session);
+    const nextValue = adjustRangeHandleValue(behavior, session, handle, direction, multiplier);
+    setSpinnerHandleValue(control, handle, nextValue, { hover: true, focused: true });
   }
 
   function isSliderControl(control) {
@@ -784,6 +846,35 @@
     if (!isRangeControl(control)) return;
 
     const behavior = getBehavior(control);
+    if (isTwoValueSpinner(control)) {
+      const session = sessionFor(control);
+      const handle = getRangeActiveHandle(session);
+      switch (key) {
+        case 'Home':
+          setSpinnerHandleValue(control, handle, getRangeMin(behavior), { hover: true, focused: true });
+          break;
+        case 'End':
+          setSpinnerHandleValue(control, handle, getRangeMax(behavior), { hover: true, focused: true });
+          break;
+        case 'ArrowLeft':
+        case 'ArrowDown':
+          adjustSpinnerActiveHandle(control, -1);
+          break;
+        case 'ArrowRight':
+        case 'ArrowUp':
+          adjustSpinnerActiveHandle(control, 1);
+          break;
+        case 'PageDown':
+          adjustSpinnerActiveHandle(control, -1, 10);
+          break;
+        case 'PageUp':
+          adjustSpinnerActiveHandle(control, 1, 10);
+          break;
+        default:
+          break;
+      }
+      return;
+    }
     if (isSliderControl(control)) {
       const role = currentSliderActiveHandle(control);
       const legal = getSliderLegalRangeForHandle(behavior, sessionFor(control), role);
@@ -849,6 +940,10 @@
   }
 
   function handleRangeTextInput(control, key) {
+    // The two-value spinner does not yet support inline digit typing (per-handle
+    // editing is a follow-up); let those keys fall through for now.
+    if (isTwoValueSpinner(control)) return false;
+
     const controlId = getControlId(control);
     const session = sessionFor(control);
     const currentBuffer = session?.valueInputActive === true ? String(session?.valueInputBuffer ?? '') : '';
@@ -930,6 +1025,9 @@
     if (!isRangeControl(control) || draggingRange) return false;
 
     const behavior = getBehavior(control);
+    // The two-value spinner uses click-to-select + steppers, not single-value
+    // scrub, so a drag must not corrupt one shared value.
+    if (isTwoValueSpinner(control)) return false;
     if (behavior?.dragEnabled !== true || isSliderRangeBehavior(behavior)) return false;
 
     const dx = Math.abs(event.clientX - pointerDownPoint.x);
@@ -973,6 +1071,10 @@
     event.preventDefault();
     event.stopPropagation();
     const direction = resolveMouseDirection(behavior, event.deltaY < 0 ? 1 : -1);
+    if (isTwoValueSpinner(control)) {
+      adjustSpinnerActiveHandle(control, direction);
+      return;
+    }
     if (isSliderControl(control)) {
       const role = currentSliderActiveHandle(control);
       setSliderRoleValue(control, role, currentSliderRoleValue(control, role) + (direction * numberOr(behavior?.step, 0.01)), {
@@ -991,6 +1093,21 @@
   function handleRangePointerClick(control, event) {
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return;
+
+    if (isTwoValueSpinner(control)) {
+      const zone = resolveSpinnerZone(rect, event.clientX);
+      if (zone !== pointerDownZone) return;
+      if (zone === 'low') {
+        setSpinnerActiveHandle(control, 'start');
+      } else if (zone === 'high') {
+        setSpinnerActiveHandle(control, 'end');
+      } else if (zone === 'decrement') {
+        adjustSpinnerActiveHandle(control, -1);
+      } else if (zone === 'increment') {
+        adjustSpinnerActiveHandle(control, 1);
+      }
+      return;
+    }
 
     const zone = resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
     if (zone !== pointerDownZone) return;
@@ -1156,7 +1273,9 @@
 
     if (isRangeControl(control)) {
       const rect = pointerActiveElement?.getBoundingClientRect?.();
-      pointerDownZone = resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
+      pointerDownZone = isTwoValueSpinner(control)
+        ? resolveSpinnerZone(rect, event.clientX)
+        : resolveRangeZone(getBehavior(control), rect, event.clientX, event.clientY);
     }
 
     let nextSliderHandle = '';
