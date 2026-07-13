@@ -561,6 +561,8 @@
         onkeydown={oneditablekeydown}
         onfocus={oneditablefocus}
         onblur={oneditableblur}
+        onpointerdown={(event) => event.stopPropagation()}
+        onmousedown={(event) => event.stopPropagation()}
       />
     {/if}
 

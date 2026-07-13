@@ -320,6 +320,8 @@
   function handleSpinnerFieldFocus(control, role, event) {
     event.stopPropagation();
     beginSpinnerFieldEdit(control, role);
+    // Select the field contents so typing replaces the value.
+    event.currentTarget?.select?.();
   }
 
   function handleSpinnerFieldInput(control, role, event) {
