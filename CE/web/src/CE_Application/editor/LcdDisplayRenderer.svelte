@@ -91,11 +91,12 @@
   }
 
   // Longest per-line cycle — governs when the whole marquee has finished N reps.
+  // Uses the token-expanded lines, since that is what actually scrolls.
   let maxScrollPeriod = $derived.by(() => {
     if (!scrolling) return 0;
     const source = Array.isArray(display?.lines) ? display.lines : [];
     let m = 0;
-    for (let r = 0; r < rows; r += 1) m = Math.max(m, linePeriod(String(source[r] ?? '')));
+    for (let r = 0; r < rows; r += 1) m = Math.max(m, linePeriod(expandTokens(String(source[r] ?? ''))));
     return m;
   });
 
@@ -123,8 +124,9 @@
 
       const elapsedChars = scrolling ? (elapsedMs / 1000) * scrollSpeed : 0;
       // scrollRepeat 0 = infinite; otherwise finish after N of the longest cycle.
-      const finiteDone = scrollRepeat > 0 && maxScrollPeriod > 0
-        && elapsedChars >= scrollRepeat * maxScrollPeriod;
+      // A zero period means no line is long enough to scroll, so it's already done.
+      const finiteDone = scrollRepeat > 0
+        && (maxScrollPeriod === 0 || elapsedChars >= scrollRepeat * maxScrollPeriod);
       const scrollNeedsMore = scrolling && !finiteDone;
       const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore;
       if (needMore) raf = requestAnimationFrame(loop);
