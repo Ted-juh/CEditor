@@ -197,6 +197,13 @@
       info.text = info.on ? 'On' : 'Off';
       info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
       info.selector = info.on ? '1' : '0';
+    } else if (family === 'trigger') {
+      // Momentary / action buttons have no stored value: read the live pressed
+      // (or executed) state so the display shows 1/On while held, 0/Off at rest.
+      info.on = session?.pressed === true || session?.executed === true;
+      info.text = info.on ? 'On' : 'Off';
+      info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
+      info.selector = info.on ? '1' : '0';
     }
     return info;
   }
