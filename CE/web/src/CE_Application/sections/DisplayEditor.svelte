@@ -614,11 +614,9 @@
   .zone-cell {
     grid-column: span 4;
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
+    flex-wrap: nowrap;
+    gap: 3px;
     align-items: center;
-    padding: 3px 0;
-    border-bottom: 1px solid var(--border-subtle, #2a2a2a);
   }
 
   .zone-num {
