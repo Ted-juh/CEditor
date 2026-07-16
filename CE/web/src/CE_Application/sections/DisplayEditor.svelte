@@ -651,6 +651,12 @@
   }
 
   .zone-cell .rm {
+    width: 26px;
+    flex: 0 0 auto;
     margin-left: auto;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+    cursor: pointer;
   }
 </style>
