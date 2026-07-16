@@ -143,7 +143,40 @@
   function resolvedPreviewFor(control) {
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
-    return resolveInteractiveControl(control, previewOverrides);
+    const resolved = resolveInteractiveControl(control, previewOverrides);
+    return applyLcdValueSource(control, resolved);
+  }
+
+  // The current numeric value + range of a value-producing control (slider,
+  // knob, range spinner, number) from its live preview session.
+  function lcdSourceValueRange(src) {
+    const behavior = getBehavior(src);
+    if (!isRangeBehavior(behavior)) return null;
+    const value = isSliderControl(src)
+      ? currentSliderRoleValue(src, currentSliderActiveHandle(src))
+      : currentRangeValue(src);
+    return { value, min: getRangeMin(behavior), max: getRangeMax(behavior) };
+  }
+
+  // If an LcdDisplay names a value source, drive its Display value/range from
+  // that control's live value so the {value}/{pct}/{bar} tokens follow it.
+  function applyLcdValueSource(control, resolved) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') return resolved;
+    const srcId = String(control?._children?.Display?.valueSourceId ?? '');
+    if (!srcId) return resolved;
+    const src = orderedControls.find((entry) => getControlId(entry) === srcId);
+    if (!src) return resolved;
+    const range = lcdSourceValueRange(src);
+    if (!range || range.value === undefined) return resolved;
+
+    const base = resolved?.control ?? control;
+    const clone = JSON.parse(JSON.stringify(base));
+    if (clone?._children?.Display) {
+      clone._children.Display.value = range.value;
+      clone._children.Display.valueMin = range.min;
+      clone._children.Display.valueMax = range.max;
+    }
+    return { ...resolved, control: clone };
   }
 
   function isDisabled(control) {

@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -14,9 +15,30 @@
   let lines = $derived(Array.isArray(display?.lines) ? display.lines : []);
   let paletteEntries = $derived(Object.entries(LCD_PALETTES));
 
+  // Value-producing controls on the panel (slider / knob / range / number) that
+  // can drive this display's value.
+  let valueSources = $derived(
+    ($activePanel?.controls ?? [])
+      .filter((c) => String(c?._children?.Behavior?.family ?? '').trim().toLowerCase() === 'range'
+        && String(c?._children?.Core?.id ?? '') !== String(core?.id ?? ''))
+      .map((c) => ({ id: String(c._children.Core.id), name: String(c._children.Core.name ?? c._children.Core.id) }))
+  );
+
   function set(prop, value) {
     if (!core?.id) return;
     updateControlProperty(core.id, `Display.${prop}`, value);
+  }
+
+  // On picking a source, adopt its value range so pct/bar tokens scale correctly.
+  function setValueSource(id) {
+    set('valueSourceId', id);
+    if (!id) return;
+    const src = ($activePanel?.controls ?? []).find((c) => String(c?._children?.Core?.id ?? '') === id);
+    const b = src?._children?.Behavior;
+    if (b) {
+      if (Number.isFinite(Number(b.min))) set('valueMin', Number(b.min));
+      if (Number.isFinite(Number(b.max))) set('valueMax', Number(b.max));
+    }
   }
 
   function toggle(prop, defaultOn = true) {
@@ -84,7 +106,15 @@
   </PropertySection>
 
   <PropertySection title="Value">
-    <PropertyCell label="Value" span={4} hint="Drives the value / pct / bar tokens. Set here for now; bind to a device or another component later.">
+    <PropertyCell label="Source" span={4} hint="Drive the value live from another control (slider / knob / number) in preview. None = use the static value below.">
+      <select class="val" value={display.valueSourceId ?? ''} onchange={(event) => setValueSource(event.target.value)}>
+        <option value="">None (static value)</option>
+        {#each valueSources as src}
+          <option value={src.id}>{src.name}</option>
+        {/each}
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Value" span={4} hint="Static value that drives the tokens (ignored in preview when a Source is set).">
       <NumberInput value={display.value ?? 0} step={1} min={display.valueMin ?? 0} max={display.valueMax ?? 127} onchange={(value) => set('value', value)} />
     </PropertyCell>
     <PropertyCell label="Min" span={2} hint="Value range minimum (for the pct and bar tokens).">

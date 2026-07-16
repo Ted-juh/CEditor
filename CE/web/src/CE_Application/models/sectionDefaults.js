@@ -580,6 +580,8 @@ export const SECTION_DEFAULTS = {
     valuePrecision: 0,
     valuePrefix: '',
     valueSuffix: '',
+    valueSourceId: '',             // Core.id of a panel control whose value drives
+                                   // this display in preview ('' = use static value)
   },
 
   /** Behavior — interaction family, role, and value model. */
