@@ -192,6 +192,12 @@
     const p = clonePages();
     if (Array.isArray(p.overlays)) { p.overlays.splice(i, 1); commitPages(p); }
   }
+
+  // Which controls count as "@active" (empty = any control).
+  let activeScope = $derived(Array.isArray(display?.activeScope) ? display.activeScope : []);
+  function addScope() { set('activeScope', [...activeScope, '']); }
+  function setScope(i, id) { const next = [...activeScope]; next[i] = id; set('activeScope', next); }
+  function removeScope(i) { const next = [...activeScope]; next.splice(i, 1); set('activeScope', next); }
 </script>
 
 {#if display}
@@ -433,6 +439,26 @@
       <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
         <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
       </PropertyCell>
+
+      <PropertyCell label="@active scope" span={4} hint="Restrict the @active source to these controls only. Empty = any control counts as active.">
+        <span class="hint-note">{activeScope.length === 0 ? 'Any control' : `${activeScope.length} control(s)`}</span>
+      </PropertyCell>
+      {#each activeScope as sid, i (i)}
+        <PropertyCell label={`In scope ${i + 1}`} span={4} hint="A control that counts toward @active.">
+          <div class="field-row">
+            <select class="val" value={sid ?? ''} onchange={(event) => setScope(i, event.target.value)}>
+              <option value="">(control)</option>
+              {#each allSources as src}
+                <option value={src.id}>{src.name}</option>
+              {/each}
+            </select>
+            <button class="val rm" type="button" onclick={() => removeScope(i)} title="Remove">✕</button>
+          </div>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Scope" span={4} hint="Add a control that @active is allowed to follow.">
+        <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
+      </PropertyCell>
     </PropertySection>
   {/if}
 
@@ -581,6 +607,11 @@
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  .hint-note {
+    font-size: 11px;
+    color: var(--text-dim, #8a8a8a);
   }
 
   .zone-row {

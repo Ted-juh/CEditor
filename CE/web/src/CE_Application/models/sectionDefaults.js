@@ -603,6 +603,8 @@ export const SECTION_DEFAULTS = {
       selectorMap: [],             // [{ when, layoutId }]
       overlays: [],                // [{ id, layoutId, sourceId, duration, dismiss }]
     },
+    // Which controls count as "@active" (Core.ids). Empty = any control.
+    activeScope: [],
   },
 
   /** Behavior — interaction family, role, and value model. */

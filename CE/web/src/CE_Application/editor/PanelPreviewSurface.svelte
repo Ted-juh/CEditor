@@ -204,6 +204,22 @@
   // The control most recently clicked / dragged / changed — resolves the
   // reserved "@active" zone source so a zone can follow whatever is touched.
   let lcdActiveId = $state('');
+  // Per-control last-activity time (press or change), for scoped @active. Plain
+  // object: reads happen at render, driven reactive by lcdActiveId changing.
+  const lcdActiveAt = {};
+
+  // Resolve "@active" for a display: the most recently active control, optionally
+  // restricted to a scope (list of Core.ids). Empty scope = any control.
+  function lcdActiveForScope(scope) {
+    const list = (Array.isArray(scope) ? scope : []).map(String).filter(Boolean);
+    if (!list.length) return lcdActiveId;
+    let best = ''; let bestAt = -1;
+    for (const id of list) {
+      const at = lcdActiveAt[id];
+      if (at !== undefined && at > bestAt) { bestAt = at; best = id; }
+    }
+    return best;
+  }
 
   // Change-time tracking for overlay pages: stamp when a control's value changes.
   let lcdChangeAt = $state({});
@@ -248,7 +264,7 @@
     }
     if (changed) {
       lcdChangeAt = next;
-      if (lastChangedId) lcdActiveId = lastChangedId;
+      if (lastChangedId) { lcdActiveAt[lastChangedId] = now; lcdActiveId = lastChangedId; }
       scheduleOverlayTicks();
     }
   });
@@ -290,8 +306,9 @@
     const live = {};
     if (hasLayouts) {
       for (const id of collectSourceIds(display)) {
-        // "@active" resolves to whichever control was most recently touched.
-        const resolvedId = id === ACTIVE_SOURCE_ID ? lcdActiveId : id;
+        // "@active" resolves to the most recently touched control, restricted to
+        // this display's activeScope (empty scope = any control).
+        const resolvedId = id === ACTIVE_SOURCE_ID ? lcdActiveForScope(display.activeScope) : id;
         const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
         if (info) live[id] = info;
@@ -1521,7 +1538,7 @@
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
-    if (pointerActiveControlId) lcdActiveId = pointerActiveControlId; // "@active" zone source
+    if (pointerActiveControlId) { lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId; } // "@active" zone source
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
       openComboboxControlId = '';
     }
