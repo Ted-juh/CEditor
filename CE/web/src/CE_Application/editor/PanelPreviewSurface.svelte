@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { collectSourceIds, resolveActiveLayoutId } from '../utils/lcdZones.js';
@@ -184,27 +184,55 @@
       if (range) { info.value = range.value; info.min = range.min; info.max = range.max; info.selector = String(range.value); }
     }
     const family = String(behavior?.family ?? '').trim().toLowerCase();
-    if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
+    const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
+    if (isComboboxControl(src) || buttonType === 'radio' || buttonType === 'cyclic') {
+      // Multi-choice: the selector/text reflect the current (or resting) choice.
+      const choice = session?.valueOverrideEnabled === true
+        ? session.valueOverride
+        : (isComboboxControl(src) ? currentComboboxValue(src) : behavior?.defaultValue);
+      info.selector = String(choice ?? '');
+      info.text = String(choice ?? '');
+    } else if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
       info.on = session?.checked === true || behavior?.defaultValue === true;
       info.text = info.on ? 'On' : 'Off';
       info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
       info.selector = info.on ? '1' : '0';
-    }
-    if (session?.valueOverrideEnabled === true) {
-      info.selector = String(session.valueOverride);
-      if (!isRangeBehavior(behavior)) info.text = String(session.valueOverride);
     }
     return info;
   }
 
   // Change-time tracking for overlay pages: stamp when a control's value changes.
   let lcdChangeAt = $state({});
+  // A reactive clock bumped by timers so timed overlays auto-dismiss while idle.
+  let overlayClock = $state(0);
   const lcdPrevValue = {};
+  let overlayTimers = [];
+
+  // Schedule a re-render at each distinct timer-overlay duration so an overlay
+  // drops when its window elapses even if the user stops interacting.
+  function scheduleOverlayTicks() {
+    overlayTimers.forEach((t) => clearTimeout(t));
+    overlayTimers = [];
+    const durations = new Set();
+    for (const control of orderedControls) {
+      if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') continue;
+      for (const ov of (control?._children?.Display?.pages?.overlays ?? [])) {
+        if (String(ov?.dismiss ?? 'timer').trim().toLowerCase() === 'timer') {
+          durations.add(Math.max(30, numberOr(ov?.duration, 800)));
+        }
+      }
+    }
+    for (const d of durations) {
+      overlayTimers.push(setTimeout(() => { overlayClock = Date.now(); }, d + 20));
+    }
+  }
+
   $effect(() => {
     void $panelPreviewSessions; // re-run when any preview value changes
     const now = Date.now();
     let changed = false;
-    const next = { ...lcdChangeAt };
+    // untrack the self-read so writing lcdChangeAt below doesn't re-trigger us.
+    const next = untrack(() => ({ ...lcdChangeAt }));
     for (const control of orderedControls) {
       const id = getControlId(control);
       if (!id) continue;
@@ -213,14 +241,20 @@
       if (lcdPrevValue[id] !== undefined && lcdPrevValue[id] !== sig) { next[id] = now; changed = true; }
       lcdPrevValue[id] = sig;
     }
-    if (changed) lcdChangeAt = next;
+    if (changed) {
+      lcdChangeAt = next;
+      scheduleOverlayTicks();
+    }
   });
+
+  onDestroy(() => overlayTimers.forEach((t) => clearTimeout(t)));
 
   // Which overlay layout is currently active (timer window, or latched until a
   // different control changes). Best-effort timing; verify in-browser.
   function resolveActiveOverlayLayout(display) {
     const overlays = display?.pages?.overlays ?? [];
     if (!overlays.length) return '';
+    void overlayClock; // re-evaluate when the overlay timers fire
     const now = Date.now();
     const times = Object.values(lcdChangeAt);
     const globalMax = times.length ? Math.max(...times) : -1;
@@ -258,9 +292,13 @@
 
     if (!hasLayouts && !primary && !fieldRanges.some(Boolean)) return resolved;
 
+    // Shallow clone that shares heavy read-only fields (imageSrc, layouts, pages)
+    // by reference; only the Display + the field entries we mutate are copied.
     const base = resolved?.control ?? control;
-    const clone = JSON.parse(JSON.stringify(base));
-    const cd = clone?._children?.Display;
+    const baseDisplay = base?._children?.Display ?? {};
+    const cd = { ...baseDisplay };
+    if (Array.isArray(baseDisplay.fields)) cd.fields = baseDisplay.fields.map((f) => ({ ...f }));
+    const clone = { ...base, _children: { ...base._children, Display: cd } };
     if (cd) {
       if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
       if (Array.isArray(cd.fields)) {
