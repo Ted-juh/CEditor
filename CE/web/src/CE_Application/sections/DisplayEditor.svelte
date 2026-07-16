@@ -332,43 +332,40 @@
 
       {#if editLayout}
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
-          <PropertyCell label={`Zone ${i + 1}`} span={4} hint="Region (row, col start–end), what to show, and the source control.">
-            <div class="zone-row">
-              <input class="val zn" type="number" min="1" title="Row" value={z.row ?? 1} onchange={(event) => setZone(i, 'row', Math.round(Number(event.target.value)))} />
-              <input class="val zn" type="number" min="1" title="Col start" value={z.colStart ?? 1} onchange={(event) => setZone(i, 'colStart', Math.round(Number(event.target.value)))} />
-              <input class="val zn" type="number" min="1" title="Col end" value={z.colEnd ?? cols} onchange={(event) => setZone(i, 'colEnd', Math.round(Number(event.target.value)))} />
-              <select class="val" title="Show" value={z.show ?? 'static'} onchange={(event) => setZone(i, 'show', event.target.value)}>
-                {#each ZONE_SHOW_KINDS as kind}
-                  <option value={kind}>{kind}</option>
+          <div class="zone-cell">
+            <span class="zone-num" title="Zone">#{i + 1}</span>
+            <input class="val zn" type="number" min="1" title="Row" value={z.row ?? 1} onchange={(event) => setZone(i, 'row', Math.round(Number(event.target.value)))} />
+            <input class="val zn" type="number" min="1" title="Col start" value={z.colStart ?? 1} onchange={(event) => setZone(i, 'colStart', Math.round(Number(event.target.value)))} />
+            <input class="val zn" type="number" min="1" title="Col end" value={z.colEnd ?? cols} onchange={(event) => setZone(i, 'colEnd', Math.round(Number(event.target.value)))} />
+            <select class="val zsel" title="Show" value={z.show ?? 'static'} onchange={(event) => setZone(i, 'show', event.target.value)}>
+              {#each ZONE_SHOW_KINDS as kind}
+                <option value={kind}>{kind}</option>
+              {/each}
+            </select>
+            {#if z.show === 'static'}
+              <input class="val ztext" type="text" placeholder="caption text" value={z.text ?? ''} oninput={(event) => setZone(i, 'text', event.target.value)} />
+            {:else}
+              <select class="val zsel" title="Source component" value={z.sourceId ?? ''} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
+                <option value="">(source)</option>
+                <option value="@active">★ Active</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
                 {/each}
               </select>
-              <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
-            </div>
-            <div class="zone-row">
-              {#if z.show === 'static'}
-                <input class="val" type="text" placeholder="caption text" value={z.text ?? ''} oninput={(event) => setZone(i, 'text', event.target.value)} />
-              {:else}
-                <select class="val" title="Source component" value={z.sourceId ?? ''} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
-                  <option value="">(source component)</option>
-                  <option value="@active">★ Active (whatever is touched)</option>
-                  {#each allSources as src}
-                    <option value={src.id}>{src.name}</option>
-                  {/each}
+              <select class="val zn2" title="Align" value={z.align ?? 'left'} onchange={(event) => setZone(i, 'align', event.target.value)}>
+                <option value="left">L</option>
+                <option value="center">C</option>
+                <option value="right">R</option>
+              </select>
+              {#if z.show === 'midiValue'}
+                <select class="val zn2" title="Radix" value={z.radix ?? 'dec'} onchange={(event) => setZone(i, 'radix', event.target.value)}>
+                  <option value="dec">dec</option>
+                  <option value="hex">hex</option>
                 </select>
-                <select class="val zn2" title="Align" value={z.align ?? 'left'} onchange={(event) => setZone(i, 'align', event.target.value)}>
-                  <option value="left">L</option>
-                  <option value="center">C</option>
-                  <option value="right">R</option>
-                </select>
-                {#if z.show === 'midiValue'}
-                  <select class="val zn2" title="Radix" value={z.radix ?? 'dec'} onchange={(event) => setZone(i, 'radix', event.target.value)}>
-                    <option value="dec">dec</option>
-                    <option value="hex">hex</option>
-                  </select>
-                {/if}
               {/if}
-            </div>
-          </PropertyCell>
+            {/if}
+            <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
+          </div>
         {/each}
         <PropertyCell label="Zones" span={4} hint="Add a region to this layout.">
           <button class="val add-field" type="button" onclick={() => addZone()}>+ Add zone</button>
@@ -614,21 +611,48 @@
     color: var(--text-dim, #8a8a8a);
   }
 
-  .zone-row {
+  .zone-cell {
+    grid-column: span 4;
     display: flex;
+    flex-wrap: wrap;
     gap: 4px;
     align-items: center;
-    margin-bottom: 3px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border-subtle, #2a2a2a);
   }
 
-  .zone-row .zn {
-    width: 46px;
+  .zone-num {
+    flex: 0 0 auto;
+    min-width: 26px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-dim, #8a8a8a);
+  }
+
+  .zone-cell .zn {
+    width: 42px;
     flex: 0 0 auto;
     text-align: center;
   }
 
-  .zone-row .zn2 {
-    width: 54px;
+  .zone-cell .zn2 {
+    width: 44px;
     flex: 0 0 auto;
+  }
+
+  .zone-cell .zsel {
+    flex: 1 1 78px;
+    min-width: 60px;
+    max-width: 130px;
+  }
+
+  .zone-cell .ztext {
+    flex: 1 1 90px;
+    min-width: 70px;
+  }
+
+  .zone-cell .rm {
+    margin-left: auto;
   }
 </style>
