@@ -14,6 +14,8 @@
 </script>
 
 <script>
+  import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
+
   let { control = null, width = 0, height = 0 } = $props();
 
   let display = $derived(control?._children?.Display ?? null);
@@ -195,10 +197,15 @@
     return out;
   });
 
+  // Segment display (7 / 14 / 16-segment). Each cell renders an SVG glyph.
+  let panelType = $derived(String(display?.panelType ?? 'character').trim().toLowerCase());
+  let isSegment = $derived(panelType === 'segment');
+  let segmentType = $derived(String(display?.segmentType ?? '16'));
+
   // Dot-matrix look: punch the lit/ghost layers into a repeating dot grid via a
   // CSS mask. Cheap approximation of a real pixel grid (true free-pixel graphic
-  // mode is a later canvas increment).
-  let dotMatrix = $derived(display?.dotMatrix === true || String(display?.panelType ?? '').trim().toLowerCase() === 'dotmatrix');
+  // mode is a later canvas increment). Not used in segment mode.
+  let dotMatrix = $derived(!isSegment && (display?.dotMatrix === true || panelType === 'dotmatrix'));
   let dotShape = $derived(String(display?.dotShape ?? 'round').trim().toLowerCase());
   let dotPitchPx = $derived.by(() => {
     const p = numberOr(display?.dotPitch, 0);
@@ -242,6 +249,9 @@
   );
   // Under a block cursor the glyph inverts to the screen colour.
   let charInvertStyle = $derived(`color:${screenCss}; opacity:1; z-index:2; text-shadow:none;`);
+  let segStyle = $derived(
+    `width:100%; height:100%; opacity:${(0.4 + brightness * 0.6).toFixed(3)}; filter: drop-shadow(0 0 ${Math.max(0.5, cellH * 0.02).toFixed(1)}px ${litCss});`
+  );
   let ghostStyle = $derived(`color:${unlitCss}; opacity:${(contrast * 0.9).toFixed(3)};`);
   let scanlineStyle = $derived(
     `background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent ${Math.max(2, Math.round(cellH / 6))}px);`
@@ -263,17 +273,35 @@
           {#each line as ch, c (c)}
             {@const isCursor = cursorVisible && r === cursorRow && c === cursorCol}
             <span class="lcd-cell" style={cellStyle}>
-              {#if showGhost}
-                <span class="lcd-ghost" style={ghostStyle}>█</span>
-              {/if}
-              {#if isCursor && cursorMode === 'block'}
-                <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
-              {/if}
-              {#if blinkOn}
-                <span class="lcd-char" style={isCursor && cursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
-              {/if}
-              {#if isCursor && cursorMode === 'underline'}
-                <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
+              {#if isSegment}
+                {@const glyph = getSegmentGlyph(segmentType, ch)}
+                <svg class="lcd-seg" viewBox="0 0 100 180" preserveAspectRatio="xMidYMid meet" style={segStyle} aria-hidden="true">
+                  {#each Object.entries(glyph.geometry) as [seg, shape] (seg)}
+                    {@const on = glyph.lit.has(seg) && blinkOn}
+                    {#if on || showGhost}
+                      {#if shape.kind === 'poly'}
+                        <polygon points={shape.points} fill={on ? litCss : unlitCss} />
+                      {:else if shape.kind === 'line'}
+                        <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} stroke={on ? litCss : unlitCss} stroke-width={shape.width} stroke-linecap="round" />
+                      {:else if shape.kind === 'dot'}
+                        <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={on ? litCss : unlitCss} />
+                      {/if}
+                    {/if}
+                  {/each}
+                </svg>
+              {:else}
+                {#if showGhost}
+                  <span class="lcd-ghost" style={ghostStyle}>█</span>
+                {/if}
+                {#if isCursor && cursorMode === 'block'}
+                  <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
+                {/if}
+                {#if blinkOn}
+                  <span class="lcd-char" style={isCursor && cursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
+                {/if}
+                {#if isCursor && cursorMode === 'underline'}
+                  <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
+                {/if}
               {/if}
             </span>
           {/each}
@@ -377,5 +405,9 @@
     height: 12%;
     z-index: 3;
     border-radius: 1px;
+  }
+
+  .lcd-seg {
+    display: block;
   }
 </style>

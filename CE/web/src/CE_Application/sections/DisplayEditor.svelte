@@ -44,6 +44,21 @@
 
 {#if display}
   <PropertySection title="Screen">
+    <PropertyCell label="Panel Type" span={2} hint="Character cells, or a 7/14/16-segment display.">
+      <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
+        <option value="character">Character</option>
+        <option value="segment">Segment</option>
+      </select>
+    </PropertyCell>
+    {#if String(display.panelType ?? '') === 'segment'}
+      <PropertyCell label="Segment Type" span={2} hint="7-segment (numeric), or 14/16-segment starburst (alphanumeric).">
+        <select class="val" value={String(display.segmentType ?? '16')} onchange={(event) => set('segmentType', event.target.value)}>
+          <option value="7">7-segment</option>
+          <option value="14">14-segment</option>
+          <option value="16">16-segment</option>
+        </select>
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Palette" span={4} hint="Ready-made lit/unlit/backlight colour set. You can still tweak colours below.">
       <select class="val" value={display.palette ?? 'greenStn'} onchange={(event) => applyPalette(event.target.value)}>
         {#each paletteEntries as [id, entry]}

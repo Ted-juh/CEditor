@@ -535,7 +535,8 @@ export const SECTION_DEFAULTS = {
    */
   Display: {
     _type: 'Display',
-    panelType: 'character',        // character | dotmatrix | segment (future)
+    panelType: 'character',        // character | segment
+    segmentType: '16',             // 7 | 14 | 16 (14 shares the 16-seg starburst)
     palette: 'greenStn',           // preset palette id (see LcdDisplayRenderer)
     rows: 2,
     cols: 16,
