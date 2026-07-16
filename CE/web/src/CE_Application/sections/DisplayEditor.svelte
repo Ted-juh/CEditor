@@ -54,6 +54,7 @@
       <PropertyCell label="Segment Type" span={2} hint="7-segment (numeric), or 14/16-segment starburst (alphanumeric).">
         <select class="val" value={String(display.segmentType ?? '16')} onchange={(event) => set('segmentType', event.target.value)}>
           <option value="7">7-segment</option>
+          <option value="9">9-segment</option>
           <option value="14">14-segment</option>
           <option value="16">16-segment</option>
         </select>

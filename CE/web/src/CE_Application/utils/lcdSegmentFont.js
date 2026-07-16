@@ -52,6 +52,32 @@ const SEVEN_SEG_MAP = {
   ' ': '',
 };
 
+// --- 9-segment --------------------------------------------------------------
+// The common 9-segment layout: the seven standard segments plus a top-centre
+// (i) and bottom-centre (l) vertical, which lets it render T, I, +, etc.
+// (9-segment isn't fully standardised; some makers used two diagonals instead.)
+
+const NINE_SEG_GEOMETRY = {
+  a: hBar(24, 76, 14),
+  b: vBar(84, 20, 86),
+  c: vBar(84, 94, 160),
+  d: hBar(24, 76, 166),
+  e: vBar(16, 94, 160),
+  f: vBar(16, 20, 86),
+  g: hBar(24, 76, 90),
+  i: vBar(50, 20, 86, 12),
+  l: vBar(50, 94, 160, 12),
+  dp: { kind: 'dot', cx: 93, cy: 166, r: 6 },
+};
+
+// Starts from the 7-seg map, then improves the glyphs that benefit from the two
+// centre verticals. Segment names are single chars, so packed strings are fine.
+const NINE_SEG_MAP = {
+  ...SEVEN_SEG_MAP,
+  '1': 'il', I: 'il', T: 'ail', t: 'gil', '+': 'gil', '±': 'gild',
+  '0': 'abcdef', // (no slash; verticals reserved for glyphs that need them)
+};
+
 // --- 16-segment starburst ---------------------------------------------------
 // Bars a/d/g are split into halves (a1/a2, d1/d2, g1/g2); i/l are the top/bottom
 // centre verticals; h/j/k/m are the diagonals.
@@ -145,18 +171,19 @@ const STARBURST_MAP = Object.fromEntries(
 export const SEGMENT_VIEWBOX = { width: 100, height: 180 };
 
 // Resolve the geometry + lit-segment set for a character in a given segment mode.
-// segmentType: 7 | 14 | 16 (14 shares the 16-seg starburst).
+// segmentType: 7 | 9 | 14 | 16 (14 shares the 16-seg starburst).
 export function getSegmentGlyph(segmentType, rawChar) {
-  const seg = String(segmentType) === '7' ? 7 : 16;
+  const s = String(segmentType);
+  const seg = s === '7' ? 7 : s === '9' ? 9 : 16;
   const upper = String(rawChar ?? ' ');
-  const geometry = seg === 7 ? SEVEN_SEG_GEOMETRY : SIXTEEN_SEG_GEOMETRY;
-  const map = seg === 7 ? SEVEN_SEG_MAP : STARBURST_MAP;
+  const geometry = seg === 7 ? SEVEN_SEG_GEOMETRY : seg === 9 ? NINE_SEG_GEOMETRY : SIXTEEN_SEG_GEOMETRY;
+  const map = seg === 7 ? SEVEN_SEG_MAP : seg === 9 ? NINE_SEG_MAP : STARBURST_MAP;
 
   // Exact match first, then case-folded, else blank.
   const litStr = map[upper] ?? map[upper.toUpperCase()] ?? map[upper.toLowerCase()] ?? '';
-  // 7-seg map values are concatenated single-char segments ("abcdef"); the
-  // starburst map is space-separated multi-char tokens ("a1 a2 b ...").
-  const tokens = seg === 7 ? litStr.split('') : litStr.split(/\s+/);
+  // 7/9-seg map values are concatenated single-char segments ("abcdef"); the
+  // 16-seg starburst map is space-separated multi-char tokens ("a1 a2 b ...").
+  const tokens = seg === 16 ? litStr.split(/\s+/) : litStr.split('');
   const lit = new Set(tokens.map((t) => t.trim()).filter(Boolean));
   return { geometry, lit };
 }
