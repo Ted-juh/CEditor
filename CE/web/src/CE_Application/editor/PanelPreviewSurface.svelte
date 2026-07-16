@@ -158,23 +158,45 @@
     return { value, min: getRangeMin(behavior), max: getRangeMax(behavior) };
   }
 
-  // If an LcdDisplay names a value source, drive its Display value/range from
-  // that control's live value so the {value}/{pct}/{bar} tokens follow it.
+  function lcdRangeForSource(srcId) {
+    const id = String(srcId ?? '');
+    if (!id) return null;
+    const src = orderedControls.find((entry) => getControlId(entry) === id);
+    if (!src) return null;
+    const range = lcdSourceValueRange(src);
+    return range && range.value !== undefined ? range : null;
+  }
+
+  // If an LcdDisplay names value sources (primary + extra fields), drive their
+  // Display value/range from those controls' live values so the tokens follow.
   function applyLcdValueSource(control, resolved) {
     if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') return resolved;
-    const srcId = String(control?._children?.Display?.valueSourceId ?? '');
-    if (!srcId) return resolved;
-    const src = orderedControls.find((entry) => getControlId(entry) === srcId);
-    if (!src) return resolved;
-    const range = lcdSourceValueRange(src);
-    if (!range || range.value === undefined) return resolved;
+    const display = control?._children?.Display;
+    if (!display) return resolved;
+
+    const primary = lcdRangeForSource(display.valueSourceId);
+    const fields = Array.isArray(display.fields) ? display.fields : [];
+    const fieldRanges = fields.map((f) => lcdRangeForSource(f?.sourceId));
+    if (!primary && !fieldRanges.some(Boolean)) return resolved;
 
     const base = resolved?.control ?? control;
     const clone = JSON.parse(JSON.stringify(base));
-    if (clone?._children?.Display) {
-      clone._children.Display.value = range.value;
-      clone._children.Display.valueMin = range.min;
-      clone._children.Display.valueMax = range.max;
+    const cd = clone?._children?.Display;
+    if (cd) {
+      if (primary) {
+        cd.value = primary.value;
+        cd.valueMin = primary.min;
+        cd.valueMax = primary.max;
+      }
+      if (Array.isArray(cd.fields)) {
+        fieldRanges.forEach((range, i) => {
+          if (range && cd.fields[i]) {
+            cd.fields[i].value = range.value;
+            cd.fields[i].min = range.min;
+            cd.fields[i].max = range.max;
+          }
+        });
+      }
     }
     return { ...resolved, control: clone };
   }

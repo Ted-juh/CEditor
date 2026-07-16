@@ -188,26 +188,48 @@
     return chars;
   }
 
-  // --- Value-driven tokens ({value}, {pct}, {bar}) ---
-  let rawValue = $derived(numberOr(display?.value, 0));
-  let valueMin = $derived(numberOr(display?.valueMin, 0));
-  let valueMax = $derived(numberOr(display?.valueMax, 100));
-  let valueFrac = $derived.by(() => {
-    const span = valueMax - valueMin;
-    return span === 0 ? 0 : clamp((rawValue - valueMin) / span, 0, 1);
-  });
-
-  function formatValue() {
-    const prec = Math.max(0, Math.round(numberOr(display?.valuePrecision, 0)));
-    return `${String(display?.valuePrefix ?? '')}${rawValue.toFixed(prec)}${String(display?.valueSuffix ?? '')}`;
+  // --- Value-driven tokens (multi-field) ---
+  // Field 1 = the primary value/valueMin/... above; fields[] hold extra sources
+  // addressed as {v2}/{p2}/{b2}, {v3}/... Tokens: {value}/{vN}, {pct}/{pN},
+  // {bar}/{bN} with optional :W width.
+  function fieldSpec(index) {
+    if (index <= 1) {
+      return {
+        value: numberOr(display?.value, 0),
+        min: numberOr(display?.valueMin, 0),
+        max: numberOr(display?.valueMax, 100),
+        precision: Math.max(0, Math.round(numberOr(display?.valuePrecision, 0))),
+        prefix: String(display?.valuePrefix ?? ''),
+        suffix: String(display?.valueSuffix ?? ''),
+      };
+    }
+    const f = (Array.isArray(display?.fields) ? display.fields : [])[index - 2];
+    if (!f) return null;
+    return {
+      value: numberOr(f.value, 0),
+      min: numberOr(f.min, 0),
+      max: numberOr(f.max, 100),
+      precision: Math.max(0, Math.round(numberOr(f.precision, 0))),
+      prefix: String(f.prefix ?? ''),
+      suffix: String(f.suffix ?? ''),
+    };
   }
 
-  // A block-character bargraph N cells wide, filled to the value fraction (with
-  // eighth-block partials on the leading edge for a smooth level meter).
+  function fieldFrac(spec) {
+    const span = spec.max - spec.min;
+    return span === 0 ? 0 : clamp((spec.value - spec.min) / span, 0, 1);
+  }
+
+  function fieldFormat(spec) {
+    return `${spec.prefix}${spec.value.toFixed(spec.precision)}${spec.suffix}`;
+  }
+
+  // A block-character bargraph N cells wide, filled to a fraction (eighth-block
+  // partials on the leading edge for a smooth level meter).
   const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
-  function barString(n) {
+  function barString(frac, n) {
     const width = Math.max(1, Math.round(n));
-    const eighths = Math.round(clamp(valueFrac, 0, 1) * width * 8);
+    const eighths = Math.round(clamp(frac, 0, 1) * width * 8);
     const full = Math.min(width, Math.floor(eighths / 8));
     let s = '█'.repeat(full);
     if (full < width) s += BAR_EIGHTHS[eighths % 8] + ' '.repeat(Math.max(0, width - full - 1));
@@ -217,9 +239,18 @@
   function expandTokens(line) {
     if (!line.includes('{')) return line;
     return line
-      .replace(/\{value\}/gi, () => formatValue())
-      .replace(/\{pct\}/gi, () => String(Math.round(valueFrac * 100)))
-      .replace(/\{bar(?::(\d+))?\}/gi, (_m, n) => barString(n ? Number(n) : 10));
+      .replace(/\{(?:value|v(\d+))\}/gi, (_m, n) => {
+        const spec = fieldSpec(n ? Number(n) : 1);
+        return spec ? fieldFormat(spec) : '';
+      })
+      .replace(/\{(?:pct|p(\d+))\}/gi, (_m, n) => {
+        const spec = fieldSpec(n ? Number(n) : 1);
+        return spec ? String(Math.round(fieldFrac(spec) * 100)) : '';
+      })
+      .replace(/\{(?:bar|b(\d+))(?::(\d+))?\}/gi, (_m, n, w) => {
+        const spec = fieldSpec(n ? Number(n) : 1);
+        return spec ? barString(fieldFrac(spec), w ? Number(w) : 10) : '';
+      });
   }
 
   // Expand tokens, then pad/truncate (or scroll) each line to exactly `cols`.

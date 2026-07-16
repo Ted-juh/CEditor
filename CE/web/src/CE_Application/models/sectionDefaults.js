@@ -582,6 +582,10 @@ export const SECTION_DEFAULTS = {
     valueSuffix: '',
     valueSourceId: '',             // Core.id of a panel control whose value drives
                                    // this display in preview ('' = use static value)
+    // Extra value fields for multi-source displays. Field 1 is the primary
+    // value above; fields[] are addressed as {v2}/{p2}/{b2}, {v3}/... in lines.
+    // Each: { sourceId, value, min, max, precision, prefix, suffix }.
+    fields: [],
   },
 
   /** Behavior — interaction family, role, and value model. */

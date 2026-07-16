@@ -41,6 +41,32 @@
     }
   }
 
+  // --- Extra value fields (addressed as v2/p2/b2, v3/...) ---
+  let extraFields = $derived(Array.isArray(display?.fields) ? display.fields : []);
+
+  function addField() {
+    set('fields', [...extraFields, { sourceId: '', value: 0, min: 0, max: 127, precision: 0, prefix: '', suffix: '' }]);
+  }
+  function removeField(index) {
+    const next = [...extraFields];
+    next.splice(index, 1);
+    set('fields', next);
+  }
+  function setField(index, prop, value) {
+    if (!core?.id) return;
+    updateControlProperty(core.id, `Display.fields.${index}.${prop}`, value);
+  }
+  function setFieldSource(index, id) {
+    setField(index, 'sourceId', id);
+    if (!id) return;
+    const src = ($activePanel?.controls ?? []).find((c) => String(c?._children?.Core?.id ?? '') === id);
+    const b = src?._children?.Behavior;
+    if (b) {
+      if (Number.isFinite(Number(b.min))) setField(index, 'min', Number(b.min));
+      if (Number.isFinite(Number(b.max))) setField(index, 'max', Number(b.max));
+    }
+  }
+
   function toggle(prop, defaultOn = true) {
     const current = display?.[prop];
     const isOn = current === undefined ? defaultOn : current !== false;
@@ -131,6 +157,25 @@
     </PropertyCell>
     <PropertyCell label="Suffix" span={1} hint="Text after the value token (e.g. dB, %).">
       <input class="val" type="text" value={display.valueSuffix ?? ''} oninput={(event) => set('valueSuffix', event.target.value)} />
+    </PropertyCell>
+
+    {#each extraFields as f, i}
+      <PropertyCell label={`Field ${i + 2}`} span={4} hint={`Drives tokens v${i + 2} / p${i + 2} / b${i + 2}. Source control, min, max.`}>
+        <div class="field-row">
+          <select class="val" value={f.sourceId ?? ''} onchange={(event) => setFieldSource(i, event.target.value)}>
+            <option value="">None</option>
+            {#each valueSources as src}
+              <option value={src.id}>{src.name}</option>
+            {/each}
+          </select>
+          <input class="val num" type="number" value={f.min ?? 0} onchange={(event) => setField(i, 'min', Number(event.target.value))} title="Min" />
+          <input class="val num" type="number" value={f.max ?? 127} onchange={(event) => setField(i, 'max', Number(event.target.value))} title="Max" />
+          <button class="val rm" type="button" onclick={() => removeField(i)} title="Remove field">✕</button>
+        </div>
+      </PropertyCell>
+    {/each}
+    <PropertyCell label="Fields" span={4} hint="Add an extra value field, addressed as v2/p2/b2, v3/... in the lines.">
+      <button class="val add-field" type="button" onclick={() => addField()}>+ Add value field</button>
     </PropertyCell>
   </PropertySection>
 
@@ -257,5 +302,27 @@
     border-radius: 4px;
     padding: 3px 6px;
     font-size: 12px;
+  }
+
+  .field-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+
+  .field-row .num {
+    width: 58px;
+    flex: 0 0 auto;
+  }
+
+  .field-row .rm {
+    width: 30px;
+    flex: 0 0 auto;
+    cursor: pointer;
+  }
+
+  .add-field {
+    cursor: pointer;
+    text-align: center;
   }
 </style>
