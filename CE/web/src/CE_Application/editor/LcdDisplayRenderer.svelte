@@ -16,8 +16,9 @@
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
+  import { composeLayout, findLayout, resolveActiveLayoutId } from '../utils/lcdZones.js';
 
-  let { control = null, width = 0, height = 0 } = $props();
+  let { control = null, allControls = [], width = 0, height = 0 } = $props();
 
   let display = $derived(control?._children?.Display ?? null);
 
@@ -91,12 +92,12 @@
   }
 
   // Longest per-line cycle — governs when the whole marquee has finished N reps.
-  // Uses the token-expanded lines, since that is what actually scrolls.
+  // Uses the composed (token-expanded / zone-composed) lines, since that is what
+  // actually scrolls.
   let maxScrollPeriod = $derived.by(() => {
     if (!scrolling) return 0;
-    const source = Array.isArray(display?.lines) ? display.lines : [];
     let m = 0;
-    for (let r = 0; r < rows; r += 1) m = Math.max(m, linePeriod(expandTokens(String(source[r] ?? ''))));
+    for (const line of composedLines) m = Math.max(m, linePeriod(String(line ?? '')));
     return m;
   });
 
@@ -256,15 +257,60 @@
       });
   }
 
-  // Expand tokens, then pad/truncate (or scroll) each line to exactly `cols`.
-  let gridLines = $derived.by(() => {
-    const source = Array.isArray(display?.lines) ? display.lines : [];
-    const elapsedChars = scrolling ? (frameTime / 1000) * scrollSpeed : 0;
-    const out = [];
-    for (let r = 0; r < rows; r += 1) {
-      out.push(visibleChars(expandTokens(String(source[r] ?? '')), elapsedChars));
+  // --- Zones / layouts ---
+  let hasLayouts = $derived(Array.isArray(display?.layouts) && display.layouts.length > 0);
+
+  // The active layout id: injected by the preview (selector/overlay resolved with
+  // timing), else statically resolved (design mode -> default layout).
+  let activeLayoutId = $derived.by(() => {
+    if (!hasLayouts) return '';
+    const injected = display?.__page?.activeLayoutId;
+    if (injected) return String(injected);
+    return resolveActiveLayoutId(display?.pages ?? {}, display.layouts, {});
+  });
+
+  // Info about a source control: live values injected by the preview (__live),
+  // falling back to the control's static defaults from allControls (design mode).
+  function controlInfo(sourceId) {
+    const id = String(sourceId ?? '');
+    if (!id) return null;
+    const live = display?.__live?.[id];
+    const ctrl = (Array.isArray(allControls) ? allControls : [])
+      .find((c) => String(c?._children?.Core?.id ?? '') === id);
+    if (!live && !ctrl) return null;
+    const behavior = ctrl?._children?.Behavior ?? null;
+    const min = live?.min ?? numberOr(behavior?.min, 0);
+    const max = live?.max ?? numberOr(behavior?.max, 127);
+    const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
+    return {
+      present: true,
+      name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
+      value: numberOr(live?.value, fallbackValue),
+      min,
+      max,
+      text: String(live?.text ?? ''),
+      on: live?.on === true,
+      address: live?.address,
+    };
+  }
+
+  // Pre-scroll source strings: composed from the active layout's zones when the
+  // display uses layouts, else the token-expanded lines.
+  let composedLines = $derived.by(() => {
+    if (hasLayouts) {
+      const layout = findLayout(display.layouts, activeLayoutId);
+      return composeLayout(layout?.zones ?? [], rows, cols, controlInfo);
     }
+    const source = Array.isArray(display?.lines) ? display.lines : [];
+    const out = [];
+    for (let r = 0; r < rows; r += 1) out.push(expandTokens(String(source[r] ?? '')));
     return out;
+  });
+
+  // Apply scroll/pad to get the visible per-row cell arrays.
+  let gridLines = $derived.by(() => {
+    const elapsedChars = scrolling ? (frameTime / 1000) * scrollSpeed : 0;
+    return composedLines.map((line) => visibleChars(String(line ?? ''), elapsedChars));
   });
 
   // Panel type: character cells, segment glyphs, or a true free-pixel graphic

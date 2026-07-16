@@ -590,6 +590,19 @@ export const SECTION_DEFAULTS = {
     // value above; fields[] are addressed as {v2}/{p2}/{b2}, {v3}/... in lines.
     // Each: { sourceId, value, min, max, precision, prefix, suffix }.
     fields: [],
+    // Zones / layouts / pages. When layouts is non-empty the display composes its
+    // rows from the active layout's zones instead of the lines/tokens above.
+    // layout: { id, name, zones:[ { id,name,row,colStart,colEnd,show,sourceId,
+    //   text,label,precision,prefix,suffix,radix,align,priority,visible } ] }.
+    layouts: [],
+    // pages: which layout is active. selector maps a control's value to a layout;
+    // overlays transiently show a layout on a trigger for a duration / until change.
+    pages: {
+      defaultLayoutId: '',
+      selectorSourceId: '',
+      selectorMap: [],             // [{ when, layoutId }]
+      overlays: [],                // [{ id, layoutId, sourceId, duration, dismiss }]
+    },
   },
 
   /** Behavior — interaction family, role, and value model. */

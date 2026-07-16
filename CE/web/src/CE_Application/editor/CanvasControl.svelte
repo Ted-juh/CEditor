@@ -4079,7 +4079,7 @@
     {/if}
 
     {#if isLcdDisplay}
-      <LcdDisplayRenderer control={renderControl} width={displayW} height={displayH} />
+      <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
     {/if}
 
     {#if isSliderControl}

@@ -2,6 +2,7 @@
   import { onDestroy } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
+  import { collectSourceIds, resolveActiveLayoutId } from '../utils/lcdZones.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
@@ -167,35 +168,113 @@
     return range && range.value !== undefined ? range : null;
   }
 
-  // If an LcdDisplay names value sources (primary + extra fields), drive their
-  // Display value/range from those controls' live values so the tokens follow.
+  // Rich live info about a source control for the zones engine: value/range, its
+  // name, an On/Off or choice text, and a selector key for page switching.
+  function lcdSourceInfo(src) {
+    if (!src) return null;
+    const behavior = getBehavior(src);
+    const session = sessionFor(src);
+    const info = {
+      present: true,
+      name: String(src?._children?.Core?.name ?? ''),
+      value: 0, min: 0, max: 127, text: '', on: false, selector: '',
+    };
+    if (isRangeBehavior(behavior)) {
+      const range = lcdSourceValueRange(src);
+      if (range) { info.value = range.value; info.min = range.min; info.max = range.max; info.selector = String(range.value); }
+    }
+    const family = String(behavior?.family ?? '').trim().toLowerCase();
+    if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
+      info.on = session?.checked === true || behavior?.defaultValue === true;
+      info.text = info.on ? 'On' : 'Off';
+      info.value = info.on ? 1 : 0; info.min = 0; info.max = 1;
+      info.selector = info.on ? '1' : '0';
+    }
+    if (session?.valueOverrideEnabled === true) {
+      info.selector = String(session.valueOverride);
+      if (!isRangeBehavior(behavior)) info.text = String(session.valueOverride);
+    }
+    return info;
+  }
+
+  // Change-time tracking for overlay pages: stamp when a control's value changes.
+  let lcdChangeAt = $state({});
+  const lcdPrevValue = {};
+  $effect(() => {
+    void $panelPreviewSessions; // re-run when any preview value changes
+    const now = Date.now();
+    let changed = false;
+    const next = { ...lcdChangeAt };
+    for (const control of orderedControls) {
+      const id = getControlId(control);
+      if (!id) continue;
+      const info = lcdSourceInfo(control);
+      const sig = info ? `${info.value}|${info.selector}|${info.on}` : '';
+      if (lcdPrevValue[id] !== undefined && lcdPrevValue[id] !== sig) { next[id] = now; changed = true; }
+      lcdPrevValue[id] = sig;
+    }
+    if (changed) lcdChangeAt = next;
+  });
+
+  // Which overlay layout is currently active (timer window, or latched until a
+  // different control changes). Best-effort timing; verify in-browser.
+  function resolveActiveOverlayLayout(display) {
+    const overlays = display?.pages?.overlays ?? [];
+    if (!overlays.length) return '';
+    const now = Date.now();
+    const times = Object.values(lcdChangeAt);
+    const globalMax = times.length ? Math.max(...times) : -1;
+    let best = ''; let bestAt = -1;
+    for (const ov of overlays) {
+      const at = lcdChangeAt[String(ov?.sourceId ?? '')];
+      if (at === undefined) continue;
+      const dismiss = String(ov?.dismiss ?? 'timer').trim().toLowerCase();
+      const active = dismiss === 'untilchange' ? at === globalMax : (now - at) < numberOr(ov?.duration, 800);
+      if (active && at > bestAt) { bestAt = at; best = String(ov?.layoutId ?? ''); }
+    }
+    return best;
+  }
+
+  // Drive an LcdDisplay from live control values: the primary/extra value fields,
+  // and (for zone layouts) a __live info map + the resolved active page.
   function applyLcdValueSource(control, resolved) {
     if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') return resolved;
     const display = control?._children?.Display;
     if (!display) return resolved;
 
+    const hasLayouts = Array.isArray(display.layouts) && display.layouts.length > 0;
     const primary = lcdRangeForSource(display.valueSourceId);
     const fields = Array.isArray(display.fields) ? display.fields : [];
     const fieldRanges = fields.map((f) => lcdRangeForSource(f?.sourceId));
-    if (!primary && !fieldRanges.some(Boolean)) return resolved;
+
+    const live = {};
+    if (hasLayouts) {
+      for (const id of collectSourceIds(display)) {
+        const src = orderedControls.find((entry) => getControlId(entry) === id);
+        const info = src ? lcdSourceInfo(src) : null;
+        if (info) live[id] = info;
+      }
+    }
+
+    if (!hasLayouts && !primary && !fieldRanges.some(Boolean)) return resolved;
 
     const base = resolved?.control ?? control;
     const clone = JSON.parse(JSON.stringify(base));
     const cd = clone?._children?.Display;
     if (cd) {
-      if (primary) {
-        cd.value = primary.value;
-        cd.valueMin = primary.min;
-        cd.valueMax = primary.max;
-      }
+      if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
       if (Array.isArray(cd.fields)) {
         fieldRanges.forEach((range, i) => {
-          if (range && cd.fields[i]) {
-            cd.fields[i].value = range.value;
-            cd.fields[i].min = range.min;
-            cd.fields[i].max = range.max;
-          }
+          if (range && cd.fields[i]) { cd.fields[i].value = range.value; cd.fields[i].min = range.min; cd.fields[i].max = range.max; }
         });
+      }
+      if (hasLayouts) {
+        cd.__live = live;
+        const pages = display.pages ?? {};
+        const selInfo = pages.selectorSourceId ? live[String(pages.selectorSourceId)] : null;
+        const selectorValue = selInfo ? selInfo.selector : undefined;
+        const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
+        cd.__page = { activeLayoutId: resolveActiveLayoutId(pages, display.layouts, { selectorValue, activeOverlayLayoutId }) };
       }
     }
     return { ...resolved, control: clone };

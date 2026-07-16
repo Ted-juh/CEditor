@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
+  import { ZONE_SHOW_KINDS } from '../utils/lcdZones.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -9,11 +10,20 @@
 
   let { control = null } = $props();
 
+  let editLayoutId = $state('');
+
   let core = $derived(getSection(control, 'Core'));
   let display = $derived(getSection(control, 'Display'));
   let rows = $derived(Math.max(1, Math.round(Number(display?.rows ?? 2))));
   let lines = $derived(Array.isArray(display?.lines) ? display.lines : []);
   let paletteEntries = $derived(Object.entries(LCD_PALETTES));
+
+  // Any control on the panel (for zone/page linking — buttons, comboboxes, etc.).
+  let allSources = $derived(
+    ($activePanel?.controls ?? [])
+      .filter((c) => String(c?._children?.Core?.id ?? '') !== String(core?.id ?? ''))
+      .map((c) => ({ id: String(c._children.Core.id), name: String(c._children.Core.name ?? c._children.Core.id) }))
+  );
 
   // Value-producing controls on the panel (slider / knob / range / number) that
   // can drive this display's value.
@@ -95,6 +105,92 @@
     const reader = new FileReader();
     reader.onload = () => set('imageSrc', String(reader.result ?? ''));
     reader.readAsDataURL(file);
+  }
+
+  // --- Zones / layouts / pages ---
+  let layouts = $derived(Array.isArray(display?.layouts) ? display.layouts : []);
+  let editLayout = $derived(layouts.find((l) => String(l?.id) === String(editLayoutId)) ?? layouts[0] ?? null);
+  let pages = $derived(display?.pages ?? {});
+  let cols = $derived(Math.max(1, Math.round(Number(display?.cols ?? 16))));
+
+  function genId(prefix) {
+    return `${prefix}${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
+  }
+  function commitLayouts(next) { set('layouts', next); }
+  function cloneLayouts() { return JSON.parse(JSON.stringify(layouts)); }
+  function commitPages(next) { set('pages', next); }
+  function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
+
+  function addLayout() {
+    const next = cloneLayouts();
+    const id = genId('lay_');
+    next.push({ id, name: `Layout ${next.length + 1}`, zones: [] });
+    commitLayouts(next);
+    editLayoutId = id;
+    if (next.length === 1) {
+      const p = clonePages();
+      p.defaultLayoutId = id;
+      commitPages(p);
+    }
+  }
+  function removeLayout(id) {
+    commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));
+  }
+  function renameLayout(id, name) {
+    const next = cloneLayouts();
+    const l = next.find((x) => String(x.id) === String(id));
+    if (l) { l.name = String(name ?? ''); commitLayouts(next); }
+  }
+  function withEditLayout(mutate) {
+    if (!editLayout) return;
+    const next = cloneLayouts();
+    const l = next.find((x) => String(x.id) === String(editLayout.id));
+    if (!l) return;
+    l.zones = Array.isArray(l.zones) ? l.zones : [];
+    mutate(l);
+    commitLayouts(next);
+  }
+  function addZone() {
+    withEditLayout((l) => l.zones.push({
+      id: genId('z_'), row: 1, colStart: 1, colEnd: Math.min(cols, 8),
+      show: 'static', sourceId: '', text: 'TEXT', align: 'left', radix: 'dec',
+    }));
+  }
+  function removeZone(i) { withEditLayout((l) => l.zones.splice(i, 1)); }
+  function setZone(i, prop, value) { withEditLayout((l) => { if (l.zones[i]) l.zones[i][prop] = value; }); }
+
+  function setPageProp(prop, value) {
+    const p = clonePages();
+    p[prop] = value;
+    commitPages(p);
+  }
+  function addSelectorRow() {
+    const p = clonePages();
+    p.selectorMap = Array.isArray(p.selectorMap) ? p.selectorMap : [];
+    p.selectorMap.push({ when: '', layoutId: editLayout?.id ?? '' });
+    commitPages(p);
+  }
+  function setSelectorRow(i, prop, value) {
+    const p = clonePages();
+    if (Array.isArray(p.selectorMap) && p.selectorMap[i]) { p.selectorMap[i][prop] = value; commitPages(p); }
+  }
+  function removeSelectorRow(i) {
+    const p = clonePages();
+    if (Array.isArray(p.selectorMap)) { p.selectorMap.splice(i, 1); commitPages(p); }
+  }
+  function addOverlay() {
+    const p = clonePages();
+    p.overlays = Array.isArray(p.overlays) ? p.overlays : [];
+    p.overlays.push({ id: genId('ov_'), layoutId: editLayout?.id ?? '', sourceId: '', duration: 800, dismiss: 'timer' });
+    commitPages(p);
+  }
+  function setOverlay(i, prop, value) {
+    const p = clonePages();
+    if (Array.isArray(p.overlays) && p.overlays[i]) { p.overlays[i][prop] = value; commitPages(p); }
+  }
+  function removeOverlay(i) {
+    const p = clonePages();
+    if (Array.isArray(p.overlays)) { p.overlays.splice(i, 1); commitPages(p); }
   }
 </script>
 
@@ -206,6 +302,138 @@
       <button class="val add-field" type="button" onclick={() => addField()}>+ Add value field</button>
     </PropertyCell>
   </PropertySection>
+
+  <PropertySection title="Layouts">
+    {#if layouts.length === 0}
+      <PropertyCell label="Layouts" span={4} hint="Zones/layouts compose the display from bound regions instead of the lines/tokens above. Add a layout to switch to region mode.">
+        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts (zones)</button>
+      </PropertyCell>
+    {:else}
+      <PropertyCell label="Edit Layout" span={4} hint="Which layout the Zones table below edits. Layouts are switched at runtime by the Pages rules.">
+        <div class="field-row">
+          <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => (editLayoutId = event.target.value)}>
+            {#each layouts as l}
+              <option value={String(l.id)}>{l.name ?? l.id}</option>
+            {/each}
+          </select>
+          <button class="val rm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
+          <button class="val rm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="Name" span={4} hint="Layout name (used by the Pages rules).">
+        <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
+      </PropertyCell>
+
+      {#if editLayout}
+        {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
+          <PropertyCell label={`Zone ${i + 1}`} span={4} hint="Region (row, col start–end), what to show, and the source control.">
+            <div class="zone-row">
+              <input class="val zn" type="number" min="1" title="Row" value={z.row ?? 1} onchange={(event) => setZone(i, 'row', Math.round(Number(event.target.value)))} />
+              <input class="val zn" type="number" min="1" title="Col start" value={z.colStart ?? 1} onchange={(event) => setZone(i, 'colStart', Math.round(Number(event.target.value)))} />
+              <input class="val zn" type="number" min="1" title="Col end" value={z.colEnd ?? cols} onchange={(event) => setZone(i, 'colEnd', Math.round(Number(event.target.value)))} />
+              <select class="val" title="Show" value={z.show ?? 'static'} onchange={(event) => setZone(i, 'show', event.target.value)}>
+                {#each ZONE_SHOW_KINDS as kind}
+                  <option value={kind}>{kind}</option>
+                {/each}
+              </select>
+              <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
+            </div>
+            <div class="zone-row">
+              {#if z.show === 'static'}
+                <input class="val" type="text" placeholder="caption text" value={z.text ?? ''} oninput={(event) => setZone(i, 'text', event.target.value)} />
+              {:else}
+                <select class="val" title="Source component" value={z.sourceId ?? ''} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
+                  <option value="">(source component)</option>
+                  {#each allSources as src}
+                    <option value={src.id}>{src.name}</option>
+                  {/each}
+                </select>
+                <select class="val zn2" title="Align" value={z.align ?? 'left'} onchange={(event) => setZone(i, 'align', event.target.value)}>
+                  <option value="left">L</option>
+                  <option value="center">C</option>
+                  <option value="right">R</option>
+                </select>
+                {#if z.show === 'midiValue'}
+                  <select class="val zn2" title="Radix" value={z.radix ?? 'dec'} onchange={(event) => setZone(i, 'radix', event.target.value)}>
+                    <option value="dec">dec</option>
+                    <option value="hex">hex</option>
+                  </select>
+                {/if}
+              {/if}
+            </div>
+          </PropertyCell>
+        {/each}
+        <PropertyCell label="Zones" span={4} hint="Add a region to this layout.">
+          <button class="val add-field" type="button" onclick={() => addZone()}>+ Add zone</button>
+        </PropertyCell>
+      {/if}
+    {/if}
+  </PropertySection>
+
+  {#if layouts.length > 0}
+    <PropertySection title="Pages">
+      <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
+        <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
+          <option value="">None (always default)</option>
+          {#each allSources as src}
+            <option value={src.id}>{src.name}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Default" span={4} hint="Resting layout when no selector value matches.">
+        <select class="val" value={pages.defaultLayoutId ?? ''} onchange={(event) => setPageProp('defaultLayoutId', event.target.value)}>
+          {#each layouts as l}
+            <option value={String(l.id)}>{l.name ?? l.id}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      {#each (pages.selectorMap ?? []) as m, i (i)}
+        <PropertyCell label={`When = ${m.when ?? ''}`} span={4} hint="Selector value → layout to show.">
+          <div class="field-row">
+            <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+            <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
+              {#each layouts as l}
+                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {/each}
+            </select>
+            <button class="val rm" type="button" onclick={() => removeSelectorRow(i)} title="Remove">✕</button>
+          </div>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Map" span={4} hint="Add a selector value → layout mapping.">
+        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page mapping</button>
+      </PropertyCell>
+
+      {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
+        <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
+          <div class="field-row">
+            <select class="val" title="Layout" value={String(ov.layoutId ?? '')} onchange={(event) => setOverlay(i, 'layoutId', event.target.value)}>
+              {#each layouts as l}
+                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {/each}
+            </select>
+            <select class="val" title="On change of" value={ov.sourceId ?? ''} onchange={(event) => setOverlay(i, 'sourceId', event.target.value)}>
+              <option value="">(trigger)</option>
+              {#each allSources as src}
+                <option value={src.id}>{src.name}</option>
+              {/each}
+            </select>
+            <select class="val zn2" title="Dismiss" value={ov.dismiss ?? 'timer'} onchange={(event) => setOverlay(i, 'dismiss', event.target.value)}>
+              <option value="timer">for</option>
+              <option value="untilChange">until</option>
+            </select>
+            {#if (ov.dismiss ?? 'timer') === 'timer'}
+              <input class="val zn" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+            {/if}
+            <button class="val rm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
+          </div>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
+        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 
   <PropertySection title="Colour">
     <PropertyCell label="Lit" span={2} hint="Foreground (lit segment) colour, AARRGGBB.">
@@ -352,5 +580,23 @@
   .add-field {
     cursor: pointer;
     text-align: center;
+  }
+
+  .zone-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+
+  .zone-row .zn {
+    width: 46px;
+    flex: 0 0 auto;
+    text-align: center;
+  }
+
+  .zone-row .zn2 {
+    width: 54px;
+    flex: 0 0 auto;
   }
 </style>
