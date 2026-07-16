@@ -88,14 +88,23 @@
   function setLine(index, value) {
     set(`lines.${index}`, String(value ?? ''));
   }
+
+  function onPickImage(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => set('imageSrc', String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  }
 </script>
 
 {#if display}
   <PropertySection title="Screen">
-    <PropertyCell label="Panel Type" span={2} hint="Character cells, or a 7/14/16-segment display.">
+    <PropertyCell label="Panel Type" span={2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
         <option value="segment">Segment</option>
+        <option value="graphic">Graphic (dot-matrix)</option>
       </select>
     </PropertyCell>
     {#if String(display.panelType ?? '') === 'segment'}
@@ -107,6 +116,25 @@
           <option value="16">16-segment</option>
         </select>
       </PropertyCell>
+    {/if}
+    {#if String(display.panelType ?? '') === 'graphic'}
+      <PropertyCell label="Pixels W" span={2} hint="Graphic pixel columns (0 = auto from Columns).">
+        <NumberInput value={display.pixelWidth ?? 0} step={1} min={0} max={512} onchange={(value) => set('pixelWidth', Math.round(value))} />
+      </PropertyCell>
+      <PropertyCell label="Pixels H" span={2} hint="Graphic pixel rows (0 = auto from Rows).">
+        <NumberInput value={display.pixelHeight ?? 0} step={1} min={0} max={512} onchange={(value) => set('pixelHeight', Math.round(value))} />
+      </PropertyCell>
+      <PropertyCell label="Image" span={3} hint="Optional image dithered onto the grid (overrides text). Clear to show text.">
+        <input class="val" type="file" accept="image/*" onchange={onPickImage} />
+      </PropertyCell>
+      <PropertyCell label="Dither" span={1} hint="Floyd–Steinberg dither vs hard threshold.">
+        <PropertyToggle value={display.imageDither !== false} onchange={() => toggle('imageDither', true)} />
+      </PropertyCell>
+      {#if display.imageSrc}
+        <PropertyCell label="Clear Image" span={4} hint="Remove the image and go back to showing text.">
+          <button class="val add-field" type="button" onclick={() => set('imageSrc', '')}>Clear image</button>
+        </PropertyCell>
+      {/if}
     {/if}
     <PropertyCell label="Palette" span={4} hint="Ready-made lit/unlit/backlight colour set. You can still tweak colours below.">
       <select class="val" value={display.palette ?? 'greenStn'} onchange={(event) => applyPalette(event.target.value)}>

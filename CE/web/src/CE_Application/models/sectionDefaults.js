@@ -535,8 +535,12 @@ export const SECTION_DEFAULTS = {
    */
   Display: {
     _type: 'Display',
-    panelType: 'character',        // character | segment
+    panelType: 'character',        // character | segment | graphic
     segmentType: '16',             // 7 | 14 | 16 (14 shares the 16-seg starburst)
+    pixelWidth: 0,                 // graphic mode pixel columns (0 = auto from cols)
+    pixelHeight: 0,                // graphic mode pixel rows (0 = auto from rows)
+    imageSrc: '',                  // graphic mode: image to dither onto the grid
+    imageDither: true,             // Floyd–Steinberg dither vs hard threshold
     palette: 'greenStn',           // preset palette id (see LcdDisplayRenderer)
     rows: 2,
     cols: 16,

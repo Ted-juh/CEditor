@@ -15,6 +15,7 @@
 
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
+  import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
 
   let { control = null, width = 0, height = 0 } = $props();
 
@@ -264,15 +265,16 @@
     return out;
   });
 
-  // Segment display (7 / 14 / 16-segment). Each cell renders an SVG glyph.
+  // Panel type: character cells, segment glyphs, or a true free-pixel graphic
+  // canvas (dot-matrix with a bitmap/dithered image).
   let panelType = $derived(String(display?.panelType ?? 'character').trim().toLowerCase());
   let isSegment = $derived(panelType === 'segment');
+  let isGraphic = $derived(panelType === 'graphic');
   let segmentType = $derived(String(display?.segmentType ?? '16'));
 
-  // Dot-matrix look: punch the lit/ghost layers into a repeating dot grid via a
-  // CSS mask. Cheap approximation of a real pixel grid (true free-pixel graphic
-  // mode is a later canvas increment). Not used in segment mode.
-  let dotMatrix = $derived(!isSegment && (display?.dotMatrix === true || panelType === 'dotmatrix'));
+  // Dot-matrix look (character mode): punch the lit/ghost layers into a repeating
+  // dot grid via a CSS mask. Not used in segment or graphic mode.
+  let dotMatrix = $derived(!isSegment && !isGraphic && (display?.dotMatrix === true || panelType === 'dotmatrix'));
   let dotShape = $derived(String(display?.dotShape ?? 'round').trim().toLowerCase());
   let dotPitchPx = $derived.by(() => {
     const p = numberOr(display?.dotPitch, 0);
@@ -338,6 +340,26 @@
       <div class="lcd-layer" style={backlightStyle}></div>
     {/if}
 
+    {#if isGraphic}
+      <LcdGraphicCanvas
+        lines={gridLines}
+        {cols}
+        {rows}
+        {litCss}
+        {unlitCss}
+        {brightness}
+        {contrast}
+        {showGhost}
+        {blinkOn}
+        dotShape={dotShape}
+        imageSrc={display?.imageSrc ?? ''}
+        dither={display?.imageDither !== false}
+        pixelWidth={numberOr(display?.pixelWidth, 0)}
+        pixelHeight={numberOr(display?.pixelHeight, 0)}
+        width={screenW}
+        height={screenH}
+      />
+    {:else}
     <div class="lcd-screen" style={screenMaskStyle}>
       {#each gridLines as line, r (r)}
         <div class="lcd-line" style={lineStyle}>
@@ -382,6 +404,7 @@
         </div>
       {/each}
     </div>
+    {/if}
 
     {#if showGrid}
       <div class="lcd-layer" style={gridStyle}></div>
