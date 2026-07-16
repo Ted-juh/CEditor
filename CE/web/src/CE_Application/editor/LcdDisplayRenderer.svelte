@@ -58,12 +58,14 @@
   let backlightCss = $derived(cssColour(display?.backlightColour ?? 'FF0E5A2E', '#0E5A2E'));
 
   // The screen area inside the bezel/padding, and the per-cell geometry.
+  // charSpacing is a real gap between cells (shared by character and segment
+  // modes), so the cell width reserves room for it.
   let screenW = $derived(Math.max(1, numberOr(width, 0) - padding * 2));
   let screenH = $derived(Math.max(1, numberOr(height, 0) - padding * 2));
-  let cellW = $derived(screenW / cols);
+  let cellW = $derived(Math.max(1, (screenW - (cols - 1) * charSpacing) / cols));
   let cellH = $derived(Math.max(1, (screenH - (rows - 1) * lineSpacing) / rows));
   // Monospace advance is ~0.6em, so fit the glyph to whichever axis is tighter.
-  let fontSize = $derived(Math.max(4, Math.min(cellH * 0.92, (cellW - charSpacing) / 0.62) * fontScale));
+  let fontSize = $derived(Math.max(4, Math.min(cellH * 0.92, cellW / 0.62) * fontScale));
 
   // --- Motion (rAF ticker) ---
   // frameTime is milliseconds since the animation (re)started, not page load,
@@ -243,15 +245,19 @@
   let cellStyle = $derived(
     `width:${cellW}px; height:${cellH}px; font-size:${fontSize}px; letter-spacing:0;`
   );
-  let lineStyle = $derived(`height:${cellH}px; margin-bottom:${lineSpacing}px;`);
+  let lineStyle = $derived(`height:${cellH}px; margin-bottom:${lineSpacing}px; gap:${charSpacing}px;`);
   let charStyle = $derived(
     `color:${litCss}; opacity:${(0.35 + brightness * 0.65).toFixed(3)}; text-shadow:0 0 ${Math.max(1, fontSize * 0.14).toFixed(1)}px ${litCss};`
   );
   // Under a block cursor the glyph inverts to the screen colour.
   let charInvertStyle = $derived(`color:${screenCss}; opacity:1; z-index:2; text-shadow:none;`);
+  // Font Scale sizes the segment glyph within its cell (default 1 = fills it).
+  let segPct = $derived((clamp(fontScale, 0.3, 3) * 100).toFixed(1));
   let segStyle = $derived(
-    `width:100%; height:100%; opacity:${(0.4 + brightness * 0.6).toFixed(3)}; filter: drop-shadow(0 0 ${Math.max(0.5, cellH * 0.02).toFixed(1)}px ${litCss});`
+    `width:${segPct}%; height:${segPct}%; opacity:${(0.4 + brightness * 0.6).toFixed(3)}; filter: drop-shadow(0 0 ${Math.max(0.5, cellH * 0.02).toFixed(1)}px ${litCss});`
   );
+  // Unlit segments dim with the contrast ("trim pot") control.
+  let segUnlitOpacity = $derived(Math.max(0.04, contrast).toFixed(2));
   let ghostStyle = $derived(`color:${unlitCss}; opacity:${(contrast * 0.9).toFixed(3)};`);
   let scanlineStyle = $derived(
     `background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent ${Math.max(2, Math.round(cellH / 6))}px);`
@@ -280,15 +286,18 @@
                     {@const on = glyph.lit.has(seg) && blinkOn}
                     {#if on || showGhost}
                       {#if shape.kind === 'poly'}
-                        <polygon points={shape.points} fill={on ? litCss : unlitCss} />
+                        <polygon points={shape.points} fill={on ? litCss : unlitCss} opacity={on ? 1 : segUnlitOpacity} />
                       {:else if shape.kind === 'line'}
-                        <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} stroke={on ? litCss : unlitCss} stroke-width={shape.width} stroke-linecap="round" />
+                        <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} stroke={on ? litCss : unlitCss} stroke-width={shape.width} stroke-linecap="round" opacity={on ? 1 : segUnlitOpacity} />
                       {:else if shape.kind === 'dot'}
-                        <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={on ? litCss : unlitCss} />
+                        <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={on ? litCss : unlitCss} opacity={on ? 1 : segUnlitOpacity} />
                       {/if}
                     {/if}
                   {/each}
                 </svg>
+                {#if isCursor && cursorMode === 'block'}
+                  <span class="lcd-cursor-block" style={`background:${litCss}; opacity:0.32; mix-blend-mode:screen;`}></span>
+                {/if}
               {:else}
                 {#if showGhost}
                   <span class="lcd-ghost" style={ghostStyle}>█</span>
@@ -299,9 +308,9 @@
                 {#if blinkOn}
                   <span class="lcd-char" style={isCursor && cursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
                 {/if}
-                {#if isCursor && cursorMode === 'underline'}
-                  <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
-                {/if}
+              {/if}
+              {#if isCursor && cursorMode === 'underline'}
+                <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
               {/if}
             </span>
           {/each}

@@ -117,18 +117,20 @@
     <PropertyCell label="Cell grid" span={2} hint="Faint pixel/cell grid lines.">
       <PropertyToggle value={display.showGrid === true} onchange={() => toggle('showGrid', false)} />
     </PropertyCell>
-    <PropertyCell label="Dot Matrix" span={2} hint="Render glyphs as a dot grid for a dot-matrix LCD look.">
-      <PropertyToggle value={display.dotMatrix === true} onchange={() => toggle('dotMatrix', false)} />
-    </PropertyCell>
-    <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots.">
-      <select class="val" value={display.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
-        <option value="round">Round</option>
-        <option value="square">Square</option>
-      </select>
-    </PropertyCell>
-    <PropertyCell label="Dot Pitch" span={2} hint="Dot spacing in px (0 = auto from cell size).">
-      <NumberInput value={display.dotPitch ?? 0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
-    </PropertyCell>
+    {#if String(display.panelType ?? '') !== 'segment'}
+      <PropertyCell label="Dot Matrix" span={2} hint="Render glyphs as a dot grid for a dot-matrix LCD look.">
+        <PropertyToggle value={display.dotMatrix === true} onchange={() => toggle('dotMatrix', false)} />
+      </PropertyCell>
+      <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots.">
+        <select class="val" value={display.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
+          <option value="round">Round</option>
+          <option value="square">Square</option>
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Dot Pitch" span={2} hint="Dot spacing in px (0 = auto from cell size).">
+        <NumberInput value={display.dotPitch ?? 0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   <PropertySection title="Motion">
