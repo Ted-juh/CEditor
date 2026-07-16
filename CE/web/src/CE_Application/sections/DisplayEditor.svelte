@@ -77,10 +77,31 @@
 
   <PropertySection title="Text">
     {#each Array.from({ length: rows }) as _, index}
-      <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text shown on this row (truncated/padded to the column count).">
+      <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text shown on this row. Tokens: {value}, {pct}, {bar} or {bar:N}. Truncated/padded to the column count.">
         <input class="val" type="text" value={lines[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
       </PropertyCell>
     {/each}
+  </PropertySection>
+
+  <PropertySection title="Value">
+    <PropertyCell label="Value" span={4} hint="Drives the {value}, {pct} and {bar} tokens. Set here for now; bind to a device/other component later.">
+      <NumberInput value={display.value ?? 0} step={1} min={display.valueMin ?? 0} max={display.valueMax ?? 127} onchange={(value) => set('value', value)} />
+    </PropertyCell>
+    <PropertyCell label="Min" span={2} hint="Value range minimum (for {pct} and {bar}).">
+      <NumberInput value={display.valueMin ?? 0} step={1} onchange={(value) => set('valueMin', value)} />
+    </PropertyCell>
+    <PropertyCell label="Max" span={2} hint="Value range maximum (for {pct} and {bar}).">
+      <NumberInput value={display.valueMax ?? 127} step={1} onchange={(value) => set('valueMax', value)} />
+    </PropertyCell>
+    <PropertyCell label="Precision" span={2} hint="Decimal places for {value}.">
+      <NumberInput value={display.valuePrecision ?? 0} step={1} min={0} max={6} onchange={(value) => set('valuePrecision', Math.round(value))} />
+    </PropertyCell>
+    <PropertyCell label="Prefix" span={1} hint="Text before {value}.">
+      <input class="val" type="text" value={display.valuePrefix ?? ''} oninput={(event) => set('valuePrefix', event.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Suffix" span={1} hint="Text after {value} (e.g. dB, %).">
+      <input class="val" type="text" value={display.valueSuffix ?? ''} oninput={(event) => set('valueSuffix', event.target.value)} />
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Colour">

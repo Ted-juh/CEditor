@@ -188,13 +188,47 @@
     return chars;
   }
 
-  // Pad/truncate (or scroll) each source line to exactly `cols` cells.
+  // --- Value-driven tokens ({value}, {pct}, {bar}) ---
+  let rawValue = $derived(numberOr(display?.value, 0));
+  let valueMin = $derived(numberOr(display?.valueMin, 0));
+  let valueMax = $derived(numberOr(display?.valueMax, 100));
+  let valueFrac = $derived.by(() => {
+    const span = valueMax - valueMin;
+    return span === 0 ? 0 : clamp((rawValue - valueMin) / span, 0, 1);
+  });
+
+  function formatValue() {
+    const prec = Math.max(0, Math.round(numberOr(display?.valuePrecision, 0)));
+    return `${String(display?.valuePrefix ?? '')}${rawValue.toFixed(prec)}${String(display?.valueSuffix ?? '')}`;
+  }
+
+  // A block-character bargraph N cells wide, filled to the value fraction (with
+  // eighth-block partials on the leading edge for a smooth level meter).
+  const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
+  function barString(n) {
+    const width = Math.max(1, Math.round(n));
+    const eighths = Math.round(clamp(valueFrac, 0, 1) * width * 8);
+    const full = Math.min(width, Math.floor(eighths / 8));
+    let s = '█'.repeat(full);
+    if (full < width) s += BAR_EIGHTHS[eighths % 8] + ' '.repeat(Math.max(0, width - full - 1));
+    return s.slice(0, width);
+  }
+
+  function expandTokens(line) {
+    if (!line.includes('{')) return line;
+    return line
+      .replace(/\{value\}/gi, () => formatValue())
+      .replace(/\{pct\}/gi, () => String(Math.round(valueFrac * 100)))
+      .replace(/\{bar(?::(\d+))?\}/gi, (_m, n) => barString(n ? Number(n) : 10));
+  }
+
+  // Expand tokens, then pad/truncate (or scroll) each line to exactly `cols`.
   let gridLines = $derived.by(() => {
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const elapsedChars = scrolling ? (frameTime / 1000) * scrollSpeed : 0;
     const out = [];
     for (let r = 0; r < rows; r += 1) {
-      out.push(visibleChars(String(source[r] ?? ''), elapsedChars));
+      out.push(visibleChars(expandTokens(String(source[r] ?? '')), elapsedChars));
     }
     return out;
   });

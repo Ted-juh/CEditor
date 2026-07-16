@@ -571,6 +571,15 @@ export const SECTION_DEFAULTS = {
     cursorRow: 0,
     cursorCol: 0,
     cursorBlink: true,
+    // Value-driven display: lines can contain {value}, {pct}, {bar} / {bar:N}
+    // tokens that expand from this value. It's the binding target for device
+    // parameters / routed component values.
+    value: 64,
+    valueMin: 0,
+    valueMax: 127,
+    valuePrecision: 0,
+    valuePrefix: '',
+    valueSuffix: '',
   },
 
   /** Behavior — interaction family, role, and value model. */
