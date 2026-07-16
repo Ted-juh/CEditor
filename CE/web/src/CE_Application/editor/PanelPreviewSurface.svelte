@@ -2,7 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
-  import { collectSourceIds, resolveActiveLayoutId } from '../utils/lcdZones.js';
+  import { collectSourceIds, resolveActiveLayoutId, ACTIVE_SOURCE_ID } from '../utils/lcdZones.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
@@ -201,6 +201,10 @@
     return info;
   }
 
+  // The control most recently clicked / dragged / changed — resolves the
+  // reserved "@active" zone source so a zone can follow whatever is touched.
+  let lcdActiveId = $state('');
+
   // Change-time tracking for overlay pages: stamp when a control's value changes.
   let lcdChangeAt = $state({});
   // A reactive clock bumped by timers so timed overlays auto-dismiss while idle.
@@ -233,16 +237,18 @@
     let changed = false;
     // untrack the self-read so writing lcdChangeAt below doesn't re-trigger us.
     const next = untrack(() => ({ ...lcdChangeAt }));
+    let lastChangedId = '';
     for (const control of orderedControls) {
       const id = getControlId(control);
       if (!id) continue;
       const info = lcdSourceInfo(control);
       const sig = info ? `${info.value}|${info.selector}|${info.on}` : '';
-      if (lcdPrevValue[id] !== undefined && lcdPrevValue[id] !== sig) { next[id] = now; changed = true; }
+      if (lcdPrevValue[id] !== undefined && lcdPrevValue[id] !== sig) { next[id] = now; changed = true; lastChangedId = id; }
       lcdPrevValue[id] = sig;
     }
     if (changed) {
       lcdChangeAt = next;
+      if (lastChangedId) lcdActiveId = lastChangedId;
       scheduleOverlayTicks();
     }
   });
@@ -284,7 +290,9 @@
     const live = {};
     if (hasLayouts) {
       for (const id of collectSourceIds(display)) {
-        const src = orderedControls.find((entry) => getControlId(entry) === id);
+        // "@active" resolves to whichever control was most recently touched.
+        const resolvedId = id === ACTIVE_SOURCE_ID ? lcdActiveId : id;
+        const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
         if (info) live[id] = info;
       }
@@ -1513,6 +1521,7 @@
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
+    if (pointerActiveControlId) lcdActiveId = pointerActiveControlId; // "@active" zone source
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
       openComboboxControlId = '';
     }

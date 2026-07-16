@@ -344,6 +344,7 @@
               {:else}
                 <select class="val" title="Source component" value={z.sourceId ?? ''} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
                   <option value="">(source component)</option>
+                  <option value="@active">★ Active (whatever is touched)</option>
                   {#each allSources as src}
                     <option value={src.id}>{src.name}</option>
                   {/each}

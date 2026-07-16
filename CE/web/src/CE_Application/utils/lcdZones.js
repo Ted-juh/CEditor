@@ -46,6 +46,12 @@ export const ZONE_SHOW_KINDS = [
   'static', 'name', 'value', 'pct', 'bar', 'midiValue', 'note', 'text', 'state', 'address',
 ];
 
+// A reserved dynamic source: instead of a fixed control id, a zone can bind to
+// "@active" — whichever control is currently / most recently being interacted
+// with. The preview resolves it to the live control and stores its info under
+// this key, so one zone can follow whatever the user touches.
+export const ACTIVE_SOURCE_ID = '@active';
+
 // Resolve the raw content string a zone shows, given its source info and the
 // region width. `info` is null/absent for static zones or missing sources.
 export function resolveZoneContent(zone, info, width) {
