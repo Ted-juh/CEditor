@@ -154,6 +154,9 @@ export function getSegmentGlyph(segmentType, rawChar) {
 
   // Exact match first, then case-folded, else blank.
   const litStr = map[upper] ?? map[upper.toUpperCase()] ?? map[upper.toLowerCase()] ?? '';
-  const lit = new Set(litStr.split(/[\s]+/).filter(Boolean));
+  // 7-seg map values are concatenated single-char segments ("abcdef"); the
+  // starburst map is space-separated multi-char tokens ("a1 a2 b ...").
+  const tokens = seg === 7 ? litStr.split('') : litStr.split(/\s+/);
+  const lit = new Set(tokens.map((t) => t.trim()).filter(Boolean));
   return { geometry, lit };
 }
