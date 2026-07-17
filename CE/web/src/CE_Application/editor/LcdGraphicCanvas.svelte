@@ -19,18 +19,25 @@
     dither = true,
     pixelWidth = 0,
     pixelHeight = 0,
+    fontScale = 1,
     width = 0,
     height = 0,
   } = $props();
 
-  const CELL_W = 6; // per-char pixel cell: ~5px glyph + 1px gap
-  const CELL_H = 8; // per-row  pixel cell: ~7px glyph + 1px gap
+  const BASE_CELL_W = 6; // per-char pixel cell at scale 1: ~5px glyph + 1px gap
+  const BASE_CELL_H = 8; // per-row  pixel cell at scale 1: ~7px glyph + 1px gap
 
   let canvasEl = $state(null);
   let imageEl = $state(null);
 
-  let pixW = $derived(pixelWidth > 0 ? Math.round(pixelWidth) : Math.max(1, cols * CELL_W));
-  let pixH = $derived(pixelHeight > 0 ? Math.round(pixelHeight) : Math.max(1, rows * CELL_H));
+  // Font Scale grows the per-character dot cell, so a larger glyph is drawn from
+  // more dots (auto-resolution modes). Explicit pixelWidth/Height still pin the
+  // grid; the glyphs then fit whatever cell the grid gives per character.
+  let scale = $derived(Math.max(0.3, Math.min(3, Number(fontScale) || 1)));
+  let cellPxW = $derived(Math.max(2, Math.round(BASE_CELL_W * scale)));
+  let cellPxH = $derived(Math.max(3, Math.round(BASE_CELL_H * scale)));
+  let pixW = $derived(pixelWidth > 0 ? Math.round(pixelWidth) : Math.max(1, cols * cellPxW));
+  let pixH = $derived(pixelHeight > 0 ? Math.round(pixelHeight) : Math.max(1, rows * cellPxH));
 
   // Load the image source (data URL or path) when set.
   $effect(() => {
@@ -53,13 +60,19 @@
     c.fillStyle = '#000';
     c.fillRect(0, 0, pixW, pixH);
     c.fillStyle = '#fff';
-    c.textBaseline = 'top';
-    c.font = `${CELL_H - 1}px monospace`;
+    // Fit each glyph to the actual per-character cell (grid width / cols) so text
+    // fills the grid at any resolution, and honours Font Scale via the cell size.
+    const charW = pixW / Math.max(1, cols);
+    const charH = pixH / Math.max(1, rows);
+    const font = Math.max(3, Math.floor(charH * 0.86));
+    c.textBaseline = 'middle';
+    c.textAlign = 'center';
+    c.font = `${font}px monospace`;
     for (let r = 0; r < rows; r += 1) {
       const line = lines[r] || [];
       for (let x = 0; x < cols; x += 1) {
         const ch = line[x] ?? ' ';
-        if (ch !== ' ') c.fillText(ch, x * CELL_W, r * CELL_H);
+        if (ch !== ' ') c.fillText(ch, x * charW + charW / 2, r * charH + charH / 2);
       }
     }
     const data = c.getImageData(0, 0, pixW, pixH).data;

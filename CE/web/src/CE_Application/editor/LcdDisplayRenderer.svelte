@@ -407,6 +407,7 @@
         dither={display?.imageDither !== false}
         pixelWidth={numberOr(display?.pixelWidth, 0)}
         pixelHeight={numberOr(display?.pixelHeight, 0)}
+        fontScale={fontScale}
         width={screenW}
         height={screenH}
       />
