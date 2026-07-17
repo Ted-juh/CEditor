@@ -334,6 +334,19 @@
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
 
+      {#if editLayout && (editLayout.zones ?? []).length > 0}
+        <div class="zone-head">
+          <span class="zone-num">#</span>
+          <span class="zn">Row</span>
+          <span class="zn">Start</span>
+          <span class="zn">End</span>
+          <span class="zsel">Show</span>
+          <span class="zsel">Source</span>
+          <span class="zn2">Kind</span>
+          <span class="zn2">Al</span>
+          <span class="rm"></span>
+        </div>
+      {/if}
       {#if editLayout}
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
           <div class="zone-cell">
@@ -623,6 +636,7 @@
     color: var(--text-dim, #8a8a8a);
   }
 
+  .zone-head,
   .zone-cell {
     grid-column: span 4;
     display: flex;
@@ -630,6 +644,23 @@
     gap: 3px;
     align-items: center;
   }
+
+  .zone-head {
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--border, #333);
+  }
+
+  .zone-head span {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--text-dim, #8a8a8a);
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .zone-head .zsel { text-align: left; }
 
   .zone-num {
     flex: 0 0 auto;
@@ -640,17 +671,20 @@
     color: var(--text-dim, #8a8a8a);
   }
 
+  .zone-head .zn,
   .zone-cell .zn {
     width: 42px;
     flex: 0 0 auto;
     text-align: center;
   }
 
+  .zone-head .zn2,
   .zone-cell .zn2 {
     width: 44px;
     flex: 0 0 auto;
   }
 
+  .zone-head .zsel,
   .zone-cell .zsel {
     flex: 1 1 78px;
     min-width: 60px;
@@ -662,6 +696,7 @@
     min-width: 70px;
   }
 
+  .zone-head .rm,
   .zone-cell .rm {
     width: 26px;
     flex: 0 0 auto;
@@ -669,6 +704,9 @@
     padding-left: 0;
     padding-right: 0;
     text-align: center;
+  }
+
+  .zone-cell .rm {
     cursor: pointer;
   }
 </style>
