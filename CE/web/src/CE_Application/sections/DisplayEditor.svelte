@@ -205,6 +205,7 @@
 </script>
 
 {#if display}
+  <div class="lcd-inspector">
   <PropertySection title="Screen">
     <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
@@ -608,18 +609,32 @@
       <NumberInput value={display.lineSpacing ?? 3} step={1} min={0} onchange={(value) => set('lineSpacing', value)} />
     </PropertyCell>
   </PropertySection>
+  </div>
 {/if}
 
 <style>
-  .val {
+  /* The inputs live inside PropertyCell (slotted content), so target them with a
+     :global descendant selector under the hashed wrapper. color-scheme keeps the
+     native select/number controls dark. !important guards against any inherited
+     UA/theme rule so the fields never fall back to a white background. */
+  .lcd-inspector {
+    color-scheme: dark;
+  }
+
+  .lcd-inspector :global(.val) {
     width: 100%;
     box-sizing: border-box;
-    background: #1A1A1A;
-    border: 1px solid #333;
-    color: #DDD;
+    background: #1A1A1A !important;
+    border: 1px solid #333 !important;
+    color: #DDD !important;
     border-radius: 4px;
     padding: 3px 6px;
     font-size: 12px;
+  }
+
+  .lcd-inspector :global(.val option) {
+    background: #1A1A1A;
+    color: #DDD;
   }
 
   .field-row {
