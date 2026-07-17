@@ -553,6 +553,7 @@ export const SECTION_DEFAULTS = {
     brightness: 100,               // 0..100 (foreground intensity)
     contrast: 55,                  // 0..100 (LCD trim-pot feel)
     glassTint: '14FFFFFF',         // glass sheen overlay
+    showGlass: true,               // draw the diagonal glass sheen overlay
     showGhost: true,               // faint unlit cells behind the text
     showScanlines: false,          // horizontal scanline overlay
     showGrid: false,               // faint pixel/cell grid lines

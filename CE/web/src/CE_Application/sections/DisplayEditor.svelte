@@ -502,6 +502,9 @@
     <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
       <input class="val" type="text" value={display.backlightColour ?? 'FF0E5A2E'} onchange={(event) => set('backlightColour', event.target.value.trim())} />
     </PropertyCell>
+    <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB (low alpha = subtle).">
+      <input class="val" type="text" value={display.glassTint ?? '14FFFFFF'} onchange={(event) => set('glassTint', event.target.value.trim())} />
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Lighting">
@@ -523,18 +526,23 @@
     <PropertyCell label="Cell grid" span={2} hint="Faint pixel/cell grid lines.">
       <PropertyToggle value={display.showGrid === true} onchange={() => toggle('showGrid', false)} />
     </PropertyCell>
-    {#if String(display.panelType ?? '') !== 'segment'}
-      <PropertyCell label="Dot Matrix" span={2} hint="Render glyphs as a dot grid for a dot-matrix LCD look.">
+    <PropertyCell label="Glass sheen" span={2} hint="Diagonal glass reflection overlay (colour set under Colour ▸ Glass).">
+      <PropertyToggle value={display.showGlass !== false} onchange={() => toggle('showGlass', true)} />
+    </PropertyCell>
+    {#if String(display.panelType ?? '') === 'character'}
+      <PropertyCell label="Dot Matrix" span={2} hint="Render character glyphs as a dot grid for a dot-matrix LCD look.">
         <PropertyToggle value={display.dotMatrix === true} onchange={() => toggle('dotMatrix', false)} />
       </PropertyCell>
-      <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots.">
+      <PropertyCell label="Dot Pitch" span={2} hint="Dot spacing in px (0 = auto from cell size).">
+        <NumberInput value={display.dotPitch ?? 0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
+      </PropertyCell>
+    {/if}
+    {#if String(display.panelType ?? '') !== 'segment'}
+      <PropertyCell label="Dot Shape" span={2} hint="Round (LCD/OLED) or square (blockier) dots. Applies to dot-matrix and graphic mode.">
         <select class="val" value={display.dotShape ?? 'round'} onchange={(event) => set('dotShape', event.target.value)}>
           <option value="round">Round</option>
           <option value="square">Square</option>
         </select>
-      </PropertyCell>
-      <PropertyCell label="Dot Pitch" span={2} hint="Dot spacing in px (0 = auto from cell size).">
-        <NumberInput value={display.dotPitch ?? 0} step={1} min={0} max={20} onchange={(value) => set('dotPitch', Math.round(value))} />
       </PropertyCell>
     {/if}
   </PropertySection>

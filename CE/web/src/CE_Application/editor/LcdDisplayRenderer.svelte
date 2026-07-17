@@ -349,13 +349,16 @@
   let showGhost = $derived(display?.showGhost !== false);
   let showScanlines = $derived(display?.showScanlines === true);
   let showGrid = $derived(display?.showGrid === true);
+  let showGlass = $derived(display?.showGlass !== false);
   let glassTintCss = $derived(cssColour(display?.glassTint ?? '14FFFFFF', 'rgba(255,255,255,0.08)'));
 
   // Inset the screen by the padding so the Background bezel frames it.
   let surfaceStyle = $derived(`inset:${padding}px; background:${screenCss}; border-radius:5px;`);
-  // Edge-lit backlight wash: brighter toward the centre.
+  // Edge-lit backlight wash: fills the whole screen (brighter toward the centre)
+  // so toggling it on/off is unmistakable. A solid opacity floor keeps the wash
+  // visible on dark palettes; contrast modulates it a little on top.
   let backlightStyle = $derived(
-    `background: radial-gradient(120% 140% at 50% 42%, ${backlightCss}, transparent 78%); opacity:${(0.35 + contrast * 0.5).toFixed(3)};`
+    `background: radial-gradient(135% 150% at 50% 40%, ${backlightCss}, transparent 96%); opacity:${(0.6 + contrast * 0.3).toFixed(3)};`
   );
   let cellStyle = $derived(
     `width:${cellW}px; height:${cellH}px; font-size:${fontSize}px; letter-spacing:0;`
@@ -460,7 +463,9 @@
     {#if showScanlines}
       <div class="lcd-layer" style={scanlineStyle}></div>
     {/if}
-    <div class="lcd-layer lcd-glass" style={`background:linear-gradient(155deg, ${glassTintCss}, transparent 55%);`}></div>
+    {#if showGlass}
+      <div class="lcd-layer lcd-glass" style={`background:linear-gradient(155deg, ${glassTintCss}, transparent 55%);`}></div>
+    {/if}
   </div>
 {/if}
 
