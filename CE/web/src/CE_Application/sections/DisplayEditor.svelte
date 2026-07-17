@@ -614,9 +614,9 @@
   .val {
     width: 100%;
     box-sizing: border-box;
-    background: var(--input-bg, #1c1c1c);
-    border: 1px solid var(--input-border, #3a3a3a);
-    color: var(--text, #e8e8e8);
+    background: #1A1A1A;
+    border: 1px solid #333;
+    color: #DDD;
     border-radius: 4px;
     padding: 3px 6px;
     font-size: 12px;
@@ -646,7 +646,7 @@
 
   .hint-note {
     font-size: 11px;
-    color: var(--text-dim, #8a8a8a);
+    color: #8a8a8a;
   }
 
   .zone-head,
@@ -660,7 +660,7 @@
 
   .zone-head {
     padding-bottom: 2px;
-    border-bottom: 1px solid var(--border, #333);
+    border-bottom: 1px solid #333;
   }
 
   .zone-head span {
@@ -668,7 +668,7 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.03em;
-    color: var(--text-dim, #8a8a8a);
+    color: #8a8a8a;
     text-align: center;
     box-sizing: border-box;
   }
@@ -681,7 +681,7 @@
     text-align: center;
     font-size: 11px;
     font-weight: 600;
-    color: var(--text-dim, #8a8a8a);
+    color: #8a8a8a;
   }
 
   .zone-head .zn,
