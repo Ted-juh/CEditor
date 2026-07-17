@@ -50,7 +50,24 @@ export const ZONE_SHOW_KINDS = [
 // "@active" — whichever control is currently / most recently being interacted
 // with. The preview resolves it to the live control and stores its info under
 // this key, so one zone can follow whatever the user touches.
+//
+// It may also carry a kind filter as "@active#value" / "@active#switch" /
+// "@active#choice" so a zone follows the active control ONLY when that control
+// is of the chosen kind. This lets two zones share the same region: e.g. a
+// "value" zone scoped to sliders and a "state" zone scoped to buttons — only
+// the one matching the currently-touched control paints, so they never collide.
 export const ACTIVE_SOURCE_ID = '@active';
+
+export function isActiveSource(id) {
+  return String(id ?? '') === ACTIVE_SOURCE_ID || String(id ?? '').startsWith(`${ACTIVE_SOURCE_ID}#`);
+}
+
+// The kind filter of an "@active#kind" source ('' when unfiltered / not active).
+export function activeFilterOf(id) {
+  const s = String(id ?? '');
+  const hash = s.indexOf('#');
+  return isActiveSource(s) && hash >= 0 ? s.slice(hash + 1).trim().toLowerCase() : '';
+}
 
 // Resolve the raw content string a zone shows, given its source info and the
 // region width. `info` is null/absent for static zones or missing sources.
@@ -73,7 +90,7 @@ export function resolveZoneContent(zone, info, width) {
     case 'pct':
       return present ? `${prefix}${Math.round(infoFraction(info) * 100)}${suffix}` : '';
     case 'bar':
-      return barString(present ? infoFraction(info) : 0, width);
+      return present ? barString(infoFraction(info), width) : '';
     case 'midivalue': {
       if (!present) return '';
       const midi = Math.round(clamp(infoFraction(info) * 127, 0, 127));
@@ -129,7 +146,11 @@ export function composeLayout(zones, rows, cols, getInfo) {
     const c1 = clamp(Math.round(numberOr(zone?.colEnd, nCols)) - 1, c0, nCols - 1);
     const width = c1 - c0 + 1;
     const info = getInfo ? getInfo(String(zone?.sourceId ?? '')) : null;
-    const fitted = fitToRegion(resolveZoneContent(zone, info, width), width, zone?.align);
+    const raw = resolveZoneContent(zone, info, width);
+    // Empty content doesn't paint, so a zone whose source is absent (or an idle
+    // "@active#kind" zone) leaves overlapping zones underneath it untouched.
+    if (raw === '') continue;
+    const fitted = fitToRegion(raw, width, zone?.align);
     for (let i = 0; i < width; i += 1) grid[row][c0 + i] = fitted[i] ?? ' ';
   }
 

@@ -2,7 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
-  import { collectSourceIds, resolveActiveLayoutId, ACTIVE_SOURCE_ID } from '../utils/lcdZones.js';
+  import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
@@ -228,6 +228,32 @@
     return best;
   }
 
+  // Coarse "kind" of a control, for "@active#kind" zone filtering. Sliders/knobs/
+  // numbers are 'value'; momentary/toggle/select buttons are 'switch'; multi-
+  // choice pickers are 'choice'.
+  function lcdControlKind(src) {
+    const behavior = getBehavior(src);
+    const family = String(behavior?.family ?? '').trim().toLowerCase();
+    const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
+    if (isComboboxControl(src) || buttonType === 'radio' || buttonType === 'cyclic') return 'choice';
+    if (family === 'trigger' || family === 'select' || String(behavior?.valueType ?? '') === 'bool') return 'switch';
+    if (family === 'range') return 'value';
+    return 'other';
+  }
+
+  // Resolve an "@active" (optionally "@active#kind") source to a concrete control
+  // id. Without a filter it's just the scoped active control; with a filter it
+  // resolves only when the currently-active control is of that kind, so a
+  // filtered zone stays empty while an off-kind control is being touched.
+  function lcdResolveActive(id, display) {
+    const base = lcdActiveForScope(display?.activeScope);
+    if (!base) return '';
+    const filter = activeFilterOf(id);
+    if (!filter) return base;
+    const ctrl = orderedControls.find((entry) => getControlId(entry) === base);
+    return ctrl && lcdControlKind(ctrl) === filter ? base : '';
+  }
+
   // Change-time tracking for overlay pages: stamp when a control's value changes.
   let lcdChangeAt = $state({});
   // A reactive clock bumped by timers so timed overlays auto-dismiss while idle.
@@ -313,9 +339,11 @@
     const live = {};
     if (hasLayouts) {
       for (const id of collectSourceIds(display)) {
-        // "@active" resolves to the most recently touched control, restricted to
-        // this display's activeScope (empty scope = any control).
-        const resolvedId = id === ACTIVE_SOURCE_ID ? lcdActiveForScope(display.activeScope) : id;
+        // "@active"/"@active#kind" resolve to the most recently touched control
+        // (restricted to this display's activeScope, and to the kind filter);
+        // a fixed id resolves to that control. Keyed by the raw id so each
+        // filtered "@active#kind" zone reads its own live value.
+        const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
         const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
         if (info) live[id] = info;

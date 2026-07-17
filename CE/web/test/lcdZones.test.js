@@ -7,6 +7,8 @@ import {
   resolveActiveLayoutId,
   collectSourceIds,
   noteName,
+  isActiveSource,
+  activeFilterOf,
 } from '../src/CE_Application/utils/lcdZones.js';
 
 const slider = { present: true, name: 'Cutoff', value: 62, min: 0, max: 127 };
@@ -72,6 +74,41 @@ test('collectSourceIds gathers zone + selector + overlay sources', () => {
     pages: { selectorSourceId: 'C', overlays: [{ sourceId: 'D' }] },
   };
   assert.deepEqual(collectSourceIds(display).sort(), ['A', 'B', 'C', 'D']);
+});
+
+test('isActiveSource / activeFilterOf parse @active kind filters', () => {
+  assert.equal(isActiveSource('@active'), true);
+  assert.equal(isActiveSource('@active#value'), true);
+  assert.equal(isActiveSource('S1'), false);
+  assert.equal(isActiveSource(''), false);
+  assert.equal(activeFilterOf('@active'), '');
+  assert.equal(activeFilterOf('@active#switch'), 'switch');
+  assert.equal(activeFilterOf('S1'), '');
+});
+
+test('empty zones do not clobber overlapping zones (per-kind @active share a region)', () => {
+  // Two zones share R1 C4-6: a slider-scoped value and a button-scoped state.
+  // Only the active kind resolves to live info; the other is empty and must not
+  // paint spaces over the one that did.
+  const zones = [
+    { row: 1, colStart: 1, colEnd: 3, show: 'static', text: 'ID' },
+    { row: 1, colStart: 4, colEnd: 6, show: 'value', sourceId: '@active#value' },
+    { row: 1, colStart: 4, colEnd: 6, show: 'state', sourceId: '@active#switch' },
+  ];
+  // Button active: only the switch source has info -> 'On' shows, value stays out.
+  const btnActive = (id) => (id === '@active#switch' ? { present: true, on: true, value: 1 } : null);
+  assert.equal(composeLayout(zones, 1, 6, btnActive)[0], 'ID On ');
+  // Slider active: only the value source has info -> '62' shows.
+  const sliderActive = (id) => (id === '@active#value' ? { present: true, value: 62, min: 0, max: 127 } : null);
+  assert.equal(composeLayout(zones, 1, 6, sliderActive)[0], 'ID 62 ');
+});
+
+test('an absent bar zone leaves the region blank rather than a full-width gutter', () => {
+  const zones = [
+    { row: 1, colStart: 1, colEnd: 4, show: 'static', text: 'AAAA' },
+    { row: 1, colStart: 1, colEnd: 4, show: 'bar', sourceId: 'S1' },
+  ];
+  assert.equal(composeLayout(zones, 1, 4, () => null)[0], 'AAAA');
 });
 
 test('noteName maps MIDI note numbers', () => {

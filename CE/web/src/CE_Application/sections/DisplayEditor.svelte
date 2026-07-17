@@ -2,7 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
-  import { ZONE_SHOW_KINDS } from '../utils/lcdZones.js';
+  import { ZONE_SHOW_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -158,6 +158,10 @@
   }
   function removeZone(i) { withEditLayout((l) => l.zones.splice(i, 1)); }
   function setZone(i, prop, value) { withEditLayout((l) => { if (l.zones[i]) l.zones[i][prop] = value; }); }
+  // The Source dropdown value: any "@active#kind" collapses to "@active".
+  function zoneSourceValue(z) { return isActiveSource(z?.sourceId) ? '@active' : (z?.sourceId ?? ''); }
+  // Set the "@active" kind filter (''=any) by rewriting the compound source id.
+  function setZoneActiveKind(i, kind) { setZone(i, 'sourceId', kind ? `@active#${kind}` : '@active'); }
 
   function setPageProp(prop, value) {
     const p = clonePages();
@@ -345,13 +349,21 @@
             {#if z.show === 'static'}
               <input class="val ztext" type="text" placeholder="caption text" value={z.text ?? ''} oninput={(event) => setZone(i, 'text', event.target.value)} />
             {:else}
-              <select class="val zsel" title="Source component" value={z.sourceId ?? ''} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
+              <select class="val zsel" title="Source component" value={zoneSourceValue(z)} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
                 <option value="">(source)</option>
                 <option value="@active">★ Active</option>
                 {#each allSources as src}
                   <option value={src.id}>{src.name}</option>
                 {/each}
               </select>
+              {#if isActiveSource(z.sourceId)}
+                <select class="val zn2" title="Active kind filter" value={activeFilterOf(z.sourceId)} onchange={(event) => setZoneActiveKind(i, event.target.value)}>
+                  <option value="">any</option>
+                  <option value="value">slid</option>
+                  <option value="switch">btn</option>
+                  <option value="choice">sel</option>
+                </select>
+              {/if}
               <select class="val zn2" title="Align" value={z.align ?? 'left'} onchange={(event) => setZone(i, 'align', event.target.value)}>
                 <option value="left">L</option>
                 <option value="center">C</option>
