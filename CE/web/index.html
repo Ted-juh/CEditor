@@ -9,6 +9,9 @@
     <title>CEditor</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
+      /* Dark UA theme for native form controls (select/input/etc.) app-wide, so
+         they never fall back to a white background in the dark UI. */
+      :root { color-scheme: dark; }
       /* Kill native number spinners globally — WebView2/Chromium */
       input[type="number"]::-webkit-inner-spin-button,
       input[type="number"]::-webkit-outer-spin-button {

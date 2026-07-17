@@ -621,7 +621,10 @@
     color-scheme: dark;
   }
 
-  .lcd-inspector :global(.val) {
+  /* Fully global (neither part hash-scoped) so it matches every .val descendant
+     regardless of whether Svelte hashed the element — including bare
+     <input class="val"> / <select class="val"> that no scoped rule touches. */
+  :global(.lcd-inspector .val) {
     width: 100%;
     box-sizing: border-box;
     background: #1A1A1A !important;
@@ -632,7 +635,7 @@
     font-size: 12px;
   }
 
-  .lcd-inspector :global(.val option) {
+  :global(.lcd-inspector .val option) {
     background: #1A1A1A;
     color: #DDD;
   }
