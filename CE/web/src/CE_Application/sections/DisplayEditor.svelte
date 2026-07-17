@@ -206,7 +206,7 @@
 
 {#if display}
   <PropertySection title="Screen">
-    <PropertyCell label="Panel Type" span={2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
+    <PropertyCell label="Panel Type" span={String(display.panelType ?? '') === 'graphic' ? 4 : 2} hint="Character cells, a 7/14/16-segment display, or a graphic (free-pixel) dot-matrix.">
       <select class="val" value={display.panelType ?? 'character'} onchange={(event) => set('panelType', event.target.value)}>
         <option value="character">Character</option>
         <option value="segment">Segment</option>
