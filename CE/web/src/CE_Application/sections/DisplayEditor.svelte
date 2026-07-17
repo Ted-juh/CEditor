@@ -344,6 +344,7 @@
           <span class="zsel">Source</span>
           <span class="zn2">Kind</span>
           <span class="zn2">Al</span>
+          <span class="zn2">Rdx</span>
           <span class="rm"></span>
         </div>
       {/if}
@@ -376,6 +377,8 @@
                   <option value="switch">btn</option>
                   <option value="choice">sel</option>
                 </select>
+              {:else}
+                <span class="zn2 zspacer" aria-hidden="true"></span>
               {/if}
               <select class="val zn2" title="Align" value={z.align ?? 'left'} onchange={(event) => setZone(i, 'align', event.target.value)}>
                 <option value="left">L</option>
@@ -387,6 +390,8 @@
                   <option value="dec">dec</option>
                   <option value="hex">hex</option>
                 </select>
+              {:else}
+                <span class="zn2 zspacer" aria-hidden="true"></span>
               {/if}
             {/if}
             <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
@@ -682,6 +687,11 @@
   .zone-cell .zn2 {
     width: 44px;
     flex: 0 0 auto;
+  }
+
+  /* Reserved empty slot so the Kind/Radix boxes appearing don't reflow the row. */
+  .zone-cell .zspacer {
+    visibility: hidden;
   }
 
   .zone-head .zsel,
