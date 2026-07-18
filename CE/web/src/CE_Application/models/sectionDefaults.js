@@ -601,7 +601,6 @@ export const SECTION_DEFAULTS = {
     // overlays transiently show a layout on a trigger for a duration / until change.
     pages: {
       defaultLayoutId: '',
-      designLayoutId: '',          // which layout the editor previews on the canvas
       selectorSourceId: '',
       selectorMap: [],             // [{ when, layoutId }]
       overlays: [],                // [{ id, layoutId, sourceId, duration, dismiss }]

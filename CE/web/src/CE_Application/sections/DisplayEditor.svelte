@@ -3,6 +3,7 @@
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -109,11 +110,10 @@
 
   // --- Zones / layouts / pages ---
   let layouts = $derived(Array.isArray(display?.layouts) ? display.layouts : []);
-  // Edit the SAME layout the canvas previews (designLayoutId) so the zone table
-  // and the on-screen preview never drift apart. Falls back to the first layout.
+  // The layout the zone table edits; the canvas mirrors it via the transient
+  // design-layout store (set in selectEditLayout), so edit and preview agree.
   let editLayout = $derived(
     layouts.find((l) => String(l?.id) === String(editLayoutId))
-    ?? layouts.find((l) => String(l?.id) === String(display?.pages?.designLayoutId ?? ''))
     ?? layouts[0] ?? null
   );
   let pages = $derived(display?.pages ?? {});
@@ -127,11 +127,11 @@
   function commitPages(next) { set('pages', next); }
   function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
 
-  // Select which layout the zone table edits, and preview it on the canvas
-  // (designLayoutId is read by the renderer in design mode).
+  // Select which layout the zone table edits, and preview it on the canvas via
+  // the transient design-layout store (view state only — never saved).
   function selectEditLayout(id) {
     editLayoutId = id;
-    setPageProp('designLayoutId', id);
+    setLcdDesignLayout(core?.id, id);
   }
   function addLayout() {
     const next = cloneLayouts();
@@ -139,10 +139,12 @@
     next.push({ id, name: `Layout ${next.length + 1}`, zones: [] });
     commitLayouts(next);
     editLayoutId = id;
-    const p = clonePages();
-    p.designLayoutId = id;
-    if (next.length === 1) p.defaultLayoutId = id;
-    commitPages(p);
+    setLcdDesignLayout(core?.id, id);
+    if (next.length === 1) {
+      const p = clonePages();
+      p.defaultLayoutId = id;
+      commitPages(p);
+    }
   }
   function removeLayout(id) {
     commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));

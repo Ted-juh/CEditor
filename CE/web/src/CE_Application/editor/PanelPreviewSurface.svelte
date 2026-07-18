@@ -4,6 +4,8 @@
   import GuideLines from './GuideLines.svelte';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import * as textEdit from '../utils/textEditBuffer.js';
+  import { get } from 'svelte/store';
+  import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
@@ -331,7 +333,9 @@
     const selInfo = selSrc ? lcdSourceInfo(selSrc) : null;
     const selectorValue = selInfo ? selInfo.selector : undefined;
     const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
-    const designId = String(pages.designLayoutId ?? '');
+    // The inspector's transient design-layout selection (in-memory store, never
+    // persisted) acts as the resting default while previewing from the editor.
+    const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
     const hasDesign = designId && display.layouts.some((l) => String(l?.id ?? '') === designId);
     const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
     return resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId });
