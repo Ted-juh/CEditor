@@ -111,6 +111,11 @@ test('an absent bar zone leaves the region blank rather than a full-width gutter
   assert.equal(composeLayout(zones, 1, 4, () => null)[0], 'AAAA');
 });
 
+test('edit zone shows the source string (caret is a renderer overlay)', () => {
+  assert.equal(resolveZoneContent({ show: 'edit' }, { present: true, text: 'LEAD 1' }, 12), 'LEAD 1');
+  assert.equal(resolveZoneContent({ show: 'edit', text: 'INIT' }, null, 8), 'INIT');
+});
+
 test('noteName maps MIDI note numbers', () => {
   assert.equal(noteName(60), 'C4');
   assert.equal(noteName(69), 'A4');

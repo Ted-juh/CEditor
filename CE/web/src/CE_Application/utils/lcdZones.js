@@ -43,7 +43,7 @@ export function noteName(value) {
 // The reserved "show" kinds a zone can render. Kinds needing a bound device
 // parameter (address, and real MIDI) fall back to a placeholder without one.
 export const ZONE_SHOW_KINDS = [
-  'static', 'name', 'value', 'pct', 'bar', 'midiValue', 'note', 'text', 'state', 'address',
+  'static', 'name', 'value', 'pct', 'bar', 'midiValue', 'note', 'text', 'state', 'address', 'edit',
 ];
 
 // A reserved dynamic source: instead of a fixed control id, a zone can bind to
@@ -102,6 +102,10 @@ export function resolveZoneContent(zone, info, width) {
       return present ? `${prefix}${noteName(info.value)}${suffix}` : '';
     case 'text':
       return `${prefix}${String(info?.text ?? '')}${suffix}`;
+    case 'edit':
+      // An editable string field (e.g. a preset name). Shows the source's live
+      // text; the renderer overlays the caret when this zone is being edited.
+      return `${prefix}${String(info?.text ?? zone?.text ?? '')}${suffix}`;
     case 'state':
       return present ? `${prefix}${info?.on === true || numberOr(info.value, 0) >= 0.5 ? 'On' : 'Off'}${suffix}` : '';
     case 'address':
