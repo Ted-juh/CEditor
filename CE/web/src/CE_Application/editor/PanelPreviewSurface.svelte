@@ -427,7 +427,13 @@
         const selInfo = pages.selectorSourceId ? live[String(pages.selectorSourceId)] : null;
         const selectorValue = selInfo ? selInfo.selector : undefined;
         const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
-        cd.__page = { activeLayoutId: resolveActiveLayoutId(pages, display.layouts, { selectorValue, activeOverlayLayoutId }) };
+        // In the editor preview, the layout you're designing (designLayoutId) is
+        // the resting layout, so pressing Play keeps showing it. A live selector
+        // value or an overlay still overrides it.
+        const designId = String(pages.designLayoutId ?? '');
+        const hasDesign = designId && (Array.isArray(display.layouts) ? display.layouts : []).some((l) => String(l?.id ?? '') === designId);
+        const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+        cd.__page = { activeLayoutId: resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId }) };
         // Live caret for the editable field when this display is being edited.
         const controlId = getControlId(control);
         cd.__edit = (lcdEdit.active && lcdEdit.id === controlId) ? { active: true, caret: lcdEdit.caret } : null;
