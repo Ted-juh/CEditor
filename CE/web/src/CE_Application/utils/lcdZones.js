@@ -134,9 +134,23 @@ export function fitToRegion(content, width, align = 'left') {
   return s + ' '.repeat(pad);
 }
 
+// Marquee window for a zone whose content overflows its region: loop the
+// content with a blank gap and slide a `width`-wide window across it.
+const ZONE_SCROLL_GAP = 3;
+export function zoneScrollWindow(content, width, elapsedChars) {
+  const track = `${content}${' '.repeat(ZONE_SCROLL_GAP)}`;
+  const period = track.length;
+  const base = ((Math.floor(elapsedChars) % period) + period) % period;
+  let out = '';
+  for (let i = 0; i < width; i += 1) out += track[(base + i) % period];
+  return out;
+}
+
 // Compose `rows` strings of `cols` chars from a layout's zones. Later (higher
 // priority) zones paint over earlier ones. getInfo(sourceId) -> info | null.
-export function composeLayout(zones, rows, cols, getInfo) {
+// `elapsedChars` drives per-zone marquee: a zone with scroll:true whose content
+// overflows its region scrolls within it instead of truncating.
+export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0) {
   const nRows = Math.max(0, Math.round(rows));
   const nCols = Math.max(0, Math.round(cols));
   const grid = [];
@@ -158,7 +172,9 @@ export function composeLayout(zones, rows, cols, getInfo) {
     // Empty content doesn't paint, so a zone whose source is absent (or an idle
     // "@active#kind" zone) leaves overlapping zones underneath it untouched.
     if (raw === '') continue;
-    const fitted = fitToRegion(raw, width, zone?.align);
+    const fitted = zone?.scroll === true && raw.length > width
+      ? zoneScrollWindow(raw, width, elapsedChars)
+      : fitToRegion(raw, width, zone?.align);
     for (let i = 0; i < width; i += 1) grid[row][c0 + i] = fitted[i] ?? ' ';
   }
 

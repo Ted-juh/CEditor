@@ -376,6 +376,7 @@
           <span class="zn2">Kind</span>
           <span class="zn2">Al</span>
           <span class="zn2">Rdx</span>
+          <span class="zn2">Ovf</span>
           <span class="rm"></span>
         </div>
       {/if}
@@ -393,6 +394,10 @@
             </select>
             {#if z.show === 'static'}
               <input class="val ztext" type="text" placeholder="caption text" value={z.text ?? ''} oninput={(event) => setZone(i, 'text', event.target.value)} />
+              <select class="val zn2" title="Overflow: cut off or scroll (marquee)" value={z.scroll === true ? 'scroll' : 'cut'} onchange={(event) => setZone(i, 'scroll', event.target.value === 'scroll')}>
+                <option value="cut">cut</option>
+                <option value="scroll">scrl</option>
+              </select>
             {:else}
               <select class="val zsel" title="Source component" value={zoneSourceValue(z)} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
                 <option value="">(source)</option>
@@ -425,6 +430,10 @@
               {:else}
                 <span class="zn2 zspacer" aria-hidden="true"></span>
               {/if}
+              <select class="val zn2" title="Overflow: cut off or scroll (marquee)" value={z.scroll === true ? 'scroll' : 'cut'} onchange={(event) => setZone(i, 'scroll', event.target.value === 'scroll')}>
+                <option value="cut">cut</option>
+                <option value="scroll">scrl</option>
+              </select>
             {/if}
             <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
           </div>

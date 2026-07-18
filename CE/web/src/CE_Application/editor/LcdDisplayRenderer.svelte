@@ -83,7 +83,14 @@
   let blinkEnabled = $derived(display?.blink === true);
   let cursorMode = $derived(String(display?.cursor ?? 'off').trim().toLowerCase());
   let cursorBlinkEnabled = $derived((cursorMode !== 'off' || editing) && display?.cursorBlink !== false);
-  let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled);
+  // Per-zone marquee (layout mode): animate whenever the active layout has a
+  // scroll-enabled zone. Speed comes from the shared Motion "Speed" setting.
+  let zoneScrollActive = $derived.by(() => {
+    if (!hasLayouts || scrollSpeed <= 0) return false;
+    const layout = findLayout(display.layouts, activeLayoutId);
+    return (layout?.zones ?? []).some((z) => z?.scroll === true && z?.visible !== false);
+  });
+  let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled || zoneScrollActive);
 
   // One full scroll cycle (in characters) for a line — 0 if it doesn't scroll.
   function linePeriod(raw) {
@@ -106,7 +113,7 @@
   let motionSignature = $derived([
     scrollDir, scrollSpeed, scrollMode, scrollGap, scrollRepeat,
     blinkEnabled, numberOr(display?.blinkRate, 500),
-    cursorMode, display?.cursorBlink !== false,
+    cursorMode, display?.cursorBlink !== false, zoneScrollActive,
     rows, cols, (Array.isArray(display?.lines) ? display.lines.join('') : ''),
   ].join('|'));
 
@@ -130,7 +137,7 @@
       const finiteDone = scrollRepeat > 0
         && (maxScrollPeriod === 0 || elapsedChars >= scrollRepeat * maxScrollPeriod);
       const scrollNeedsMore = scrolling && !finiteDone;
-      const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore;
+      const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore || zoneScrollActive;
       if (needMore) raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -331,7 +338,8 @@
   let composedLines = $derived.by(() => {
     if (hasLayouts) {
       const layout = findLayout(display.layouts, activeLayoutId);
-      return composeLayout(layout?.zones ?? [], rows, cols, controlInfo);
+      const zoneElapsed = zoneScrollActive ? (frameTime / 1000) * scrollSpeed : 0;
+      return composeLayout(layout?.zones ?? [], rows, cols, controlInfo, zoneElapsed);
     }
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const out = [];

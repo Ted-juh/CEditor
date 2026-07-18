@@ -116,6 +116,21 @@ test('edit zone shows the source string (caret is a renderer overlay)', () => {
   assert.equal(resolveZoneContent({ show: 'edit', text: 'INIT' }, null, 8), 'INIT');
 });
 
+test('a scroll zone marquees overflowing content within its region', () => {
+  const zones = [{ row: 1, colStart: 1, colEnd: 4, show: 'static', text: 'HELLO', scroll: true }];
+  // width 4, track "HELLO   " (gap 3). elapsed 0 -> "HELL"; 1 -> "ELLO"; 2 -> "LLO ".
+  assert.equal(composeLayout(zones, 1, 4, null, 0)[0], 'HELL');
+  assert.equal(composeLayout(zones, 1, 4, null, 1)[0], 'ELLO');
+  assert.equal(composeLayout(zones, 1, 4, null, 2)[0], 'LLO ');
+  // wraps: period is 8, elapsed 8 -> back to the start.
+  assert.equal(composeLayout(zones, 1, 4, null, 8)[0], 'HELL');
+});
+
+test('a scroll zone that fits its region does not scroll', () => {
+  const zones = [{ row: 1, colStart: 1, colEnd: 6, show: 'static', text: 'HI', scroll: true }];
+  assert.equal(composeLayout(zones, 1, 6, null, 5)[0], 'HI    ');
+});
+
 test('noteName maps MIDI note numbers', () => {
   assert.equal(noteName(60), 'C4');
   assert.equal(noteName(69), 'A4');
