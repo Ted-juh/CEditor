@@ -109,7 +109,13 @@
 
   // --- Zones / layouts / pages ---
   let layouts = $derived(Array.isArray(display?.layouts) ? display.layouts : []);
-  let editLayout = $derived(layouts.find((l) => String(l?.id) === String(editLayoutId)) ?? layouts[0] ?? null);
+  // Edit the SAME layout the canvas previews (designLayoutId) so the zone table
+  // and the on-screen preview never drift apart. Falls back to the first layout.
+  let editLayout = $derived(
+    layouts.find((l) => String(l?.id) === String(editLayoutId))
+    ?? layouts.find((l) => String(l?.id) === String(display?.pages?.designLayoutId ?? ''))
+    ?? layouts[0] ?? null
+  );
   let pages = $derived(display?.pages ?? {});
   let cols = $derived(Math.max(1, Math.round(Number(display?.cols ?? 16))));
 

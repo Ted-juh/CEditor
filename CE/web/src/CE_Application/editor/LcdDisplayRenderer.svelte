@@ -16,7 +16,7 @@
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
-  import { composeLayout, findLayout, resolveActiveLayoutId } from '../utils/lcdZones.js';
+  import { composeLayout, findLayout } from '../utils/lcdZones.js';
 
   let { control = null, allControls = [], width = 0, height = 0 } = $props();
 
@@ -288,11 +288,12 @@
     if (!hasLayouts) return '';
     const injected = display?.__page?.activeLayoutId;
     if (injected) return String(injected);
-    // Design mode: show the layout currently being edited in the inspector, so
-    // switching "Edit Layout" previews that layout on the canvas.
+    // Design mode: show the layout currently being edited (designLayoutId), else
+    // the first layout — matching the inspector's Edit/Preview Layout. (The Pages
+    // runtime default only applies to the live preview, which injects __page.)
     const design = String(display?.pages?.designLayoutId ?? '');
     if (design && findLayout(display.layouts, design)) return design;
-    return resolveActiveLayoutId(display?.pages ?? {}, display.layouts, {});
+    return String(display.layouts[0]?.id ?? '');
   });
 
   // Info about a source control: live values injected by the preview (__live),
