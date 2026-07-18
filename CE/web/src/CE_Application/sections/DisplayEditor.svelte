@@ -121,17 +121,22 @@
   function commitPages(next) { set('pages', next); }
   function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
 
+  // Select which layout the zone table edits, and preview it on the canvas
+  // (designLayoutId is read by the renderer in design mode).
+  function selectEditLayout(id) {
+    editLayoutId = id;
+    setPageProp('designLayoutId', id);
+  }
   function addLayout() {
     const next = cloneLayouts();
     const id = genId('lay_');
     next.push({ id, name: `Layout ${next.length + 1}`, zones: [] });
     commitLayouts(next);
     editLayoutId = id;
-    if (next.length === 1) {
-      const p = clonePages();
-      p.defaultLayoutId = id;
-      commitPages(p);
-    }
+    const p = clonePages();
+    p.designLayoutId = id;
+    if (next.length === 1) p.defaultLayoutId = id;
+    commitPages(p);
   }
   function removeLayout(id) {
     commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));
@@ -337,9 +342,9 @@
         <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts (zones)</button>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Edit Layout" span={4} hint="Which layout the Zones table below edits. Layouts are switched at runtime by the Pages rules.">
+      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits AND previews on the canvas. Runtime switching is set by the Pages rules below.">
         <div class="field-row">
-          <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => (editLayoutId = event.target.value)}>
+          <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
             {#each layouts as l}
               <option value={String(l.id)}>{l.name ?? l.id}</option>
             {/each}

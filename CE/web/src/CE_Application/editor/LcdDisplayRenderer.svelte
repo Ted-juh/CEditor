@@ -288,6 +288,10 @@
     if (!hasLayouts) return '';
     const injected = display?.__page?.activeLayoutId;
     if (injected) return String(injected);
+    // Design mode: show the layout currently being edited in the inspector, so
+    // switching "Edit Layout" previews that layout on the canvas.
+    const design = String(display?.pages?.designLayoutId ?? '');
+    if (design && findLayout(display.layouts, design)) return design;
     return resolveActiveLayoutId(display?.pages ?? {}, display.layouts, {});
   });
 
