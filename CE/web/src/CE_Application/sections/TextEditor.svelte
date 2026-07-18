@@ -9,6 +9,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { stateEditScope } from '../stores/stateEditScope.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -731,11 +732,8 @@
         </div>
       </PropertyCell>
       {#if String(core?.controlType ?? '') === 'Label'}
-        <PropertyCell label="Editable" span={4} hint="Allow an LCD 'edit' zone bound to this label to rewrite its text from the screen (in preview/runtime). Off = the label is fixed.">
-          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#DDD; cursor:pointer;">
-            <input type="checkbox" checked={text?.editable === true} onchange={(event) => set('Text.editable', event.target.checked)} />
-            <span>Editable from a display screen</span>
-          </label>
+        <PropertyCell label="Editable" span={2} hint="Whether this label's text can be edited by the user at runtime. Must be On before an LCD 'edit' zone can rewrite it from the screen.">
+          <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
         </PropertyCell>
       {/if}
     </PropertySection>
