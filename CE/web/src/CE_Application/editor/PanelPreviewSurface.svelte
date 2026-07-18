@@ -260,6 +260,31 @@
     return null;
   }
 
+  // Map a click point (control-local px) to a caret index inside an edit zone,
+  // mirroring the renderer's cell geometry (padding, cols/rows, char/line gaps).
+  // Clicks outside the zone land the caret at the end of the text.
+  function lcdCaretFromPoint(control, zone, pt, textLen) {
+    const display = lcdDisplayOf(control);
+    const transform = control?._children?.Transform ?? {};
+    const width = numberOr(transform.width, 0);
+    const height = numberOr(transform.height, 0);
+    if (!display || !pt || width <= 0 || height <= 0) return textLen;
+    const padding = Math.max(0, numberOr(display.padding, 10));
+    const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
+    const rows = Math.max(1, Math.round(numberOr(display.rows, 2)));
+    const charSpacing = Math.max(0, numberOr(display.charSpacing, 1));
+    const lineSpacing = Math.max(0, numberOr(display.lineSpacing, 3));
+    const cellW = Math.max(1, (Math.max(1, width - padding * 2) - (cols - 1) * charSpacing) / cols);
+    const cellH = Math.max(1, (Math.max(1, height - padding * 2) - (rows - 1) * lineSpacing) / rows);
+    const col = Math.floor((pt.x - padding) / (cellW + charSpacing));
+    const row = Math.floor((pt.y - padding) / (cellH + lineSpacing));
+    const zoneRow = Math.round(numberOr(zone?.row, 1)) - 1;
+    const c0 = Math.round(numberOr(zone?.colStart, 1)) - 1;
+    const c1 = Math.round(numberOr(zone?.colEnd, cols)) - 1;
+    if (row !== zoneRow || col < c0 || col > c1) return textLen;
+    return Math.max(0, Math.min(textLen, col - c0));
+  }
+
   // Text edit target read/write: '@edit' -> Display.editText, else a Label's content.
   function lcdEditText(control, sourceId) {
     if (String(sourceId) === '@edit') return String(lcdDisplayOf(control)?.editText ?? '');
@@ -1731,7 +1756,11 @@
     // target just arms the cycler (wheel/arrows change the option).
     const editTarget = lcdActiveEditZone(control);
     if (editTarget) {
-      const caret = editTarget.kind === 'text' ? lcdEditText(control, editTarget.sourceId).length : 0;
+      // Clicking inside the field places the caret at the clicked character;
+      // clicking elsewhere on the screen puts it at the end.
+      const caret = editTarget.kind === 'text'
+        ? lcdCaretFromPoint(control, editTarget.zone, pointerDownLocal, lcdEditText(control, editTarget.sourceId).length)
+        : 0;
       lcdEdit = { id: pointerActiveControlId, sourceId: editTarget.sourceId, kind: editTarget.kind, caret, active: true };
     } else if (lcdEdit.active) {
       lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false };
