@@ -156,7 +156,7 @@
   let editZone = $derived.by(() => {
     if (!hasLayouts) return null;
     const layout = findLayout(display.layouts, activeLayoutId);
-    const zones = (layout?.zones ?? []).filter((z) => String(z?.show ?? '') === 'edit');
+    const zones = (layout?.zones ?? []).filter((z) => String(z?.show ?? '') === 'edit' && String(z?.sourceId ?? '') === '@edit');
     return zones[0] ?? null;
   });
   let editing = $derived(editState?.active === true && editZone != null);
@@ -319,8 +319,7 @@
       value: numberOr(live?.value, fallbackValue),
       min,
       max,
-      // Fall back to a Label's static content so an edit zone shows it in design mode.
-      text: String(live?.text ?? ctrl?._children?.Text?.content ?? ''),
+      text: String(live?.text ?? ''),
       on: live?.on === true,
       address: live?.address,
     };
