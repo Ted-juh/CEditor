@@ -2,7 +2,7 @@
   import { onDestroy, untrack } from 'svelte';
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
-  import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
@@ -187,13 +187,18 @@
     }
     const family = String(behavior?.family ?? '').trim().toLowerCase();
     const buttonType = String(behavior?.buttonType ?? '').trim().toLowerCase();
-    if (isComboboxControl(src) || buttonType === 'radio' || buttonType === 'cyclic') {
-      // Multi-choice: the selector/text reflect the current (or resting) choice.
+    if (String(src?._children?.Core?.controlType ?? '') === 'Label') {
+      // A label's editable text is its Text.content.
+      info.text = String(src?._children?.Text?.content ?? '');
+    } else if (isComboboxControl(src) || buttonType === 'radio' || buttonType === 'cyclic') {
+      // Multi-choice: the selector is the internal value; the text is the option's
+      // human label (so the screen shows "Bright", not "option_2").
       const choice = session?.valueOverrideEnabled === true
         ? session.valueOverride
         : (isComboboxControl(src) ? currentComboboxValue(src) : behavior?.defaultValue);
       info.selector = String(choice ?? '');
-      info.text = String(choice ?? '');
+      const row = getValueRows(src).find((r) => String(rowValue(r)) === String(choice ?? ''));
+      info.text = String(row?.displayText ?? choice ?? '');
     } else if (family === 'select' || String(behavior?.valueType ?? '') === 'bool') {
       info.on = session?.checked === true || behavior?.defaultValue === true;
       info.text = info.on ? 'On' : 'Off';
@@ -210,40 +215,72 @@
     return info;
   }
 
-  // --- On-screen text editing (the LCD's editable "@edit" field) ---
-  // The display whose editable field is being edited, plus the caret index.
-  let lcdEdit = $state({ id: '', caret: 0, active: false });
+  // --- On-screen editing (an edit zone writes back to its target) ---
+  // Edit targets: '@edit' (the display's own text), a Label (its Text.content) —
+  // both free-text with a caret — or a Combobox/Radio/Cyclic, which becomes a
+  // choice cycler (no caret; wheel/arrows change the selected option).
+  let lcdEdit = $state({ id: '', sourceId: '', kind: '', caret: 0, active: false });
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
       ? (control?._children?.Display ?? null) : null;
   }
-  // Does this display have an editable field (an edit zone bound to "@edit")?
-  function lcdHasEditField(control) {
-    const display = lcdDisplayOf(control);
-    if (!display) return false;
-    for (const layout of (Array.isArray(display.layouts) ? display.layouts : [])) {
-      for (const zone of (Array.isArray(layout?.zones) ? layout.zones : [])) {
-        if (String(zone?.show ?? '') === 'edit' && String(zone?.sourceId ?? '') === '@edit') return true;
-      }
-    }
-    return false;
+  function lcdSourceControl(sourceId) {
+    return orderedControls.find((c) => getControlId(c) === String(sourceId ?? '')) ?? null;
+  }
+  // What kind of edit a zone source supports: 'text' | 'choice' | 'none'.
+  function lcdEditKindOf(sourceId) {
+    const sid = String(sourceId ?? '');
+    if (sid === '@edit') return 'text';
+    const src = lcdSourceControl(sid);
+    if (!src) return 'none';
+    if (String(src?._children?.Core?.controlType ?? '') === 'Label') return 'text';
+    const bt = String(getBehavior(src)?.buttonType ?? '').trim().toLowerCase();
+    if (isComboboxControl(src) || bt === 'radio' || bt === 'cyclic') return 'choice';
+    return 'none';
   }
   function lcdEditOpts(display) {
     return { charset: String(display?.editCharset ?? 'upper'), maxLength: Math.max(0, Math.round(numberOr(display?.editMaxLength, 16))) };
   }
-  // Apply a text-edit op to the display's editText, persist it, and move the caret.
+  // The active layout's first editable "edit" zone (source is a text/choice target).
+  function lcdActiveEditZone(control) {
+    const display = lcdDisplayOf(control);
+    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return null;
+    const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
+    for (const z of (layout?.zones ?? [])) {
+      if (String(z?.show ?? '') !== 'edit') continue;
+      const kind = lcdEditKindOf(z?.sourceId);
+      if (kind !== 'none') return { zone: z, sourceId: String(z?.sourceId ?? ''), kind };
+    }
+    return null;
+  }
+
+  // Text edit target read/write: '@edit' -> Display.editText, else a Label's content.
+  function lcdEditText(control, sourceId) {
+    if (String(sourceId) === '@edit') return String(lcdDisplayOf(control)?.editText ?? '');
+    return String(lcdSourceControl(sourceId)?._children?.Text?.content ?? '');
+  }
+  function lcdWriteEditText(control, sourceId, text) {
+    if (String(sourceId) === '@edit') {
+      const id = getControlId(control);
+      if (id) updateControlProperty(id, 'Display.editText', text);
+      return;
+    }
+    const sid = getControlId(lcdSourceControl(sourceId));
+    if (sid) updateControlProperty(sid, 'Text.content', text);
+  }
+  // Apply a text op to the active target, persist it, and move the caret.
   function lcdApplyEdit(control, opName, arg) {
     const display = lcdDisplayOf(control);
     const id = getControlId(control);
-    if (!display || !id) return;
+    if (!display || !id || !lcdEdit.active) return;
     const opts = lcdEditOpts(display);
-    const buf = textEdit.makeBuffer(display.editText ?? '', lcdEdit.caret, opts);
+    const cur = lcdEditText(control, lcdEdit.sourceId);
+    const buf = textEdit.makeBuffer(cur, lcdEdit.caret, opts);
     let next;
     switch (opName) {
       case 'insert': {
-        // Convenience: the 'upper' set has no lowercase, so auto-uppercase typed
-        // letters instead of silently dropping them.
+        // 'upper' has no lowercase, so auto-uppercase typed letters.
         const ch = opts.charset === 'upper' && typeof arg === 'string' ? arg.toUpperCase() : arg;
         next = textEdit.insert(buf, ch, opts);
         break;
@@ -257,10 +294,44 @@
       case 'cycle': next = textEdit.cycleChar(buf, arg, opts); break;
       default: return;
     }
-    if (next.text !== String(display.editText ?? '')) {
-      updateControlProperty(id, 'Display.editText', next.text);
-    }
-    lcdEdit = { id, caret: next.caret, active: true };
+    if (next.text !== cur) lcdWriteEditText(control, lcdEdit.sourceId, next.text);
+    lcdEdit = { ...lcdEdit, id, caret: next.caret, active: true };
+  }
+
+  // Choice cycler: move the bound combobox/radio/cyclic to the prev/next option.
+  function lcdCurrentChoice(src) {
+    const session = sessionFor(src);
+    if (session?.valueOverrideEnabled === true) return session.valueOverride;
+    if (isComboboxControl(src)) return currentComboboxValue(src);
+    return getBehavior(src)?.defaultValue ?? getValueRows(src)[0]?.internalValue ?? getValueRows(src)[0]?.id ?? '';
+  }
+  function lcdCycleChoice(control, sourceId, delta) {
+    const src = lcdSourceControl(sourceId);
+    if (!src) return;
+    const rows = getValueRows(src).filter((r) => r?.enabled !== false);
+    if (!rows.length) return;
+    const cur = String(lcdCurrentChoice(src));
+    let idx = rows.findIndex((r) => String(rowValue(r)) === cur);
+    if (idx < 0) idx = 0;
+    const nextIdx = ((idx + Math.sign(delta || 1)) % rows.length + rows.length) % rows.length;
+    selectComboboxRow(src, rows[nextIdx]);
+    lcdEdit = { ...lcdEdit, id: getControlId(control), sourceId, kind: 'choice', active: true };
+  }
+
+  // The layout active in the editor preview (design layout as the resting default,
+  // overridden by a live selector value or an overlay). Shared with the renderer feed.
+  function resolveLcdActiveLayoutId(control) {
+    const display = lcdDisplayOf(control);
+    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return '';
+    const pages = display.pages ?? {};
+    const selSrc = pages.selectorSourceId ? lcdSourceControl(pages.selectorSourceId) : null;
+    const selInfo = selSrc ? lcdSourceInfo(selSrc) : null;
+    const selectorValue = selInfo ? selInfo.selector : undefined;
+    const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
+    const designId = String(pages.designLayoutId ?? '');
+    const hasDesign = designId && display.layouts.some((l) => String(l?.id ?? '') === designId);
+    const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    return resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId });
   }
 
   // The control most recently clicked / dragged / changed — resolves the
@@ -423,20 +494,14 @@
       }
       if (hasLayouts) {
         cd.__live = live;
-        const pages = display.pages ?? {};
-        const selInfo = pages.selectorSourceId ? live[String(pages.selectorSourceId)] : null;
-        const selectorValue = selInfo ? selInfo.selector : undefined;
-        const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
-        // In the editor preview, the layout you're designing (designLayoutId) is
-        // the resting layout, so pressing Play keeps showing it. A live selector
-        // value or an overlay still overrides it.
-        const designId = String(pages.designLayoutId ?? '');
-        const hasDesign = designId && (Array.isArray(display.layouts) ? display.layouts : []).some((l) => String(l?.id ?? '') === designId);
-        const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
-        cd.__page = { activeLayoutId: resolveActiveLayoutId(effPages, display.layouts, { selectorValue, activeOverlayLayoutId }) };
-        // Live caret for the editable field when this display is being edited.
+        // Active layout: design layout as the resting default, overridden by a
+        // live selector value or an overlay (shared resolver).
+        cd.__page = { activeLayoutId: resolveLcdActiveLayoutId(control) };
+        // Live caret only for a free-text edit (Label / @edit); the choice cycler
+        // has no caret — it just updates the bound control's selection.
         const controlId = getControlId(control);
-        cd.__edit = (lcdEdit.active && lcdEdit.id === controlId) ? { active: true, caret: lcdEdit.caret } : null;
+        cd.__edit = (lcdEdit.active && lcdEdit.id === controlId && lcdEdit.kind === 'text')
+          ? { active: true, caret: lcdEdit.caret } : null;
       }
     }
     return { ...resolved, control: clone };
@@ -1469,11 +1534,13 @@
       deltaX: event.deltaX,
       deltaY: event.deltaY,
     });
-    // Hardware style: while editing an LCD field, the wheel cycles the char
-    // under the caret through the charset (like a data knob).
-    if (lcdEdit.active && lcdEdit.id === getControlId(control) && lcdHasEditField(control)) {
+    // Hardware style: while an LCD edit zone is active, the wheel acts as a data
+    // knob — cycling the char under the caret (text) or the option (choice).
+    if (lcdEdit.active && lcdEdit.id === getControlId(control)) {
       event.preventDefault();
-      lcdApplyEdit(control, 'cycle', event.deltaY < 0 ? 1 : -1);
+      const dir = event.deltaY < 0 ? 1 : -1;
+      if (lcdEdit.kind === 'choice') lcdCycleChoice(control, lcdEdit.sourceId, dir);
+      else lcdApplyEdit(control, 'cycle', dir);
       return;
     }
     if (isCustomComponent(control)) {
@@ -1645,14 +1712,15 @@
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
     if (pointerActiveControlId) { lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId; } // "@active" zone source
-    // Clicking an LCD that has an editable field focuses it for typing/knob edit;
-    // clicking anything else ends any active edit.
-    if (lcdHasEditField(control)) {
-      const display = lcdDisplayOf(control);
-      const len = String(display?.editText ?? '').length;
-      lcdEdit = { id: pointerActiveControlId, caret: len, active: true };
+    // Clicking an LCD with an editable zone focuses it; clicking anything else
+    // ends any active edit. Text targets place the caret at the end; a choice
+    // target just arms the cycler (wheel/arrows change the option).
+    const editTarget = lcdActiveEditZone(control);
+    if (editTarget) {
+      const caret = editTarget.kind === 'text' ? lcdEditText(control, editTarget.sourceId).length : 0;
+      lcdEdit = { id: pointerActiveControlId, sourceId: editTarget.sourceId, kind: editTarget.kind, caret, active: true };
     } else if (lcdEdit.active) {
-      lcdEdit = { id: '', caret: 0, active: false };
+      lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false };
     }
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
       openComboboxControlId = '';
@@ -1866,7 +1934,7 @@
   function handleBlur(control) {
     const controlId = getControlId(control);
     if (lcdEdit.active && lcdEdit.id === controlId) {
-      lcdEdit = { id: '', caret: 0, active: false };
+      lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false };
     }
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.cancel(controlId);
@@ -1904,10 +1972,17 @@
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
 
-    // On-screen text editing takes over the keyboard while an LCD field is active.
-    if (lcdEdit.active && lcdEdit.id === controlId && lcdHasEditField(control)) {
+    // On-screen editing takes over the keyboard while an LCD zone is active.
+    if (lcdEdit.active && lcdEdit.id === controlId) {
       const key = event.key;
-      if (key === 'Enter' || key === 'Escape') { event.preventDefault(); lcdEdit = { id: '', caret: 0, active: false }; event.currentTarget?.blur?.(); return; }
+      if (key === 'Enter' || key === 'Escape') { event.preventDefault(); lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false }; event.currentTarget?.blur?.(); return; }
+      if (lcdEdit.kind === 'choice') {
+        // Choice cycler: arrows move through the bound control's options.
+        if (key === 'ArrowUp' || key === 'ArrowRight') { event.preventDefault(); lcdCycleChoice(control, lcdEdit.sourceId, 1); return; }
+        if (key === 'ArrowDown' || key === 'ArrowLeft') { event.preventDefault(); lcdCycleChoice(control, lcdEdit.sourceId, -1); return; }
+        return;
+      }
+      // Free-text editing (Label / @edit).
       if (key === 'ArrowLeft') { event.preventDefault(); lcdApplyEdit(control, 'left'); return; }
       if (key === 'ArrowRight') { event.preventDefault(); lcdApplyEdit(control, 'right'); return; }
       if (key === 'Home') { event.preventDefault(); lcdApplyEdit(control, 'home'); return; }
