@@ -58,6 +58,10 @@ export const ZONE_SHOW_KINDS = [
 // the one matching the currently-touched control paints, so they never collide.
 export const ACTIVE_SOURCE_ID = '@active';
 
+// The reserved source for the display's own editable text buffer (Display.editText).
+// A zone with show:'edit' bound to this shows/edits the preset-name field.
+export const EDIT_SOURCE_ID = '@edit';
+
 export function isActiveSource(id) {
   return String(id ?? '') === ACTIVE_SOURCE_ID || String(id ?? '').startsWith(`${ACTIVE_SOURCE_ID}#`);
 }

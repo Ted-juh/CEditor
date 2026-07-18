@@ -3,6 +3,8 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import * as textEdit from '../utils/textEditBuffer.js';
+  import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
   import { showPreviewSelectionRing } from '../stores/runtimePreferences.js';
@@ -208,6 +210,59 @@
     return info;
   }
 
+  // --- On-screen text editing (the LCD's editable "@edit" field) ---
+  // The display whose editable field is being edited, plus the caret index.
+  let lcdEdit = $state({ id: '', caret: 0, active: false });
+
+  function lcdDisplayOf(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
+      ? (control?._children?.Display ?? null) : null;
+  }
+  // Does this display have an editable field (an edit zone bound to "@edit")?
+  function lcdHasEditField(control) {
+    const display = lcdDisplayOf(control);
+    if (!display) return false;
+    for (const layout of (Array.isArray(display.layouts) ? display.layouts : [])) {
+      for (const zone of (Array.isArray(layout?.zones) ? layout.zones : [])) {
+        if (String(zone?.show ?? '') === 'edit' && String(zone?.sourceId ?? '') === '@edit') return true;
+      }
+    }
+    return false;
+  }
+  function lcdEditOpts(display) {
+    return { charset: String(display?.editCharset ?? 'upper'), maxLength: Math.max(0, Math.round(numberOr(display?.editMaxLength, 16))) };
+  }
+  // Apply a text-edit op to the display's editText, persist it, and move the caret.
+  function lcdApplyEdit(control, opName, arg) {
+    const display = lcdDisplayOf(control);
+    const id = getControlId(control);
+    if (!display || !id) return;
+    const opts = lcdEditOpts(display);
+    const buf = textEdit.makeBuffer(display.editText ?? '', lcdEdit.caret, opts);
+    let next;
+    switch (opName) {
+      case 'insert': {
+        // Convenience: the 'upper' set has no lowercase, so auto-uppercase typed
+        // letters instead of silently dropping them.
+        const ch = opts.charset === 'upper' && typeof arg === 'string' ? arg.toUpperCase() : arg;
+        next = textEdit.insert(buf, ch, opts);
+        break;
+      }
+      case 'backspace': next = textEdit.backspace(buf); break;
+      case 'delete': next = textEdit.deleteForward(buf); break;
+      case 'left': next = textEdit.moveCaret(buf, -1); break;
+      case 'right': next = textEdit.moveCaret(buf, 1); break;
+      case 'home': next = textEdit.caretHome(buf); break;
+      case 'end': next = textEdit.caretEnd(buf); break;
+      case 'cycle': next = textEdit.cycleChar(buf, arg, opts); break;
+      default: return;
+    }
+    if (next.text !== String(display.editText ?? '')) {
+      updateControlProperty(id, 'Display.editText', next.text);
+    }
+    lcdEdit = { id, caret: next.caret, active: true };
+  }
+
   // The control most recently clicked / dragged / changed — resolves the
   // reserved "@active" zone source so a zone can follow whatever is touched.
   let lcdActiveId = $state('');
@@ -373,6 +428,9 @@
         const selectorValue = selInfo ? selInfo.selector : undefined;
         const activeOverlayLayoutId = resolveActiveOverlayLayout(display);
         cd.__page = { activeLayoutId: resolveActiveLayoutId(pages, display.layouts, { selectorValue, activeOverlayLayoutId }) };
+        // Live caret for the editable field when this display is being edited.
+        const controlId = getControlId(control);
+        cd.__edit = (lcdEdit.active && lcdEdit.id === controlId) ? { active: true, caret: lcdEdit.caret } : null;
       }
     }
     return { ...resolved, control: clone };
@@ -1405,6 +1463,13 @@
       deltaX: event.deltaX,
       deltaY: event.deltaY,
     });
+    // Hardware style: while editing an LCD field, the wheel cycles the char
+    // under the caret through the charset (like a data knob).
+    if (lcdEdit.active && lcdEdit.id === getControlId(control) && lcdHasEditField(control)) {
+      event.preventDefault();
+      lcdApplyEdit(control, 'cycle', event.deltaY < 0 ? 1 : -1);
+      return;
+    }
     if (isCustomComponent(control)) {
       if (isDisabled(control)) return;
       event.preventDefault();
@@ -1574,6 +1639,15 @@
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
     if (pointerActiveControlId) { lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId; } // "@active" zone source
+    // Clicking an LCD that has an editable field focuses it for typing/knob edit;
+    // clicking anything else ends any active edit.
+    if (lcdHasEditField(control)) {
+      const display = lcdDisplayOf(control);
+      const len = String(display?.editText ?? '').length;
+      lcdEdit = { id: pointerActiveControlId, caret: len, active: true };
+    } else if (lcdEdit.active) {
+      lcdEdit = { id: '', caret: 0, active: false };
+    }
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
       openComboboxControlId = '';
     }
@@ -1785,6 +1859,9 @@
 
   function handleBlur(control) {
     const controlId = getControlId(control);
+    if (lcdEdit.active && lcdEdit.id === controlId) {
+      lcdEdit = { id: '', caret: 0, active: false };
+    }
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.cancel(controlId);
     }
@@ -1820,6 +1897,28 @@
     lastInputMode = 'keyboard';
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
+
+    // On-screen text editing takes over the keyboard while an LCD field is active.
+    if (lcdEdit.active && lcdEdit.id === controlId && lcdHasEditField(control)) {
+      const key = event.key;
+      if (key === 'Enter' || key === 'Escape') { event.preventDefault(); lcdEdit = { id: '', caret: 0, active: false }; event.currentTarget?.blur?.(); return; }
+      if (key === 'ArrowLeft') { event.preventDefault(); lcdApplyEdit(control, 'left'); return; }
+      if (key === 'ArrowRight') { event.preventDefault(); lcdApplyEdit(control, 'right'); return; }
+      if (key === 'Home') { event.preventDefault(); lcdApplyEdit(control, 'home'); return; }
+      if (key === 'End') { event.preventDefault(); lcdApplyEdit(control, 'end'); return; }
+      if (key === 'Backspace') { event.preventDefault(); lcdApplyEdit(control, 'backspace'); return; }
+      if (key === 'Delete') { event.preventDefault(); lcdApplyEdit(control, 'delete'); return; }
+      // Hardware style: Up/Down cycles the char under the caret through the charset.
+      if (key === 'ArrowUp') { event.preventDefault(); lcdApplyEdit(control, 'cycle', 1); return; }
+      if (key === 'ArrowDown') { event.preventDefault(); lcdApplyEdit(control, 'cycle', -1); return; }
+      // Printable single characters insert (PC style).
+      if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        lcdApplyEdit(control, 'insert', key);
+        return;
+      }
+      return;
+    }
 
     if (isRangeControl(control) && !event.ctrlKey && !event.metaKey && !event.altKey) {
       if (handleRangeTextInput(control, event.key)) {

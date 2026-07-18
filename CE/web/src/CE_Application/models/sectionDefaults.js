@@ -606,6 +606,14 @@ export const SECTION_DEFAULTS = {
     },
     // Which controls count as "@active" (Core.ids). Empty = any control.
     activeScope: [],
+    // Editable text field (e.g. a preset name). A zone with show:'edit' bound to
+    // the reserved "@edit" source displays this buffer; in preview the screen is
+    // focusable and edits it live (keyboard type/caret, or a knob/wheel cycling
+    // the character under the caret). It's a named, bindable text value so it can
+    // later drive a device patch-name parameter.
+    editText: 'INIT',              // the current string
+    editCharset: 'upper',          // upper | alnum | ascii | digits
+    editMaxLength: 16,             // 0 = unbounded
   },
 
   /** Behavior — interaction family, role, and value model. */

@@ -81,7 +81,7 @@
   let scrolling = $derived((scrollDir === 'left' || scrollDir === 'right') && scrollSpeed > 0);
   let blinkEnabled = $derived(display?.blink === true);
   let cursorMode = $derived(String(display?.cursor ?? 'off').trim().toLowerCase());
-  let cursorBlinkEnabled = $derived(cursorMode !== 'off' && display?.cursorBlink !== false);
+  let cursorBlinkEnabled = $derived((cursorMode !== 'off' || editing) && display?.cursorBlink !== false);
   let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled);
 
   // One full scroll cycle (in characters) for a line — 0 if it doesn't scroll.
@@ -144,12 +144,34 @@
   });
 
   let cursorVisible = $derived.by(() => {
-    if (cursorMode === 'off') return false;
-    if (display?.cursorBlink === false) return true;
+    if (effectiveCursorMode === 'off') return false;
+    if (!editing && display?.cursorBlink === false) return true;
     return Math.floor(frameTime / 530) % 2 === 0;
   });
-  let cursorRow = $derived(Math.max(0, Math.round(numberOr(display?.cursorRow, 0))));
-  let cursorCol = $derived(Math.max(0, Math.round(numberOr(display?.cursorCol, 0))));
+  // Live text-edit caret: the preview injects display.__edit = { active, caret }
+  // when the screen's editable field is focused. It overrides the cursor to sit
+  // at the edit zone's (colStart + caret), so the block/underline marks the
+  // insertion point. Falls back to the static cursor otherwise.
+  let editState = $derived(display?.__edit ?? null);
+  let editZone = $derived.by(() => {
+    if (!hasLayouts) return null;
+    const layout = findLayout(display.layouts, activeLayoutId);
+    const zones = (layout?.zones ?? []).filter((z) => String(z?.show ?? '') === 'edit' && String(z?.sourceId ?? '') === '@edit');
+    return zones[0] ?? null;
+  });
+  let editing = $derived(editState?.active === true && editZone != null);
+  let editCaretCol = $derived.by(() => {
+    if (!editing) return 0;
+    const c0 = Math.max(0, Math.round(numberOr(editZone?.colStart, 1)) - 1);
+    const c1 = Math.max(c0, Math.round(numberOr(editZone?.colEnd, cols)) - 1);
+    return clamp(c0 + Math.max(0, Math.round(numberOr(editState?.caret, 0))), c0, c1);
+  });
+  let editCaretRow = $derived(editing ? Math.max(0, Math.round(numberOr(editZone?.row, 1)) - 1) : 0);
+  // When editing, force a visible caret at the edit position; else use the
+  // configured cursor.
+  let effectiveCursorMode = $derived(editing ? (cursorMode === 'off' ? 'block' : cursorMode) : cursorMode);
+  let cursorRow = $derived(editing ? editCaretRow : Math.max(0, Math.round(numberOr(display?.cursorRow, 0))));
+  let cursorCol = $derived(editing ? editCaretCol : Math.max(0, Math.round(numberOr(display?.cursorCol, 0))));
 
   // Visible characters for one row, applying marquee scroll when the source
   // line is longer than the column count.
@@ -274,6 +296,10 @@
   function controlInfo(sourceId) {
     const id = String(sourceId ?? '');
     if (!id) return null;
+    // The display's own editable text buffer (preset-name field).
+    if (id === '@edit') {
+      return { present: true, name: '', value: 0, min: 0, max: 0, text: String(display?.editText ?? ''), on: false };
+    }
     const live = display?.__live?.[id];
     const ctrl = (Array.isArray(allControls) ? allControls : [])
       .find((c) => String(c?._children?.Core?.id ?? '') === id);
@@ -434,21 +460,21 @@
                     {/if}
                   {/each}
                 </svg>
-                {#if isCursor && cursorMode === 'block'}
+                {#if isCursor && effectiveCursorMode === 'block'}
                   <span class="lcd-cursor-block" style={`background:${litCss}; opacity:0.32; mix-blend-mode:screen;`}></span>
                 {/if}
               {:else}
                 {#if showGhost}
                   <span class="lcd-ghost" style={ghostStyle}>█</span>
                 {/if}
-                {#if isCursor && cursorMode === 'block'}
+                {#if isCursor && effectiveCursorMode === 'block'}
                   <span class="lcd-cursor-block" style={`background:${litCss};`}></span>
                 {/if}
                 {#if blinkOn}
-                  <span class="lcd-char" style={isCursor && cursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
+                  <span class="lcd-char" style={isCursor && effectiveCursorMode === 'block' ? charInvertStyle : charStyle}>{ch}</span>
                 {/if}
               {/if}
-              {#if isCursor && cursorMode === 'underline'}
+              {#if isCursor && effectiveCursorMode === 'underline'}
                 <span class="lcd-cursor-underline" style={`background:${litCss};`}></span>
               {/if}
             </span>

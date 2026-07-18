@@ -314,6 +314,23 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Edit Field">
+    <PropertyCell label="Text" span={4} hint="Editable text (e.g. a preset name). Bind a zone with Show=edit to '✎ This screen's text' to show/edit it. In preview, click the screen and type, or use the wheel/Up-Down to cycle characters.">
+      <input class="val" type="text" value={display.editText ?? ''} oninput={(event) => set('editText', event.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Charset" span={2} hint="Allowed characters. 'upper' auto-uppercases typed letters (classic patch-name set).">
+      <select class="val" value={display.editCharset ?? 'upper'} onchange={(event) => set('editCharset', event.target.value)}>
+        <option value="upper">A–Z 0–9 (upper)</option>
+        <option value="alnum">A–z 0–9 (alnum)</option>
+        <option value="ascii">ASCII</option>
+        <option value="digits">Digits</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Max Length" span={2} hint="Maximum characters (0 = unbounded). Usually match the zone width.">
+      <NumberInput value={display.editMaxLength ?? 16} step={1} min={0} max={64} onchange={(value) => set('editMaxLength', Math.round(value))} />
+    </PropertyCell>
+  </PropertySection>
+
   <PropertySection title="Layouts">
     {#if layouts.length === 0}
       <PropertyCell label="Layouts" span={4} hint="Zones/layouts compose the display from bound regions instead of the lines/tokens above. Add a layout to switch to region mode.">
@@ -367,6 +384,7 @@
               <select class="val zsel" title="Source component" value={zoneSourceValue(z)} onchange={(event) => setZone(i, 'sourceId', event.target.value)}>
                 <option value="">(source)</option>
                 <option value="@active">★ Active</option>
+                <option value="@edit">✎ This screen's text</option>
                 {#each allSources as src}
                   <option value={src.id}>{src.name}</option>
                 {/each}
