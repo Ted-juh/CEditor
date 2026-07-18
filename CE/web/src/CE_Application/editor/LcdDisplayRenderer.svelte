@@ -165,13 +165,18 @@
     if (!hasLayouts) return null;
     const layout = findLayout(display.layouts, activeLayoutId);
     const zones = (layout?.zones ?? []).filter((z) => String(z?.show ?? '') === 'edit');
-    return zones[0] ?? null;
+    // The armed zone (by id, for layouts with several edit fields), else the first.
+    const armed = zones.find((z) => String(z?.id ?? '') === String(editState?.zoneId ?? ''));
+    return armed ?? zones[0] ?? null;
   });
   let editing = $derived(editState?.active === true && editZone != null);
   let editCaretCol = $derived.by(() => {
     if (!editing) return 0;
     const c0 = Math.max(0, Math.round(numberOr(editZone?.colStart, 1)) - 1);
     const c1 = Math.max(c0, Math.round(numberOr(editZone?.colEnd, cols)) - 1);
+    // A choice (option-picker) zone has no caret: park the block on its first
+    // cell as the "this field is armed" indicator.
+    if (String(editState?.kind ?? 'text') === 'choice') return c0;
     return clamp(c0 + Math.max(0, Math.round(numberOr(editState?.caret, 0))), c0, c1);
   });
   let editCaretRow = $derived(editing ? Math.max(0, Math.round(numberOr(editZone?.row, 1)) - 1) : 0);

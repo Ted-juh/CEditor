@@ -221,7 +221,7 @@
   // Edit targets: '@edit' (the display's own text), a Label (its Text.content) —
   // both free-text with a caret — or a Combobox/Radio/Cyclic, which becomes a
   // choice cycler (no caret; wheel/arrows change the selected option).
-  let lcdEdit = $state({ id: '', sourceId: '', kind: '', caret: 0, active: false });
+  let lcdEdit = $state({ id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false });
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
@@ -247,28 +247,28 @@
   function lcdEditOpts(display) {
     return { charset: String(display?.editCharset ?? 'upper'), maxLength: Math.max(0, Math.round(numberOr(display?.editMaxLength, 16))) };
   }
-  // The active layout's first editable "edit" zone (source is a text/choice target).
-  function lcdActiveEditZone(control) {
+  // All editable "edit" zones on the active layout (text/choice targets), in order.
+  function lcdEditZones(control) {
     const display = lcdDisplayOf(control);
-    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return null;
+    if (!display || !Array.isArray(display.layouts) || !display.layouts.length) return [];
     const layout = findLayout(display.layouts, resolveLcdActiveLayoutId(control));
+    const out = [];
     for (const z of (layout?.zones ?? [])) {
-      if (String(z?.show ?? '') !== 'edit') continue;
+      if (String(z?.show ?? '') !== 'edit' || z?.visible === false) continue;
       const kind = lcdEditKindOf(z?.sourceId);
-      if (kind !== 'none') return { zone: z, sourceId: String(z?.sourceId ?? ''), kind };
+      if (kind !== 'none') out.push({ zone: z, sourceId: String(z?.sourceId ?? ''), kind });
     }
-    return null;
+    return out;
   }
 
-  // Map a click point (control-local px) to a caret index inside an edit zone,
-  // mirroring the renderer's cell geometry (padding, cols/rows, char/line gaps).
-  // Clicks outside the zone land the caret at the end of the text.
-  function lcdCaretFromPoint(control, zone, pt, textLen) {
+  // Map a click point (control-local px) to a character cell {row, col},
+  // mirroring the renderer's geometry (padding, cols/rows, char/line gaps).
+  function lcdCellFromPoint(control, pt) {
     const display = lcdDisplayOf(control);
     const transform = control?._children?.Transform ?? {};
     const width = numberOr(transform.width, 0);
     const height = numberOr(transform.height, 0);
-    if (!display || !pt || width <= 0 || height <= 0) return textLen;
+    if (!display || !pt || width <= 0 || height <= 0) return null;
     const padding = Math.max(0, numberOr(display.padding, 10));
     const cols = Math.max(1, Math.round(numberOr(display.cols, 16)));
     const rows = Math.max(1, Math.round(numberOr(display.rows, 2)));
@@ -276,14 +276,41 @@
     const lineSpacing = Math.max(0, numberOr(display.lineSpacing, 3));
     const cellW = Math.max(1, (Math.max(1, width - padding * 2) - (cols - 1) * charSpacing) / cols);
     const cellH = Math.max(1, (Math.max(1, height - padding * 2) - (rows - 1) * lineSpacing) / rows);
-    const col = Math.floor((pt.x - padding) / (cellW + charSpacing));
-    const row = Math.floor((pt.y - padding) / (cellH + lineSpacing));
+    return {
+      col: Math.floor((pt.x - padding) / (cellW + charSpacing)),
+      row: Math.floor((pt.y - padding) / (cellH + lineSpacing)),
+    };
+  }
+
+  function lcdZoneContainsCell(zone, cell, cols) {
+    if (!cell) return false;
     const zoneRow = Math.round(numberOr(zone?.row, 1)) - 1;
     const c0 = Math.round(numberOr(zone?.colStart, 1)) - 1;
     const c1 = Math.round(numberOr(zone?.colEnd, cols)) - 1;
-    if (row !== zoneRow || col < c0 || col > c1) return textLen;
-    return Math.max(0, Math.min(textLen, col - c0));
+    return cell.row === zoneRow && cell.col >= c0 && cell.col <= c1;
   }
+
+  // Caret index for a click cell inside a zone; outside -> end of text.
+  function lcdCaretFromCell(zone, cell, cols, textLen) {
+    if (!cell) return textLen;
+    const c0 = Math.round(numberOr(zone?.colStart, 1)) - 1;
+    if (!lcdZoneContainsCell(zone, cell, cols)) return textLen;
+    return Math.max(0, Math.min(textLen, cell.col - c0));
+  }
+
+  // Arm an edit target: text kinds remember the original for Esc-cancel.
+  function lcdArmEdit(control, target, caret) {
+    lcdEdit = {
+      id: getControlId(control),
+      zoneId: String(target.zone?.id ?? ''),
+      sourceId: target.sourceId,
+      kind: target.kind,
+      caret,
+      original: target.kind === 'text' ? lcdEditText(control, target.sourceId) : '',
+      active: true,
+    };
+  }
+  const LCD_EDIT_IDLE = { id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false };
 
   // Text edit target read/write: '@edit' -> Display.editText, else a Label's content.
   function lcdEditText(control, sourceId) {
@@ -532,11 +559,11 @@
         // Active layout: design layout as the resting default, overridden by a
         // live selector value or an overlay (shared resolver).
         cd.__page = { activeLayoutId: resolveLcdActiveLayoutId(control) };
-        // Live caret only for a free-text edit (Label / @edit); the choice cycler
-        // has no caret — it just updates the bound control's selection.
+        // Live edit marker: text edits carry the caret; a choice edit highlights
+        // the armed zone (the renderer parks the block on its first cell).
         const controlId = getControlId(control);
-        cd.__edit = (lcdEdit.active && lcdEdit.id === controlId && lcdEdit.kind === 'text')
-          ? { active: true, caret: lcdEdit.caret } : null;
+        cd.__edit = (lcdEdit.active && lcdEdit.id === controlId)
+          ? { active: true, caret: lcdEdit.caret, zoneId: lcdEdit.zoneId, kind: lcdEdit.kind } : null;
       }
     }
     return { ...resolved, control: clone };
@@ -1754,16 +1781,19 @@
     // Clicking an LCD with an editable zone focuses it; clicking anything else
     // ends any active edit. Text targets place the caret at the end; a choice
     // target just arms the cycler (wheel/arrows change the option).
-    const editTarget = lcdActiveEditZone(control);
-    if (editTarget) {
-      // Clicking inside the field places the caret at the clicked character;
-      // clicking elsewhere on the screen puts it at the end.
-      const caret = editTarget.kind === 'text'
-        ? lcdCaretFromPoint(control, editTarget.zone, pointerDownLocal, lcdEditText(control, editTarget.sourceId).length)
+    const editTargets = lcdEditZones(control);
+    if (editTargets.length) {
+      // Pick the edit field under the click (falling back to the first one);
+      // clicking inside a text field places the caret at the clicked character.
+      const displayCols = Math.max(1, Math.round(numberOr(lcdDisplayOf(control)?.cols, 16)));
+      const cell = lcdCellFromPoint(control, pointerDownLocal);
+      const target = editTargets.find((t) => lcdZoneContainsCell(t.zone, cell, displayCols)) ?? editTargets[0];
+      const caret = target.kind === 'text'
+        ? lcdCaretFromCell(target.zone, cell, displayCols, lcdEditText(control, target.sourceId).length)
         : 0;
-      lcdEdit = { id: pointerActiveControlId, sourceId: editTarget.sourceId, kind: editTarget.kind, caret, active: true };
+      lcdArmEdit(control, target, caret);
     } else if (lcdEdit.active) {
-      lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false };
+      lcdEdit = { ...LCD_EDIT_IDLE };
     }
     if (openComboboxControlId && openComboboxControlId !== pointerActiveControlId) {
       openComboboxControlId = '';
@@ -1977,7 +2007,7 @@
   function handleBlur(control) {
     const controlId = getControlId(control);
     if (lcdEdit.active && lcdEdit.id === controlId) {
-      lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false };
+      lcdEdit = { ...LCD_EDIT_IDLE };
     }
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.cancel(controlId);
@@ -2018,7 +2048,26 @@
     // On-screen editing takes over the keyboard while an LCD zone is active.
     if (lcdEdit.active && lcdEdit.id === controlId) {
       const key = event.key;
-      if (key === 'Enter' || key === 'Escape') { event.preventDefault(); lcdEdit = { id: '', sourceId: '', kind: '', caret: 0, active: false }; event.currentTarget?.blur?.(); return; }
+      if (key === 'Enter') { event.preventDefault(); lcdEdit = { ...LCD_EDIT_IDLE }; event.currentTarget?.blur?.(); return; }
+      if (key === 'Escape') {
+        // Cancel: restore the text as it was when editing started.
+        event.preventDefault();
+        if (lcdEdit.kind === 'text') lcdWriteEditText(control, lcdEdit.sourceId, lcdEdit.original);
+        lcdEdit = { ...LCD_EDIT_IDLE };
+        event.currentTarget?.blur?.();
+        return;
+      }
+      if (key === 'Tab') {
+        // Cycle between the layout's edit fields (Shift+Tab goes back).
+        event.preventDefault();
+        const targets = lcdEditZones(control);
+        if (targets.length > 1) {
+          const idx = targets.findIndex((t) => String(t.zone?.id ?? '') === lcdEdit.zoneId);
+          const next = targets[(((idx < 0 ? 0 : idx) + (event.shiftKey ? -1 : 1)) % targets.length + targets.length) % targets.length];
+          lcdArmEdit(control, next, next.kind === 'text' ? lcdEditText(control, next.sourceId).length : 0);
+        }
+        return;
+      }
       if (lcdEdit.kind === 'choice') {
         // Choice cycler: arrows move through the bound control's options.
         if (key === 'ArrowUp' || key === 'ArrowRight') { event.preventDefault(); lcdCycleChoice(control, lcdEdit.sourceId, 1); return; }
