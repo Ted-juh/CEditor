@@ -178,6 +178,7 @@ export const SECTION_DEFAULTS = {
   Text: {
     _type: 'Text',
     content: '',
+    editable: false,               // may an LCD edit zone rewrite this text? (Labels)
     _children: {
       Fill: {
         _type: 'Fill',

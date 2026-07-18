@@ -730,6 +730,14 @@
           <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
         </div>
       </PropertyCell>
+      {#if String(core?.controlType ?? '') === 'Label'}
+        <PropertyCell label="Editable" span={4} hint="Allow an LCD 'edit' zone bound to this label to rewrite its text from the screen (in preview/runtime). Off = the label is fixed.">
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#DDD; cursor:pointer;">
+            <input type="checkbox" checked={text?.editable === true} onchange={(event) => set('Text.editable', event.target.checked)} />
+            <span>Editable from a display screen</span>
+          </label>
+        </PropertyCell>
+      {/if}
     </PropertySection>
 
     {#key fontEditorRenderKey}

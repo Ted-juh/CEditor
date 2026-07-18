@@ -234,7 +234,10 @@
     if (sid === '@edit') return 'text';
     const src = lcdSourceControl(sid);
     if (!src) return 'none';
-    if (String(src?._children?.Core?.controlType ?? '') === 'Label') return 'text';
+    // A Label is only editable from the screen when its Text.editable flag is on.
+    if (String(src?._children?.Core?.controlType ?? '') === 'Label') {
+      return src?._children?.Text?.editable === true ? 'text' : 'none';
+    }
     const bt = String(getBehavior(src)?.buttonType ?? '').trim().toLowerCase();
     if (isComboboxControl(src) || bt === 'radio' || bt === 'cyclic') return 'choice';
     return 'none';
