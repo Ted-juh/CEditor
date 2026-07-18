@@ -538,7 +538,14 @@
       }
     }
 
-    if (!hasLayouts && !primary && !fieldRanges.some(Boolean)) return resolved;
+    // Optional live drives for the panel lighting: a range control for
+    // brightness (mapped 0-100 across its range), a switch for the backlight.
+    const brightRange = display.brightnessSourceId ? lcdRangeForSource(display.brightnessSourceId) : null;
+    const backCtrl = display.backlightSourceId
+      ? orderedControls.find((entry) => getControlId(entry) === String(display.backlightSourceId)) : null;
+    const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
+
+    if (!hasLayouts && !primary && !fieldRanges.some(Boolean) && !brightRange && !backInfo) return resolved;
 
     // Shallow clone that shares heavy read-only fields (imageSrc, layouts, pages)
     // by reference; only the Display + the field entries we mutate are copied.
@@ -548,6 +555,12 @@
     if (Array.isArray(baseDisplay.fields)) cd.fields = baseDisplay.fields.map((f) => ({ ...f }));
     const clone = { ...base, _children: { ...base._children, Display: cd } };
     if (cd) {
+      if (brightRange) {
+        const span = brightRange.max - brightRange.min;
+        const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
+        cd.brightness = Math.round(frac * 100);
+      }
+      if (backInfo) cd.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
       if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
       if (Array.isArray(cd.fields)) {
         fieldRanges.forEach((range, i) => {

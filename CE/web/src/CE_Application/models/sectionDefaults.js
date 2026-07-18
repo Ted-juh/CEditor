@@ -553,6 +553,8 @@ export const SECTION_DEFAULTS = {
     backlightColour: 'FF0E5A2E',   // backlight wash
     brightness: 100,               // 0..100 (foreground intensity)
     contrast: 55,                  // 0..100 (LCD trim-pot feel)
+    brightnessSourceId: '',        // range control that drives brightness live in preview
+    backlightSourceId: '',         // switch/button control that drives the backlight on/off
     glassTint: '14FFFFFF',         // glass sheen overlay
     showGlass: true,               // draw the diagonal glass sheen overlay
     showGhost: true,               // faint unlit cells behind the text

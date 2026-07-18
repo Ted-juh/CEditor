@@ -117,6 +117,25 @@
     ?? layouts[0] ?? null
   );
   let pages = $derived(display?.pages ?? {});
+  // Known values of the Pages selector control, so the "When" field can be a
+  // pick-list instead of a guessing game. null = free numeric/text entry.
+  let selectorOptions = $derived.by(() => {
+    const src = ($activePanel?.controls ?? [])
+      .find((c) => String(c?._children?.Core?.id ?? '') === String(pages?.selectorSourceId ?? ''));
+    if (!src) return null;
+    const b = src._children?.Behavior ?? {};
+    const bt = String(b.buttonType ?? '').trim().toLowerCase();
+    if (bt === 'combobox' || bt === 'radio' || bt === 'cyclic') {
+      const rows = Array.isArray(src._children?.Value?.rows) ? src._children.Value.rows : [];
+      const opts = rows.filter((r) => r?.enabled !== false)
+        .map((r) => ({ value: String(r.internalValue ?? r.id ?? ''), label: String(r.displayText ?? r.internalValue ?? r.id ?? '') }));
+      if (opts.length) return opts;
+    }
+    if (String(b.family ?? '') === 'select' || String(b.valueType ?? '') === 'bool' || String(b.family ?? '') === 'trigger') {
+      return [{ value: '0', label: '0 (Off)' }, { value: '1', label: '1 (On)' }];
+    }
+    return null;
+  });
   let cols = $derived(Math.max(1, Math.round(Number(display?.cols ?? 16))));
 
   function genId(prefix) {
@@ -170,6 +189,18 @@
     }));
   }
   function removeZone(i) { withEditLayout((l) => l.zones.splice(i, 1)); }
+  // Reorder zones: later zones paint over earlier ones, so ▲▼ controls stacking.
+  function moveZone(i, dir) {
+    withEditLayout((l) => {
+      const j = i + dir;
+      if (j < 0 || j >= l.zones.length) return;
+      const [moved] = l.zones.splice(i, 1);
+      l.zones.splice(j, 0, moved);
+    });
+  }
+  // Which zone's extra settings (prefix/suffix/…) are expanded ('' = none).
+  let expandedZoneId = $state('');
+  function toggleZoneExtras(key) { expandedZoneId = expandedZoneId === key ? '' : key; }
   function setZone(i, prop, value) { withEditLayout((l) => { if (l.zones[i]) l.zones[i][prop] = value; }); }
   // The Source dropdown value: any "@active#kind" collapses to "@active".
   function zoneSourceValue(z) { return isActiveSource(z?.sourceId) ? '@active' : (z?.sourceId ?? ''); }
@@ -378,6 +409,7 @@
           <span class="zn2">Rdx</span>
           <span class="zn2">Ovf</span>
           <span class="rm"></span>
+          <span class="rm"></span>
         </div>
       {/if}
       {#if editLayout}
@@ -435,8 +467,28 @@
                 <option value="scroll">scrl</option>
               </select>
             {/if}
+            <button class="val rm" type="button" class:zopen={expandedZoneId === String(z.id ?? i)} onclick={() => toggleZoneExtras(String(z.id ?? i))} title="More zone settings (prefix/suffix, order, …)">…</button>
             <button class="val rm" type="button" onclick={() => removeZone(i)} title="Remove zone">✕</button>
           </div>
+          {#if expandedZoneId === String(z.id ?? i)}
+            <div class="zone-extra">
+              <span class="zx-lab">Pre</span>
+              <input class="val zn2" type="text" title="Prefix text" value={z.prefix ?? ''} oninput={(event) => setZone(i, 'prefix', event.target.value)} />
+              <span class="zx-lab">Suf</span>
+              <input class="val zn2" type="text" title="Suffix text" value={z.suffix ?? ''} oninput={(event) => setZone(i, 'suffix', event.target.value)} />
+              <span class="zx-lab">Dec</span>
+              <input class="val zn" type="number" min="0" max="6" title="Decimal places (value kind)" value={z.precision ?? 0} onchange={(event) => setZone(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <span class="zx-lab">Lbl</span>
+              <input class="val ztext" type="text" title="Custom label (name kind; empty = source name)" placeholder="(source name)" value={z.label ?? ''} oninput={(event) => setZone(i, 'label', event.target.value)} />
+              <span class="zx-lab">Vis</span>
+              <select class="val zn2" title="Zone visible" value={z.visible === false ? 'off' : 'on'} onchange={(event) => setZone(i, 'visible', event.target.value !== 'off')}>
+                <option value="on">on</option>
+                <option value="off">off</option>
+              </select>
+              <button class="val rm" type="button" onclick={() => moveZone(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
+              <button class="val rm" type="button" onclick={() => moveZone(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === (editLayout.zones ?? []).length - 1}>▼</button>
+            </div>
+          {/if}
         {/each}
         <PropertyCell label="Zones" span={4} hint="Add a region to this layout.">
           <button class="val add-field" type="button" onclick={() => addZone()}>+ Add zone</button>
@@ -465,7 +517,16 @@
       {#each (pages.selectorMap ?? []) as m, i (i)}
         <PropertyCell label={`When = ${m.when ?? ''}`} span={4} hint="Selector value → layout to show.">
           <div class="field-row">
-            <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+            {#if selectorOptions}
+              <select class="val zsel" title="Selector value" value={String(m.when ?? '')} onchange={(event) => setSelectorRow(i, 'when', event.target.value)}>
+                <option value="">(value)</option>
+                {#each selectorOptions as opt}
+                  <option value={opt.value}>{opt.label}</option>
+                {/each}
+              </select>
+            {:else}
+              <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+            {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
               {#each layouts as l}
                 <option value={String(l.id)}>{l.name ?? l.id}</option>
@@ -557,6 +618,22 @@
     </PropertyCell>
     <PropertyCell label="Contrast" span={2} hint="LCD trim-pot feel — ghost/backlight strength (0–100).">
       <NumberInput value={display.contrast ?? 55} step={5} min={0} max={100} onchange={(value) => set('contrast', value)} />
+    </PropertyCell>
+    <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview (its range maps to 0–100).">
+      <select class="val" value={display.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
+        <option value="">None</option>
+        {#each valueSources as src}
+          <option value={src.id}>{src.name}</option>
+        {/each}
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Backlt Src" span={2} hint="Drive the backlight on/off live from a toggle/button in preview.">
+      <select class="val" value={display.backlightSourceId ?? ''} onchange={(event) => set('backlightSourceId', event.target.value)}>
+        <option value="">None</option>
+        {#each allSources as src}
+          <option value={src.id}>{src.name}</option>
+        {/each}
+      </select>
     </PropertyCell>
     <PropertyCell label="Ghost dots" span={2} hint="Faint unlit cells behind the text (realism cue).">
       <PropertyToggle value={display.showGhost !== false} onchange={() => toggle('showGhost', true)} />
@@ -758,6 +835,54 @@
   /* Reserved empty slot so the Kind/Radix boxes appearing don't reflow the row. */
   .zone-cell .zspacer {
     visibility: hidden;
+  }
+
+  /* Expanded per-zone extras (prefix/suffix/precision/label/visible/order). */
+  .zone-extra {
+    grid-column: span 4;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    align-items: center;
+    padding: 3px 0 5px 26px;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .zx-lab {
+    flex: 0 0 auto;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #8a8a8a;
+  }
+
+  .zone-extra .zn,
+  .zone-extra .zn2 {
+    flex: 0 0 auto;
+  }
+
+  .zone-extra .ztext {
+    flex: 1 1 80px;
+    min-width: 60px;
+  }
+
+  .zone-extra .rm,
+  .zone-cell .zopen {
+    flex: 0 0 auto;
+    width: 26px;
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  .zone-extra .rm:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+
+  .zone-cell .zopen {
+    background: #094771;
+    color: #ddd;
   }
 
   .zone-head .zsel,
