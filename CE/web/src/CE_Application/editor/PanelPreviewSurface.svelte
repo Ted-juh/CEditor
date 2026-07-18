@@ -281,7 +281,10 @@
     if (!display || !id || !lcdEdit.active) return;
     const opts = lcdEditOpts(display);
     const cur = lcdEditText(control, lcdEdit.sourceId);
-    const buf = textEdit.makeBuffer(cur, lcdEdit.caret, opts);
+    // Leave the EXISTING text untouched (no charset normalisation — that would
+    // eat e.g. lowercase letters under the 'upper' set); the charset/maxLength
+    // constrain only new input via insert/cycle.
+    const buf = textEdit.clampCaret({ text: cur, caret: lcdEdit.caret });
     let next;
     switch (opName) {
       case 'insert': {
@@ -1718,7 +1721,11 @@
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
-    if (pointerActiveControlId) { lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId; } // "@active" zone source
+    // "@active" zone source — but a display itself never counts as the active
+    // control (clicking a screen shouldn't make its own zones show the screen).
+    if (pointerActiveControlId && String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') {
+      lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId;
+    }
     // Clicking an LCD with an editable zone focuses it; clicking anything else
     // ends any active edit. Text targets place the caret at the end; a choice
     // target just arms the cycler (wheel/arrows change the option).
