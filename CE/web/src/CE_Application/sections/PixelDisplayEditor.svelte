@@ -386,48 +386,21 @@
       {#if expandedElementId === String(el.id ?? i)}
         <div class="el-extra">
           <div class="ex-row">
-            <span class="ex-lab">Align</span>
             <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
               <option value="left">L</option>
               <option value="center">C</option>
               <option value="right">R</option>
             </select>
-            <span class="ex-lab">Pre</span>
-            <input class="val en" type="text" title="Prefix text" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
-            <span class="ex-lab">Suf</span>
-            <input class="val en" type="text" title="Suffix text" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
-            <span class="ex-lab">Dec</span>
+            <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
+            <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
             <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
-            <span class="ex-lab">Lbl</span>
-            <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="(caption)" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
-          </div>
-          <div class="ex-row">
-            <span class="ex-lab">Vis</span>
-            <select class="val en2" title="Element visible" value={el.visible === false ? 'off' : 'on'} onchange={(event) => setElement(i, 'visible', event.target.value !== 'off')}>
-              <option value="on">on</option>
-              <option value="off">off</option>
-            </select>
+            <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+            <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             {#if WIDGET_KINDS.includes(el.kind)}
-              <span class="ex-lab">Frame</span>
-              <select class="val en2" title="Outline frame" value={el.frame === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'frame', event.target.value === 'on')}>
-                <option value="off">off</option>
-                <option value="on">on</option>
-              </select>
-              <span class="ex-lab">Ticks</span>
-              <select class="val en2" title="Tick marks" value={el.ticks === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'ticks', event.target.value === 'on')}>
-                <option value="off">off</option>
-                <option value="on">on</option>
-              </select>
-              <span class="ex-lab">Peak</span>
-              <select class="val en2" title="Peak-hold marker (bars)" value={el.peakHold === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'peakHold', event.target.value === 'on')}>
-                <option value="off">off</option>
-                <option value="on">on</option>
-              </select>
-              <span class="ex-lab">Smooth</span>
-              <select class="val en2" title="Meter ballistics (smoothed movement)" value={el.smooth === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'smooth', event.target.value === 'on')}>
-                <option value="off">off</option>
-                <option value="on">on</option>
-              </select>
+              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
+              <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
+              <label class="ex-chk" title="Peak-hold marker (bars)"><input type="checkbox" checked={el.peakHold === true} onchange={(event) => setElement(i, 'peakHold', event.target.checked)} />Pk</label>
+              <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
             {/if}
             <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
             <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
@@ -699,9 +672,26 @@
 
   .ex-row {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     gap: 3px;
     align-items: center;
+  }
+
+  .ex-chk {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    text-transform: uppercase;
+    color: #aaa;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .ex-chk input {
+    margin: 0;
+    accent-color: #5B9BD5;
   }
 
   .el-extra .ex-fill {
