@@ -368,11 +368,15 @@
       if (w.kind === 'hbar') {
         const fill = Math.round(iw * frac);
         if (fill > 0) fillRect(ix0, iy0, ix0 + fill - 1, iy1);
+        // Empty meter: keep a 1px baseline so the widget is always visible.
+        else for (let y = iy0; y <= iy1; y += 1) px(ix0, y);
         if (w.peakHold) { const pxx = ix0 + Math.round((iw - 1) * peak); for (let y = iy0; y <= iy1; y += 1) px(pxx, y); }
         if (w.ticks) for (const f of [0.25, 0.5, 0.75]) { const tx = ix0 + Math.round((iw - 1) * f); px(tx, iy1); px(tx, iy1 - 1); }
       } else if (w.kind === 'vbar') {
         const fill = Math.round(ih * frac);
         if (fill > 0) fillRect(ix0, iy1 - fill + 1, ix1, iy1);
+        // Empty meter: keep a 1px baseline so the widget is always visible.
+        else for (let x = ix0; x <= ix1; x += 1) px(x, iy1);
         if (w.peakHold) { const pyy = iy1 - Math.round((ih - 1) * peak); for (let x = ix0; x <= ix1; x += 1) px(x, pyy); }
         if (w.ticks) for (const f of [0.25, 0.5, 0.75]) { const ty = iy1 - Math.round((ih - 1) * f); px(ix1, ty); px(ix1 - 1, ty); }
       } else if (w.kind === 'hslider') {

@@ -44,6 +44,10 @@ const SEVEN_SEG_GEOMETRY = {
 const SEVEN_SEG_MAP = {
   '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc',
   '5': 'afgcd', '6': 'afgcde', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg',
+  // Block characters (bar/level fallbacks) approximated with segments so
+  // widget zones stay visible on segment panels.
+  '▁': 'd', '▂': 'd', '▃': 'cde', '▄': 'cdeg', '▅': 'cdeg', '▆': 'bcdefg', '▇': 'abcdefg', '█': 'abcdefg',
+  '▏': 'ef', '▎': 'ef', '▍': 'ef', '▌': 'adef', '▋': 'adef', '▊': 'adefg', '▉': 'abcdef',
   A: 'abcefg', b: 'cdefg', B: 'cdefg', C: 'adef', c: 'deg', D: 'bcdeg', d: 'bcdeg',
   E: 'adefg', F: 'aefg', G: 'acdef', H: 'bcefg', h: 'cefg', I: 'bc', J: 'bcd',
   L: 'def', n: 'ceg', N: 'abcef', O: 'abcdef', o: 'cdeg', P: 'abefg', q: 'abcfg',
@@ -160,6 +164,13 @@ const STARBURST_TOKENS = {
   '/': ['j', 'k'],
   '\\': ['h', 'm'],
   ' ': [],
+  // Block characters (bar/level fallbacks), approximated.
+  '▁': ['d'], '▂': ['d'], '▃': ['c', 'd', 'e'],
+  '▄': ['g', 'c', 'd', 'e', 'l'], '▅': ['g', 'c', 'd', 'e', 'l'],
+  '▆': ['b', 'c', 'd', 'e', 'f', 'g', 'l'], '▇': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'i', 'l'], '█': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'i', 'l'],
+  '▏': ['e', 'f'], '▎': ['e', 'f'], '▍': ['e', 'f'],
+  '▌': ['a1', 'd1', 'g1', 'e', 'f'], '▋': ['a1', 'd1', 'g1', 'e', 'f'],
+  '▊': ['a1', 'd1', 'g', 'e', 'f', 'i', 'l'], '▉': ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
 };
 
 const STARBURST_MAP = Object.fromEntries(

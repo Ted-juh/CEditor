@@ -128,7 +128,8 @@ export function resolveZoneContent(zone, info, width) {
     case 'vbar':
     case 'vslider': {
       if (!present) return '';
-      const level = ' ▁▂▃▄▅▆▇█'[clamp(Math.round(infoFraction(info) * 8), 0, 8)];
+      // Floor at the lowest visible level so an empty meter still reads as one.
+      const level = ' ▁▂▃▄▅▆▇█'[clamp(Math.max(1, Math.round(infoFraction(info) * 8)), 1, 8)];
       return level.repeat(Math.max(1, Math.round(width)));
     }
     case 'needle':
