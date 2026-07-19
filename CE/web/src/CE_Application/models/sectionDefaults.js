@@ -542,6 +542,14 @@ export const SECTION_DEFAULTS = {
     pixelHeight: 0,                // graphic mode pixel rows (0 = auto from rows)
     imageSrc: '',                  // graphic mode: image to dither onto the grid
     imageDither: true,             // Floyd–Steinberg dither vs hard threshold
+    // Graphic-mode animation layer (plays behind the zones/text):
+    animMode: 'off',               // off | file (GIF/APNG/sprite sheet) | preset
+    animSrc: '',                   // uploaded animation file (data URL)
+    animFrames: 0,                 // sprite-sheet frame count (0 = animated file)
+    animFps: 12,                   // sprite-sheet playback rate
+    animLoop: true,                // loop, or hold the last frame
+    animPreset: 'wave',            // wave | scanner | rain | starfield | spinner | plasma
+    animSpeed: 1,                  // preset speed multiplier
     palette: 'greenStn',           // preset palette id (see LcdDisplayRenderer)
     rows: 2,
     cols: 16,

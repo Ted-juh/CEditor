@@ -44,7 +44,13 @@ export function noteName(value) {
 // parameter (address, and real MIDI) fall back to a placeholder without one.
 export const ZONE_SHOW_KINDS = [
   'static', 'name', 'value', 'pct', 'bar', 'midiValue', 'note', 'text', 'state', 'address', 'edit',
+  'hbar', 'vbar', 'hslider', 'vslider', 'needle',
 ];
+
+// Pixel-widget kinds: on a graphic (dot-matrix) panel these draw as true pixel
+// widgets (bars/sliders/needle) spanning the zone's region (row..row+rowSpan).
+// On character/segment panels they degrade to the char fallbacks below.
+export const WIDGET_ZONE_KINDS = new Set(['hbar', 'vbar', 'hslider', 'vslider', 'needle']);
 
 // A reserved dynamic source: instead of a fixed control id, a zone can bind to
 // "@active" — whichever control is currently / most recently being interacted
@@ -114,6 +120,19 @@ export function resolveZoneContent(zone, info, width) {
       return present ? `${prefix}${info?.on === true || numberOr(info.value, 0) >= 0.5 ? 'On' : 'Off'}${suffix}` : '';
     case 'address':
       return String(info?.address ?? zone?.text ?? '----');
+    // Character-mode fallbacks for the pixel widgets (graphic panels render
+    // these as real pixel drawings instead of this text).
+    case 'hbar':
+    case 'hslider':
+      return present ? barString(infoFraction(info), width) : '';
+    case 'vbar':
+    case 'vslider': {
+      if (!present) return '';
+      const level = ' ▁▂▃▄▅▆▇█'[clamp(Math.round(infoFraction(info) * 8), 0, 8)];
+      return level.repeat(Math.max(1, Math.round(width)));
+    }
+    case 'needle':
+      return present ? `${prefix}${Math.round(infoFraction(info) * 100)}%${suffix}` : '';
     default:
       return '';
   }

@@ -2,7 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
-  import { ZONE_SHOW_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -105,6 +105,14 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => set('imageSrc', String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  }
+
+  function onPickAnim(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => set('animSrc', String(reader.result ?? ''));
     reader.readAsDataURL(file);
   }
 
@@ -485,6 +493,30 @@
                 <option value="on">on</option>
                 <option value="off">off</option>
               </select>
+              {#if WIDGET_ZONE_KINDS.has(z.show)}
+                <span class="zx-lab">Rows</span>
+                <input class="val zn" type="number" min="1" max="16" title="Rows tall (graphic panels)" value={z.rowSpan ?? 1} onchange={(event) => setZone(i, 'rowSpan', Math.max(1, Math.round(Number(event.target.value))))} />
+                <span class="zx-lab">Frame</span>
+                <select class="val zn2" title="Outline frame" value={z.frame === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'frame', event.target.value === 'on')}>
+                  <option value="off">off</option>
+                  <option value="on">on</option>
+                </select>
+                <span class="zx-lab">Ticks</span>
+                <select class="val zn2" title="Tick marks" value={z.ticks === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'ticks', event.target.value === 'on')}>
+                  <option value="off">off</option>
+                  <option value="on">on</option>
+                </select>
+                <span class="zx-lab">Peak</span>
+                <select class="val zn2" title="Peak-hold marker (bars)" value={z.peakHold === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'peakHold', event.target.value === 'on')}>
+                  <option value="off">off</option>
+                  <option value="on">on</option>
+                </select>
+                <span class="zx-lab">Smooth</span>
+                <select class="val zn2" title="Meter ballistics (smoothed movement)" value={z.smooth === true ? 'on' : 'off'} onchange={(event) => setZone(i, 'smooth', event.target.value === 'on')}>
+                  <option value="off">off</option>
+                  <option value="on">on</option>
+                </select>
+              {/if}
               <button class="val rm" type="button" onclick={() => moveZone(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
               <button class="val rm" type="button" onclick={() => moveZone(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === (editLayout.zones ?? []).length - 1}>▼</button>
             </div>
@@ -588,6 +620,52 @@
       <PropertyCell label="Scope" span={4} hint="Add a control that @active is allowed to follow.">
         <button class="val add-field" type="button" onclick={() => addScope()}>+ Add to @active scope</button>
       </PropertyCell>
+    </PropertySection>
+  {/if}
+
+  {#if String(display.panelType ?? '') === 'graphic'}
+    <PropertySection title="Animation">
+      <PropertyCell label="Mode" span={4} hint="Dot-matrix animation played behind the zones/text. File = GIF/APNG or a sprite sheet; Preset = built-in effects.">
+        <select class="val" value={display.animMode ?? 'off'} onchange={(event) => set('animMode', event.target.value)}>
+          <option value="off">Off</option>
+          <option value="file">File (GIF / sprite sheet)</option>
+          <option value="preset">Preset</option>
+        </select>
+      </PropertyCell>
+      {#if String(display.animMode ?? 'off') === 'file'}
+        <PropertyCell label="File" span={4} hint="Animated GIF/APNG/WebP (decoded frame-by-frame), or one image holding sprite frames side-by-side.">
+          <input class="val" type="file" accept="image/*" onchange={onPickAnim} />
+        </PropertyCell>
+        <PropertyCell label="Frames" span={2} hint="Sprite-sheet frame count (frames laid out horizontally). 0 = the file is an animated GIF/APNG.">
+          <NumberInput value={display.animFrames ?? 0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+        </PropertyCell>
+        <PropertyCell label="FPS" span={1} hint="Sprite-sheet playback rate (animated files use their own frame timing).">
+          <NumberInput value={display.animFps ?? 12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />
+        </PropertyCell>
+        <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
+          <PropertyToggle value={display.animLoop !== false} onchange={() => toggle('animLoop', true)} />
+        </PropertyCell>
+        {#if display.animSrc}
+          <PropertyCell label="Clear" span={4} hint="Remove the animation file.">
+            <button class="val add-field" type="button" onclick={() => set('animSrc', '')}>Clear animation</button>
+          </PropertyCell>
+        {/if}
+      {/if}
+      {#if String(display.animMode ?? 'off') === 'preset'}
+        <PropertyCell label="Preset" span={2} hint="Built-in dot-matrix effect.">
+          <select class="val" value={display.animPreset ?? 'wave'} onchange={(event) => set('animPreset', event.target.value)}>
+            <option value="wave">Wave</option>
+            <option value="scanner">Scanner</option>
+            <option value="rain">Rain</option>
+            <option value="starfield">Starfield</option>
+            <option value="spinner">Spinner</option>
+            <option value="plasma">Plasma</option>
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
+          <NumberInput value={display.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+        </PropertyCell>
+      {/if}
     </PropertySection>
   {/if}
 

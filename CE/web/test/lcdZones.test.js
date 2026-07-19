@@ -131,6 +131,14 @@ test('a scroll zone that fits its region does not scroll', () => {
   assert.equal(composeLayout(zones, 1, 6, null, 5)[0], 'HI    ');
 });
 
+test('widget kinds have character-mode fallbacks', () => {
+  const half = { present: true, value: 50, min: 0, max: 100 };
+  assert.equal(resolveZoneContent({ show: 'hbar' }, half, 4), '██  ');
+  assert.equal(resolveZoneContent({ show: 'vbar' }, half, 3), '▄▄▄');
+  assert.equal(resolveZoneContent({ show: 'needle' }, half, 5), '50%');
+  assert.equal(resolveZoneContent({ show: 'hslider' }, { present: false }, 4), '');
+});
+
 test('noteName maps MIDI note numbers', () => {
   assert.equal(noteName(60), 'C4');
   assert.equal(noteName(69), 'A4');

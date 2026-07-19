@@ -16,7 +16,7 @@
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
-  import { composeLayout, findLayout, resolveActiveLayoutId } from '../utils/lcdZones.js';
+  import { composeLayout, findLayout, resolveActiveLayoutId, infoFraction, WIDGET_ZONE_KINDS } from '../utils/lcdZones.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
 
   let { control = null, allControls = [], width = 0, height = 0 } = $props();
@@ -90,7 +90,7 @@
     const layout = findLayout(display.layouts, activeLayoutId);
     return (layout?.zones ?? []).some((z) => z?.scroll === true && z?.visible !== false);
   });
-  let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled || zoneScrollActive);
+  let motionActive = $derived(scrolling || blinkEnabled || cursorBlinkEnabled || zoneScrollActive || animActive || widgetMotion);
 
   // One full scroll cycle (in characters) for a line — 0 if it doesn't scroll.
   function linePeriod(raw) {
@@ -137,7 +137,7 @@
       const finiteDone = scrollRepeat > 0
         && (maxScrollPeriod === 0 || elapsedChars >= scrollRepeat * maxScrollPeriod);
       const scrollNeedsMore = scrolling && !finiteDone;
-      const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore || zoneScrollActive;
+      const needMore = blinkEnabled || cursorBlinkEnabled || scrollNeedsMore || zoneScrollActive || animActive || widgetMotion;
       if (needMore) raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
@@ -344,7 +344,13 @@
     if (hasLayouts) {
       const layout = findLayout(display.layouts, activeLayoutId);
       const zoneElapsed = zoneScrollActive ? (frameTime / 1000) * scrollSpeed : 0;
-      return composeLayout(layout?.zones ?? [], rows, cols, controlInfo, zoneElapsed);
+      // On a graphic panel, widget zones render as real pixel drawings on the
+      // canvas — exclude them from the character composition so their char
+      // fallbacks don't rasterise underneath the widgets.
+      const zones = isGraphic
+        ? (layout?.zones ?? []).filter((z) => !WIDGET_ZONE_KINDS.has(String(z?.show ?? '')))
+        : (layout?.zones ?? []);
+      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed);
     }
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const out = [];
@@ -364,6 +370,39 @@
   let isSegment = $derived(panelType === 'segment');
   let isGraphic = $derived(panelType === 'graphic');
   let segmentType = $derived(String(display?.segmentType ?? '16'));
+
+  // Pixel widgets (graphic panels): widget-kind zones become live pixel drawings
+  // — region in character units + the bound source's value fraction.
+  let pixelWidgets = $derived.by(() => {
+    if (!isGraphic || !hasLayouts) return [];
+    const layout = findLayout(display.layouts, activeLayoutId);
+    const out = [];
+    for (const z of (layout?.zones ?? [])) {
+      const kind = String(z?.show ?? '');
+      if (!WIDGET_ZONE_KINDS.has(kind) || z?.visible === false) continue;
+      const info = controlInfo(String(z?.sourceId ?? ''));
+      out.push({
+        id: String(z?.id ?? ''),
+        kind,
+        row: Math.max(0, Math.round(numberOr(z?.row, 1)) - 1),
+        rowSpan: Math.max(1, Math.round(numberOr(z?.rowSpan, 1))),
+        colStart: Math.max(0, Math.round(numberOr(z?.colStart, 1)) - 1),
+        colEnd: Math.max(0, Math.round(numberOr(z?.colEnd, cols)) - 1),
+        frac: info ? infoFraction(info) : 0,
+        frame: z?.frame === true,
+        ticks: z?.ticks === true,
+        peakHold: z?.peakHold === true,
+        smooth: z?.smooth === true,
+      });
+    }
+    return out;
+  });
+
+  // Animation (graphic panels): keep the rAF clock running for GIF/preset
+  // playback and for widget ballistics (smoothing / peak decay).
+  let animMode = $derived(String(display?.animMode ?? 'off').trim().toLowerCase());
+  let animActive = $derived(isGraphic && animMode !== 'off');
+  let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold));
 
   // Dot-matrix look (character mode): punch the lit/ghost layers into a repeating
   // dot grid via a CSS mask. Not used in segment or graphic mode.
@@ -451,6 +490,15 @@
         pixelWidth={numberOr(display?.pixelWidth, 0)}
         pixelHeight={numberOr(display?.pixelHeight, 0)}
         fontScale={fontScale}
+        widgets={pixelWidgets}
+        animMode={animMode}
+        animSrc={display?.animSrc ?? ''}
+        animFrames={numberOr(display?.animFrames, 0)}
+        animFps={numberOr(display?.animFps, 12)}
+        animLoop={display?.animLoop !== false}
+        animPreset={display?.animPreset ?? 'wave'}
+        animSpeed={numberOr(display?.animSpeed, 1)}
+        animTick={frameTime}
         width={screenW}
         height={screenH}
       />
