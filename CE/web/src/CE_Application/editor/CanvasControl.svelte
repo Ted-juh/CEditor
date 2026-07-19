@@ -4085,7 +4085,14 @@
     {/if}
 
     {#if isPixelDisplay}
-      <PixelDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
+      <PixelDisplayRenderer
+        control={renderControl}
+        allControls={allControls}
+        width={displayW}
+        height={displayH}
+        editable={editorInteractionEnabled && isSelected && !isEditorLocked}
+        {scale}
+      />
     {/if}
 
     {#if isSliderControl}

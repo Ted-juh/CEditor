@@ -4,11 +4,13 @@
   // live at (x, y, w, h) on a pixelsW × pixelsH grid. Text elements rasterise at
   // their position with a per-element font height; widget elements (bars,
   // sliders, needle) fill their rect; an animation layer plays behind.
+  import { onDestroy } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout } from '../utils/lcdZones.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { updateControlProperty } from '../stores/controls.js';
 
-  let { control = null, allControls = [], width = 0, height = 0 } = $props();
+  let { control = null, allControls = [], width = 0, height = 0, editable = false, scale = 1 } = $props();
 
   let pixel = $derived(control?._children?.Pixel ?? null);
   let coreId = $derived(String(control?._children?.Core?.id ?? ''));
@@ -148,6 +150,81 @@
     return out;
   });
 
+  // --- Design-mode element dragging ---
+  // Handles overlay each element on the screen (when the control is selected in
+  // design mode) and drag writes the element's x/y back in grid pixels.
+  let dragEl = $state(null); // { i, cx, cy, x, y }
+
+  function elementPathPrefix(i) {
+    if (hasLayouts) {
+      const li = layouts.findIndex((l) => String(l?.id ?? '') === String(activeLayoutId));
+      if (li < 0) return '';
+      return `Pixel.layouts.${li}.elements.${i}`;
+    }
+    return `Pixel.elements.${i}`;
+  }
+
+  let overlayBoxes = $derived.by(() => {
+    if (!editable) return [];
+    const sx = screenW / pixW;
+    const sy = screenH / pixH;
+    const out = [];
+    elements.forEach((el, i) => {
+      if (el?.visible === false) return;
+      const kind = String(el?.kind ?? '');
+      const h = Math.max(3, Math.round(numberOr(el?.h, 8)));
+      let w = Math.max(0, Math.round(numberOr(el?.w, 0)));
+      // Text without an alignment box: estimate the grab area from the content.
+      if (!WIDGET_ZONE_KINDS.has(kind) && w <= 0) {
+        const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
+        w = Math.ceil(h * 0.6 * len);
+      }
+      out.push({
+        i,
+        left: numberOr(el?.x, 0) * sx,
+        top: numberOr(el?.y, 0) * sy,
+        width: Math.max(6, w * sx),
+        height: Math.max(6, h * sy),
+      });
+    });
+    return out;
+  });
+
+  function startElementDrag(box, event) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const el = elements[box.i];
+    if (!el) return;
+    dragEl = { i: box.i, cx: event.clientX, cy: event.clientY, x: numberOr(el.x, 0), y: numberOr(el.y, 0) };
+    window.addEventListener('mousemove', onElementDragMove);
+    window.addEventListener('mouseup', endElementDrag);
+  }
+
+  function onElementDragMove(event) {
+    if (!dragEl) return;
+    const s = Math.max(0.01, Number(scale) || 1);
+    const gx = (event.clientX - dragEl.cx) / s / (screenW / pixW);
+    const gy = (event.clientY - dragEl.cy) / s / (screenH / pixH);
+    const el = elements[dragEl.i];
+    const prefix = elementPathPrefix(dragEl.i);
+    if (!el || !prefix || !coreId) return;
+    const w = Math.min(pixW, Math.max(1, Math.round(numberOr(el.w, 1))));
+    const h = Math.min(pixH, Math.max(1, Math.round(numberOr(el.h, 8))));
+    const nx = Math.round(clamp(dragEl.x + gx, 0, Math.max(0, pixW - w)));
+    const ny = Math.round(clamp(dragEl.y + gy, 0, Math.max(0, pixH - h)));
+    if (nx !== numberOr(el.x, 0)) updateControlProperty(coreId, `${prefix}.x`, nx);
+    if (ny !== numberOr(el.y, 0)) updateControlProperty(coreId, `${prefix}.y`, ny);
+  }
+
+  function endElementDrag() {
+    dragEl = null;
+    window.removeEventListener('mousemove', onElementDragMove);
+    window.removeEventListener('mouseup', endElementDrag);
+  }
+
+  onDestroy(() => endElementDrag());
+
   // rAF clock for animations and widget ballistics.
   let frameTime = $state(0);
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
@@ -223,6 +300,19 @@
     {#if showGlass}
       <div class="pixel-layer pixel-glass" style={`background:linear-gradient(155deg, ${glassTintCss}, transparent 55%);`}></div>
     {/if}
+
+    {#if editable}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      {#each overlayBoxes as box (box.i)}
+        <div
+          class="el-handle"
+          class:dragging={dragEl?.i === box.i}
+          style={`left:${box.left}px; top:${box.top}px; width:${box.width}px; height:${box.height}px;`}
+          onmousedown={(event) => startElementDrag(box, event)}
+          title="Drag to move element"
+        ></div>
+      {/each}
+    {/if}
   </div>
 {/if}
 
@@ -243,5 +333,21 @@
 
   .pixel-glass {
     mix-blend-mode: screen;
+  }
+
+  .el-handle {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: move;
+    border: 1px dashed transparent;
+    border-radius: 2px;
+    z-index: 5;
+  }
+
+  .el-handle:hover,
+  .el-handle.dragging {
+    border-color: rgba(91, 155, 213, 0.9);
+    background: rgba(91, 155, 213, 0.12);
   }
 </style>
