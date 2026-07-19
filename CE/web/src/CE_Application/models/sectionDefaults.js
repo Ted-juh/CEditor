@@ -627,6 +627,53 @@ export const SECTION_DEFAULTS = {
     editMaxLength: 16,             // 0 = unbounded
   },
 
+  /**
+   * Pixel — a free-pixel dot-matrix surface (OLED/GLCD style). Everything is
+   * addressed in grid pixels: elements are placed at (x, y, w, h) on a
+   * pixelsW × pixelsH grid — no character rows/columns.
+   */
+  Pixel: {
+    _type: 'Pixel',
+    pixelsW: 128,                  // grid resolution (pixels)
+    pixelsH: 64,
+    palette: 'oledWhite',
+    litColour: 'FFF2F2F2',
+    unlitColour: '14FFFFFF',
+    screenColour: 'FF000000',
+    backlightOn: true,
+    backlightColour: '00000000',
+    brightness: 100,
+    contrast: 55,
+    brightnessSourceId: '',        // range control that drives brightness live in preview
+    backlightSourceId: '',         // switch control that drives the backlight on/off
+    glassTint: '14FFFFFF',
+    showGlass: true,
+    showGhost: true,               // faint unlit dots
+    showScanlines: false,
+    dotShape: 'round',             // round | square
+    padding: 8,                    // bezel inset (screen px, not grid px)
+    imageSrc: '',                  // static image dithered onto the grid
+    imageDither: true,
+    // Animation layer (plays behind the elements) — same engine as the LCD.
+    animMode: 'off',
+    animSrc: '',
+    animFrames: 0,
+    animFps: 12,
+    animLoop: true,
+    animPreset: 'wave',
+    animSpeed: 1,
+    // Which controls count as "@active" (Core.ids). Empty = any control.
+    activeScope: [],
+    // The scene: pixel-addressed elements. Each:
+    // { id, kind (static|name|value|pct|midiValue|note|text|state|
+    //   hbar|vbar|hslider|vslider|needle), x, y, w, h, sourceId, align,
+    //   precision, prefix, suffix, label, radix, frame, ticks, peakHold,
+    //   smooth, visible }
+    // Text kinds draw at (x, y) with font height h (w > 0 clips/aligns);
+    // widget kinds fill the (x, y, w, h) rect.
+    elements: [],
+  },
+
   /** Behavior — interaction family, role, and value model. */
   Behavior: {
     _type: 'Behavior',

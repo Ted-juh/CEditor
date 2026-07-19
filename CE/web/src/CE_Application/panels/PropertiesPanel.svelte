@@ -121,6 +121,7 @@
     { id: 'border',     icon: Frame,         label: 'Border',     section: 'Background' },
     { id: 'text',       icon: Type,          label: 'Text',       section: 'Text' },
     { id: 'display',    icon: Monitor,       label: 'Display',    section: 'Display' },
+    { id: 'pixel',      icon: Grid3x3,       label: 'Pixels',     section: 'Pixel' },
     { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },

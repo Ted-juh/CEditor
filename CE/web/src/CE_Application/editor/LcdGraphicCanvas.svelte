@@ -25,6 +25,7 @@
     pixelHeight = 0,
     fontScale = 1,
     widgets = [],
+    texts = [],                  // pixel-positioned strings: {x, y, h, w, align, content}
     animMode = 'off',            // off | file | preset
     animSrc = '',
     animFrames = 0,              // sprite-sheet frame count (0 = animated file)
@@ -130,6 +131,26 @@
         const ch = line[x] ?? ' ';
         if (ch !== ' ') { c.fillText(ch, x * charW + charW / 2, r * charH + charH / 2); any = true; }
       }
+    }
+    // Pixel-positioned strings (PixelDisplay elements): drawn at (x, y) with a
+    // per-text font height; w > 0 clips and provides the alignment box.
+    for (const t of (Array.isArray(texts) ? texts : [])) {
+      const content = String(t?.content ?? '');
+      if (!content) continue;
+      const th = Math.max(3, Math.round(Number(t?.h) || 8));
+      const tx = Math.round(Number(t?.x) || 0);
+      const ty = Math.round(Number(t?.y) || 0);
+      const tw = Math.max(0, Math.round(Number(t?.w) || 0));
+      const align = String(t?.align ?? 'left');
+      c.save();
+      if (tw > 0) { c.beginPath(); c.rect(tx, ty, tw, th + 2); c.clip(); }
+      c.font = `${th}px monospace`;
+      c.textBaseline = 'top';
+      c.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
+      const anchorX = align === 'center' ? tx + tw / 2 : align === 'right' ? tx + tw : tx;
+      c.fillText(content, anchorX, ty);
+      c.restore();
+      any = true;
     }
     if (!any) return null;
     const data = c.getImageData(0, 0, pixW, pixH).data;
@@ -294,10 +315,20 @@
   let lastDrawAt = 0;
 
   function widgetRect(w) {
-    const x0 = Math.round((w.colStart * pixW) / Math.max(1, cols));
-    const x1 = Math.round(((w.colEnd + 1) * pixW) / Math.max(1, cols)) - 1;
-    const y0 = Math.round((w.row * pixH) / Math.max(1, rows));
-    const y1 = Math.round(((w.row + w.rowSpan) * pixH) / Math.max(1, rows)) - 1;
+    // Pixel-native widgets (PixelDisplay) carry their rect directly; the LCD's
+    // cell-based widgets convert row/col character units to grid pixels.
+    let x0; let x1; let y0; let y1;
+    if (w.px === true) {
+      x0 = Math.round(Number(w.x) || 0);
+      y0 = Math.round(Number(w.y) || 0);
+      x1 = x0 + Math.max(1, Math.round(Number(w.w) || 1)) - 1;
+      y1 = y0 + Math.max(1, Math.round(Number(w.h) || 1)) - 1;
+    } else {
+      x0 = Math.round((w.colStart * pixW) / Math.max(1, cols));
+      x1 = Math.round(((w.colEnd + 1) * pixW) / Math.max(1, cols)) - 1;
+      y0 = Math.round((w.row * pixH) / Math.max(1, rows));
+      y1 = Math.round(((w.row + w.rowSpan) * pixH) / Math.max(1, rows)) - 1;
+    }
     return {
       x0: Math.max(0, Math.min(pixW - 1, x0)),
       x1: Math.max(0, Math.min(pixW - 1, Math.max(x0, x1))),
@@ -480,7 +511,7 @@
     void lines; void cols; void rows; void litCss; void unlitCss; void brightness;
     void contrast; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
-    void widgets; void animMode; void animCache; void animPreset; void animSpeed;
+    void widgets; void texts; void animMode; void animCache; void animPreset; void animSpeed;
     void animLoop; void animTick;
     try {
       draw();

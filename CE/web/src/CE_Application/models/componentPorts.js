@@ -136,6 +136,20 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  PixelDisplay: [
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'brightness',
+      label: 'Brightness',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+  ],
   CustomComponent: [
     {
       id: 'mainValue',

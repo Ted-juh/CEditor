@@ -149,7 +149,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyLcdValueSource(control, resolved);
+    return applyPixelValueSource(control, applyLcdValueSource(control, resolved));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -580,6 +580,47 @@
       }
     }
     return { ...resolved, control: clone };
+  }
+
+  // Drive a PixelDisplay from live control values: element sources (+ @active),
+  // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
+  // pixel-surface component.
+  function applyPixelValueSource(control, resolved) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'PixelDisplay') return resolved;
+    const pixel = control?._children?.Pixel;
+    if (!pixel) return resolved;
+
+    const ids = new Set();
+    for (const el of (Array.isArray(pixel.elements) ? pixel.elements : [])) {
+      const id = String(el?.sourceId ?? '');
+      if (id) ids.add(id);
+    }
+    const live = {};
+    for (const id of ids) {
+      const resolvedId = isActiveSource(id) ? lcdResolveActive(id, pixel) : id;
+      const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
+      const info = src ? lcdSourceInfo(src) : null;
+      if (info) live[id] = info;
+    }
+
+    const brightRange = pixel.brightnessSourceId ? lcdRangeForSource(pixel.brightnessSourceId) : null;
+    const backCtrl = pixel.backlightSourceId
+      ? orderedControls.find((entry) => getControlId(entry) === String(pixel.backlightSourceId)) : null;
+    const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
+
+    if (!Object.keys(live).length && !brightRange && !backInfo) return resolved;
+
+    const base = resolved?.control ?? control;
+    const basePixel = base?._children?.Pixel ?? {};
+    const cp = { ...basePixel, __live: live };
+    if (brightRange) {
+      const span = brightRange.max - brightRange.min;
+      const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
+      cp.brightness = Math.round(frac * 100);
+    }
+    if (backInfo) cp.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+    const clone = { ...base, _children: { ...base._children, Pixel: cp } };
+    return { ...(resolved ?? {}), control: clone };
   }
 
   function isDisabled(control) {
@@ -1788,7 +1829,7 @@
     pointerActiveControlId = getControlId(control);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
-    if (pointerActiveControlId && String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') {
+    if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
       lcdActiveAt[pointerActiveControlId] = Date.now(); lcdActiveId = pointerActiveControlId;
     }
     // Clicking an LCD with an editable zone focuses it; clicking anything else

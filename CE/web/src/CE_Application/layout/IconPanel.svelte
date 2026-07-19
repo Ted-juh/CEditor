@@ -3,6 +3,7 @@
     BadgeCheck,
     CircleDot,
     Container,
+    Grid3x3,
     Library,
     Monitor,
     Pin,
@@ -90,6 +91,7 @@
       { type: 'Group',           icon: Container,          label: 'Insert Group / Frame' },
       { type: 'Image',           icon: Square,             label: 'Insert Image' },
       { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
+      { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

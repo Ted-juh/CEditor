@@ -502,6 +502,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  PixelDisplay: {
+    sections: ['Background', 'Pixel', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('PixelDisplay'),
+    defaultOverrides: {
+      // A 128x64 OLED-style pixel surface in a dark bezel by default.
+      Transform: { width: 260, height: 140 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101010' },
+          Border: { enabled: true, thickness: 2, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   TestBox: {
     sections: ['Background', 'Effects'],
     defaultOverrides: {
