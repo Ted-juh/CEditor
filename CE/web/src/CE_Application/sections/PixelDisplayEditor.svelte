@@ -385,49 +385,53 @@
       </div>
       {#if expandedElementId === String(el.id ?? i)}
         <div class="el-extra">
-          <span class="ex-lab">Align</span>
-          <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
-            <option value="left">L</option>
-            <option value="center">C</option>
-            <option value="right">R</option>
-          </select>
-          <span class="ex-lab">Pre</span>
-          <input class="val en2" type="text" title="Prefix text" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
-          <span class="ex-lab">Suf</span>
-          <input class="val en2" type="text" title="Suffix text" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
-          <span class="ex-lab">Dec</span>
-          <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
-          <span class="ex-lab">Lbl</span>
-          <input class="val etext" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="(caption)" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
-          <span class="ex-lab">Vis</span>
-          <select class="val en2" title="Element visible" value={el.visible === false ? 'off' : 'on'} onchange={(event) => setElement(i, 'visible', event.target.value !== 'off')}>
-            <option value="on">on</option>
-            <option value="off">off</option>
-          </select>
-          {#if WIDGET_KINDS.includes(el.kind)}
-            <span class="ex-lab">Frame</span>
-            <select class="val en2" title="Outline frame" value={el.frame === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'frame', event.target.value === 'on')}>
-              <option value="off">off</option>
-              <option value="on">on</option>
+          <div class="ex-row">
+            <span class="ex-lab">Align</span>
+            <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
+              <option value="left">L</option>
+              <option value="center">C</option>
+              <option value="right">R</option>
             </select>
-            <span class="ex-lab">Ticks</span>
-            <select class="val en2" title="Tick marks" value={el.ticks === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'ticks', event.target.value === 'on')}>
-              <option value="off">off</option>
+            <span class="ex-lab">Pre</span>
+            <input class="val en" type="text" title="Prefix text" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
+            <span class="ex-lab">Suf</span>
+            <input class="val en" type="text" title="Suffix text" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
+            <span class="ex-lab">Dec</span>
+            <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+            <span class="ex-lab">Lbl</span>
+            <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="(caption)" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+          </div>
+          <div class="ex-row">
+            <span class="ex-lab">Vis</span>
+            <select class="val en2" title="Element visible" value={el.visible === false ? 'off' : 'on'} onchange={(event) => setElement(i, 'visible', event.target.value !== 'off')}>
               <option value="on">on</option>
-            </select>
-            <span class="ex-lab">Peak</span>
-            <select class="val en2" title="Peak-hold marker (bars)" value={el.peakHold === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'peakHold', event.target.value === 'on')}>
               <option value="off">off</option>
-              <option value="on">on</option>
             </select>
-            <span class="ex-lab">Smooth</span>
-            <select class="val en2" title="Meter ballistics (smoothed movement)" value={el.smooth === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'smooth', event.target.value === 'on')}>
-              <option value="off">off</option>
-              <option value="on">on</option>
-            </select>
-          {/if}
-          <button class="val erm" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
-          <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
+            {#if WIDGET_KINDS.includes(el.kind)}
+              <span class="ex-lab">Frame</span>
+              <select class="val en2" title="Outline frame" value={el.frame === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'frame', event.target.value === 'on')}>
+                <option value="off">off</option>
+                <option value="on">on</option>
+              </select>
+              <span class="ex-lab">Ticks</span>
+              <select class="val en2" title="Tick marks" value={el.ticks === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'ticks', event.target.value === 'on')}>
+                <option value="off">off</option>
+                <option value="on">on</option>
+              </select>
+              <span class="ex-lab">Peak</span>
+              <select class="val en2" title="Peak-hold marker (bars)" value={el.peakHold === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'peakHold', event.target.value === 'on')}>
+                <option value="off">off</option>
+                <option value="on">on</option>
+              </select>
+              <span class="ex-lab">Smooth</span>
+              <select class="val en2" title="Meter ballistics (smoothed movement)" value={el.smooth === true ? 'on' : 'off'} onchange={(event) => setElement(i, 'smooth', event.target.value === 'on')}>
+                <option value="off">off</option>
+                <option value="on">on</option>
+              </select>
+            {/if}
+            <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
+            <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
+          </div>
         </div>
       {/if}
     {/each}
@@ -687,11 +691,26 @@
   .el-extra {
     grid-column: span 4;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     gap: 3px;
-    align-items: center;
     padding: 3px 0 5px 24px;
     border-bottom: 1px solid #2a2a2a;
+  }
+
+  .ex-row {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 3px;
+    align-items: center;
+  }
+
+  .el-extra .ex-fill {
+    flex: 1 1 60px;
+    min-width: 50px;
+  }
+
+  .el-extra .ex-end {
+    margin-left: auto;
   }
 
   .ex-lab {
