@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
+  import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -71,16 +72,110 @@
     reader.readAsDataURL(file);
   }
 
-  // --- Elements ---
-  let elements = $derived(Array.isArray(pixel?.elements) ? pixel.elements : []);
+  // --- Layouts / pages (same engine as the LCD) ---
+  let layouts = $derived(Array.isArray(pixel?.layouts) ? pixel.layouts : []);
+  let editLayoutId = $state('');
+  let editLayout = $derived(layouts.find((l) => String(l?.id) === String(editLayoutId)) ?? layouts[0] ?? null);
+  let pages = $derived(pixel?.pages ?? {});
   let pixelsW = $derived(Math.max(8, Math.round(Number(pixel?.pixelsW ?? 128))));
   let pixelsH = $derived(Math.max(8, Math.round(Number(pixel?.pixelsH ?? 64))));
 
   function genId(prefix) {
     return `${prefix}${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
   }
+  function cloneLayouts() { return JSON.parse(JSON.stringify(layouts)); }
+  function commitLayouts(next) { set('layouts', next); }
+  function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
+  function commitPages(next) { set('pages', next); }
+  function setPageProp(prop, value) { const p = clonePages(); p[prop] = value; commitPages(p); }
+
+  function selectEditLayout(id) {
+    editLayoutId = id;
+    setLcdDesignLayout(core?.id, id);
+  }
+  function addLayout() {
+    const next = cloneLayouts();
+    const id = genId('lay_');
+    // The first layout adopts the current flat elements so nothing is lost.
+    next.push({ id, name: `Layout ${next.length + 1}`, elements: next.length === 0 ? JSON.parse(JSON.stringify(flatElements)) : [] });
+    commitLayouts(next);
+    editLayoutId = id;
+    setLcdDesignLayout(core?.id, id);
+    if (next.length === 1) {
+      const p = clonePages();
+      p.defaultLayoutId = id;
+      commitPages(p);
+    }
+  }
+  function removeLayout(id) {
+    commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));
+  }
+  function renameLayout(id, name) {
+    const next = cloneLayouts();
+    const l = next.find((x) => String(x.id) === String(id));
+    if (l) { l.name = String(name ?? ''); commitLayouts(next); }
+  }
+  function addSelectorRow() {
+    const p = clonePages();
+    p.selectorMap = Array.isArray(p.selectorMap) ? p.selectorMap : [];
+    p.selectorMap.push({ when: '', layoutId: editLayout?.id ?? '' });
+    commitPages(p);
+  }
+  function setSelectorRow(i, prop, value) {
+    const p = clonePages();
+    if (Array.isArray(p.selectorMap) && p.selectorMap[i]) { p.selectorMap[i][prop] = value; commitPages(p); }
+  }
+  function removeSelectorRow(i) {
+    const p = clonePages();
+    if (Array.isArray(p.selectorMap)) { p.selectorMap.splice(i, 1); commitPages(p); }
+  }
+  function addOverlay() {
+    const p = clonePages();
+    p.overlays = Array.isArray(p.overlays) ? p.overlays : [];
+    p.overlays.push({ id: genId('ov_'), layoutId: editLayout?.id ?? '', sourceId: '', duration: 800, dismiss: 'timer' });
+    commitPages(p);
+  }
+  function setOverlay(i, prop, value) {
+    const p = clonePages();
+    if (Array.isArray(p.overlays) && p.overlays[i]) { p.overlays[i][prop] = value; commitPages(p); }
+  }
+  function removeOverlay(i) {
+    const p = clonePages();
+    if (Array.isArray(p.overlays)) { p.overlays.splice(i, 1); commitPages(p); }
+  }
+
+  // Known values of the Pages selector control (pick-list for "When").
+  let selectorOptions = $derived.by(() => {
+    const src = ($activePanel?.controls ?? [])
+      .find((c) => String(c?._children?.Core?.id ?? '') === String(pages?.selectorSourceId ?? ''));
+    if (!src) return null;
+    const b = src._children?.Behavior ?? {};
+    const bt = String(b.buttonType ?? '').trim().toLowerCase();
+    if (bt === 'combobox' || bt === 'radio' || bt === 'cyclic') {
+      const rows = Array.isArray(src._children?.Value?.rows) ? src._children.Value.rows : [];
+      const opts = rows.filter((r) => r?.enabled !== false)
+        .map((r) => ({ value: String(r.internalValue ?? r.id ?? ''), label: String(r.displayText ?? r.internalValue ?? r.id ?? '') }));
+      if (opts.length) return opts;
+    }
+    if (String(b.family ?? '') === 'select' || String(b.valueType ?? '') === 'bool' || String(b.family ?? '') === 'trigger') {
+      return [{ value: '0', label: '0 (Off)' }, { value: '1', label: '1 (On)' }];
+    }
+    return null;
+  });
+
+  // --- Elements (of the edited layout, or the flat list when no layouts) ---
+  let flatElements = $derived(Array.isArray(pixel?.elements) ? pixel.elements : []);
+  let elements = $derived(layouts.length ? (Array.isArray(editLayout?.elements) ? editLayout.elements : []) : flatElements);
+
   function cloneElements() { return JSON.parse(JSON.stringify(elements)); }
-  function commitElements(next) { set('elements', next); }
+  function commitElements(next) {
+    if (!layouts.length) { set('elements', next); return; }
+    const all = cloneLayouts();
+    const l = all.find((x) => String(x.id) === String(editLayout?.id));
+    if (!l) return;
+    l.elements = next;
+    commitLayouts(all);
+  }
 
   function addElement() {
     const next = cloneElements();
@@ -150,6 +245,103 @@
       </PropertyCell>
     {/if}
   </PropertySection>
+
+  <PropertySection title="Layouts">
+    {#if layouts.length === 0}
+      <PropertyCell label="Layouts" span={4} hint="Multiple element scenes for the same screen, switched by the Pages rules. Enabling moves the current elements into Layout 1.">
+        <button class="val add-field" type="button" onclick={() => addLayout()}>+ Enable layouts</button>
+      </PropertyCell>
+    {:else}
+      <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Elements table edits AND previews on the canvas. Runtime switching follows the Pages rules.">
+        <div class="field-row">
+          <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
+            {#each layouts as l}
+              <option value={String(l.id)}>{l.name ?? l.id}</option>
+            {/each}
+          </select>
+          <button class="val erm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
+          <button class="val erm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="Name" span={4} hint="Layout name (used by the Pages rules).">
+        <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
+      </PropertyCell>
+    {/if}
+  </PropertySection>
+
+  {#if layouts.length > 0}
+    <PropertySection title="Pages">
+      <PropertyCell label="Selector" span={4} hint="A control whose value selects the resting layout (e.g. a mode/preset combobox).">
+        <select class="val" value={pages.selectorSourceId ?? ''} onchange={(event) => setPageProp('selectorSourceId', event.target.value)}>
+          <option value="">None (always default)</option>
+          {#each allSources as src}
+            <option value={src.id}>{src.name}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Default" span={4} hint="Resting layout when no selector value matches.">
+        <select class="val" value={pages.defaultLayoutId ?? ''} onchange={(event) => setPageProp('defaultLayoutId', event.target.value)}>
+          {#each layouts as l}
+            <option value={String(l.id)}>{l.name ?? l.id}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      {#each (pages.selectorMap ?? []) as m, i (i)}
+        <PropertyCell label={`When = ${m.when ?? ''}`} span={4} hint="Selector value → layout to show.">
+          <div class="field-row">
+            {#if selectorOptions}
+              <select class="val" title="Selector value" value={String(m.when ?? '')} onchange={(event) => setSelectorRow(i, 'when', event.target.value)}>
+                <option value="">(value)</option>
+                {#each selectorOptions as opt}
+                  <option value={opt.value}>{opt.label}</option>
+                {/each}
+              </select>
+            {:else}
+              <input class="val en" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+            {/if}
+            <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
+              {#each layouts as l}
+                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {/each}
+            </select>
+            <button class="val erm" type="button" onclick={() => removeSelectorRow(i)} title="Remove">✕</button>
+          </div>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Map" span={4} hint="Add a selector value → layout mapping.">
+        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page mapping</button>
+      </PropertyCell>
+
+      {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}
+        <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
+          <div class="field-row">
+            <select class="val" title="Layout" value={String(ov.layoutId ?? '')} onchange={(event) => setOverlay(i, 'layoutId', event.target.value)}>
+              {#each layouts as l}
+                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {/each}
+            </select>
+            <select class="val" title="On change of" value={ov.sourceId ?? ''} onchange={(event) => setOverlay(i, 'sourceId', event.target.value)}>
+              <option value="">(trigger)</option>
+              {#each allSources as src}
+                <option value={src.id}>{src.name}</option>
+              {/each}
+            </select>
+            <select class="val en2" title="Dismiss" value={ov.dismiss ?? 'timer'} onchange={(event) => setOverlay(i, 'dismiss', event.target.value)}>
+              <option value="timer">for</option>
+              <option value="untilChange">until</option>
+            </select>
+            {#if (ov.dismiss ?? 'timer') === 'timer'}
+              <input class="val en" type="number" min="0" title="Duration ms" value={ov.duration ?? 800} onchange={(event) => setOverlay(i, 'duration', Math.round(Number(event.target.value)))} />
+            {/if}
+            <button class="val erm" type="button" onclick={() => removeOverlay(i)} title="Remove">✕</button>
+          </div>
+        </PropertyCell>
+      {/each}
+      <PropertyCell label="Overlays" span={4} hint="Add a transient page shown on a control change (for N ms, or until a change).">
+        <button class="val add-field" type="button" onclick={() => addOverlay()}>+ Add overlay page</button>
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 
   <PropertySection title="Elements">
     {#if elements.length > 0}

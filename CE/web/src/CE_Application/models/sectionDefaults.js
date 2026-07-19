@@ -672,6 +672,16 @@ export const SECTION_DEFAULTS = {
     // Text kinds draw at (x, y) with font height h (w > 0 clips/aligns);
     // widget kinds fill the (x, y, w, h) rect.
     elements: [],
+    // Layouts/pages (same engine as the LCD): when layouts is non-empty the
+    // active layout's elements replace the flat list above.
+    // layout: { id, name, elements: [...] }
+    layouts: [],
+    pages: {
+      defaultLayoutId: '',
+      selectorSourceId: '',
+      selectorMap: [],             // [{ when, layoutId }]
+      overlays: [],                // [{ id, layoutId, sourceId, duration, dismiss }]
+    },
   },
 
   /** Behavior — interaction family, role, and value model. */

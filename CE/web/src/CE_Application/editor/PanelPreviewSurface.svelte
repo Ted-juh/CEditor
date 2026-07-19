@@ -456,8 +456,11 @@
     overlayTimers = [];
     const durations = new Set();
     for (const control of orderedControls) {
-      if (String(control?._children?.Core?.controlType ?? '') !== 'LcdDisplay') continue;
-      for (const ov of (control?._children?.Display?.pages?.overlays ?? [])) {
+      const type = String(control?._children?.Core?.controlType ?? '');
+      const section = type === 'LcdDisplay' ? control?._children?.Display
+        : type === 'PixelDisplay' ? control?._children?.Pixel : null;
+      if (!section) continue;
+      for (const ov of (section?.pages?.overlays ?? [])) {
         if (String(ov?.dismiss ?? 'timer').trim().toLowerCase() === 'timer') {
           durations.add(Math.max(30, numberOr(ov?.duration, 800)));
         }
@@ -585,18 +588,50 @@
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
+  // Every element sourceId across the flat list and all layouts, plus the page
+  // selector and overlay triggers.
+  function pixelSourceIds(pixel) {
+    const ids = new Set();
+    const collect = (list) => {
+      for (const el of (Array.isArray(list) ? list : [])) {
+        const id = String(el?.sourceId ?? '');
+        if (id) ids.add(id);
+      }
+    };
+    collect(pixel.elements);
+    for (const layout of (Array.isArray(pixel.layouts) ? pixel.layouts : [])) collect(layout?.elements);
+    const pages = pixel.pages ?? {};
+    if (pages.selectorSourceId) ids.add(String(pages.selectorSourceId));
+    for (const ov of (Array.isArray(pages.overlays) ? pages.overlays : [])) {
+      if (ov?.sourceId) ids.add(String(ov.sourceId));
+    }
+    return [...ids];
+  }
+
+  // Active layout for a PixelDisplay in preview: design selection as the resting
+  // default, overridden by a live selector value or an overlay.
+  function resolvePixelActiveLayoutId(control) {
+    const pixel = control?._children?.Pixel;
+    const layouts = Array.isArray(pixel?.layouts) ? pixel.layouts : [];
+    if (!layouts.length) return '';
+    const pages = pixel.pages ?? {};
+    const selSrc = pages.selectorSourceId ? orderedControls.find((e) => getControlId(e) === String(pages.selectorSourceId)) : null;
+    const selInfo = selSrc ? lcdSourceInfo(selSrc) : null;
+    const selectorValue = selInfo ? selInfo.selector : undefined;
+    const activeOverlayLayoutId = resolveActiveOverlayLayout(pixel);
+    const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
+    const hasDesign = designId && layouts.some((l) => String(l?.id ?? '') === designId);
+    const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    return resolveActiveLayoutId(effPages, layouts, { selectorValue, activeOverlayLayoutId });
+  }
+
   function applyPixelValueSource(control, resolved) {
     if (String(control?._children?.Core?.controlType ?? '') !== 'PixelDisplay') return resolved;
     const pixel = control?._children?.Pixel;
     if (!pixel) return resolved;
 
-    const ids = new Set();
-    for (const el of (Array.isArray(pixel.elements) ? pixel.elements : [])) {
-      const id = String(el?.sourceId ?? '');
-      if (id) ids.add(id);
-    }
     const live = {};
-    for (const id of ids) {
+    for (const id of pixelSourceIds(pixel)) {
       const resolvedId = isActiveSource(id) ? lcdResolveActive(id, pixel) : id;
       const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
       const info = src ? lcdSourceInfo(src) : null;
@@ -607,12 +642,14 @@
     const backCtrl = pixel.backlightSourceId
       ? orderedControls.find((entry) => getControlId(entry) === String(pixel.backlightSourceId)) : null;
     const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
+    const hasLayouts = Array.isArray(pixel.layouts) && pixel.layouts.length > 0;
 
-    if (!Object.keys(live).length && !brightRange && !backInfo) return resolved;
+    if (!Object.keys(live).length && !brightRange && !backInfo && !hasLayouts) return resolved;
 
     const base = resolved?.control ?? control;
     const basePixel = base?._children?.Pixel ?? {};
     const cp = { ...basePixel, __live: live };
+    if (hasLayouts) cp.__page = { activeLayoutId: resolvePixelActiveLayoutId(control) };
     if (brightRange) {
       const span = brightRange.max - brightRange.min;
       const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));

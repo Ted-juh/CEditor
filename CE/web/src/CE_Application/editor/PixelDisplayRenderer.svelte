@@ -5,11 +5,13 @@
   // their position with a per-element font height; widget elements (bars,
   // sliders, needle) fill their rect; an animation layer plays behind.
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
-  import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS } from '../utils/lcdZones.js';
+  import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout } from '../utils/lcdZones.js';
+  import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
 
   let { control = null, allControls = [], width = 0, height = 0 } = $props();
 
   let pixel = $derived(control?._children?.Pixel ?? null);
+  let coreId = $derived(String(control?._children?.Core?.id ?? ''));
 
   function numberOr(value, fallback = 0) {
     const numeric = Number(value);
@@ -78,7 +80,26 @@
     };
   }
 
-  let elements = $derived(Array.isArray(pixel?.elements) ? pixel.elements : []);
+  // Layouts/pages: when layouts exist, the active layout's elements replace the
+  // flat list. Active = preview-injected (__page), else the inspector's design
+  // selection (transient store), else the Pages default.
+  let layouts = $derived(Array.isArray(pixel?.layouts) ? pixel.layouts : []);
+  let hasLayouts = $derived(layouts.length > 0);
+  let activeLayoutId = $derived.by(() => {
+    if (!hasLayouts) return '';
+    const injected = pixel?.__page?.activeLayoutId;
+    if (injected) return String(injected);
+    const design = String($lcdDesignLayoutIds[coreId] ?? '');
+    if (design && findLayout(layouts, design)) return design;
+    return resolveActiveLayoutId(pixel?.pages ?? {}, layouts, {});
+  });
+  let elements = $derived.by(() => {
+    if (hasLayouts) {
+      const layout = findLayout(layouts, activeLayoutId);
+      return Array.isArray(layout?.elements) ? layout.elements : [];
+    }
+    return Array.isArray(pixel?.elements) ? pixel.elements : [];
+  });
 
   // Text elements → pixel-positioned strings for the canvas.
   let texts = $derived.by(() => {
