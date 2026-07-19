@@ -398,7 +398,7 @@
           <span class="ex-lab">Dec</span>
           <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
           <span class="ex-lab">Lbl</span>
-          <input class="val etext" type="text" title="Custom label (name kind)" placeholder="(source name)" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+          <input class="val etext" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="(caption)" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
           <span class="ex-lab">Vis</span>
           <select class="val en2" title="Element visible" value={el.visible === false ? 'off' : 'on'} onchange={(event) => setElement(i, 'visible', event.target.value !== 'off')}>
             <option value="on">on</option>
@@ -636,6 +636,12 @@
     text-align: center;
   }
 
+  .el-extra .en {
+    width: 44px;
+    flex: 0 0 auto;
+    text-align: center;
+  }
+
   .el-extra .en2 {
     width: 48px;
     flex: 0 0 auto;
@@ -648,10 +654,15 @@
     max-width: 120px;
   }
 
-  .el-row .etext,
-  .el-extra .etext {
+  .el-row .etext {
     flex: 1 1 80px;
     min-width: 60px;
+  }
+
+  .el-extra .etext {
+    flex: 1 1 70px;
+    min-width: 50px;
+    max-width: 180px;
   }
 
   .el-head .erm,

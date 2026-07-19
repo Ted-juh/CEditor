@@ -933,14 +933,21 @@
     color: #8a8a8a;
   }
 
-  .zone-extra .zn,
+  .zone-extra .zn {
+    width: 42px;
+    flex: 0 0 auto;
+    text-align: center;
+  }
+
   .zone-extra .zn2 {
+    width: 54px;
     flex: 0 0 auto;
   }
 
   .zone-extra .ztext {
-    flex: 1 1 80px;
-    min-width: 60px;
+    flex: 1 1 70px;
+    min-width: 50px;
+    max-width: 180px;
   }
 
   .zone-extra .rm,

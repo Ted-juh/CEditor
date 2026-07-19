@@ -103,12 +103,33 @@
     return Array.isArray(pixel?.elements) ? pixel.elements : [];
   });
 
-  // Text elements → pixel-positioned strings for the canvas.
+  // Text elements → pixel-positioned strings for the canvas. Widget elements
+  // with a label get a small caption drawn under the widget (above it when the
+  // widget sits at the bottom edge).
+  const WIDGET_LABEL_H = 7;
   let texts = $derived.by(() => {
     const out = [];
     for (const el of elements) {
       const kind = String(el?.kind ?? '');
-      if (el?.visible === false || WIDGET_ZONE_KINDS.has(kind) || !kind) continue;
+      if (el?.visible === false || !kind) continue;
+      if (WIDGET_ZONE_KINDS.has(kind)) {
+        const label = String(el?.label ?? '').trim();
+        if (!label) continue;
+        const x = Math.round(numberOr(el?.x, 0));
+        const y = Math.round(numberOr(el?.y, 0));
+        const w = Math.max(1, Math.round(numberOr(el?.w, 10)));
+        const h = Math.max(1, Math.round(numberOr(el?.h, 10)));
+        const below = y + h + 1;
+        out.push({
+          x,
+          y: below + WIDGET_LABEL_H <= pixH ? below : Math.max(0, y - WIDGET_LABEL_H - 1),
+          w,
+          h: WIDGET_LABEL_H,
+          align: 'center',
+          content: label,
+        });
+        continue;
+      }
       const info = controlInfo(String(el?.sourceId ?? ''));
       // Reuse the zone content engine (element kinds mirror zone show kinds).
       const content = resolveZoneContent({ ...el, show: kind }, info, 16);
