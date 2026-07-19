@@ -12,7 +12,9 @@
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
   const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state'];
   const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
-  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS];
+  // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
+  // part of the layout, so switching layouts switches animations.
+  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'anim'];
 
   let { control = null } = $props();
 
@@ -69,6 +71,21 @@
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => set('animSrc', String(reader.result ?? ''));
+    reader.readAsDataURL(file);
+  }
+
+  function onPickElementAnim(i, event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const next = cloneElements();
+      if (next[i]) {
+        next[i].animSrc = String(reader.result ?? '');
+        next[i].animMode = 'file';
+        commitElements(next);
+      }
+    };
     reader.readAsDataURL(file);
   }
 
@@ -371,6 +388,11 @@
         <input class="val en" type="number" title="Height (px); for text: font height" value={el.h ?? 8} onchange={(event) => setElement(i, 'h', Math.round(Number(event.target.value)))} />
         {#if el.kind === 'static'}
           <input class="val etext" type="text" placeholder="caption text" value={el.text ?? ''} oninput={(event) => setElement(i, 'text', event.target.value)} />
+        {:else if el.kind === 'anim'}
+          <select class="val esel" title="Animation source: an uploaded file (GIF/sprite) or a built-in preset" value={el.animMode ?? 'preset'} onchange={(event) => setElement(i, 'animMode', event.target.value)}>
+            <option value="preset">preset</option>
+            <option value="file">file</option>
+          </select>
         {:else}
           <select class="val esel" title="Source component" value={el.sourceId ?? ''} onchange={(event) => setElement(i, 'sourceId', event.target.value)}>
             <option value="">(source)</option>
@@ -386,15 +408,34 @@
       {#if expandedElementId === String(el.id ?? i)}
         <div class="el-extra">
           <div class="ex-row">
-            <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
-              <option value="left">L</option>
-              <option value="center">C</option>
-              <option value="right">R</option>
-            </select>
-            <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
-            <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
-            <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
-            <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+            {#if el.kind === 'anim'}
+              {#if (el.animMode ?? 'preset') === 'file'}
+                <input class="val ex-fill" type="file" accept="image/*" title="Animated GIF/APNG/WebP, or a sprite sheet" onchange={(event) => onPickElementAnim(i, event)} />
+                <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
+                <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
+                <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
+              {:else}
+                <select class="val esel" title="Built-in effect" value={el.animPreset ?? 'wave'} onchange={(event) => setElement(i, 'animPreset', event.target.value)}>
+                  <option value="wave">Wave</option>
+                  <option value="scanner">Scanner</option>
+                  <option value="rain">Rain</option>
+                  <option value="starfield">Starfield</option>
+                  <option value="spinner">Spinner</option>
+                  <option value="plasma">Plasma</option>
+                </select>
+                <input class="val en" type="number" min="0.1" max="5" step="0.1" title="Speed multiplier" value={el.animSpeed ?? 1} onchange={(event) => setElement(i, 'animSpeed', Number(event.target.value))} />
+              {/if}
+            {:else}
+              <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
+                <option value="left">L</option>
+                <option value="center">C</option>
+                <option value="right">R</option>
+              </select>
+              <input class="val en" type="text" title="Prefix text" placeholder="pre" value={el.prefix ?? ''} oninput={(event) => setElement(i, 'prefix', event.target.value)} />
+              <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
+              <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
+              <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+            {/if}
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             {#if WIDGET_KINDS.includes(el.kind)}
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>

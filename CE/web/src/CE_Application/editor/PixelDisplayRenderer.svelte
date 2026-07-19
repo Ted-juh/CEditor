@@ -196,7 +196,7 @@
       const h = Math.max(3, Math.round(numberOr(el?.h, 8)));
       let w = Math.max(0, Math.round(numberOr(el?.w, 0)));
       // Text without an alignment box: estimate the grab area from the content.
-      if (!WIDGET_ZONE_KINDS.has(kind) && w <= 0) {
+      if (!WIDGET_ZONE_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
         const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
         w = Math.ceil(h * 0.6 * len);
       }
@@ -246,10 +246,34 @@
 
   onDestroy(() => endElementDrag());
 
+  // Placeable animation elements (kind 'anim'): their own rect + source, part
+  // of the layout — so switching layouts switches animations.
+  let animElements = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      if (el?.visible === false || String(el?.kind ?? '') !== 'anim') continue;
+      out.push({
+        id: String(el?.id ?? ''),
+        x: Math.round(numberOr(el?.x, 0)),
+        y: Math.round(numberOr(el?.y, 0)),
+        w: Math.max(4, Math.round(numberOr(el?.w, 32))),
+        h: Math.max(4, Math.round(numberOr(el?.h, 16))),
+        mode: String(el?.animMode ?? (el?.animSrc ? 'file' : 'preset')),
+        src: String(el?.animSrc ?? ''),
+        frames: Math.max(0, Math.round(numberOr(el?.animFrames, 0))),
+        fps: Math.max(1, numberOr(el?.animFps, 12)),
+        loop: el?.animLoop !== false,
+        preset: String(el?.animPreset ?? 'wave'),
+        speed: Math.max(0.05, numberOr(el?.animSpeed, 1)),
+      });
+    }
+    return out;
+  });
+
   // rAF clock for animations and widget ballistics.
   let frameTime = $state(0);
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
-  let animActive = $derived(animMode !== 'off');
+  let animActive = $derived(animMode !== 'off' || animElements.length > 0);
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold));
   let motionActive = $derived(animActive || widgetMotion);
 
@@ -303,6 +327,7 @@
       pixelHeight={pixH}
       widgets={pixelWidgets}
       {texts}
+      anims={animElements}
       animMode={animMode}
       animSrc={pixel?.animSrc ?? ''}
       animFrames={numberOr(pixel?.animFrames, 0)}

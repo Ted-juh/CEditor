@@ -26,6 +26,7 @@
     fontScale = 1,
     widgets = [],
     texts = [],                  // pixel-positioned strings: {x, y, h, w, align, content}
+    anims = [],                  // placeable animations: {id, x, y, w, h, mode, src, frames, fps, loop, preset, speed}
     animMode = 'off',            // off | file | preset
     animSrc = '',
     animFrames = 0,              // sprite-sheet frame count (0 = animated file)
@@ -96,14 +97,83 @@
     return bmp;
   }
 
-  function drawSourceToBitmap(source, sx, sy, sw, sh) {
+  function drawSourceToBitmap(source, sx, sy, sw, sh, tw = pixW, th = pixH) {
     const off = document.createElement('canvas');
-    off.width = pixW;
-    off.height = pixH;
+    off.width = tw;
+    off.height = th;
     const c = off.getContext('2d');
     if (!c) return null;
-    c.drawImage(source, sx, sy, sw, sh, 0, 0, pixW, pixH);
-    return bitmapFromImageData(c.getImageData(0, 0, pixW, pixH).data, pixW, pixH, dither);
+    c.drawImage(source, sx, sy, sw, sh, 0, 0, tw, th);
+    return bitmapFromImageData(c.getImageData(0, 0, tw, th).data, tw, th, dither);
+  }
+
+  // Decode an animation source (sprite sheet, or animated GIF/APNG/WebP via
+  // WebCodecs ImageDecoder) into 1-bit frames at a target size. Resolves to
+  // { frames, durations, total } or null.
+  async function decodeAnimation(src, spriteFrames, fps, tw, th) {
+    if (!src) return null;
+    if (spriteFrames > 1) {
+      const img = await new Promise((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(null);
+        image.src = src;
+      });
+      if (!img) return null;
+      const fw = Math.max(1, Math.floor(img.width / spriteFrames));
+      const frames = [];
+      for (let i = 0; i < spriteFrames; i += 1) {
+        const bmp = drawSourceToBitmap(img, i * fw, 0, fw, img.height, tw, th);
+        if (bmp) frames.push(bmp);
+      }
+      if (!frames.length) return null;
+      const durations = frames.map(() => 1000 / Math.max(1, fps));
+      return { frames, durations, total: frames.length * (1000 / Math.max(1, fps)) };
+    }
+    if (typeof ImageDecoder === 'undefined') {
+      const img = await new Promise((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => resolve(null);
+        image.src = src;
+      });
+      if (!img) return null;
+      const bmp = drawSourceToBitmap(img, 0, 0, img.width, img.height, tw, th);
+      return bmp ? { frames: [bmp], durations: [1000], total: 1000 } : null;
+    }
+    try {
+      const mime = src.startsWith('data:') ? src.slice(5, src.indexOf(';')) : 'image/gif';
+      const buf = await (await fetch(src)).arrayBuffer();
+      const decoder = new ImageDecoder({ data: buf, type: mime });
+      await decoder.tracks.ready;
+      const count = Math.min(MAX_ANIM_FRAMES, decoder.tracks.selectedTrack?.frameCount ?? 1);
+      const frames = [];
+      const durations = [];
+      for (let i = 0; i < count; i += 1) {
+        const { image } = await decoder.decode({ frameIndex: i });
+        const bmp = drawSourceToBitmap(image, 0, 0, image.displayWidth, image.displayHeight, tw, th);
+        durations.push(Math.max(20, (image.duration ?? 100000) / 1000));
+        image.close();
+        if (bmp) frames.push(bmp);
+      }
+      decoder.close?.();
+      return frames.length ? { frames, durations, total: durations.reduce((a, b) => a + b, 0) } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function pickFrame(cache, tMs, loop) {
+    if (!cache || !cache.frames.length) return null;
+    const { frames, durations, total } = cache;
+    let t = Math.max(0, tMs);
+    if (loop === false && t >= total) return frames[frames.length - 1];
+    t %= total;
+    for (let i = 0; i < frames.length; i += 1) {
+      if (t < durations[i]) return frames[i];
+      t -= durations[i];
+    }
+    return frames[frames.length - 1];
   }
 
   // Rasterise the text into a 1-bit bitmap using the browser's monospace font.
@@ -179,134 +249,96 @@
     if (mode !== 'file' || !src) return;
     const token = ++animDecodeToken;
 
-    const finish = (cache) => { if (token === animDecodeToken) animCache = cache; };
-
-    if (spriteFrames > 1) {
-      // Sprite sheet: N frames side by side in one image.
-      const img = new Image();
-      img.onload = () => {
-        const fw = Math.max(1, Math.floor(img.width / spriteFrames));
-        const frames = [];
-        for (let i = 0; i < spriteFrames; i += 1) {
-          const bmp = drawSourceToBitmap(img, i * fw, 0, fw, img.height);
-          if (bmp) frames.push(bmp);
-        }
-        if (frames.length) {
-          const durations = frames.map(() => 1000 / fps);
-          finish({ frames, durations, total: frames.length * (1000 / fps) });
-        }
-      };
-      img.src = src;
-      return;
-    }
-
-    // Animated file (GIF/APNG/WebP) via WebCodecs ImageDecoder (Chromium).
-    if (typeof ImageDecoder === 'undefined') {
-      // Unsupported: fall back to the first frame as a static image.
-      const img = new Image();
-      img.onload = () => {
-        const bmp = drawSourceToBitmap(img, 0, 0, img.width, img.height);
-        if (bmp) finish({ frames: [bmp], durations: [1000], total: 1000 });
-      };
-      img.src = src;
-      return;
-    }
-
-    (async () => {
-      try {
-        const mime = src.startsWith('data:') ? src.slice(5, src.indexOf(';')) : 'image/gif';
-        const buf = await (await fetch(src)).arrayBuffer();
-        const decoder = new ImageDecoder({ data: buf, type: mime });
-        await decoder.tracks.ready;
-        const count = Math.min(MAX_ANIM_FRAMES, decoder.tracks.selectedTrack?.frameCount ?? 1);
-        const frames = [];
-        const durations = [];
-        for (let i = 0; i < count; i += 1) {
-          const { image } = await decoder.decode({ frameIndex: i });
-          const bmp = drawSourceToBitmap(image, 0, 0, image.displayWidth, image.displayHeight);
-          // Frame duration comes in microseconds; default to 100ms when absent.
-          durations.push(Math.max(20, (image.duration ?? 100000) / 1000));
-          image.close();
-          if (bmp) frames.push(bmp);
-        }
-        decoder.close?.();
-        if (frames.length) finish({ frames, durations, total: durations.reduce((a, b) => a + b, 0) });
-      } catch {
-        /* undecodable source: leave the animation empty */
-      }
-    })();
+    decodeAnimation(src, spriteFrames, fps, pixW, pixH).then((cache) => {
+      if (token === animDecodeToken && cache) animCache = cache;
+    });
   });
 
   function animFrameBitmap() {
-    if (!animCache || !animCache.frames.length) return null;
-    const { frames, durations, total } = animCache;
-    let t = Math.max(0, animTick);
-    if (animLoop === false && t >= total) return frames[frames.length - 1];
-    t %= total;
-    for (let i = 0; i < frames.length; i += 1) {
-      if (t < durations[i]) return frames[i];
-      t -= durations[i];
-    }
-    return frames[frames.length - 1];
+    return pickFrame(animCache, animTick, animLoop);
   }
+
+  // --- Placeable animation elements (their own rect + source per element) ---
+  // Decoded per element at its rect size, keyed so size/source changes re-decode.
+  let elAnimCaches = $state({});
+  $effect(() => {
+    const list = Array.isArray(anims) ? anims : [];
+    void dither;
+    for (const a of list) {
+      if (a.mode !== 'file' || !a.src) continue;
+      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.fps}|${dither}`;
+      if (elAnimCaches[a.id]?.key === key) continue;
+      elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache: null } };
+      decodeAnimation(a.src, a.frames, a.fps, a.w, a.h).then((cache) => {
+        if (elAnimCaches[a.id]?.key === key) {
+          elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache } };
+        }
+      });
+    }
+  });
 
   // --- Procedural presets (deterministic in t, so resume/HMR are stable) ---
   function hash01(n) {
     return (((n * 2654435761) >>> 0) % 100000) / 100000;
   }
 
-  function presetBitmap() {
-    const bmp = new Uint8Array(pixW * pixH);
+  // Draw a preset effect into a w×h bitmap at time t (seconds). Shared by the
+  // full-screen animation layer and placeable anim elements.
+  function presetInto(w, h, t, kindName) {
+    const bmp = new Uint8Array(w * h);
     const px = (x, y) => {
       const xi = Math.round(x); const yi = Math.round(y);
-      if (xi >= 0 && xi < pixW && yi >= 0 && yi < pixH) bmp[yi * pixW + xi] = 1;
+      if (xi >= 0 && xi < w && yi >= 0 && yi < h) bmp[yi * w + xi] = 1;
     };
-    const t = (animTick / 1000) * Math.max(0.05, Number(animSpeed) || 1);
-    const kind = String(animPreset ?? 'wave');
-    const midY = pixH / 2;
+    const kind = String(kindName ?? 'wave');
+    const midY = h / 2;
 
     if (kind === 'wave') {
-      const amp = Math.max(2, pixH * 0.32);
-      for (let x = 0; x < pixW; x += 1) {
+      const amp = Math.max(2, h * 0.32);
+      for (let x = 0; x < w; x += 1) {
         px(x, midY + Math.sin(x * 0.28 + t * 5) * amp);
       }
     } else if (kind === 'scanner') {
-      const w = Math.max(3, Math.round(pixW / 8));
-      const span = Math.max(1, pixW - w);
+      const bw = Math.max(3, Math.round(w / 8));
+      const span = Math.max(1, w - bw);
       const phase = (t * 1.2) % 2;
       const pos = Math.round((phase <= 1 ? phase : 2 - phase) * span);
-      for (let x = pos; x < pos + w; x += 1) {
+      for (let x = pos; x < pos + bw; x += 1) {
         for (let y = Math.floor(midY) - 1; y <= Math.floor(midY) + 1; y += 1) px(x, y);
       }
     } else if (kind === 'rain') {
-      for (let cx = 0; cx < pixW; cx += 2) {
+      for (let cx = 0; cx < w; cx += 2) {
         const speed = 14 + hash01(cx + 7) * 30;
-        const head = (hash01(cx) * (pixH + 10) + t * speed) % (pixH + 10);
+        const head = (hash01(cx) * (h + 10) + t * speed) % (h + 10);
         for (let trail = 0; trail < 4; trail += 1) px(cx, head - trail);
       }
     } else if (kind === 'starfield') {
       for (let i = 0; i < 42; i += 1) {
         const speed = 8 + hash01(i * 3 + 1) * 40;
-        const x = (hash01(i) * pixW + pixW * 4 - t * speed) % pixW;
-        px(x, Math.floor(hash01(i * 7 + 3) * pixH));
+        const x = (hash01(i) * w + w * 4 - t * speed) % w;
+        px(x, Math.floor(hash01(i * 7 + 3) * h));
       }
     } else if (kind === 'spinner') {
-      const cx = pixW / 2; const cy = pixH / 2;
-      const r = Math.max(3, Math.min(pixW, pixH) / 2 - 2);
+      const cx = w / 2; const cy = h / 2;
+      const r = Math.max(3, Math.min(w, h) / 2 - 2);
       const a = t * 5;
       for (let s = 0; s <= r; s += 0.5) {
         px(cx + Math.cos(a) * s, cy + Math.sin(a) * s);
         px(cx + Math.cos(a + Math.PI) * s * 0.55, cy + Math.sin(a + Math.PI) * s * 0.55);
       }
     } else if (kind === 'plasma') {
-      for (let y = 0; y < pixH; y += 1) {
-        for (let x = 0; x < pixW; x += 1) {
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
           const v = Math.sin(x * 0.32 + t * 2.2) + Math.sin(y * 0.34 - t * 1.7) + Math.sin((x + y) * 0.21 + t);
-          if (v > 0.85) bmp[y * pixW + x] = 1;
+          if (v > 0.85) bmp[y * w + x] = 1;
         }
       }
     }
     return bmp;
+  }
+
+  function presetBitmap() {
+    return presetInto(pixW, pixH, (animTick / 1000) * Math.max(0.05, Number(animSpeed) || 1), animPreset);
   }
 
   // --- Pixel widgets (bars / sliders / needle) ---
@@ -477,6 +509,26 @@
         if (text) for (let i = 0; i < bmp.length; i += 1) if (text[i]) bmp[i] = 1;
       }
     }
+    // Placeable animation elements: blit each one's current frame into its rect.
+    for (const a of (Array.isArray(anims) ? anims : [])) {
+      let fb = null;
+      if (a.mode === 'preset') {
+        fb = presetInto(a.w, a.h, (animTick / 1000) * Math.max(0.05, Number(a.speed) || 1), a.preset);
+      } else {
+        fb = pickFrame(elAnimCaches[a.id]?.cache, animTick, a.loop);
+      }
+      if (!fb) continue;
+      for (let yy = 0; yy < a.h; yy += 1) {
+        const gy = a.y + yy;
+        if (gy < 0 || gy >= pixH) continue;
+        for (let xx = 0; xx < a.w; xx += 1) {
+          if (!fb[yy * a.w + xx]) continue;
+          const gx = a.x + xx;
+          if (gx >= 0 && gx < pixW) bmp[gy * pixW + gx] = 1;
+        }
+      }
+    }
+
     if (Array.isArray(widgets) && widgets.length) drawWidgets(bmp, dtMs);
 
     const cellW = w / pixW;
@@ -511,8 +563,8 @@
     void lines; void cols; void rows; void litCss; void unlitCss; void brightness;
     void contrast; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
-    void widgets; void texts; void animMode; void animCache; void animPreset; void animSpeed;
-    void animLoop; void animTick;
+    void widgets; void texts; void anims; void elAnimCaches; void animMode; void animCache;
+    void animPreset; void animSpeed; void animLoop; void animTick;
     try {
       draw();
     } catch (err) {
