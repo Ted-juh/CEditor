@@ -53,6 +53,10 @@ const SEVEN_SEG_MAP = {
   L: 'def', n: 'ceg', N: 'abcef', O: 'abcdef', o: 'cdeg', P: 'abefg', q: 'abcfg',
   r: 'eg', R: 'abcef', S: 'afgcd', t: 'defg', T: 'defg', U: 'bcdef', u: 'cde',
   Y: 'bcdfg', y: 'bcdfg', Z: 'abged', '-': 'g', '_': 'd', '=': 'gd', '°': 'abfg',
+  // The letters with no true 7-seg form get the conventional hardware
+  // stand-ins: K/X ≈ H-shapes, M/W the classic two-stroke fragments, V ≈ U.
+  K: 'befg', M: 'ace', V: 'bcdef', W: 'bdf', X: 'bcefg',
+  '?': 'abge', '(': 'adef', ')': 'abcd', "'": 'f', '"': 'bf',
   ' ': '',
 };
 
@@ -80,6 +84,8 @@ const NINE_SEG_MAP = {
   ...SEVEN_SEG_MAP,
   '1': 'il', I: 'il', T: 'ail', t: 'gil', '+': 'gil', '±': 'gild',
   '0': 'abcdef', // (no slash; verticals reserved for glyphs that need them)
+  // The centre verticals give M/W/Y proper spines.
+  M: 'bcefi', W: 'bcefl', Y: 'bfgl',
 };
 
 // --- 16-segment starburst ---------------------------------------------------
