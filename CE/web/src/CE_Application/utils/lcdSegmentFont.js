@@ -191,6 +191,11 @@ export function getSegmentGlyph(segmentType, rawChar) {
   const map = seg === 7 ? SEVEN_SEG_MAP : seg === 9 ? NINE_SEG_MAP : STARBURST_MAP;
 
   // Exact match first, then case-folded, else blank.
+  // Decimal point / comma light the dp dot present in every segment geometry.
+  // (Special-cased because the 7/9-seg maps are single-char concatenations, so
+  // the two-char 'dp' token can't be expressed there.)
+  if (upper === '.' || upper === ',') return { geometry, lit: new Set(['dp']) };
+
   const litStr = map[upper] ?? map[upper.toUpperCase()] ?? map[upper.toLowerCase()] ?? '';
   // 7/9-seg map values are concatenated single-char segments ("abcdef"); the
   // 16-seg starburst map is space-separated multi-char tokens ("a1 a2 b ...").
