@@ -271,6 +271,7 @@
         <select class="val" value={String(display.segmentType ?? '16')} onchange={(event) => set('segmentType', event.target.value)}>
           <option value="7">7-segment</option>
           <option value="9">9-segment</option>
+          <option value="curved9">9-segment curved (VFD)</option>
           <option value="14">14-segment</option>
           <option value="16">16-segment</option>
         </select>

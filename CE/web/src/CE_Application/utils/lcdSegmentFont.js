@@ -88,7 +88,27 @@ const NINE_SEG_MAP = {
   M: 'bcefi', W: 'bcefl', Y: 'bfgl',
 };
 
-// --- 16-segment starburst ---------------------------------------------------
+// --- curved 9-segment (Itron VFD style) --------------------------------------
+// Early-1970s Itron VFD tubes (Sharp EL-8 era) drew digits from ~9 CURVED
+// strokes, giving the rounded, almost handwritten look. Same segment names as
+// the straight 9-segment (a-g + centre verticals i/l), so it shares its map —
+// only the geometry differs: every stroke is a curved path.
+function curve(d, width = 11) {
+  return { kind: 'path', d, width };
+}
+
+const CURVED9_GEOMETRY = {
+  a: curve('M22,28 Q50,8 78,28'),          // top arc
+  b: curve('M80,32 Q90,58 80,84'),         // upper right, bulging out
+  c: curve('M80,96 Q90,122 80,148'),       // lower right
+  d: curve('M22,152 Q50,172 78,152'),      // bottom arc
+  e: curve('M20,96 Q10,122 20,148'),       // lower left
+  f: curve('M20,32 Q10,58 20,84'),         // upper left
+  g: curve('M28,90 Q50,82 72,90', 10),     // gently arched middle
+  i: curve('M50,22 Q46,55 50,86', 10),     // centre vertical, upper (slight sway)
+  l: curve('M50,94 Q54,127 50,158', 10),   // centre vertical, lower
+  dp: { kind: 'dot', cx: 92, cy: 164, r: 6 },
+};
 // Bars a/d/g are split into halves (a1/a2, d1/d2, g1/g2); i/l are the top/bottom
 // centre verticals; h/j/k/m are the diagonals.
 
@@ -190,11 +210,15 @@ export const SEGMENT_VIEWBOX = { width: 100, height: 180 };
 // Resolve the geometry + lit-segment set for a character in a given segment mode.
 // segmentType: 7 | 9 | 14 | 16 (14 shares the 16-seg starburst).
 export function getSegmentGlyph(segmentType, rawChar) {
-  const s = String(segmentType);
-  const seg = s === '7' ? 7 : s === '9' ? 9 : 16;
+  const s = String(segmentType).trim().toLowerCase();
+  // 'curved9' = Itron-VFD-style curved strokes; same names/map as straight 9-seg.
+  const seg = s === '7' ? 7 : s === '9' ? 9 : s === 'curved9' ? 'c9' : 16;
   const upper = String(rawChar ?? ' ');
-  const geometry = seg === 7 ? SEVEN_SEG_GEOMETRY : seg === 9 ? NINE_SEG_GEOMETRY : SIXTEEN_SEG_GEOMETRY;
-  const map = seg === 7 ? SEVEN_SEG_MAP : seg === 9 ? NINE_SEG_MAP : STARBURST_MAP;
+  const geometry = seg === 7 ? SEVEN_SEG_GEOMETRY
+    : seg === 9 ? NINE_SEG_GEOMETRY
+    : seg === 'c9' ? CURVED9_GEOMETRY
+    : SIXTEEN_SEG_GEOMETRY;
+  const map = seg === 7 ? SEVEN_SEG_MAP : (seg === 9 || seg === 'c9') ? NINE_SEG_MAP : STARBURST_MAP;
 
   // Exact match first, then case-folded, else blank.
   // Decimal point / comma light the dp dot present in every segment geometry.

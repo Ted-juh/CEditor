@@ -519,6 +519,8 @@
                         <polygon points={shape.points} fill={on ? litCss : unlitCss} opacity={on ? 1 : segUnlitOpacity} />
                       {:else if shape.kind === 'line'}
                         <line x1={shape.x1} y1={shape.y1} x2={shape.x2} y2={shape.y2} stroke={on ? litCss : unlitCss} stroke-width={shape.width} stroke-linecap="round" opacity={on ? 1 : segUnlitOpacity} />
+                      {:else if shape.kind === 'path'}
+                        <path d={shape.d} fill="none" stroke={on ? litCss : unlitCss} stroke-width={shape.width} stroke-linecap="round" opacity={on ? 1 : segUnlitOpacity} />
                       {:else if shape.kind === 'dot'}
                         <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={on ? litCss : unlitCss} opacity={on ? 1 : segUnlitOpacity} />
                       {/if}
