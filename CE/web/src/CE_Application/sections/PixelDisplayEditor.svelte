@@ -131,6 +131,19 @@
   function removeLayout(id) {
     commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));
   }
+  function duplicateLayout(id) {
+    const next = cloneLayouts();
+    const src = next.find((x) => String(x.id) === String(id));
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = genId('lay_');
+    copy.name = `${src.name ?? 'Layout'} copy`;
+    for (const el of (Array.isArray(copy.elements) ? copy.elements : [])) el.id = genId('el_');
+    next.splice(next.indexOf(src) + 1, 0, copy);
+    commitLayouts(next);
+    editLayoutId = copy.id;
+    setLcdDesignLayout(core?.id, copy.id);
+  }
   function renameLayout(id, name) {
     const next = cloneLayouts();
     const l = next.find((x) => String(x.id) === String(id));
@@ -213,6 +226,18 @@
     next.splice(i, 1);
     commitElements(next);
   }
+  function duplicateElement(i) {
+    const next = cloneElements();
+    const src = next[i];
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = genId('el_');
+    // Nudge the copy so it doesn't sit exactly on the original.
+    copy.x = Math.min(pixelsW - 1, (Number(copy.x) || 0) + 2);
+    copy.y = Math.min(pixelsH - 1, (Number(copy.y) || 0) + 2);
+    next.splice(i + 1, 0, copy);
+    commitElements(next);
+  }
   function setElement(i, prop, value) {
     const next = cloneElements();
     if (next[i]) { next[i][prop] = value; commitElements(next); }
@@ -288,6 +313,7 @@
             {/each}
           </select>
           <button class="val erm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
+          <button class="val erm" type="button" onclick={() => duplicateLayout(editLayout?.id)} title="Duplicate layout">⧉</button>
           <button class="val erm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
         </div>
       </PropertyCell>
@@ -437,6 +463,7 @@
           {/if}
         {/if}
         <button class="val erm" type="button" class:eopen={expandedElementId === String(el.id ?? i)} onclick={() => toggleElementExtras(String(el.id ?? i))} title="More element settings">…</button>
+        <button class="val erm" type="button" onclick={() => duplicateElement(i)} title="Duplicate element">⧉</button>
         <button class="val erm" type="button" onclick={() => removeElement(i)} title="Remove element">✕</button>
       </div>
       {#if expandedElementId === String(el.id ?? i)}

@@ -177,6 +177,19 @@
   function removeLayout(id) {
     commitLayouts(cloneLayouts().filter((l) => String(l.id) !== String(id)));
   }
+  function duplicateLayout(id) {
+    const next = cloneLayouts();
+    const src = next.find((x) => String(x.id) === String(id));
+    if (!src) return;
+    const copy = JSON.parse(JSON.stringify(src));
+    copy.id = genId('lay_');
+    copy.name = `${src.name ?? 'Layout'} copy`;
+    for (const z of (Array.isArray(copy.zones) ? copy.zones : [])) z.id = genId('z_');
+    next.splice(next.indexOf(src) + 1, 0, copy);
+    commitLayouts(next);
+    editLayoutId = copy.id;
+    setLcdDesignLayout(core?.id, copy.id);
+  }
   function renameLayout(id, name) {
     const next = cloneLayouts();
     const l = next.find((x) => String(x.id) === String(id));
@@ -198,6 +211,15 @@
     }));
   }
   function removeZone(i) { withEditLayout((l) => l.zones.splice(i, 1)); }
+  function duplicateZone(i) {
+    withEditLayout((l) => {
+      const src = l.zones[i];
+      if (!src) return;
+      const copy = JSON.parse(JSON.stringify(src));
+      copy.id = genId('z_');
+      l.zones.splice(i + 1, 0, copy);
+    });
+  }
   // Reorder zones: later zones paint over earlier ones, so ▲▼ controls stacking.
   function moveZone(i, dir) {
     withEditLayout((l) => {
@@ -399,6 +421,7 @@
             {/each}
           </select>
           <button class="val rm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
+          <button class="val rm" type="button" onclick={() => duplicateLayout(editLayout?.id)} title="Duplicate layout">⧉</button>
           <button class="val rm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
         </div>
       </PropertyCell>
@@ -521,6 +544,7 @@
               {/if}
               <button class="val rm" type="button" onclick={() => moveZone(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
               <button class="val rm" type="button" onclick={() => moveZone(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === (editLayout.zones ?? []).length - 1}>▼</button>
+              <button class="val rm" type="button" onclick={() => duplicateZone(i)} title="Duplicate zone">⧉</button>
             </div>
           {/if}
         {/each}
