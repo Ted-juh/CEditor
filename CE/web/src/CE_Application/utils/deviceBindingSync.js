@@ -40,6 +40,26 @@ function patchForBinding(control, binding, value) {
     };
   }
 
+  // Display ports: a device parameter bound directly onto an LcdDisplay /
+  // PixelDisplay writes an override into the display's preview session, which
+  // applyLcdValueSource / applyPixelValueSource then reflect into the panel.
+  if (port === 'text') {
+    return { textOverride: value == null ? '' : String(value) };
+  }
+
+  if (port === 'brightness') {
+    // Accept 0..1 normalized or 0..100; store as 0..100 for the display model.
+    const n = Number(value);
+    const pct = Number.isFinite(n) ? Math.round(Math.max(0, Math.min(100, n <= 1 ? n * 100 : n))) : null;
+    return pct == null ? null : { brightnessOverride: pct };
+  }
+
+  if (port === 'backlight') {
+    const on = value === true || value === 1 || value === 'true' || value === '1'
+      || (Number.isFinite(Number(value)) && Number(value) >= 0.5);
+    return { backlightOverride: on };
+  }
+
   if (port === 'value') {
     const behavior = getBehavior(control);
     const isSlider = String(behavior?.family ?? '') === 'range'

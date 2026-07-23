@@ -548,7 +548,14 @@
       ? orderedControls.find((entry) => getControlId(entry) === String(display.backlightSourceId)) : null;
     const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
 
-    if (!hasLayouts && !primary && !fieldRanges.some(Boolean) && !brightRange && !backInfo) return resolved;
+    // A device parameter bound directly onto this display (text/brightness/
+    // backlight port) lands in the preview session as an override.
+    const ownSession = sessionFor(control) ?? {};
+    const hasOwnOverride = ownSession.textOverride !== undefined
+      || ownSession.brightnessOverride !== undefined
+      || ownSession.backlightOverride !== undefined;
+
+    if (!hasLayouts && !primary && !fieldRanges.some(Boolean) && !brightRange && !backInfo && !hasOwnOverride) return resolved;
 
     // Shallow clone that shares heavy read-only fields (imageSrc, layouts, pages)
     // by reference; only the Display + the field entries we mutate are copied.
@@ -565,6 +572,10 @@
       }
       if (backInfo) cd.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
       if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
+      // Direct device bindings win over source-control drives (more specific).
+      if (ownSession.brightnessOverride !== undefined) cd.brightness = ownSession.brightnessOverride;
+      if (ownSession.backlightOverride !== undefined) cd.backlightOn = ownSession.backlightOverride === true;
+      if (ownSession.textOverride !== undefined) cd.editText = String(ownSession.textOverride);
       if (Array.isArray(cd.fields)) {
         fieldRanges.forEach((range, i) => {
           if (range && cd.fields[i]) { cd.fields[i].value = range.value; cd.fields[i].min = range.min; cd.fields[i].max = range.max; }
@@ -644,7 +655,12 @@
     const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
     const hasLayouts = Array.isArray(pixel.layouts) && pixel.layouts.length > 0;
 
-    if (!Object.keys(live).length && !brightRange && !backInfo && !hasLayouts) return resolved;
+    const ownSession = sessionFor(control) ?? {};
+    const hasOwnOverride = ownSession.textOverride !== undefined
+      || ownSession.brightnessOverride !== undefined
+      || ownSession.backlightOverride !== undefined;
+
+    if (!Object.keys(live).length && !brightRange && !backInfo && !hasLayouts && !hasOwnOverride) return resolved;
 
     const base = resolved?.control ?? control;
     const basePixel = base?._children?.Pixel ?? {};
@@ -656,6 +672,10 @@
       cp.brightness = Math.round(frac * 100);
     }
     if (backInfo) cp.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+    // Direct device bindings win over source-control drives (more specific).
+    if (ownSession.brightnessOverride !== undefined) cp.brightness = ownSession.brightnessOverride;
+    if (ownSession.backlightOverride !== undefined) cp.backlightOn = ownSession.backlightOverride === true;
+    if (ownSession.textOverride !== undefined) cp.editText = String(ownSession.textOverride);
     const clone = { ...base, _children: { ...base._children, Pixel: cp } };
     return { ...(resolved ?? {}), control: clone };
   }

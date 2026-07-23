@@ -135,6 +135,12 @@ export const DEFAULT_COMPONENT_PORTS = {
       accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED],
       defaultBindingMode: 'continuous',
     },
+    {
+      id: 'backlight',
+      label: 'Backlight',
+      accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'onCommit',
+    },
   ],
   PixelDisplay: [
     {
@@ -144,10 +150,22 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
     {
+      id: 'text',
+      label: 'Text',
+      accepts: [PARAMETER_TYPES.TEXT, PARAMETER_TYPES.PATCH_NAME, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+    {
       id: 'brightness',
       label: 'Brightness',
       accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED],
       defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'backlight',
+      label: 'Backlight',
+      accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'onCommit',
     },
   ],
   CustomComponent: [

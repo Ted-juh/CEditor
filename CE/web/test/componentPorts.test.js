@@ -52,3 +52,22 @@ test('custom component device binding compatibility uses published input ports',
   assert.equal(choice.port.id, 'mode');
 });
 
+
+test('display components expose text/brightness/backlight binding ports', () => {
+  const lcd = getComponentPorts({ _children: { Core: { controlType: 'LcdDisplay' } } });
+  const lcdIds = lcd.map((p) => p.id);
+  assert.deepEqual(lcdIds, ['text', 'value', 'brightness', 'backlight']);
+
+  const pixel = getComponentPorts({ _children: { Core: { controlType: 'PixelDisplay' } } });
+  const pixelIds = pixel.map((p) => p.id);
+  assert.deepEqual(pixelIds, ['value', 'text', 'brightness', 'backlight']);
+
+  // Backlight accepts a boolean-ish device parameter on both.
+  for (const control of [
+    { _children: { Core: { controlType: 'LcdDisplay' } } },
+    { _children: { Core: { controlType: 'PixelDisplay' } } },
+  ]) {
+    const compat = getBindingCompatibility(control, { type: PARAMETER_TYPES.BOOLEAN });
+    assert.equal(compat.status, 'compatible', 'boolean binds to a display port');
+  }
+});
