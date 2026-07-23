@@ -102,6 +102,38 @@ and driven by `PanelPreviewSurface.svelte`):
   `aria-activedescendant` following the keyboard browse cursor, and a focus
   ring on the list plus the active option.
 
+## Cascading (dependent) selectors 🟢
+
+Any selector (combobox / listbox / radio / cyclic) can show only the choices
+that belong to **another** selector's current value — bank → preset,
+category → item, manufacturer → device. Authored entirely through the choices
+editor (`ValueEditor.svelte`), no expressions:
+
+1. On the child list, pick a **Depends on** parent from the dropdown of the
+   panel's other selectors (`Value.dependsOn` = the parent's control id).
+2. Each choice row gains a **Show for** dropdown, populated from the parent's
+   rows. Leave it on **All** to show the row under every parent value (a shared
+   / "★ Favourite" row); pick a specific parent value to scope it.
+3. **Reset pick** (default on) makes the child jump to the first matching row
+   when the parent changes; turn it off to keep a still-visible pick.
+
+How it works:
+- The child stores the parent's live value in its session as
+  `dependsParentValue`; the store post-process `applyPanelDependentChoices`
+  (alongside `applyPanelCustomLinkRoutes`) updates it whenever the parent
+  changes and resets the child's selection to the first visible row.
+- Row filtering is one pure function, `utils/dependentChoices.js`
+  (`visibleChoiceRows` / `dependentControl`), applied at every consumer — the
+  listbox renderer + hit-test, the combobox menu, and `interactionRuntime`
+  value resolution — so what's drawn, what's clickable and what's exported all
+  agree. A row's `parentValue` tag is matched against the parent's
+  `internalValue`; blank = shown for all; headers are always kept.
+- Chains naturally (A → B → C) and is a no-op for independent lists.
+- **Export note:** each list still exports as its numeric index parameter, but
+  the index's *meaning* shifts with the parent — bind/store the resolved
+  `internalValue` if the panel needs the child to round-trip independently of
+  the parent.
+
 ## Multi-select variant — shipped
 
 A `selectionMode: 'multi'` Listbox needs:

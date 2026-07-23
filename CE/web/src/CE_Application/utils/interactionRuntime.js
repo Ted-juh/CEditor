@@ -28,6 +28,7 @@ import {
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { constrainCustomValues } from './customComponentInteraction.js';
+import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -542,7 +543,9 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
-  const valueRows = getValueRows(control);
+  // Cascading selectors: reduce the choices to those visible under the parent
+  // selector's current value (a no-op for independent controls).
+  const valueRows = visibleChoiceRows(getValueRows(control), previewSession?.dependsParentValue, dependsOnId(control));
   const defaultRow = findDefaultRow(valueRows);
   const buttonType = String(behavior?.buttonType ?? '');
   const valueType = String(behavior?.valueType ?? 'none');

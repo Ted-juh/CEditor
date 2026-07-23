@@ -100,6 +100,7 @@ function buildValueRows(rows = []) {
     badge: row.badge ?? '',        // trailing tag (bank letter, FAV, MIDI #)
     swatch: row.swatch ?? '',      // AARRGGBB category accent (left stripe/dot)
     isHeader: row.isHeader === true, // renders as a non-selectable section header
+    parentValue: row.parentValue ?? '', // cascading: parent value this row belongs to ('' = all)
   }));
 }
 

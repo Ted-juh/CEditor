@@ -800,6 +800,11 @@ export const SECTION_DEFAULTS = {
     _type: 'Value',
     showMapping: false,
     rows: [],
+    // Cascading selectors: id of the parent selector this list depends on
+    // ('' = independent). When set, only rows whose `parentValue` matches the
+    // parent's current selection (or is blank = shown for all) are visible.
+    dependsOn: '',
+    dependsResetOnChange: true, // reset this list's pick when the parent changes
     segmentStyle: {
       shared: {},
       rows: {},

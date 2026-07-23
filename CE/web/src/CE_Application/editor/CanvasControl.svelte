@@ -18,6 +18,7 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
   import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
@@ -196,10 +197,19 @@
   let sourceValueSection = $derived(getSection(sourceControl, 'Value') ?? valueSection);
   let sourceStatesSection = $derived(getSection(sourceControl, 'States') ?? statesSection);
   let buttonType = $derived(String(sourceBehavior?.buttonType ?? behavior?.buttonType ?? '').trim().toLowerCase());
-  let valueRows = $derived(getEnabledValueRows(sourceValueSection ?? valueSection));
+  // Cascading selectors: rows visible under the parent selector's current value
+  // (a no-op unless this control has Value.dependsOn set).
+  let valueRows = $derived(visibleChoiceRows(
+    getEnabledValueRows(sourceValueSection ?? valueSection),
+    previewSession?.dependsParentValue,
+    dependsOnId(renderControl),
+  ));
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let isComboboxControl = $derived(buttonType === 'combobox');
   let isListboxControl = $derived(buttonType === 'listbox');
+  // The control the listbox renderer draws — with its rows reduced to the
+  // parent value so render + hit-test stay aligned.
+  let listboxRenderControl = $derived(dependentControl(renderControl, previewSession?.dependsParentValue));
   // Multi-select set for the listbox renderer (null unless multiSelect is on).
   let listboxMultiSet = $derived.by(() => {
     if (!isListboxControl || (renderControl?._children?.Listbox?.multiSelect !== true)) return null;
@@ -4145,7 +4155,7 @@
 
     {#if isListboxControl}
       <ListboxRenderer
-        control={renderControl}
+        control={listboxRenderControl}
         width={displayW}
         height={displayH}
         selectedValue={interactionRuntime?.signals?.valueRaw}

@@ -28,6 +28,7 @@
     listboxFilterHeight,
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -872,6 +873,7 @@
   // The Value row under a click on an always-open listbox (accounts for scroll).
   function resolveListboxPreviewValue(control, clientX, clientY) {
     if (!isListboxControl(control)) return undefined;
+    control = lbControl(control);
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return undefined;
     const transformSection = control?._children?.Transform ?? null;
@@ -893,6 +895,12 @@
   function lbFilter(control) {
     return String(sessionFor(control)?.listboxFilter ?? '');
   }
+  // The listbox with its rows reduced to the parent selector's value (cascading);
+  // the id/name are preserved so session reads/writes still resolve. Every
+  // listbox row/hit-test read should go through this so it matches the renderer.
+  function lbControl(control) {
+    return dependentControl(control, sessionFor(control)?.dependsParentValue);
+  }
   function handleListboxFilterInput(control, event) {
     // Reset the scroll on a new query so the top match is visible.
     patchControlSession(getControlId(control), { listboxFilter: String(event?.target?.value ?? ''), listboxScrollTop: 0 });
@@ -900,13 +908,14 @@
   // Keep the selected row in view (if configured) by nudging session scrollTop.
   function scrollListboxToIndex(control, index) {
     if (index < 0 || listboxConfig(control).scrollIntoView === false) return;
+    control = lbControl(control);
     const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
     const next = listboxScrollIntoView(control, index, listboxViewport(control), cur, lbFilter(control));
     if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
   }
   // Select the visible row at `index` (by value), scroll it into view.
   function selectListboxIndex(control, index) {
-    const row = listboxRows(control, lbFilter(control))[index];
+    const row = listboxRows(lbControl(control), lbFilter(control))[index];
     if (!isSelectableRow(row)) return;
     selectComboboxRow(control, row);
     scrollListboxToIndex(control, index);
@@ -935,6 +944,7 @@
     if (listboxConfig(control).keyboardNav === false) return false;
     const cfg = listboxConfig(control);
     const deferred = cfg.multiSelect === true || String(cfg.confirmMode ?? 'single') !== 'single';
+    control = lbControl(control); // cascading: navigate only the visible rows
     const filter = lbFilter(control);
     const rows = listboxRows(control, filter);
     if (!rows.length) return false;
@@ -985,6 +995,7 @@
     const key = event.key;
     if (key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return false;
     event.preventDefault();
+    control = lbControl(control); // cascading: search only the visible rows
     const id = getControlId(control);
     const now = (typeof performance !== 'undefined' ? performance.now() : 0);
     if (listboxTypeBuffer.id !== id || now - listboxTypeBuffer.at > 900) listboxTypeBuffer = { id, text: '', at: now };
@@ -1056,8 +1067,9 @@
   }
 
   function getValueRows(control) {
-    const rows = control?._children?.Value?.rows;
-    return Array.isArray(rows) ? rows.filter((row) => row?.enabled !== false) : [];
+    // Cascading selectors: reduce to the rows visible under the parent value.
+    const rows = visibleChoiceRows(control?._children?.Value?.rows, sessionFor(control)?.dependsParentValue, dependsOnId(control));
+    return rows.filter((row) => row?.enabled !== false && row?.isHeader !== true);
   }
 
   function rowValue(row) {
@@ -2077,6 +2089,7 @@
     }
     // Listbox: wheel scrolls the row viewport (one row per notch).
     if (isListboxControl(control)) {
+      control = lbControl(control); // cascading: scroll only the visible rows
       const rect = event.currentTarget?.getBoundingClientRect?.();
       const viewH = numberOr(control?._children?.Transform?.height, rect ? rect.height / (scale || 1) : 0);
       const max = listboxMaxScroll(control, viewH, lbFilter(control));
@@ -2206,7 +2219,7 @@
     if (listboxDrag && listboxDrag.id === getControlId(control)) {
       const dy = (event.clientY - listboxDrag.startY) / (scale || 1);
       if (Math.abs(dy) > 4) listboxDrag.moved = true;
-      const max = listboxMaxScroll(control, listboxViewport(control), lbFilter(control));
+      const max = listboxMaxScroll(lbControl(control), listboxViewport(control), lbFilter(control));
       const next = Math.max(0, Math.min(max, listboxDrag.startScroll - dy));
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
@@ -2217,6 +2230,7 @@
       if (listboxConfig(control).hoverHighlight !== false) {
         const rect = event?.currentTarget?.getBoundingClientRect?.();
         if (rect) {
+          control = lbControl(control); // cascading: hit-test only the visible rows
           const transformSection = control?._children?.Transform ?? null;
           const localY = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
           const scrollTop = numberOr(sessionFor(control)?.listboxScrollTop, 0);
