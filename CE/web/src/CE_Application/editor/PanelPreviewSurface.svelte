@@ -1019,6 +1019,12 @@
       focused: true, hover: true, pressed: false,
     });
   }
+  // Fire the "recall" side effect on commit when recallOnSelect is on: mark the
+  // row as now-playing (in a real device this also sends the recall message).
+  function recallListboxRow(control, row) {
+    if (listboxConfig(control).recallOnSelect !== true || !isSelectableRow(row)) return;
+    patchControlSession(getControlId(control), { listboxNowPlaying: String(rowValue(row)) });
+  }
   // A click's effect on a listbox row, honoring multiSelect + confirmMode.
   function activateListboxRow(control, row) {
     if (!isSelectableRow(row)) return;
@@ -1027,6 +1033,7 @@
     const mode = String(cfg.confirmMode ?? 'single');
     if (mode === 'single') {
       selectComboboxRow(control, row);
+      recallListboxRow(control, row);
       patchControlSession(getControlId(control), { listboxPending: '' });
     } else {
       // double / enter: a single click only arms the row; commit happens on the
@@ -1043,6 +1050,7 @@
       .find((r) => String(rowValue(r)) === String(sessionFor(control)?.listboxPending ?? ''));
     if (!isSelectableRow(target)) return false;
     selectComboboxRow(control, target);
+    recallListboxRow(control, target);
     patchControlSession(getControlId(control), { listboxPending: '' });
     return true;
   }

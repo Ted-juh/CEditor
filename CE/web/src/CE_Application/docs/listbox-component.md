@@ -69,7 +69,40 @@ like the radio/slider parts). No dropdown, no arrow.
 - **Export / Player** (`scriptPanelExport.js`, `Player/PanelParameters.h`,
   `Player/PanelValueModel.h`) — component-type-agnostic.
 
-## Later: multi-select variant
+## Implemented feature set 🟢
+
+Beyond the single-select MVP, the full Listbox feature menu shipped
+(config in the `Listbox` section, inspector in `ListboxEditor.svelte`,
+geometry in `utils/listboxLayout.js`, all rendered by `ListboxRenderer.svelte`
+and driven by `PanelPreviewSurface.svelte`):
+
+- **Scroll & nav (A):** line vs smooth scroll, wheel + drag-scroll (click
+  suppressed after a drag), visual scrollbar (auto/always/thin/hidden),
+  keyboard nav (arrows/page/home/end) with scroll-into-view, edge fades.
+- **Search (B):** type-ahead (prefix/fuzzy) and an optional filter box that
+  reduces the visible rows, with a match highlight. The renderer and hit-test
+  share `listboxLayout` and the same filter string, so they stay aligned.
+- **Rich rows (C):** per-row icon (glyph or image), subtitle (two-line),
+  trailing badge, colour swatch, and non-selectable section headers.
+- **Interaction & animation (D):** per-row hover highlight + hover animations
+  (glow/slide/scale/icon-reveal), an animated sliding selection indicator,
+  confirm modes (single / double-click / Enter with a pending "armed" row),
+  and **multi-select** (checkboxes; click or Enter/Space toggles a per-session
+  value set).
+- **Appearance (E):** selection styles (bar/stripe/outline/check/bold), zebra
+  striping, card rows, density, empty-state text.
+- **Preset browser (F):** `choiceSource: devicePresets` swaps the authored
+  Value rows for `Listbox._presetRows` when a preset scan injects them (falls
+  back to the authored rows for authoring/preview — the scanner is a runtime
+  hook); `recallOnSelect` fires the recall on commit and stamps the
+  now-playing row; `nowPlaying` marks the live/recalled row (▶) distinct from
+  the current selection.
+- **Accessibility (G):** `role="listbox"`/`role="option"`, `aria-selected`,
+  `aria-disabled`, `aria-multiselectable`, per-option ids +
+  `aria-activedescendant` following the keyboard browse cursor, and a focus
+  ring on the list plus the active option.
+
+## Multi-select variant — shipped
 
 A `selectionMode: 'multi'` Listbox needs:
 - a new **`selectedChoices`** port (array of CHOICE/ENUM),

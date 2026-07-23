@@ -14,11 +14,12 @@
     selectedValue = undefined,   // single-select value
     selectedValues = null,       // Set of values (multi-select)
     pendingValue = undefined,    // row awaiting confirm (double/enter modes)
-    nowPlayingValue = undefined, // the live/recalled row
+    nowPlayingValue = undefined, // the live/recalled row (▶ marker)
     hoveredIndex = -1,           // row under the pointer
     scrollTop = 0,
     matchQuery = '',             // substring to highlight (search)
     filterText = '',             // filter-box query (reduces the visible rows)
+    focused = false,             // control holds keyboard focus (draws a focus ring)
   } = $props();
 
   function css(hex, fallback = 'rgba(224,224,224,1)') {
@@ -57,6 +58,20 @@
   // single-selected row, so a bar can transition between rows.
   let selIndex = $derived.by(() => {
     if (cfg.selectionAnim !== true || cfg.multiSelect === true) return -1;
+    return rows.findIndex((r) => r.isHeader !== true && isSelected(r));
+  });
+
+  // Accessibility: a stable id base for options + the active-descendant index
+  // (the keyboard browse cursor — the pending row if one is armed, else the
+  // selected row). Screen readers follow aria-activedescendant to this option.
+  let idBase = $derived(`lb-${String(control?._children?.Core?.id ?? 'x')}`);
+  function optionId(i) { return `${idBase}-opt-${i}`; }
+  let activeIndex = $derived.by(() => {
+    const pv = String(pendingValue ?? '');
+    if (pv) {
+      const at = rows.findIndex((r) => r.isHeader !== true && String(rowValue(r)) === pv);
+      if (at >= 0) return at;
+    }
     return rows.findIndex((r) => r.isHeader !== true && isSelected(r));
   });
 
@@ -103,8 +118,10 @@
   class="listbox"
   class:zebra={cfg.zebra === true}
   class:fade-edges={cfg.fadeEdges === true}
+  class:focused={focused === true}
   role="listbox"
   aria-multiselectable={cfg.multiSelect === true}
+  aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
   style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padBottom}px; --lb-accent:${accentCss};`}
 >
   {#if thumb}
@@ -127,9 +144,11 @@
           {@const disabled = row.enabled === false}
           {@const parts = matchParts(row.displayText)}
           <div
+            id={optionId(i)}
             class="listbox-row"
             class:selected={sel}
             class:disabled
+            class:active-descendant={i === activeIndex && focused}
             class:pending={isPending(row) && !sel}
             class:hovered={i === hoveredIndex && cfg.hoverHighlight !== false}
             class:card={cfg.cardRows === true}
@@ -232,6 +251,13 @@
   }
   .listbox-row.disabled { opacity: 0.4; }
   .listbox-row.hovered { background: rgba(255, 255, 255, 0.08); }
+
+  /* Keyboard focus (G1): a ring on the whole list + on the active option. */
+  .listbox.focused { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--lb-accent) 70%, transparent); border-radius: 4px; }
+  .listbox-row.active-descendant::after {
+    content: ""; position: absolute; inset: 1px; border-radius: 3px;
+    box-shadow: inset 0 0 0 1.5px var(--lb-accent); pointer-events: none; z-index: 2;
+  }
 
   /* Selection styles */
   .listbox-row.sel-bar { background: var(--lb-accent); color: #0B0B0B; }

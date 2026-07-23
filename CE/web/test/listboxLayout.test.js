@@ -91,6 +91,28 @@ test('listboxScrollIntoView nudges the minimum needed', async () => {
   assert.equal(listboxScrollIntoView(c, 0, 100, 50), 6);     // scrolled past row 0 -> back to its top (padTop)
 });
 
+test('device-preset source overrides Value rows when scanned in', async () => {
+  const { listboxRowSource } = await import('../src/CE_Application/utils/listboxLayout.js');
+  const c = control(2);
+  // Default: authored Value rows.
+  assert.equal(listboxRowSource(c).length, 2);
+  // choiceSource=devicePresets but no scan yet → still the authored rows.
+  c._children.Listbox = { choiceSource: 'devicePresets' };
+  assert.equal(listboxRowSource(c).length, 2);
+  // Scan injects _presetRows → those take over.
+  c._children.Listbox._presetRows = [
+    { id: 'p0', internalValue: '0', displayText: 'INIT' },
+    { id: 'p1', internalValue: '1', displayText: 'Bass' },
+    { id: 'p2', internalValue: '2', displayText: 'Lead' },
+  ];
+  assert.equal(listboxRowSource(c).length, 3);
+  assert.equal(listboxRows(c).length, 3);
+  assert.equal(listboxRows(c, 'ba').length, 1); // Bass
+  // An empty scan falls back to authored rows (nothing to show otherwise).
+  c._children.Listbox._presetRows = [];
+  assert.equal(listboxRowSource(c).length, 2);
+});
+
 test('filter reduces the visible rows (and drops headers)', () => {
   const c = { _children: { Text: { _children: { Font: { size: 12 } } }, ContentLayout: {}, Listbox: {},
     Value: { rows: [

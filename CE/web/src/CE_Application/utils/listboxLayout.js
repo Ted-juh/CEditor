@@ -35,11 +35,24 @@ function rowMatches(row, filter, mode) {
   return label.includes(q) || sub.includes(q);
 }
 
+// The row source for the list. Normally the authored Value rows; when the
+// listbox is sourced from device presets (choiceSource === 'devicePresets')
+// and a scan has injected `Listbox._presetRows`, those take over — a runtime
+// hook the preset scanner fills in, with the authored rows as the fallback so
+// the editor still shows something to lay out.
+export function listboxRowSource(control) {
+  const cfg = listboxConfig(control);
+  if (String(cfg.choiceSource) === 'devicePresets' && Array.isArray(cfg._presetRows) && cfg._presetRows.length) {
+    return cfg._presetRows;
+  }
+  return control?._children?.Value?.rows;
+}
+
 // Visible rows in render order. No filter → every row (headers + disabled
 // included, so authoring/reorder is faithful). With a filter → only matching
 // selectable rows (headers dropped).
 export function listboxRows(control, filter = '') {
-  const rows = control?._children?.Value?.rows;
+  const rows = listboxRowSource(control);
   const all = Array.isArray(rows) ? rows : [];
   const q = String(filter ?? '').trim();
   if (!q) return all;

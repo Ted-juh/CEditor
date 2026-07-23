@@ -206,6 +206,12 @@
     const arr = previewSession?.listboxSelected;
     return new Set((Array.isArray(arr) ? arr : []).map((v) => String(v)));
   });
+  // Now-playing (recalled) row for the ▶ marker (only when nowPlaying is on).
+  let listboxNowPlaying = $derived.by(() => {
+    if (!isListboxControl || renderControl?._children?.Listbox?.nowPlaying !== true) return undefined;
+    const np = previewSession?.listboxNowPlaying;
+    return (np !== undefined && np !== '') ? np : undefined;
+  });
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   let designer = $derived(getSection(renderControl, 'Designer'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
@@ -4145,6 +4151,8 @@
         selectedValue={interactionRuntime?.signals?.valueRaw}
         selectedValues={listboxMultiSet}
         pendingValue={previewSession?.listboxPending ?? ''}
+        nowPlayingValue={listboxNowPlaying}
+        focused={previewSession?.focused === true && previewInteractive}
         scrollTop={previewSession?.listboxScrollTop ?? 0}
         hoveredIndex={previewSession?.listboxHoverIndex ?? -1}
         filterText={previewListboxFilter?.value ?? ''}
