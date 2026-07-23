@@ -53,6 +53,7 @@ const SEVEN_SEG_MAP = {
   L: 'def', n: 'ceg', N: 'abcef', O: 'abcdef', o: 'cdeg', P: 'abefg', q: 'abcfg',
   r: 'eg', R: 'abcef', S: 'afgcd', t: 'defg', T: 'defg', U: 'bcdef', u: 'cde',
   Y: 'bcdfg', y: 'bcdfg', Z: 'abged', '-': 'g', '_': 'd', '=': 'gd', '°': 'abfg',
+  '±': 'gd', // no true 7-seg form; minus-over-bar stand-in
   // The letters with no true 7-seg form get the conventional hardware
   // stand-ins: K/X ≈ H-shapes, M/W the classic two-stroke fragments, V ≈ U.
   K: 'befg', M: 'ace', V: 'bcdef', W: 'bdf', X: 'bcefg',
@@ -132,6 +133,36 @@ const SIXTEEN_SEG_GEOMETRY = {
   dp: { kind: 'dot', cx: 94, cy: 166, r: 6 },
 };
 
+// --- 14-segment -------------------------------------------------------------
+// A true 14-segment starburst: identical to 16-seg EXCEPT the top and bottom
+// are single continuous bars (a, d) instead of the 16-seg's split halves
+// (a1/a2, d1/d2). The centre bar stays split (g1/g2). This is the visible
+// difference from 16-seg; picking "14" no longer just aliases 16.
+const FOURTEEN_SEG_GEOMETRY = {
+  a: hBar(20, 80, 14, 13),
+  b: vBar(86, 20, 86, 13),
+  c: vBar(86, 94, 160, 13),
+  d: hBar(20, 80, 166, 13),
+  e: vBar(14, 94, 160, 13),
+  f: vBar(14, 20, 86, 13),
+  g1: hBar(20, 48, 90, 13),
+  g2: hBar(52, 80, 90, 13),
+  i: vBar(50, 20, 86, 12),
+  l: vBar(50, 94, 160, 12),
+  h: diag(22, 22, 44, 82),
+  j: diag(78, 22, 56, 82),
+  k: diag(22, 158, 44, 98),
+  m: diag(78, 158, 56, 98),
+  dp: { kind: 'dot', cx: 94, cy: 166, r: 6 },
+};
+
+// Colon / semicolon: a dedicated two-dot cell (clock displays). Independent of
+// the digit segments, so it renders the same in every segment mode.
+const COLON_GEOMETRY = {
+  ct: { kind: 'dot', cx: 50, cy: 62, r: 9 },
+  cb: { kind: 'dot', cx: 50, cy: 118, r: 9 },
+};
+
 // Compact tokens expand to the split half-bars.
 function expandStarburst(tokens) {
   const out = [];
@@ -186,6 +217,8 @@ const STARBURST_TOKENS = {
   '_': ['d'],
   '=': ['g', 'd'],
   '+': ['g', 'i', 'l'],
+  '±': ['g', 'i', 'l', 'd'],
+  '°': ['a', 'b', 'f', 'g'],
   '*': ['g', 'h', 'i', 'j', 'k', 'l', 'm'],
   '/': ['j', 'k'],
   '\\': ['h', 'm'],
@@ -203,22 +236,47 @@ const STARBURST_MAP = Object.fromEntries(
   Object.entries(STARBURST_TOKENS).map(([ch, toks]) => [ch, expandStarburst(toks).join(' ')])
 );
 
+// 14-seg expands the same character tokens but keeps a/d as single bars (any
+// half-bar reference folds back to the whole bar); only g stays split.
+function expandFourteen(tokens) {
+  const out = [];
+  for (const tok of tokens) {
+    if (tok === 'a' || tok === 'a1' || tok === 'a2') out.push('a');
+    else if (tok === 'd' || tok === 'd1' || tok === 'd2') out.push('d');
+    else if (tok === 'g') out.push('g1', 'g2');
+    else out.push(tok);
+  }
+  return [...new Set(out)];
+}
+
+const FOURTEEN_MAP = Object.fromEntries(
+  Object.entries(STARBURST_TOKENS).map(([ch, toks]) => [ch, expandFourteen(toks).join(' ')])
+);
+
 // --- public API -------------------------------------------------------------
 
 export const SEGMENT_VIEWBOX = { width: 100, height: 180 };
 
 // Resolve the geometry + lit-segment set for a character in a given segment mode.
-// segmentType: 7 | 9 | 14 | 16 (14 shares the 16-seg starburst).
+// segmentType: 7 | 9 | curved9 | 14 | 16.
 export function getSegmentGlyph(segmentType, rawChar) {
   const s = String(segmentType).trim().toLowerCase();
   // 'curved9' = Itron-VFD-style curved strokes; same names/map as straight 9-seg.
-  const seg = s === '7' ? 7 : s === '9' ? 9 : s === 'curved9' ? 'c9' : 16;
+  const seg = s === '7' ? 7 : s === '9' ? 9 : s === 'curved9' ? 'c9' : s === '14' ? 14 : 16;
   const upper = String(rawChar ?? ' ');
+
+  // Colon / semicolon are a dedicated two-dot cell in every mode (clock use).
+  if (upper === ':' || upper === ';') return { geometry: COLON_GEOMETRY, lit: new Set(['ct', 'cb']) };
+
   const geometry = seg === 7 ? SEVEN_SEG_GEOMETRY
     : seg === 9 ? NINE_SEG_GEOMETRY
     : seg === 'c9' ? CURVED9_GEOMETRY
+    : seg === 14 ? FOURTEEN_SEG_GEOMETRY
     : SIXTEEN_SEG_GEOMETRY;
-  const map = seg === 7 ? SEVEN_SEG_MAP : (seg === 9 || seg === 'c9') ? NINE_SEG_MAP : STARBURST_MAP;
+  const map = seg === 7 ? SEVEN_SEG_MAP
+    : (seg === 9 || seg === 'c9') ? NINE_SEG_MAP
+    : seg === 14 ? FOURTEEN_MAP
+    : STARBURST_MAP;
 
   // Exact match first, then case-folded, else blank.
   // Decimal point / comma light the dp dot present in every segment geometry.
@@ -228,8 +286,9 @@ export function getSegmentGlyph(segmentType, rawChar) {
 
   const litStr = map[upper] ?? map[upper.toUpperCase()] ?? map[upper.toLowerCase()] ?? '';
   // 7/9-seg map values are concatenated single-char segments ("abcdef"); the
-  // 16-seg starburst map is space-separated multi-char tokens ("a1 a2 b ...").
-  const tokens = seg === 16 ? litStr.split(/\s+/) : litStr.split('');
+  // 14/16-seg maps are space-separated multi-char tokens ("a1 a2 b ...").
+  const multi = seg === 16 || seg === 14;
+  const tokens = multi ? litStr.split(/\s+/) : litStr.split('');
   const lit = new Set(tokens.map((t) => t.trim()).filter(Boolean));
   return { geometry, lit };
 }

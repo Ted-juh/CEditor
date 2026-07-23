@@ -537,7 +537,7 @@ export const SECTION_DEFAULTS = {
   Display: {
     _type: 'Display',
     panelType: 'character',        // character | segment | graphic
-    segmentType: '16',             // 7 | 14 | 16 (14 shares the 16-seg starburst)
+    segmentType: '16',             // 7 | 9 | curved9 | 14 | 16
     pixelWidth: 0,                 // graphic mode pixel columns (0 = auto from cols)
     pixelHeight: 0,                // graphic mode pixel rows (0 = auto from rows)
     imageSrc: '',                  // graphic mode: image to dither onto the grid
