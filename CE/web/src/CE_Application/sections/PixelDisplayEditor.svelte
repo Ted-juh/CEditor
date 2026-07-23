@@ -8,6 +8,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
@@ -475,6 +476,7 @@
                 <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
               {/if}
             {/if}
+            <input class="val cswatch" type="color" title="Pick element colour (keeps alpha)" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             {#if WIDGET_KINDS.includes(el.kind)}
@@ -650,21 +652,27 @@
     {/if}
   </PropertySection>
 
+  {#snippet colourField(prop, current, fallback)}
+    <div class="field-row">
+      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
+      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
+    </div>
+  {/snippet}
   <PropertySection title="Colour">
     <PropertyCell label="Lit" span={2} hint="Lit dot colour, AARRGGBB.">
-      <input class="val" type="text" value={pixel.litColour ?? 'FFF2F2F2'} onchange={(event) => set('litColour', event.target.value.trim())} />
+      {@render colourField('litColour', pixel.litColour, 'FFF2F2F2')}
     </PropertyCell>
     <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' dot colour, AARRGGBB.">
-      <input class="val" type="text" value={pixel.unlitColour ?? '14FFFFFF'} onchange={(event) => set('unlitColour', event.target.value.trim())} />
+      {@render colourField('unlitColour', pixel.unlitColour, '14FFFFFF')}
     </PropertyCell>
     <PropertyCell label="Screen" span={2} hint="Screen substrate behind the dots, AARRGGBB.">
-      <input class="val" type="text" value={pixel.screenColour ?? 'FF000000'} onchange={(event) => set('screenColour', event.target.value.trim())} />
+      {@render colourField('screenColour', pixel.screenColour, 'FF000000')}
     </PropertyCell>
     <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      <input class="val" type="text" value={pixel.backlightColour ?? '00000000'} onchange={(event) => set('backlightColour', event.target.value.trim())} />
+      {@render colourField('backlightColour', pixel.backlightColour, '4D0E5A2E')}
     </PropertyCell>
     <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB.">
-      <input class="val" type="text" value={pixel.glassTint ?? '14FFFFFF'} onchange={(event) => set('glassTint', event.target.value.trim())} />
+      {@render colourField('glassTint', pixel.glassTint, '14FFFFFF')}
     </PropertyCell>
   </PropertySection>
 
@@ -732,6 +740,14 @@
     display: flex;
     gap: 4px;
     align-items: center;
+  }
+
+  .cswatch {
+    width: 26px;
+    flex: 0 0 auto;
+    padding: 1px;
+    height: 22px;
+    cursor: pointer;
   }
 
   .add-field {

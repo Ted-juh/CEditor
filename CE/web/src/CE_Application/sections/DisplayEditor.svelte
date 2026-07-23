@@ -3,6 +3,7 @@
   import { activePanel } from '../stores/panels.js';
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
+  import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -685,21 +686,27 @@
     </PropertySection>
   {/if}
 
+  {#snippet colourField(prop, current, fallback)}
+    <div class="field-row">
+      <input class="val cswatch" type="color" title="Pick RGB (keeps the current alpha)" value={aarrggbbToHex(current ?? fallback)} oninput={(event) => set(prop, mergeHexKeepAlpha(current ?? fallback, event.target.value))} />
+      <input class="val" type="text" title="AARRGGBB (alpha + RGB)" value={current ?? fallback} onchange={(event) => set(prop, event.target.value.trim())} />
+    </div>
+  {/snippet}
   <PropertySection title="Colour">
     <PropertyCell label="Lit" span={2} hint="Foreground (lit segment) colour, AARRGGBB.">
-      <input class="val" type="text" value={display.litColour ?? 'FF2BE86A'} onchange={(event) => set('litColour', event.target.value.trim())} />
+      {@render colourField('litColour', display.litColour, 'FF2BE86A')}
     </PropertyCell>
     <PropertyCell label="Unlit" span={2} hint="Faint unlit 'ghost' segment colour, AARRGGBB.">
-      <input class="val" type="text" value={display.unlitColour ?? '242BE86A'} onchange={(event) => set('unlitColour', event.target.value.trim())} />
+      {@render colourField('unlitColour', display.unlitColour, '242BE86A')}
     </PropertyCell>
     <PropertyCell label="Screen" span={2} hint="Screen substrate behind the pixels, AARRGGBB.">
-      <input class="val" type="text" value={display.screenColour ?? 'FF06371C'} onchange={(event) => set('screenColour', event.target.value.trim())} />
+      {@render colourField('screenColour', display.screenColour, 'FF06371C')}
     </PropertyCell>
     <PropertyCell label="Backlight" span={2} hint="Backlight wash colour, AARRGGBB.">
-      <input class="val" type="text" value={display.backlightColour ?? 'FF0E5A2E'} onchange={(event) => set('backlightColour', event.target.value.trim())} />
+      {@render colourField('backlightColour', display.backlightColour, 'FF0E5A2E')}
     </PropertyCell>
     <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB (low alpha = subtle).">
-      <input class="val" type="text" value={display.glassTint ?? '14FFFFFF'} onchange={(event) => set('glassTint', event.target.value.trim())} />
+      {@render colourField('glassTint', display.glassTint, '14FFFFFF')}
     </PropertyCell>
   </PropertySection>
 
@@ -865,6 +872,14 @@
   .field-row .rm {
     width: 30px;
     flex: 0 0 auto;
+    cursor: pointer;
+  }
+
+  .field-row .cswatch {
+    width: 30px;
+    flex: 0 0 auto;
+    padding: 1px;
+    height: 24px;
     cursor: pointer;
   }
 
