@@ -136,6 +136,20 @@
                 </label>
                 <button type="button" class="action-btn danger" onclick={() => removeRow(index)}>Remove</button>
               </div>
+              {#if buttonType === 'listbox'}
+                <div class="row-rich">
+                  <label class="flag">
+                    <input type="checkbox" checked={row.isHeader === true} onchange={(event) => updateRow(index, 'isHeader', event.currentTarget.checked)} />
+                    <span>Header</span>
+                  </label>
+                  {#if row.isHeader !== true}
+                    <input class="rich-in" type="text" placeholder="icon (glyph or URL)" value={row.icon ?? ''} onchange={(event) => updateRow(index, 'icon', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="subtitle" value={row.subtitle ?? ''} onchange={(event) => updateRow(index, 'subtitle', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="badge" value={row.badge ?? ''} onchange={(event) => updateRow(index, 'badge', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="swatch AARRGGBB" value={row.swatch ?? ''} onchange={(event) => updateRow(index, 'swatch', event.target.value.trim())} />
+                  {/if}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -191,6 +205,25 @@
     gap: 10px;
     justify-content: flex-end;
   }
+
+  .row-rich {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .row-rich .rich-in {
+    flex: 1 1 90px;
+    min-width: 70px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    color: #DDD;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  .row-rich .rich-in:focus-visible { outline: 2px solid #5B9BD5; outline-offset: 1px; }
 
   .flag {
     display: inline-flex;

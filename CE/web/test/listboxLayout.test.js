@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   listboxRows, listboxRowHeight, listboxContentHeight, listboxMaxScroll, listboxRowIndexAtPoint,
+  isSelectableRow, listboxRowStride,
 } from '../src/CE_Application/utils/listboxLayout.js';
 
 function control(rowCount, { fontSize = 12, padTop = 6 } = {}) {
@@ -19,10 +20,32 @@ test('row height derives from font size with a floor', () => {
   assert.equal(listboxRowHeight(control(3, { fontSize: 4 })), 18); // floor
 });
 
-test('disabled rows are excluded', () => {
+test('rows include headers/disabled (indices align); isSelectableRow filters', () => {
   const c = control(3);
   c._children.Value.rows[1].enabled = false;
-  assert.equal(listboxRows(c).length, 2);
+  c._children.Value.rows[2].isHeader = true;
+  assert.equal(listboxRows(c).length, 3); // all rendered
+  assert.equal(isSelectableRow(c._children.Value.rows[0]), true);
+  assert.equal(isSelectableRow(c._children.Value.rows[1]), false); // disabled
+  assert.equal(isSelectableRow(c._children.Value.rows[2]), false); // header
+});
+
+test('row height honors explicit rowHeight, density and two-line', () => {
+  const c = control(3, { fontSize: 12 });
+  assert.equal(listboxRowHeight(c), 22); // auto (comfortable)
+  c._children.Listbox = { density: 'compact' };
+  assert.equal(listboxRowHeight(c), 18); // 12 + 6
+  c._children.Listbox = { rowHeight: 40 };
+  assert.equal(listboxRowHeight(c), 40); // explicit
+  c._children.Listbox = { twoLine: true };
+  assert.equal(listboxRowHeight(c), 22 + Math.round(12 * 0.9) + 2); // + subtitle line
+});
+
+test('card rows add a gap to the stride', () => {
+  const c = control(3);
+  assert.equal(listboxRowStride(c), 22); // no cards
+  c._children.Listbox = { cardRows: true };
+  assert.equal(listboxRowStride(c), 26); // + 4 gap
 });
 
 test('hit-test maps a local point to the right row, honoring scroll', () => {

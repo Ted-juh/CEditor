@@ -22,7 +22,7 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
-  import { listboxRows, listboxRowHeight, listboxRowIndexAtPoint, listboxMaxScroll } from '../utils/listboxLayout.js';
+  import { listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
     createTimedButtonPreviewController,
@@ -873,7 +873,9 @@
     const scrollTop = numberOr(sessionFor(control)?.listboxScrollTop, 0);
     const idx = listboxRowIndexAtPoint(control, localY, scrollTop);
     const rows = listboxRows(control);
-    return idx >= 0 ? rows[idx] : undefined;
+    const row = idx >= 0 ? rows[idx] : undefined;
+    // Section headers / disabled rows aren't selectable.
+    return isSelectableRow(row) ? row : undefined;
   }
 
   function getValueRows(control) {
@@ -1905,7 +1907,7 @@
       event.preventDefault();
       event.stopPropagation();
       const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
-      const step = listboxRowHeight(control) * (event.deltaY > 0 ? 1 : -1);
+      const step = listboxRowStride(control) * (event.deltaY > 0 ? 1 : -1);
       const next = Math.max(0, Math.min(max, cur + step));
       if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
