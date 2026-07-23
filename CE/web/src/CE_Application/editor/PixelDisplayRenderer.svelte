@@ -12,6 +12,10 @@
 
   let { control = null, allControls = [], width = 0, height = 0, editable = false, scale = 1 } = $props();
 
+  // Pixel-only widget kinds: the LCD's zone widgets plus the synthesized
+  // waveform and the scope trace (which have no character fallback).
+  const PIXEL_WIDGET_KINDS = new Set([...WIDGET_ZONE_KINDS, 'wave', 'scope']);
+
   let pixel = $derived(control?._children?.Pixel ?? null);
   let coreId = $derived(String(control?._children?.Core?.id ?? ''));
 
@@ -112,7 +116,7 @@
     for (const el of elements) {
       const kind = String(el?.kind ?? '');
       if (el?.visible === false || !kind) continue;
-      if (WIDGET_ZONE_KINDS.has(kind)) {
+      if (PIXEL_WIDGET_KINDS.has(kind)) {
         const label = String(el?.label ?? '').trim();
         if (!label) continue;
         const x = Math.round(numberOr(el?.x, 0));
@@ -153,8 +157,12 @@
     const out = [];
     for (const el of elements) {
       const kind = String(el?.kind ?? '');
-      if (el?.visible === false || !WIDGET_ZONE_KINDS.has(kind)) continue;
+      if (el?.visible === false || !PIXEL_WIDGET_KINDS.has(kind)) continue;
       const info = controlInfo(String(el?.sourceId ?? ''));
+      const cutInfo = kind === 'wave' ? controlInfo(String(el?.cutoffSourceId ?? '')) : null;
+      const resInfo = kind === 'wave' ? controlInfo(String(el?.resoSourceId ?? '')) : null;
+      const lfoInfo = kind === 'wave' ? controlInfo(String(el?.lfoSourceId ?? '')) : null;
+      const freqInfo = kind === 'wave' ? controlInfo(String(el?.freqSourceId ?? '')) : null;
       out.push({
         id: String(el?.id ?? ''),
         kind,
@@ -170,6 +178,19 @@
         smooth: el?.smooth === true,
         colour: el?.colour ? cssColour(el.colour) : '',
         meterColours: el?.meterColours === true,
+        // wave: synthesized waveform driven by MIDI values (no audio needed)
+        shape: String(el?.waveShape ?? 'saw'),
+        cycles: Math.max(0.25, numberOr(el?.waveCycles, 2)),
+        speed: numberOr(el?.waveSpeed, 1),
+        lfoDepth: Math.max(0, Math.min(1, numberOr(el?.waveDepth, 0.5))),
+        amp: kind === 'wave' ? (info ? infoFraction(info) : 1) : undefined,
+        cutoff: cutInfo ? infoFraction(cutInfo) : null,
+        reso: resInfo ? infoFraction(resInfo) : 0,
+        lfoRate: lfoInfo ? 0.3 + infoFraction(lfoInfo) * 7 : 0,
+        freqMul: freqInfo ? 0.5 + infoFraction(freqInfo) * 1.5 : 1,
+        // scope: rolling history window
+        secs: Math.max(0.25, numberOr(el?.scopeSecs, 3)),
+        fill: el?.scopeFill === true,
       });
     }
     return out;
@@ -200,7 +221,7 @@
       const h = Math.max(3, Math.round(numberOr(el?.h, 8)));
       let w = Math.max(0, Math.round(numberOr(el?.w, 0)));
       // Text without an alignment box: estimate the grab area from the content.
-      if (!WIDGET_ZONE_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
+      if (!PIXEL_WIDGET_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
         const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
         w = Math.ceil(h * 0.6 * len);
       }
@@ -280,7 +301,7 @@
   let frameTime = $state(0);
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
   let animActive = $derived(animMode !== 'off' || animElements.length > 0);
-  let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold));
+  let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
   let motionActive = $derived(animActive || widgetMotion);
 
   $effect(() => {

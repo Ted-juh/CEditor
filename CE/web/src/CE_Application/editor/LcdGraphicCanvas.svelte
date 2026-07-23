@@ -531,6 +531,89 @@
           const ta = ((135 - 90 * f) * Math.PI) / 180;
           px(cx + Math.cos(ta) * radius, iy1 - Math.sin(ta) * radius);
         }
+      } else if (w.kind === 'wave') {
+        // Synthesized "audio-like" waveform: additive harmonics of the chosen
+        // shape, low-pass rolled off by the cutoff source, resonance bump near
+        // the cutoff, LFO wobbling the filter — mimics the sound from MIDI
+        // values without any audio.
+        const K = 16;
+        const t = (animTick / 1000) * Math.max(0.05, Number(w.speed) || 1);
+        const lfo = w.lfoRate > 0 ? Math.sin(2 * Math.PI * w.lfoRate * (animTick / 1000)) : 0;
+        const cutBase = (w.cutoff === null || w.cutoff === undefined) ? 1 : w.cutoff;
+        const cEff = Math.min(1, Math.max(0.03, cutBase + (w.lfoDepth ?? 0.5) * 0.35 * lfo));
+        const kc = 1 + cEff * (K - 1);
+        const reso = Math.max(0, w.reso ?? 0);
+        const gains = [];
+        let norm = 0;
+        for (let k = 1; k <= K; k += 1) {
+          let a = 0;
+          if (w.shape === 'sine') a = k === 1 ? 1 : 0;
+          else if (w.shape === 'square') a = k % 2 === 1 ? 1 / k : 0;
+          else if (w.shape === 'triangle') a = k % 2 === 1 ? (k % 4 === 1 ? 1 : -1) / (k * k) : 0;
+          else a = 1 / k; // saw
+          if (a === 0) { gains.push(0); continue; }
+          const roll = 1 / (1 + Math.pow(k / kc, 6));
+          const peakBump = 1 + reso * 2.5 * Math.exp(-((k - kc) * (k - kc)) / 1.5);
+          const g = a * roll * peakBump;
+          gains.push(g);
+          norm += Math.abs(g);
+        }
+        if (norm < 0.0001) norm = 1;
+        const amp = Math.max(0.05, Math.min(1, w.amp ?? 1));
+        const cyc = Math.max(0.25, (w.cycles ?? 2) * (w.freqMul ?? 1));
+        const cyMid = (iy0 + iy1) / 2;
+        const half = Math.max(1, (ih - 1) / 2);
+        let prevY = null;
+        for (let dx = 0; dx < iw; dx += 1) {
+          const p = ((dx / Math.max(1, iw - 1)) * cyc + t) * 2 * Math.PI;
+          let yv = 0;
+          for (let k = 1; k <= K; k += 1) {
+            const g = gains[k - 1];
+            if (g) yv += g * Math.sin(k * p);
+          }
+          yv /= norm;
+          const py = Math.round(cyMid - yv * amp * half);
+          if (prevY === null) {
+            px(ix0 + dx, py);
+          } else {
+            const lo = Math.min(prevY, py); const hi = Math.max(prevY, py);
+            for (let yy = lo; yy <= hi; yy += 1) px(ix0 + dx, yy);
+          }
+          prevY = py;
+        }
+      } else if (w.kind === 'scope') {
+        // Rolling history trace of the bound source (oscilloscope / chart
+        // recorder): one sample per pixel column across a time window.
+        let sc = state.scope;
+        if (!sc || sc.samples.length !== iw) {
+          sc = { samples: new Float32Array(iw).fill(Math.max(0, Math.min(1, w.frac))), at: animTick };
+          state.scope = sc;
+        }
+        const windowMs = Math.max(250, (w.secs ?? 3) * 1000);
+        const interval = windowMs / Math.max(1, iw);
+        let steps = Math.floor((animTick - sc.at) / interval);
+        if (steps > iw || steps < 0) { sc.samples.fill(Math.max(0, Math.min(1, w.frac))); sc.at = animTick; steps = 0; }
+        for (let s2 = 0; s2 < steps; s2 += 1) {
+          sc.samples.copyWithin(0, 1);
+          sc.samples[iw - 1] = Math.max(0, Math.min(1, w.frac));
+          sc.at += interval;
+        }
+        let prevY = null;
+        for (let dx = 0; dx < iw; dx += 1) {
+          const v = sc.samples[dx];
+          if (w.meterColours) cur = meterId(v);
+          const py = Math.round(iy1 - v * (ih - 1));
+          if (w.fill) {
+            for (let yy = py; yy <= iy1; yy += 1) px(ix0 + dx, yy);
+          } else if (prevY === null) {
+            px(ix0 + dx, py);
+          } else {
+            const lo = Math.min(prevY, py); const hi = Math.max(prevY, py);
+            for (let yy = lo; yy <= hi; yy += 1) px(ix0 + dx, yy);
+          }
+          prevY = py;
+        }
+        cur = baseId;
       }
     }
   }

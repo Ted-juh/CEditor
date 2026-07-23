@@ -14,7 +14,9 @@
   const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
   // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
   // part of the layout, so switching layouts switches animations.
-  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'anim'];
+  // 'wave' = synthesized waveform driven by MIDI values (shape + cutoff/reso/
+  // LFO/freq sources); 'scope' = rolling history trace of the bound source.
+  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'anim'];
 
   let { control = null } = $props();
 
@@ -449,6 +451,57 @@
               <label class="ex-chk" title="Peak-hold marker (bars)"><input type="checkbox" checked={el.peakHold === true} onchange={(event) => setElement(i, 'peakHold', event.target.checked)} />Pk</label>
               <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
               <label class="ex-chk" title="VU meter colours: green/yellow/red by level"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
+            {/if}
+            {#if el.kind === 'wave'}
+              <select class="val en2" title="Waveform shape" value={el.waveShape ?? 'saw'} onchange={(event) => setElement(i, 'waveShape', event.target.value)}>
+                <option value="sine">sin</option>
+                <option value="triangle">tri</option>
+                <option value="saw">saw</option>
+                <option value="square">sqr</option>
+              </select>
+              <span class="ex-lab">Cyc</span>
+              <input class="val en" type="number" min="0.25" max="16" step="0.25" title="Cycles shown across the width" value={el.waveCycles ?? 2} onchange={(event) => setElement(i, 'waveCycles', Number(event.target.value))} />
+              <span class="ex-lab">Spd</span>
+              <input class="val en" type="number" min="0" max="10" step="0.1" title="Phase scroll speed" value={el.waveSpeed ?? 1} onchange={(event) => setElement(i, 'waveSpeed', Number(event.target.value))} />
+              <span class="ex-lab">Dep</span>
+              <input class="val en" type="number" min="0" max="1" step="0.05" title="LFO wobble depth (needs an LFO source)" value={el.waveDepth ?? 0.5} onchange={(event) => setElement(i, 'waveDepth', Number(event.target.value))} />
+              <span class="ex-lab">Frm</span>
+              <input type="checkbox" class="ex-chk" title="Outline frame" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />
+              <span class="ex-lab">Cut</span>
+              <select class="val esel" title="Cutoff source: rolls off harmonics (low-pass)" value={el.cutoffSourceId ?? ''} onchange={(event) => setElement(i, 'cutoffSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">Res</span>
+              <select class="val esel" title="Resonance source: peak near the cutoff" value={el.resoSourceId ?? ''} onchange={(event) => setElement(i, 'resoSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">LFO</span>
+              <select class="val esel" title="LFO rate source: wobbles the filter" value={el.lfoSourceId ?? ''} onchange={(event) => setElement(i, 'lfoSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">Frq</span>
+              <select class="val esel" title="Frequency source: squeezes more cycles in" value={el.freqSourceId ?? ''} onchange={(event) => setElement(i, 'freqSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+            {/if}
+            {#if el.kind === 'scope'}
+              <span class="ex-lab">Secs</span>
+              <input class="val en" type="number" min="0.25" max="60" step="0.25" title="Time window the trace spans" value={el.scopeSecs ?? 3} onchange={(event) => setElement(i, 'scopeSecs', Number(event.target.value))} />
+              <label class="ex-chk" title="Fill under the trace"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
+              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
+              <label class="ex-chk" title="Colour the trace by level (green/yellow/red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
             {/if}
             <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
             <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
