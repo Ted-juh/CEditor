@@ -7,6 +7,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberInput from './NumberInput.svelte';
+  import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
@@ -215,6 +216,10 @@
     const next = cloneElements();
     if (next[i]) { next[i][prop] = value; commitElements(next); }
   }
+  // The Source dropdown value: any "@active#kind" collapses to "@active".
+  function elementSourceValue(el) { return isActiveSource(el?.sourceId) ? '@active' : (el?.sourceId ?? ''); }
+  // Set the "@active" kind filter (''=any) by rewriting the compound source id.
+  function setElementActiveKind(i, kind) { setElement(i, 'sourceId', kind ? `@active#${kind}` : '@active'); }
   function moveElement(i, dir) {
     const next = cloneElements();
     const j = i + dir;
@@ -399,13 +404,21 @@
             <option value="file">file</option>
           </select>
         {:else}
-          <select class="val esel" title="Source component" value={el.sourceId ?? ''} onchange={(event) => setElement(i, 'sourceId', event.target.value)}>
+          <select class="val esel" title="Source component" value={elementSourceValue(el)} onchange={(event) => setElement(i, 'sourceId', event.target.value)}>
             <option value="">(source)</option>
             <option value="@active">★ Active</option>
             {#each allSources as src}
               <option value={src.id}>{src.name}</option>
             {/each}
           </select>
+          {#if isActiveSource(el.sourceId)}
+            <select class="val en2" title="Active kind filter (only follow controls of this kind)" value={activeFilterOf(el.sourceId)} onchange={(event) => setElementActiveKind(i, event.target.value)}>
+              <option value="">any</option>
+              <option value="value">slid</option>
+              <option value="switch">btn</option>
+              <option value="choice">sel</option>
+            </select>
+          {/if}
         {/if}
         <button class="val erm" type="button" class:eopen={expandedElementId === String(el.id ?? i)} onclick={() => toggleElementExtras(String(el.id ?? i))} title="More element settings">…</button>
         <button class="val erm" type="button" onclick={() => removeElement(i)} title="Remove element">✕</button>
@@ -442,6 +455,10 @@
               <input class="val en" type="text" title="Suffix text" placeholder="suf" value={el.suffix ?? ''} oninput={(event) => setElement(i, 'suffix', event.target.value)} />
               <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
               <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
+              <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box (instead of clipping)"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
+              {#if el.kind === 'midiValue'}
+                <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
+              {/if}
             {/if}
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>

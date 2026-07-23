@@ -6,7 +6,8 @@
   // sliders, needle) fill their rect; an animation layer plays behind.
   import { onDestroy } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
-  import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout } from '../utils/lcdZones.js';
+  import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
+  import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { updateControlProperty } from '../stores/controls.js';
 
@@ -137,13 +138,28 @@
       }
       const info = controlInfo(String(el?.sourceId ?? ''));
       // Reuse the zone content engine (element kinds mirror zone show kinds).
-      const content = resolveZoneContent({ ...el, show: kind }, info, 16);
+      let content = resolveZoneContent({ ...el, show: kind }, info, 16);
       if (content === '') continue;
+      const elX = Math.round(numberOr(el?.x, 0));
+      const elY = Math.round(numberOr(el?.y, 0));
+      const boxW = Math.max(0, Math.round(numberOr(el?.w, 0)));
+      const elH = Math.max(3, Math.round(numberOr(el?.h, 8)));
+      // Marquee: when the text overflows its W box, scroll a window across it
+      // rather than clipping. Reads the rAF clock only when scroll is on, so
+      // static text elements don't recompute every frame.
+      if (el?.scroll === true && boxW > 0) {
+        const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+        const fit = Math.floor(boxW / (FONT_ADVANCE * s));
+        if (fit > 0 && content.length > fit) {
+          const elapsed = Math.floor((frameTime / 1000) * 3); // ~3 chars/sec
+          content = zoneScrollWindow(content, fit, elapsed);
+        }
+      }
       out.push({
-        x: Math.round(numberOr(el?.x, 0)),
-        y: Math.round(numberOr(el?.y, 0)),
-        w: Math.max(0, Math.round(numberOr(el?.w, 0))),
-        h: Math.max(3, Math.round(numberOr(el?.h, 8))),
+        x: elX,
+        y: elY,
+        w: boxW,
+        h: elH,
         align: String(el?.align ?? 'left'),
         content,
         colour: el?.colour ? cssColour(el.colour) : '',
