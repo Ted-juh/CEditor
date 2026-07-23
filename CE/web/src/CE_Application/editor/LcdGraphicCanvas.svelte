@@ -8,6 +8,8 @@
   // and then paints every on-pixel as a lit dot (off pixels as faint ghosts).
   // The screen fill + backlight + glass come from the CSS layers in
   // LcdDisplayRenderer; this canvas draws only the dots (transparent).
+  import { FONT_W, FONT_H, FONT_ADVANCE, drawCharInto, drawTextInto } from '../utils/pixelFont.js';
+
   let {
     lines = [],
     cols = 16,
@@ -200,67 +202,42 @@
     return frames[frames.length - 1];
   }
 
-  // Rasterise the text into a 1-bit bitmap using the browser's monospace font.
+  // Rasterise the grid text with the built-in 5×7 bitmap pixel font: exact
+  // pixels at scale 1, crisp at integer scales — no antialias/threshold mush.
   function textBitmap() {
-    const off = document.createElement('canvas');
-    off.width = pixW;
-    off.height = pixH;
-    const c = off.getContext('2d');
-    if (!c) return null;
-    c.fillStyle = '#000';
-    c.fillRect(0, 0, pixW, pixH);
-    c.fillStyle = '#fff';
-    // Fit each glyph to the actual per-character cell (grid width / cols) so text
-    // fills the grid at any resolution, and honours Font Scale via the cell size.
+    const bmp = new Uint8Array(pixW * pixH);
     const charW = pixW / Math.max(1, cols);
     const charH = pixH / Math.max(1, rows);
-    const font = Math.max(3, Math.floor(charH * 0.86));
-    c.textBaseline = 'middle';
-    c.textAlign = 'center';
-    c.font = `${font}px monospace`;
+    // Largest integer scale whose glyph cell (6×8 incl. gap) fits the grid cell.
+    const s = Math.max(1, Math.floor(Math.min(charW / FONT_ADVANCE, charH / (FONT_H + 1))));
     let any = false;
     for (let r = 0; r < rows; r += 1) {
       const line = lines[r] || [];
+      const oy = Math.round(r * charH + (charH - FONT_H * s) / 2);
       for (let x = 0; x < cols; x += 1) {
         const ch = line[x] ?? ' ';
-        if (ch !== ' ') { c.fillText(ch, x * charW + charW / 2, r * charH + charH / 2); any = true; }
+        if (ch === ' ') continue;
+        const ox = Math.round(x * charW + (charW - FONT_W * s) / 2);
+        if (drawCharInto(bmp, pixW, pixH, ch, ox, oy, s)) any = true;
       }
     }
-    if (!any) return null;
-    const data = c.getImageData(0, 0, pixW, pixH).data;
-    const bmp = new Uint8Array(pixW * pixH);
-    for (let i = 0; i < bmp.length; i += 1) bmp[i] = data[i * 4] > 128 ? 1 : 0;
-    return bmp;
+    return any ? bmp : null;
   }
 
-  // Rasterise ONE pixel-positioned string (PixelDisplay element): drawn at
-  // (x, y) with its font height h; w > 0 clips and provides the alignment box.
-  // Separate per element so each can be stamped in its own colour.
+  // Rasterise ONE pixel-positioned string (PixelDisplay element) with the
+  // bitmap font. h picks the integer scale (8px per scale step); w > 0 is the
+  // alignment/clip box. Separate per element so each can take its own colour.
   function textElementBitmap(t) {
     const content = String(t?.content ?? '');
     if (!content) return null;
-    const off = document.createElement('canvas');
-    off.width = pixW;
-    off.height = pixH;
-    const c = off.getContext('2d');
-    if (!c) return null;
-    c.fillStyle = '#000';
-    c.fillRect(0, 0, pixW, pixH);
-    c.fillStyle = '#fff';
-    const th = Math.max(3, Math.round(Number(t?.h) || 8));
-    const tx = Math.round(Number(t?.x) || 0);
-    const ty = Math.round(Number(t?.y) || 0);
-    const tw = Math.max(0, Math.round(Number(t?.w) || 0));
-    const align = String(t?.align ?? 'left');
-    if (tw > 0) { c.beginPath(); c.rect(tx, ty, tw, th + 2); c.clip(); }
-    c.font = `${th}px monospace`;
-    c.textBaseline = 'top';
-    c.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
-    const anchorX = align === 'center' ? tx + tw / 2 : align === 'right' ? tx + tw : tx;
-    c.fillText(content, anchorX, ty);
-    const data = c.getImageData(0, 0, pixW, pixH).data;
     const bmp = new Uint8Array(pixW * pixH);
-    for (let i = 0; i < bmp.length; i += 1) bmp[i] = data[i * 4] > 128 ? 1 : 0;
+    const th = Math.max(3, Math.round(Number(t?.h) || 8));
+    const s = Math.max(1, Math.floor(th / (FONT_H + 1)));
+    drawTextInto(
+      bmp, pixW, pixH, content,
+      Math.round(Number(t?.x) || 0), Math.round(Number(t?.y) || 0),
+      s, String(t?.align ?? 'left'), Math.max(0, Math.round(Number(t?.w) || 0))
+    );
     return bmp;
   }
 
