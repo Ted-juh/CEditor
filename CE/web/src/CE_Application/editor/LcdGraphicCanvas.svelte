@@ -18,6 +18,8 @@
     unlitCss = 'rgba(43,232,106,0.2)',
     brightness = 1,
     contrast = 0.5,
+    gamma = 1,                   // brightness response curve (>1 lifts mids)
+    glow = 0,                    // 0..1 bloom halo under lit dots
     showGhost = true,
     dotShape = 'round',
     blinkOn = true,
@@ -790,10 +792,18 @@
     const cellW = w / pixW;
     const cellH = h / pixH;
     const rad = Math.max(0.5, Math.min(cellW, cellH) * 0.42);
-    // Brightness spans a low floor (dim but not black) to full, so turning it
-    // down actually dims the panel instead of stopping at 40%.
-    const litOpacity = 0.1 + brightness * 0.9;
+    // Gamma shapes the brightness response (>1 lifts mids, <1 crushes them);
+    // brightness spans a low floor (dim but not black) to full.
+    const g = Math.max(0.2, Math.min(4, Number(gamma) || 1));
+    const litOpacity = 0.1 + Math.pow(Math.max(0, Math.min(1, brightness)), 1 / g) * 0.9;
     const ghostOpacity = Math.max(0.03, contrast * 0.5);
+    const glowAmt = Math.max(0, Math.min(1, Number(glow) || 0));
+    const glowRad = rad * (1 + glowAmt * 1.6);
+
+    const paintDot = (cx, cy, r) => {
+      if (dotShape === 'square') ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+      else { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); }
+    };
 
     for (let y = 0; y < pixH; y += 1) {
       for (let x = 0; x < pixW; x += 1) {
@@ -802,15 +812,15 @@
         if (!on && !showGhost) continue;
         const cx = x * cellW + cellW / 2;
         const cy = y * cellH + cellH / 2;
+        // Bloom halo under lit dots (larger, faint) then the crisp dot on top.
+        if (on && glowAmt > 0) {
+          ctx.globalAlpha = litOpacity * 0.28 * glowAmt;
+          ctx.fillStyle = palette[id];
+          paintDot(cx, cy, glowRad);
+        }
         ctx.globalAlpha = on ? litOpacity : ghostOpacity;
         ctx.fillStyle = on ? palette[id] : unlitCss;
-        if (dotShape === 'square') {
-          ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
-        } else {
-          ctx.beginPath();
-          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        paintDot(cx, cy, rad);
       }
     }
     ctx.globalAlpha = 1;
@@ -820,7 +830,7 @@
     if (!canvasEl) return;
     // Track the inputs so the canvas repaints when any of them change.
     void lines; void cols; void rows; void litCss; void unlitCss; void brightness;
-    void contrast; void showGhost; void dotShape; void blinkOn; void imageEl;
+    void contrast; void gamma; void glow; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
     void widgets; void caret; void texts; void anims; void elAnimCaches; void animMode; void animCache;
     void animPreset; void animSpeed; void animLoop; void animTick; void imageColour; void animColour;

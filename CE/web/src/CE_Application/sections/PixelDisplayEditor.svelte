@@ -794,6 +794,12 @@
         <option value="square">Square</option>
       </select>
     </PropertyCell>
+    <PropertyCell label="Gamma" span={2} hint="Brightness response curve. 1 = linear; >1 lifts mid-tones, <1 crushes them.">
+      <NumberInput value={pixel.gamma ?? 1} step={0.1} min={0.2} max={4} onchange={(value) => set('gamma', value)} />
+    </PropertyCell>
+    <PropertyCell label="Glow" span={2} hint="Bloom halo under lit dots (0 = crisp, 1 = strong glow).">
+      <NumberInput value={pixel.glow ?? 0} step={0.1} min={0} max={1} onchange={(value) => set('glow', value)} />
+    </PropertyCell>
     <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
       <NumberInput value={pixel.padding ?? 8} step={1} min={0} onchange={(value) => set('padding', value)} />
     </PropertyCell>

@@ -651,6 +651,8 @@ export const SECTION_DEFAULTS = {
     showGhost: true,               // faint unlit dots
     showScanlines: false,
     dotShape: 'round',             // round | square
+    gamma: 1,                      // brightness response curve (>1 lifts mids)
+    glow: 0,                       // 0..1 bloom halo under lit dots
     showGrid: false,               // design-time grid overlay (editor aid, not painted at runtime)
     snapGrid: 0,                   // snap element drags to this pixel step (0 = free)
     padding: 8,                    // bezel inset (screen px, not grid px)

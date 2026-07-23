@@ -555,6 +555,8 @@
       {unlitCss}
       {brightness}
       {contrast}
+      gamma={numberOr(pixel?.gamma, 1)}
+      glow={numberOr(pixel?.glow, 0)}
       {showGhost}
       blinkOn={true}
       dotShape={dotShape}
