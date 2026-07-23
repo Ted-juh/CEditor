@@ -548,17 +548,32 @@
         </select>
       </PropertyCell>
       {#each (pages.selectorMap ?? []) as m, i (i)}
-        <PropertyCell label={`When = ${m.when ?? ''}`} span={4} hint="Selector value → layout to show.">
+        {@const op = String(m.op ?? 'eq')}
+        <PropertyCell label={`When ${op}`} span={4} hint="Selector value (or range) → layout to show. Numeric operators compare against a range control's value.">
           <div class="field-row">
-            {#if selectorOptions}
+            <select class="val zn2" title="Match operator" value={op} onchange={(event) => setSelectorRow(i, 'op', event.target.value)}>
+              <option value="eq">=</option>
+              <option value="ne">≠</option>
+              <option value="lt">&lt;</option>
+              <option value="le">≤</option>
+              <option value="gt">&gt;</option>
+              <option value="ge">≥</option>
+              <option value="between">a–b</option>
+            </select>
+            {#if (op === 'eq' || op === 'ne') && selectorOptions}
               <select class="val zsel" title="Selector value" value={String(m.when ?? '')} onchange={(event) => setSelectorRow(i, 'when', event.target.value)}>
                 <option value="">(value)</option>
                 {#each selectorOptions as opt}
                   <option value={opt.value}>{opt.label}</option>
                 {/each}
               </select>
-            {:else}
+            {:else if op === 'eq' || op === 'ne'}
               <input class="val zn" type="text" title="Selector value" placeholder="value" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+            {:else}
+              <input class="val zn" type="number" title="Threshold" placeholder="a" value={m.when ?? ''} oninput={(event) => setSelectorRow(i, 'when', event.target.value)} />
+              {#if op === 'between'}
+                <input class="val zn" type="number" title="Upper bound" placeholder="b" value={m.when2 ?? ''} oninput={(event) => setSelectorRow(i, 'when2', event.target.value)} />
+              {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
               {#each layouts as l}
@@ -569,8 +584,8 @@
           </div>
         </PropertyCell>
       {/each}
-      <PropertyCell label="Map" span={4} hint="Add a selector value → layout mapping.">
-        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page mapping</button>
+      <PropertyCell label="Map" span={4} hint="Add a selector value/range → layout rule. Rules match top-to-bottom; put specific ones first.">
+        <button class="val add-field" type="button" onclick={() => addSelectorRow()}>+ Add page rule</button>
       </PropertyCell>
 
       {#each (pages.overlays ?? []) as ov, i (ov.id ?? i)}

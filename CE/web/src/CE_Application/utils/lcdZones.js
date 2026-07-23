@@ -201,8 +201,34 @@ export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0) {
   return grid.map((cells) => cells.join(''));
 }
 
+// Does a selector-map rule match the live selector value? Supports exact match
+// (default) plus comparison operators so a layout can switch on a range, not
+// only an exact value. Numeric ops coerce both sides to Number; a non-numeric
+// selector never matches a numeric op.
+//   op: 'eq' (default) | 'ne' | 'lt' | 'le' | 'gt' | 'ge' | 'between'
+//   'between' uses `when`..`when2` (inclusive, order-independent).
+export function selectorRuleMatches(rule, sel) {
+  const op = String(rule?.op ?? 'eq').trim().toLowerCase();
+  if (op === 'eq') return String(rule?.when) === String(sel);
+  if (op === 'ne') return String(rule?.when) !== String(sel);
+  const n = Number(sel);
+  const a = Number(rule?.when);
+  if (!Number.isFinite(n) || !Number.isFinite(a)) return false;
+  if (op === 'lt') return n < a;
+  if (op === 'le') return n <= a;
+  if (op === 'gt') return n > a;
+  if (op === 'ge') return n >= a;
+  if (op === 'between') {
+    const b = Number(rule?.when2);
+    if (!Number.isFinite(b)) return false;
+    return n >= Math.min(a, b) && n <= Math.max(a, b);
+  }
+  return false;
+}
+
 // Pick the active layout id. Priority: an active overlay (resolved by the caller
-// with timing) > the selector's mapped layout > the default > the first layout.
+// with timing) > the first matching selector rule > the default > the first
+// layout. Rules are evaluated in order, so put more specific ones first.
 export function resolveActiveLayoutId(pages, layouts, state = {}) {
   const list = Array.isArray(layouts) ? layouts : [];
   const ids = new Set(list.map((l) => String(l?.id ?? '')));
@@ -213,7 +239,7 @@ export function resolveActiveLayoutId(pages, layouts, state = {}) {
   const map = Array.isArray(pages?.selectorMap) ? pages.selectorMap : [];
   const sel = state?.selectorValue;
   if (sel !== undefined && sel !== null && String(sel) !== '') {
-    const hit = map.find((m) => String(m?.when) === String(sel));
+    const hit = map.find((m) => selectorRuleMatches(m, sel));
     if (hit && ids.has(String(hit.layoutId))) return String(hit.layoutId);
   }
 

@@ -143,3 +143,31 @@ test('noteName maps MIDI note numbers', () => {
   assert.equal(noteName(60), 'C4');
   assert.equal(noteName(69), 'A4');
 });
+
+test('selectorRuleMatches supports comparison operators', async () => {
+  const { selectorRuleMatches, resolveActiveLayoutId } = await import('../src/CE_Application/utils/lcdZones.js');
+  // eq / ne (string equality)
+  assert.equal(selectorRuleMatches({ when: 'A' }, 'A'), true);
+  assert.equal(selectorRuleMatches({ op: 'eq', when: '2' }, 2), true);
+  assert.equal(selectorRuleMatches({ op: 'ne', when: 'A' }, 'B'), true);
+  // numeric comparisons
+  assert.equal(selectorRuleMatches({ op: 'ge', when: 64 }, 80), true);
+  assert.equal(selectorRuleMatches({ op: 'ge', when: 64 }, 40), false);
+  assert.equal(selectorRuleMatches({ op: 'lt', when: 10 }, 5), true);
+  assert.equal(selectorRuleMatches({ op: 'between', when: 20, when2: 40 }, 30), true);
+  assert.equal(selectorRuleMatches({ op: 'between', when: 40, when2: 20 }, 10), false);
+  // non-numeric selector never matches a numeric op
+  assert.equal(selectorRuleMatches({ op: 'gt', when: 5 }, 'hi'), false);
+
+  // resolver picks the first matching rule in order
+  const layouts = [{ id: 'lo' }, { id: 'hi' }];
+  const pages = {
+    defaultLayoutId: 'lo',
+    selectorMap: [
+      { op: 'ge', when: 64, layoutId: 'hi' },
+      { op: 'lt', when: 64, layoutId: 'lo' },
+    ],
+  };
+  assert.equal(resolveActiveLayoutId(pages, layouts, { selectorValue: '100' }), 'hi');
+  assert.equal(resolveActiveLayoutId(pages, layouts, { selectorValue: '10' }), 'lo');
+});
