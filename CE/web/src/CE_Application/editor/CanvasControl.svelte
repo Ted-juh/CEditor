@@ -5,6 +5,7 @@
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
+  import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -164,6 +165,7 @@
   let valueRows = $derived(getEnabledValueRows(sourceValueSection ?? valueSection));
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let isComboboxControl = $derived(buttonType === 'combobox');
+  let isListboxControl = $derived(buttonType === 'listbox');
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   let designer = $derived(getSection(renderControl, 'Designer'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
@@ -2843,7 +2845,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4092,6 +4094,16 @@
         height={displayH}
         editable={editorInteractionEnabled && isSelected && !isEditorLocked}
         {scale}
+      />
+    {/if}
+
+    {#if isListboxControl}
+      <ListboxRenderer
+        control={renderControl}
+        width={displayW}
+        height={displayH}
+        selectedValue={interactionRuntime?.signals?.valueRaw}
+        scrollTop={previewSession?.listboxScrollTop ?? 0}
       />
     {/if}
 

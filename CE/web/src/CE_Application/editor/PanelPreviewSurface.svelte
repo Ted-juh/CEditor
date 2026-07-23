@@ -22,6 +22,7 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
+  import { listboxRows, listboxRowHeight, listboxRowIndexAtPoint, listboxMaxScroll } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
     createTimedButtonPreviewController,
@@ -816,6 +817,23 @@
 
   function isComboboxControl(control) {
     return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'combobox';
+  }
+
+  function isListboxControl(control) {
+    return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox';
+  }
+
+  // The Value row under a click on an always-open listbox (accounts for scroll).
+  function resolveListboxPreviewValue(control, clientX, clientY) {
+    if (!isListboxControl(control)) return undefined;
+    const rect = pointerActiveElement?.getBoundingClientRect?.();
+    if (!rect) return undefined;
+    const transformSection = control?._children?.Transform ?? null;
+    const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
+    const scrollTop = numberOr(sessionFor(control)?.listboxScrollTop, 0);
+    const idx = listboxRowIndexAtPoint(control, localY, scrollTop);
+    const rows = listboxRows(control);
+    return idx >= 0 ? rows[idx] : undefined;
   }
 
   function getValueRows(control) {
@@ -1835,6 +1853,20 @@
       else lcdApplyEdit(control, 'cycle', dir);
       return;
     }
+    // Listbox: wheel scrolls the row viewport (one row per notch).
+    if (isListboxControl(control)) {
+      const rect = event.currentTarget?.getBoundingClientRect?.();
+      const viewH = numberOr(control?._children?.Transform?.height, rect ? rect.height / (scale || 1) : 0);
+      const max = listboxMaxScroll(control, viewH);
+      if (max <= 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
+      const step = listboxRowHeight(control) * (event.deltaY > 0 ? 1 : -1);
+      const next = Math.max(0, Math.min(max, cur + step));
+      if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
+      return;
+    }
     if (isCustomComponent(control)) {
       if (isDisabled(control)) return;
       event.preventDefault();
@@ -2199,7 +2231,11 @@
       } else if (isTimedButtonBehavior(activeBehavior)) {
         timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
       } else if (String(getBehavior(activeControl)?.family ?? 'trigger') === 'select') {
-        if (isComboboxControl(activeControl)) {
+        if (isListboxControl(activeControl)) {
+          const row = resolveListboxPreviewValue(activeControl, event.clientX, event.clientY);
+          if (row) selectComboboxRow(activeControl, row);
+          patchControlSession(activeId, { focused: true, hover: true });
+        } else if (isComboboxControl(activeControl)) {
           openComboboxControlId = openComboboxControlId === activeId ? '' : activeId;
           patchControlSession(activeId, {
             focused: true,

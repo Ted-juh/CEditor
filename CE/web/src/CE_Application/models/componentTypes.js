@@ -318,6 +318,93 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Listbox: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Listbox'),
+    defaultOverrides: {
+      // Tall enough for ~5 rows; no dropdown arrow gutter.
+      Transform: { width: 160, height: 200 },
+      Text: { content: 'Option 1' },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF2F2F2F' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'center',
+        gap: 8,
+        paddingLeft: 10,
+        paddingRight: 10,
+        paddingTop: 6,
+        paddingBottom: 6,
+      },
+      Behavior: {
+        buttonType: 'listbox',
+        subtype: 'scrollable',
+        family: 'select',
+        role: 'listbox',
+        valueType: 'enum',
+        defaultValue: 'option_1',
+        selectionMode: 'single',
+        keyboardEnabled: true,
+        focusable: true,
+        emitClick: true,
+        emitValueChange: true,
+        emitStateChange: true,
+      },
+      States: createComboboxStates(),
+      Value: {
+        showMapping: true,
+        rows: buildValueRows([
+          { id: 'option_1', displayText: 'Option 1', internalValue: 'option_1', sendValue: 0, selectedByDefault: true },
+          { id: 'option_2', displayText: 'Option 2', internalValue: 'option_2', sendValue: 1 },
+          { id: 'option_3', displayText: 'Option 3', internalValue: 'option_3', sendValue: 2 },
+        ]),
+        segmentStyle: { shared: {}, rows: {} },
+      },
+    },
+  },
+
+  TextInput: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'DeviceBindings'],
+    ports: getComponentPorts('TextInput'),
+    defaultOverrides: {
+      Transform: { width: 160, height: 32 },
+      Text: { content: 'Enter text…' }, // placeholder (NOT the live value)
+      Background: {
+        _children: {
+          Fill: { colour: 'FF2F2F2F' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'center',
+        paddingLeft: 8,
+        paddingRight: 8,
+        paddingTop: 4,
+        paddingBottom: 4,
+      },
+      Behavior: {
+        buttonType: 'textInput',
+        family: 'text',
+        role: 'textInput',
+        valueType: 'text',
+        defaultValue: '', // the live text lives here
+        keyboardEnabled: true,
+        focusable: true,
+        emitValueChange: true,
+      },
+      States: createComboboxStates(),
+    },
+  },
+
   TimedButton: createButtonType({
     label: 'Hold',
     width: 148,

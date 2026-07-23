@@ -593,7 +593,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     };
   }
 
-  if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox') {
+  if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox' || buttonType === 'listbox') {
     const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
       ?? findDefaultRow(valueRows);
     const selectionActive = resolvedRow != null;

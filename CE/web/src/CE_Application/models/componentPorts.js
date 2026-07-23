@@ -84,6 +84,22 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'onCommit',
     },
   ],
+  Listbox: [
+    {
+      id: 'selectedChoice',
+      label: 'Selected Choice',
+      accepts: [PARAMETER_TYPES.CHOICE, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
+  TextInput: [
+    {
+      id: 'text',
+      label: 'Text',
+      accepts: [PARAMETER_TYPES.TEXT, PARAMETER_TYPES.PATCH_NAME],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
   Range: [
     {
       id: 'value',
