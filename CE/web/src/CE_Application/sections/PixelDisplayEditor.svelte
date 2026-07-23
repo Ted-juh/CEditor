@@ -14,7 +14,7 @@
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
-  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit', 'icon'];
+  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit', 'icon', 'clock'];
   const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
   // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
   // part of the layout, so switching layouts switches animations.
@@ -447,6 +447,14 @@
             {#each ICON_NAMES as name}
               <option value={name}>{name}</option>
             {/each}
+          </select>
+        {:else if el.kind === 'clock'}
+          <select class="val esel" title="Clock format (current time)" value={el.clockFormat ?? 'hm'} onchange={(event) => setElement(i, 'clockFormat', event.target.value)}>
+            <option value="hm">HH:MM</option>
+            <option value="hms">HH:MM:SS</option>
+            <option value="hm12">h:MM (12h)</option>
+            <option value="hms12">h:MM:SS (12h)</option>
+            <option value="date">YYYY-MM-DD</option>
           </select>
         {:else if el.kind === 'anim'}
           <select class="val esel" title="Animation source: an uploaded file (GIF/sprite) or a built-in preset" value={el.animMode ?? 'preset'} onchange={(event) => setElement(i, 'animMode', event.target.value)}>

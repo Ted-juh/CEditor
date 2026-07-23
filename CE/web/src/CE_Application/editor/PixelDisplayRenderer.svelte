@@ -29,6 +29,22 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  // Current wall-clock time, formatted for a 'clock' element.
+  function formatClock(fmt) {
+    const two = (n) => String(n).padStart(2, '0');
+    const d = new Date();
+    const h24 = d.getHours(); const m = d.getMinutes(); const s = d.getSeconds();
+    const h12 = ((h24 + 11) % 12) + 1;
+    switch (String(fmt ?? 'hm')) {
+      case 'hms': return `${two(h24)}:${two(m)}:${two(s)}`;
+      case 'hm12': return `${h12}:${two(m)}`;
+      case 'hms12': return `${h12}:${two(m)}:${two(s)}`;
+      case 'date': return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+      case 'hm':
+      default: return `${two(h24)}:${two(m)}`;
+    }
+  }
+
   // Word-wrap a string to at most `maxChars` per line, honouring explicit
   // newlines and hard-breaking any single word longer than the line.
   function wrapText(str, maxChars) {
@@ -159,9 +175,13 @@
         continue;
       }
       // Icon element: content is the picked glyph char (no source).
+      // Clock element: current wall-clock time (ticks via the rAF clock).
       let content;
       if (kind === 'icon') {
         content = ICON_GLYPHS[String(el?.icon ?? 'play')] ?? '';
+      } else if (kind === 'clock') {
+        void frameTime; // re-derive each frame so the time advances
+        content = formatClock(el?.clockFormat);
       } else {
         const info = controlInfo(String(el?.sourceId ?? ''));
         // Reuse the zone content engine (element kinds mirror zone show kinds).
@@ -410,7 +430,8 @@
   let animActive = $derived(animMode !== 'off' || animElements.length > 0);
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
   let editActive = $derived(pixel?.__edit?.active === true);
-  let motionActive = $derived(animActive || widgetMotion || editActive);
+  let clockActive = $derived(elements.some((e) => String(e?.kind ?? '') === 'clock' && e?.visible !== false));
+  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive);
 
   // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
   // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring
