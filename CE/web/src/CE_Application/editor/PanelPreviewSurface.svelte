@@ -22,7 +22,10 @@
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
-  import { listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow } from '../utils/listboxLayout.js';
+  import {
+    listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
+    listboxConfig, listboxIndexOfValue, listboxStep, listboxScrollIntoView, listboxRowHeight,
+  } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
     createTimedButtonPreviewController,
@@ -98,6 +101,7 @@
   let draggingRange = $state(false);
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
+  let listboxDrag = null; // { id, startY, startScroll, moved } while drag-scrolling a listbox
   // Transient interaction-event tracking (onDoubleClick timing, onPointerMove throttle).
   let lastPointerDownAt = 0;
   let lastPointerDownId = '';
@@ -876,6 +880,74 @@
     const row = idx >= 0 ? rows[idx] : undefined;
     // Section headers / disabled rows aren't selectable.
     return isSelectableRow(row) ? row : undefined;
+  }
+
+  // The listbox viewport height (logical grid px).
+  function listboxViewport(control) {
+    return Math.max(1, numberOr(control?._children?.Transform?.height, 0));
+  }
+  // Keep the selected row in view (if configured) by nudging session scrollTop.
+  function scrollListboxToIndex(control, index) {
+    if (index < 0 || listboxConfig(control).scrollIntoView === false) return;
+    const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
+    const next = listboxScrollIntoView(control, index, listboxViewport(control), cur);
+    if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
+  }
+  // Select the row at `index` (by value), scroll it into view.
+  function selectListboxIndex(control, index) {
+    const row = listboxRows(control)[index];
+    if (!isSelectableRow(row)) return;
+    selectComboboxRow(control, row);
+    scrollListboxToIndex(control, index);
+  }
+  // Keyboard navigation for a focused listbox. Returns true if handled.
+  function handleListboxKey(control, event) {
+    if (listboxConfig(control).keyboardNav === false) return false;
+    const rows = listboxRows(control);
+    if (!rows.length) return false;
+    const curIdx = listboxIndexOfValue(control, currentComboboxValue(control));
+    const perPage = Math.max(1, Math.floor(listboxViewport(control) / listboxRowStride(control)) - 1);
+    let target = -1;
+    switch (event.key) {
+      case 'ArrowDown': target = listboxStep(control, curIdx, 1); break;
+      case 'ArrowUp': target = listboxStep(control, curIdx, -1); break;
+      case 'PageDown': target = listboxStep(control, curIdx, perPage); break;
+      case 'PageUp': target = listboxStep(control, curIdx, -perPage); break;
+      case 'Home': target = listboxStep(control, -1, 1); break;
+      case 'End': target = listboxStep(control, rows.length, -1); break;
+      default: return false;
+    }
+    event.preventDefault();
+    if (target >= 0) selectListboxIndex(control, target);
+    return true;
+  }
+
+  // Type-ahead: accumulate typed chars (reset after a pause) and jump to the
+  // first matching row (prefix or fuzzy). Returns true if handled.
+  let listboxTypeBuffer = { id: '', text: '', at: 0 };
+  function fuzzyMatch(q, s) {
+    let i = 0;
+    for (const ch of s) { if (ch === q[i]) i += 1; if (i >= q.length) return true; }
+    return q.length === 0;
+  }
+  function handleListboxTypeAhead(control, event) {
+    const mode = String(listboxConfig(control).typeAhead ?? 'off');
+    if (mode === 'off') return false;
+    const key = event.key;
+    if (key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) return false;
+    event.preventDefault();
+    const id = getControlId(control);
+    const now = (typeof performance !== 'undefined' ? performance.now() : 0);
+    if (listboxTypeBuffer.id !== id || now - listboxTypeBuffer.at > 900) listboxTypeBuffer = { id, text: '', at: now };
+    listboxTypeBuffer = { id, text: listboxTypeBuffer.text + key, at: now };
+    const q = listboxTypeBuffer.text.toLowerCase();
+    const idx = listboxRows(control).findIndex((r) => {
+      if (!isSelectableRow(r)) return false;
+      const label = String(r.displayText ?? '').toLowerCase();
+      return mode === 'fuzzy' ? fuzzyMatch(q, label) : label.startsWith(q);
+    });
+    if (idx >= 0) selectListboxIndex(control, idx);
+    return true;
   }
 
   function getValueRows(control) {
@@ -1907,7 +1979,11 @@
       event.preventDefault();
       event.stopPropagation();
       const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
-      const step = listboxRowStride(control) * (event.deltaY > 0 ? 1 : -1);
+      // Smooth = pixel scroll (raw wheel delta); line = one row-stride per notch.
+      const smooth = String(listboxConfig(control).scrollMode) === 'smooth';
+      const step = smooth
+        ? Math.max(-80, Math.min(80, event.deltaY))
+        : listboxRowStride(control) * (event.deltaY > 0 ? 1 : -1);
       const next = Math.max(0, Math.min(max, cur + step));
       if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
@@ -2021,6 +2097,15 @@
       lastPointerMoveDispatchAt = moveAt;
       dispatchInteraction(getControlId(control), 'onPointerMove', controlLocalPoint(event));
     }
+    // Listbox drag-scroll while the pointer is held down on it.
+    if (listboxDrag && listboxDrag.id === getControlId(control)) {
+      const dy = (event.clientY - listboxDrag.startY) / (scale || 1);
+      if (Math.abs(dy) > 4) listboxDrag.moved = true;
+      const max = listboxMaxScroll(control, listboxViewport(control));
+      const next = Math.max(0, Math.min(max, listboxDrag.startScroll - dy));
+      patchControlSession(getControlId(control), { listboxScrollTop: next });
+      return;
+    }
     if (isDisabled(control) || pointerActiveControlId) return;
     if (!isCustomComponent(control)) return;
     const controlId = getControlId(control);
@@ -2080,6 +2165,10 @@
     lastInputMode = 'pointer';
     keyboardFocusControlId = '';
     pointerActiveControlId = getControlId(control);
+    // Arm listbox drag-scroll (a moved drag suppresses the row select on release).
+    listboxDrag = (isListboxControl(control) && listboxConfig(control).dragScroll === true)
+      ? { id: getControlId(control), startY: event.clientY, startScroll: numberOr(sessionFor(control)?.listboxScrollTop, 0), moved: false }
+      : null;
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2277,8 +2366,11 @@
         timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
       } else if (String(getBehavior(activeControl)?.family ?? 'trigger') === 'select') {
         if (isListboxControl(activeControl)) {
-          const row = resolveListboxPreviewValue(activeControl, event.clientX, event.clientY);
-          if (row) selectComboboxRow(activeControl, row);
+          // A moved drag-scroll suppresses the row select on release.
+          if (!(listboxDrag && listboxDrag.moved)) {
+            const row = resolveListboxPreviewValue(activeControl, event.clientX, event.clientY);
+            if (row) selectComboboxRow(activeControl, row);
+          }
           patchControlSession(activeId, { focused: true, hover: true });
         } else if (isComboboxControl(activeControl)) {
           openComboboxControlId = openComboboxControlId === activeId ? '' : activeId;
@@ -2310,6 +2402,7 @@
     pointerSliderHandle = '';
     pointerCustomHitZone = null;
     pointerCustomStartValues = {};
+    listboxDrag = null;
     removeWindowListeners();
   }
 
@@ -2363,6 +2456,12 @@
     lastInputMode = 'keyboard';
     keyboardFocusControlId = controlId;
     inspectPreviewControl(controlId);
+
+    // Listbox keyboard navigation (arrows / page / home / end) + type-ahead.
+    if (isListboxControl(control)) {
+      if (handleListboxKey(control, event)) return;
+      if (handleListboxTypeAhead(control, event)) return;
+    }
 
     // On-screen editing takes over the keyboard while an LCD zone is active.
     if (lcdEdit.active && lcdEdit.id === controlId) {

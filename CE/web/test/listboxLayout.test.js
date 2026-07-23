@@ -64,3 +64,29 @@ test('content height + max scroll', () => {
   assert.equal(listboxMaxScroll(c, 100), 132);
   assert.equal(listboxMaxScroll(c, 300), 0); // everything fits
 });
+
+test('selectableIndices + listboxStep skip headers/disabled', async () => {
+  const { selectableIndices, listboxStep, listboxIndexOfValue } = await import('../src/CE_Application/utils/listboxLayout.js');
+  const c = { _children: { Text: { _children: { Font: { size: 12 } } }, ContentLayout: {}, Value: { rows: [
+    { id: 'h', isHeader: true, displayText: 'H' },
+    { id: 'a', internalValue: 'a', displayText: 'A' },
+    { id: 'b', internalValue: 'b', displayText: 'B', enabled: false },
+    { id: 'c', internalValue: 'c', displayText: 'C' },
+  ] } } };
+  assert.deepEqual(selectableIndices(c), [1, 3]); // skips header(0) + disabled(2)
+  assert.equal(listboxIndexOfValue(c, 'a'), 1);
+  assert.equal(listboxStep(c, 1, 1), 3);   // A -> C (skips disabled B)
+  assert.equal(listboxStep(c, 3, -1), 1);  // C -> A
+  assert.equal(listboxStep(c, 3, 1), 3);   // clamped at last
+});
+
+test('listboxScrollIntoView nudges the minimum needed', async () => {
+  const { listboxScrollIntoView } = await import('../src/CE_Application/utils/listboxLayout.js');
+  // 10 rows, rowH 22, padTop 6 -> content 232; viewport 100.
+  const c = { _children: { Text: { _children: { Font: { size: 12 } } }, ContentLayout: { paddingTop: 6 },
+    Value: { rows: Array.from({ length: 10 }, (_, i) => ({ id: 'r' + i, internalValue: 'v' + i })) } } };
+  assert.equal(listboxScrollIntoView(c, 0, 100, 0), 0);      // already visible
+  const s8 = listboxScrollIntoView(c, 8, 100, 0);            // row 8 below the fold -> scroll down
+  assert.ok(s8 > 0 && s8 <= 132);
+  assert.equal(listboxScrollIntoView(c, 0, 100, 50), 6);     // scrolled past row 0 -> back to its top (padTop)
+});

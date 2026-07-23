@@ -6,6 +6,7 @@
   import {
     listboxRows, listboxConfig, isSelectableRow,
     listboxRowHeight, listboxRowGap, listboxPadTop,
+    listboxContentHeight, listboxMaxScroll,
   } from '../utils/listboxLayout.js';
 
   let {
@@ -46,6 +47,19 @@
 
   let selStyle = $derived(String(cfg.selectionStyle ?? 'bar'));
 
+  // Scrollbar thumb geometry (visual indicator of position).
+  let scrollbarMode = $derived(String(cfg.scrollbar ?? 'auto'));
+  let contentH = $derived(listboxContentHeight(control));
+  let maxScroll = $derived(listboxMaxScroll(control, height));
+  let showScrollbar = $derived(scrollbarMode !== 'hidden' && maxScroll > 0 && (scrollbarMode === 'always' || scrollbarMode === 'thin' || scrollbarMode === 'auto'));
+  let thumb = $derived.by(() => {
+    if (!showScrollbar || contentH <= 0) return null;
+    const trackH = Math.max(1, height);
+    const h = Math.max(18, Math.round((trackH / contentH) * trackH));
+    const t = Math.round((Math.max(0, scrollTop) / Math.max(1, maxScroll)) * (trackH - h));
+    return { top: Math.max(0, Math.min(trackH - h, t)), height: h };
+  });
+
   function rowValue(row) { return row?.internalValue ?? row?.id ?? ''; }
   function isSelected(row) {
     if (selectedValues && typeof selectedValues.has === 'function') return selectedValues.has(String(rowValue(row)));
@@ -77,6 +91,11 @@
   aria-multiselectable={cfg.multiSelect === true}
   style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padTop}px; --lb-accent:${accentCss};`}
 >
+  {#if thumb}
+    <div class="listbox-scrollbar" class:thin={scrollbarMode === 'thin'}>
+      <div class="listbox-thumb" style={`top:${thumb.top}px; height:${thumb.height}px;`}></div>
+    </div>
+  {/if}
   {#if rows.length === 0}
     <div class="listbox-empty" style={`padding-left:${padLeft}px;`}>{cfg.emptyText ?? 'No items'}</div>
   {:else}
@@ -229,6 +248,16 @@
   }
   .lb-check { flex: 0 0 auto; color: var(--lb-accent); font-weight: 700; }
   .lb-checkbox { flex: 0 0 auto; opacity: 0.8; }
+
+  .listbox-scrollbar {
+    position: absolute; top: 2px; right: 2px; bottom: 2px; width: 6px; z-index: 3;
+    border-radius: 3px; pointer-events: none;
+  }
+  .listbox-scrollbar.thin { width: 3px; }
+  .listbox-thumb {
+    position: absolute; right: 0; width: 100%;
+    background: rgba(255, 255, 255, 0.28); border-radius: 3px;
+  }
 
   .fade-edges::before, .fade-edges::after {
     content: ""; position: absolute; left: 0; right: 0; height: 14px; pointer-events: none; z-index: 2;

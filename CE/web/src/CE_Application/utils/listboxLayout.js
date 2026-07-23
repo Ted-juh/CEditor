@@ -79,3 +79,42 @@ export function listboxRowIndexAtPoint(control, localY, scrollTop = 0) {
 export function listboxRowTop(control, index) {
   return listboxPadTop(control) + Math.max(0, num(index, 0)) * listboxRowStride(control);
 }
+
+// Indices of rows the user can move selection to (skips headers/disabled).
+export function selectableIndices(control) {
+  return listboxRows(control).reduce((out, row, i) => {
+    if (isSelectableRow(row)) out.push(i);
+    return out;
+  }, []);
+}
+
+// The index of the row whose value matches `value` (-1 if none).
+export function listboxIndexOfValue(control, value) {
+  const target = String(value ?? '');
+  return listboxRows(control).findIndex((r) => String(r?.internalValue ?? r?.id ?? '') === target);
+}
+
+// Move selection by `delta` selectable steps from the current index; returns the
+// new row index (clamped), or -1 if there are no selectable rows.
+export function listboxStep(control, currentIndex, delta) {
+  const sel = selectableIndices(control);
+  if (!sel.length) return -1;
+  let pos = sel.indexOf(currentIndex);
+  if (pos < 0) pos = delta >= 0 ? -1 : sel.length; // start before/after so first step lands in range
+  const next = Math.max(0, Math.min(sel.length - 1, pos + Math.sign(delta) * Math.max(1, Math.abs(delta))));
+  return sel[next];
+}
+
+// A scrollTop that brings row `index` fully into a `viewport`-high window,
+// nudging the current `scrollTop` the minimum needed.
+export function listboxScrollIntoView(control, index, viewport, scrollTop) {
+  const top = listboxRowTop(control, index);
+  const rh = listboxRowHeight(control);
+  const view = Math.max(0, num(viewport, 0));
+  const cur = Math.max(0, num(scrollTop, 0));
+  const maxScroll = listboxMaxScroll(control, view);
+  let next = cur;
+  if (top < cur) next = top;
+  else if (top + rh > cur + view) next = top + rh - view;
+  return Math.max(0, Math.min(maxScroll, next));
+}
