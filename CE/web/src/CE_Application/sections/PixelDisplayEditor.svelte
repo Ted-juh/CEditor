@@ -322,6 +322,16 @@
       <PropertyCell label="Name" span={4} hint="Layout name (used by the Pages rules).">
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
+      <PropertyCell label="Transition" span={2} hint="Animate the new layout in when switching (runtime preview).">
+        <select class="val" value={pixel.layoutTransition ?? 'none'} onchange={(event) => set('layoutTransition', event.target.value)}>
+          <option value="none">None</option>
+          <option value="fade">Fade in</option>
+          <option value="slide">Slide in</option>
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Duration" span={2} hint="Transition length (ms).">
+        <NumberInput value={pixel.transitionMs ?? 250} step={50} min={0} max={2000} onchange={(value) => set('transitionMs', Math.max(0, Math.round(value)))} />
+      </PropertyCell>
     {/if}
   </PropertySection>
 

@@ -686,6 +686,8 @@ export const SECTION_DEFAULTS = {
     // active layout's elements replace the flat list above.
     // layout: { id, name, elements: [...] }
     layouts: [],
+    layoutTransition: 'none',      // none | fade | slide — animate on layout switch
+    transitionMs: 250,
     pages: {
       defaultLayoutId: '',
       selectorSourceId: '',

@@ -4,7 +4,7 @@
   // live at (x, y, w, h) on a pixelsW × pixelsH grid. Text elements rasterise at
   // their position with a per-element font height; widget elements (bars,
   // sliders, needle) fill their rect; an animation layer plays behind.
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
   import { FONT_H, FONT_ADVANCE, ICON_GLYPHS } from '../utils/pixelFont.js';
@@ -426,6 +426,33 @@
     return out;
   });
 
+  // Layout transition: when the active layout changes, fade/slide the new
+  // content in via a CSS transition on the screen wrapper (browser-timed, so it
+  // works even when the render loop is otherwise idle).
+  let screenWrap = $state(null);
+  let lastTransLayout = '';
+  $effect(() => {
+    const id = activeLayoutId;
+    const kind = String(pixel?.layoutTransition ?? 'none');
+    const ms = Math.max(0, Math.round(numberOr(pixel?.transitionMs, 250)));
+    const el = screenWrap;
+    if (!el) { lastTransLayout = id; return; }
+    if (id === lastTransLayout) return;
+    const first = lastTransLayout === '';
+    lastTransLayout = id;
+    if (first || kind === 'none' || ms === 0) return;
+    untrack(() => {
+      el.style.transition = 'none';
+      el.style.opacity = '0';
+      if (kind === 'slide') el.style.transform = 'translateX(10%)';
+      // Force reflow so the from-state applies before the transition.
+      void el.offsetWidth;
+      el.style.transition = `opacity ${ms}ms ease, transform ${ms}ms ease`;
+      el.style.opacity = '1';
+      el.style.transform = 'translateX(0)';
+    });
+  });
+
   // rAF clock for animations and widget ballistics.
   let frameTime = $state(0);
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
@@ -519,6 +546,7 @@
       <div class="pixel-layer" style={backlightStyle}></div>
     {/if}
 
+    <div class="screen-fx" bind:this={screenWrap}>
     <LcdGraphicCanvas
       lines={[]}
       cols={1}
@@ -552,6 +580,7 @@
       width={screenW}
       height={screenH}
     />
+    </div>
 
     {#if showScanlines}
       <div class="pixel-layer" style={scanlineStyle}></div>
@@ -596,6 +625,12 @@
   }
 
   .pixel-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .screen-fx {
     position: absolute;
     inset: 0;
     pointer-events: none;
