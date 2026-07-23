@@ -86,6 +86,11 @@
     onpreviewfieldkeydown = null,
     onpreviewfieldfocus = null,
     onpreviewfieldblur = null,
+    previewTextField = null,
+    onpreviewtextinput = null,
+    onpreviewtextkeydown = null,
+    onpreviewtextfocus = null,
+    onpreviewtextblur = null,
   } = $props();
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
@@ -129,6 +134,33 @@
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
   let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
+  let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
+  // TextInput: an editable <input> styled from the Text/Font/ContentLayout
+  // sections. Value + placeholder come from the preview surface.
+  function argbCss(hex, fallback) {
+    const s = String(hex ?? '').replace(/^#/, '').trim();
+    if (/^[0-9a-fA-F]{8}$/.test(s)) {
+      return `rgba(${parseInt(s.slice(2, 4), 16)},${parseInt(s.slice(4, 6), 16)},${parseInt(s.slice(6, 8), 16)},${parseInt(s.slice(0, 2), 16) / 255})`;
+    }
+    if (/^[0-9a-fA-F]{6}$/.test(s)) {
+      return `rgba(${parseInt(s.slice(0, 2), 16)},${parseInt(s.slice(2, 4), 16)},${parseInt(s.slice(4, 6), 16)},1)`;
+    }
+    return fallback;
+  }
+  let tiValue = $derived(String(previewTextField?.value ?? ''));
+  let tiPlaceholder = $derived(String(previewTextField?.placeholder ?? control?._children?.Text?.content ?? ''));
+  let tiStyle = $derived.by(() => {
+    const font = control?._children?.Text?._children?.Font ?? null;
+    const cl = control?._children?.ContentLayout ?? null;
+    const colour = argbCss(control?._children?.Text?._children?.Fill?.colour, 'rgba(224,224,224,1)');
+    const align = String(cl?.horizontalAlign ?? 'left');
+    return `color:${colour};`
+      + `font-family:${String(font?.family ?? 'Arial')};`
+      + `font-size:${Math.max(6, Number(font?.size) || 12)}px;`
+      + `font-weight:${Number(font?.weightValue) || 400};`
+      + `text-align:${align};`
+      + `padding:${Math.max(0, Number(cl?.paddingTop) || 4)}px ${Math.max(0, Number(cl?.paddingRight) || 8)}px ${Math.max(0, Number(cl?.paddingBottom) || 4)}px ${Math.max(0, Number(cl?.paddingLeft) || 8)}px;`;
+  });
   let previewSession = $derived(previewSessionOverride ?? null);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
@@ -2845,7 +2877,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4104,6 +4136,24 @@
         height={displayH}
         selectedValue={interactionRuntime?.signals?.valueRaw}
         scrollTop={previewSession?.listboxScrollTop ?? 0}
+      />
+    {/if}
+
+    {#if isTextInput}
+      <input
+        class="canvas-text-input"
+        type="text"
+        style={tiStyle}
+        value={tiValue}
+        placeholder={tiPlaceholder}
+        disabled={previewTextField?.disabled === true}
+        readonly={!previewInteractive}
+        tabindex={previewInteractive ? 0 : -1}
+        oninput={previewInteractive ? onpreviewtextinput : undefined}
+        onkeydown={previewInteractive ? onpreviewtextkeydown : undefined}
+        onfocus={previewInteractive ? onpreviewtextfocus : undefined}
+        onblur={previewInteractive ? onpreviewtextblur : undefined}
+        onpointerdown={previewInteractive ? (event) => event.stopPropagation() : undefined}
       />
     {/if}
 
@@ -5419,6 +5469,22 @@
   .canvas-control {
     position: absolute;
     box-sizing: border-box;
+    cursor: default;
+  }
+
+  /* TextInput editable field: fills the control, styled via inline tiStyle. */
+  .canvas-text-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: transparent;
+    border: none;
+    outline: none;
+    margin: 0;
+  }
+  .canvas-text-input:read-only {
     cursor: default;
   }
 

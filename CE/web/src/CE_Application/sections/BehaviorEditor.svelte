@@ -176,13 +176,24 @@
     <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />
     </PropertyCell>
-    {#if showSubtypeSelector}
+    {#if showSubtypeSelector && String(behavior.valueType ?? '') !== 'text'}
       <PropertyCell label="Subtype" span={2} hint="Choose the exact behavior variant for this button type.">
         <select class="val" value={behavior.subtype ?? subtypeOptions[0]} onchange={(event) => handleSubtypeChange(event.target.value)}>
           {#each subtypeOptions as option}
             <option value={option}>{option}</option>
           {/each}
         </select>
+      </PropertyCell>
+    {/if}
+    {#if String(behavior.valueType ?? '') === 'text'}
+      <PropertyCell label="Initial text" span={4} hint="The field's starting value (Text section holds the empty-state placeholder).">
+        <input class="val" type="text" value={behavior.defaultValue ?? ''} oninput={(event) => set('defaultValue', event.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="Editable" span={2} hint="Allow keyboard text entry in preview / player.">
+        <input type="checkbox" checked={behavior.keyboardEnabled !== false} onchange={(event) => set('keyboardEnabled', event.target.checked)} />
+      </PropertyCell>
+      <PropertyCell label="Focusable" span={2} hint="Can receive keyboard focus (Tab).">
+        <input type="checkbox" checked={behavior.focusable !== false} onchange={(event) => set('focusable', event.target.checked)} />
       </PropertyCell>
     {/if}
   </PropertySection>

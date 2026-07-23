@@ -823,6 +823,46 @@
     return String(getBehavior(control)?.buttonType ?? '').trim().toLowerCase() === 'listbox';
   }
 
+  // --- TextInput: an editable text field committing to Behavior.defaultValue ---
+  function isTextInputControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'TextInput';
+  }
+  // The live text = Behavior.defaultValue (the input stays uncontrolled while
+  // typing; this value only changes on commit or an inbound device update).
+  function currentTextValue(control) {
+    return String(getBehavior(control)?.defaultValue ?? '');
+  }
+  function commitTextValue(control, value) {
+    const id = getControlId(control);
+    if (!id) return;
+    const str = String(value ?? '');
+    if (str !== currentTextValue(control)) updateControlProperty(id, 'Behavior.defaultValue', str);
+    // Emit through the text port (SysEx patch-name value on the device side).
+    emitDeviceBindingsForPatch(control, { textValue: str });
+  }
+  function handleTextFieldFocus(control) {
+    const id = getControlId(control);
+    inspectPreviewControl(id);
+    patchControlSession(id, { focused: true, hover: true });
+  }
+  function handleTextFieldBlur(control, event) {
+    commitTextValue(control, event?.target?.value);
+    patchControlSession(getControlId(control), { focused: false });
+  }
+  function handleTextFieldKeyDown(control, event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitTextValue(control, event.target?.value);
+      event.currentTarget?.blur?.();
+    } else if (event.key === 'Escape') {
+      // Cancel: restore the committed value and drop focus.
+      event.preventDefault();
+      const original = currentTextValue(control);
+      if (event.target) event.target.value = original;
+      event.currentTarget?.blur?.();
+    }
+  }
+
   // The Value row under a click on an always-open listbox (accounts for scroll).
   function resolveListboxPreviewValue(control, clientX, clientY) {
     if (!isListboxControl(control)) return undefined;
@@ -1267,6 +1307,9 @@
     }
     if (port === 'selectedChoice') {
       return Object.prototype.hasOwnProperty.call(patch, 'valueOverride') ? patch.valueOverride : undefined;
+    }
+    if (port === 'text') {
+      return Object.prototype.hasOwnProperty.call(patch, 'textValue') ? patch.textValue : undefined;
     }
     if (port === 'value') {
       if (Object.prototype.hasOwnProperty.call(patch, 'valueOverride')) return patch.valueOverride;
@@ -2590,6 +2633,14 @@
       onpreviewfieldkeydown={(role, event) => handleSpinnerFieldKeyDown(control, role, event)}
       onpreviewfieldfocus={(role, event) => handleSpinnerFieldFocus(control, role, event)}
       onpreviewfieldblur={(role, event) => handleSpinnerFieldBlur(control, role, event)}
+      previewTextField={isTextInputControl(control) ? {
+        value: currentTextValue(control),
+        placeholder: String(control?._children?.Text?.content ?? ''),
+        disabled: isDisabled(control),
+      } : null}
+      onpreviewtextkeydown={(event) => handleTextFieldKeyDown(control, event)}
+      onpreviewtextfocus={() => handleTextFieldFocus(control)}
+      onpreviewtextblur={(event) => handleTextFieldBlur(control, event)}
     />
     {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
       <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">
