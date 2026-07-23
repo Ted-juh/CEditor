@@ -806,6 +806,45 @@ export const SECTION_DEFAULTS = {
     },
   },
 
+  /** Listbox — display + behaviour options for the always-open list component. */
+  Listbox: {
+    _type: 'Listbox',
+    // --- Layout / appearance ---
+    rowHeight: 0,                 // 0 = auto from font size; else fixed px
+    density: 'comfortable',       // comfortable | compact (auto row height tweak)
+    selectionStyle: 'bar',        // bar | stripe | outline | check | bold
+    accentColour: '',             // selection colour (empty = Background border colour)
+    zebra: false,                 // alternating row stripes
+    cardRows: false,              // gaps + rounded corners per row
+    showIcons: true,              // render per-row icons when present
+    twoLine: false,               // show row subtitles on a second line
+    showBadges: true,             // render per-row trailing badges
+    showSwatch: false,            // render the per-row colour stripe/dot
+    fadeEdges: false,             // top/bottom fade to hint scroll
+    scrollbar: 'auto',            // auto | always | hidden | thin
+    emptyText: 'No items',        // shown when there are no rows
+    // --- Scroll / navigation ---
+    scrollMode: 'line',           // line | smooth
+    momentum: false,              // inertial flick scrolling (smooth mode)
+    dragScroll: false,            // grab-and-swipe the list
+    keyboardNav: true,            // arrows / page / home / end move selection
+    scrollIntoView: true,         // keep the selected row visible
+    // --- Search ---
+    typeAhead: 'off',             // off | prefix | fuzzy — focus + type to jump
+    filterBox: false,             // header search field that live-filters rows
+    highlightMatch: true,         // highlight the matched substring
+    // --- Interaction / animation ---
+    hoverHighlight: true,         // highlight the row under the pointer
+    hoverAnim: 'none',            // none | glow | slide | scale | icon
+    selectionAnim: false,         // animate the selection indicator between rows
+    confirmMode: 'single',        // single | double | enter — when a pick "commits"
+    multiSelect: false,           // checkbox / ctrl-click multi-selection
+    // --- Data (preset browser) ---
+    choiceSource: 'rows',         // rows | devicePresets
+    recallOnSelect: false,        // fire the bound recall action on select/confirm
+    nowPlaying: false,            // mark the live/recalled row distinct from selection
+  },
+
   /** Parts — named internal sub-elements for advanced controls. */
   Parts: {
     _type: 'Parts',

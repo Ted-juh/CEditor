@@ -94,6 +94,12 @@ function buildValueRows(rows = []) {
     selectedByDefault: row.selectedByDefault === true,
     enabled: row.enabled !== false,
     visualOverrides: row.visualOverrides ?? {},
+    // Rich-row extras (Listbox): all optional.
+    icon: row.icon ?? '',          // data URL or icon name (left of the label)
+    subtitle: row.subtitle ?? '',  // secondary line under the label
+    badge: row.badge ?? '',        // trailing tag (bank letter, FAV, MIDI #)
+    swatch: row.swatch ?? '',      // AARRGGBB category accent (left stripe/dot)
+    isHeader: row.isHeader === true, // renders as a non-selectable section header
   }));
 }
 
@@ -319,7 +325,7 @@ export const COMPONENT_TYPES = {
   },
 
   Listbox: {
-    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'Listbox', 'DeviceBindings', 'Animations', 'Scripts'],
     ports: getComponentPorts('Listbox'),
     defaultOverrides: {
       // Tall enough for ~5 rows; no dropdown arrow gutter.

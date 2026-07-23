@@ -26,6 +26,7 @@ const LAZY_COMPONENT_LOADERS = {
   behavior: () => import('../sections/BehaviorEditor.svelte'),
   display: () => import('../sections/DisplayEditor.svelte'),
   pixel: () => import('../sections/PixelDisplayEditor.svelte'),
+  listbox: () => import('../sections/ListboxEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),
