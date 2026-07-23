@@ -46,6 +46,7 @@
   const INBOUND_CC = Object.fromEntries(Object.entries(deviceRuntime.ccIn ?? {}).map(([cc, rid]) => [Number(cc), flatId(rid)]));
   const INBOUND_SYSEX = Object.fromEntries(Object.entries(deviceRuntime.sysexIn ?? {}).map(([addr, rid]) => [addr, flatId(rid)]));
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
+  let paramPortMap = {};     // parameterId -> binding port (value | brightness | backlight | text | …)
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
 
   // Coalesce high-rate incoming CC to ONE DOM update per animation frame. The GAIA streams
@@ -58,6 +59,7 @@
   function rebuildParamControlMap(controls) {
     const map = {};
     const rows = {};
+    const ports = {};
     for (const c of controls ?? []) {
       const id = c?._children?.Core?.id;
       if (!id) continue;
@@ -65,10 +67,12 @@
       for (const b of c?._children?.DeviceBindings?.bindings ?? [])
         if (b?.kind === 'deviceParameter' && b?.parameterId) {
           map[b.parameterId] = id;
+          ports[b.parameterId] = String(b.port ?? 'value');
           if (Array.isArray(valueRows) && valueRows.length) rows[b.parameterId] = valueRows;
         }
     }
     paramControlMap = map;
+    paramPortMap = ports;
     paramRows = rows;
     lastAppliedValue = {};
   }
@@ -161,12 +165,19 @@
     pendingIncoming = null;
     if (!pend) return;
     for (const controlId in pend) {
-      const value = pend[controlId];
+      const { v: value, port } = pend[controlId];
       if (lastAppliedValue[controlId] === value) continue;  // no change -> no render
       lastAppliedValue[controlId] = value;
       // Move the on-screen control WITHOUT re-emitting a send (updatePanelPreviewSession
       // directly, not patchControlSession) so we don't fight the synth / create a loop.
-      updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: value });
+      // Display ports drive the panel's lighting/text, not a value override, so a
+      // display bound directly to a device parameter responds live in the player.
+      let patch;
+      if (port === 'brightness') patch = { brightnessOverride: Math.max(0, Math.min(100, Math.round((Number(value) / 127) * 100))) };
+      else if (port === 'backlight') patch = { backlightOverride: Number(value) >= 64 };
+      else if (port === 'text') patch = { textOverride: String(value) };
+      else patch = { valueOverrideEnabled: true, valueOverride: value };
+      updatePanelPreviewSession(controlId, patch);
     }
   }
 
@@ -187,7 +198,7 @@
       if (!Number.isFinite(value)) return;    // sliders: numeric only
       v = value;
     }
-    (pendingIncoming ??= {})[controlId] = v;
+    (pendingIncoming ??= {})[controlId] = { v, port: paramPortMap[parameterId] ?? 'value' };
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 
