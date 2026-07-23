@@ -654,6 +654,8 @@ export const SECTION_DEFAULTS = {
     padding: 8,                    // bezel inset (screen px, not grid px)
     imageSrc: '',                  // static image dithered onto the grid
     imageDither: true,
+    imageColour: false,            // keep the image's colours (posterized) vs 1-bit
+    animColour: false,             // global anim: colour frames / hue-cycling presets
     // Animation layer (plays behind the elements) — same engine as the LCD.
     animMode: 'off',
     animSrc: '',

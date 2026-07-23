@@ -21,6 +21,8 @@
     blinkOn = true,
     imageSrc = '',
     dither = true,
+    imageColour = false,         // static image keeps its colours (posterized) vs 1-bit dither
+    animColour = false,          // global anim layer: colour frames / hue-cycling presets
     pixelWidth = 0,
     pixelHeight = 0,
     fontScale = 1,
@@ -107,11 +109,33 @@
     return bitmapFromImageData(c.getImageData(0, 0, tw, th).data, tw, th, dither);
   }
 
+  // RGBA sampling for colour mode (a colour frame instead of a 1-bit one).
+  function rgbaFromSource(source, sx, sy, sw, sh, tw = pixW, th = pixH) {
+    const off = document.createElement('canvas');
+    off.width = tw;
+    off.height = th;
+    const c = off.getContext('2d');
+    if (!c) return null;
+    c.drawImage(source, sx, sy, sw, sh, 0, 0, tw, th);
+    return c.getImageData(0, 0, tw, th).data;
+  }
+
+  // Hue-cycling colour for "colourful" presets.
+  function hueCss(tMs, speed) {
+    return `hsl(${Math.round(tMs * 0.05 * Math.max(0.05, Number(speed) || 1)) % 360} 90% 60%)`;
+  }
+
   // Decode an animation source (sprite sheet, or animated GIF/APNG/WebP via
   // WebCodecs ImageDecoder) into 1-bit frames at a target size. Resolves to
   // { frames, durations, total } or null.
-  async function decodeAnimation(src, spriteFrames, fps, tw, th) {
+  async function decodeAnimation(src, spriteFrames, fps, tw, th, wantColour = false) {
     if (!src) return null;
+    // A frame is a mono Uint8Array, or { rgba } when colour is requested.
+    const grab = (source, sx, sy, sw, sh) => {
+      if (!wantColour) return drawSourceToBitmap(source, sx, sy, sw, sh, tw, th);
+      const data = rgbaFromSource(source, sx, sy, sw, sh, tw, th);
+      return data ? { rgba: data } : null;
+    };
     if (spriteFrames > 1) {
       const img = await new Promise((resolve) => {
         const image = new Image();
@@ -123,7 +147,7 @@
       const fw = Math.max(1, Math.floor(img.width / spriteFrames));
       const frames = [];
       for (let i = 0; i < spriteFrames; i += 1) {
-        const bmp = drawSourceToBitmap(img, i * fw, 0, fw, img.height, tw, th);
+        const bmp = grab(img, i * fw, 0, fw, img.height);
         if (bmp) frames.push(bmp);
       }
       if (!frames.length) return null;
@@ -138,7 +162,7 @@
         image.src = src;
       });
       if (!img) return null;
-      const bmp = drawSourceToBitmap(img, 0, 0, img.width, img.height, tw, th);
+      const bmp = grab(img, 0, 0, img.width, img.height);
       return bmp ? { frames: [bmp], durations: [1000], total: 1000 } : null;
     }
     try {
@@ -151,7 +175,7 @@
       const durations = [];
       for (let i = 0; i < count; i += 1) {
         const { image } = await decoder.decode({ frameIndex: i });
-        const bmp = drawSourceToBitmap(image, 0, 0, image.displayWidth, image.displayHeight, tw, th);
+        const bmp = grab(image, 0, 0, image.displayWidth, image.displayHeight);
         durations.push(Math.max(20, (image.duration ?? 100000) / 1000));
         image.close();
         if (bmp) frames.push(bmp);
@@ -202,27 +226,38 @@
         if (ch !== ' ') { c.fillText(ch, x * charW + charW / 2, r * charH + charH / 2); any = true; }
       }
     }
-    // Pixel-positioned strings (PixelDisplay elements): drawn at (x, y) with a
-    // per-text font height; w > 0 clips and provides the alignment box.
-    for (const t of (Array.isArray(texts) ? texts : [])) {
-      const content = String(t?.content ?? '');
-      if (!content) continue;
-      const th = Math.max(3, Math.round(Number(t?.h) || 8));
-      const tx = Math.round(Number(t?.x) || 0);
-      const ty = Math.round(Number(t?.y) || 0);
-      const tw = Math.max(0, Math.round(Number(t?.w) || 0));
-      const align = String(t?.align ?? 'left');
-      c.save();
-      if (tw > 0) { c.beginPath(); c.rect(tx, ty, tw, th + 2); c.clip(); }
-      c.font = `${th}px monospace`;
-      c.textBaseline = 'top';
-      c.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
-      const anchorX = align === 'center' ? tx + tw / 2 : align === 'right' ? tx + tw : tx;
-      c.fillText(content, anchorX, ty);
-      c.restore();
-      any = true;
-    }
     if (!any) return null;
+    const data = c.getImageData(0, 0, pixW, pixH).data;
+    const bmp = new Uint8Array(pixW * pixH);
+    for (let i = 0; i < bmp.length; i += 1) bmp[i] = data[i * 4] > 128 ? 1 : 0;
+    return bmp;
+  }
+
+  // Rasterise ONE pixel-positioned string (PixelDisplay element): drawn at
+  // (x, y) with its font height h; w > 0 clips and provides the alignment box.
+  // Separate per element so each can be stamped in its own colour.
+  function textElementBitmap(t) {
+    const content = String(t?.content ?? '');
+    if (!content) return null;
+    const off = document.createElement('canvas');
+    off.width = pixW;
+    off.height = pixH;
+    const c = off.getContext('2d');
+    if (!c) return null;
+    c.fillStyle = '#000';
+    c.fillRect(0, 0, pixW, pixH);
+    c.fillStyle = '#fff';
+    const th = Math.max(3, Math.round(Number(t?.h) || 8));
+    const tx = Math.round(Number(t?.x) || 0);
+    const ty = Math.round(Number(t?.y) || 0);
+    const tw = Math.max(0, Math.round(Number(t?.w) || 0));
+    const align = String(t?.align ?? 'left');
+    if (tw > 0) { c.beginPath(); c.rect(tx, ty, tw, th + 2); c.clip(); }
+    c.font = `${th}px monospace`;
+    c.textBaseline = 'top';
+    c.textAlign = align === 'center' ? 'center' : align === 'right' ? 'right' : 'left';
+    const anchorX = align === 'center' ? tx + tw / 2 : align === 'right' ? tx + tw : tx;
+    c.fillText(content, anchorX, ty);
     const data = c.getImageData(0, 0, pixW, pixH).data;
     const bmp = new Uint8Array(pixW * pixH);
     for (let i = 0; i < bmp.length; i += 1) bmp[i] = data[i * 4] > 128 ? 1 : 0;
@@ -244,12 +279,13 @@
     const mode = String(animMode ?? 'off');
     const spriteFrames = Math.max(0, Math.round(Number(animFrames) || 0));
     const fps = Math.max(1, Number(animFps) || 12);
+    const wantColour = animColour === true;
     void pixW; void pixH; void dither;
     animCache = null;
     if (mode !== 'file' || !src) return;
     const token = ++animDecodeToken;
 
-    decodeAnimation(src, spriteFrames, fps, pixW, pixH).then((cache) => {
+    decodeAnimation(src, spriteFrames, fps, pixW, pixH, wantColour).then((cache) => {
       if (token === animDecodeToken && cache) animCache = cache;
     });
   });
@@ -266,10 +302,10 @@
     void dither;
     for (const a of list) {
       if (a.mode !== 'file' || !a.src) continue;
-      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.fps}|${dither}`;
+      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.fps}|${dither}|c${a.colourful ? 1 : 0}`;
       if (elAnimCaches[a.id]?.key === key) continue;
       elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache: null } };
-      decodeAnimation(a.src, a.frames, a.fps, a.w, a.h).then((cache) => {
+      decodeAnimation(a.src, a.frames, a.fps, a.w, a.h, a.colourful === true).then((cache) => {
         if (elAnimCaches[a.id]?.key === key) {
           elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache } };
         }
@@ -369,11 +405,19 @@
     };
   }
 
-  function drawWidgets(bmp, dtMs) {
+  const METER_GREEN = 'rgb(52,214,86)';
+  const METER_YELLOW = 'rgb(235,200,60)';
+  const METER_RED = 'rgb(240,72,56)';
+
+  function drawWidgets(bmp, dtMs, colId) {
+    // `cur` is the palette id the px helper writes; widgets set it per stroke.
+    let cur = 1;
     const px = (x, y) => {
       const xi = Math.round(x); const yi = Math.round(y);
-      if (xi >= 0 && xi < pixW && yi >= 0 && yi < pixH) bmp[yi * pixW + xi] = 1;
+      if (xi >= 0 && xi < pixW && yi >= 0 && yi < pixH) bmp[yi * pixW + xi] = cur;
     };
+    // Classic VU zoning by position/value: green -> yellow -> red.
+    const meterId = (frac) => colId(frac < 0.6 ? METER_GREEN : frac < 0.85 ? METER_YELLOW : METER_RED);
     const fillRect = (x0, y0, x1, y1) => {
       for (let y = y0; y <= y1; y += 1) for (let x = x0; x <= x1; x += 1) px(x, y);
     };
@@ -422,6 +466,8 @@
       const frac = Math.max(0, Math.min(1, state.display));
       const peak = Math.max(0, Math.min(1, state.peak));
 
+      const baseId = colId(w.colour);
+      cur = baseId;
       if (w.frame) outline(x0, y0, x1, y1);
       const inset = w.frame ? 2 : 0;
       const ix0 = Math.min(x1, x0 + inset); const ix1 = Math.max(ix0, x1 - inset);
@@ -430,17 +476,51 @@
 
       if (w.kind === 'hbar') {
         const fill = Math.round(iw * frac);
-        if (fill > 0) fillRect(ix0, iy0, ix0 + fill - 1, iy1);
-        // Empty meter: keep a 1px baseline so the widget is always visible.
-        else for (let y = iy0; y <= iy1; y += 1) px(ix0, y);
-        if (w.peakHold) { const pxx = ix0 + Math.round((iw - 1) * peak); for (let y = iy0; y <= iy1; y += 1) px(pxx, y); }
+        if (fill > 0) {
+          if (w.meterColours) {
+            // VU zoning by position: the bar's left zone is green, then yellow, red.
+            for (let dx = 0; dx < fill; dx += 1) {
+              cur = meterId(dx / Math.max(1, iw - 1));
+              for (let y = iy0; y <= iy1; y += 1) px(ix0 + dx, y);
+            }
+            cur = baseId;
+          } else {
+            fillRect(ix0, iy0, ix0 + fill - 1, iy1);
+          }
+        } else {
+          // Empty meter: keep a 1px baseline so the widget is always visible.
+          for (let y = iy0; y <= iy1; y += 1) px(ix0, y);
+        }
+        if (w.peakHold) {
+          cur = w.meterColours ? meterId(peak) : baseId;
+          const pxx = ix0 + Math.round((iw - 1) * peak);
+          for (let y = iy0; y <= iy1; y += 1) px(pxx, y);
+          cur = baseId;
+        }
         if (w.ticks) for (const f of [0.25, 0.5, 0.75]) { const tx = ix0 + Math.round((iw - 1) * f); px(tx, iy1); px(tx, iy1 - 1); }
       } else if (w.kind === 'vbar') {
         const fill = Math.round(ih * frac);
-        if (fill > 0) fillRect(ix0, iy1 - fill + 1, ix1, iy1);
-        // Empty meter: keep a 1px baseline so the widget is always visible.
-        else for (let x = ix0; x <= ix1; x += 1) px(x, iy1);
-        if (w.peakHold) { const pyy = iy1 - Math.round((ih - 1) * peak); for (let x = ix0; x <= ix1; x += 1) px(x, pyy); }
+        if (fill > 0) {
+          if (w.meterColours) {
+            // VU zoning by position: bottom green, middle yellow, top red.
+            for (let dy = 0; dy < fill; dy += 1) {
+              cur = meterId(dy / Math.max(1, ih - 1));
+              for (let x = ix0; x <= ix1; x += 1) px(x, iy1 - dy);
+            }
+            cur = baseId;
+          } else {
+            fillRect(ix0, iy1 - fill + 1, ix1, iy1);
+          }
+        } else {
+          // Empty meter: keep a 1px baseline so the widget is always visible.
+          for (let x = ix0; x <= ix1; x += 1) px(x, iy1);
+        }
+        if (w.peakHold) {
+          cur = w.meterColours ? meterId(peak) : baseId;
+          const pyy = iy1 - Math.round((ih - 1) * peak);
+          for (let x = ix0; x <= ix1; x += 1) px(x, pyy);
+          cur = baseId;
+        }
         if (w.ticks) for (const f of [0.25, 0.5, 0.75]) { const ty = iy1 - Math.round((ih - 1) * f); px(ix1, ty); px(ix1 - 1, ty); }
       } else if (w.kind === 'hslider') {
         const cy = Math.round((iy0 + iy1) / 2);
@@ -448,22 +528,28 @@
         if (w.ticks) for (const f of [0, 0.5, 1]) { const tx = ix0 + Math.round((iw - 1) * f); px(tx, cy - 1); px(tx, cy + 1); }
         const r = Math.max(1, Math.floor(Math.min(ih, Math.max(4, ih * 0.9)) / 2));
         const hx = ix0 + Math.round((iw - 1) * frac);
+        cur = w.meterColours ? meterId(frac) : baseId;
         if (dotShape === 'square') fillRect(hx - r, cy - r, hx + r, cy + r);
         else disc(hx, cy, r);
+        cur = baseId;
       } else if (w.kind === 'vslider') {
         const cx = Math.round((ix0 + ix1) / 2);
         for (let y = iy0; y <= iy1; y += 1) px(cx, y);
         if (w.ticks) for (const f of [0, 0.5, 1]) { const ty = iy1 - Math.round((ih - 1) * f); px(cx - 1, ty); px(cx + 1, ty); }
         const r = Math.max(1, Math.floor(Math.min(iw, Math.max(4, iw * 0.9)) / 2));
         const hy = iy1 - Math.round((ih - 1) * frac);
+        cur = w.meterColours ? meterId(frac) : baseId;
         if (dotShape === 'square') fillRect(cx - r, hy - r, cx + r, hy + r);
         else disc(cx, hy, r);
+        cur = baseId;
       } else if (w.kind === 'needle') {
         const cx = (ix0 + ix1) / 2;
         const radius = Math.max(2, Math.min(ih - 1, iw / 2 - 1));
         // Sweep 135° (left) -> 45° (right) as the value rises, pivot at the bottom.
         const a = ((135 - 90 * frac) * Math.PI) / 180;
+        cur = w.meterColours ? meterId(frac) : baseId;
         line(cx, iy1, cx + Math.cos(a) * radius, iy1 - Math.sin(a) * radius);
+        cur = baseId;
         if (w.ticks) for (const f of [0, 0.25, 0.5, 0.75, 1]) {
           const ta = ((135 - 90 * f) * Math.PI) / 180;
           px(cx + Math.cos(ta) * radius, iy1 - Math.sin(ta) * radius);
@@ -486,31 +572,61 @@
     const dtMs = lastDrawAt ? Math.min(200, now - lastDrawAt) : 16;
     lastDrawAt = now;
 
-    // Compose the 1-bit frame: animation/image base, text OR-ed over, widgets last.
+    // Compose the frame into a COLOUR buffer: 0 = off, otherwise an index into
+    // this frame's palette (index 1 is always the panel's lit colour, so mono
+    // panels behave exactly as before). Passes: animation/image base, texts,
+    // placeable anims, widgets last.
+    const buf = new Uint16Array(pixW * pixH);
+    const palette = ['', litCss];
+    const colMap = new Map([[litCss, 1]]);
+    const colId = (css) => {
+      const key = css || litCss;
+      let id = colMap.get(key);
+      if (id === undefined) { id = palette.length; palette.push(key); colMap.set(key, id); }
+      return id;
+    };
+    const stamp = (mono, id) => {
+      if (!mono) return;
+      for (let i = 0; i < buf.length; i += 1) if (mono[i]) buf[i] = id;
+    };
+    // Posterized colour stamp (3-bit channels) so photos read as an LED panel.
+    const stampRgba = (data) => {
+      if (!data) return;
+      for (let i = 0; i < buf.length; i += 1) {
+        if (data[i * 4 + 3] < 128) continue;
+        const r = (data[i * 4] & 0xE0) + 16;
+        const g = (data[i * 4 + 1] & 0xE0) + 16;
+        const b = (data[i * 4 + 2] & 0xE0) + 16;
+        if (r + g + b < 80) continue; // near-black stays "off" (screen shows through)
+        buf[i] = colId(`rgb(${r},${g},${b})`);
+      }
+    };
+
     const mode = String(animMode ?? 'off');
-    let bmp;
     let baseIsImage = false;
     if (mode === 'preset') {
-      bmp = presetBitmap();
+      stamp(presetBitmap(), animColour ? colId(hueCss(animTick, animSpeed)) : 1);
     } else if (mode === 'file') {
-      bmp = animFrameBitmap() ?? new Uint8Array(pixW * pixH);
+      const fr = animFrameBitmap();
+      if (fr && fr.rgba) stampRgba(fr.rgba);
+      else stamp(fr, 1);
       baseIsImage = true;
     } else if (imageEl) {
-      bmp = imageBitmap() ?? new Uint8Array(pixW * pixH);
+      if (imageColour) stampRgba(rgbaFromSource(imageEl, 0, 0, imageEl.width, imageEl.height));
+      else stamp(imageBitmap(), 1);
       baseIsImage = true;
-    } else {
-      bmp = new Uint8Array(pixW * pixH);
     }
     // Text goes on top unless a static image replaced it (original behaviour:
     // an Image overrides the text; animations play BEHIND the text).
-    if (!(mode === 'off' && baseIsImage)) {
-      if (blinkOn) {
-        const text = textBitmap();
-        if (text) for (let i = 0; i < bmp.length; i += 1) if (text[i]) bmp[i] = 1;
+    if (!(mode === 'off' && baseIsImage) && blinkOn) {
+      stamp(textBitmap(), 1);
+      for (const t of (Array.isArray(texts) ? texts : [])) {
+        stamp(textElementBitmap(t), colId(t.colour));
       }
     }
     // Placeable animation elements: blit each one's current frame into its rect.
     for (const a of (Array.isArray(anims) ? anims : [])) {
+      const tint = a.colourful && a.mode === 'preset' ? colId(hueCss(animTick, a.speed)) : colId(a.colour);
       let fb = null;
       if (a.mode === 'preset') {
         fb = presetInto(a.w, a.h, (animTick / 1000) * Math.max(0.05, Number(a.speed) || 1), a.preset);
@@ -518,18 +634,29 @@
         fb = pickFrame(elAnimCaches[a.id]?.cache, animTick, a.loop);
       }
       if (!fb) continue;
+      const rgba = fb.rgba ?? null;
       for (let yy = 0; yy < a.h; yy += 1) {
         const gy = a.y + yy;
         if (gy < 0 || gy >= pixH) continue;
         for (let xx = 0; xx < a.w; xx += 1) {
-          if (!fb[yy * a.w + xx]) continue;
           const gx = a.x + xx;
-          if (gx >= 0 && gx < pixW) bmp[gy * pixW + gx] = 1;
+          if (gx < 0 || gx >= pixW) continue;
+          const fi = yy * a.w + xx;
+          if (rgba) {
+            if (rgba[fi * 4 + 3] < 128) continue;
+            const r = (rgba[fi * 4] & 0xE0) + 16;
+            const g = (rgba[fi * 4 + 1] & 0xE0) + 16;
+            const b = (rgba[fi * 4 + 2] & 0xE0) + 16;
+            if (r + g + b < 80) continue;
+            buf[gy * pixW + gx] = colId(`rgb(${r},${g},${b})`);
+          } else if (fb[fi]) {
+            buf[gy * pixW + gx] = tint;
+          }
         }
       }
     }
 
-    if (Array.isArray(widgets) && widgets.length) drawWidgets(bmp, dtMs);
+    if (Array.isArray(widgets) && widgets.length) drawWidgets(buf, dtMs, colId);
 
     const cellW = w / pixW;
     const cellH = h / pixH;
@@ -539,12 +666,13 @@
 
     for (let y = 0; y < pixH; y += 1) {
       for (let x = 0; x < pixW; x += 1) {
-        const on = bmp[y * pixW + x] === 1;
+        const id = buf[y * pixW + x];
+        const on = id > 0;
         if (!on && !showGhost) continue;
         const cx = x * cellW + cellW / 2;
         const cy = y * cellH + cellH / 2;
         ctx.globalAlpha = on ? litOpacity : ghostOpacity;
-        ctx.fillStyle = on ? litCss : unlitCss;
+        ctx.fillStyle = on ? palette[id] : unlitCss;
         if (dotShape === 'square') {
           ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
         } else {
@@ -564,7 +692,7 @@
     void contrast; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
     void widgets; void texts; void anims; void elAnimCaches; void animMode; void animCache;
-    void animPreset; void animSpeed; void animLoop; void animTick;
+    void animPreset; void animSpeed; void animLoop; void animTick; void imageColour; void animColour;
     try {
       draw();
     } catch (err) {

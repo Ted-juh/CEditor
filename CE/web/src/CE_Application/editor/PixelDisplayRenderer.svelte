@@ -127,6 +127,7 @@
           h: WIDGET_LABEL_H,
           align: 'center',
           content: label,
+          colour: el?.colour ? cssColour(el.colour) : '',
         });
         continue;
       }
@@ -141,6 +142,7 @@
         h: Math.max(3, Math.round(numberOr(el?.h, 8))),
         align: String(el?.align ?? 'left'),
         content,
+        colour: el?.colour ? cssColour(el.colour) : '',
       });
     }
     return out;
@@ -166,6 +168,8 @@
         ticks: el?.ticks === true,
         peakHold: el?.peakHold === true,
         smooth: el?.smooth === true,
+        colour: el?.colour ? cssColour(el.colour) : '',
+        meterColours: el?.meterColours === true,
       });
     }
     return out;
@@ -265,6 +269,8 @@
         loop: el?.animLoop !== false,
         preset: String(el?.animPreset ?? 'wave'),
         speed: Math.max(0.05, numberOr(el?.animSpeed, 1)),
+        colour: el?.colour ? cssColour(el.colour) : '',
+        colourful: el?.animColour === true,
       });
     }
     return out;
@@ -323,6 +329,8 @@
       dotShape={dotShape}
       imageSrc={pixel?.imageSrc ?? ''}
       dither={pixel?.imageDither !== false}
+      imageColour={pixel?.imageColour === true}
+      animColour={pixel?.animColour === true}
       pixelWidth={pixW}
       pixelHeight={pixH}
       widgets={pixelWidgets}

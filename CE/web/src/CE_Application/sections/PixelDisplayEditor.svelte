@@ -256,6 +256,9 @@
     <PropertyCell label="Dither" span={1} hint="Floyd–Steinberg dither vs hard threshold.">
       <PropertyToggle value={pixel.imageDither !== false} onchange={() => toggle('imageDither', true)} />
     </PropertyCell>
+    <PropertyCell label="Img Colour" span={2} hint="Keep the image's colours (posterized, LED-panel look) instead of 1-bit dots.">
+      <PropertyToggle value={pixel.imageColour === true} onchange={() => toggle('imageColour', false)} />
+    </PropertyCell>
     {#if pixel.imageSrc}
       <PropertyCell label="Clear Image" span={4} hint="Remove the image.">
         <button class="val add-field" type="button" onclick={() => set('imageSrc', '')}>Clear image</button>
@@ -414,6 +417,7 @@
                 <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
                 <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
                 <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
+                <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {:else}
                 <select class="val esel" title="Built-in effect" value={el.animPreset ?? 'wave'} onchange={(event) => setElement(i, 'animPreset', event.target.value)}>
                   <option value="wave">Wave</option>
@@ -424,6 +428,7 @@
                   <option value="plasma">Plasma</option>
                 </select>
                 <input class="val en" type="number" min="0.1" max="5" step="0.1" title="Speed multiplier" value={el.animSpeed ?? 1} onchange={(event) => setElement(i, 'animSpeed', Number(event.target.value))} />
+                <label class="ex-chk" title="Hue-cycling colour"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
               {/if}
             {:else}
               <select class="val en2" title="Text alignment within the W box" value={el.align ?? 'left'} onchange={(event) => setElement(i, 'align', event.target.value)}>
@@ -436,12 +441,14 @@
               <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
               <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
             {/if}
+            <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             {#if WIDGET_KINDS.includes(el.kind)}
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
               <label class="ex-chk" title="Peak-hold marker (bars)"><input type="checkbox" checked={el.peakHold === true} onchange={(event) => setElement(i, 'peakHold', event.target.checked)} />Pk</label>
               <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
+              <label class="ex-chk" title="VU meter colours: green/yellow/red by level"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
             {/if}
             <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
             <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
@@ -495,6 +502,9 @@
       <PropertyCell label="Loop" span={1} hint="Loop forever, or hold the last frame.">
         <PropertyToggle value={pixel.animLoop !== false} onchange={() => toggle('animLoop', true)} />
       </PropertyCell>
+      <PropertyCell label="Colour" span={2} hint="Keep the animation's colours (posterized) instead of 1-bit dots.">
+        <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
+      </PropertyCell>
       {#if pixel.animSrc}
         <PropertyCell label="Clear" span={4} hint="Remove the animation file.">
           <button class="val add-field" type="button" onclick={() => set('animSrc', '')}>Clear animation</button>
@@ -514,6 +524,9 @@
       </PropertyCell>
       <PropertyCell label="Speed" span={2} hint="Preset speed multiplier.">
         <NumberInput value={pixel.animSpeed ?? 1} step={0.1} min={0.1} max={5} onchange={(value) => set('animSpeed', value)} />
+      </PropertyCell>
+      <PropertyCell label="Colour" span={2} hint="Hue-cycling colour for the preset.">
+        <PropertyToggle value={pixel.animColour === true} onchange={() => toggle('animColour', false)} />
       </PropertyCell>
     {/if}
   </PropertySection>
@@ -733,6 +746,11 @@
   .ex-chk input {
     margin: 0;
     accent-color: #5B9BD5;
+  }
+
+  .el-extra .ecol {
+    width: 78px;
+    flex: 0 0 auto;
   }
 
   .el-extra .ex-fill {
