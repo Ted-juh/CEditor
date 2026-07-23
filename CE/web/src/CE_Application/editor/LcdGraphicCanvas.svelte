@@ -719,10 +719,15 @@
       else stamp(imageBitmap(), 1);
       baseIsImage = true;
     }
-    // Text goes on top unless a static image replaced it (original behaviour:
-    // an Image overrides the text; animations play BEHIND the text).
+    // Grid text (the LCD char grid) is overridden by a static image — original
+    // behaviour: an Image replaces the text; animations play BEHIND it.
     if (!(mode === 'off' && baseIsImage) && blinkOn) {
       stamp(textBitmap(), 1);
+    }
+    // Pixel-positioned text elements (captions / readouts) always draw on top,
+    // including over a background image — a pixel display wants labels over its
+    // artwork, not hidden by it. Gated only by blink.
+    if (blinkOn) {
       for (const t of (Array.isArray(texts) ? texts : [])) {
         stamp(textElementBitmap(t), colId(t.colour));
       }
@@ -764,7 +769,9 @@
     const cellW = w / pixW;
     const cellH = h / pixH;
     const rad = Math.max(0.5, Math.min(cellW, cellH) * 0.42);
-    const litOpacity = 0.4 + brightness * 0.6;
+    // Brightness spans a low floor (dim but not black) to full, so turning it
+    // down actually dims the panel instead of stopping at 40%.
+    const litOpacity = 0.1 + brightness * 0.9;
     const ghostOpacity = Math.max(0.03, contrast * 0.5);
 
     for (let y = 0; y < pixH; y += 1) {

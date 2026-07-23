@@ -641,7 +641,7 @@ export const SECTION_DEFAULTS = {
     unlitColour: '14FFFFFF',
     screenColour: 'FF000000',
     backlightOn: true,
-    backlightColour: '00000000',
+    backlightColour: '4D0E5A2E',   // subtle green wash (was fully transparent: an "on" backlight that painted nothing)
     brightness: 100,
     contrast: 55,
     brightnessSourceId: '',        // range control that drives brightness live in preview

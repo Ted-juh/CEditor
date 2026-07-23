@@ -203,7 +203,9 @@
         cycles: Math.max(0.25, numberOr(el?.waveCycles, 2)),
         speed: numberOr(el?.waveSpeed, 1),
         lfoDepth: Math.max(0, Math.min(1, numberOr(el?.waveDepth, 0.5))),
-        amp: kind === 'wave' ? (info ? infoFraction(info) : 1) : undefined,
+        // Bound → the source drives amplitude; unbound → a steady idle amplitude
+        // (not full-scale, so "no source" reads differently from "source at max").
+        amp: kind === 'wave' ? (info ? infoFraction(info) : 0.7) : undefined,
         cutoff: cutInfo ? infoFraction(cutInfo) : null,
         reso: resInfo ? infoFraction(resInfo) : 0,
         lfoRate: lfoInfo ? 0.3 + infoFraction(lfoInfo) * 7 : 0,
@@ -243,8 +245,10 @@
     elements.forEach((el, i) => {
       if (el?.visible === false) return;
       const kind = String(el?.kind ?? '');
-      const h = Math.max(3, Math.round(numberOr(el?.h, 8)));
-      let w = Math.max(0, Math.round(numberOr(el?.w, 0)));
+      // anim defaults to its rendered 32×16 rect so the grab handle matches the
+      // element instead of collapsing to the 6px minimum.
+      const h = Math.max(3, Math.round(numberOr(el?.h, kind === 'anim' ? 16 : 8)));
+      let w = Math.max(0, Math.round(numberOr(el?.w, kind === 'anim' ? 32 : 0)));
       // Text without an alignment box: estimate the grab area from the content.
       if (!PIXEL_WIDGET_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
         const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
