@@ -676,6 +676,9 @@ export const SECTION_DEFAULTS = {
     editText: 'INIT',              // the current string
     editCharset: 'upper',          // upper | alnum | ascii | digits
     editMaxLength: 16,             // 0 = unbounded
+    // Optional custom bitmap font from a glyph sprite sheet. Elements set
+    // font:'custom' to use it. { src(dataURL), glyphW, glyphH, cols, first(charCode) }.
+    customFont: null,
     // The scene: pixel-addressed elements. Each:
     // { id, kind (static|name|value|pct|midiValue|note|text|state|
     //   hbar|vbar|hslider|vslider|needle), x, y, w, h, sourceId, align,

@@ -33,6 +33,11 @@
     widgets = [],
     caret = null,                // on-screen edit caret: {x, y, w, h, on} in grid px
     bitmaps = [],                // freehand pixel art: {x, y, w, h, bits ('0'/'1' string), colour}
+    customFontSrc = '',          // sprite-sheet image of glyph cells (optional custom font)
+    cfGlyphW = 6,                // glyph cell width / height / columns / first char code
+    cfGlyphH = 8,
+    cfCols = 16,
+    cfFirst = 32,
     texts = [],                  // pixel-positioned strings: {x, y, h, w, align, content}
     anims = [],                  // placeable animations: {id, x, y, w, h, mode, src, frames, fps, loop, preset, speed}
     animMode = 'off',            // off | file | preset
@@ -234,6 +239,71 @@
     return any ? bmp : null;
   }
 
+  // --- Custom bitmap font (optional): a sprite sheet of glyph cells decoded to
+  // 1-bit glyphs keyed by char code, so text elements can opt into a bespoke
+  // face instead of the built-in 5×7. ---
+  let customFont = $state(null); // { glyphs: Map<code, Uint8Array>, gw, gh }
+  let cfToken = 0;
+  $effect(() => {
+    const src = String(customFontSrc ?? '');
+    const gw = Math.max(2, Math.round(Number(cfGlyphW) || 0));
+    const gh = Math.max(2, Math.round(Number(cfGlyphH) || 0));
+    const cols = Math.max(1, Math.round(Number(cfCols) || 0));
+    const first = Math.max(0, Math.round(Number(cfFirst) || 32));
+    customFont = null;
+    if (!src) return;
+    const token = ++cfToken;
+    const image = new Image();
+    image.onload = () => {
+      if (token !== cfToken) return;
+      const rows = Math.max(1, Math.floor(image.height / gh));
+      const glyphs = new Map();
+      let code = first;
+      for (let r = 0; r < rows; r += 1) {
+        for (let c = 0; c < cols; c += 1) {
+          const data = rgbaFromSource(image, c * gw, r * gh, gw, gh, gw, gh);
+          if (data) glyphs.set(code, bitmapFromImageData(data, gw, gh, false));
+          code += 1;
+        }
+      }
+      customFont = { glyphs, gw, gh };
+    };
+    image.onerror = () => {};
+    image.src = src;
+  });
+
+  // Draw a string using the custom font glyphs (mirrors drawTextInto).
+  function drawCustomTextInto(target, tw, th, text, x, y, scale, align, boxW, font) {
+    const s = Math.max(1, Math.round(scale));
+    const { glyphs, gw, gh } = font;
+    const advance = (gw + 1) * s;
+    const str = String(text ?? '');
+    const textW = str.length > 0 ? str.length * advance - s : 0;
+    let startX = x;
+    if (boxW > 0) {
+      if (align === 'center') startX = x + Math.round((boxW - textW) / 2);
+      else if (align === 'right') startX = x + boxW - textW;
+    }
+    for (let i = 0; i < str.length; i += 1) {
+      const g = glyphs.get(str.charCodeAt(i)) ?? glyphs.get(str[i].toUpperCase().charCodeAt(0));
+      if (!g) continue;
+      const gx0 = startX + i * advance;
+      for (let yy = 0; yy < gh; yy += 1) {
+        for (let xx = 0; xx < gw; xx += 1) {
+          if (!g[yy * gw + xx]) continue;
+          for (let sy = 0; sy < s; sy += 1) {
+            for (let sx = 0; sx < s; sx += 1) {
+              const px = gx0 + xx * s + sx; const py = y + yy * s + sy;
+              if (px < 0 || px >= tw || py < 0 || py >= th) continue;
+              if (boxW > 0 && (px < x || px >= x + boxW)) continue;
+              target[py * tw + px] = 1;
+            }
+          }
+        }
+      }
+    }
+  }
+
   // Rasterise ONE pixel-positioned string (PixelDisplay element) with the
   // bitmap font. h picks the integer scale (8px per scale step); w > 0 is the
   // alignment/clip box. Separate per element so each can take its own colour.
@@ -242,12 +312,17 @@
     if (!content) return null;
     const bmp = new Uint8Array(pixW * pixH);
     const th = Math.max(3, Math.round(Number(t?.h) || 8));
+    const x = Math.round(Number(t?.x) || 0);
+    const y = Math.round(Number(t?.y) || 0);
+    const boxW = Math.max(0, Math.round(Number(t?.w) || 0));
+    const align = String(t?.align ?? 'left');
+    if (t?.font === 'custom' && customFont) {
+      const s = Math.max(1, Math.floor(th / customFont.gh));
+      drawCustomTextInto(bmp, pixW, pixH, content, x, y, s, align, boxW, customFont);
+      return bmp;
+    }
     const s = Math.max(1, Math.floor(th / (FONT_H + 1)));
-    drawTextInto(
-      bmp, pixW, pixH, content,
-      Math.round(Number(t?.x) || 0), Math.round(Number(t?.y) || 0),
-      s, String(t?.align ?? 'left'), Math.max(0, Math.round(Number(t?.w) || 0))
-    );
+    drawTextInto(bmp, pixW, pixH, content, x, y, s, align, boxW);
     return bmp;
   }
 
@@ -881,6 +956,7 @@
     void contrast; void gamma; void glow; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
     void widgets; void caret; void bitmaps; void texts; void anims; void elAnimCaches; void animMode; void animCache;
+    void customFont;
     void animPreset; void animSpeed; void animLoop; void animTick; void imageColour; void animColour;
     try {
       draw();

@@ -204,7 +204,7 @@
         const lineH = FONT_H * s + 1;
         wrapText(content, charsPerLine).forEach((ln, li) => {
           const ly = elY + li * lineH;
-          if (ly < pixH) out.push({ x: elX, y: ly, w: boxW, h: elH, align, content: ln, colour });
+          if (ly < pixH) out.push({ x: elX, y: ly, w: boxW, h: elH, align, content: ln, colour, font: String(el?.font ?? '') });
         });
         continue;
       }
@@ -219,7 +219,7 @@
           content = zoneScrollWindow(content, fit, elapsed);
         }
       }
-      out.push({ x: elX, y: elY, w: boxW, h: elH, align, content, colour });
+      out.push({ x: elX, y: elY, w: boxW, h: elH, align, content, colour, font: String(el?.font ?? '') });
     }
     return out;
   });
@@ -597,6 +597,11 @@
       widgets={pixelWidgets}
       {texts}
       {bitmaps}
+      customFontSrc={pixel?.customFont?.src ?? ''}
+      cfGlyphW={numberOr(pixel?.customFont?.glyphW, 6)}
+      cfGlyphH={numberOr(pixel?.customFont?.glyphH, 8)}
+      cfCols={numberOr(pixel?.customFont?.cols, 16)}
+      cfFirst={numberOr(pixel?.customFont?.first, 32)}
       caret={caretRect}
       anims={animElements}
       animMode={animMode}

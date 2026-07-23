@@ -89,6 +89,19 @@
     reader.readAsDataURL(file);
   }
 
+  // Custom bitmap font: import a glyph sheet, or tweak its cell metrics.
+  function setCustomFont(patch) {
+    const cur = pixel?.customFont ?? { glyphW: 6, glyphH: 8, cols: 16, first: 32, src: '' };
+    set('customFont', { ...cur, ...patch });
+  }
+  function onPickCustomFont(event) {
+    const file = event?.target?.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setCustomFont({ src: String(reader.result ?? '') });
+    reader.readAsDataURL(file);
+  }
+
   function onPickElementAnim(i, event) {
     const file = event?.target?.files?.[0];
     if (!file) return;
@@ -592,6 +605,12 @@
               <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
               <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box (instead of clipping)"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
               <label class="ex-chk" title="Word-wrap into stacked lines within the W box (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
+              {#if pixel.customFont?.src}
+                <select class="val en2" title="Font face" value={el.font ?? ''} onchange={(event) => setElement(i, 'font', event.target.value)}>
+                  <option value="">5×7</option>
+                  <option value="custom">Cust</option>
+                </select>
+              {/if}
               {#if el.kind === 'midiValue'}
                 <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
               {/if}
@@ -887,6 +906,29 @@
     <PropertyCell label="Max length" span={2} hint="Cap on the edited string (0 = unbounded).">
       <NumberInput value={pixel.editMaxLength ?? 16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Custom font">
+    <PropertyCell label="Glyph sheet" span={4} hint="An image of glyph cells laid out in a grid (left-to-right, top-to-bottom). Text elements set Font → Custom to use it. Clear the file input to remove.">
+      <input class="val" type="file" accept="image/*" onchange={onPickCustomFont} />
+    </PropertyCell>
+    {#if pixel.customFont?.src}
+      <PropertyCell label="Cell W" span={1} hint="Glyph cell width (px).">
+        <NumberInput value={pixel.customFont?.glyphW ?? 6} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphW: Math.max(2, Math.round(value)) })} />
+      </PropertyCell>
+      <PropertyCell label="Cell H" span={1} hint="Glyph cell height (px).">
+        <NumberInput value={pixel.customFont?.glyphH ?? 8} step={1} min={2} max={64} onchange={(value) => setCustomFont({ glyphH: Math.max(2, Math.round(value)) })} />
+      </PropertyCell>
+      <PropertyCell label="Cols" span={1} hint="Glyph columns per row in the sheet.">
+        <NumberInput value={pixel.customFont?.cols ?? 16} step={1} min={1} max={64} onchange={(value) => setCustomFont({ cols: Math.max(1, Math.round(value)) })} />
+      </PropertyCell>
+      <PropertyCell label="First" span={1} hint="Char code of the first glyph (32 = space, 65 = 'A').">
+        <NumberInput value={pixel.customFont?.first ?? 32} step={1} min={0} max={255} onchange={(value) => setCustomFont({ first: Math.max(0, Math.round(value)) })} />
+      </PropertyCell>
+      <PropertyCell label="Remove" span={4} hint="Drop the custom font (elements fall back to the built-in face).">
+        <button class="val add-field" type="button" onclick={() => set('customFont', null)}>Remove custom font</button>
+      </PropertyCell>
+    {/if}
   </PropertySection>
   </div>
 {/if}
