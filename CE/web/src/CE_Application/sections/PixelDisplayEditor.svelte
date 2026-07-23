@@ -490,6 +490,7 @@
               {#if (el.animMode ?? 'preset') === 'file'}
                 <input class="val ex-fill" type="file" accept="image/*" title="Animated GIF/APNG/WebP, or a sprite sheet" onchange={(event) => onPickElementAnim(i, event)} />
                 <input class="val en" type="number" min="0" max="180" title="Sprite frame count (0 = animated file)" placeholder="frames" value={el.animFrames ?? 0} onchange={(event) => setElement(i, 'animFrames', Math.max(0, Math.round(Number(event.target.value))))} />
+                <input class="val en" type="number" min="0" max="64" title="Sprite columns (0 = single horizontal strip; set for a grid/vertical sheet)" placeholder="cols" value={el.animSpriteCols ?? 0} onchange={(event) => setElement(i, 'animSpriteCols', Math.max(0, Math.round(Number(event.target.value))))} />
                 <input class="val en" type="number" min="1" max="60" title="Sprite FPS" value={el.animFps ?? 12} onchange={(event) => setElement(i, 'animFps', Math.max(1, Math.round(Number(event.target.value))))} />
                 <label class="ex-chk" title="Loop, or hold the last frame"><input type="checkbox" checked={el.animLoop !== false} onchange={(event) => setElement(i, 'animLoop', event.target.checked)} />Loop</label>
                 <label class="ex-chk" title="Keep the file's colours (posterized) instead of 1-bit dither"><input type="checkbox" checked={el.animColour === true} onchange={(event) => setElement(i, 'animColour', event.target.checked)} />Clr</label>
@@ -661,6 +662,9 @@
       </PropertyCell>
       <PropertyCell label="Frames" span={2} hint="Sprite-sheet frame count. 0 = the file is an animated GIF/APNG.">
         <NumberInput value={pixel.animFrames ?? 0} step={1} min={0} max={180} onchange={(value) => set('animFrames', Math.round(value))} />
+      </PropertyCell>
+      <PropertyCell label="Cols" span={1} hint="Sprite columns. 0 = single horizontal strip; set for a grid or vertical (cols=1) sheet.">
+        <NumberInput value={pixel.animSpriteCols ?? 0} step={1} min={0} max={64} onchange={(value) => set('animSpriteCols', Math.round(value))} />
       </PropertyCell>
       <PropertyCell label="FPS" span={1} hint="Sprite-sheet playback rate.">
         <NumberInput value={pixel.animFps ?? 12} step={1} min={1} max={60} onchange={(value) => set('animFps', Math.round(value))} />

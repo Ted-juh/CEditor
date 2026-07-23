@@ -35,6 +35,7 @@
     animMode = 'off',            // off | file | preset
     animSrc = '',
     animFrames = 0,              // sprite-sheet frame count (0 = animated file)
+    animSpriteCols = 0,          // sprite-sheet columns (0 = single horizontal strip)
     animFps = 12,
     animLoop = true,
     animPreset = 'wave',
@@ -131,7 +132,7 @@
   // Decode an animation source (sprite sheet, or animated GIF/APNG/WebP via
   // WebCodecs ImageDecoder) into 1-bit frames at a target size. Resolves to
   // { frames, durations, total } or null.
-  async function decodeAnimation(src, spriteFrames, fps, tw, th, wantColour = false) {
+  async function decodeAnimation(src, spriteFrames, fps, tw, th, wantColour = false, spriteCols = 0) {
     if (!src) return null;
     // A frame is a mono Uint8Array, or { rgba } when colour is requested.
     const grab = (source, sx, sy, sw, sh) => {
@@ -147,10 +148,15 @@
         image.src = src;
       });
       if (!img) return null;
-      const fw = Math.max(1, Math.floor(img.width / spriteFrames));
+      // Grid layout: `spriteCols` columns (0 = a single horizontal strip). Cells
+      // are read row-major, so vertical strips (cols=1) and grids both work.
+      const cols = Math.max(1, Math.round(Number(spriteCols) || 0) || spriteFrames);
+      const rows = Math.max(1, Math.ceil(spriteFrames / cols));
+      const fw = Math.max(1, Math.floor(img.width / cols));
+      const fh = Math.max(1, Math.floor(img.height / rows));
       const frames = [];
       for (let i = 0; i < spriteFrames; i += 1) {
-        const bmp = grab(img, i * fw, 0, fw, img.height);
+        const bmp = grab(img, (i % cols) * fw, Math.floor(i / cols) * fh, fw, fh);
         if (bmp) frames.push(bmp);
       }
       if (!frames.length) return null;
@@ -256,14 +262,15 @@
     const src = String(animSrc ?? '');
     const mode = String(animMode ?? 'off');
     const spriteFrames = Math.max(0, Math.round(Number(animFrames) || 0));
+    const spriteCols = Math.max(0, Math.round(Number(animSpriteCols) || 0));
     const fps = Math.max(1, Number(animFps) || 12);
     const wantColour = animColour === true;
-    void pixW; void pixH; void dither;
+    void pixW; void pixH; void dither; void spriteCols;
     animCache = null;
     if (mode !== 'file' || !src) return;
     const token = ++animDecodeToken;
 
-    decodeAnimation(src, spriteFrames, fps, pixW, pixH, wantColour).then((cache) => {
+    decodeAnimation(src, spriteFrames, fps, pixW, pixH, wantColour, spriteCols).then((cache) => {
       if (token === animDecodeToken && cache) animCache = cache;
     });
   });
@@ -280,10 +287,10 @@
     void dither;
     for (const a of list) {
       if (a.mode !== 'file' || !a.src) continue;
-      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.fps}|${dither}|c${a.colourful ? 1 : 0}`;
+      const key = `${a.src.length}:${a.src.slice(-24)}|${a.w}x${a.h}|${a.frames}|${a.spriteCols ?? 0}|${a.fps}|${dither}|c${a.colourful ? 1 : 0}`;
       if (elAnimCaches[a.id]?.key === key) continue;
       elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache: null } };
-      decodeAnimation(a.src, a.frames, a.fps, a.w, a.h, a.colourful === true).then((cache) => {
+      decodeAnimation(a.src, a.frames, a.fps, a.w, a.h, a.colourful === true, a.spriteCols ?? 0).then((cache) => {
         if (elAnimCaches[a.id]?.key === key) {
           elAnimCaches = { ...elAnimCaches, [a.id]: { key, cache } };
         }

@@ -413,6 +413,7 @@
         mode: String(el?.animMode ?? (el?.animSrc ? 'file' : 'preset')),
         src: String(el?.animSrc ?? ''),
         frames: Math.max(0, Math.round(numberOr(el?.animFrames, 0))),
+        spriteCols: Math.max(0, Math.round(numberOr(el?.animSpriteCols, 0))),
         fps: Math.max(1, numberOr(el?.animFps, 12)),
         loop: el?.animLoop !== false,
         preset: String(el?.animPreset ?? 'wave'),
@@ -537,6 +538,7 @@
       animMode={animMode}
       animSrc={pixel?.animSrc ?? ''}
       animFrames={numberOr(pixel?.animFrames, 0)}
+      animSpriteCols={numberOr(pixel?.animSpriteCols, 0)}
       animFps={numberOr(pixel?.animFps, 12)}
       animLoop={pixel?.animLoop !== false}
       animPreset={pixel?.animPreset ?? 'wave'}

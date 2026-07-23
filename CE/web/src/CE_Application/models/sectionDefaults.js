@@ -662,6 +662,7 @@ export const SECTION_DEFAULTS = {
     animMode: 'off',
     animSrc: '',
     animFrames: 0,
+    animSpriteCols: 0,             // sprite columns (0 = single horizontal strip)
     animFps: 12,
     animLoop: true,
     animPreset: 'wave',
