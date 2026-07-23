@@ -25,6 +25,7 @@
   import {
     listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
     listboxConfig, listboxIndexOfValue, listboxStep, listboxScrollIntoView, listboxRowHeight,
+    listboxFilterHeight,
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import {
@@ -875,8 +876,9 @@
     const transformSection = control?._children?.Transform ?? null;
     const localY = ((clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
     const scrollTop = numberOr(sessionFor(control)?.listboxScrollTop, 0);
-    const idx = listboxRowIndexAtPoint(control, localY, scrollTop);
-    const rows = listboxRows(control);
+    const filter = lbFilter(control);
+    const idx = listboxRowIndexAtPoint(control, localY, scrollTop, filter);
+    const rows = listboxRows(control, filter);
     const row = idx >= 0 ? rows[idx] : undefined;
     // Section headers / disabled rows aren't selectable.
     return isSelectableRow(row) ? row : undefined;
@@ -886,16 +888,24 @@
   function listboxViewport(control) {
     return Math.max(1, numberOr(control?._children?.Transform?.height, 0));
   }
+  // The live filter text for a listbox (filter-box search).
+  function lbFilter(control) {
+    return String(sessionFor(control)?.listboxFilter ?? '');
+  }
+  function handleListboxFilterInput(control, event) {
+    // Reset the scroll on a new query so the top match is visible.
+    patchControlSession(getControlId(control), { listboxFilter: String(event?.target?.value ?? ''), listboxScrollTop: 0 });
+  }
   // Keep the selected row in view (if configured) by nudging session scrollTop.
   function scrollListboxToIndex(control, index) {
     if (index < 0 || listboxConfig(control).scrollIntoView === false) return;
     const cur = numberOr(sessionFor(control)?.listboxScrollTop, 0);
-    const next = listboxScrollIntoView(control, index, listboxViewport(control), cur);
+    const next = listboxScrollIntoView(control, index, listboxViewport(control), cur, lbFilter(control));
     if (next !== cur) patchControlSession(getControlId(control), { listboxScrollTop: next });
   }
-  // Select the row at `index` (by value), scroll it into view.
+  // Select the visible row at `index` (by value), scroll it into view.
   function selectListboxIndex(control, index) {
-    const row = listboxRows(control)[index];
+    const row = listboxRows(control, lbFilter(control))[index];
     if (!isSelectableRow(row)) return;
     selectComboboxRow(control, row);
     scrollListboxToIndex(control, index);
@@ -903,18 +913,19 @@
   // Keyboard navigation for a focused listbox. Returns true if handled.
   function handleListboxKey(control, event) {
     if (listboxConfig(control).keyboardNav === false) return false;
-    const rows = listboxRows(control);
+    const filter = lbFilter(control);
+    const rows = listboxRows(control, filter);
     if (!rows.length) return false;
-    const curIdx = listboxIndexOfValue(control, currentComboboxValue(control));
+    const curIdx = listboxIndexOfValue(control, currentComboboxValue(control), filter);
     const perPage = Math.max(1, Math.floor(listboxViewport(control) / listboxRowStride(control)) - 1);
     let target = -1;
     switch (event.key) {
-      case 'ArrowDown': target = listboxStep(control, curIdx, 1); break;
-      case 'ArrowUp': target = listboxStep(control, curIdx, -1); break;
-      case 'PageDown': target = listboxStep(control, curIdx, perPage); break;
-      case 'PageUp': target = listboxStep(control, curIdx, -perPage); break;
-      case 'Home': target = listboxStep(control, -1, 1); break;
-      case 'End': target = listboxStep(control, rows.length, -1); break;
+      case 'ArrowDown': target = listboxStep(control, curIdx, 1, filter); break;
+      case 'ArrowUp': target = listboxStep(control, curIdx, -1, filter); break;
+      case 'PageDown': target = listboxStep(control, curIdx, perPage, filter); break;
+      case 'PageUp': target = listboxStep(control, curIdx, -perPage, filter); break;
+      case 'Home': target = listboxStep(control, -1, 1, filter); break;
+      case 'End': target = listboxStep(control, rows.length, -1, filter); break;
       default: return false;
     }
     event.preventDefault();
@@ -941,7 +952,7 @@
     if (listboxTypeBuffer.id !== id || now - listboxTypeBuffer.at > 900) listboxTypeBuffer = { id, text: '', at: now };
     listboxTypeBuffer = { id, text: listboxTypeBuffer.text + key, at: now };
     const q = listboxTypeBuffer.text.toLowerCase();
-    const idx = listboxRows(control).findIndex((r) => {
+    const idx = listboxRows(control, lbFilter(control)).findIndex((r) => {
       if (!isSelectableRow(r)) return false;
       const label = String(r.displayText ?? '').toLowerCase();
       return mode === 'fuzzy' ? fuzzyMatch(q, label) : label.startsWith(q);
@@ -1974,7 +1985,7 @@
     if (isListboxControl(control)) {
       const rect = event.currentTarget?.getBoundingClientRect?.();
       const viewH = numberOr(control?._children?.Transform?.height, rect ? rect.height / (scale || 1) : 0);
-      const max = listboxMaxScroll(control, viewH);
+      const max = listboxMaxScroll(control, viewH, lbFilter(control));
       if (max <= 0) return;
       event.preventDefault();
       event.stopPropagation();
@@ -2101,7 +2112,7 @@
     if (listboxDrag && listboxDrag.id === getControlId(control)) {
       const dy = (event.clientY - listboxDrag.startY) / (scale || 1);
       if (Math.abs(dy) > 4) listboxDrag.moved = true;
-      const max = listboxMaxScroll(control, listboxViewport(control));
+      const max = listboxMaxScroll(control, listboxViewport(control), lbFilter(control));
       const next = Math.max(0, Math.min(max, listboxDrag.startScroll - dy));
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
@@ -2742,6 +2753,12 @@
       onpreviewtextkeydown={(event) => handleTextFieldKeyDown(control, event)}
       onpreviewtextfocus={() => handleTextFieldFocus(control)}
       onpreviewtextblur={(event) => handleTextFieldBlur(control, event)}
+      previewListboxFilter={isListboxControl(control) && listboxConfig(control).filterBox === true ? {
+        visible: true,
+        value: lbFilter(control),
+        height: listboxFilterHeight(control),
+      } : null}
+      onpreviewlistboxfilter={(event) => handleListboxFilterInput(control, event)}
     />
     {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
       <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">

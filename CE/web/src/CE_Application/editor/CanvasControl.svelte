@@ -91,6 +91,8 @@
     onpreviewtextkeydown = null,
     onpreviewtextfocus = null,
     onpreviewtextblur = null,
+    previewListboxFilter = null,
+    onpreviewlistboxfilter = null,
   } = $props();
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
@@ -4136,7 +4138,20 @@
         height={displayH}
         selectedValue={interactionRuntime?.signals?.valueRaw}
         scrollTop={previewSession?.listboxScrollTop ?? 0}
+        hoveredIndex={previewSession?.listboxHoverIndex ?? -1}
+        filterText={previewListboxFilter?.value ?? ''}
       />
+      {#if previewListboxFilter?.visible && previewInteractive}
+        <input
+          class="canvas-listbox-filter"
+          type="text"
+          placeholder="Search…"
+          value={previewListboxFilter?.value ?? ''}
+          style={`height:${previewListboxFilter?.height ?? 24}px;`}
+          oninput={onpreviewlistboxfilter}
+          onpointerdown={(event) => event.stopPropagation()}
+        />
+      {/if}
     {/if}
 
     {#if isTextInput}
@@ -5487,6 +5502,22 @@
   .canvas-text-input:read-only {
     cursor: default;
   }
+
+  /* Listbox filter-box input, pinned to the top of the control. */
+  .canvas-listbox-filter {
+    position: absolute;
+    top: 2px; left: 4px; right: 4px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    padding: 0 6px;
+    outline: none;
+    z-index: 4;
+  }
+  .canvas-listbox-filter:focus-visible { border-color: #5B9BD5; }
 
   .control-content {
     position: absolute;

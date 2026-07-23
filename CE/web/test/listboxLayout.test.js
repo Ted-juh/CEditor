@@ -90,3 +90,16 @@ test('listboxScrollIntoView nudges the minimum needed', async () => {
   assert.ok(s8 > 0 && s8 <= 132);
   assert.equal(listboxScrollIntoView(c, 0, 100, 50), 6);     // scrolled past row 0 -> back to its top (padTop)
 });
+
+test('filter reduces the visible rows (and drops headers)', () => {
+  const c = { _children: { Text: { _children: { Font: { size: 12 } } }, ContentLayout: {}, Listbox: {},
+    Value: { rows: [
+      { id: 'h', isHeader: true, displayText: 'PADS' },
+      { id: 'a', internalValue: 'a', displayText: 'Warm Pad' },
+      { id: 'b', internalValue: 'b', displayText: 'Bright Lead' },
+      { id: 'c', internalValue: 'c', displayText: 'Deep Pad' },
+    ] } } };
+  assert.equal(listboxRows(c).length, 4);            // no filter -> all (header included)
+  assert.equal(listboxRows(c, 'pad').length, 2);      // Warm Pad + Deep Pad (header dropped)
+  assert.equal(listboxRows(c, 'zzz').length, 0);
+});

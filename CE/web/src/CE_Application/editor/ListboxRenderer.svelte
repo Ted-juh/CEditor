@@ -17,6 +17,7 @@
     hoveredIndex = -1,           // row under the pointer
     scrollTop = 0,
     matchQuery = '',             // substring to highlight (search)
+    filterText = '',             // filter-box query (reduces the visible rows)
   } = $props();
 
   function css(hex, fallback = 'rgba(224,224,224,1)') {
@@ -32,10 +33,13 @@
   }
 
   let cfg = $derived(listboxConfig(control));
-  let rows = $derived(listboxRows(control));
+  let effFilter = $derived(String(filterText ?? ''));
+  let rows = $derived(listboxRows(control, effFilter));
   let rowH = $derived(listboxRowHeight(control));
   let gap = $derived(listboxRowGap(control));
-  let padTop = $derived(listboxPadTop(control));
+  let padTop = $derived(listboxPadTop(control)); // includes the filter-bar height
+  let padBottom = $derived(Math.max(0, Number(control?._children?.ContentLayout?.paddingTop) || 6));
+  let effMatch = $derived(String(matchQuery || effFilter || ''));
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let textCss = $derived(css(control?._children?.Text?._children?.Fill?.colour, 'rgba(224,224,224,1)'));
   let accentCss = $derived(css(cfg.accentColour || control?._children?.Background?._children?.Border?.colour, 'rgba(137,194,255,0.9)'));
@@ -49,8 +53,8 @@
 
   // Scrollbar thumb geometry (visual indicator of position).
   let scrollbarMode = $derived(String(cfg.scrollbar ?? 'auto'));
-  let contentH = $derived(listboxContentHeight(control));
-  let maxScroll = $derived(listboxMaxScroll(control, height));
+  let contentH = $derived(listboxContentHeight(control, effFilter));
+  let maxScroll = $derived(listboxMaxScroll(control, height, effFilter));
   let showScrollbar = $derived(scrollbarMode !== 'hidden' && maxScroll > 0 && (scrollbarMode === 'always' || scrollbarMode === 'thin' || scrollbarMode === 'auto'));
   let thumb = $derived.by(() => {
     if (!showScrollbar || contentH <= 0) return null;
@@ -74,7 +78,7 @@
   }
   // Split a label into [before, match, after] for the highlight span.
   function matchParts(label) {
-    const q = String(matchQuery ?? '').trim();
+    const q = String(effMatch ?? '').trim();
     const s = String(label ?? '');
     if (!q) return [s, '', ''];
     const i = s.toLowerCase().indexOf(q.toLowerCase());
@@ -89,7 +93,7 @@
   class:fade-edges={cfg.fadeEdges === true}
   role="listbox"
   aria-multiselectable={cfg.multiSelect === true}
-  style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padTop}px; --lb-accent:${accentCss};`}
+  style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padBottom}px; --lb-accent:${accentCss};`}
 >
   {#if thumb}
     <div class="listbox-scrollbar" class:thin={scrollbarMode === 'thin'}>

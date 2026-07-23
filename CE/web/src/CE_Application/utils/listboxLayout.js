@@ -1,6 +1,8 @@
 // Geometry for the Listbox: a vertical stack of fixed-height rows in a
-// scrollable viewport, configured by the control's Listbox section. Shared by
-// the renderer (draw) and the preview surface (hit-test). Pure + unit-testable.
+// scrollable viewport, configured by the control's Listbox section. When a
+// filter string is supplied the visible set is reduced (and headers dropped),
+// so the renderer and the hit-test stay aligned by both passing the same
+// filter. Pure + unit-testable.
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -11,16 +13,38 @@ export function listboxConfig(control) {
   return control?._children?.Listbox ?? {};
 }
 
-// All rows in render order (headers + disabled included so indices align
-// between the renderer and the hit-test).
-export function listboxRows(control) {
-  const rows = control?._children?.Value?.rows;
-  return Array.isArray(rows) ? rows : [];
-}
-
-// A row the user can actually pick (not a section header, not disabled).
+// A row the user can pick (not a section header, not disabled).
 export function isSelectableRow(row) {
   return !!row && row.isHeader !== true && row.enabled !== false;
+}
+
+// Fuzzy = all of q's chars appear in s in order.
+function fuzzy(q, s) {
+  let i = 0;
+  for (const ch of s) { if (ch === q[i]) i += 1; if (i >= q.length) return true; }
+  return q.length === 0;
+}
+
+// Does a row match the filter under the configured mode?
+function rowMatches(row, filter, mode) {
+  const q = String(filter ?? '').trim().toLowerCase();
+  if (!q) return true;
+  const label = String(row?.displayText ?? '').toLowerCase();
+  const sub = String(row?.subtitle ?? '').toLowerCase();
+  if (mode === 'fuzzy') return fuzzy(q, label) || fuzzy(q, sub);
+  return label.includes(q) || sub.includes(q);
+}
+
+// Visible rows in render order. No filter → every row (headers + disabled
+// included, so authoring/reorder is faithful). With a filter → only matching
+// selectable rows (headers dropped).
+export function listboxRows(control, filter = '') {
+  const rows = control?._children?.Value?.rows;
+  const all = Array.isArray(rows) ? rows : [];
+  const q = String(filter ?? '').trim();
+  if (!q) return all;
+  const mode = String(listboxConfig(control).typeAhead) === 'fuzzy' ? 'fuzzy' : 'prefix';
+  return all.filter((r) => isSelectableRow(r) && rowMatches(r, q, mode === 'fuzzy' ? 'fuzzy' : 'substr'));
 }
 
 // Card gap between rows (0 unless cardRows is on).
@@ -45,28 +69,35 @@ export function listboxRowStride(control) {
   return listboxRowHeight(control) + listboxRowGap(control);
 }
 
-// Top inset before the first row (ContentLayout.paddingTop).
-export function listboxPadTop(control) {
-  return Math.max(0, num(control?._children?.ContentLayout?.paddingTop, 6));
+// The filter-bar height reserved at the top (0 unless filterBox is on).
+export function listboxFilterHeight(control) {
+  if (listboxConfig(control).filterBox !== true) return 0;
+  const size = Math.max(6, num(control?._children?.Text?._children?.Font?.size, 12));
+  return Math.max(20, Math.round(size + 12));
 }
 
-// Total height all rows want (may exceed the control → scroll).
-export function listboxContentHeight(control) {
-  const n = listboxRows(control).length;
+// Top inset before the first row (ContentLayout paddingTop + filter bar).
+export function listboxPadTop(control) {
+  return Math.max(0, num(control?._children?.ContentLayout?.paddingTop, 6)) + listboxFilterHeight(control);
+}
+
+// Total height the visible rows want (may exceed the control → scroll).
+export function listboxContentHeight(control, filter = '') {
+  const n = listboxRows(control, filter).length;
   const stride = listboxRowStride(control);
   const gap = listboxRowGap(control);
-  return (n > 0 ? n * stride - gap : 0) + listboxPadTop(control) * 2;
+  return (n > 0 ? n * stride - gap : 0) + listboxPadTop(control) + Math.max(0, num(control?._children?.ContentLayout?.paddingTop, 6));
 }
 
 // Largest scrollTop that still shows content (0 when everything fits).
-export function listboxMaxScroll(control, viewportHeight) {
-  return Math.max(0, listboxContentHeight(control) - Math.max(0, num(viewportHeight, 0)));
+export function listboxMaxScroll(control, viewportHeight, filter = '') {
+  return Math.max(0, listboxContentHeight(control, filter) - Math.max(0, num(viewportHeight, 0)));
 }
 
-// The row index under a control-local point, accounting for scroll; -1 if the
-// click is above the first row / below the last / outside the list.
-export function listboxRowIndexAtPoint(control, localY, scrollTop = 0) {
-  const rows = listboxRows(control);
+// The visible-row index under a control-local point (accounting for scroll +
+// filter bar); -1 above the first row / below the last / in the filter bar.
+export function listboxRowIndexAtPoint(control, localY, scrollTop = 0, filter = '') {
+  const rows = listboxRows(control, filter);
   if (!rows.length) return -1;
   const stride = listboxRowStride(control);
   const y = num(localY, -1) - listboxPadTop(control) + Math.max(0, num(scrollTop, 0));
@@ -75,46 +106,44 @@ export function listboxRowIndexAtPoint(control, localY, scrollTop = 0) {
   return idx >= 0 && idx < rows.length ? idx : -1;
 }
 
-// The Y offset (grid px, before scroll) of a row's top edge — for scroll-into-view.
+// The Y offset (grid px, before scroll) of a visible row's top edge.
 export function listboxRowTop(control, index) {
   return listboxPadTop(control) + Math.max(0, num(index, 0)) * listboxRowStride(control);
 }
 
-// Indices of rows the user can move selection to (skips headers/disabled).
-export function selectableIndices(control) {
-  return listboxRows(control).reduce((out, row, i) => {
+// Indices (into the visible set) of rows the user can move selection to.
+export function selectableIndices(control, filter = '') {
+  return listboxRows(control, filter).reduce((out, row, i) => {
     if (isSelectableRow(row)) out.push(i);
     return out;
   }, []);
 }
 
-// The index of the row whose value matches `value` (-1 if none).
-export function listboxIndexOfValue(control, value) {
+// The visible index of the row whose value matches `value` (-1 if none/hidden).
+export function listboxIndexOfValue(control, value, filter = '') {
   const target = String(value ?? '');
-  return listboxRows(control).findIndex((r) => String(r?.internalValue ?? r?.id ?? '') === target);
+  return listboxRows(control, filter).findIndex((r) => String(r?.internalValue ?? r?.id ?? '') === target);
 }
 
-// Move selection by `delta` selectable steps from the current index; returns the
-// new row index (clamped), or -1 if there are no selectable rows.
-export function listboxStep(control, currentIndex, delta) {
-  const sel = selectableIndices(control);
+// Move selection by `delta` selectable steps from the current visible index.
+export function listboxStep(control, currentIndex, delta, filter = '') {
+  const sel = selectableIndices(control, filter);
   if (!sel.length) return -1;
   let pos = sel.indexOf(currentIndex);
-  if (pos < 0) pos = delta >= 0 ? -1 : sel.length; // start before/after so first step lands in range
+  if (pos < 0) pos = delta >= 0 ? -1 : sel.length;
   const next = Math.max(0, Math.min(sel.length - 1, pos + Math.sign(delta) * Math.max(1, Math.abs(delta))));
   return sel[next];
 }
 
-// A scrollTop that brings row `index` fully into a `viewport`-high window,
-// nudging the current `scrollTop` the minimum needed.
-export function listboxScrollIntoView(control, index, viewport, scrollTop) {
+// A scrollTop that brings visible row `index` fully into view.
+export function listboxScrollIntoView(control, index, viewport, scrollTop, filter = '') {
   const top = listboxRowTop(control, index);
   const rh = listboxRowHeight(control);
   const view = Math.max(0, num(viewport, 0));
   const cur = Math.max(0, num(scrollTop, 0));
-  const maxScroll = listboxMaxScroll(control, view);
+  const maxScroll = listboxMaxScroll(control, view, filter);
   let next = cur;
-  if (top < cur) next = top;
+  if (top < cur + listboxFilterHeight(control)) next = top - listboxFilterHeight(control);
   else if (top + rh > cur + view) next = top + rh - view;
   return Math.max(0, Math.min(maxScroll, next));
 }
