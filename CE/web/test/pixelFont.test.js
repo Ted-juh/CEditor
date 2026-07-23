@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { FONT_W, FONT_H, glyphRows, drawCharInto, drawTextInto } from '../src/CE_Application/utils/pixelFont.js';
 
 test('glyphs are well-formed 5x7 grids', () => {
-  for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,:;!?-_+=/()<>%#@°*"\'[]\\ ') {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    + '0123456789.,:;!?-_+=/()<>%#@°*"\'[]\\ ';
+  for (const ch of chars) {
     const rows = glyphRows(ch);
     assert.ok(rows, `missing glyph: ${ch}`);
     assert.equal(rows.length, FONT_H, `rows: ${ch}`);
@@ -11,8 +13,12 @@ test('glyphs are well-formed 5x7 grids', () => {
   }
 });
 
-test('lowercase falls back to uppercase', () => {
-  assert.deepEqual(glyphRows('a'), glyphRows('A'));
+test('lowercase has its own distinct glyphs', () => {
+  // a-z are now real lowercase shapes, not an uppercase fold.
+  assert.notDeepEqual(glyphRows('a'), glyphRows('A'));
+  assert.notDeepEqual(glyphRows('e'), glyphRows('E'));
+  // Unknown case still folds (e.g. accented char -> block fallback or none).
+  assert.deepEqual(glyphRows('m').length, FONT_H);
 });
 
 test('block characters generate fills', () => {

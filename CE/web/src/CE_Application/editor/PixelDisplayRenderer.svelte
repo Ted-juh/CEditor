@@ -7,7 +7,7 @@
   import { onDestroy } from 'svelte';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
   import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
-  import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
+  import { FONT_H, FONT_ADVANCE, ICON_GLYPHS } from '../utils/pixelFont.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
   import { updateControlProperty } from '../stores/controls.js';
 
@@ -158,9 +158,15 @@
         });
         continue;
       }
-      const info = controlInfo(String(el?.sourceId ?? ''));
-      // Reuse the zone content engine (element kinds mirror zone show kinds).
-      let content = resolveZoneContent({ ...el, show: kind }, info, 16);
+      // Icon element: content is the picked glyph char (no source).
+      let content;
+      if (kind === 'icon') {
+        content = ICON_GLYPHS[String(el?.icon ?? 'play')] ?? '';
+      } else {
+        const info = controlInfo(String(el?.sourceId ?? ''));
+        // Reuse the zone content engine (element kinds mirror zone show kinds).
+        content = resolveZoneContent({ ...el, show: kind }, info, 16);
+      }
       if (content === '') continue;
       const elX = Math.round(numberOr(el?.x, 0));
       const elY = Math.round(numberOr(el?.y, 0));

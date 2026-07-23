@@ -9,10 +9,12 @@
   import NumberInput from './NumberInput.svelte';
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
+  import { ICON_GLYPHS } from '../utils/pixelFont.js';
+  const ICON_NAMES = Object.keys(ICON_GLYPHS);
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
-  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit'];
+  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit', 'icon'];
   const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
   // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
   // part of the layout, so switching layouts switches animations.
@@ -440,6 +442,12 @@
         <input class="val en" type="number" title="Height (px); for text: font height" value={el.h ?? 8} onchange={(event) => setElement(i, 'h', Math.round(Number(event.target.value)))} />
         {#if el.kind === 'static'}
           <input class="val etext" type="text" placeholder="caption text" value={el.text ?? ''} oninput={(event) => setElement(i, 'text', event.target.value)} />
+        {:else if el.kind === 'icon'}
+          <select class="val esel" title="Icon glyph" value={el.icon ?? 'play'} onchange={(event) => setElement(i, 'icon', event.target.value)}>
+            {#each ICON_NAMES as name}
+              <option value={name}>{name}</option>
+            {/each}
+          </select>
         {:else if el.kind === 'anim'}
           <select class="val esel" title="Animation source: an uploaded file (GIF/sprite) or a built-in preset" value={el.animMode ?? 'preset'} onchange={(event) => setElement(i, 'animMode', event.target.value)}>
             <option value="preset">preset</option>
