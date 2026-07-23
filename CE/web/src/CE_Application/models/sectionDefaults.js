@@ -668,6 +668,11 @@ export const SECTION_DEFAULTS = {
     animSpeed: 1,
     // Which controls count as "@active" (Core.ids). Empty = any control.
     activeScope: [],
+    // On-screen editable text (an 'edit' element bound to '@edit' shows/edits
+    // this buffer; the same edit engine as the LCD).
+    editText: 'INIT',              // the current string
+    editCharset: 'upper',          // upper | alnum | ascii | digits
+    editMaxLength: 16,             // 0 = unbounded
     // The scene: pixel-addressed elements. Each:
     // { id, kind (static|name|value|pct|midiValue|note|text|state|
     //   hbar|vbar|hslider|vslider|needle), x, y, w, h, sourceId, align,

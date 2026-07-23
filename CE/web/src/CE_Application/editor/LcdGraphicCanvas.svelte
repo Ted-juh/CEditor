@@ -29,6 +29,7 @@
     pixelHeight = 0,
     fontScale = 1,
     widgets = [],
+    caret = null,                // on-screen edit caret: {x, y, w, h, on} in grid px
     texts = [],                  // pixel-positioned strings: {x, y, h, w, align, content}
     anims = [],                  // placeable animations: {id, x, y, w, h, mode, src, frames, fps, loop, preset, speed}
     animMode = 'off',            // off | file | preset
@@ -766,6 +767,19 @@
 
     if (Array.isArray(widgets) && widgets.length) drawWidgets(buf, dtMs, colId);
 
+    // On-screen edit caret (I-beam at the insertion point), painted last so it
+    // sits above the text. Lit palette id 1 so it matches the panel colour.
+    if (caret && caret.on) {
+      const cx0 = Math.round(caret.x); const cy0 = Math.round(caret.y);
+      const cw = Math.max(1, Math.round(caret.w)); const ch = Math.max(1, Math.round(caret.h));
+      for (let yy = 0; yy < ch; yy += 1) {
+        for (let xx = 0; xx < cw; xx += 1) {
+          const gx = cx0 + xx; const gy = cy0 + yy;
+          if (gx >= 0 && gx < pixW && gy >= 0 && gy < pixH) buf[gy * pixW + gx] = 1;
+        }
+      }
+    }
+
     const cellW = w / pixW;
     const cellH = h / pixH;
     const rad = Math.max(0.5, Math.min(cellW, cellH) * 0.42);
@@ -801,7 +815,7 @@
     void lines; void cols; void rows; void litCss; void unlitCss; void brightness;
     void contrast; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
-    void widgets; void texts; void anims; void elAnimCaches; void animMode; void animCache;
+    void widgets; void caret; void texts; void anims; void elAnimCaches; void animMode; void animCache;
     void animPreset; void animSpeed; void animLoop; void animTick; void imageColour; void animColour;
     try {
       draw();

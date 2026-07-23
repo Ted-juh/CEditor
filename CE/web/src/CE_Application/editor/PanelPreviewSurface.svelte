@@ -3,6 +3,7 @@
   import CanvasControl from './CanvasControl.svelte';
   import GuideLines from './GuideLines.svelte';
   import { collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout } from '../utils/lcdZones.js';
+  import { FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
@@ -231,6 +232,14 @@
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
       ? (control?._children?.Display ?? null) : null;
   }
+  // The editable section for either display type (@edit target + edit options
+  // live here). name is the section key for updateControlProperty writes.
+  function editSectionOf(control) {
+    const type = String(control?._children?.Core?.controlType ?? '');
+    if (type === 'LcdDisplay') return { type, section: control?._children?.Display ?? null, name: 'Display' };
+    if (type === 'PixelDisplay') return { type, section: control?._children?.Pixel ?? null, name: 'Pixel' };
+    return { type: '', section: null, name: '' };
+  }
   function lcdSourceControl(sourceId) {
     return orderedControls.find((c) => getControlId(c) === String(sourceId ?? '')) ?? null;
   }
@@ -248,8 +257,8 @@
     if (isComboboxControl(src) || bt === 'radio' || bt === 'cyclic') return 'choice';
     return 'none';
   }
-  function lcdEditOpts(display) {
-    return { charset: String(display?.editCharset ?? 'upper'), maxLength: Math.max(0, Math.round(numberOr(display?.editMaxLength, 16))) };
+  function lcdEditOpts(section) {
+    return { charset: String(section?.editCharset ?? 'upper'), maxLength: Math.max(0, Math.round(numberOr(section?.editMaxLength, 16))) };
   }
   // All editable "edit" zones on the active layout (text/choice targets), in order.
   function lcdEditZones(control) {
@@ -263,6 +272,93 @@
       if (kind !== 'none') out.push({ zone: z, sourceId: String(z?.sourceId ?? ''), kind });
     }
     return out;
+  }
+
+  // --- PixelDisplay edit targets (pixel-positioned 'edit' elements) ---
+  function pixelDisplayOf(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'PixelDisplay'
+      ? (control?._children?.Pixel ?? null) : null;
+  }
+  // The elements the renderer is currently showing: the active layout's, else
+  // the flat list (mirrors PixelDisplayRenderer).
+  function pixelActiveElements(control) {
+    const pixel = pixelDisplayOf(control);
+    if (!pixel) return [];
+    const layouts = Array.isArray(pixel.layouts) ? pixel.layouts : [];
+    if (layouts.length) {
+      const layout = findLayout(layouts, resolvePixelActiveLayoutId(control));
+      return Array.isArray(layout?.elements) ? layout.elements : [];
+    }
+    return Array.isArray(pixel.elements) ? pixel.elements : [];
+  }
+  // Editable 'edit' elements on the active layout, in order.
+  function pixelEditElements(control) {
+    const out = [];
+    for (const el of pixelActiveElements(control)) {
+      if (String(el?.kind ?? '') !== 'edit' || el?.visible === false) continue;
+      const kind = lcdEditKindOf(el?.sourceId);
+      if (kind !== 'none') out.push({ element: el, id: String(el?.id ?? ''), sourceId: String(el?.sourceId ?? ''), kind });
+    }
+    return out;
+  }
+  // Text-layout params for a pixel element's rendered string (grid px), so the
+  // caret lands between characters exactly as the renderer draws them.
+  function pixelTextLayout(control, element, sourceId) {
+    const elX = Math.round(numberOr(element?.x, 0));
+    const elH = Math.max(3, Math.round(numberOr(element?.h, 8)));
+    const boxW = Math.max(0, Math.round(numberOr(element?.w, 0)));
+    const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+    const advance = FONT_ADVANCE * s;
+    const text = lcdEditText(control, sourceId);
+    const len = text.length;
+    const textW = len > 0 ? len * advance - s : 0;
+    let startX = elX;
+    if (boxW > 0) {
+      const align = String(element?.align ?? 'left');
+      if (align === 'center') startX = elX + Math.round((boxW - textW) / 2);
+      else if (align === 'right') startX = elX + boxW - textW;
+    }
+    return { startX, advance, len, elY: Math.round(numberOr(element?.y, 0)), rowH: FONT_H * s };
+  }
+  // Element bounds (grid px) → is a control-local click inside it?
+  function pixelElementContainsPoint(control, element, pt) {
+    const pixel = pixelDisplayOf(control);
+    const transform = control?._children?.Transform ?? {};
+    const width = numberOr(transform.width, 0);
+    const height = numberOr(transform.height, 0);
+    if (!pixel || !pt || width <= 0 || height <= 0) return false;
+    const padding = Math.max(0, numberOr(pixel.padding, 8));
+    const pixW = Math.max(1, Math.round(numberOr(pixel.pixelsW, 128)));
+    const pixH = Math.max(1, Math.round(numberOr(pixel.pixelsH, 64)));
+    const sx = Math.max(1e-6, (width - padding * 2) / pixW);
+    const sy = Math.max(1e-6, (height - padding * 2) / pixH);
+    const gx = (pt.x - padding) / sx;
+    const gy = (pt.y - padding) / sy;
+    const lay = pixelTextLayout(control, element, String(element?.sourceId ?? ''));
+    const w = Math.max(1, Math.round(numberOr(element?.w, Math.max(1, lay.len) * (FONT_ADVANCE))));
+    const x0 = Math.round(numberOr(element?.x, 0));
+    return gx >= x0 - 1 && gx <= x0 + w + 1 && gy >= lay.elY - 1 && gy <= lay.elY + lay.rowH + 1;
+  }
+  // Caret index from a click on a pixel edit element.
+  function pixelCaretFromPoint(control, element, pt) {
+    const pixel = pixelDisplayOf(control);
+    const transform = control?._children?.Transform ?? {};
+    const width = numberOr(transform.width, 0);
+    const padding = Math.max(0, numberOr(pixel?.padding, 8));
+    const pixW = Math.max(1, Math.round(numberOr(pixel?.pixelsW, 128)));
+    const sx = Math.max(1e-6, (width - padding * 2) / pixW);
+    const lay = pixelTextLayout(control, element, String(element?.sourceId ?? ''));
+    const gx = (pt.x - padding) / sx;
+    const caret = Math.round((gx - lay.startX) / Math.max(1, lay.advance));
+    return Math.max(0, Math.min(lay.len, caret));
+  }
+
+  // Unified edit targets for whichever display type this control is.
+  function screenEditTargets(control) {
+    const type = String(control?._children?.Core?.controlType ?? '');
+    if (type === 'LcdDisplay') return lcdEditZones(control).map((t) => ({ ...t, id: String(t.zone?.id ?? '') }));
+    if (type === 'PixelDisplay') return pixelEditElements(control);
+    return [];
   }
 
   // Map a click point (control-local px) to a character cell {row, col},
@@ -306,7 +402,7 @@
   function lcdArmEdit(control, target, caret) {
     lcdEdit = {
       id: getControlId(control),
-      zoneId: String(target.zone?.id ?? ''),
+      zoneId: String(target.id ?? target.zone?.id ?? ''),
       sourceId: target.sourceId,
       kind: target.kind,
       caret,
@@ -316,15 +412,17 @@
   }
   const LCD_EDIT_IDLE = { id: '', zoneId: '', sourceId: '', kind: '', caret: 0, original: '', active: false };
 
-  // Text edit target read/write: '@edit' -> Display.editText, else a Label's content.
+  // Text edit target read/write: '@edit' -> the display's own editText
+  // (Display.editText or Pixel.editText), else a Label's content.
   function lcdEditText(control, sourceId) {
-    if (String(sourceId) === '@edit') return String(lcdDisplayOf(control)?.editText ?? '');
+    if (String(sourceId) === '@edit') return String(editSectionOf(control).section?.editText ?? '');
     return String(lcdSourceControl(sourceId)?._children?.Text?.content ?? '');
   }
   function lcdWriteEditText(control, sourceId, text) {
     if (String(sourceId) === '@edit') {
       const id = getControlId(control);
-      if (id) updateControlProperty(id, 'Display.editText', text);
+      const { name } = editSectionOf(control);
+      if (id && name) updateControlProperty(id, `${name}.editText`, text);
       return;
     }
     const sid = getControlId(lcdSourceControl(sourceId));
@@ -332,10 +430,10 @@
   }
   // Apply a text op to the active target, persist it, and move the caret.
   function lcdApplyEdit(control, opName, arg) {
-    const display = lcdDisplayOf(control);
+    const { section } = editSectionOf(control);
     const id = getControlId(control);
-    if (!display || !id || !lcdEdit.active) return;
-    const opts = lcdEditOpts(display);
+    if (!section || !id || !lcdEdit.active) return;
+    const opts = lcdEditOpts(section);
     const cur = lcdEditText(control, lcdEdit.sourceId);
     // Leave the EXISTING text untouched (no charset normalisation — that would
     // eat e.g. lowercase letters under the 'upper' set); the charset/maxLength
@@ -663,8 +761,9 @@
     const hasOwnOverride = ownSession.textOverride !== undefined
       || ownSession.brightnessOverride !== undefined
       || ownSession.backlightOverride !== undefined;
+    const editingHere = lcdEdit.active && lcdEdit.id === getControlId(control);
 
-    if (!Object.keys(live).length && !brightRange && !backInfo && !hasLayouts && !hasOwnOverride) return resolved;
+    if (!Object.keys(live).length && !brightRange && !backInfo && !hasLayouts && !hasOwnOverride && !editingHere) return resolved;
 
     const base = resolved?.control ?? control;
     const basePixel = base?._children?.Pixel ?? {};
@@ -680,6 +779,10 @@
     if (ownSession.brightnessOverride !== undefined) cp.brightness = ownSession.brightnessOverride;
     if (ownSession.backlightOverride !== undefined) cp.backlightOn = ownSession.backlightOverride === true;
     if (ownSession.textOverride !== undefined) cp.editText = String(ownSession.textOverride);
+    // Live edit caret: the renderer parks a blinking I-beam on the armed element.
+    cp.__edit = editingHere
+      ? { active: true, caret: lcdEdit.caret, elementId: lcdEdit.zoneId, kind: lcdEdit.kind }
+      : null;
     const clone = { ...base, _children: { ...base._children, Pixel: cp } };
     return { ...(resolved ?? {}), control: clone };
   }
@@ -1896,16 +1999,24 @@
     // Clicking an LCD with an editable zone focuses it; clicking anything else
     // ends any active edit. Text targets place the caret at the end; a choice
     // target just arms the cycler (wheel/arrows change the option).
-    const editTargets = lcdEditZones(control);
+    const editTargets = screenEditTargets(control);
     if (editTargets.length) {
       // Pick the edit field under the click (falling back to the first one);
       // clicking inside a text field places the caret at the clicked character.
-      const displayCols = Math.max(1, Math.round(numberOr(lcdDisplayOf(control)?.cols, 16)));
-      const cell = lcdCellFromPoint(control, pointerDownLocal);
-      const target = editTargets.find((t) => lcdZoneContainsCell(t.zone, cell, displayCols)) ?? editTargets[0];
-      const caret = target.kind === 'text'
-        ? lcdCaretFromCell(target.zone, cell, displayCols, lcdEditText(control, target.sourceId).length)
-        : 0;
+      const dtype = String(control?._children?.Core?.controlType ?? '');
+      let target;
+      let caret;
+      if (dtype === 'PixelDisplay') {
+        target = editTargets.find((t) => pixelElementContainsPoint(control, t.element, pointerDownLocal)) ?? editTargets[0];
+        caret = target.kind === 'text' ? pixelCaretFromPoint(control, target.element, pointerDownLocal) : 0;
+      } else {
+        const displayCols = Math.max(1, Math.round(numberOr(lcdDisplayOf(control)?.cols, 16)));
+        const cell = lcdCellFromPoint(control, pointerDownLocal);
+        target = editTargets.find((t) => lcdZoneContainsCell(t.zone, cell, displayCols)) ?? editTargets[0];
+        caret = target.kind === 'text'
+          ? lcdCaretFromCell(target.zone, cell, displayCols, lcdEditText(control, target.sourceId).length)
+          : 0;
+      }
       lcdArmEdit(control, target, caret);
     } else if (lcdEdit.active) {
       lcdEdit = { ...LCD_EDIT_IDLE };
@@ -2175,9 +2286,9 @@
       if (key === 'Tab') {
         // Cycle between the layout's edit fields (Shift+Tab goes back).
         event.preventDefault();
-        const targets = lcdEditZones(control);
+        const targets = screenEditTargets(control);
         if (targets.length > 1) {
-          const idx = targets.findIndex((t) => String(t.zone?.id ?? '') === lcdEdit.zoneId);
+          const idx = targets.findIndex((t) => String(t.id ?? t.zone?.id ?? '') === lcdEdit.zoneId);
           const next = targets[(((idx < 0 ? 0 : idx) + (event.shiftKey ? -1 : 1)) % targets.length + targets.length) % targets.length];
           lcdArmEdit(control, next, next.kind === 'text' ? lcdEditText(control, next.sourceId).length : 0);
         }

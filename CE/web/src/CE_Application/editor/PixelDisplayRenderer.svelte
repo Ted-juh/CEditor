@@ -86,6 +86,10 @@
   function controlInfo(sourceId) {
     const id = String(sourceId ?? '');
     if (!id) return null;
+    // '@edit' resolves to this screen's own editable buffer (Pixel.editText).
+    if (id === '@edit') {
+      return { present: true, name: '', value: 0, min: 0, max: 0, text: String(pixel?.editText ?? ''), on: false };
+    }
     const live = pixel?.__live?.[id];
     const ctrl = (Array.isArray(allControls) ? allControls : [])
       .find((c) => String(c?._children?.Core?.id ?? '') === id);
@@ -399,7 +403,38 @@
   let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
   let animActive = $derived(animMode !== 'off' || animElements.length > 0);
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
-  let motionActive = $derived(animActive || widgetMotion);
+  let editActive = $derived(pixel?.__edit?.active === true);
+  let motionActive = $derived(animActive || widgetMotion || editActive);
+
+  // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
+  // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring
+  // the text layout (font scale + alignment) so it lands between characters.
+  let editBlink = $derived(Math.floor(frameTime / 530) % 2 === 0);
+  let caretRect = $derived.by(() => {
+    const es = pixel?.__edit;
+    if (!es || es.active !== true) return null;
+    const el = elements.find((e) => String(e?.id ?? '') === String(es.elementId ?? ''));
+    if (!el) return null;
+    const elX = Math.round(numberOr(el.x, 0));
+    const elY = Math.round(numberOr(el.y, 0));
+    const elH = Math.max(3, Math.round(numberOr(el.h, 8)));
+    const boxW = Math.max(0, Math.round(numberOr(el.w, 0)));
+    const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+    const advance = FONT_ADVANCE * s;
+    const info = controlInfo(String(el.sourceId ?? ''));
+    const content = resolveZoneContent({ ...el, show: String(el.kind ?? 'edit') }, info, 16);
+    const len = content.length;
+    const textW = len > 0 ? len * advance - s : 0;
+    let startX = elX;
+    if (boxW > 0) {
+      const align = String(el.align ?? 'left');
+      if (align === 'center') startX = elX + Math.round((boxW - textW) / 2);
+      else if (align === 'right') startX = elX + boxW - textW;
+    }
+    const caret = String(es.kind ?? 'text') === 'choice'
+      ? 0 : Math.max(0, Math.min(len, Math.round(numberOr(es.caret, 0))));
+    return { x: startX + caret * advance, y: elY, w: Math.max(1, s), h: FONT_H * s, on: editBlink };
+  });
 
   function prefersReducedMotion() {
     return typeof window !== 'undefined' && window.matchMedia
@@ -470,6 +505,7 @@
       pixelHeight={pixH}
       widgets={pixelWidgets}
       {texts}
+      caret={caretRect}
       anims={animElements}
       animMode={animMode}
       animSrc={pixel?.animSrc ?? ''}

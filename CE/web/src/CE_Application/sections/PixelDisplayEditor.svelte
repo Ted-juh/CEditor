@@ -12,7 +12,7 @@
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
-  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state'];
+  const TEXT_KINDS = ['static', 'name', 'value', 'pct', 'midiValue', 'note', 'text', 'state', 'edit'];
   const WIDGET_KINDS = ['hbar', 'vbar', 'hslider', 'vslider', 'needle'];
   // 'anim' is a placeable animation (GIF/sprite/preset) inside its own rect —
   // part of the layout, so switching layouts switches animations.
@@ -449,6 +449,7 @@
           <select class="val esel" title="Source component" value={elementSourceValue(el)} onchange={(event) => setElement(i, 'sourceId', event.target.value)}>
             <option value="">(source)</option>
             <option value="@active">★ Active</option>
+            <option value="@edit">✎ This screen's text</option>
             {#each allSources as src}
               <option value={src.id}>{src.name}</option>
             {/each}
@@ -753,6 +754,23 @@
     </PropertyCell>
     <PropertyCell label="Padding" span={2} hint="Inset from the bezel to the screen (px).">
       <NumberInput value={pixel.padding ?? 8} step={1} min={0} onchange={(value) => set('padding', value)} />
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="On-screen text">
+    <PropertyCell label="Edit text" span={4} hint="The string shown/edited by an 'edit' element bound to ✎ This screen's text. Click it in preview to type; wheel/↑↓ cycle the character under the caret.">
+      <input class="val" type="text" value={pixel.editText ?? 'INIT'} oninput={(event) => set('editText', event.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Charset" span={2} hint="Which characters new input is limited to.">
+      <select class="val" value={pixel.editCharset ?? 'upper'} onchange={(event) => set('editCharset', event.target.value)}>
+        <option value="upper">A–Z 0–9</option>
+        <option value="alnum">a–z A–Z 0–9</option>
+        <option value="ascii">ASCII</option>
+        <option value="digits">0–9</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Max length" span={2} hint="Cap on the edited string (0 = unbounded).">
+      <NumberInput value={pixel.editMaxLength ?? 16} step={1} min={0} max={256} onchange={(value) => set('editMaxLength', Math.max(0, Math.round(value)))} />
     </PropertyCell>
   </PropertySection>
   </div>
