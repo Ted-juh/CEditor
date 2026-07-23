@@ -155,6 +155,7 @@
     for (const el of elements) {
       const kind = String(el?.kind ?? '');
       if (el?.visible === false || !kind) continue;
+      if (el?.blink === true && !blinkPhase) continue; // blink: hidden on the off half
       if (PIXEL_WIDGET_KINDS.has(kind)) {
         const label = String(el?.label ?? '').trim();
         if (!label) continue;
@@ -432,7 +433,11 @@
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
   let editActive = $derived(pixel?.__edit?.active === true);
   let clockActive = $derived(elements.some((e) => String(e?.kind ?? '') === 'clock' && e?.visible !== false));
-  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive);
+  let blinkActive = $derived(elements.some((e) => e?.blink === true && e?.visible !== false));
+  // Blink phase (~530ms, matches the LCD cursor): elements flagged blink are
+  // dropped from the frame on the "off" half.
+  let blinkPhase = $derived(Math.floor(frameTime / 530) % 2 === 0);
+  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive || blinkActive);
 
   // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
   // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring

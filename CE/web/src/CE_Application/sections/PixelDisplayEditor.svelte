@@ -525,6 +525,7 @@
             <input class="val cswatch" type="color" title="Pick element colour (keeps alpha)" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
+            <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
             {#if WIDGET_KINDS.includes(el.kind)}
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
