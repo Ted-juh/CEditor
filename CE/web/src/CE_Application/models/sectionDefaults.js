@@ -805,6 +805,10 @@ export const SECTION_DEFAULTS = {
     // parent's current selection (or is blank = shown for all) are visible.
     dependsOn: '',
     dependsResetOnChange: true, // reset this list's pick when the parent changes
+    // Export a selector's choice by its stable name (internalValue) instead of
+    // a bare row index — so the saved/automated value round-trips even when the
+    // visible rows change (cascading lists). Default keeps the numeric index.
+    storeByValue: false,
     segmentStyle: {
       shared: {},
       rows: {},

@@ -129,10 +129,27 @@ How it works:
   agree. A row's `parentValue` tag is matched against the parent's
   `internalValue`; blank = shown for all; headers are always kept.
 - Chains naturally (A → B → C) and is a no-op for independent lists.
-- **Export note:** each list still exports as its numeric index parameter, but
-  the index's *meaning* shifts with the parent — bind/store the resolved
-  `internalValue` if the panel needs the child to round-trip independently of
-  the parent.
+
+### Store choice by name (export round-trip)
+
+A selector normally exports as a **row index**. For an independent list that's
+fine, but a cascading child's visible rows change with the parent, so a bare
+index can point at the wrong row after a reload. The **Store by name** toggle
+(Value section) fixes this:
+
+- `Value.storeByValue: true` makes `deriveExportParameters` attach the fixed
+  choice metadata — `choiceMode: 'value'`, `choiceValues` (every authored row's
+  `internalValue`, headers dropped, **full** list not the filtered view),
+  `choiceLabels`, `defaultChoice` — alongside the usual numeric min/max so the
+  APVTS contract is unchanged.
+- The Player maps the live choice name ↔ that fixed host index via
+  `choiceIndexOf` / `choiceValueAt` (`utils/exportParameters.js`), so host
+  automation records/restores by a stable position and the on-screen value
+  round-trips regardless of the cascading parent. (This also fixes selectors
+  whose `internalValue` is non-numeric — previously they were skipped by the
+  host-param sync entirely.)
+- Off by default (plain index) — turn it on for preset/bank browsers and any
+  cascading child that must round-trip independently of its parent.
 
 ## Multi-select variant — shipped
 
