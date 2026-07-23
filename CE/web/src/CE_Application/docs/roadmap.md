@@ -56,7 +56,8 @@ Shipped, pure engine-reuse:
 - **Musical context** → chord gen, pad grid melodic, keyboard, arp.
 
 ### Phase 3 — components (consume Phase 2)
-- **Listbox**, **Text Input** (two-way needs Phase 0 #1).
+- **Listbox** ✅, **Text Input** ✅ (single-select / single-line MVPs shipped;
+  Text Input's two-way SysEx emit still needs Phase 0 #1 + a build).
 - **Ribbon** (return), **Pitch/Mod wheel** (slider+return).
 - **Crossfader**, **Vector Joystick** (fan-out + blend + snapshots).
 - **Meter**, **Progress** (value-driven display).
