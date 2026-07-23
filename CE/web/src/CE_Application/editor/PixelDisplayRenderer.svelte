@@ -227,6 +227,7 @@
   // Handles overlay each element on the screen (when the control is selected in
   // design mode) and drag writes the element's x/y back in grid pixels.
   let dragEl = $state(null); // { i, cx, cy, x, y }
+  let resizeEl = $state(null); // { i, cx, cy, w, h }
 
   function elementPathPrefix(i) {
     if (hasLayouts) {
@@ -301,7 +302,46 @@
     window.removeEventListener('mouseup', endElementDrag);
   }
 
-  onDestroy(() => endElementDrag());
+  // SE-corner resize: drags the element's width/height (grid px), snapped to the
+  // same step as moves and clamped so the element stays on screen.
+  function startElementResize(box, event) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const el = elements[box.i];
+    if (!el) return;
+    const defW = String(el?.kind) === 'anim' ? 32 : Math.max(4, Math.round(numberOr(el?.w, 10)));
+    const defH = String(el?.kind) === 'anim' ? 16 : Math.max(3, Math.round(numberOr(el?.h, 8)));
+    resizeEl = { i: box.i, cx: event.clientX, cy: event.clientY, w: numberOr(el.w, defW), h: numberOr(el.h, defH) };
+    window.addEventListener('mousemove', onElementResizeMove);
+    window.addEventListener('mouseup', endElementResize);
+  }
+
+  function onElementResizeMove(event) {
+    if (!resizeEl) return;
+    const s = Math.max(0.01, Number(scale) || 1);
+    const dw = (event.clientX - resizeEl.cx) / s / (screenW / pixW);
+    const dh = (event.clientY - resizeEl.cy) / s / (screenH / pixH);
+    const el = elements[resizeEl.i];
+    const prefix = elementPathPrefix(resizeEl.i);
+    if (!el || !prefix || !coreId) return;
+    const x = Math.round(numberOr(el.x, 0));
+    const y = Math.round(numberOr(el.y, 0));
+    const step = Math.max(0, Math.round(numberOr(pixel?.snapGrid, 0)));
+    const snap = (v) => (step > 1 ? Math.round(v / step) * step : Math.round(v));
+    const nw = Math.max(1, snap(clamp(resizeEl.w + dw, 1, pixW - x)));
+    const nh = Math.max(1, snap(clamp(resizeEl.h + dh, 1, pixH - y)));
+    if (nw !== numberOr(el.w, -1)) updateControlProperty(coreId, `${prefix}.w`, nw);
+    if (nh !== numberOr(el.h, -1)) updateControlProperty(coreId, `${prefix}.h`, nh);
+  }
+
+  function endElementResize() {
+    resizeEl = null;
+    window.removeEventListener('mousemove', onElementResizeMove);
+    window.removeEventListener('mouseup', endElementResize);
+  }
+
+  onDestroy(() => { endElementDrag(); endElementResize(); });
 
   // Placeable animation elements (kind 'anim'): their own rect + source, part
   // of the layout — so switching layouts switches animations.
@@ -438,7 +478,14 @@
           style={`left:${box.left}px; top:${box.top}px; width:${box.width}px; height:${box.height}px;`}
           onmousedown={(event) => startElementDrag(box, event)}
           title="Drag to move element"
-        ></div>
+        >
+          <div
+            class="el-resize"
+            class:resizing={resizeEl?.i === box.i}
+            onmousedown={(event) => startElementResize(box, event)}
+            title="Drag to resize (W×H)"
+          ></div>
+        </div>
       {/each}
     {/if}
   </div>
@@ -477,5 +524,27 @@
   .el-handle.dragging {
     border-color: rgba(91, 155, 213, 0.9);
     background: rgba(91, 155, 213, 0.12);
+  }
+
+  .el-resize {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: nwse-resize;
+    border: 1px solid rgba(91, 155, 213, 0.95);
+    background: rgba(20, 24, 21, 0.85);
+    border-radius: 2px;
+    opacity: 0;
+    z-index: 6;
+  }
+
+  .el-handle:hover .el-resize,
+  .el-handle.dragging .el-resize,
+  .el-resize.resizing {
+    opacity: 1;
   }
 </style>
