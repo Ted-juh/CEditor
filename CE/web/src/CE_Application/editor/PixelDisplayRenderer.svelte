@@ -286,8 +286,11 @@
     if (!el || !prefix || !coreId) return;
     const w = Math.min(pixW, Math.max(1, Math.round(numberOr(el.w, 1))));
     const h = Math.min(pixH, Math.max(1, Math.round(numberOr(el.h, 8))));
-    const nx = Math.round(clamp(dragEl.x + gx, 0, Math.max(0, pixW - w)));
-    const ny = Math.round(clamp(dragEl.y + gy, 0, Math.max(0, pixH - h)));
+    // Optional snap-to-grid (Pixel.snapGrid, in grid pixels; 0 = free).
+    const step = Math.max(0, Math.round(numberOr(pixel?.snapGrid, 0)));
+    const snap = (v) => (step > 1 ? Math.round(v / step) * step : Math.round(v));
+    const nx = snap(clamp(dragEl.x + gx, 0, Math.max(0, pixW - w)));
+    const ny = snap(clamp(dragEl.y + gy, 0, Math.max(0, pixH - h)));
     if (nx !== numberOr(el.x, 0)) updateControlProperty(coreId, `${prefix}.x`, nx);
     if (ny !== numberOr(el.y, 0)) updateControlProperty(coreId, `${prefix}.y`, ny);
   }
@@ -333,8 +336,15 @@
   let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
   let motionActive = $derived(animActive || widgetMotion);
 
+  function prefersReducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   $effect(() => {
-    if (!motionActive) {
+    // Respect the OS reduced-motion setting: render a representative static
+    // frame instead of running the animation loop.
+    if (!motionActive || prefersReducedMotion()) {
       frameTime = 0;
       return;
     }
@@ -358,6 +368,16 @@
   let scanlineStyle = $derived(
     `background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 3px);`
   );
+  // Design-time grid overlay (editor aid). Cell = snap step (or 8) grid pixels,
+  // scaled into screen pixels. Never shown outside the editor / at runtime.
+  let gridStep = $derived(Math.max(2, Math.round(numberOr(pixel?.snapGrid, 0)) || 8));
+  let gridStyle = $derived.by(() => {
+    const cx = ((screenW / pixW) * gridStep).toFixed(2);
+    const cy = ((screenH / pixH) * gridStep).toFixed(2);
+    return `background-image:`
+      + `repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px ${cy}px),`
+      + `repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px ${cx}px);`;
+  });
 </script>
 
 {#if pixel}
@@ -403,6 +423,10 @@
     {/if}
     {#if showGlass}
       <div class="pixel-layer pixel-glass" style={`background:linear-gradient(155deg, ${glassTintCss}, transparent 55%);`}></div>
+    {/if}
+
+    {#if editable && pixel?.showGrid}
+      <div class="pixel-layer pixel-grid" style={gridStyle}></div>
     {/if}
 
     {#if editable}

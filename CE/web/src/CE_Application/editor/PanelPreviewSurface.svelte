@@ -183,6 +183,10 @@
       name: String(src?._children?.Core?.name ?? ''),
       value: 0, min: 0, max: 127, text: '', on: false, selector: '',
     };
+    // 'address' show-kind: the device parameter this control is bound to (if
+    // any), so the panel can print e.g. a CC/NRPN address instead of "----".
+    const bind = (src?._children?.DeviceBindings?.bindings ?? []).find((b) => b?.parameterId);
+    if (bind) info.address = String(bind.parameterId);
     if (isRangeBehavior(behavior)) {
       const range = lcdSourceValueRange(src);
       if (range) { info.value = range.value; info.min = range.min; info.max = range.max; info.selector = String(range.value); }

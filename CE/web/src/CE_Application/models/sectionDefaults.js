@@ -651,6 +651,8 @@ export const SECTION_DEFAULTS = {
     showGhost: true,               // faint unlit dots
     showScanlines: false,
     dotShape: 'round',             // round | square
+    showGrid: false,               // design-time grid overlay (editor aid, not painted at runtime)
+    snapGrid: 0,                   // snap element drags to this pixel step (0 = free)
     padding: 8,                    // bezel inset (screen px, not grid px)
     imageSrc: '',                  // static image dithered onto the grid
     imageDither: true,

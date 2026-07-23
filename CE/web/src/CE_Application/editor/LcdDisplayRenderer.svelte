@@ -117,10 +117,16 @@
     rows, cols, (Array.isArray(display?.lines) ? display.lines.join('') : ''),
   ].join('|'));
 
+  function prefersReducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
   $effect(() => {
     // Reference the signature so a settings change re-runs (restarts) the loop.
     void motionSignature;
-    if (!motionActive) {
+    // Respect the OS reduced-motion setting: hold a static frame.
+    if (!motionActive || prefersReducedMotion()) {
       frameTime = 0;
       return;
     }

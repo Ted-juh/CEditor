@@ -716,6 +716,12 @@
     <PropertyCell label="Ghost dots" span={2} hint="Faint unlit dots (realism cue).">
       <PropertyToggle value={pixel.showGhost !== false} onchange={() => toggle('showGhost', true)} />
     </PropertyCell>
+    <PropertyCell label="Design grid" span={2} hint="Show a grid overlay while editing (editor aid — never painted at runtime).">
+      <PropertyToggle value={pixel.showGrid === true} onchange={() => toggle('showGrid', false)} />
+    </PropertyCell>
+    <PropertyCell label="Snap" span={2} hint="Snap element drags to this pixel step (0 = free). Also sets the grid spacing.">
+      <NumberInput value={pixel.snapGrid ?? 0} step={1} min={0} max={64} onchange={(value) => set('snapGrid', Math.max(0, Math.round(value)))} />
+    </PropertyCell>
     <PropertyCell label="Bright Src" span={2} hint="Drive Brightness live from a slider/knob/number in preview.">
       <select class="val" value={pixel.brightnessSourceId ?? ''} onchange={(event) => set('brightnessSourceId', event.target.value)}>
         <option value="">None</option>
