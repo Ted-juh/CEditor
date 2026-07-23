@@ -860,6 +860,14 @@
     font-size: 12px;
   }
 
+  /* Visible keyboard focus for every inspector control + checkbox. */
+  .val:focus-visible,
+  .ex-chk input:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
+    border-color: #5B9BD5;
+  }
+
   .field-row {
     display: flex;
     gap: 4px;

@@ -888,6 +888,12 @@
     font-size: 12px;
   }
 
+  :global(.lcd-inspector .val:focus-visible) {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
+    border-color: #5B9BD5 !important;
+  }
+
   :global(.lcd-inspector .val option) {
     background: #1A1A1A;
     color: #DDD;
