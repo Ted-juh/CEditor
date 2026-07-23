@@ -171,3 +171,20 @@ test('selectorRuleMatches supports comparison operators', async () => {
   assert.equal(resolveActiveLayoutId(pages, layouts, { selectorValue: '100' }), 'hi');
   assert.equal(resolveActiveLayoutId(pages, layouts, { selectorValue: '10' }), 'lo');
 });
+
+test('regionStartOffset agrees with fitToRegion placement (caret alignment)', async () => {
+  const { regionStartOffset, fitToRegion } = await import('../src/CE_Application/utils/lcdZones.js');
+  // The offset must equal the count of leading spaces fitToRegion adds.
+  for (const width of [8, 10, 16]) {
+    for (const text of ['A', 'HELLO', 'PATCH01', 'ABCDEFGHIJKL']) {
+      for (const align of ['left', 'center', 'right']) {
+        const rendered = fitToRegion(text, width, align);
+        const leading = rendered.length - rendered.replace(/^ +/, '').length;
+        const expected = text.length >= width ? 0 : leading;
+        assert.equal(regionStartOffset(width, text.length, align), expected, `${width}/${text}/${align}`);
+      }
+    }
+  }
+  // Overflow: offset is 0 (content is sliced, no padding).
+  assert.equal(regionStartOffset(4, 10, 'right'), 0);
+});

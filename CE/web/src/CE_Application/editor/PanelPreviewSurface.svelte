@@ -302,23 +302,27 @@
     return out;
   }
   // Text-layout params for a pixel element's rendered string (grid px), so the
-  // caret lands between characters exactly as the renderer draws them.
+  // caret lands between characters exactly as the renderer draws them. The
+  // rendered line is prefix + editText + suffix; alignment uses the full
+  // rendered width, and the caret is offset past the prefix.
   function pixelTextLayout(control, element, sourceId) {
     const elX = Math.round(numberOr(element?.x, 0));
     const elH = Math.max(3, Math.round(numberOr(element?.h, 8)));
     const boxW = Math.max(0, Math.round(numberOr(element?.w, 0)));
     const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
     const advance = FONT_ADVANCE * s;
-    const text = lcdEditText(control, sourceId);
-    const len = text.length;
-    const textW = len > 0 ? len * advance - s : 0;
+    const prefixLen = String(element?.prefix ?? '').length;
+    const suffixLen = String(element?.suffix ?? '').length;
+    const len = lcdEditText(control, sourceId).length;
+    const renderedLen = prefixLen + len + suffixLen;
+    const textW = renderedLen > 0 ? renderedLen * advance - s : 0;
     let startX = elX;
     if (boxW > 0) {
       const align = String(element?.align ?? 'left');
       if (align === 'center') startX = elX + Math.round((boxW - textW) / 2);
       else if (align === 'right') startX = elX + boxW - textW;
     }
-    return { startX, advance, len, elY: Math.round(numberOr(element?.y, 0)), rowH: FONT_H * s };
+    return { startX, advance, len, prefixLen, renderedLen, elY: Math.round(numberOr(element?.y, 0)), rowH: FONT_H * s };
   }
   // Element bounds (grid px) → is a control-local click inside it?
   function pixelElementContainsPoint(control, element, pt) {
@@ -335,7 +339,7 @@
     const gx = (pt.x - padding) / sx;
     const gy = (pt.y - padding) / sy;
     const lay = pixelTextLayout(control, element, String(element?.sourceId ?? ''));
-    const w = Math.max(1, Math.round(numberOr(element?.w, Math.max(1, lay.len) * (FONT_ADVANCE))));
+    const w = Math.max(1, Math.round(numberOr(element?.w, Math.max(1, lay.renderedLen) * FONT_ADVANCE)));
     const x0 = Math.round(numberOr(element?.x, 0));
     return gx >= x0 - 1 && gx <= x0 + w + 1 && gy >= lay.elY - 1 && gy <= lay.elY + lay.rowH + 1;
   }
@@ -349,7 +353,8 @@
     const sx = Math.max(1e-6, (width - padding * 2) / pixW);
     const lay = pixelTextLayout(control, element, String(element?.sourceId ?? ''));
     const gx = (pt.x - padding) / sx;
-    const caret = Math.round((gx - lay.startX) / Math.max(1, lay.advance));
+    // Clicked rendered-column → subtract the prefix to get a caret into editText.
+    const caret = Math.round((gx - lay.startX) / Math.max(1, lay.advance)) - lay.prefixLen;
     return Math.max(0, Math.min(lay.len, caret));
   }
 
@@ -390,12 +395,19 @@
     return cell.row === zoneRow && cell.col >= c0 && cell.col <= c1;
   }
 
-  // Caret index for a click cell inside a zone; outside -> end of text.
+  // Caret index for a click cell inside a zone; outside -> end of text. Mirrors
+  // fitToRegion's alignment padding + the prefix so the caret lands on the same
+  // character the renderer drew under the click.
   function lcdCaretFromCell(zone, cell, cols, textLen) {
     if (!cell) return textLen;
     const c0 = Math.round(numberOr(zone?.colStart, 1)) - 1;
+    const c1 = Math.max(c0, Math.round(numberOr(zone?.colEnd, cols)) - 1);
     if (!lcdZoneContainsCell(zone, cell, cols)) return textLen;
-    return Math.max(0, Math.min(textLen, cell.col - c0));
+    const width = c1 - c0 + 1;
+    const prefixLen = String(zone?.prefix ?? '').length;
+    const suffixLen = String(zone?.suffix ?? '').length;
+    const startOff = regionStartOffset(width, prefixLen + textLen + suffixLen, zone?.align);
+    return Math.max(0, Math.min(textLen, cell.col - c0 - startOff - prefixLen));
   }
 
   // Arm an edit target: text kinds remember the original for Esc-cancel.

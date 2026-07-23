@@ -510,8 +510,14 @@
     const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
     const advance = FONT_ADVANCE * s;
     const info = controlInfo(String(el.sourceId ?? ''));
+    // The rendered string is prefix + editText + suffix; the caret index is into
+    // editText, so it sits past the prefix. Alignment uses the full rendered
+    // width, so center/right-aligned edit fields track correctly too.
     const content = resolveZoneContent({ ...el, show: String(el.kind ?? 'edit') }, info, 16);
     const len = content.length;
+    const prefixLen = String(el.prefix ?? '').length;
+    const suffixLen = String(el.suffix ?? '').length;
+    const rawLen = Math.max(0, len - prefixLen - suffixLen);
     const textW = len > 0 ? len * advance - s : 0;
     let startX = elX;
     if (boxW > 0) {
@@ -520,8 +526,8 @@
       else if (align === 'right') startX = elX + boxW - textW;
     }
     const caret = String(es.kind ?? 'text') === 'choice'
-      ? 0 : Math.max(0, Math.min(len, Math.round(numberOr(es.caret, 0))));
-    return { x: startX + caret * advance, y: elY, w: Math.max(1, s), h: FONT_H * s, on: editBlink };
+      ? 0 : Math.max(0, Math.min(rawLen, Math.round(numberOr(es.caret, 0))));
+    return { x: startX + (prefixLen + caret) * advance, y: elY, w: Math.max(1, s), h: FONT_H * s, on: editBlink };
   });
 
   function prefersReducedMotion() {

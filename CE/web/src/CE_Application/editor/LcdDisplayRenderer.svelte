@@ -16,7 +16,7 @@
 <script>
   import { getSegmentGlyph } from '../utils/lcdSegmentFont.js';
   import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
-  import { composeLayout, findLayout, resolveActiveLayoutId, infoFraction, WIDGET_ZONE_KINDS } from '../utils/lcdZones.js';
+  import { composeLayout, findLayout, resolveActiveLayoutId, infoFraction, WIDGET_ZONE_KINDS, regionStartOffset } from '../utils/lcdZones.js';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
 
   let { control = null, allControls = [], width = 0, height = 0 } = $props();
@@ -180,10 +180,18 @@
     if (!editing) return 0;
     const c0 = Math.max(0, Math.round(numberOr(editZone?.colStart, 1)) - 1);
     const c1 = Math.max(c0, Math.round(numberOr(editZone?.colEnd, cols)) - 1);
-    // A choice (option-picker) zone has no caret: park the block on its first
-    // cell as the "this field is armed" indicator.
-    if (String(editState?.kind ?? 'text') === 'choice') return c0;
-    return clamp(c0 + Math.max(0, Math.round(numberOr(editState?.caret, 0))), c0, c1);
+    // The rendered line is prefix + editText + suffix, placed in the zone width
+    // with fitToRegion's left/right/centre padding. Mirror that so the caret
+    // tracks under any alignment, and offset it past the prefix.
+    const width = c1 - c0 + 1;
+    const prefix = String(editZone?.prefix ?? '');
+    const suffix = String(editZone?.suffix ?? '');
+    const rawText = String(controlInfo(editZone?.sourceId)?.text ?? '');
+    const startOff = regionStartOffset(width, prefix.length + rawText.length + suffix.length, editZone?.align);
+    // A choice (option-picker) zone has no caret: park the block at the value start.
+    if (String(editState?.kind ?? 'text') === 'choice') return clamp(c0 + startOff, c0, c1);
+    const caret = Math.max(0, Math.min(rawText.length, Math.round(numberOr(editState?.caret, 0))));
+    return clamp(c0 + startOff + prefix.length + caret, c0, c1);
   });
   let editCaretRow = $derived(editing ? Math.max(0, Math.round(numberOr(editZone?.row, 1)) - 1) : 0);
   // When editing, force a visible caret at the edit position; else use the

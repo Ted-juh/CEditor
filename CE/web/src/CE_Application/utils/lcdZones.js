@@ -139,6 +139,19 @@ export function resolveZoneContent(zone, info, width) {
   }
 }
 
+// The column offset (from the region's left edge) at which fitToRegion places
+// content of `contentLen` chars under a given alignment. Used to place/read the
+// on-screen edit caret so it tracks left/right/centre alignment.
+export function regionStartOffset(width, contentLen, align = 'left') {
+  const w = Math.max(0, Math.round(width));
+  const len = Math.min(w, Math.max(0, Math.round(contentLen)));
+  const pad = Math.max(0, w - len);
+  const a = String(align ?? 'left').trim().toLowerCase();
+  if (a === 'right') return pad;
+  if (a === 'center') return Math.floor(pad / 2);
+  return 0;
+}
+
 // Fit content into a fixed-width region with alignment + truncation.
 export function fitToRegion(content, width, align = 'left') {
   const w = Math.max(0, Math.round(width));
