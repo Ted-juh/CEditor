@@ -10,7 +10,15 @@
   import { isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
   import { ICON_GLYPHS } from '../utils/pixelFont.js';
+  import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   const ICON_NAMES = Object.keys(ICON_GLYPHS);
+  // Reset only appearance (never content: elements/layouts/text/sources).
+  const APPEARANCE_KEYS = ['litColour', 'unlitColour', 'screenColour', 'backlightColour', 'glassTint',
+    'backlightOn', 'brightness', 'contrast', 'showGhost', 'showGlass', 'showScanlines', 'dotShape', 'padding'];
+  function resetAppearance() {
+    const d = SECTION_DEFAULTS.Pixel ?? {};
+    for (const k of APPEARANCE_KEYS) if (k in d) set(k, d[k]);
+  }
 
   // Element kinds: text-ish (drawn at x,y with font height h) and pixel widgets
   // (fill the x,y,w,h rect). Mirrors the LCD zone kinds minus char-only ones.
@@ -733,6 +741,9 @@
     </PropertyCell>
     <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB.">
       {@render colourField('glassTint', pixel.glassTint, '14FFFFFF')}
+    </PropertyCell>
+    <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, dots, glass). Leaves elements, layouts and text untouched.">
+      <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
 

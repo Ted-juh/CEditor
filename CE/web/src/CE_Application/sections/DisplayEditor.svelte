@@ -4,7 +4,15 @@
   import { LCD_PALETTES } from '../editor/LcdDisplayRenderer.svelte';
   import { ZONE_SHOW_KINDS, WIDGET_ZONE_KINDS, isActiveSource, activeFilterOf } from '../utils/lcdZones.js';
   import { aarrggbbToHex, mergeHexKeepAlpha } from '../utils/colourHex.js';
+  import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
   import { setLcdDesignLayout } from '../stores/lcdDesignLayout.js';
+  // Reset only appearance (never content: layouts/zones/text/sources).
+  const APPEARANCE_KEYS = ['litColour', 'unlitColour', 'screenColour', 'backlightColour', 'glassTint',
+    'backlightOn', 'brightness', 'contrast', 'showGhost'];
+  function resetAppearance() {
+    const d = SECTION_DEFAULTS.Display ?? {};
+    for (const k of APPEARANCE_KEYS) if (k in d) set(k, d[k]);
+  }
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -731,6 +739,9 @@
     </PropertyCell>
     <PropertyCell label="Glass" span={2} hint="Glass sheen overlay colour, AARRGGBB (low alpha = subtle).">
       {@render colourField('glassTint', display.glassTint, '14FFFFFF')}
+    </PropertyCell>
+    <PropertyCell label="Reset" span={4} hint="Restore the default look (colours, brightness, ghost). Leaves layouts, zones and text untouched.">
+      <button class="val add-field" type="button" onclick={() => resetAppearance()}>↺ Reset appearance</button>
     </PropertyCell>
   </PropertySection>
 
