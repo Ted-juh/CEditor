@@ -581,6 +581,49 @@
           }
           prevY = py;
         }
+      } else if (w.kind === 'adsr') {
+        // ADSR envelope curve from four bound sources: attack/decay/release
+        // fracs scale their segment widths, sustain sets the plateau level.
+        const c01 = (v, fb) => (v === null || v === undefined ? fb : Math.max(0, Math.min(1, v)));
+        const at = c01(w.att, 0.3); const de = c01(w.dec, 0.3);
+        const su = c01(w.sus, 0.7); const re = c01(w.rel, 0.3);
+        const wsus = Math.max(2, Math.round(iw * 0.22));
+        const rest = Math.max(3, iw - wsus);
+        const weight = at + de + re + 0.18;
+        const wa = Math.max(1, Math.round((rest * (at + 0.06)) / weight));
+        const wd = Math.max(1, Math.round((rest * (de + 0.06)) / weight));
+        const wr = Math.max(1, rest - wa - wd);
+        const segIds = w.meterColours
+          ? [colId(METER_GREEN), colId(METER_YELLOW), baseId, colId(METER_RED)]
+          : [baseId, baseId, baseId, baseId];
+        const levelAt = (dx) => {
+          if (dx < wa) { const t = dx / Math.max(1, wa); return { v: Math.pow(t, 0.55), seg: 0 }; }
+          if (dx < wa + wd) { const t = (dx - wa) / Math.max(1, wd); return { v: su + (1 - su) * Math.pow(1 - t, 2), seg: 1 }; }
+          if (dx < wa + wd + wsus) return { v: su, seg: 2 };
+          const t = (dx - wa - wd - wsus) / Math.max(1, wr);
+          return { v: su * Math.pow(1 - Math.min(1, t), 2), seg: 3 };
+        };
+        let prevY = null;
+        for (let dx = 0; dx < iw; dx += 1) {
+          const { v, seg } = levelAt(dx);
+          cur = segIds[seg];
+          const py = Math.round(iy1 - v * (ih - 1));
+          if (w.fill) {
+            for (let yy = py; yy <= iy1; yy += 1) px(ix0 + dx, yy);
+          } else if (prevY === null) {
+            px(ix0 + dx, py);
+          } else {
+            const lo = Math.min(prevY, py); const hi = Math.max(prevY, py);
+            for (let yy = lo; yy <= hi; yy += 1) px(ix0 + dx, yy);
+          }
+          prevY = py;
+        }
+        cur = baseId;
+        if (w.ticks) {
+          for (const bx of [wa, wa + wd, wa + wd + wsus]) {
+            px(ix0 + bx, iy1); px(ix0 + bx, iy1 - 1);
+          }
+        }
       } else if (w.kind === 'scope') {
         // Rolling history trace of the bound source (oscilloscope / chart
         // recorder): one sample per pixel column across a time window.

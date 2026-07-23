@@ -16,7 +16,7 @@
   // part of the layout, so switching layouts switches animations.
   // 'wave' = synthesized waveform driven by MIDI values (shape + cutoff/reso/
   // LFO/freq sources); 'scope' = rolling history trace of the bound source.
-  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'anim'];
+  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'adsr', 'anim'];
 
   let { control = null } = $props();
 
@@ -495,6 +495,40 @@
                   <option value={src.id}>{src.name}</option>
                 {/each}
               </select>
+            {/if}
+            {#if el.kind === 'adsr'}
+              <span class="ex-lab">Atk</span>
+              <select class="val esel" title="Attack source (segment width)" value={el.attackSourceId ?? ''} onchange={(event) => setElement(i, 'attackSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">Dec</span>
+              <select class="val esel" title="Decay source (segment width)" value={el.decaySourceId ?? ''} onchange={(event) => setElement(i, 'decaySourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">Sus</span>
+              <select class="val esel" title="Sustain source (plateau level)" value={el.sustainSourceId ?? ''} onchange={(event) => setElement(i, 'sustainSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <span class="ex-lab">Rel</span>
+              <select class="val esel" title="Release source (segment width)" value={el.releaseSourceId ?? ''} onchange={(event) => setElement(i, 'releaseSourceId', event.target.value)}>
+                <option value="">(none)</option>
+                {#each allSources as src}
+                  <option value={src.id}>{src.name}</option>
+                {/each}
+              </select>
+              <label class="ex-chk" title="Fill under the curve"><input type="checkbox" checked={el.scopeFill === true} onchange={(event) => setElement(i, 'scopeFill', event.target.checked)} />Fill</label>
+              <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
+              <label class="ex-chk" title="Segment ticks at A/D/S/R boundaries"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
+              <label class="ex-chk" title="Colour the segments (A green, D yellow, S base, R red)"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
             {/if}
             {#if el.kind === 'scope'}
               <span class="ex-lab">Secs</span>

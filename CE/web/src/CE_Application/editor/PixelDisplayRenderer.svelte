@@ -14,7 +14,7 @@
 
   // Pixel-only widget kinds: the LCD's zone widgets plus the synthesized
   // waveform and the scope trace (which have no character fallback).
-  const PIXEL_WIDGET_KINDS = new Set([...WIDGET_ZONE_KINDS, 'wave', 'scope']);
+  const PIXEL_WIDGET_KINDS = new Set([...WIDGET_ZONE_KINDS, 'wave', 'scope', 'adsr']);
 
   let pixel = $derived(control?._children?.Pixel ?? null);
   let coreId = $derived(String(control?._children?.Core?.id ?? ''));
@@ -163,6 +163,10 @@
       const resInfo = kind === 'wave' ? controlInfo(String(el?.resoSourceId ?? '')) : null;
       const lfoInfo = kind === 'wave' ? controlInfo(String(el?.lfoSourceId ?? '')) : null;
       const freqInfo = kind === 'wave' ? controlInfo(String(el?.freqSourceId ?? '')) : null;
+      const attInfo = kind === 'adsr' ? controlInfo(String(el?.attackSourceId ?? '')) : null;
+      const decInfo = kind === 'adsr' ? controlInfo(String(el?.decaySourceId ?? '')) : null;
+      const susInfo = kind === 'adsr' ? controlInfo(String(el?.sustainSourceId ?? '')) : null;
+      const relInfo = kind === 'adsr' ? controlInfo(String(el?.releaseSourceId ?? '')) : null;
       out.push({
         id: String(el?.id ?? ''),
         kind,
@@ -191,6 +195,11 @@
         // scope: rolling history window
         secs: Math.max(0.25, numberOr(el?.scopeSecs, 3)),
         fill: el?.scopeFill === true,
+        // adsr: envelope curve from four sources
+        att: attInfo ? infoFraction(attInfo) : null,
+        dec: decInfo ? infoFraction(decInfo) : null,
+        sus: susInfo ? infoFraction(susInfo) : null,
+        rel: relInfo ? infoFraction(relInfo) : null,
       });
     }
     return out;
