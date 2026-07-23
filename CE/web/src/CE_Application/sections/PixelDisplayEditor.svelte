@@ -550,6 +550,9 @@
               <label class="ex-chk" title="Peak-hold marker (bars)"><input type="checkbox" checked={el.peakHold === true} onchange={(event) => setElement(i, 'peakHold', event.target.checked)} />Pk</label>
               <label class="ex-chk" title="Meter ballistics (smoothed movement)"><input type="checkbox" checked={el.smooth === true} onchange={(event) => setElement(i, 'smooth', event.target.checked)} />Sm</label>
               <label class="ex-chk" title="VU meter colours: green/yellow/red by level"><input type="checkbox" checked={el.meterColours === true} onchange={(event) => setElement(i, 'meterColours', event.target.checked)} />Clr</label>
+              {#if el.kind === 'hbar' || el.kind === 'vbar'}
+                <label class="ex-chk" title="Brightness gradient along the bar (dim base → bright tip); ignored when VU colours are on"><input type="checkbox" checked={el.gradient === true} onchange={(event) => setElement(i, 'gradient', event.target.checked)} />Grd</label>
+              {/if}
             {/if}
             {#if el.kind === 'wave'}
               <select class="val en2" title="Waveform shape" value={el.waveShape ?? 'saw'} onchange={(event) => setElement(i, 'waveShape', event.target.value)}>

@@ -254,6 +254,7 @@
         smooth: el?.smooth === true,
         colour: el?.colour ? cssColour(el.colour) : '',
         meterColours: el?.meterColours === true,
+        gradient: el?.gradient === true,
         // wave: synthesized waveform driven by MIDI values (no audio needed)
         shape: String(el?.waveShape ?? 'saw'),
         cycles: Math.max(0.25, numberOr(el?.waveCycles, 2)),

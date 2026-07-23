@@ -392,6 +392,18 @@
     };
   }
 
+  // Parse an rgb()/rgba()/#hex/AARRGGBB colour to {r,g,b} for gradients.
+  function parseRgb(css) {
+    const s = String(css ?? '').trim();
+    let m = s.match(/rgba?\(([^)]+)\)/i);
+    if (m) { const p = m[1].split(',').map((n) => parseFloat(n)); return { r: p[0] || 0, g: p[1] || 0, b: p[2] || 0 }; }
+    m = s.match(/^#?([0-9a-fA-F]{8})$/);
+    if (m) { const h = m[1]; return { r: parseInt(h.slice(2, 4), 16), g: parseInt(h.slice(4, 6), 16), b: parseInt(h.slice(6, 8), 16) }; }
+    m = s.match(/^#?([0-9a-fA-F]{6})$/);
+    if (m) { const n = parseInt(m[1], 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
+    return { r: 43, g: 232, b: 106 };
+  }
+
   const METER_GREEN = 'rgb(52,214,86)';
   const METER_YELLOW = 'rgb(235,200,60)';
   const METER_RED = 'rgb(240,72,56)';
@@ -471,6 +483,15 @@
               for (let y = iy0; y <= iy1; y += 1) px(ix0 + dx, y);
             }
             cur = baseId;
+          } else if (w.gradient) {
+            // Brightness gradient: dim at the base, bright toward the tip.
+            const b = parseRgb(w.colour || litCss);
+            for (let dx = 0; dx < fill; dx += 1) {
+              const t = 0.4 + 0.6 * (dx / Math.max(1, iw - 1));
+              cur = colId(`rgb(${Math.round(b.r * t)},${Math.round(b.g * t)},${Math.round(b.b * t)})`);
+              for (let y = iy0; y <= iy1; y += 1) px(ix0 + dx, y);
+            }
+            cur = baseId;
           } else {
             fillRect(ix0, iy0, ix0 + fill - 1, iy1);
           }
@@ -492,6 +513,15 @@
             // VU zoning by position: bottom green, middle yellow, top red.
             for (let dy = 0; dy < fill; dy += 1) {
               cur = meterId(dy / Math.max(1, ih - 1));
+              for (let x = ix0; x <= ix1; x += 1) px(x, iy1 - dy);
+            }
+            cur = baseId;
+          } else if (w.gradient) {
+            // Brightness gradient: dim at the base, bright toward the top.
+            const b = parseRgb(w.colour || litCss);
+            for (let dy = 0; dy < fill; dy += 1) {
+              const t = 0.4 + 0.6 * (dy / Math.max(1, ih - 1));
+              cur = colId(`rgb(${Math.round(b.r * t)},${Math.round(b.g * t)},${Math.round(b.b * t)})`);
               for (let x = ix0; x <= ix1; x += 1) px(x, iy1 - dy);
             }
             cur = baseId;
