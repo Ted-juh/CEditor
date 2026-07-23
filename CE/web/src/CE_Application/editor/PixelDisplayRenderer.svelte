@@ -224,6 +224,24 @@
     return out;
   });
 
+  // Freehand pixel-art (kind 'bitmap') → bitmap descriptors for the canvas.
+  let bitmaps = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      if (el?.visible === false || String(el?.kind ?? '') !== 'bitmap') continue;
+      if (el?.blink === true && !blinkPhase) continue;
+      out.push({
+        x: Math.round(numberOr(el?.x, 0)),
+        y: Math.round(numberOr(el?.y, 0)),
+        w: Math.max(1, Math.round(numberOr(el?.w, 8))),
+        h: Math.max(1, Math.round(numberOr(el?.h, 8))),
+        bits: String(el?.bits ?? ''),
+        colour: el?.colour ? cssColour(el.colour) : '',
+      });
+    }
+    return out;
+  });
+
   // Widget elements → pixel-rect widgets for the canvas.
   let pixelWidgets = $derived.by(() => {
     const out = [];
@@ -578,6 +596,7 @@
       pixelHeight={pixH}
       widgets={pixelWidgets}
       {texts}
+      {bitmaps}
       caret={caretRect}
       anims={animElements}
       animMode={animMode}

@@ -28,7 +28,8 @@
   // part of the layout, so switching layouts switches animations.
   // 'wave' = synthesized waveform driven by MIDI values (shape + cutoff/reso/
   // LFO/freq sources); 'scope' = rolling history trace of the bound source.
-  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'adsr', 'anim'];
+  const ELEMENT_KINDS = [...TEXT_KINDS, ...WIDGET_KINDS, 'wave', 'scope', 'adsr', 'anim', 'bitmap'];
+  const PAINT_MAX = 576; // cap the on-screen paint grid (24×24) to keep the DOM light
 
   let { control = null } = $props();
 
@@ -270,6 +271,24 @@
   function elementSourceValue(el) { return isActiveSource(el?.sourceId) ? '@active' : (el?.sourceId ?? ''); }
   // Set the "@active" kind filter (''=any) by rewriting the compound source id.
   function setElementActiveKind(i, kind) { setElement(i, 'sourceId', kind ? `@active#${kind}` : '@active'); }
+  // Freehand bitmap paint: toggle the bit at (x,y) within the element's w×h grid.
+  function bitmapDims(el) {
+    return { w: Math.max(1, Math.round(Number(el?.w) || 8)), h: Math.max(1, Math.round(Number(el?.h) || 8)) };
+  }
+  function paintBits(el) {
+    const { w, h } = bitmapDims(el);
+    return String(el?.bits ?? '').padEnd(w * h, '0').slice(0, w * h);
+  }
+  function togglePaintBit(i, el, idx) {
+    const arr = paintBits(el).split('');
+    arr[idx] = arr[idx] === '1' ? '0' : '1';
+    setElement(i, 'bits', arr.join(''));
+  }
+  function clearPaint(i) { setElement(i, 'bits', ''); }
+  function invertPaint(i, el) {
+    const arr = paintBits(el).split('').map((c) => (c === '1' ? '0' : '1'));
+    setElement(i, 'bits', arr.join(''));
+  }
   function moveElement(i, dir) {
     const next = cloneElements();
     const j = i + dir;
@@ -480,6 +499,8 @@
               <option value={name}>{name}</option>
             {/each}
           </select>
+        {:else if el.kind === 'bitmap'}
+          <span class="val esel bitmap-hint" title="Freehand pixel art — set W/H, then paint in the … panel">paint ↓</span>
         {:else if el.kind === 'clock'}
           <select class="val esel" title="Clock format (current time)" value={el.clockFormat ?? 'hm'} onchange={(event) => setElement(i, 'clockFormat', event.target.value)}>
             <option value="hm">HH:MM</option>
@@ -517,6 +538,27 @@
       </div>
       {#if expandedElementId === String(el.id ?? i)}
         <div class="el-extra">
+          {#if el.kind === 'bitmap'}
+            {@const bd = bitmapDims(el)}
+            <div class="ex-row">
+              <input class="val cswatch" type="color" title="Bitmap colour" value={aarrggbbToHex(el.colour || 'FF2BE86A')} oninput={(event) => setElement(i, 'colour', mergeHexKeepAlpha(el.colour || 'FF000000', event.target.value))} />
+              <button class="val add-field" type="button" onclick={() => clearPaint(i)}>Clear</button>
+              <button class="val add-field" type="button" onclick={() => invertPaint(i, el)}>Invert</button>
+              <span class="ex-lab">{bd.w}×{bd.h}</span>
+              <button class="val erm" type="button" onclick={() => moveElement(i, -1)} title="Move up" disabled={i === 0}>▲</button>
+              <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down" disabled={i === elements.length - 1}>▼</button>
+            </div>
+            {#if bd.w * bd.h <= PAINT_MAX}
+              {@const bits = paintBits(el)}
+              <div class="paint-grid" style={`grid-template-columns: repeat(${bd.w}, 1fr); max-width:${bd.w * 16}px;`}>
+                {#each bits.split('') as bit, idx (idx)}
+                  <button type="button" class="paint-cell" class:on={bit === '1'} aria-label={`pixel ${idx % bd.w},${Math.floor(idx / bd.w)}`} onclick={() => togglePaintBit(i, el, idx)}></button>
+                {/each}
+              </div>
+            {:else}
+              <span class="hint-note">Grid is {bd.w}×{bd.h} — too large to paint here (max {PAINT_MAX} cells). Reduce W/H to edit.</span>
+            {/if}
+          {:else}
           <div class="ex-row">
             {#if el.kind === 'anim'}
               {#if (el.animMode ?? 'preset') === 'file'}
@@ -657,6 +699,7 @@
             <button class="val erm ex-end" type="button" onclick={() => moveElement(i, -1)} title="Move up (paints earlier)" disabled={i === 0}>▲</button>
             <button class="val erm" type="button" onclick={() => moveElement(i, 1)} title="Move down (paints later, wins overlaps)" disabled={i === elements.length - 1}>▼</button>
           </div>
+          {/if}
         </div>
       {/if}
     {/each}
@@ -880,6 +923,42 @@
     padding: 1px;
     height: 22px;
     cursor: pointer;
+  }
+
+  .bitmap-hint {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+    font-style: italic;
+    pointer-events: none;
+  }
+
+  .paint-grid {
+    display: grid;
+    gap: 1px;
+    margin-top: 4px;
+    background: #333;
+    border: 1px solid #333;
+    width: fit-content;
+  }
+
+  .paint-cell {
+    width: 15px;
+    height: 15px;
+    padding: 0;
+    border: none;
+    background: #141414;
+    cursor: pointer;
+  }
+
+  .paint-cell.on {
+    background: #2BE86A;
+  }
+
+  .paint-cell:focus-visible {
+    outline: 2px solid #5B9BD5;
+    outline-offset: -2px;
   }
 
   .add-field {

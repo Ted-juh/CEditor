@@ -32,6 +32,7 @@
     fontScale = 1,
     widgets = [],
     caret = null,                // on-screen edit caret: {x, y, w, h, on} in grid px
+    bitmaps = [],                // freehand pixel art: {x, y, w, h, bits ('0'/'1' string), colour}
     texts = [],                  // pixel-positioned strings: {x, y, h, w, align, content}
     anims = [],                  // placeable animations: {id, x, y, w, h, mode, src, frames, fps, loop, preset, speed}
     animMode = 'off',            // off | file | preset
@@ -772,6 +773,23 @@
         stamp(textElementBitmap(t), colId(t.colour));
       }
     }
+    // Freehand pixel-art bitmaps: set each element's '1' bits into its rect.
+    for (const bm of (Array.isArray(bitmaps) ? bitmaps : [])) {
+      const bits = String(bm?.bits ?? '');
+      if (!bits) continue;
+      const bw = Math.max(1, Math.round(Number(bm.w) || 1));
+      const bh = Math.max(1, Math.round(Number(bm.h) || 1));
+      const id = colId(bm.colour);
+      for (let yy = 0; yy < bh; yy += 1) {
+        for (let xx = 0; xx < bw; xx += 1) {
+          if (bits[yy * bw + xx] !== '1') continue;
+          const gx = Math.round(Number(bm.x) || 0) + xx;
+          const gy = Math.round(Number(bm.y) || 0) + yy;
+          if (gx >= 0 && gx < pixW && gy >= 0 && gy < pixH) buf[gy * pixW + gx] = id;
+        }
+      }
+    }
+
     // Placeable animation elements: blit each one's current frame into its rect.
     for (const a of (Array.isArray(anims) ? anims : [])) {
       const tint = a.colourful && a.mode === 'preset' ? colId(hueCss(animTick, a.speed)) : colId(a.colour);
@@ -862,7 +880,7 @@
     void lines; void cols; void rows; void litCss; void unlitCss; void brightness;
     void contrast; void gamma; void glow; void showGhost; void dotShape; void blinkOn; void imageEl;
     void dither; void pixW; void pixH; void width; void height;
-    void widgets; void caret; void texts; void anims; void elAnimCaches; void animMode; void animCache;
+    void widgets; void caret; void bitmaps; void texts; void anims; void elAnimCaches; void animMode; void animCache;
     void animPreset; void animSpeed; void animLoop; void animTick; void imageColour; void animColour;
     try {
       draw();
