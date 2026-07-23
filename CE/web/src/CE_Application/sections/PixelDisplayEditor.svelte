@@ -252,6 +252,20 @@
     const next = cloneElements();
     if (next[i]) { next[i][prop] = value; commitElements(next); }
   }
+  // Distinct non-empty group names in the active element set.
+  let groupNames = $derived([...new Set(elements
+    .map((e) => String(e?.group ?? '').trim())
+    .filter(Boolean))]);
+  // Is every member of a group currently visible?
+  function groupVisible(name) {
+    return elements.filter((e) => String(e?.group ?? '').trim() === name).every((e) => e?.visible !== false);
+  }
+  // Show/hide all members of a group at once.
+  function setGroupVisible(name, visible) {
+    const next = cloneElements();
+    for (const e of next) if (String(e?.group ?? '').trim() === name) e.visible = visible;
+    commitElements(next);
+  }
   // The Source dropdown value: any "@active#kind" collapses to "@active".
   function elementSourceValue(el) { return isActiveSource(el?.sourceId) ? '@active' : (el?.sourceId ?? ''); }
   // Set the "@active" kind filter (''=any) by rewriting the compound source id.
@@ -544,6 +558,7 @@
             <input class="val ecol" type="text" title="Element colour AARRGGBB or RRGGBB (empty = panel lit colour)" placeholder="colour" value={el.colour ?? ''} onchange={(event) => setElement(i, 'colour', event.target.value.trim())} />
             <label class="ex-chk" title="Element visible"><input type="checkbox" checked={el.visible !== false} onchange={(event) => setElement(i, 'visible', event.target.checked)} />Vis</label>
             <label class="ex-chk" title="Blink this element on/off (~530ms)"><input type="checkbox" checked={el.blink === true} onchange={(event) => setElement(i, 'blink', event.target.checked)} />Blk</label>
+            <input class="val en" type="text" title="Group name: elements sharing a group drag together and can be shown/hidden as one" placeholder="grp" value={el.group ?? ''} onchange={(event) => setElement(i, 'group', event.target.value.trim())} />
             {#if WIDGET_KINDS.includes(el.kind)}
               <label class="ex-chk" title="Outline frame"><input type="checkbox" checked={el.frame === true} onchange={(event) => setElement(i, 'frame', event.target.checked)} />Frm</label>
               <label class="ex-chk" title="Tick marks"><input type="checkbox" checked={el.ticks === true} onchange={(event) => setElement(i, 'ticks', event.target.checked)} />Tck</label>
@@ -648,6 +663,12 @@
     <PropertyCell label="Elements" span={4} hint="Add a pixel-addressed element: text kinds draw at X/Y with font height H; widget kinds (bars/sliders/needle) fill the X/Y/W/H rect.">
       <button class="val add-field" type="button" onclick={() => addElement()}>+ Add element</button>
     </PropertyCell>
+
+    {#each groupNames as g (g)}
+      <PropertyCell label={`Group “${g}”`} span={4} hint="Elements in this group drag together on screen; toggle to show/hide them all.">
+        <label class="ex-chk" title="Show/hide every element in this group"><input type="checkbox" checked={groupVisible(g)} onchange={(event) => setGroupVisible(g, event.target.checked)} />Visible</label>
+      </PropertyCell>
+    {/each}
 
     <PropertyCell label="@active scope" span={4} hint="Restrict the ★ Active source to these controls. Empty = any control counts.">
       <span class="hint-note">{activeScope.length === 0 ? 'Any control' : `${activeScope.length} control(s)`}</span>

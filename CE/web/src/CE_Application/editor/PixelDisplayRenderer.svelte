@@ -329,7 +329,13 @@
     event.preventDefault();
     const el = elements[box.i];
     if (!el) return;
-    dragEl = { i: box.i, cx: event.clientX, cy: event.clientY, x: numberOr(el.x, 0), y: numberOr(el.y, 0) };
+    // Grouped elements move together: capture every member's start position.
+    const group = String(el.group ?? '').trim();
+    const members = elements
+      .map((e, idx) => ({ idx, e }))
+      .filter(({ e, idx }) => idx === box.i || (group && String(e?.group ?? '').trim() === group))
+      .map(({ idx, e }) => ({ idx, x: numberOr(e.x, 0), y: numberOr(e.y, 0) }));
+    dragEl = { i: box.i, cx: event.clientX, cy: event.clientY, x: numberOr(el.x, 0), y: numberOr(el.y, 0), members };
     window.addEventListener('mousemove', onElementDragMove);
     window.addEventListener('mouseup', endElementDrag);
   }
@@ -339,18 +345,21 @@
     const s = Math.max(0.01, Number(scale) || 1);
     const gx = (event.clientX - dragEl.cx) / s / (screenW / pixW);
     const gy = (event.clientY - dragEl.cy) / s / (screenH / pixH);
-    const el = elements[dragEl.i];
-    const prefix = elementPathPrefix(dragEl.i);
-    if (!el || !prefix || !coreId) return;
-    const w = Math.min(pixW, Math.max(1, Math.round(numberOr(el.w, 1))));
-    const h = Math.min(pixH, Math.max(1, Math.round(numberOr(el.h, 8))));
+    if (!coreId) return;
     // Optional snap-to-grid (Pixel.snapGrid, in grid pixels; 0 = free).
     const step = Math.max(0, Math.round(numberOr(pixel?.snapGrid, 0)));
     const snap = (v) => (step > 1 ? Math.round(v / step) * step : Math.round(v));
-    const nx = snap(clamp(dragEl.x + gx, 0, Math.max(0, pixW - w)));
-    const ny = snap(clamp(dragEl.y + gy, 0, Math.max(0, pixH - h)));
-    if (nx !== numberOr(el.x, 0)) updateControlProperty(coreId, `${prefix}.x`, nx);
-    if (ny !== numberOr(el.y, 0)) updateControlProperty(coreId, `${prefix}.y`, ny);
+    for (const m of (dragEl.members ?? [{ idx: dragEl.i, x: dragEl.x, y: dragEl.y }])) {
+      const el = elements[m.idx];
+      const prefix = elementPathPrefix(m.idx);
+      if (!el || !prefix) continue;
+      const w = Math.min(pixW, Math.max(1, Math.round(numberOr(el.w, 1))));
+      const h = Math.min(pixH, Math.max(1, Math.round(numberOr(el.h, 8))));
+      const nx = snap(clamp(m.x + gx, 0, Math.max(0, pixW - w)));
+      const ny = snap(clamp(m.y + gy, 0, Math.max(0, pixH - h)));
+      if (nx !== numberOr(el.x, 0)) updateControlProperty(coreId, `${prefix}.x`, nx);
+      if (ny !== numberOr(el.y, 0)) updateControlProperty(coreId, `${prefix}.y`, ny);
+    }
   }
 
   function endElementDrag() {
