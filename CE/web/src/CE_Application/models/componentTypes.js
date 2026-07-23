@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Meter: {
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Meter'),
+    defaultOverrides: {
+      // A horizontal level meter in a dark inset by default.
+      Transform: { width: 220, height: 34 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 6 },
+        },
+      },
+    },
+  },
+
   TestBox: {
     sections: ['Background', 'Effects'],
     defaultOverrides: {

@@ -29,6 +29,7 @@
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
+  import { meterPosition, meterPeak } from '../utils/meterLayout.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -158,7 +159,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyPixelValueSource(control, applyLcdValueSource(control, resolved));
+    return applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -716,6 +717,57 @@
       }
     }
     return { ...resolved, control: clone };
+  }
+
+  // --- Meter: value-driven level meter -----------------------------------
+  // Peak-hold state per control id + a lazy rAF ticker so the peak marker keeps
+  // decaying between value changes (only runs while a peak-hold meter exists).
+  let meterClock = $state(0);
+  const meterPeakState = {};
+  let meterTickerRunning = false;
+  function ensureMeterTicker() {
+    if (meterTickerRunning) return;
+    meterTickerRunning = true;
+    const loop = () => {
+      const anyPeak = (orderedControls ?? []).some((c) =>
+        String(c?._children?.Core?.controlType ?? '') === 'Meter' && c?._children?.Meter?.peakHold === true);
+      if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
+      meterClock = Date.now();
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+
+  // Inject the meter's live value + peak-hold onto the resolved Meter section:
+  // the value comes from a linked range control (valueSourceId) or the static
+  // config; the peak decays via the ticker. The renderer reads Meter.__value /
+  // Meter.__peak.
+  function applyMeterValueSource(control, resolved) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'Meter') return resolved;
+    const base = resolved?.control ?? control;
+    const meter = base?._children?.Meter;
+    if (!meter) return resolved;
+
+    const range = meter.valueSourceId ? lcdRangeForSource(meter.valueSourceId) : null;
+    const value = range && range.value !== undefined ? range.value : numberOr(meter.value, 0);
+    const nextMeter = { ...meter, __value: value };
+    if (range) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
+
+    if (meter.peakHold === true) {
+      ensureMeterTicker();
+      void meterClock; // re-evaluate as the peak decays
+      const pos = meterPosition(value, nextMeter);
+      const id = getControlId(control);
+      const now = Date.now();
+      const prev = meterPeakState[id] ?? { peak: pos, peakAt: now };
+      const next = meterPeak({
+        prevPeak: prev.peak, prevPeakAt: prev.peakAt, pos, now,
+        holdMs: numberOr(meter.peakHoldMs, 1200), decayPerSec: numberOr(meter.peakDecayPerSec, 0.4),
+      });
+      meterPeakState[id] = next;
+      nextMeter.__peak = next.peak;
+    }
+    return { ...resolved, control: { ...base, _children: { ...base._children, Meter: nextMeter } } };
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),

@@ -3,6 +3,7 @@
     BadgeCheck,
     CircleDot,
     Container,
+    Gauge,
     Grid3x3,
     Library,
     Monitor,
@@ -95,6 +96,7 @@
       { type: 'Image',           icon: Square,             label: 'Insert Image' },
       { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
       { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
+      { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

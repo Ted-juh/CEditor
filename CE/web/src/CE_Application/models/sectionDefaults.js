@@ -854,6 +854,55 @@ export const SECTION_DEFAULTS = {
     nowPlaying: false,            // mark the live/recalled row distinct from selection
   },
 
+  /** Meter — a read-only, value-driven level meter (bar / vertical / arc). */
+  Meter: {
+    _type: 'Meter',
+    orientation: 'horizontal',    // horizontal | vertical | arc
+    // Value + range. In preview the value comes from valueSourceId (a range
+    // control's live value); at runtime the bound `level` device port drives it.
+    value: 0.72,                  // static/test value (in value units)
+    valueMin: 0,
+    valueMax: 1,
+    valueSourceId: '',            // Core.id of a control whose value drives this meter
+    scale: 'linear',             // linear | db
+    dbFloor: -60,                 // dB at the bottom (scale = db)
+    dbCeil: 6,                    // dB at the top
+    // Fill styling.
+    segments: 0,                  // 0 = continuous fill; N = N discrete LED segments
+    segmentGap: 2,                // px gap between segments
+    gradient: true,               // blend zone colours smoothly (vs hard steps)
+    trackColour: 'FF1B1B1B',      // unlit background
+    fillColour: 'FF39D98A',       // used when no zones are configured
+    thickness: 0,                 // bar/arc thickness px (0 = fill the box)
+    rounded: 3,                   // fill corner radius (bar)
+    // Threshold zones (green → amber → red). Each lights from `from` (0..1) up.
+    zones: [
+      { from: 0.0, colour: 'FF39D98A' },
+      { from: 0.7, colour: 'FFF2C94C' },
+      { from: 0.9, colour: 'FFEB5757' },
+    ],
+    // Peak-hold marker.
+    peakHold: false,
+    peakHoldMs: 1200,             // hold before the marker starts falling
+    peakDecayPerSec: 0.4,         // normalized units/sec the marker falls after hold
+    peakColour: 'FFF2F2F2',
+    // Scale ticks + labels.
+    showTicks: false,
+    tickCount: 4,
+    showScaleLabels: false,       // print value/dB at the ticks
+    // Numeric readout.
+    showValue: false,
+    valuePrecision: 0,
+    valuePrefix: '',
+    valueSuffix: '',
+    // Caption.
+    label: '',
+    labelPosition: 'none',        // none | above | below
+    // Arc geometry (orientation = arc): clockwise from 3 o'clock in SVG space.
+    arcStart: 135,
+    arcSweep: 270,
+  },
+
   /** Parts — named internal sub-elements for advanced controls. */
   Parts: {
     _type: 'Parts',

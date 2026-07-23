@@ -5,7 +5,35 @@
 > whole synth tier actually needs. Part of the
 > [panel parts backlog](./README.md); see [component-gaps.md](./component-gaps.md).
 
-## Meter / Bargraph / LED
+## Meter — shipped 🟢
+
+Built as its own palette `controlType` (like the displays), not a slider preset —
+a read-only, value-driven level meter. Files: pure engine
+`utils/meterLayout.js` (+ `test/meterLayout.test.js`), `editor/MeterRenderer.svelte`,
+`sections/MeterEditor.svelte`, model in `componentTypes`/`componentPorts`/
+`sectionDefaults` (a `Meter` section), dispatch in `CanvasControl`, live value +
+peak in `PanelPreviewSurface.applyMeterValueSource`.
+
+- **Orientations:** horizontal bar, vertical bar, radial arc.
+- **Fill:** continuous (zone gradient, hard-step or smooth) or N discrete LED
+  segments; track colour, thickness, corner radius.
+- **Zones:** threshold colour stops (green→amber→red), each lighting the fill
+  from its position upward; colours the continuous gradient and each segment.
+- **Scale:** linear or dB (`dbFloor`/`dbCeil`), optional tick marks.
+- **Peak-hold:** a marker that jumps to the recent maximum, holds, then falls
+  (`peakHoldMs` / `peakDecayPerSec`), driven by a lazy rAF ticker in preview.
+- **Readout + caption:** optional numeric value (precision/prefix/suffix) and a
+  label above/below.
+- **Value source:** the `level` device port (inbound) drives it at runtime; in
+  preview a linked range control (`valueSourceId`) or the static value does — the
+  same value-driven-display machinery as the LCD, so the read-only "shows an
+  inbound value" capability below is satisfied for the Meter.
+
+Remaining: true two-way hardware feedback still depends on the inbound-MIDI
+wiring (Phase 0, code-written but unbuilt) for the `level` port to move from a
+live device value.
+
+## Meter / Bargraph / LED (original investigation)
 
 Mostly a **configuration of existing engines**, not a new primitive:
 
