@@ -103,6 +103,7 @@
   let pointerDownPoint = $state({ x: 0, y: 0 });
   let pointerDownZone = $state('');
   let listboxDrag = null; // { id, startY, startScroll, moved } while drag-scrolling a listbox
+  let listboxDoubleTap = false; // this press is the 2nd tap of a double-click on a listbox
   // Transient interaction-event tracking (onDoubleClick timing, onPointerMove throttle).
   let lastPointerDownAt = 0;
   let lastPointerDownId = '';
@@ -910,13 +911,47 @@
     selectComboboxRow(control, row);
     scrollListboxToIndex(control, index);
   }
+  // Arm the visible row at `index` as pending (double/enter/multi modes),
+  // scrolling it into view. Distinct from committing the value.
+  function armListboxIndex(control, index) {
+    const row = listboxRows(control, lbFilter(control))[index];
+    if (!isSelectableRow(row)) return;
+    patchControlSession(getControlId(control), { listboxPending: String(rowValue(row)) });
+    scrollListboxToIndex(control, index);
+  }
+  // The current keyboard anchor: the pending row if one is armed, else the
+  // committed selection.
+  function listboxAnchorIndex(control, filter) {
+    const pending = String(sessionFor(control)?.listboxPending ?? '');
+    if (pending) {
+      const at = listboxRows(control, filter).findIndex((r) => String(rowValue(r)) === pending);
+      if (at >= 0) return at;
+    }
+    return listboxIndexOfValue(control, currentComboboxValue(control), filter);
+  }
+
   // Keyboard navigation for a focused listbox. Returns true if handled.
   function handleListboxKey(control, event) {
     if (listboxConfig(control).keyboardNav === false) return false;
+    const cfg = listboxConfig(control);
+    const deferred = cfg.multiSelect === true || String(cfg.confirmMode ?? 'single') !== 'single';
     const filter = lbFilter(control);
     const rows = listboxRows(control, filter);
     if (!rows.length) return false;
-    const curIdx = listboxIndexOfValue(control, currentComboboxValue(control), filter);
+    // Enter / Space commit (or toggle in multi-select) the armed row.
+    if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+      if (!deferred) return false;
+      const idx = listboxAnchorIndex(control, filter);
+      const row = idx >= 0 ? rows[idx] : undefined;
+      if (isSelectableRow(row)) {
+        event.preventDefault();
+        if (cfg.multiSelect === true) toggleListboxSelection(control, row);
+        else confirmListboxPending(control, row);
+        return true;
+      }
+      return false;
+    }
+    const curIdx = deferred ? listboxAnchorIndex(control, filter) : listboxIndexOfValue(control, currentComboboxValue(control), filter);
     const perPage = Math.max(1, Math.floor(listboxViewport(control) / listboxRowStride(control)) - 1);
     let target = -1;
     switch (event.key) {
@@ -929,7 +964,10 @@
       default: return false;
     }
     event.preventDefault();
-    if (target >= 0) selectListboxIndex(control, target);
+    if (target >= 0) {
+      if (deferred) armListboxIndex(control, target);
+      else selectListboxIndex(control, target);
+    }
     return true;
   }
 
@@ -958,6 +996,54 @@
       return mode === 'fuzzy' ? fuzzyMatch(q, label) : label.startsWith(q);
     });
     if (idx >= 0) selectListboxIndex(control, idx);
+    return true;
+  }
+
+  // --- Confirm modes (D4) + multi-select (D5) ------------------------------
+  function listboxMultiSelected(control) {
+    const cur = sessionFor(control)?.listboxSelected;
+    return Array.isArray(cur) ? cur : [];
+  }
+  // Toggle a row in the multi-select set; the anchor value follows the row.
+  function toggleListboxSelection(control, row) {
+    if (!isSelectableRow(row)) return;
+    const controlId = getControlId(control);
+    const val = String(rowValue(row));
+    const cur = listboxMultiSelected(control).slice();
+    const at = cur.indexOf(val);
+    if (at >= 0) cur.splice(at, 1); else cur.push(val);
+    inspectPreviewControl(controlId);
+    patchControlSession(controlId, {
+      listboxSelected: cur,
+      valueOverrideEnabled: true, valueOverride: val,
+      focused: true, hover: true, pressed: false,
+    });
+  }
+  // A click's effect on a listbox row, honoring multiSelect + confirmMode.
+  function activateListboxRow(control, row) {
+    if (!isSelectableRow(row)) return;
+    const cfg = listboxConfig(control);
+    if (cfg.multiSelect === true) { toggleListboxSelection(control, row); return; }
+    const mode = String(cfg.confirmMode ?? 'single');
+    if (mode === 'single') {
+      selectComboboxRow(control, row);
+      patchControlSession(getControlId(control), { listboxPending: '' });
+    } else {
+      // double / enter: a single click only arms the row; commit happens on the
+      // double-click or Enter that confirms it.
+      patchControlSession(getControlId(control), {
+        listboxPending: String(rowValue(row)), focused: true, hover: true, pressed: false,
+      });
+      inspectPreviewControl(getControlId(control));
+    }
+  }
+  // Commit the armed (pending) row in double/enter confirm modes.
+  function confirmListboxPending(control, row) {
+    const target = row ?? listboxRows(control, lbFilter(control))
+      .find((r) => String(rowValue(r)) === String(sessionFor(control)?.listboxPending ?? ''));
+    if (!isSelectableRow(target)) return false;
+    selectComboboxRow(control, target);
+    patchControlSession(getControlId(control), { listboxPending: '' });
     return true;
   }
 
@@ -2117,6 +2203,26 @@
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
     }
+    // Listbox per-row hover: track the row under the pointer so the renderer can
+    // highlight / animate it. Runs whether or not the pointer is held.
+    if (isListboxControl(control) && !isDisabled(control)) {
+      if (listboxConfig(control).hoverHighlight !== false) {
+        const rect = event?.currentTarget?.getBoundingClientRect?.();
+        if (rect) {
+          const transformSection = control?._children?.Transform ?? null;
+          const localY = ((event.clientY - rect.top) / Math.max(rect.height, 1)) * (transformSection?.height ?? rect.height);
+          const scrollTop = numberOr(sessionFor(control)?.listboxScrollTop, 0);
+          const filter = lbFilter(control);
+          const idx = listboxRowIndexAtPoint(control, localY, scrollTop, filter);
+          const row = idx >= 0 ? listboxRows(control, filter)[idx] : undefined;
+          const hoverIdx = isSelectableRow(row) ? idx : -1;
+          if ((sessionFor(control)?.listboxHoverIndex ?? -1) !== hoverIdx) {
+            patchControlSession(getControlId(control), { listboxHoverIndex: hoverIdx });
+          }
+        }
+      }
+      return;
+    }
     if (isDisabled(control) || pointerActiveControlId) return;
     if (!isCustomComponent(control)) return;
     const controlId = getControlId(control);
@@ -2137,6 +2243,10 @@
   function handlePointerLeave(control) {
     if (isDisabled(control)) return;
     const controlId = getControlId(control);
+    // Drop any listbox hover-row highlight when the pointer leaves.
+    if (isListboxControl(control) && (sessionFor(control)?.listboxHoverIndex ?? -1) !== -1) {
+      patchControlSession(controlId, { listboxHoverIndex: -1 });
+    }
     if (pointerActiveControlId === controlId) {
       patchControlSession(controlId, {
         hover: false,
@@ -2162,9 +2272,11 @@
     // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
     const downId = getControlId(control);
     const downAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-    if (downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350) {
+    const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
+    if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
     }
+    listboxDoubleTap = isDoubleTap && isListboxControl(control);
     lastPointerDownId = downId;
     lastPointerDownAt = downAt;
     const pointerDownLocal = controlLocalPoint(event);
@@ -2380,7 +2492,11 @@
           // A moved drag-scroll suppresses the row select on release.
           if (!(listboxDrag && listboxDrag.moved)) {
             const row = resolveListboxPreviewValue(activeControl, event.clientX, event.clientY);
-            if (row) selectComboboxRow(activeControl, row);
+            if (row) {
+              const mode = String(listboxConfig(activeControl).confirmMode ?? 'single');
+              if (mode === 'double' && listboxDoubleTap) confirmListboxPending(activeControl, row);
+              else activateListboxRow(activeControl, row);
+            }
           }
           patchControlSession(activeId, { focused: true, hover: true });
         } else if (isComboboxControl(activeControl)) {

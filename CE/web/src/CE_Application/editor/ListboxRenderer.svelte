@@ -13,6 +13,7 @@
     control = null, width = 0, height = 0,
     selectedValue = undefined,   // single-select value
     selectedValues = null,       // Set of values (multi-select)
+    pendingValue = undefined,    // row awaiting confirm (double/enter modes)
     nowPlayingValue = undefined, // the live/recalled row
     hoveredIndex = -1,           // row under the pointer
     scrollTop = 0,
@@ -50,6 +51,14 @@
   let padLeft = $derived(Math.max(0, Number(control?._children?.ContentLayout?.paddingLeft) || 10));
 
   let selStyle = $derived(String(cfg.selectionStyle ?? 'bar'));
+  let stride = $derived(rowH + gap);
+
+  // Sliding selection indicator (animated): the visible-row index of the
+  // single-selected row, so a bar can transition between rows.
+  let selIndex = $derived.by(() => {
+    if (cfg.selectionAnim !== true || cfg.multiSelect === true) return -1;
+    return rows.findIndex((r) => r.isHeader !== true && isSelected(r));
+  });
 
   // Scrollbar thumb geometry (visual indicator of position).
   let scrollbarMode = $derived(String(cfg.scrollbar ?? 'auto'));
@@ -71,6 +80,9 @@
   }
   function isNowPlaying(row) {
     return nowPlayingValue !== undefined && String(rowValue(row)) === String(nowPlayingValue);
+  }
+  function isPending(row) {
+    return pendingValue !== undefined && pendingValue !== '' && String(rowValue(row)) === String(pendingValue);
   }
   function isImageIcon(icon) {
     const s = String(icon ?? '');
@@ -104,6 +116,9 @@
     <div class="listbox-empty" style={`padding-left:${padLeft}px;`}>{cfg.emptyText ?? 'No items'}</div>
   {:else}
     <div class="listbox-scroll" style={`transform: translateY(${-Math.max(0, scrollTop)}px);`}>
+      {#if selIndex >= 0}
+        <div class="listbox-sel-indicator" class:ind-outline={selStyle === 'outline'} style={`transform: translateY(${selIndex * stride}px); height:${rowH}px;`}></div>
+      {/if}
       {#each rows as row, i (row.id ?? row.internalValue ?? row.displayText)}
         {#if row.isHeader === true}
           <div class="listbox-header" style={`height:${rowH}px; margin-bottom:${gap}px; padding-left:${padLeft}px;`}>{row.displayText ?? ''}</div>
@@ -115,11 +130,12 @@
             class="listbox-row"
             class:selected={sel}
             class:disabled
+            class:pending={isPending(row) && !sel}
             class:hovered={i === hoveredIndex && cfg.hoverHighlight !== false}
             class:card={cfg.cardRows === true}
-            class:sel-bar={sel && selStyle === 'bar'}
-            class:sel-stripe={sel && selStyle === 'stripe'}
-            class:sel-outline={sel && selStyle === 'outline'}
+            class:sel-bar={sel && selStyle === 'bar' && cfg.selectionAnim !== true}
+            class:sel-stripe={sel && selStyle === 'stripe' && cfg.selectionAnim !== true}
+            class:sel-outline={sel && selStyle === 'outline' && cfg.selectionAnim !== true}
             class:sel-bold={sel && selStyle === 'bold'}
             class:now-playing={cfg.nowPlaying === true && isNowPlaying(row)}
             class:hov-glow={cfg.hoverAnim === 'glow'}
@@ -225,6 +241,26 @@
   }
   .listbox-row.sel-stripe { background: rgba(255, 255, 255, 0.05); }
   .listbox-row.sel-outline { box-shadow: inset 0 0 0 1.5px var(--lb-accent); }
+
+  /* Pending pick (awaiting confirm in double/enter modes) */
+  .listbox-row.pending { box-shadow: inset 0 0 0 1px var(--lb-accent); }
+  .listbox-row.pending::before {
+    content: ""; position: absolute; inset: 0; background: var(--lb-accent); opacity: 0.12;
+  }
+
+  /* Animated selection indicator (slides between rows) */
+  .listbox-sel-indicator {
+    position: absolute; left: 0; right: 0; top: 0; z-index: 0;
+    background: var(--lb-accent); opacity: 0.22;
+    border-left: 3px solid var(--lb-accent);
+    box-sizing: border-box;
+    transition: transform 160ms cubic-bezier(0.22, 0.61, 0.36, 1), height 160ms ease;
+    will-change: transform;
+  }
+  .listbox-sel-indicator.ind-outline {
+    background: transparent; box-shadow: inset 0 0 0 1.5px var(--lb-accent); border-left: none;
+  }
+  .listbox-row { z-index: 1; background: transparent; }
 
   .listbox-row.now-playing::after {
     content: "▶"; position: absolute; right: 6px; font-size: 0.7em; color: var(--lb-accent);

@@ -200,6 +200,12 @@
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let isComboboxControl = $derived(buttonType === 'combobox');
   let isListboxControl = $derived(buttonType === 'listbox');
+  // Multi-select set for the listbox renderer (null unless multiSelect is on).
+  let listboxMultiSet = $derived.by(() => {
+    if (!isListboxControl || (renderControl?._children?.Listbox?.multiSelect !== true)) return null;
+    const arr = previewSession?.listboxSelected;
+    return new Set((Array.isArray(arr) ? arr : []).map((v) => String(v)));
+  });
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   let designer = $derived(getSection(renderControl, 'Designer'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
@@ -4137,6 +4143,8 @@
         width={displayW}
         height={displayH}
         selectedValue={interactionRuntime?.signals?.valueRaw}
+        selectedValues={listboxMultiSet}
+        pendingValue={previewSession?.listboxPending ?? ''}
         scrollTop={previewSession?.listboxScrollTop ?? 0}
         hoveredIndex={previewSession?.listboxHoverIndex ?? -1}
         filterText={previewListboxFilter?.value ?? ''}
