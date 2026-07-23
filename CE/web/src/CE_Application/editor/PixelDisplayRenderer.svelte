@@ -29,6 +29,24 @@
     return Math.max(min, Math.min(max, value));
   }
 
+  // Word-wrap a string to at most `maxChars` per line, honouring explicit
+  // newlines and hard-breaking any single word longer than the line.
+  function wrapText(str, maxChars) {
+    const out = [];
+    for (const rawLine of String(str ?? '').split('\n')) {
+      if (maxChars <= 0) { out.push(rawLine); continue; }
+      let cur = '';
+      for (const word of rawLine.split(' ')) {
+        if (cur === '') cur = word;
+        else if ((cur + ' ' + word).length <= maxChars) cur += ' ' + word;
+        else { out.push(cur); cur = word; }
+        while (cur.length > maxChars) { out.push(cur.slice(0, maxChars)); cur = cur.slice(maxChars); }
+      }
+      out.push(cur);
+    }
+    return out.length ? out : [''];
+  }
+
   // AARRGGBB / RRGGBB hex → css rgba().
   function cssColour(value, fallback = 'transparent') {
     const raw = String(value ?? '').trim();
@@ -144,26 +162,33 @@
       const elY = Math.round(numberOr(el?.y, 0));
       const boxW = Math.max(0, Math.round(numberOr(el?.w, 0)));
       const elH = Math.max(3, Math.round(numberOr(el?.h, 8)));
+      const colour = el?.colour ? cssColour(el.colour) : '';
+      const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+      const align = String(el?.align ?? 'left');
+
+      // Word-wrap into stacked lines (honours explicit \n too). Takes precedence
+      // over marquee; each wrapped line is its own text entry.
+      if (el?.wrap === true && boxW > 0) {
+        const charsPerLine = Math.max(1, Math.floor(boxW / (FONT_ADVANCE * s)));
+        const lineH = FONT_H * s + 1;
+        wrapText(content, charsPerLine).forEach((ln, li) => {
+          const ly = elY + li * lineH;
+          if (ly < pixH) out.push({ x: elX, y: ly, w: boxW, h: elH, align, content: ln, colour });
+        });
+        continue;
+      }
+
       // Marquee: when the text overflows its W box, scroll a window across it
       // rather than clipping. Reads the rAF clock only when scroll is on, so
       // static text elements don't recompute every frame.
       if (el?.scroll === true && boxW > 0) {
-        const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
         const fit = Math.floor(boxW / (FONT_ADVANCE * s));
         if (fit > 0 && content.length > fit) {
           const elapsed = Math.floor((frameTime / 1000) * 3); // ~3 chars/sec
           content = zoneScrollWindow(content, fit, elapsed);
         }
       }
-      out.push({
-        x: elX,
-        y: elY,
-        w: boxW,
-        h: elH,
-        align: String(el?.align ?? 'left'),
-        content,
-        colour: el?.colour ? cssColour(el.colour) : '',
-      });
+      out.push({ x: elX, y: elY, w: boxW, h: elH, align, content, colour });
     }
     return out;
   });

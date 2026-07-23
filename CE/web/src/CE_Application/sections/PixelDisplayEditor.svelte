@@ -499,6 +499,7 @@
               <input class="val en" type="number" min="0" max="6" title="Decimal places (value kind)" value={el.precision ?? 0} onchange={(event) => setElement(i, 'precision', Math.max(0, Math.round(Number(event.target.value))))} />
               <input class="val ex-fill" type="text" title="Widgets: caption drawn under the widget (above it at the bottom edge). Name kind: overrides the source name." placeholder="caption" value={el.label ?? ''} oninput={(event) => setElement(i, 'label', event.target.value)} />
               <label class="ex-chk" title="Marquee-scroll the text when it overflows the W box (instead of clipping)"><input type="checkbox" checked={el.scroll === true} onchange={(event) => setElement(i, 'scroll', event.target.checked)} />Scrl</label>
+              <label class="ex-chk" title="Word-wrap into stacked lines within the W box (overrides scroll)"><input type="checkbox" checked={el.wrap === true} onchange={(event) => setElement(i, 'wrap', event.target.checked)} />Wrap</label>
               {#if el.kind === 'midiValue'}
                 <label class="ex-chk" title="Show the MIDI value in hexadecimal (00–7F)"><input type="checkbox" checked={el.radix === 'hex'} onchange={(event) => setElement(i, 'radix', event.target.checked ? 'hex' : 'dec')} />Hex</label>
               {/if}
