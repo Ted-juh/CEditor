@@ -73,6 +73,10 @@
     stepKinetic, kineticKick,
   } from '../utils/kineticLayout.js';
   import {
+    constellationConfig, constellationPresets, constellationGeometry,
+    constellationHitPreset, constellationFromPx, wanderPos,
+  } from '../utils/constellationLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -201,7 +205,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))));
+    return applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1836,6 +1840,116 @@
     ensureKineticTicker();
   }
 
+  // --- Preset Constellation: recall/morph a preset library; wander the probe --
+  const constPhaseState = {};   // { [id]: wander phase 0..1 }
+  let constTickerRunning = false;
+  let constLastMs = 0;
+  let constDrag = null;         // { id, kind: 'probe' | 'star', index }
+  function isConstControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Constellation';
+  }
+  function constControls() { return (orderedControls ?? []).filter((c) => isConstControl(c)); }
+  function constGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return constellationGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 10);
+  }
+  function constWorkingPresets(control) {
+    const s = sessionFor(control)?.constPresets;
+    return Array.isArray(s) ? s : constellationPresets(control);
+  }
+  function constModelProbe(control) {
+    const cfg = constellationConfig(control);
+    return { x: numberOr(cfg.probeX, 0.5), y: numberOr(cfg.probeY, 0.5) };
+  }
+  function constControlWith(control, probe, presets) {
+    const con = { ...control._children?.Constellation, __probeX: probe.x, __probeY: probe.y };
+    if (Array.isArray(presets)) con.presets = presets;
+    return { ...control, _children: { ...control._children, Constellation: con } };
+  }
+  function ensureConstTicker() {
+    if (constTickerRunning) return;
+    constTickerRunning = true;
+    constLastMs = Date.now();
+    const loop = () => {
+      const running = constControls().filter((c) => constellationConfig(c).running === true);
+      if (!running.length) { constTickerRunning = false; return; } // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - constLastMs) / 1000));
+      constLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        if (constDrag && constDrag.id === id) continue;      // manual override
+        const rate = numberOr(constellationConfig(c).wanderRate, 0.08);
+        const phase = ((constPhaseState[id] ?? 0) + rate * dt) % 1;
+        constPhaseState[id] = phase;
+        emitClockFanout(constControlWith(c, wanderPos(phase)), now, 'constellation');
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // Inject the live probe (drag > wander > committed) + any star drag + marker.
+  function applyConstellationValueSource(control, resolved) {
+    if (!isConstControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const con = base?._children?.Constellation;
+    if (!con) return resolved;
+    const id = getControlId(control);
+    const running = con.running === true;
+    if (running) { ensureConstTicker(); void orbitClock; }
+    const sess = sessionFor(control);
+    let probe;
+    if (typeof sess?.constX === 'number') probe = { x: sess.constX, y: sess.constY };
+    else if (running) probe = wanderPos(constPhaseState[id] ?? 0);
+    else probe = { x: numberOr(con.probeX, 0.5), y: numberOr(con.probeY, 0.5) };
+    const next = { ...con, __probeX: probe.x, __probeY: probe.y };
+    if (Array.isArray(sess?.constPresets)) next.presets = sess.constPresets;
+    if (sess?.constDrag) next.__drag = sess.constDrag;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Constellation: next } } };
+  }
+  // Pointer-down: grab a preset star if under the cursor, else jump + drag probe.
+  function handleConstellationPointerDown(control, localPoint) {
+    if (!isConstControl(control) || constellationConfig(control).editable === false) return false;
+    const id = getControlId(control);
+    const geom = constGeomFor(control);
+    const hit = constellationHitPreset(control, geom, localPoint.x, localPoint.y, 13);
+    if (hit >= 0) {
+      constDrag = { id, kind: 'star', index: hit };
+      patchControlSession(id, { constDrag: `star:${hit}` });
+      return true;
+    }
+    const p = constellationFromPx(localPoint.x, localPoint.y, geom);
+    constDrag = { id, kind: 'probe', index: -1 };
+    patchControlSession(id, { constX: p.x, constY: p.y, constDrag: 'probe' });
+    emitControlPortFanout(constControlWith(control, p), 'continuous');
+    return true;
+  }
+  function moveConstDrag(control, localPoint) {
+    const geom = constGeomFor(control);
+    const p = constellationFromPx(localPoint.x, localPoint.y, geom);
+    if (constDrag.kind === 'star') {
+      const presets = constWorkingPresets(control).map((x) => ({ ...x }));
+      if (presets[constDrag.index]) { presets[constDrag.index].x = p.x; presets[constDrag.index].y = p.y; }
+      patchControlSession(getControlId(control), { constPresets: presets });
+      emitControlPortFanout(constControlWith(control, constModelProbe(control), presets), 'continuous');
+    } else {
+      patchControlSession(getControlId(control), { constX: p.x, constY: p.y });
+      emitControlPortFanout(constControlWith(control, p), 'continuous');
+    }
+  }
+  function releaseConstDrag(control) {
+    const id = getControlId(control);
+    const sess = sessionFor(control);
+    if (constDrag.kind === 'star' && Array.isArray(sess?.constPresets)) {
+      updateControlProperty(id, 'Constellation.presets', sess.constPresets);
+    } else if (constDrag.kind === 'probe' && typeof sess?.constX === 'number') {
+      updateControlProperty(id, 'Constellation.probeX', sess.constX);
+      updateControlProperty(id, 'Constellation.probeY', sess.constY);
+    }
+    patchControlSession(id, { constPresets: undefined, constX: undefined, constY: undefined, constDrag: undefined });
+  }
+
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
@@ -3425,6 +3539,11 @@
       moveKineticDrag(control, controlLocalPoint(event));
       return;
     }
+    // Constellation: move the probe or reposition a preset star.
+    if (constDrag && constDrag.id === getControlId(control)) {
+      moveConstDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3539,6 +3658,8 @@
     handleTuringPointerDown(control, pointerDownLocal);
     // Kinetic: grab the ball to fling it.
     handleKineticPointerDown(control, pointerDownLocal);
+    // Constellation: grab a preset star, or jump + drag the probe.
+    handleConstellationPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3794,6 +3915,12 @@
       const kc = activeControl;
       kineticDrag = null;
       releaseKineticDrag(kc);
+    }
+
+    // Release a constellation probe / star: commit its position.
+    if (constDrag && activeControl) {
+      constDrag = null;
+      releaseConstDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

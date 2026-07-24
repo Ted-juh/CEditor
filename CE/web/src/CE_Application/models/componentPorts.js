@@ -4,6 +4,7 @@ import { orbitPorts } from '../utils/orbitLayout.js';
 import { looperPorts } from '../utils/looperLayout.js';
 import { routerPorts } from '../utils/routerLayout.js';
 import { timbrePorts } from '../utils/timbreLayout.js';
+import { constellationPorts } from '../utils/constellationLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -353,6 +354,10 @@ export function getComponentPorts(componentOrType) {
   // Timbre Space: one bindable port per morph target ("Target N").
   if (componentType === 'Timbre' && typeof componentOrType === 'object') {
     return timbrePorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Preset Constellation: one bindable port per morph target ("Target N").
+  if (componentType === 'Constellation' && typeof componentOrType === 'object') {
+    return constellationPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

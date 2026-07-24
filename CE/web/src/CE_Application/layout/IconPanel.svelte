@@ -11,6 +11,7 @@
     Palette,
     BarChart3,
     Circle,
+    Sparkle,
     Gauge,
     Spline,
     Grid2x2,
@@ -120,6 +121,7 @@
       { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
       { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
       { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
+      { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

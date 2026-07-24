@@ -93,6 +93,12 @@ not DSP:
 - Substrate: value layer + DPD (semantic) + Dump Analyzer (byte-level pairing).
 - Daily driver for sound design *and* reverse-engineering.
 
+### 4b. Preset Constellation — your library as a map — **shipped 🟢**
+- Presets as stars on a 2D field; a probe **recalls** (snap) or **morphs** (blend)
+  between them; similarity **links** + **auto-arrange** turn the library into a
+  navigable map; **wander** drifts through it. See
+  [preset-constellation.md](./preset-constellation.md).
+
 ### 5. Constrained Randomizer / "Generate"
 - Generate new patches **within DPD ranges and user locks** ("randomize all
   except the filter"). Only musical/safe because the DPD constrains it.

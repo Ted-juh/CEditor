@@ -40,6 +40,7 @@ const LAZY_COMPONENT_LOADERS = {
   timbre: () => import('../sections/TimbreEditor.svelte'),
   turing: () => import('../sections/TuringEditor.svelte'),
   kinetic: () => import('../sections/KineticEditor.svelte'),
+  constellation: () => import('../sections/ConstellationEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),

@@ -628,6 +628,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Constellation: {
+    sections: ['Background', 'Constellation', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Constellation'),
+    defaultOverrides: {
+      // A wide preset-map field on a dark panel by default.
+      Transform: { width: 260, height: 220 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0C0C12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
   Timbre: {
     sections: ['Background', 'Timbre', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Timbre'),

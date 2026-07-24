@@ -931,6 +931,43 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Constellation — your preset library as a 2D map of stars; a probe recalls
+   *  (snap) or morphs (blend) between them; links show sonic neighbours. */
+  Constellation: {
+    _type: 'Constellation',
+    probeX: 0.5,                  // probe position 0..1
+    probeY: 0.5,
+    mode: 'blend',               // snap (recall nearest) | blend (morph)
+    blendPower: 2,               // blend sharpness
+    running: false,              // wander (auto-drift the probe)
+    wanderRate: 0.08,            // wander cycles per second
+    editable: true,              // drag the probe / stars in preview
+    showLinks: true,             // constellation lines between similar presets
+    linkCount: 2,                // k nearest neighbours per preset
+    showField: true,
+    showLabels: true,
+    // Targets: the bindable dimensions each preset stores (target_N ports).
+    targets: [
+      { id: 'cutoff', label: 'Filter Cutoff', colour: 'FF39D98A' },
+      { id: 'reso', label: 'Resonance', colour: 'FF5B9BD5' },
+      { id: 'drive', label: 'Drive', colour: 'FF9B8AFF' },
+    ],
+    // Presets: stars on the map, each a patch (value per target).
+    presets: [
+      { id: 's0', label: 'Deep Pad', x: 0.2, y: 0.25, colour: 'FF5B9BD5', values: { cutoff: 0.2, reso: 0.3, drive: 0.1 } },
+      { id: 's1', label: 'Warm Keys', x: 0.32, y: 0.5, colour: 'FF9B8AFF', values: { cutoff: 0.42, reso: 0.35, drive: 0.15 } },
+      { id: 's2', label: 'Glass Bell', x: 0.72, y: 0.3, colour: 'FF39D98A', values: { cutoff: 0.72, reso: 0.2, drive: 0.2 } },
+      { id: 's3', label: 'Bright Lead', x: 0.82, y: 0.68, colour: 'FFF2C94C', values: { cutoff: 0.9, reso: 0.55, drive: 0.6 } },
+      { id: 's4', label: 'Screamer', x: 0.68, y: 0.85, colour: 'FFF2994A', values: { cutoff: 0.95, reso: 0.85, drive: 0.95 } },
+      { id: 's5', label: 'Sub Bass', x: 0.18, y: 0.78, colour: 'FFEB5757', values: { cutoff: 0.15, reso: 0.5, drive: 0.4 } },
+    ],
+    // Colours.
+    fieldColour: 'FF0C0C12',
+    probeColour: 'FFF2C94C',
+    linkColour: '332A6BA8',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Timbre — a 2D "sound map": axes are musical meanings, anchors are patches,
    *  and the puck blends them (inverse-distance) into every target's value. */
   Timbre: {
