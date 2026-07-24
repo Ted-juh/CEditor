@@ -708,6 +708,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  ChordPad: {
+    // Note-playing control: it emits MIDI notes rather than driving a device
+    // parameter, so it carries no DeviceBindings section.
+    sections: ['Background', 'ChordPad', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('ChordPad'),
+    defaultOverrides: {
+      // A square chord wheel on a dark panel by default.
+      Transform: { width: 260, height: 280 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

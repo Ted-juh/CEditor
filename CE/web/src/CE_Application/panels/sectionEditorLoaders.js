@@ -42,6 +42,7 @@ const LAZY_COMPONENT_LOADERS = {
   kinetic: () => import('../sections/KineticEditor.svelte'),
   constellation: () => import('../sections/ConstellationEditor.svelte'),
   constraint: () => import('../sections/ConstraintEditor.svelte'),
+  chordpad: () => import('../sections/ChordPadEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),

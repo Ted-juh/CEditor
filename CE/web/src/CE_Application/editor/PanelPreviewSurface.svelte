@@ -81,6 +81,12 @@
     constraintGeometry, barAtPoint, valueFromY as constraintValueFromY,
   } from '../utils/constraintLayout.js';
   import {
+    chordPadConfig, chordPadLayout as chordPadLayoutMode, chordPadPads, wheelSlots,
+    gridGeometry, gridHit, wheelGeometry, wheelHit, padNotes,
+    chordPadVelocity, chordPadChannel, noteOnBytes, noteOffBytes, bytesToHex,
+  } from '../utils/chordPadLayout.js';
+  import { triggerRawMidiAction } from '../bridge/bridge.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -209,7 +215,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))));
+    return applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2014,6 +2020,122 @@
     patchControlSession(getControlId(control), { constraintValues: undefined, constraintDrag: undefined });
   }
 
+  // --- Chord Pad: PLAY the synth (MIDI notes, not parameters) -----------------
+  // The only control here that emits notes: pressing a pad sends note-on for each
+  // chord tone (optionally strummed), releasing sends note-off. Notes go out as
+  // raw MIDI via the same bridge action the scripting runtime uses, so they reach
+  // whatever hardware output the 'mainSynth' role holds. Held pads + sounding
+  // notes live in the session so the renderer can light up.
+  const chordHeld = {};         // id -> { [padId]: number[] }  (sounding notes per pad)
+  const chordStrumTimers = {};  // id -> [timeoutId...]
+  let chordPress = null;        // { id, padId } while a pad is held by the pointer
+  function isChordPadControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'ChordPad';
+  }
+  function sendNoteBytes(bytes, actionId) {
+    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId, message: bytesToHex(bytes), dryRun: false });
+  }
+  // Push the union of every held pad's notes into the session (for the renderer).
+  function syncChordSession(control) {
+    const id = getControlId(control);
+    const map = chordHeld[id] ?? {};
+    const padIds = Object.keys(map);
+    const notes = [...new Set(padIds.flatMap((k) => map[k]))].sort((a, b) => a - b);
+    patchControlSession(id, { chordHeldIds: padIds, chordNotes: notes });
+  }
+  function chordNoteOn(control, padId, notes) {
+    const id = getControlId(control);
+    const cfg = chordPadConfig(control);
+    const ch = chordPadChannel(control);
+    const vel = chordPadVelocity(control);
+    const strum = Math.max(0, numberOr(cfg.strumMs, 0));
+    (chordHeld[id] ??= {})[padId] = notes;
+    notes.forEach((note, i) => {
+      if (strum > 0 && i > 0) {
+        const t = setTimeout(() => sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`), strum * i);
+        (chordStrumTimers[id] ??= []).push(t);
+      } else {
+        sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`);
+      }
+    });
+    syncChordSession(control);
+  }
+  function chordNoteOff(control, padId) {
+    const id = getControlId(control);
+    const map = chordHeld[id] ?? {};
+    const notes = map[padId];
+    if (!notes) return;
+    const ch = chordPadChannel(control);
+    // Only silence notes no OTHER held pad is still sounding.
+    const stillHeld = new Set(Object.entries(map).filter(([k]) => k !== padId).flatMap(([, v]) => v));
+    for (const note of notes) if (!stillHeld.has(note)) sendNoteBytes(noteOffBytes(ch, note), `note_off_${note}`);
+    delete map[padId];
+    syncChordSession(control);
+  }
+  function chordAllOff(control) {
+    const id = getControlId(control);
+    for (const t of chordStrumTimers[id] ?? []) clearTimeout(t);
+    chordStrumTimers[id] = [];
+    for (const padId of Object.keys(chordHeld[id] ?? {})) chordNoteOff(control, padId);
+  }
+  // Inject the held pads + sounding notes so the renderer lights up.
+  function applyChordPadValueSource(control, resolved) {
+    if (!isChordPadControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const c = base?._children?.ChordPad;
+    if (!c) return resolved;
+    const sess = sessionFor(control);
+    if (!sess?.chordHeldIds && !sess?.chordNotes) return resolved;
+    return {
+      ...resolved,
+      control: { ...base, _children: { ...base._children, ChordPad: { ...c, __held: sess.chordHeldIds ?? [], __notes: sess.chordNotes ?? [] } } },
+    };
+  }
+  // Which pad (if any) is under the pointer — shared by both layouts.
+  function chordPadAtPoint(control, localPoint) {
+    const t = control?._children?.Transform ?? {};
+    const w = numberOr(t.width, 0);
+    const h = numberOr(t.height, 0);
+    const cfg = chordPadConfig(control);
+    const pianoH = cfg.showPiano !== false ? 26 : 0;
+    if (chordPadLayoutMode(control) === 'grid') {
+      const pads = chordPadPads(control);
+      const geom = gridGeometry(w, h, Math.max(1, pads.length), Math.max(1, Math.round(numberOr(cfg.gridCols, 4))), 10, 30, pianoH);
+      const i = gridHit(geom, localPoint.x, localPoint.y, pads.length);
+      return i >= 0 ? pads[i] : null;
+    }
+    const geom = wheelGeometry(w, h - pianoH, 10, 30);
+    const hit = wheelHit(geom, localPoint.x, localPoint.y);
+    if (!hit) return null;
+    const slot = wheelSlots(control)[hit.index];
+    return hit.ring === 'minor' ? slot.minor : slot.major;
+  }
+  function handleChordPadPointerDown(control, localPoint) {
+    if (!isChordPadControl(control) || chordPadConfig(control).editable === false) return false;
+    const pad = chordPadAtPoint(control, localPoint);
+    if (!pad) return false;
+    const id = getControlId(control);
+    const latch = chordPadConfig(control).latch === true;
+    // Latch: a second tap on a sounding pad silences it.
+    if (latch && (chordHeld[id] ?? {})[pad.id]) { chordNoteOff(control, pad.id); return true; }
+    if (!latch) chordAllOff(control);            // momentary: one pad at a time
+    chordNoteOn(control, pad.id, padNotes(control, pad));
+    if (!latch) chordPress = { id, padId: pad.id };
+    return true;
+  }
+  // Drag across pads → legato: release the old pad, sound the new one.
+  function moveChordPress(control, localPoint) {
+    const pad = chordPadAtPoint(control, localPoint);
+    if (!pad || pad.id === chordPress.padId) return;
+    chordNoteOff(control, chordPress.padId);
+    chordNoteOn(control, pad.id, padNotes(control, pad));
+    chordPress.padId = pad.id;
+  }
+  function releaseChordPress(control) {
+    if (chordPadConfig(control).latch === true) return;   // latched pads keep ringing
+    chordAllOff(control);
+  }
+
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
@@ -3613,6 +3735,11 @@
       solveConstraintFrom(control, controlLocalPoint(event));
       return;
     }
+    // Chord Pad: slide across pads to play them legato.
+    if (chordPress && chordPress.id === getControlId(control)) {
+      moveChordPress(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3731,6 +3858,8 @@
     handleConstellationPointerDown(control, pointerDownLocal);
     // Constraint: grab a member bar; the rule moves the others.
     handleConstraintPointerDown(control, pointerDownLocal);
+    // Chord Pad: press a pad to sound its notes.
+    handleChordPadPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3998,6 +4127,13 @@
     if (constraintDrag && activeControl) {
       constraintDrag = null;
       releaseConstraintDrag(activeControl);
+    }
+
+    // Release a chord pad: note-off (unless latched).
+    if (chordPress && activeControl) {
+      const cpc = activeControl;
+      chordPress = null;
+      releaseChordPress(cpc);
     }
 
     if (isCustomComponent(activeControl)) {

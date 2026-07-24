@@ -1091,6 +1091,37 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** ChordPad — PLAYS the synth: key/scale-aware pads that emit MIDI notes.
+   *  Two layouts: wheel (circle of fifths) or grid. Not a parameter control. */
+  ChordPad: {
+    _type: 'ChordPad',
+    layout: 'wheel',              // wheel (circle of fifths) | grid
+    mode: 'chords',               // chords | notes
+    key: 0,                       // tonic pitch class (0 = C)
+    scale: 'major',               // see SCALES in chordPadLayout.js
+    chordType: 'triad',           // triad | seventh
+    voicing: 'close',             // close | spread | drop2
+    inversion: 0,
+    baseOctave: 4,                // tonic octave (4 → middle C)
+    octave: 0,                    // transpose in octaves
+    noteSpan: 2,                  // notes mode: octaves of scale notes
+    velocity: 96,
+    channel: 1,                   // MIDI channel 1-16
+    strumMs: 0,                   // stagger between chord notes (0 = block chord)
+    latch: false,                 // pads stay held until tapped again
+    editable: true,               // play the pads in preview
+    showPiano: true,              // the sounding-notes keyboard strip
+    showRomans: true,             // roman numerals on the pads
+    gridCols: 4,
+    // Colours.
+    fieldColour: 'FF101017',
+    padColour: 'FF171720',
+    inKeyColour: 'FF5B9BD5',
+    tonicColour: 'FFF2C94C',
+    minorColour: 'FF9B8AFF',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Constraint — linked parameters that always preserve a relationship the synth
    *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
   Constraint: {

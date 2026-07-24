@@ -28,6 +28,14 @@ not DSP:
 
 ## The ideas
 
+### 00. Chord Pad — PLAY the synth — **shipped 🟢** (new category)
+- Every other control modulates parameters; this one emits **MIDI notes**. Key +
+  scale aware pads in a **circle-of-fifths wheel** (V one step CW, IV one CCW,
+  relative minors inside, borrowed chords one step outside the lit wedge) or a
+  compact grid. See [chord-pad.md](./chord-pad.md).
+- It also builds the **note-output path**, which an Arpeggiator / ribbon-keyboard
+  / strum pad can now reuse cheaply.
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its
