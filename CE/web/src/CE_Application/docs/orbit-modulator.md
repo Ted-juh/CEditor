@@ -37,12 +37,17 @@ phase-offset pair, invert one for a counter-sweep.
   the `nodes[]`, display toggles). **Dynamic ports**: `getComponentPorts`
   generates one `node_N` port per satellite (like the Mod Matrix / Macro), so the
   DeviceBindings editor lists every satellite.
-- **Self-running preview** (`PanelPreviewSurface`) — a lazy rAF ticker advances
+- **Self-running clock** (`PanelPreviewSurface`) — a lazy rAF ticker advances
   each running Orbit's phase by `rate·dt`, re-renders, and **fans out every
-  satellite's value** to its bound parameter each frame. It self-stops when no
-  running Orbit remains (the Meter peak-hold pattern). Satellites can also be
-  **dragged** to a new radius/angle (its base angle is back-solved so it sits
-  under the cursor at the current phase), committed on release.
+  satellite's value** to its bound parameter. It self-stops when no running Orbit
+  remains (the Meter peak-hold pattern). Because the exported **Player mounts the
+  same surface** (with `dryRun=false`), the Orbit runs as a **live modulation
+  source driving real MIDI** — not just an editor animation. The fan-out is
+  **rate-capped (~40 Hz) and change-filtered** per port, so a free-running
+  modulator never floods the device and a parked satellite stays silent.
+  Satellites can also be **dragged** to a new radius/angle (its base angle is
+  back-solved so it sits under the cursor at the current phase), committed on
+  release.
 - **`OrbitEditor.svelte`** — a Run toggle + global Rate + display toggles, and a
   satellite table (label · colour · on/off · radius% · angle° · speed · output ·
   depth% · invert · add/remove).
@@ -57,9 +62,9 @@ stays declarative and the engine stays pure and testable.
 
 ## Possible next steps
 
-- **Player-side clock** — the editor preview animates; running the Orbit as a
-  live source in the exported Player wants the same ticker in `Player.svelte`.
 - **Phase sync** — bind the global phase to a host tempo / MIDI clock instead of
-  free-running seconds.
+  free-running seconds (bars/beats, retrigger on transport).
 - **Shapes beyond circles** — elliptical / Lissajous fields, or a "gravity" mode
   where satellites perturb each other.
+- **Per-satellite smoothing** — optional slew so a fast satellite emits a rounded
+  rather than stepped stream at the send cap.

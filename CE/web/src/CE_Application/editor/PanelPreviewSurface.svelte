@@ -1180,8 +1180,15 @@
   // live value to its device parameter. Satellites can also be dragged to a new
   // radius/angle. Only runs while a running Orbit exists (self-stops).
   const ORBIT_PAD = 10;
+  // The Orbit re-renders at rAF (~60Hz) but a free-running modulator must NOT
+  // spam that many MIDI messages per bound port. Cap each port's send rate and
+  // skip sends when its value hasn't meaningfully moved (a parked satellite is
+  // silent). ~40Hz max / ~0.5-of-127-step epsilon keeps it smooth yet lean.
+  const ORBIT_EMIT_MS = 25;
+  const ORBIT_EMIT_EPS = 0.004;
   let orbitClock = $state(0);
   const orbitPhaseState = {};   // { [id]: phase 0..1 }
+  const orbitLastSent = {};     // { [`${id}:${port}`]: { value, at } }
   let orbitTickerRunning = false;
   let orbitLastMs = 0;
   let orbitDrag = null;         // { id, index } while dragging a satellite
@@ -1211,12 +1218,38 @@
         const rate = numberOr(orbitConfig(c).rate, 0.25);
         const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
         orbitPhaseState[id] = (prev + rate * dt) % 1;
-        emitControlPortFanout(orbitControlWith(c, orbitPhaseState[id]), 'continuous');
+        emitOrbitFanout(c, orbitPhaseState[id], now);
       }
       orbitClock = now;
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+  // Rate-capped, change-filtered fan-out for the free-running clock: send a
+  // bound satellite's value only when it moved ≥ epsilon AND its port hasn't
+  // sent within ORBIT_EMIT_MS. Keeps a live modulator from flooding MIDI.
+  function emitOrbitFanout(control, phase, now) {
+    const values = controlPortValues(orbitControlWith(control, phase));
+    if (!values) return;
+    const controlId = getControlId(control);
+    for (const binding of activeDeviceBindings(control)) {
+      const port = String(binding?.port ?? '');
+      const v = values[port];
+      if (v === undefined) continue;
+      const key = `${controlId}:${port}`;
+      const prev = orbitLastSent[key];
+      if (prev && Math.abs(prev.value - v) < ORBIT_EMIT_EPS) continue; // parked / no move
+      if (prev && (now - prev.at) < ORBIT_EMIT_MS) continue;           // rate cap
+      orbitLastSent[key] = { value: v, at: now };
+      commitDeviceParameter({
+        requestId: `panel_preview_${controlId || 'control'}_orbit_${now}`,
+        deviceRole: binding.deviceRole || 'mainSynth',
+        parameterId: binding.parameterId,
+        value: v,
+        interactionPhase: 'continuous',
+        dryRun: binding.dryRun !== false,
+      });
+    }
   }
   // A control-like with its Orbit phase (and optional node override) swapped in,
   // for resolving fan-out / rendering from the live clock before it's committed.
