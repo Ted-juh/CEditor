@@ -5,6 +5,7 @@ import { looperPorts } from '../utils/looperLayout.js';
 import { routerPorts } from '../utils/routerLayout.js';
 import { timbrePorts } from '../utils/timbreLayout.js';
 import { constellationPorts } from '../utils/constellationLayout.js';
+import { constraintPorts } from '../utils/constraintLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -358,6 +359,10 @@ export function getComponentPorts(componentOrType) {
   // Preset Constellation: one bindable port per morph target ("Target N").
   if (componentType === 'Constellation' && typeof componentOrType === 'object') {
     return constellationPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Constraint Cell: one bindable port per linked member ("Member N").
+  if (componentType === 'Constraint' && typeof componentOrType === 'object') {
+    return constraintPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

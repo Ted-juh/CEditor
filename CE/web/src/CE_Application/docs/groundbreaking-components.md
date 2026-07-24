@@ -99,6 +99,11 @@ not DSP:
   navigable map; **wander** drifts through it. See
   [preset-constellation.md](./preset-constellation.md).
 
+### 4c. Constraint Cell — musical relationships enforced — **shipped 🟢**
+- Linked members that always preserve a rule (sum=100% / ordered / ratio /
+  mirror) as you move them — e.g. resonance never exceeds cutoff. Each is a
+  fan-out port. See [constraint-cell.md](./constraint-cell.md).
+
 ### 5. Constrained Randomizer / "Generate"
 - Generate new patches **within DPD ranges and user locks** ("randomize all
   except the filter"). Only musical/safe because the DPD constrains it.

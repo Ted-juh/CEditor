@@ -77,6 +77,10 @@
     constellationHitPreset, constellationFromPx, wanderPos,
   } from '../utils/constellationLayout.js';
   import {
+    constraintConfig, constraintMembers, constraintMode, applyConstraint,
+    constraintGeometry, barAtPoint, valueFromY as constraintValueFromY,
+  } from '../utils/constraintLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -205,7 +209,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))));
+    return applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1950,6 +1954,66 @@
     patchControlSession(id, { constPresets: undefined, constX: undefined, constY: undefined, constDrag: undefined });
   }
 
+  // --- Constraint Cell: drag a member bar; the rule moves the others ----------
+  let constraintDrag = null;    // { id, index } while dragging a member bar
+  function isConstraintControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Constraint';
+  }
+  function constraintGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const count = Math.max(1, constraintMembers(control).length);
+    return constraintGeometry(numberOr(t.width, 0), numberOr(t.height, 0), count, 8, 16);
+  }
+  function constraintWorkingValues(control) {
+    const sess = sessionFor(control)?.constraintValues;
+    return Array.isArray(sess) ? sess : constraintMembers(control).map((m) => m.value);
+  }
+  function constraintControlWith(control, values) {
+    return { ...control, _children: { ...control._children, Constraint: { ...control._children?.Constraint, __values: values } } };
+  }
+  // Inject the live (in-progress) values + dragged index onto the resolved cell.
+  function applyConstraintValueSource(control, resolved) {
+    if (!isConstraintControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const c = base?._children?.Constraint;
+    if (!c) return resolved;
+    const sess = sessionFor(control);
+    if (!Array.isArray(sess?.constraintValues) && sess?.constraintDrag === undefined) return resolved;
+    const next = { ...c };
+    if (Array.isArray(sess?.constraintValues)) next.__values = sess.constraintValues;
+    if (typeof sess?.constraintDrag === 'number') next.__drag = sess.constraintDrag;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Constraint: next } } };
+  }
+  // Set the dragged member from the pointer's Y, then run the solver.
+  function solveConstraintFrom(control, localPoint) {
+    const geom = constraintGeomFor(control);
+    const nv = constraintValueFromY(geom, localPoint.y);
+    const working = constraintWorkingValues(control);
+    const next = applyConstraint(working, constraintMode(control), constraintDrag.index, nv, { minGap: numberOr(constraintConfig(control).minGap, 0) });
+    patchControlSession(getControlId(control), { constraintValues: next });
+    emitControlPortFanout(constraintControlWith(control, next), 'continuous');
+  }
+  function handleConstraintPointerDown(control, localPoint) {
+    if (!isConstraintControl(control) || constraintConfig(control).editable === false) return false;
+    const geom = constraintGeomFor(control);
+    const idx = barAtPoint(geom, localPoint.x, constraintMembers(control).length);
+    if (idx < 0) return false;
+    constraintDrag = { id: getControlId(control), index: idx };
+    // Seed the working values from the model so the solver has a base.
+    patchControlSession(getControlId(control), { constraintValues: constraintMembers(control).map((m) => m.value), constraintDrag: idx });
+    solveConstraintFrom(control, localPoint);
+    return true;
+  }
+  function releaseConstraintDrag(control) {
+    const sess = sessionFor(control)?.constraintValues;
+    if (Array.isArray(sess)) {
+      const members = constraintMembers(control).map((m, i) => ({ ...m, value: Math.max(0, Math.min(1, numberOr(sess[i], m.value))) }));
+      updateControlProperty(getControlId(control), 'Constraint.members', members);
+      emitControlPortFanout(constraintControlWith(control, members.map((m) => m.value)), 'commit');
+    }
+    patchControlSession(getControlId(control), { constraintValues: undefined, constraintDrag: undefined });
+  }
+
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
@@ -3544,6 +3608,11 @@
       moveConstDrag(control, controlLocalPoint(event));
       return;
     }
+    // Constraint: drag a member bar, re-running the solver.
+    if (constraintDrag && constraintDrag.id === getControlId(control)) {
+      solveConstraintFrom(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3660,6 +3729,8 @@
     handleKineticPointerDown(control, pointerDownLocal);
     // Constellation: grab a preset star, or jump + drag the probe.
     handleConstellationPointerDown(control, pointerDownLocal);
+    // Constraint: grab a member bar; the rule moves the others.
+    handleConstraintPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3921,6 +3992,12 @@
     if (constDrag && activeControl) {
       constDrag = null;
       releaseConstDrag(activeControl);
+    }
+
+    // Release a constraint member: commit the solved values.
+    if (constraintDrag && activeControl) {
+      constraintDrag = null;
+      releaseConstraintDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

@@ -708,6 +708,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Constraint: {
+    sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Constraint'),
+    defaultOverrides: {
+      // A row of linked value bars on a dark panel by default.
+      Transform: { width: 200, height: 140 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Kinetic: {
     sections: ['Background', 'Kinetic', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Kinetic'),

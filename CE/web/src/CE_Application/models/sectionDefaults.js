@@ -1091,6 +1091,28 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Constraint — linked parameters that always preserve a relationship the synth
+   *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
+  Constraint: {
+    _type: 'Constraint',
+    mode: 'sum',                  // sum | order | ratio | mirror | free
+    minGap: 0,                    // order mode: minimum gap between members
+    editable: true,              // drag the member bars in preview
+    showValues: true,
+    showBadge: true,             // the rule badge (Σ=100% / a≤b≤c / …)
+    // Members: the linked parameters. Each is a bindable "Member" port.
+    members: [
+      { id: 'c0', label: 'Osc 1', value: 0.5, colour: 'FF39D98A' },
+      { id: 'c1', label: 'Osc 2', value: 0.3, colour: 'FF5B9BD5' },
+      { id: 'c2', label: 'Noise', value: 0.2, colour: 'FF9B8AFF' },
+    ],
+    // Colours.
+    fieldColour: 'FF0E0E13',
+    trackColour: '18FFFFFF',
+    linkColour: '55F2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Kinetic — a physics "bouncing ball": gravity + wall-bounce + drag drive a
    *  ball in a box; emits x / y / speed / bounce as modulation (fan-out). */
   Kinetic: {

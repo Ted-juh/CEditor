@@ -12,6 +12,7 @@
     BarChart3,
     Circle,
     Sparkle,
+    Link2,
     Gauge,
     Spline,
     Grid2x2,
@@ -122,6 +123,7 @@
       { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
       { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
       { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
+      { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

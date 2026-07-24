@@ -17,6 +17,7 @@ import { timbrePortValues } from './timbreLayout.js';
 import { turingPortValues } from './turingLayout.js';
 import { kineticPortValues } from './kineticLayout.js';
 import { constellationPortValues } from './constellationLayout.js';
+import { constraintPortValues } from './constraintLayout.js';
 
 const RESOLVERS = {
   Envelope: (control) => envelopeStageValues(control),
@@ -32,6 +33,7 @@ const RESOLVERS = {
   Turing: (control) => turingPortValues(control),
   Kinetic: (control) => kineticPortValues(control),
   Constellation: (control) => constellationPortValues(control),
+  Constraint: (control) => constraintPortValues(control),
 };
 
 // The map of { portId: value } a multi-port control currently exposes, or null.
