@@ -4,6 +4,7 @@
     CircleDot,
     Container,
     ArrowLeftRight,
+    CircleDashed,
     Gauge,
     Spline,
     Grid2x2,
@@ -106,6 +107,7 @@
       { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
       { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
       { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
+      { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

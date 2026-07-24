@@ -50,6 +50,7 @@
     ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonValueFromPx,
     ribbonSnap, ribbonReturnTarget, ribbonGlide,
   } from '../utils/ribbonLayout.js';
+  import { macroConfig, macroValue, macroGeometry, macroKnobHit } from '../utils/macroLayout.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -179,7 +180,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))));
+    return applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1133,6 +1134,41 @@
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+
+  // --- Macro: one knob → many assignments (fan-out) -----------------------
+  let macroDrag = null; // { id, startY, startValue } while turning the knob
+  function isMacroControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Macro';
+  }
+  function macroWorkingValue(control) {
+    const sess = sessionFor(control)?.macroValue;
+    return typeof sess === 'number' ? sess : macroValue(control);
+  }
+  function commitMacroValue(control, value) {
+    updateControlProperty(getControlId(control), 'Macro.value', value);
+  }
+  function macroControlWith(control, value) {
+    return { ...control, _children: { ...control._children, Macro: { ...control._children?.Macro, value } } };
+  }
+  function applyMacroValueSource(control, resolved) {
+    if (!isMacroControl(control)) return resolved;
+    const sess = sessionFor(control)?.macroValue;
+    if (typeof sess !== 'number') return resolved;
+    const base = resolved?.control ?? control;
+    const m = base?._children?.Macro;
+    if (!m) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Macro: { ...m, __value: sess } } } };
+  }
+  // Pointer-down on the knob starts a vertical drag (up = more).
+  function handleMacroPointerDown(control, localPoint) {
+    if (!isMacroControl(control) || macroConfig(control).editable === false) return false;
+    const t = control?._children?.Transform ?? {};
+    const geom = macroGeometry(numberOr(t.width, 0), numberOr(t.height, 0), control);
+    if (!macroKnobHit(geom, localPoint.x, localPoint.y)) return false;
+    macroDrag = { id: getControlId(control), startY: localPoint.y, startValue: macroWorkingValue(control) };
+    patchControlSession(getControlId(control), { dragging: true });
+    return true;
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2686,6 +2722,14 @@
       emitControlPortFanout(ribControlWith(control, value, true), 'continuous');
       return;
     }
+    // Macro: vertical knob drag (up = more) → fan out all assignments live.
+    if (macroDrag && macroDrag.id === getControlId(control)) {
+      const local = controlLocalPoint(event);
+      const value = Math.max(0, Math.min(1, macroDrag.startValue - (local.y - macroDrag.startY) / 150));
+      patchControlSession(getControlId(control), { macroValue: value, dragging: true });
+      emitControlPortFanout(macroControlWith(control, value), 'continuous');
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2786,6 +2830,8 @@
     handleCrossfaderPointerDown(control, pointerDownLocal);
     // Ribbon: absolute touch — jump the value to the finger + start tracking.
     handleRibbonPointerDown(control, pointerDownLocal);
+    // Macro: grab the knob for a vertical drag.
+    handleMacroPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2995,6 +3041,15 @@
     if (ribbonDrag && activeControl) {
       ribbonDrag = null;
       releaseRibbon(activeControl);
+    }
+
+    // Release a macro knob: commit the position, drop the session override.
+    if (macroDrag && activeControl) {
+      const value = macroWorkingValue(activeControl);
+      macroDrag = null;
+      commitMacroValue(activeControl, value);
+      emitControlPortFanout(macroControlWith(activeControl, value), 'commit');
+      patchControlSession(activeId, { macroValue: undefined, dragging: false });
     }
 
     if (isCustomComponent(activeControl)) {

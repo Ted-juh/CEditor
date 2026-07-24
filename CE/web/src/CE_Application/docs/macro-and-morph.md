@@ -1,9 +1,33 @@
 # Macro & Snapshot-Morph — Component Design
 
-> Status: **design.** The headline groundbreaking controls — and both are
-> **compositions** of already-designed foundations. Part of the
+> Status: **Macro shipped 🟢** (per-assignment version). Snapshot-morph still
+> design. Both are **compositions** of already-designed foundations. Part of the
 > [panel parts backlog](./README.md); ideation in
 > [groundbreaking-components.md](./groundbreaking-components.md).
+
+## Macro — shipped
+
+The per-assignment Macro is live: one knob → N destinations, each with its own
+depth, curve and range, driven through the fan-out mechanism. It's a knob wired
+into fan-out — assembly over the parts, exactly as this doc predicted.
+
+- Pure engine `utils/macroLayout.js` (+ `test/macroLayout.test.js`, 5 tests):
+  per-slot resolve (curve-shaped, inverted for negative depth, scaled by |depth|,
+  mapped into [min,max]), the knob geometry/angle + hit-test, and the dynamic
+  per-slot ports + fan-out values.
+- `MacroRenderer.svelte`: knob dial (value arc + pointer + readout) and the
+  assignment lanes (destination · colour meter · live value). Visual-only.
+- Model: `Macro` controlType + `Macro` section (`value` + `slots[]` of
+  `{ label, depth −1..1, curve, min, max, enabled, colour }`). **Dynamic ports** —
+  `getComponentPorts` generates one `slot_N` port per assignment (like the Mod
+  Matrix), so the DeviceBindings editor lists every destination.
+- Interaction (`PanelPreviewSurface`): vertical knob drag → session copy →
+  commit on release; every assignment emits its resolved value via the fan-out.
+- `MacroEditor.svelte`: knob position + an assignment table (label · depth% ·
+  curve · min · max · on/off · add/remove) + loader/tab/palette.
+
+**Not built:** the **snapshot-morph** macro below (define the panel at 0% and
+100% and morph between them) — a bigger feature that needs the snapshot system.
 
 ## Macro
 

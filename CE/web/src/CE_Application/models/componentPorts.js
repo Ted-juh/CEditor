@@ -1,4 +1,5 @@
 import { matrixPorts } from '../utils/matrixLayout.js';
+import { macroPorts } from '../utils/macroLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -315,6 +316,10 @@ export function getComponentPorts(componentOrType) {
   // generated from the control's rows × cols (dynamic, like custom components).
   if (componentType === 'Matrix' && typeof componentOrType === 'object') {
     return matrixPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Macro: one bindable port per assignment ("Destination"), from the slots.
+  if (componentType === 'Macro' && typeof componentOrType === 'object') {
+    return macroPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

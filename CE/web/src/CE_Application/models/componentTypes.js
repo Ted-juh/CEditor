@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Macro: {
+    sections: ['Background', 'Macro', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Macro'),
+    defaultOverrides: {
+      // A macro knob + assignment lanes in a dark panel by default.
+      Transform: { width: 320, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Ribbon: {
     sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Ribbon'),

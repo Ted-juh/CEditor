@@ -903,6 +903,30 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Macro — one knob driving many assignments (depth · curve · range) via fan-out. */
+  Macro: {
+    _type: 'Macro',
+    value: 0.28,                  // knob position 0..1
+    editable: true,
+    showLanes: true,              // show the assignment lanes (vs knob only)
+    showValues: true,             // per-lane live value readout
+    label: 'Macro',
+    // Assignments: each maps the macro position to a bound device parameter with
+    // its own depth (−1..1; sign = direction), curve and output range. Each slot
+    // is a bindable port ("Destination").
+    slots: [
+      { id: 'm0', label: 'Filter Cutoff', depth: 1.0, curve: 'linear', min: 0, max: 1, enabled: true, colour: 'FF39D98A' },
+      { id: 'm1', label: 'Reverb Mix', depth: 0.6, curve: 'linear', min: 0, max: 1, enabled: true, colour: 'FF5B9BD5' },
+      { id: 'm2', label: 'Osc Detune', depth: -0.4, curve: 'linear', min: 0, max: 1, enabled: true, colour: 'FFF2C94C' },
+      { id: 'm3', label: 'Drive', depth: 1.0, curve: 'exp', min: 0, max: 1, enabled: true, colour: 'FFF2994A' },
+    ],
+    // Colours.
+    knobColour: 'FF23232A',
+    arcColour: 'FF5B9BD5',
+    trackColour: 'FF0E0E12',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Ribbon — a 1-D absolute-touch strip / pitch-mod wheel with return-to-rest. */
   Ribbon: {
     _type: 'Ribbon',
