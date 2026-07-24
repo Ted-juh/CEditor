@@ -214,6 +214,13 @@ export const DEFAULT_COMPONENT_PORTS = {
     { id: 'gate', label: 'Gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
     { id: 'inverse', label: 'Inverse', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
   ],
+  Kinetic: [
+    // A physics ball: its position axes, its speed, and a bounce pulse.
+    { id: 'x', label: 'X position', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'y', label: 'Y position', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'speed', label: 'Speed', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'bounce', label: 'Bounce gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
   VectorJoystick: [
     // Two axes + four bilinear corner blends — bind any subset (fan-out).
     { id: 'x', label: 'X axis', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },

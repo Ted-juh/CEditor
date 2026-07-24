@@ -57,8 +57,13 @@ not DSP:
 ### 0e. Turing Modulator — lock or evolve a step sequence — **shipped 🟢**
 - The **algorithmic** motion source: a looping shift-register whose single
   randomness knob goes from frozen loop to pure chaos. Value / gate / inverse
-  fan-out ports. Completes the motion family (Orbit = geometric, Looper = human,
-  Turing = generative). See [turing-modulator.md](./turing-modulator.md).
+  fan-out ports. See [turing-modulator.md](./turing-modulator.md).
+
+### 0f. Kinetic Modulator — physics you fling — **shipped 🟢**
+- The **physical** motion source: a ball with gravity, wall-bounce and drag that
+  you fling around a box, emitting X / Y / speed / bounce. Rounds out the motion
+  family (geometric · human · generative · **physical**). See
+  [kinetic-modulator.md](./kinetic-modulator.md).
 
 ### 1. Macro control → Snapshot Morph (headline)
 - **Macro:** one knob drives **many** device parameters with per-target curves

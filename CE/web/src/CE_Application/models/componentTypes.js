@@ -692,6 +692,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Kinetic: {
+    sections: ['Background', 'Kinetic', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Kinetic'),
+    defaultOverrides: {
+      // A square physics box on a dark panel by default.
+      Transform: { width: 180, height: 180 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0D0D12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Orbit: {
     sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Orbit'),

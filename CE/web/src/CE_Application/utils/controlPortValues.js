@@ -15,6 +15,7 @@ import { looperPortValues } from './looperLayout.js';
 import { routerPortValues } from './routerLayout.js';
 import { timbrePortValues } from './timbreLayout.js';
 import { turingPortValues } from './turingLayout.js';
+import { kineticPortValues } from './kineticLayout.js';
 
 const RESOLVERS = {
   Envelope: (control) => envelopeStageValues(control),
@@ -28,6 +29,7 @@ const RESOLVERS = {
   Router: (control) => routerPortValues(control),
   Timbre: (control) => timbrePortValues(control),
   Turing: (control) => turingPortValues(control),
+  Kinetic: (control) => kineticPortValues(control),
 };
 
 // The map of { portId: value } a multi-port control currently exposes, or null.

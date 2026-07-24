@@ -69,6 +69,10 @@
     stepAtPoint, valueFromY, turingStepsPerSecond, mutateStep,
   } from '../utils/turingLayout.js';
   import {
+    kineticConfig, kineticParams, kineticInitial, kineticGeometry, kineticFromPx,
+    stepKinetic, kineticKick,
+  } from '../utils/kineticLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -197,7 +201,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))));
+    return applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1717,6 +1721,119 @@
     const sess = sessionFor(control)?.turingSteps;
     if (Array.isArray(sess)) updateControlProperty(getControlId(control), 'Turing.steps', sess);
     // Keep the session register so evolution continues from the edited seed.
+  }
+
+  // --- Kinetic Modulator: a physics ball you fling around a box ---------------
+  // The physics integration is stateful, so the evolving ball state (+ trail)
+  // lives in plain maps advanced by the shared clock; the pure stepKinetic does
+  // the maths. Fling: drag sets position and derives a throw velocity; on release
+  // the ball flies off and the ticker takes over. Generative state is ephemeral.
+  const KINETIC_PAD = 8;
+  const kineticStateMap = {};   // id -> { x, y, vx, vy, bounced }
+  const kineticTrailMap = {};   // id -> [{ x, y }...]
+  let kineticTickerRunning = false;
+  let kineticLastMs = 0;
+  let kineticDrag = null;       // { id, lastX, lastY, lastT } while flinging
+  function isKineticControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Kinetic';
+  }
+  function kineticControls() {
+    return (orderedControls ?? []).filter((c) => isKineticControl(c));
+  }
+  function kineticStateFor(control) {
+    return kineticStateMap[getControlId(control)] ?? kineticInitial(control);
+  }
+  function kineticControlWith(control, state, trail, extra) {
+    const k = { ...control._children?.Kinetic, __state: state };
+    if (Array.isArray(trail)) k.__trail = trail;
+    if (extra) Object.assign(k, extra);
+    return { ...control, _children: { ...control._children, Kinetic: k } };
+  }
+  function pushKineticTrail(id, state) {
+    const tr = kineticTrailMap[id] ?? [];
+    tr.push({ x: state.x, y: state.y });
+    while (tr.length > 16) tr.shift();
+    kineticTrailMap[id] = tr;
+  }
+  function ensureKineticTicker() {
+    if (kineticTickerRunning) return;
+    kineticTickerRunning = true;
+    kineticLastMs = Date.now();
+    const loop = () => {
+      const active = kineticControls().filter((c) => kineticConfig(c).running !== false || (kineticDrag && kineticDrag.id === getControlId(c)));
+      if (!active.length) { kineticTickerRunning = false; return; } // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.05, Math.max(0, (now - kineticLastMs) / 1000));
+      kineticLastMs = now;
+      for (const c of active) {
+        const id = getControlId(c);
+        if (kineticDrag && kineticDrag.id === id) continue; // driven by the fling drag
+        const params = kineticParams(c);
+        const prev = kineticStateMap[id] ?? kineticInitial(c);
+        let next = stepKinetic(prev, dt, params);
+        // Keep-alive: a nearly-stalled ball gets a fresh random kick.
+        if (params.keepAlive > 0 && Math.hypot(next.vx, next.vy) < 0.05) {
+          next = { ...next, ...kineticKick(next, params.keepAlive, Math.random(), Math.random()) };
+        }
+        kineticStateMap[id] = next;
+        pushKineticTrail(id, next);
+        emitClockFanout(kineticControlWith(c, next, null, { __bounce: next.bounced }), now, 'kinetic');
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  function applyKineticValueSource(control, resolved) {
+    if (!isKineticControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const k = base?._children?.Kinetic;
+    if (!k) return resolved;
+    const id = getControlId(control);
+    if (k.running !== false || (kineticDrag && kineticDrag.id === id)) { ensureKineticTicker(); void orbitClock; }
+    const next = { ...k, __state: kineticStateMap[id] ?? kineticInitial(control), __trail: kineticTrailMap[id] ?? [] };
+    if (kineticDrag && kineticDrag.id === id) next.__drag = true;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Kinetic: next } } };
+  }
+  function kineticGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return kineticGeometry(numberOr(t.width, 0), numberOr(t.height, 0), KINETIC_PAD);
+  }
+  function handleKineticPointerDown(control, localPoint) {
+    if (!isKineticControl(control) || kineticConfig(control).editable === false) return false;
+    const geom = kineticGeomFor(control);
+    const p = kineticFromPx(localPoint.x, localPoint.y, geom);
+    const id = getControlId(control);
+    kineticDrag = { id, lastX: p.x, lastY: p.y, lastT: Date.now() };
+    kineticStateMap[id] = { x: p.x, y: p.y, vx: 0, vy: 0, bounced: false };
+    ensureKineticTicker();
+    return true;
+  }
+  // Track the finger and derive a throw velocity from its recent movement.
+  function moveKineticDrag(control, localPoint) {
+    const geom = kineticGeomFor(control);
+    const p = kineticFromPx(localPoint.x, localPoint.y, geom);
+    const now = Date.now();
+    const dt = Math.max(0.001, (now - kineticDrag.lastT) / 1000);
+    const id = getControlId(control);
+    const vx = (p.x - kineticDrag.lastX) / dt;
+    const vy = (p.y - kineticDrag.lastY) / dt;
+    kineticStateMap[id] = { x: p.x, y: p.y, vx, vy, bounced: false };
+    pushKineticTrail(id, kineticStateMap[id]);
+    kineticDrag.lastX = p.x; kineticDrag.lastY = p.y; kineticDrag.lastT = now;
+    emitControlPortFanout(kineticControlWith(control, kineticStateMap[id]), 'continuous');
+    orbitClock = now;
+  }
+  // Release: clamp the fling velocity; the ticker integrates from here.
+  function releaseKineticDrag(control) {
+    const id = getControlId(control);
+    const st = kineticStateMap[id];
+    if (st) {
+      const cap = kineticParams(control).maxSpeed * 1.5;
+      const sp = Math.hypot(st.vx, st.vy);
+      if (sp > cap) { const kk = cap / sp; kineticStateMap[id] = { ...st, vx: st.vx * kk, vy: st.vy * kk }; }
+    }
+    ensureKineticTicker();
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -3303,6 +3420,11 @@
       paintTuringStep(control, controlLocalPoint(event));
       return;
     }
+    // Kinetic: drag the ball (deriving a throw velocity).
+    if (kineticDrag && kineticDrag.id === getControlId(control)) {
+      moveKineticDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3415,6 +3537,8 @@
     handleTimbrePointerDown(control, pointerDownLocal);
     // Turing: paint a step bar's value.
     handleTuringPointerDown(control, pointerDownLocal);
+    // Kinetic: grab the ball to fling it.
+    handleKineticPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3663,6 +3787,13 @@
     if (turingDrag && activeControl) {
       turingDrag = null;
       releaseTuringDrag(activeControl);
+    }
+
+    // Release the kinetic ball: it flies off with the fling velocity.
+    if (kineticDrag && activeControl) {
+      const kc = activeControl;
+      kineticDrag = null;
+      releaseKineticDrag(kc);
     }
 
     if (isCustomComponent(activeControl)) {

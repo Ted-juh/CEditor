@@ -1054,6 +1054,28 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Kinetic — a physics "bouncing ball": gravity + wall-bounce + drag drive a
+   *  ball in a box; emits x / y / speed / bounce as modulation (fan-out). */
+  Kinetic: {
+    _type: 'Kinetic',
+    running: true,               // integrate the physics in preview / player
+    gravity: 0,                   // downward pull (0 = zero-g billiard)
+    restitution: 0.92,           // wall bounce energy kept (1 = perpetual)
+    friction: 0.04,              // air drag per second
+    keepAlive: 0.35,             // re-kick strength when the ball nearly stalls
+    editable: true,              // fling the ball in preview
+    showTrail: true,
+    showWalls: true,
+    // Starting position + velocity.
+    initial: { x: 0.5, y: 0.72, vx: 0.7, vy: 0.2 },
+    // Colours.
+    fieldColour: 'FF0D0D12',
+    ballColour: 'FF39D98A',
+    trailColour: '6639D98A',
+    wallColour: '332A6BA8',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Orbit — a spatial poly-LFO: satellites orbit a centre, each emitting a live
    *  0..1 modulation value from its position (one bindable port per satellite). */
   Orbit: {

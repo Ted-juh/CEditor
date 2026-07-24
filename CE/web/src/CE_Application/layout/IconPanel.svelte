@@ -10,6 +10,7 @@
     Waypoints,
     Palette,
     BarChart3,
+    Circle,
     Gauge,
     Spline,
     Grid2x2,
@@ -118,6 +119,7 @@
       { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
       { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
       { type: 'Turing',          icon: BarChart3,          label: 'Insert Turing Modulator' },
+      { type: 'Kinetic',         icon: Circle,             label: 'Insert Kinetic Modulator' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
