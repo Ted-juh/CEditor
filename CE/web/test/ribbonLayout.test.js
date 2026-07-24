@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ribbonSnap, ribbonGeometry, ribbonIndicator, ribbonValueFromPx,
-  ribbonReturnTarget, ribbonGlide, ribbonPortValues,
+  ribbonReturnTarget, ribbonGlide, ribbonPortValues, wheelRidges,
 } from '../src/CE_Application/utils/ribbonLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -40,6 +40,22 @@ test('glide steps, clamps, and snaps instantly when rate ≤ 0', () => {
   assert.ok(near(s.value, 0.5) && s.settled === true);
   s = ribbonGlide(0.1, 0.5, 0, 1);      // rate 0 → instant snap
   assert.ok(near(s.value, 0.5) && s.settled === true);
+});
+
+test('wheelRidges project + scroll like a rotating cylinder', () => {
+  const r = wheelRidges(0.5, 16);
+  assert.equal(r.length, 16);
+  assert.ok(r.every((x) => x.pos >= 0 && x.pos <= 1 && x.shade >= 0 && x.shade <= 1));
+  // Sorted top→bottom; ridges bunch near the ends (smaller gaps than the middle).
+  const gaps = r.slice(1).map((x, i) => x.pos - r[i].pos);
+  const midGap = gaps[Math.floor(gaps.length / 2)];
+  assert.ok(gaps[0] < midGap); // top edge denser than the centre
+  // Shading is brightest mid-face, dim at the edges.
+  assert.ok(r[0].shade < 0.5 && r[Math.floor(r.length / 2)].shade > 0.7);
+  // Rotating (changing value) moves the ridge set.
+  const a = wheelRidges(0.2, 16).map((x) => x.pos.toFixed(3)).join();
+  const b = wheelRidges(0.35, 16).map((x) => x.pos.toFixed(3)).join();
+  assert.notEqual(a, b);
 });
 
 test('portValues: value (bipolar) + touch gate', () => {

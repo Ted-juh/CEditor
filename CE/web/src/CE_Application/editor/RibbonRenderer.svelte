@@ -5,7 +5,7 @@
   // ribbonLayout geometry (pad = 8). Live value/touch arrive via
   // Ribbon.__value / Ribbon.__touch.
   import {
-    ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonIndicator,
+    ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonIndicator, wheelRidges,
   } from '../utils/ribbonLayout.js';
 
   let { control = null, width = 0, height = 0 } = $props();
@@ -24,7 +24,8 @@
 
   let cfg = $derived(ribbonConfig(control));
   let vertical = $derived(ribbonVertical(control));
-  let wheel = $derived(String(cfg.style) === 'wheel');
+  let wheel = $derived(String(cfg.style) === 'wheel' || String(cfg.style) === 'wheel3d');
+  let realistic = $derived(String(cfg.style) === 'wheel3d');
   let value = $derived(cfg.__value !== undefined ? Math.max(0, Math.min(1, n(cfg.__value, 0.5))) : ribbonValue(control));
   let touched = $derived(cfg.__touch === true);
   let bipolar = $derived(cfg.bipolar === true);
@@ -51,6 +52,8 @@
     return (bipolar ? (value * 2 - 1) : value).toFixed(p);
   });
   let gid = $derived(`rib-${String(control?._children?.Core?.id ?? 'x')}`);
+  let wheelRx = $derived(Math.min(geom.w, geom.h) * 0.28);
+  let ridges = $derived(realistic ? wheelRidges(value, Math.max(6, Math.round((vertical ? geom.h : geom.w) / 6))) : []);
 </script>
 
 <svg class="ribbon" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
@@ -60,9 +63,59 @@
       <stop offset="0.5" stop-color="rgba(255,255,255,0.14)" />
       <stop offset="1" stop-color="rgba(0,0,0,0.55)" />
     </linearGradient>
+    <!-- Glossy cylinder cross-section (perpendicular to the axis). -->
+    <linearGradient id={`${gid}-body`} x1="0" y1="0" x2={vertical ? '1' : '0'} y2={vertical ? '0' : '1'}>
+      <stop offset="0" stop-color="rgba(0,0,0,0.62)" />
+      <stop offset="0.13" stop-color="rgba(255,255,255,0.05)" />
+      <stop offset="0.40" stop-color="rgba(255,255,255,0.38)" />
+      <stop offset="0.52" stop-color="rgba(255,255,255,0.06)" />
+      <stop offset="0.72" stop-color="rgba(255,255,255,0.03)" />
+      <stop offset="1" stop-color="rgba(0,0,0,0.66)" />
+    </linearGradient>
+    <!-- Axial darkening: the cylinder curves away at the ends. -->
+    <linearGradient id={`${gid}-axial`} x1="0" y1="0" x2={vertical ? '0' : '1'} y2={vertical ? '1' : '0'}>
+      <stop offset="0" stop-color="rgba(0,0,0,0.6)" />
+      <stop offset="0.18" stop-color="rgba(0,0,0,0)" />
+      <stop offset="0.82" stop-color="rgba(0,0,0,0)" />
+      <stop offset="1" stop-color="rgba(0,0,0,0.6)" />
+    </linearGradient>
+    <clipPath id={`${gid}-clip`}>
+      <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={wheelRx} />
+    </clipPath>
   </defs>
 
-  {#if wheel}
+  {#if realistic}
+    <!-- Recessed slot bezel -->
+    <rect x={geom.x0 - 2} y={geom.y0 - 2} width={geom.w + 4} height={geom.h + 4} rx={wheelRx + 2} fill="rgba(0,0,0,0.55)" />
+    <!-- Wheel body + gloss -->
+    <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={wheelRx} fill={wheelCss} />
+    <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={wheelRx} fill={`url(#${gid}-body)`} />
+    <g clip-path={`url(#${gid}-clip)`}>
+      {#each ridges as ridge (ridge.pos)}
+        {#if ridge.pos > 0.02 && ridge.pos < 0.98}
+          {#if vertical}
+            {@const y = geom.y0 + ridge.pos * geom.h}
+            <line x1={geom.x0} y1={y} x2={geom.x0 + geom.w} y2={y} stroke={`rgba(0,0,0,${(0.16 + 0.42 * ridge.shade).toFixed(3)})`} stroke-width="1" />
+            <line x1={geom.x0} y1={y + 0.9} x2={geom.x0 + geom.w} y2={y + 0.9} stroke={`rgba(255,255,255,${(0.04 + 0.22 * ridge.shade).toFixed(3)})`} stroke-width="1" />
+          {:else}
+            {@const xr = geom.x0 + ridge.pos * geom.w}
+            <line x1={xr} y1={geom.y0} x2={xr} y2={geom.y0 + geom.h} stroke={`rgba(0,0,0,${(0.16 + 0.42 * ridge.shade).toFixed(3)})`} stroke-width="1" />
+            <line x1={xr + 0.9} y1={geom.y0} x2={xr + 0.9} y2={geom.y0 + geom.h} stroke={`rgba(255,255,255,${(0.04 + 0.22 * ridge.shade).toFixed(3)})`} stroke-width="1" />
+          {/if}
+        {/if}
+      {/each}
+    </g>
+    <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={wheelRx} fill={`url(#${gid}-axial)`} />
+    {#if bipolar}
+      {#if vertical}
+        <line x1={geom.x0 - 1} y1={centerAxis} x2={geom.x0 + geom.w + 1} y2={centerAxis} stroke="rgba(255,255,255,0.45)" stroke-width="1.25" />
+      {:else}
+        <line x1={centerAxis} y1={geom.y0 - 1} x2={centerAxis} y2={geom.y0 + geom.h + 1} stroke="rgba(255,255,255,0.45)" stroke-width="1.25" />
+      {/if}
+    {/if}
+    <!-- Rim highlight -->
+    <rect x={geom.x0 + 0.5} y={geom.y0 + 0.5} width={geom.w - 1} height={geom.h - 1} rx={wheelRx} fill="none" stroke={touched ? glowCss : 'rgba(255,255,255,0.08)'} stroke-width={touched ? 2 : 1} />
+  {:else if wheel}
     <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={Math.min(geom.w, geom.h) * 0.28} fill={wheelCss} />
     <rect x={geom.x0} y={geom.y0} width={geom.w} height={geom.h} rx={Math.min(geom.w, geom.h) * 0.28} fill={`url(#${gid}-wheel)`} />
     {#if bipolar}

@@ -15,8 +15,11 @@ the right fields).
   mode (none/center/min/max/rest), the return glide (rate ≤ 0 = instant snap),
   and the fan-out port values (value + touch gate).
 - `RibbonRenderer.svelte`: flat strip (groove + origin/centre fill + indicator +
-  touch glow) or wheel (gradient body + centre detent + value notch); horizontal
-  or vertical; optional readout + label. Visual-only.
+  touch glow), a simple wheel, or a **realistic wheel** (`style: 'wheel3d'`) —
+  a glossy cylinder with grip ridges that foreshorten toward the ends and scroll
+  as the wheel turns (`wheelRidges`, tested), a recessed slot and centre detent;
+  horizontal or vertical; optional readout + label. Visual-only. The Pitch/Mod
+  presets use the realistic wheel.
 - Model: `Ribbon` controlType + `Ribbon` section + two ports (`value`,
   `touch` gate).
 - Interaction (`PanelPreviewSurface`): absolute touch (jump-to-finger) with snap,

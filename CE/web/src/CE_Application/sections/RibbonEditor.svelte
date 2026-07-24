@@ -21,9 +21,9 @@
   function applyPreset(name) {
     if (!core?.id) return;
     const fields = name === 'pitch'
-      ? { style: 'wheel', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnRate: 12 }
+      ? { style: 'wheel3d', orientation: 'vertical', bipolar: true, value: 0.5, returnMode: 'center', returnRate: 12 }
       : name === 'mod'
-        ? { style: 'wheel', orientation: 'vertical', bipolar: false, value: 0, returnMode: 'none' }
+        ? { style: 'wheel3d', orientation: 'vertical', bipolar: false, value: 0, returnMode: 'none' }
         : { style: 'ribbon', bipolar: false, returnMode: 'none' };
     const patch = {};
     for (const [k, v] of Object.entries(fields)) patch[`Ribbon.${k}`] = v;
@@ -53,7 +53,8 @@
     <PropertyCell label="Style" span={2} hint="Flat touch strip or a 3-D wheel.">
       <select class="val" value={r.style ?? 'ribbon'} onchange={(e) => set('style', e.target.value)}>
         <option value="ribbon">Ribbon (strip)</option>
-        <option value="wheel">Wheel</option>
+        <option value="wheel">Wheel (flat)</option>
+        <option value="wheel3d">Wheel (realistic)</option>
       </select>
     </PropertyCell>
     <PropertyCell label="Orientation" span={2} hint="Vertical or horizontal.">

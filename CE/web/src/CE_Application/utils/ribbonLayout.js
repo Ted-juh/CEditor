@@ -71,6 +71,26 @@ export function ribbonGlide(value, target, rate, dtSec) {
   return { value: from + Math.sign(d) * step, settled: false };
 }
 
+// Realistic-wheel grip ridges: positions (0..1 along the visible face, 0 = top)
+// of the grip lines on a cylinder rotated by `value`. Projected so ridges bunch
+// toward the ends (foreshortening) and scroll as the value changes — the
+// rotating-cylinder illusion. Each ridge also carries a `shade` 0..1 (1 = facing
+// the viewer / brightest, 0 = grazing at the edge) for embossed shading.
+export function wheelRidges(value, count = 16) {
+  const v = clamp01(num(value, 0.5));
+  const n = Math.max(2, Math.round(num(count, 16)));
+  const phase = v; // one full value sweep scrolls the surface one ridge-set
+  const out = [];
+  for (let k = 0; k < n; k += 1) {
+    let u = (k / n) - phase;          // surface coordinate around the front face
+    u = ((u % 1) + 1) % 1;            // wrap 0..1
+    const pos = (1 - Math.cos(u * Math.PI)) / 2; // project: bunches near 0 and 1
+    const shade = Math.sin(u * Math.PI);          // 1 at centre, →0 at the edges
+    out.push({ pos, shade });
+  }
+  return out.sort((a, b) => a.pos - b.pos);
+}
+
 // The port values for the fan-out: the value (bipolar −1..1 or 0..1) and a
 // touch gate (1 while held, else 0 — surface injects `__touch`).
 export function ribbonPortValues(control) {
