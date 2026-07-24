@@ -628,6 +628,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Looper: {
+    sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Looper'),
+    defaultOverrides: {
+      // A wide multi-lane gesture recorder on a dark panel by default.
+      Transform: { width: 300, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Orbit: {
     sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Orbit'),

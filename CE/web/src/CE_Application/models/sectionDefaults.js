@@ -927,6 +927,30 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Looper — record your own control motion as a loopable clip that replays into
+   *  a device parameter on the clock. Each lane is a bindable fan-out port. */
+  Looper: {
+    _type: 'Looper',
+    phase: 0,                     // global loop clock 0..1 (advanced by the ticker)
+    running: true,               // play the loops in preview / player
+    loopSeconds: 4,              // loop length (seconds)
+    editable: true,              // allow recording / scrubbing in preview
+    showPlayhead: true,
+    showGrid: true,
+    quantizeLoop: false,         // snap the loop length to whole beats (visual aid)
+    // Lanes: each records a value-over-loop gesture (sorted {t,v} points, 0..1),
+    // emitted live via its bindable "Lane N" port. `rest` = value when empty.
+    lanes: [
+      { id: 'g0', label: 'Filter Cutoff', points: [], rest: 0, enabled: true, colour: 'FF39D98A' },
+      { id: 'g1', label: 'Resonance', points: [], rest: 0, enabled: true, colour: 'FF5B9BD5' },
+    ],
+    // Colours.
+    laneColour: 'FF0E0E13',
+    gridColour: '22FFFFFF',
+    playheadColour: 'FFFFFFFF',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Orbit — a spatial poly-LFO: satellites orbit a centre, each emitting a live
    *  0..1 modulation value from its position (one bindable port per satellite). */
   Orbit: {

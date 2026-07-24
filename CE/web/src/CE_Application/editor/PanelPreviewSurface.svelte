@@ -55,6 +55,10 @@
     orbitConfig, orbitNodes, orbitGeometry, orbitHitNode, pxToOrbit, nodeAngle,
   } from '../utils/orbitLayout.js';
   import {
+    looperConfig, looperLanes, looperGeometry, laneRect, laneAtPoint, pxToLane,
+    recordAppend, normalizeGesture, looperLoopSeconds,
+  } from '../utils/looperLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -183,7 +187,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))));
+    return applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1218,18 +1222,19 @@
         const rate = numberOr(orbitConfig(c).rate, 0.25);
         const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
         orbitPhaseState[id] = (prev + rate * dt) % 1;
-        emitOrbitFanout(c, orbitPhaseState[id], now);
+        emitClockFanout(orbitControlWith(c, orbitPhaseState[id]), now, 'orbit');
       }
       orbitClock = now;
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
   }
-  // Rate-capped, change-filtered fan-out for the free-running clock: send a
-  // bound satellite's value only when it moved ≥ epsilon AND its port hasn't
-  // sent within ORBIT_EMIT_MS. Keeps a live modulator from flooding MIDI.
-  function emitOrbitFanout(control, phase, now) {
-    const values = controlPortValues(orbitControlWith(control, phase));
+  // Rate-capped, change-filtered fan-out for a free-running clock (Orbit,
+  // Looper): send a bound port's value only when it moved ≥ epsilon AND that
+  // port hasn't sent within ORBIT_EMIT_MS. The `control` already carries its
+  // live __phase. Keeps a self-running modulator from flooding MIDI.
+  function emitClockFanout(control, now, tag = 'clock') {
+    const values = controlPortValues(control);
     if (!values) return;
     const controlId = getControlId(control);
     for (const binding of activeDeviceBindings(control)) {
@@ -1242,7 +1247,7 @@
       if (prev && (now - prev.at) < ORBIT_EMIT_MS) continue;           // rate cap
       orbitLastSent[key] = { value: v, at: now };
       commitDeviceParameter({
-        requestId: `panel_preview_${controlId || 'control'}_orbit_${now}`,
+        requestId: `panel_preview_${controlId || 'control'}_${tag}_${now}`,
         deviceRole: binding.deviceRole || 'mainSynth',
         parameterId: binding.parameterId,
         value: v,
@@ -1318,6 +1323,107 @@
       emitControlPortFanout(orbitControlWith(control, orbitPhaseFor(control), sess), 'commit');
     }
     patchControlSession(getControlId(control), { orbitNodes: undefined, orbitDragIndex: undefined });
+  }
+
+  // --- Gesture Looper: record a control motion, loop it on the clock ---------
+  // Same self-running clock as the Orbit (phase advances by dt / loopSeconds),
+  // plus recording: press-and-move inside a lane paints a value-over-loop gesture
+  // (x = loop position, y = value); on release it commits and loops.
+  const LOOP_PAD = 8;
+  const looperPhaseState = {};  // { [id]: phase 0..1 }
+  let looperTickerRunning = false;
+  let looperLastMs = 0;
+  let looperRec = null;         // { id, lane } while recording a lane
+  function isLooperControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Looper';
+  }
+  function looperControls() {
+    return (orderedControls ?? []).filter((c) => isLooperControl(c));
+  }
+  function looperPhaseFor(control) {
+    const id = getControlId(control);
+    if (looperPhaseState[id] !== undefined) return looperPhaseState[id];
+    return ((numberOr(looperConfig(control).phase, 0) % 1) + 1) % 1;
+  }
+  function looperControlWith(control, phase, lanes = null) {
+    const looper = { ...control._children?.Looper, __phase: phase };
+    if (Array.isArray(lanes)) looper.lanes = lanes;
+    return { ...control, _children: { ...control._children, Looper: looper } };
+  }
+  function ensureLooperTicker() {
+    if (looperTickerRunning) return;
+    looperTickerRunning = true;
+    looperLastMs = Date.now();
+    const loop = () => {
+      const running = looperControls().filter((c) => looperConfig(c).running !== false);
+      if (!running.length) { looperTickerRunning = false; return; } // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - looperLastMs) / 1000));
+      looperLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        const prev = looperPhaseState[id] ?? looperPhaseFor(c);
+        looperPhaseState[id] = (prev + dt / looperLoopSeconds(c)) % 1;
+        // Don't fight a recording in progress on this control's lane.
+        if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
+      }
+      // touch a reactive dep so the resolve path re-runs
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  function looperGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const lanes = looperLanes(control);
+    return looperGeometry(numberOr(t.width, 0), numberOr(t.height, 0), Math.max(1, lanes.length), LOOP_PAD);
+  }
+  // Inject the live clock phase (+ in-progress recording) onto the resolved
+  // Looper so the renderer animates + shows the take. Reads __phase/__recLane/…
+  function applyLooperValueSource(control, resolved) {
+    if (!isLooperControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const looper = base?._children?.Looper;
+    if (!looper) return resolved;
+    if (looper.running !== false) { ensureLooperTicker(); void orbitClock; }
+    const next = { ...looper, __phase: looperPhaseFor(control) };
+    const sess = sessionFor(control);
+    if (typeof sess?.looperRecLane === 'number') { next.__recLane = sess.looperRecLane; next.__recPoints = sess.looperRecPoints ?? []; }
+    return { ...resolved, control: { ...base, _children: { ...base._children, Looper: next } } };
+  }
+  // Pointer-down inside a lane starts recording that lane from scratch.
+  function handleLooperPointerDown(control, localPoint) {
+    if (!isLooperControl(control) || looperConfig(control).editable === false) return false;
+    const geom = looperGeomFor(control);
+    const lane = laneAtPoint(geom, localPoint.y, looperLanes(control).length);
+    if (lane < 0) return false;
+    const rect = laneRect(geom, lane);
+    const first = pxToLane(rect, localPoint.x, localPoint.y);
+    looperRec = { id: getControlId(control), lane };
+    patchControlSession(getControlId(control), { looperRecLane: lane, looperRecPoints: [{ t: first.t, v: first.v }], dragging: true });
+    return true;
+  }
+  // While recording: append the pointer's (t,v) and fan the drawn value live.
+  function moveLooperRec(control, localPoint) {
+    const geom = looperGeomFor(control);
+    const rect = laneRect(geom, looperRec.lane);
+    const p = pxToLane(rect, localPoint.x, localPoint.y);
+    const pts = recordAppend(sessionFor(control)?.looperRecPoints ?? [], p.t, p.v);
+    patchControlSession(getControlId(control), { looperRecPoints: pts });
+    // Emit this lane's drawn value at the drawn position immediately.
+    const lanes = looperLanes(control).map((l, i) => (i === looperRec.lane ? { ...l, points: pts } : l));
+    emitControlPortFanout(looperControlWith(control, p.t, lanes), 'continuous');
+  }
+  // Release: commit the recorded lane, drop the session take.
+  function releaseLooperRec(control) {
+    const sess = sessionFor(control);
+    const pts = normalizeGesture(sess?.looperRecPoints ?? []);
+    const lane = sess?.looperRecLane;
+    if (typeof lane === 'number' && pts.length) {
+      const lanes = looperLanes(control).map((l, i) => (i === lane ? { ...l, points: pts } : l));
+      updateControlProperty(getControlId(control), 'Looper.lanes', lanes);
+    }
+    patchControlSession(getControlId(control), { looperRecLane: undefined, looperRecPoints: undefined, dragging: false });
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2884,6 +2990,11 @@
       moveOrbitDrag(control, controlLocalPoint(event));
       return;
     }
+    // Looper: paint the gesture into the recording lane.
+    if (looperRec && looperRec.id === getControlId(control)) {
+      moveLooperRec(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2988,6 +3099,8 @@
     handleMacroPointerDown(control, pointerDownLocal);
     // Orbit: grab the satellite under the cursor for a radius/angle drag.
     handleOrbitPointerDown(control, pointerDownLocal);
+    // Looper: press inside a lane to record a gesture.
+    handleLooperPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3212,6 +3325,12 @@
     if (orbitDrag && activeControl) {
       orbitDrag = null;
       releaseOrbitDrag(activeControl);
+    }
+
+    // Release a looper recording: commit the lane's gesture.
+    if (looperRec && activeControl) {
+      looperRec = null;
+      releaseLooperRec(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

@@ -6,6 +6,7 @@
     ArrowLeftRight,
     CircleDashed,
     Orbit,
+    AudioWaveform,
     Gauge,
     Spline,
     Grid2x2,
@@ -110,6 +111,7 @@
       { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
       { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
       { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
+      { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

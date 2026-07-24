@@ -35,6 +35,7 @@ const LAZY_COMPONENT_LOADERS = {
   ribbon: () => import('../sections/RibbonEditor.svelte'),
   macro: () => import('../sections/MacroEditor.svelte'),
   orbit: () => import('../sections/OrbitEditor.svelte'),
+  looper: () => import('../sections/LooperEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),
