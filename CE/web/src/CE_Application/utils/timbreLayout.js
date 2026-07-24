@@ -136,6 +136,34 @@ export function timbrePortValues(control) {
   return out;
 }
 
+// Targets paired with the device parameter their port is bound to (or null).
+// Used by capture-from-patch to know which parameter each target follows.
+export function timbreTargetBindings(control) {
+  const bindings = control?._children?.DeviceBindings?.bindings;
+  const byPort = {};
+  (Array.isArray(bindings) ? bindings : []).forEach((b) => {
+    if (b?.kind === 'deviceParameter' && b?.parameterId) {
+      byPort[String(b.port ?? '')] = { parameterId: String(b.parameterId), deviceRole: String(b.deviceRole ?? 'mainSynth') };
+    }
+  });
+  return timbreTargets(control).map((t, i) => ({ ...t, index: i, binding: byPort[timbreTargetPortId(i)] ?? null }));
+}
+
+// Capture-from-patch: given a { parameterId: normalizedValue } snapshot of the
+// current device/panel state, produce { targetId: value } for every target whose
+// bound parameter is present. Targets with no binding (or no snapshot value) are
+// left out so the caller can keep their existing anchor value.
+export function captureAnchorValues(control, paramValues) {
+  const src = paramValues && typeof paramValues === 'object' ? paramValues : {};
+  const out = {};
+  timbreTargetBindings(control).forEach((t) => {
+    if (t.binding && Object.prototype.hasOwnProperty.call(src, t.binding.parameterId)) {
+      out[t.id] = clamp01(num(src[t.binding.parameterId], 0));
+    }
+  });
+  return out;
+}
+
 // Honesty readout: how many targets are actually MIDI-addressable (i.e. have a
 // device-parameter binding on their port) out of the total.
 export function timbreAddressableCount(control) {

@@ -4,7 +4,7 @@ import {
   timbreTargets, timbreAnchors, timbrePuck, anchorWeights, targetValue,
   timbreOutputs, timbreGeometry, timbreToPx, timbreFromPx, timbreHitAnchor,
   timbreTargetPortId, parseTimbreTargetPort, timbrePorts, timbrePortValues,
-  timbreAddressableCount,
+  timbreAddressableCount, timbreTargetBindings, captureAnchorValues,
 } from '../src/CE_Application/utils/timbreLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -78,4 +78,21 @@ test('addressable count reflects bound target ports', () => {
   const r = timbreAddressableCount(c);
   assert.equal(r.total, 2);
   assert.equal(r.addressable, 1);
+});
+
+test('capture-from-patch maps bound targets from a param snapshot', () => {
+  const c = ts({ targets: TARGETS, anchors: ANCHORS }, [
+    { kind: 'deviceParameter', parameterId: 'filter.cutoff', port: 'target_0' },
+    { kind: 'deviceParameter', parameterId: 'filter.reso', port: 'target_1' },
+  ]);
+  const binds = timbreTargetBindings(c);
+  assert.equal(binds[0].binding.parameterId, 'filter.cutoff');
+  assert.equal(binds[1].binding.parameterId, 'filter.reso');
+  // Snapshot only has cutoff → only that target is captured; reso left out.
+  const captured = captureAnchorValues(c, { 'filter.cutoff': 0.73, 'other': 0.4 });
+  assert.ok(near(captured.cut, 0.73));
+  assert.equal(captured.res, undefined);
+  // Unbound targets are never captured even if a param matches.
+  const c2 = ts({ targets: TARGETS, anchors: ANCHORS }, []);
+  assert.deepEqual(captureAnchorValues(c2, { 'filter.cutoff': 0.5 }), {});
 });

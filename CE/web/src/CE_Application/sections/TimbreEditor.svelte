@@ -1,6 +1,10 @@
 <script>
+  import { get } from 'svelte/store';
   import { getSection, updateControlProperty } from '../stores/controls.js';
-  import { timbreAddressableCount } from '../utils/timbreLayout.js';
+  import { activePanel } from '../stores/panels.js';
+  import { panelPreviewSessions } from '../stores/interactionPreview.js';
+  import { isRangeBehavior, getRangeMin, getRangeMax, getCurrentRangeValue } from '../utils/rangeBehavior.js';
+  import { timbreAddressableCount, captureAnchorValues } from '../utils/timbreLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -43,6 +47,41 @@
   }
   function removeAnchor(i) { setAnchors(anchors.filter((_, idx) => idx !== i)); }
   function av(a, id) { return num(a?.values?.[id], 0); }
+
+  // --- Capture from patch ---------------------------------------------------
+  // A { parameterId: normalizedValue } snapshot of the panel's current state:
+  // every range control (slider/knob/number), normalized by its own range, keyed
+  // by the device parameter(s) it's bound to. Prefers the live preview value.
+  function currentParamValues() {
+    const controls = $activePanel?.controls ?? [];
+    const sessions = get(panelPreviewSessions) ?? {};
+    const map = {};
+    for (const c of controls) {
+      const beh = c?._children?.Behavior;
+      if (!isRangeBehavior(beh)) continue;
+      const bindings = c?._children?.DeviceBindings?.bindings;
+      if (!Array.isArray(bindings) || !bindings.length) continue;
+      const id = String(c?._children?.Core?.id ?? '');
+      const min = getRangeMin(beh);
+      const max = getRangeMax(beh);
+      const raw = getCurrentRangeValue(beh, sessions[id] ?? null);
+      const norm = max > min ? Math.max(0, Math.min(1, (raw - min) / (max - min))) : 0;
+      for (const b of bindings) {
+        if (b?.kind === 'deviceParameter' && b?.parameterId) map[String(b.parameterId)] = norm;
+      }
+    }
+    return map;
+  }
+  // How many targets could be captured right now (bound + a matching panel value).
+  let capturable = $derived.by(() => {
+    const vals = currentParamValues();
+    return Object.keys(captureAnchorValues(control, vals)).length;
+  });
+  function captureAnchor(i) {
+    const captured = captureAnchorValues(control, currentParamValues());
+    if (!Object.keys(captured).length) return;
+    setAnchors(anchors.map((a, idx) => idx === i ? { ...a, values: { ...(a.values ?? {}), ...captured } } : a));
+  }
 </script>
 
 {#if tb}
@@ -89,7 +128,7 @@
   </PropertySection>
 
   <PropertySection title="Anchors">
-    <PropertyCell label="" span={4} hint="Each anchor is a named patch placed on the pad (X/Y in 0–1), storing a value per target. The puck blends the anchors by distance — move it and the whole patch morphs toward the nearest anchors.">
+    <PropertyCell label="" span={4} hint="Each anchor is a named patch placed on the pad (X/Y in 0–1), storing a value per target. The puck blends the anchors by distance — move it and the whole patch morphs toward the nearest anchors. 'Capture' stamps an anchor's values from the panel's current bound controls: dial in a sound with the panel's knobs, then capture it.">
       <div class="rows">
         {#if anchors.length === 0}<div class="empty">No anchors yet. Add one and set its per-target values.</div>{/if}
         {#each anchors as a, i (a.id ?? i)}
@@ -97,6 +136,7 @@
             <div class="arow">
               <input class="val name" type="text" value={a.label ?? ''} placeholder="Patch name" onchange={(e) => updateAnchor(i, 'label', e.target.value)} />
               <input class="swatch" type="color" value={`#${String(a.colour ?? 'FF5B9BD5').slice(-6)}`} onchange={(e) => updateAnchor(i, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} title="Colour" />
+              <button type="button" class="action-btn" onclick={() => captureAnchor(i)} disabled={capturable === 0} title={capturable ? `Set this anchor's values from the panel's current bound controls (${capturable})` : 'Bind targets to device parameters that panel controls also drive, then capture'}>Capture</button>
               <button type="button" class="action-btn danger" onclick={() => removeAnchor(i)} title="Remove">✕</button>
             </div>
             <div class="arow2">
@@ -145,6 +185,7 @@
     font-size: 11px; padding: 4px 8px; cursor: pointer; align-self: flex-start;
   }
   .action-btn:hover { border-color: #5B9BD5; }
+  .action-btn:disabled { opacity: 0.4; cursor: not-allowed; border-color: #3B3B3B; }
   .action-btn.danger { flex: 0 0 auto; padding: 3px 7px; }
   .action-btn.danger:hover { border-color: #C96A6A; }
 </style>

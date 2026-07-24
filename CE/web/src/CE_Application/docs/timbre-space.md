@@ -36,9 +36,22 @@ this does.
   a patch on the pad; both commit on release. Runs live in the exported Player
   (same surface).
 - **`TimbreEditor.svelte`** — axis names, blend sharpness, display toggles, a
-  targets table, and an anchors table with a **per-target value grid** and X/Y.
-  A live "N of M targets are MIDI-addressable" note. Loader, Properties tab and
-  palette entry included.
+  targets table, and an anchors table with a **per-target value grid**, X/Y, and
+  a **Capture** button per anchor. A live "N of M targets are MIDI-addressable"
+  note. Loader, Properties tab and palette entry included.
+
+## Capture from patch
+
+Each anchor has a **Capture** button: it stamps that anchor's values from the
+**panel's current bound controls**. Dial in a sound with the panel's knobs/
+sliders (in the editor or live in preview), then hit Capture — for every target
+bound to a device parameter, it finds a panel control bound to the *same*
+parameter, normalizes its current value by that control's range, and writes it
+into the anchor. The button is disabled (with a why-not tooltip) until targets
+are bound to parameters that panel controls also drive. Pure + tested
+(`captureAnchorValues` / `timbreTargetBindings`); the editor just supplies the
+`{ parameterId: value }` snapshot, preferring the live preview value over the
+design-time default.
 
 ## Compatibility (the honest bit)
 
@@ -51,9 +64,9 @@ morphs; NRPN/sysex targets morph cleanly.
 
 ## Possible next steps (v1 → v2)
 
-- **Capture-from-patch** — a "set this anchor from the current device state"
-  button, so anchors are grabbed by ear instead of typed into the value grid
-  (needs a live patch/snapshot read). This is the biggest UX win.
+- **Device-runtime capture** — extend Capture to also read the *hardware's* live
+  parameter values (`deviceRuntimeState`) when connected, not just the panel's
+  bound controls, normalizing via the DPD profile ranges.
 - **Snapshot anchors** — back anchors with the reusable snapshot system so they
   round-trip with presets (shared with Snapshot-Morph).
 - **Auto-axes** — derive a "brightness" direction from two captured patches via
