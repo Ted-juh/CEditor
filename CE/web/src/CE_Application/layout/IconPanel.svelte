@@ -4,6 +4,7 @@
     CircleDot,
     Container,
     Gauge,
+    Spline,
     Grid3x3,
     Library,
     Monitor,
@@ -97,6 +98,7 @@
       { type: 'LcdDisplay',      icon: Monitor,            label: 'Insert LCD Display' },
       { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
       { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
+      { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

@@ -31,6 +31,10 @@
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak } from '../utils/meterLayout.js';
   import {
+    envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
+    envDragNode, envAddNode, envRemoveNode,
+  } from '../utils/envelopeLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -159,7 +163,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)));
+    return applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -768,6 +772,83 @@
       nextMeter.__peak = next.peak;
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Meter: nextMeter } } };
+  }
+
+  // --- Envelope: draggable breakpoint / curve editor ----------------------
+  const ENV_PAD = 10;
+  let envDrag = null; // { id, index } while dragging a node
+  function isEnvelopeControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Envelope';
+  }
+  function envGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return envelopeGeometry(numberOr(t.width, 0), numberOr(t.height, 0), ENV_PAD);
+  }
+  // The working points: the live session copy while dragging, else the model.
+  function envWorkingPoints(control) {
+    const sess = sessionFor(control)?.envPoints;
+    return Array.isArray(sess) ? sess : envelopePoints(control);
+  }
+  // Envelope presets keep the start (and one-shot end) pinned to y=0; free/MSEG
+  // shapes let every node move in y. Ends always keep their x (span the axis).
+  function envLockY(control, points) {
+    const preset = String(envelopeConfig(control).preset ?? 'adsr');
+    if (preset === 'free' || preset === 'mseg') return [];
+    return [0, points.length - 1];
+  }
+  function envSnap(control, pt) {
+    const cfg = envelopeConfig(control);
+    const sx = numberOr(cfg.snapX, 0);
+    const sy = numberOr(cfg.snapY, 0);
+    return {
+      x: sx > 0 ? Math.round(pt.x / sx) * sx : pt.x,
+      y: sy > 0 ? Math.round(pt.y / sy) * sy : pt.y,
+    };
+  }
+  function commitEnvPoints(control, points) {
+    updateControlProperty(getControlId(control), 'Envelope.points', points);
+  }
+  // Inject the live working points + resolved phase onto the resolved Envelope
+  // so the renderer draws the in-progress drag and the playhead.
+  function applyEnvelopeValueSource(control, resolved) {
+    if (!isEnvelopeControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const env = base?._children?.Envelope;
+    if (!env) return resolved;
+    const sessPoints = sessionFor(control)?.envPoints;
+    const phaseRange = env.phaseSourceId ? lcdRangeForSource(env.phaseSourceId) : null;
+    const phase = phaseRange
+      ? (phaseRange.max === phaseRange.min ? 0 : (phaseRange.value - phaseRange.min) / (phaseRange.max - phaseRange.min))
+      : undefined;
+    if (!Array.isArray(sessPoints) && phase === undefined) return resolved;
+    const nextEnv = { ...env };
+    if (Array.isArray(sessPoints)) nextEnv.points = sessPoints;
+    if (phase !== undefined) nextEnv.__phase = Math.max(0, Math.min(1, phase));
+    return { ...resolved, control: { ...base, _children: { ...base._children, Envelope: nextEnv } } };
+  }
+  // Pointer-down on an envelope: start dragging the node under the cursor.
+  // Returns true when it grabbed a node (so the generic handler leaves it alone).
+  function handleEnvelopePointerDown(control, localPoint, isDoubleTap) {
+    if (!isEnvelopeControl(control) || envelopeConfig(control).editable === false) return false;
+    const geom = envGeomFor(control);
+    const points = envWorkingPoints(control);
+    const hit = envHitNode(points, geom, localPoint.x, localPoint.y, Math.max(8, numberOr(envelopeConfig(control).nodeRadius, 4) + 6));
+    if (isDoubleTap) {
+      // Double-click: remove an interior node, or add one where there's none.
+      if (hit > 0 && hit < points.length - 1) commitEnvPoints(control, envRemoveNode(points, hit));
+      else if (hit < 0 && envelopeConfig(control).addOnDoubleClick !== false) {
+        const norm = envSnap(control, envFromPx(localPoint.x, localPoint.y, geom));
+        const { points: added, index } = envAddNode(points, norm.x, norm.y);
+        commitEnvPoints(control, added);
+        patchControlSession(getControlId(control), { envActiveIndex: index });
+      }
+      envDrag = null;
+      return true;
+    }
+    if (hit < 0) return false;
+    envDrag = { id: getControlId(control), index: hit };
+    patchControlSession(getControlId(control), { envActiveIndex: hit, envPoints: points });
+    return true;
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2276,6 +2357,16 @@
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
     }
+    // Envelope: drag the grabbed node (constrained + snapped), live into session.
+    if (envDrag && envDrag.id === getControlId(control)) {
+      const geom = envGeomFor(control);
+      const local = controlLocalPoint(event);
+      const points = envWorkingPoints(control);
+      const norm = envSnap(control, envFromPx(local.x, local.y, geom));
+      const next = envDragNode(points, envDrag.index, norm.x, norm.y, { lockEndsX: true, lockYIndices: envLockY(control, points) });
+      patchControlSession(getControlId(control), { envPoints: next, envActiveIndex: envDrag.index });
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2366,6 +2457,8 @@
     listboxDrag = (isListboxControl(control) && listboxConfig(control).dragScroll === true)
       ? { id: getControlId(control), startY: event.clientY, startScroll: numberOr(sessionFor(control)?.listboxScrollTop, 0), moved: false }
       : null;
+    // Envelope: grab the node under the cursor (or add/remove on double-click).
+    handleEnvelopePointerDown(control, pointerDownLocal, isDoubleTap);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2526,6 +2619,15 @@
     const activeControl = orderedControls.find((control) => getControlId(control) === activeId) ?? null;
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
+
+    // Commit an envelope node drag: persist the working points to the model,
+    // then drop the live session override so the model is the source of truth.
+    if (envDrag && activeControl) {
+      const finalPoints = sessionFor(activeControl)?.envPoints;
+      if (Array.isArray(finalPoints)) commitEnvPoints(activeControl, finalPoints);
+      patchControlSession(activeId, { envPoints: undefined });
+      envDrag = null;
+    }
 
     if (isCustomComponent(activeControl)) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();

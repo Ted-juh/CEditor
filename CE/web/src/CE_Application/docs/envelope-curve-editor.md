@@ -1,5 +1,35 @@
 # Envelope / Curve Editor — Investigation
 
+> Status: **core shipped 🟢** (Envelope component with the breakpoint engine +
+> presets). Multi-parameter fan-out binding + LFO/response-curve sibling
+> components remain — see "Remaining" below. Original design notes follow.
+
+## Shipped
+
+An interactive **Envelope** palette component built on one reusable
+breakpoint-curve engine (as the doc recommends — not a one-off ADSR widget):
+
+- Pure engine `utils/envelopeLayout.js` (+ `test/envelopeLayout.test.js`, 9
+  tests): normalized points, px round-trip, per-segment curve sampling
+  (linear/exp/log/scurve/hold), `envValueAt`, node hit-test, drag with x-monotonic
+  + end + y-lock constraints, add/remove, and presets.
+- Presets: **ADSR / AR / AD / DAHDSR** (constrained stages) + **MSEG / Free**
+  (every node moves). Sustain marker; loop start/end markers.
+- `EnvelopeRenderer.svelte`: SVG grid, filled area, per-segment curve line,
+  draggable nodes, sustain + loop markers, moving playhead dot.
+- Interaction (`PanelPreviewSurface`): drag a node (live session copy, committed
+  to the model on release), double-click to add / remove, optional x/y snap.
+- `EnvelopeEditor.svelte` inspector: preset picker, per-node x/y/curve table,
+  sustain node, loop, snap, playhead source, full styling. Model:
+  `Envelope` controlType + section + stage ports (attack/decay/sustain/release).
+
+**Remaining:** full per-node → device-parameter **fan-out binding** (the doc's
+"real architectural lift"; the four stage ports cover the common ADSR case for
+now), and the **LFO** / **response-curve** sibling components that reuse the same
+engine.
+
+## Original investigation
+
 > Status: **investigation / design.** "ADSR" is one preset of a much larger
 > family; the flexible answer is a single breakpoint/curve engine with presets.
 > Part of the [panel parts backlog](./README.md); see

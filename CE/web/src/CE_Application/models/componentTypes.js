@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Envelope: {
+    sections: ['Background', 'Envelope', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Envelope'),
+    defaultOverrides: {
+      // A wide ADSR editing area in a dark panel by default.
+      Transform: { width: 280, height: 160 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF141414' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Meter: {
     sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Meter'),

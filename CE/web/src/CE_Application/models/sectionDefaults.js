@@ -903,6 +903,51 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Envelope — a draggable breakpoint / curve editor (ADSR, MSEG, …). */
+  Envelope: {
+    _type: 'Envelope',
+    preset: 'adsr',               // adsr | ar | ad | dahdsr | mseg | free
+    // Breakpoints: normalized x (time/input) + y (level/output), each with the
+    // curve shape of the segment ending at it (linear | exp | log | scurve | hold).
+    points: [
+      { id: 'e0', x: 0, y: 0, curve: 'linear', tension: 0 },
+      { id: 'e1', x: 0.25, y: 1, curve: 'exp', tension: 0 },
+      { id: 'e2', x: 0.5, y: 0.6, curve: 'exp', tension: 0 },
+      { id: 'e3', x: 1, y: 0, curve: 'exp', tension: 0 },
+    ],
+    sustainIndex: 2,              // point that holds while a note is held (-1 = none)
+    loopEnabled: false,
+    loopStart: 0,                 // point index of the loop start
+    loopEnd: 0,                   // point index of the loop end
+    // Interaction (preview): drag nodes, double-click to add / remove.
+    editable: true,
+    addOnDoubleClick: true,
+    snapX: 0,                     // grid snap step for x (0 = free)
+    snapY: 0,                     // grid snap step for y (0 = free)
+    // Axis + readout.
+    xLabel: 'Time',
+    yLabel: 'Level',
+    timeMax: 1000,                // ms represented by x = 1 (readout only)
+    timeUnit: 'ms',
+    // A moving playhead dot at the current phase (driven live by a source).
+    showPlayhead: false,
+    phase: 0,                     // 0..1 static phase for the dot
+    phaseSourceId: '',            // range control that drives the phase in preview
+    // Style.
+    showGrid: true,
+    gridX: 4,
+    gridY: 4,
+    fillUnder: true,
+    lineWidth: 2,
+    nodeRadius: 4,
+    lineColour: 'FF5B9BD5',
+    fillColour: '335B9BD5',
+    nodeColour: 'FFF2F2F2',
+    gridColour: '18FFFFFF',
+    sustainColour: 'FFF2C94C',
+    playheadColour: 'FFFFFFFF',
+  },
+
   /** Parts — named internal sub-elements for advanced controls. */
   Parts: {
     _type: 'Parts',

@@ -192,6 +192,14 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  Envelope: [
+    // Common stage parameters — the typical ADSR/DAHDSR device bindings. (Full
+    // per-node fan-out binding is a later capability; these cover the usual case.)
+    { id: 'attack', label: 'Attack', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'decay', label: 'Decay', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'sustain', label: 'Sustain', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'release', label: 'Release', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
   CustomComponent: [
     {
       id: 'mainValue',

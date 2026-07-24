@@ -6,6 +6,7 @@
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
+  import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
@@ -139,6 +140,7 @@
   let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
   let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
   let isMeter = $derived(String(core?.controlType ?? '') === 'Meter');
+  let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -2903,7 +2905,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4146,6 +4148,10 @@
 
     {#if isMeter}
       <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isEnvelope}
+      <EnvelopeRenderer control={renderControl} width={displayW} height={displayH} activeIndex={previewSession?.envActiveIndex ?? -1} />
     {/if}
 
     {#if isPixelDisplay}
