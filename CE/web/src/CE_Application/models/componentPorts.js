@@ -1,3 +1,5 @@
+import { matrixPorts } from '../utils/matrixLayout.js';
+
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
   FLOAT: 'float',
@@ -290,6 +292,11 @@ export function getComponentPorts(componentOrType) {
   if (componentType === 'CustomComponent' && typeof componentOrType === 'object') {
     const dynamicPorts = publishedPorts(componentOrType);
     return dynamicPorts.length ? dynamicPorts : DEFAULT_COMPONENT_PORTS.CustomComponent;
+  }
+  // Mod Matrix: one bindable port per grid cell ("Source → Destination"),
+  // generated from the control's rows × cols (dynamic, like custom components).
+  if (componentType === 'Matrix' && typeof componentOrType === 'object') {
+    return matrixPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

@@ -903,6 +903,31 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Matrix — a modulation routing grid: sources (rows) × destinations (cols). */
+  Matrix: {
+    _type: 'Matrix',
+    rows: ['LFO 1', 'LFO 2', 'Env', 'Vel'],       // sources
+    cols: ['Pitch', 'Cutoff', 'Amp', 'Pan'],      // destinations
+    // Row-major R×C modulation amounts (−1..1 bipolar, or 0..1). Each cell is a
+    // bindable port ("Src → Dest") for the fan-out mechanism.
+    amounts: [0.6, 0, 0, 0, 0, -0.45, 0, 0, 0, 0, 0.8, 0, 0, 0, 0, 0.3],
+    bipolar: true,
+    step: 0,                    // snap step for cell amounts (0 = continuous)
+    cellStyle: 'bar',           // bar | fill | dot — how a cell shows its amount
+    editable: true,             // drag cells in preview
+    showLabels: true,
+    showValues: false,          // print the numeric amount in each cell
+    rowHeaderW: 52,             // left label column width (px)
+    colHeaderH: 20,             // top label row height (px)
+    // Colours.
+    cellBg: 'FF161616',
+    gridColour: '22FFFFFF',
+    posColour: 'FF39D98A',      // positive amount
+    negColour: 'FFEB5757',      // negative amount
+    labelColour: 'FFB9B9B9',
+    activeColour: 'FFFFFFFF',
+  },
+
   /** Envelope — a draggable breakpoint / curve editor (ADSR, MSEG, …). */
   Envelope: {
     _type: 'Envelope',

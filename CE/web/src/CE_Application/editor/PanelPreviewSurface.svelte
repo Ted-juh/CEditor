@@ -36,6 +36,10 @@
   } from '../utils/envelopeLayout.js';
   import { controlPortValues } from '../utils/controlPortValues.js';
   import {
+    matrixConfig, matrixAmounts, matrixGeometry, matrixCellAtPoint, matrixCellRect,
+    matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
+  } from '../utils/matrixLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -164,7 +168,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))));
+    return applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -877,6 +881,44 @@
     if (hit < 0) return false;
     envDrag = { id: getControlId(control), index: hit };
     patchControlSession(getControlId(control), { envActiveIndex: hit, envPoints: points });
+    return true;
+  }
+
+  // --- Mod Matrix: modulation routing grid --------------------------------
+  let matrixDrag = null; // { id, r, c, startAmount, startY } while dragging a cell
+  function isMatrixControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Matrix';
+  }
+  function matrixGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return matrixGeometry(numberOr(t.width, 0), numberOr(t.height, 0), control);
+  }
+  function matrixWorkingAmounts(control) {
+    const sess = sessionFor(control)?.matrixAmounts;
+    return Array.isArray(sess) ? sess : matrixAmounts(control);
+  }
+  function commitMatrixAmounts(control, amounts) {
+    updateControlProperty(getControlId(control), 'Matrix.amounts', amounts);
+  }
+  function matrixControlWith(control, amounts) {
+    return { ...control, _children: { ...control._children, Matrix: { ...control._children?.Matrix, amounts } } };
+  }
+  function applyMatrixValueSource(control, resolved) {
+    if (!isMatrixControl(control)) return resolved;
+    const sess = sessionFor(control)?.matrixAmounts;
+    if (!Array.isArray(sess)) return resolved;
+    const base = resolved?.control ?? control;
+    const m = base?._children?.Matrix;
+    if (!m) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Matrix: { ...m, __amounts: sess } } } };
+  }
+  // Pointer-down on a matrix: grab the cell under the cursor for a knob drag.
+  function handleMatrixPointerDown(control, localPoint) {
+    if (!isMatrixControl(control) || matrixConfig(control).editable === false) return false;
+    const cell = matrixCellAtPoint(matrixGeomFor(control), localPoint.x, localPoint.y);
+    if (!cell) return false;
+    matrixDrag = { id: getControlId(control), r: cell.r, c: cell.c, startAmount: matrixAmountAt(control, cell.r, cell.c), startY: localPoint.y };
+    patchControlSession(getControlId(control), { matrixActiveCell: cell, matrixAmounts: matrixWorkingAmounts(control) });
     return true;
   }
 
@@ -2397,6 +2439,16 @@
       emitControlPortFanout(envControlWith(control, next), 'continuous'); // fan-out live
       return;
     }
+    // Mod Matrix: knob-drag the grabbed cell (up = more), live into session.
+    if (matrixDrag && matrixDrag.id === getControlId(control)) {
+      const geom = matrixGeomFor(control);
+      const local = controlLocalPoint(event);
+      const amount = matrixAmountFromDrag(matrixDrag.startAmount, local.y - matrixDrag.startY, geom.cellH, control);
+      const next = matrixSetAmount(matrixControlWith(control, matrixWorkingAmounts(control)), matrixDrag.r, matrixDrag.c, amount);
+      patchControlSession(getControlId(control), { matrixAmounts: next, matrixActiveCell: { r: matrixDrag.r, c: matrixDrag.c } });
+      emitControlPortFanout(matrixControlWith(control, next), 'continuous'); // fan-out live
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2489,6 +2541,8 @@
       : null;
     // Envelope: grab the node under the cursor (or add/remove on double-click).
     handleEnvelopePointerDown(control, pointerDownLocal, isDoubleTap);
+    // Mod Matrix: grab the cell under the cursor for a knob drag.
+    handleMatrixPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2660,6 +2714,17 @@
       }
       patchControlSession(activeId, { envPoints: undefined });
       envDrag = null;
+    }
+
+    // Commit a matrix cell drag: persist the amounts, drop the session override.
+    if (matrixDrag && activeControl) {
+      const finalAmounts = sessionFor(activeControl)?.matrixAmounts;
+      if (Array.isArray(finalAmounts)) {
+        commitMatrixAmounts(activeControl, finalAmounts);
+        emitControlPortFanout(matrixControlWith(activeControl, finalAmounts), 'commit');
+      }
+      patchControlSession(activeId, { matrixAmounts: undefined });
+      matrixDrag = null;
     }
 
     if (isCustomComponent(activeControl)) {

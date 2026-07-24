@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Matrix: {
+    sections: ['Background', 'Matrix', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Matrix'),
+    defaultOverrides: {
+      // A 4×4 routing grid in a dark panel by default.
+      Transform: { width: 260, height: 170 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Envelope: {
     sections: ['Background', 'Envelope', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Envelope'),

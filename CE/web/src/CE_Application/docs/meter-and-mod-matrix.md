@@ -47,7 +47,28 @@ Mostly a **configuration of existing engines**, not a new primitive:
 - **Missing piece:** a **read-only / output-only mode** where the value comes
   from a device *input*, not user drag. Shared with the LCD.
 
-## Mod Matrix
+## Mod Matrix — shipped 🟢
+
+Built as its own `Matrix` palette controlType (sources = rows × destinations =
+columns), using the fan-out binding mechanism above. Files: pure engine
+`utils/matrixLayout.js` (+ `test/matrixLayout.test.js`), `editor/MatrixRenderer.svelte`,
+`sections/MatrixEditor.svelte`, `Matrix` section + controlType, dynamic per-cell
+ports in `componentPorts` (`getComponentPorts` Matrix branch → `matrixPorts`),
+`controlPortValues` Matrix resolver, cell drag in `PanelPreviewSurface`.
+
+- **Grid:** editable rows/cols (add/remove/relabel; amounts preserved on resize),
+  bipolar (−1..1) or unipolar (0..1), row/col label headers.
+- **Cell styles:** centre-bar (green up / red down), fill heatmap, dot; optional
+  per-cell numeric value.
+- **Interaction:** knob-style vertical drag per cell (live session copy →
+  committed to the model on release), optional snap step.
+- **Fan-out binding:** every cell is a bindable port (`cell_r_c`, labelled
+  "Source → Destination") — the DeviceBindings editor lists all N×M, and dragging
+  a cell emits its amount to the bound device parameter. The "binding fan-out"
+  the original investigation flagged as the missing piece is done (shipped with
+  the Envelope; the Matrix reuses it).
+
+## Mod Matrix (original investigation)
 
 **Buildable on existing engines:**
 - Generators already emit grid cells (`rows × columns`, `parts = rows*columns` —

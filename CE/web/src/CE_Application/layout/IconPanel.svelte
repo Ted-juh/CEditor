@@ -5,6 +5,7 @@
     Container,
     Gauge,
     Spline,
+    Grid2x2,
     Grid3x3,
     Library,
     Monitor,
@@ -99,6 +100,7 @@
       { type: 'PixelDisplay',    icon: Grid3x3,            label: 'Insert Pixel Display' },
       { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
       { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
+      { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

@@ -7,6 +7,7 @@
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
+  import MatrixRenderer from './MatrixRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
@@ -141,6 +142,7 @@
   let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
   let isMeter = $derived(String(core?.controlType ?? '') === 'Meter');
   let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
+  let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -2905,7 +2907,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4152,6 +4154,10 @@
 
     {#if isEnvelope}
       <EnvelopeRenderer control={renderControl} width={displayW} height={displayH} activeIndex={previewSession?.envActiveIndex ?? -1} />
+    {/if}
+
+    {#if isMatrix}
+      <MatrixRenderer control={renderControl} width={displayW} height={displayH} activeCell={previewSession?.matrixActiveCell ?? null} />
     {/if}
 
     {#if isPixelDisplay}
