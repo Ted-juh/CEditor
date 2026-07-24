@@ -3,7 +3,12 @@ import assert from 'node:assert/strict';
 import {
   normalizePoints, envelopeGeometry, envToPx, envFromPx, envWarp, envValueAt,
   envHitNode, envDragNode, envAddNode, envRemoveNode, envelopePreset, envPath,
+  envelopeStageValues,
 } from '../src/CE_Application/utils/envelopeLayout.js';
+
+function envControl(points, sustainIndex) {
+  return { _children: { Envelope: { points, sustainIndex } } };
+}
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
 
@@ -85,6 +90,29 @@ test('presets provide sane shapes + sustain markers', () => {
   const adsr = envelopePreset('adsr').points;
   assert.equal(adsr[0].y, 0);
   assert.equal(adsr.at(-1).y, 0);
+});
+
+test('envelopeStageValues fans an ADSR out to normalized ports', () => {
+  // A clean ADSR: peak at x=0.2, sustain node index 2 at x=0.5 level 0.6, end x=1.
+  const pts = [
+    { x: 0, y: 0 }, { x: 0.2, y: 1 }, { x: 0.5, y: 0.6 }, { x: 1, y: 0 },
+  ];
+  const s = envelopeStageValues(envControl(pts, 2));
+  assert.ok(near(s.attack, 0.2));    // 0 → peak
+  assert.ok(near(s.decay, 0.3));     // peak → sustain (0.5 - 0.2)
+  assert.ok(near(s.sustain, 0.6));   // sustain level
+  assert.ok(near(s.release, 0.5));   // sustain → end (1 - 0.5)
+  assert.equal(s.peakIndex, 1);
+  assert.equal(s.sustainIndex, 2);
+});
+
+test('envelopeStageValues handles no-sustain (AR) shapes', () => {
+  const { points } = envelopePreset('ar'); // [0,0] [0.45,1] [1,0], sustain -1
+  const s = envelopeStageValues(envControl(points, -1));
+  assert.ok(near(s.attack, 0.45));   // to the peak
+  assert.equal(s.decay, 0);          // no sustain node
+  assert.ok(near(s.sustain, 1));     // peak level
+  assert.ok(near(s.release, 0.55));  // peak → end
 });
 
 test('envPath emits a move + line commands across all segments', () => {

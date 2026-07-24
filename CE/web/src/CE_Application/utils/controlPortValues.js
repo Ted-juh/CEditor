@@ -1,0 +1,23 @@
+// Fan-out binding: a multi-port native control resolves a value for EACH of its
+// semantic ports, so one control can drive many device parameters at once (an
+// Envelope → attack/decay/sustain/release; later a Mod Matrix → one per cell).
+// A registry keyed by controlType; each resolver returns { portId: value }.
+// Single-port controls (their value flows through the normal `value`/`state`/…
+// binding path) return null here. Pure — no store/DOM deps.
+import { envelopeStageValues } from './envelopeLayout.js';
+
+const RESOLVERS = {
+  Envelope: (control) => envelopeStageValues(control),
+};
+
+// The map of { portId: value } a multi-port control currently exposes, or null.
+export function controlPortValues(control) {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  const resolver = RESOLVERS[type];
+  return resolver ? resolver(control) : null;
+}
+
+// True when this control type fans out to multiple device-parameter ports.
+export function isFanoutControl(control) {
+  return RESOLVERS[String(control?._children?.Core?.controlType ?? '')] !== undefined;
+}

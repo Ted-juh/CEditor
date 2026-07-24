@@ -59,6 +59,17 @@ Mostly a **configuration of existing engines**, not a new primitive:
   **Missing piece:** the **binding fan-out** — N×M cells → N×M routing
   parameters.
 
+## Fan-out binding — mechanism shipped 🟢
+
+The "one component → many device parameters" capability now exists as a general
+mechanism (first used by the Envelope): a controlType-keyed resolver
+(`utils/controlPortValues.js`) returns a value per semantic port, and
+`PanelPreviewSurface.emitControlPortFanout` sends every bound port to its device
+parameter. The DeviceBindings model already carries a `port` per binding and the
+editor already lists a control's ports + adds a binding each — so the **Mod
+Matrix** now only needs its grid component (N×M cells → N×M ports), not new
+binding infrastructure.
+
 ## The synthesis — two cross-cutting capabilities
 
 Across the synth tier, two foundational capabilities keep surfacing as the real

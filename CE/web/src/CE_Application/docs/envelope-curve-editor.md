@@ -23,10 +23,18 @@ breakpoint-curve engine (as the doc recommends — not a one-off ADSR widget):
   sustain node, loop, snap, playhead source, full styling. Model:
   `Envelope` controlType + section + stage ports (attack/decay/sustain/release).
 
-**Remaining:** full per-node → device-parameter **fan-out binding** (the doc's
-"real architectural lift"; the four stage ports cover the common ADSR case for
-now), and the **LFO** / **response-curve** sibling components that reuse the same
-engine.
+**Fan-out binding — shipped (outbound) 🟢** One Envelope now drives *many* device
+parameters at once: its `attack` / `decay` / `sustain` / `release` ports each
+resolve a normalized value from the shape (`envelopeStageValues`) and emit to
+their bound device parameter. The mechanism is general — `utils/controlPortValues.js`
+is a controlType-keyed registry, and `PanelPreviewSurface.emitControlPortFanout`
+sends every bound port on drag (continuous), release and add/remove. Authoring
+is the existing DeviceBindings editor (it already lists all four ports and lets
+you add a binding per port). This is the same capability the Mod Matrix needs.
+
+**Remaining:** *inbound* fan-out (a device value reshaping the envelope),
+arbitrary per-node ports for free/MSEG shapes (beyond the four ADSR stages), and
+the **LFO** / **response-curve** sibling components that reuse the same engine.
 
 ## Original investigation
 

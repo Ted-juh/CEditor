@@ -185,6 +185,39 @@ export function envValueAt(points, x) {
   return pts[pts.length - 1].y;
 }
 
+// Fan-out mapping: derive the ADSR stage values (normalized 0..1) that the
+// envelope's `attack`/`decay`/`sustain`/`release` ports emit to device
+// parameters. Times are fractions of the total time axis (attack + decay +
+// release + any hold = 1); sustain is the sustain node's level. The "peak" is
+// the highest point up to (and including) the sustain node.
+export function envelopeStageValues(control) {
+  const pts = envelopePoints(control);
+  if (pts.length < 2) return { attack: 0, decay: 0, sustain: 0, release: 0, peakIndex: 0, sustainIndex: -1 };
+  const cfg = envelopeConfig(control);
+  const last = pts.length - 1;
+  let sustainIndex = Math.round(num(cfg.sustainIndex, -1));
+  if (sustainIndex < 0 || sustainIndex > last) sustainIndex = -1;
+
+  // Peak = highest point at/ before the sustain node (else the global max).
+  const peakLimit = sustainIndex >= 0 ? sustainIndex : last;
+  let peakIndex = 0;
+  for (let i = 1; i <= peakLimit; i += 1) { if (pts[i].y > pts[peakIndex].y) peakIndex = i; }
+
+  const startX = pts[0].x;
+  const peakX = pts[peakIndex].x;
+  const susX = sustainIndex >= 0 ? pts[sustainIndex].x : peakX;
+  const endX = pts[last].x;
+
+  return {
+    attack: clamp01(peakX - startX),
+    decay: clamp01(susX - peakX),
+    sustain: clamp01(sustainIndex >= 0 ? pts[sustainIndex].y : pts[peakIndex].y),
+    release: clamp01(endX - susX),
+    peakIndex,
+    sustainIndex,
+  };
+}
+
 // Preset shapes → { points, sustainIndex, lockYIndices }. Envelope presets lock
 // the start (and one-shot end) to y=0 so they always begin/settle at zero.
 export function envelopePreset(name) {

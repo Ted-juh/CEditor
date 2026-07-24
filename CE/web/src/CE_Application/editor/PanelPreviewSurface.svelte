@@ -34,6 +34,7 @@
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
     envDragNode, envAddNode, envRemoveNode,
   } from '../utils/envelopeLayout.js';
+  import { controlPortValues } from '../utils/controlPortValues.js';
   import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
@@ -808,6 +809,30 @@
   function commitEnvPoints(control, points) {
     updateControlProperty(getControlId(control), 'Envelope.points', points);
   }
+  // A control-like with its Envelope points swapped, for resolving fan-out
+  // values from the in-progress (session) shape before it's committed.
+  function envControlWith(control, points) {
+    return { ...control, _children: { ...control._children, Envelope: { ...control._children?.Envelope, points } } };
+  }
+  // Fan-out: send EVERY bound port's resolved value to its device parameter.
+  // One multi-port control (Envelope) → many device parameters at once.
+  function emitControlPortFanout(control, phase = 'commit') {
+    const values = controlPortValues(control);
+    if (!values) return;
+    const controlId = getControlId(control);
+    for (const binding of activeDeviceBindings(control)) {
+      const v = values[String(binding?.port ?? '')];
+      if (v === undefined) continue;
+      commitDeviceParameter({
+        requestId: `panel_preview_${controlId || 'control'}_${phase}_${Date.now()}`,
+        deviceRole: binding.deviceRole || 'mainSynth',
+        parameterId: binding.parameterId,
+        value: v,
+        interactionPhase: phase,
+        dryRun: binding.dryRun !== false,
+      });
+    }
+  }
   // Inject the live working points + resolved phase onto the resolved Envelope
   // so the renderer draws the in-progress drag and the playhead.
   function applyEnvelopeValueSource(control, resolved) {
@@ -835,11 +860,15 @@
     const hit = envHitNode(points, geom, localPoint.x, localPoint.y, Math.max(8, numberOr(envelopeConfig(control).nodeRadius, 4) + 6));
     if (isDoubleTap) {
       // Double-click: remove an interior node, or add one where there's none.
-      if (hit > 0 && hit < points.length - 1) commitEnvPoints(control, envRemoveNode(points, hit));
-      else if (hit < 0 && envelopeConfig(control).addOnDoubleClick !== false) {
+      if (hit > 0 && hit < points.length - 1) {
+        const removed = envRemoveNode(points, hit);
+        commitEnvPoints(control, removed);
+        emitControlPortFanout(envControlWith(control, removed), 'commit');
+      } else if (hit < 0 && envelopeConfig(control).addOnDoubleClick !== false) {
         const norm = envSnap(control, envFromPx(localPoint.x, localPoint.y, geom));
         const { points: added, index } = envAddNode(points, norm.x, norm.y);
         commitEnvPoints(control, added);
+        emitControlPortFanout(envControlWith(control, added), 'commit');
         patchControlSession(getControlId(control), { envActiveIndex: index });
       }
       envDrag = null;
@@ -2365,6 +2394,7 @@
       const norm = envSnap(control, envFromPx(local.x, local.y, geom));
       const next = envDragNode(points, envDrag.index, norm.x, norm.y, { lockEndsX: true, lockYIndices: envLockY(control, points) });
       patchControlSession(getControlId(control), { envPoints: next, envActiveIndex: envDrag.index });
+      emitControlPortFanout(envControlWith(control, next), 'continuous'); // fan-out live
       return;
     }
     // Listbox per-row hover: track the row under the pointer so the renderer can
@@ -2624,7 +2654,10 @@
     // then drop the live session override so the model is the source of truth.
     if (envDrag && activeControl) {
       const finalPoints = sessionFor(activeControl)?.envPoints;
-      if (Array.isArray(finalPoints)) commitEnvPoints(activeControl, finalPoints);
+      if (Array.isArray(finalPoints)) {
+        commitEnvPoints(activeControl, finalPoints);
+        emitControlPortFanout(envControlWith(activeControl, finalPoints), 'commit'); // fan-out on release
+      }
       patchControlSession(activeId, { envPoints: undefined });
       envDrag = null;
     }
