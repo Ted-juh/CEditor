@@ -1,10 +1,34 @@
 # Crossfader — Component Design
 
-> Status: **design / ready to spec into build.** A new `controlType` reusing the
-> (bipolar) slider engine + fan-out binding. The 1D sibling of the
-> [Vector Joystick](./vector-joystick-component.md). Full what/how/where/when.
-> Part of the [panel parts backlog](./README.md); mini-spec in
-> [conventional-components.md](./conventional-components.md).
+> Status: **shipped 🟢** as the `Crossfader` controlType. Original design notes
+> follow.
+
+## Shipped
+
+A 1-D A/B blend fader — the sibling of the
+[Vector Joystick](./vector-joystick-component.md).
+
+- Pure engine `utils/crossfaderLayout.js` (+ `test/crossfaderLayout.test.js`, 5
+  tests): per-side gain laws (linear / equal-power / sharp), track geometry +
+  px round-trip (horizontal + vertical), centre detent, the fan-out port values,
+  and the return glide step.
+- `CrossfaderRenderer.svelte`: groove with an A-side/B-side split fill, centre
+  detent tick, the handle, A/B end labels and optional per-side gain bars;
+  horizontal or vertical. Visual-only.
+- Model: `Crossfader` controlType + `Crossfader` section + three ports
+  (`a` = Gain A, `b` = Gain B, `mix` = position).
+- Interaction (`PanelPreviewSurface`): absolute handle drag with centre detent
+  snap, live into a session copy, committed on release; optional
+  spring-return-to-centre glide (reuses the joystick's return pattern).
+- **Fan-out binding:** the two gains + the mix each emit to their bound device
+  parameter — bind Gain A + Gain B to two oscillator levels for an equal-power
+  crossfade, or Mix to a single dry/wet.
+- `CrossfaderEditor.svelte` inspector: law, orientation, mix, bipolar, detent,
+  gain bars, return-to-centre, A/B labels + colours.
+
+## Original design
+
+> A new `controlType` reusing the (bipolar) slider engine + fan-out binding.
 
 ## What
 

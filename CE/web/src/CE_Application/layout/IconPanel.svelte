@@ -3,6 +3,7 @@
     BadgeCheck,
     CircleDot,
     Container,
+    ArrowLeftRight,
     Gauge,
     Spline,
     Grid2x2,
@@ -103,6 +104,7 @@
       { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
       { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
       { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
+      { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

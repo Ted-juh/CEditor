@@ -194,6 +194,11 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  Crossfader: [
+    { id: 'a', label: 'Gain A', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'b', label: 'Gain B', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'mix', label: 'Mix', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
   VectorJoystick: [
     // Two axes + four bilinear corner blends — bind any subset (fan-out).
     { id: 'x', label: 'X axis', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },

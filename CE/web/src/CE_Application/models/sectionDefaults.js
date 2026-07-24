@@ -903,6 +903,31 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Crossfader — a 1-D A/B blend with a curve law + centre detent. */
+  Crossfader: {
+    _type: 'Crossfader',
+    mix: 0.5,                     // 0 = full A, 1 = full B
+    law: 'equalPower',            // linear | equalPower | sharp
+    bipolar: false,               // mix port emits −1..1 (vs 0..1)
+    orientation: 'horizontal',    // horizontal | vertical
+    editable: true,
+    detent: 0.03,                 // centre detent snap threshold (0 = off)
+    returnToCenter: false,        // spring back to centre on release
+    returnRate: 4,                // glide speed (units/sec)
+    labelA: 'A',
+    labelB: 'B',
+    showLabels: true,
+    showGains: false,             // draw per-side gain bars
+    handleSize: 14,
+    // Colours.
+    trackColour: 'FF1B1B1B',
+    fillAColour: 'FF5B9BD5',
+    fillBColour: 'FFF2994A',
+    handleColour: 'FFF2F2F2',
+    detentColour: '55FFFFFF',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Joystick — an XY vector pad: a puck blending four corners + X/Y axes. */
   Joystick: {
     _type: 'Joystick',

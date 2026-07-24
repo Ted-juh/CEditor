@@ -31,6 +31,7 @@ const LAZY_COMPONENT_LOADERS = {
   envelope: () => import('../sections/EnvelopeEditor.svelte'),
   matrix: () => import('../sections/MatrixEditor.svelte'),
   joystick: () => import('../sections/JoystickEditor.svelte'),
+  crossfader: () => import('../sections/CrossfaderEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),

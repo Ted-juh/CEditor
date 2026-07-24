@@ -43,6 +43,10 @@
     joystickConfig, joystickPos, joystickGeometry, joyFromPx, joystickGlide,
   } from '../utils/joystickLayout.js';
   import {
+    crossfaderConfig, crossfaderMix, crossfaderGeometry, crossfaderMixFromPx,
+    crossfaderDetent, crossfaderGlide,
+  } from '../utils/crossfaderLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -171,7 +175,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))));
+    return applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -994,6 +998,65 @@
       patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
       emitControlPortFanout(joyControlWith(control, pos), settled ? 'commit' : 'continuous');
       if (settled) { commitJoyPos(control, pos); patchControlSession(id, { joyPos: undefined }); return; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+    return true;
+  }
+
+  // --- Crossfader: 1-D A/B blend fader ------------------------------------
+  const XF_PAD = 10;
+  let xfadeDrag = null; // { id } while dragging the handle
+  function isCrossfaderControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Crossfader';
+  }
+  function xfadeGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return crossfaderGeometry(numberOr(t.width, 0), numberOr(t.height, 0), control, XF_PAD);
+  }
+  function xfadeWorkingMix(control) {
+    const sess = sessionFor(control)?.xfadeMix;
+    return typeof sess === 'number' ? sess : crossfaderMix(control);
+  }
+  function commitXfadeMix(control, mix) {
+    updateControlProperty(getControlId(control), 'Crossfader.mix', mix);
+  }
+  function xfadeControlWith(control, mix) {
+    return { ...control, _children: { ...control._children, Crossfader: { ...control._children?.Crossfader, mix } } };
+  }
+  function applyCrossfaderValueSource(control, resolved) {
+    if (!isCrossfaderControl(control)) return resolved;
+    const sess = sessionFor(control)?.xfadeMix;
+    if (typeof sess !== 'number') return resolved;
+    const base = resolved?.control ?? control;
+    const x = base?._children?.Crossfader;
+    if (!x) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Crossfader: { ...x, __mix: sess } } } };
+  }
+  function handleCrossfaderPointerDown(control, localPoint) {
+    if (!isCrossfaderControl(control) || crossfaderConfig(control).editable === false) return false;
+    const raw = crossfaderMixFromPx(localPoint.x, localPoint.y, xfadeGeomFor(control));
+    const mix = crossfaderDetent(raw, crossfaderConfig(control).detent);
+    xfadeDrag = { id: getControlId(control) };
+    patchControlSession(getControlId(control), { xfadeMix: mix });
+    emitControlPortFanout(xfadeControlWith(control, mix), 'continuous');
+    return true;
+  }
+  function startCrossfaderReturn(control) {
+    const cfg = crossfaderConfig(control);
+    if (cfg.returnToCenter !== true) return false;
+    const id = getControlId(control);
+    const rate = numberOr(cfg.returnRate, 4);
+    let lastT = Date.now();
+    const loop = () => {
+      if (xfadeDrag && xfadeDrag.id === id) return; // a new grab cancels the return
+      const now = Date.now();
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const { mix, settled } = crossfaderGlide(xfadeWorkingMix(control), 0.5, rate, dt);
+      patchControlSession(id, { xfadeMix: mix });
+      emitControlPortFanout(xfadeControlWith(control, mix), settled ? 'commit' : 'continuous');
+      if (settled) { commitXfadeMix(control, mix); patchControlSession(id, { xfadeMix: undefined }); return; }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -2535,6 +2598,14 @@
       emitControlPortFanout(joyControlWith(control, pos), 'continuous');
       return;
     }
+    // Crossfader: move the handle to the pointer (absolute + detent), live.
+    if (xfadeDrag && xfadeDrag.id === getControlId(control)) {
+      const local = controlLocalPoint(event);
+      const mix = crossfaderDetent(crossfaderMixFromPx(local.x, local.y, xfadeGeomFor(control)), crossfaderConfig(control).detent);
+      patchControlSession(getControlId(control), { xfadeMix: mix });
+      emitControlPortFanout(xfadeControlWith(control, mix), 'continuous');
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2631,6 +2702,8 @@
     handleMatrixPointerDown(control, pointerDownLocal);
     // Vector Joystick: jump the puck to the click point + start dragging.
     handleJoystickPointerDown(control, pointerDownLocal);
+    // Crossfader: jump the handle to the click point + start dragging.
+    handleCrossfaderPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2823,6 +2896,16 @@
       if (!startJoystickReturn(activeControl)) {
         commitJoyPos(activeControl, pos);
         patchControlSession(activeId, { joyPos: undefined, joyTrail: undefined });
+      }
+    }
+
+    // Release a crossfader handle: commit its mix, then spring-return if enabled.
+    if (xfadeDrag && activeControl) {
+      const mix = xfadeWorkingMix(activeControl);
+      xfadeDrag = null;
+      if (!startCrossfaderReturn(activeControl)) {
+        commitXfadeMix(activeControl, mix);
+        patchControlSession(activeId, { xfadeMix: undefined });
       }
     }
 

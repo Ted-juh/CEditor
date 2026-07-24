@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Crossfader: {
+    sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Crossfader'),
+    defaultOverrides: {
+      // A wide horizontal A/B fader by default.
+      Transform: { width: 200, height: 44 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   VectorJoystick: {
     sections: ['Background', 'Joystick', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('VectorJoystick'),
