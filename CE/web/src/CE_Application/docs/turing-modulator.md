@@ -42,8 +42,11 @@ the Turing gives you **generative surprise you stay in control of**.
   (committed to the model). Runs live in the exported Player (same surface).
 - **`TuringEditor.svelte`** — run / rate / length, a **Randomness slider**
   (locked ↔ chaos), quantize levels, gate threshold, Randomize / Flatten seed
-  buttons, and the three output-port chips. Loader, Properties tab and palette
-  entry included.
+  buttons, optional **value-scale divisions** (major/minor count), and the three
+  output-port chips. Loader, Properties tab and palette entry included.
+- **Value divisions** reuse the **same `buildSliderTickStops` generator the
+  sliders use** (`utils/sliderGeometry.js`) — a pure function keyed only on
+  major/minor counts — so the scale markings match across the whole app.
 
 ## Compatibility
 

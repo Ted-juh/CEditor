@@ -1005,6 +1005,10 @@ export const SECTION_DEFAULTS = {
     gateThreshold: 0.5,          // gate port fires when a step ≥ this
     editable: true,              // drag step bars to seed/edit the sequence
     showGate: true,
+    // Value-scale divisions — the same major/minor tick generator the sliders use.
+    showDivisions: false,
+    majorTickCount: 5,           // major division lines across the value range
+    minorTickCount: 0,           // minor lines between each pair of majors
     // The register — one value 0..1 per step (a musical-ish seed sequence).
     steps: [0.2, 0.8, 0.5, 1.0, 0.35, 0.65, 0.1, 0.9],
     // Colours.

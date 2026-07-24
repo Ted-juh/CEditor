@@ -8,6 +8,9 @@
     turingConfig, turingSteps, turingLength, turingStepIndex, stepOutput, gateAt,
     turingGeometry, stepRect,
   } from '../utils/turingLayout.js';
+  // Reuse the SAME major/minor tick generator the sliders use (pure — keyed only
+  // on major/minor counts), so the value-scale divisions match across the app.
+  import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
   let { control = null, width = 0, height = 0 } = $props();
 
@@ -42,6 +45,12 @@
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
 
+  // Value-scale divisions (horizontal lines), from the shared slider generator.
+  let divs = $derived(cfg.showDivisions === true
+    ? buildSliderTickStops({ majorTickCount: n(cfg.majorTickCount, 5), minorTickCount: n(cfg.minorTickCount, 0) })
+    : { major: [], minor: [] });
+  function divY(normalized) { return geom.y0 + (1 - Math.max(0, Math.min(1, normalized))) * geom.h; }
+
   let bars = $derived.by(() => steps.map((s, i) => {
     const v = stepOutput(steps, i, quant);
     const r = stepRect(geom, i, v);
@@ -52,6 +61,14 @@
 
 <svg class="turing" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <rect x={geom.x0 - 2} y={geom.y0 - 2} width={geom.w + 4} height={geom.h + 4} rx="5" fill={fieldCss} stroke="rgba(0,0,0,0.5)" stroke-width="1" />
+
+  <!-- value-scale divisions (same generator as the sliders' ticks) -->
+  {#each divs.minor as d (d.key)}
+    <line x1={geom.x0} y1={divY(d.normalized)} x2={geom.x0 + geom.w} y2={divY(d.normalized)} stroke={labelCss} stroke-width="1" opacity="0.1" />
+  {/each}
+  {#each divs.major as d (d.key)}
+    <line x1={geom.x0} y1={divY(d.normalized)} x2={geom.x0 + geom.w} y2={divY(d.normalized)} stroke={labelCss} stroke-width="1" opacity="0.22" />
+  {/each}
 
   {#each bars as b (b.i)}
     <!-- track well -->

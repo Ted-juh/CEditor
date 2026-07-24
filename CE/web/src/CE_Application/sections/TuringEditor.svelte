@@ -69,6 +69,17 @@
     <PropertyCell label="Gate row" span={1} hint="Show the gate dots below the bars.">
       <PropertyToggle value={tr.showGate !== false} onchange={() => set('showGate', !(tr.showGate !== false))} />
     </PropertyCell>
+    <PropertyCell label="Divisions" span={1} hint="Draw value-scale lines across the bars, using the same major/minor tick generator as the sliders.">
+      <PropertyToggle value={tr.showDivisions === true} onchange={() => set('showDivisions', !(tr.showDivisions === true))} />
+    </PropertyCell>
+    {#if tr.showDivisions === true}
+      <PropertyCell label="Major" span={1} hint="Major division lines across the value range (same as a slider's Major Count).">
+        <input class="val" type="number" min="2" max="21" step="1" value={tr.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      </PropertyCell>
+      <PropertyCell label="Minor / gap" span={1} hint="Minor lines inserted between each pair of majors (same as a slider's Minor / Gap).">
+        <input class="val" type="number" min="0" max="8" step="1" value={tr.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Seed" span={3} hint="Regenerate the step values. Drag the bars in preview for a hand-drawn sequence.">
       <div class="btns">
         <button type="button" class="action-btn" onclick={() => reseed(true)}>Randomize</button>
