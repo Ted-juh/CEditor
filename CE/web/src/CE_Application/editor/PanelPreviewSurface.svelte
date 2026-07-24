@@ -59,6 +59,9 @@
     recordAppend, normalizeGesture, looperLoopSeconds,
   } from '../utils/looperLayout.js';
   import {
+    routerConfig, routerCurvePoints, routerGeometry, routerHitNode, routerNodeFromPx,
+  } from '../utils/routerLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -187,7 +190,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))));
+    return applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1424,6 +1427,94 @@
       updateControlProperty(getControlId(control), 'Looper.lanes', lanes);
     }
     patchControlSession(getControlId(control), { looperRecLane: undefined, looperRecPoints: undefined, dragging: false });
+  }
+
+  // --- Expression Router: shape an input signal, fan it to many params -------
+  // In preview the input comes from a linked on-panel control (source = 'link')
+  // or the section's test value; the shaped curve output fans out on change. The
+  // transfer-curve nodes are draggable. (In the Player, incoming MIDI feeds it.)
+  const ROUTER_PAD = 8;
+  const ROUTER_HEADER = 26;
+  const lastRouterInput = {};   // { [id]: input } — emit fan-out only on change
+  let routerDrag = null;        // { id, index } while dragging a curve node
+  function isRouterControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Router';
+  }
+  // The live input 0..1: a linked control's normalized value, else the test value.
+  function routerInputLive(control) {
+    const cfg = routerConfig(control);
+    if (String(cfg.source ?? '') === 'link' && cfg.sourceControlId) {
+      const range = lcdRangeForSource(cfg.sourceControlId);
+      if (range && range.max !== range.min) return Math.max(0, Math.min(1, (range.value - range.min) / (range.max - range.min)));
+    }
+    return Math.max(0, Math.min(1, numberOr(cfg.testInput, 0)));
+  }
+  function routerControlWith(control, curve) {
+    const router = { ...control._children?.Router };
+    if (Array.isArray(curve)) router.curve = curve;
+    return { ...control, _children: { ...control._children, Router: router } };
+  }
+  // The curve editing rect (matches the renderer: header row + left ~52%).
+  function routerCurveLayout(control) {
+    const t = control?._children?.Transform ?? {};
+    const w = numberOr(t.width, 0);
+    const h = numberOr(t.height, 0);
+    const curveW = Math.round((w - ROUTER_PAD * 2) * 0.52);
+    const bodyH = Math.max(20, h - (ROUTER_PAD + ROUTER_HEADER) - ROUTER_PAD);
+    const geom = routerGeometry(curveW + ROUTER_PAD * 2, bodyH + ROUTER_PAD * 2, ROUTER_PAD);
+    return { geom, gy: ROUTER_HEADER };
+  }
+  function routerWorkingPoints(control) {
+    const sess = sessionFor(control)?.routerCurve;
+    return Array.isArray(sess) ? sess : routerCurvePoints(control);
+  }
+  // Inject the live input (+ any in-progress curve drag) and fan out on change.
+  function applyRouterValueSource(control, resolved) {
+    if (!isRouterControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const router = base?._children?.Router;
+    if (!router) return resolved;
+    const input = routerInputLive(control);
+    const next = { ...router, __input: input };
+    const sess = sessionFor(control);
+    if (Array.isArray(sess?.routerCurve)) next.curve = sess.routerCurve;
+    if (typeof sess?.routerDragIndex === 'number') next.__drag = sess.routerDragIndex;
+    // Fan out the shaped destinations whenever the input moved (preview link).
+    const id = getControlId(control);
+    if (lastRouterInput[id] === undefined || Math.abs(lastRouterInput[id] - input) > 0.0015) {
+      lastRouterInput[id] = input;
+      emitControlPortFanout({ ...base, _children: { ...base._children, Router: next } }, 'continuous');
+    }
+    return { ...resolved, control: { ...base, _children: { ...base._children, Router: next } } };
+  }
+  // Pointer-down on a transfer-curve node starts dragging it.
+  function handleRouterPointerDown(control, localPoint) {
+    if (!isRouterControl(control) || routerConfig(control).editable === false) return false;
+    const { geom, gy } = routerCurveLayout(control);
+    const pts = routerWorkingPoints(control);
+    const hit = routerHitNode(pts, geom, localPoint.x, localPoint.y - gy, 12);
+    if (hit < 0) return false;
+    routerDrag = { id: getControlId(control), index: hit };
+    patchControlSession(getControlId(control), { routerDragIndex: hit });
+    return true;
+  }
+  // Drag a curve node: ends keep their x (0/1), interior x stays between neighbours.
+  function moveRouterDrag(control, localPoint) {
+    const { geom, gy } = routerCurveLayout(control);
+    const pts = routerWorkingPoints(control).map((p) => ({ ...p }));
+    const node = pts[routerDrag.index];
+    if (!node) return;
+    const norm = routerNodeFromPx(localPoint.x, localPoint.y - gy, geom);
+    const isFirst = routerDrag.index === 0;
+    const isLast = routerDrag.index === pts.length - 1;
+    node.x = isFirst ? 0 : isLast ? 1 : Math.max(pts[routerDrag.index - 1].x, Math.min(pts[routerDrag.index + 1].x, norm.x));
+    node.y = norm.y;
+    patchControlSession(getControlId(control), { routerCurve: pts });
+  }
+  function releaseRouterDrag(control) {
+    const sess = sessionFor(control)?.routerCurve;
+    if (Array.isArray(sess)) updateControlProperty(getControlId(control), 'Router.curve', sess);
+    patchControlSession(getControlId(control), { routerCurve: undefined, routerDragIndex: undefined });
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2995,6 +3086,11 @@
       moveLooperRec(control, controlLocalPoint(event));
       return;
     }
+    // Router: reshape the transfer curve by dragging a node.
+    if (routerDrag && routerDrag.id === getControlId(control)) {
+      moveRouterDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3101,6 +3197,8 @@
     handleOrbitPointerDown(control, pointerDownLocal);
     // Looper: press inside a lane to record a gesture.
     handleLooperPointerDown(control, pointerDownLocal);
+    // Router: grab a transfer-curve node to reshape the response.
+    handleRouterPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3331,6 +3429,12 @@
     if (looperRec && activeControl) {
       looperRec = null;
       releaseLooperRec(activeControl);
+    }
+
+    // Release a router curve node: commit the reshaped curve.
+    if (routerDrag && activeControl) {
+      routerDrag = null;
+      releaseRouterDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

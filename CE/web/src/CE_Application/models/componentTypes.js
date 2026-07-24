@@ -628,6 +628,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Router: {
+    sections: ['Background', 'Router', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Router'),
+    defaultOverrides: {
+      // A transfer-curve panel with a source chip + destination lanes by default.
+      Transform: { width: 320, height: 190 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Looper: {
     sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Looper'),

@@ -12,6 +12,7 @@ import { ribbonPortValues } from './ribbonLayout.js';
 import { macroPortValues } from './macroLayout.js';
 import { orbitPortValues } from './orbitLayout.js';
 import { looperPortValues } from './looperLayout.js';
+import { routerPortValues } from './routerLayout.js';
 
 const RESOLVERS = {
   Envelope: (control) => envelopeStageValues(control),
@@ -22,6 +23,7 @@ const RESOLVERS = {
   Macro: (control) => macroPortValues(control),
   Orbit: (control) => orbitPortValues(control),
   Looper: (control) => looperPortValues(control),
+  Router: (control) => routerPortValues(control),
 };
 
 // The map of { portId: value } a multi-port control currently exposes, or null.

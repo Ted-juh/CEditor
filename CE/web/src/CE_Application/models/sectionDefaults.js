@@ -927,6 +927,38 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Router — shape an incoming signal (mod wheel / aftertouch / breath / a linked
+   *  control) through a transfer curve, then fan it to many device parameters. */
+  Router: {
+    _type: 'Router',
+    source: 'modwheel',          // ROUTER_INPUT_SOURCES id
+    sourceControlId: '',         // when source = 'link': the on-panel control to follow
+    testInput: 0.5,              // preview input when no live source (0..1)
+    invert: false,               // flip the input before the curve
+    deadzone: 0,                 // low-end dead-zone 0..1 (rescales the rest)
+    editable: true,              // drag the transfer-curve nodes in preview
+    showGrid: true,
+    // Transfer curve: normalized breakpoints (x = shaped input, y = output).
+    curve: [
+      { id: 'c0', x: 0, y: 0, curve: 'linear' },
+      { id: 'c1', x: 0.5, y: 0.4, curve: 'scurve' },
+      { id: 'c2', x: 1, y: 1, curve: 'linear' },
+    ],
+    // Destinations: each maps the shaped value to a bound parameter with its own
+    // depth (−1..1; sign = direction) + output range. Each is a bindable port.
+    destinations: [
+      { id: 'r0', label: 'Filter Cutoff', depth: 1.0, min: 0, max: 1, enabled: true, colour: 'FF39D98A' },
+      { id: 'r1', label: 'LFO Depth', depth: 0.6, min: 0, max: 1, enabled: true, colour: 'FF5B9BD5' },
+      { id: 'r2', label: 'Drive', depth: 0.3, min: 0, max: 1, enabled: true, colour: 'FF9B8AFF' },
+    ],
+    // Colours.
+    curveColour: 'FF39D98A',
+    inputColour: 'FFF2C94C',
+    fieldColour: 'FF0A0A0F',
+    gridColour: '18FFFFFF',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Looper — record your own control motion as a loopable clip that replays into
    *  a device parameter on the clock. Each lane is a bindable fan-out port. */
   Looper: {

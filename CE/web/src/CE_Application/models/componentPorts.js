@@ -2,6 +2,7 @@ import { matrixPorts } from '../utils/matrixLayout.js';
 import { macroPorts } from '../utils/macroLayout.js';
 import { orbitPorts } from '../utils/orbitLayout.js';
 import { looperPorts } from '../utils/looperLayout.js';
+import { routerPorts } from '../utils/routerLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -330,6 +331,10 @@ export function getComponentPorts(componentOrType) {
   // Looper: one bindable port per recorded lane ("Lane N").
   if (componentType === 'Looper' && typeof componentOrType === 'object') {
     return looperPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Router: one bindable port per destination ("Destination N").
+  if (componentType === 'Router' && typeof componentOrType === 'object') {
+    return routerPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

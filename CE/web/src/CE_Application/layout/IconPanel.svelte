@@ -7,6 +7,7 @@
     CircleDashed,
     Orbit,
     AudioWaveform,
+    Waypoints,
     Gauge,
     Spline,
     Grid2x2,
@@ -112,6 +113,7 @@
       { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
       { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
       { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
+      { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

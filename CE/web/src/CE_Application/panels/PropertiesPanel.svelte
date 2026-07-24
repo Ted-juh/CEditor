@@ -1,7 +1,7 @@
 <script>
   import {
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play, Cable,
-    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical, CircleDashed, Orbit, AudioWaveform,
+    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical, CircleDashed, Orbit, AudioWaveform, Waypoints,
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
@@ -132,6 +132,7 @@
     { id: 'macro',      icon: CircleDashed,  label: 'Macro',      section: 'Macro' },
     { id: 'orbit',      icon: Orbit,         label: 'Orbit',      section: 'Orbit' },
     { id: 'looper',     icon: AudioWaveform, label: 'Looper',     section: 'Looper' },
+    { id: 'router',     icon: Waypoints,     label: 'Router',     section: 'Router' },
     { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },
