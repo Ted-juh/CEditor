@@ -6,10 +6,12 @@
 // binding path) return null here. Pure — no store/DOM deps.
 import { envelopeStageValues } from './envelopeLayout.js';
 import { matrixPortValues } from './matrixLayout.js';
+import { joystickPortValues } from './joystickLayout.js';
 
 const RESOLVERS = {
   Envelope: (control) => envelopeStageValues(control),
   Matrix: (control) => matrixPortValues(control),
+  VectorJoystick: (control) => joystickPortValues(control),
 };
 
 // The map of { portId: value } a multi-port control currently exposes, or null.

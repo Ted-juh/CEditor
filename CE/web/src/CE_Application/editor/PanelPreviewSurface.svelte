@@ -40,6 +40,9 @@
     matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
   } from '../utils/matrixLayout.js';
   import {
+    joystickConfig, joystickPos, joystickGeometry, joyFromPx, joystickGlide,
+  } from '../utils/joystickLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -168,7 +171,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))));
+    return applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -919,6 +922,81 @@
     if (!cell) return false;
     matrixDrag = { id: getControlId(control), r: cell.r, c: cell.c, startAmount: matrixAmountAt(control, cell.r, cell.c), startY: localPoint.y };
     patchControlSession(getControlId(control), { matrixActiveCell: cell, matrixAmounts: matrixWorkingAmounts(control) });
+    return true;
+  }
+
+  // --- Vector Joystick: XY pad with a draggable puck ----------------------
+  const JOY_PAD = 10;
+  let joyDrag = null; // { id } while dragging the puck
+  function isJoystickControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'VectorJoystick';
+  }
+  function joyGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return joystickGeometry(numberOr(t.width, 0), numberOr(t.height, 0), JOY_PAD);
+  }
+  function joyWorkingPos(control) {
+    const sess = sessionFor(control)?.joyPos;
+    return (sess && typeof sess === 'object') ? sess : joystickPos(control);
+  }
+  function commitJoyPos(control, pos) {
+    updateControlProperty(getControlId(control), 'Joystick.x', pos.x);
+    updateControlProperty(getControlId(control), 'Joystick.y', pos.y);
+  }
+  function joyControlWith(control, pos) {
+    return { ...control, _children: { ...control._children, Joystick: { ...control._children?.Joystick, x: pos.x, y: pos.y } } };
+  }
+  function joyTrailNext(control, pos) {
+    if (joystickConfig(control).showTrail !== true) return undefined;
+    const cap = Math.max(2, Math.round(numberOr(joystickConfig(control).trailLength, 24)));
+    const cur = sessionFor(control)?.joyTrail;
+    const arr = Array.isArray(cur) ? cur.slice(-(cap - 1)) : [];
+    arr.push(pos);
+    return arr;
+  }
+  function applyJoystickValueSource(control, resolved) {
+    if (!isJoystickControl(control)) return resolved;
+    const session = sessionFor(control);
+    const sess = session?.joyPos;
+    const trail = session?.joyTrail;
+    if (!(sess && typeof sess === 'object') && !Array.isArray(trail)) return resolved;
+    const base = resolved?.control ?? control;
+    const j = base?._children?.Joystick;
+    if (!j) return resolved;
+    const next = { ...j };
+    if (sess && typeof sess === 'object') { next.__x = sess.x; next.__y = sess.y; }
+    if (Array.isArray(trail)) next.__trail = trail;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Joystick: next } } };
+  }
+  // Pointer-down on a joystick: jump the puck to the click point + start dragging.
+  function handleJoystickPointerDown(control, localPoint) {
+    if (!isJoystickControl(control) || joystickConfig(control).editable === false) return false;
+    const pos = joyFromPx(localPoint.x, localPoint.y, joyGeomFor(control));
+    joyDrag = { id: getControlId(control) };
+    patchControlSession(getControlId(control), { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
+    emitControlPortFanout(joyControlWith(control, pos), 'continuous');
+    return true;
+  }
+  // Spring-return glide back to centre on release (rAF loop, emits fan-out).
+  function startJoystickReturn(control) {
+    const cfg = joystickConfig(control);
+    if (cfg.returnToCenter !== true) return false;
+    const id = getControlId(control);
+    const axes = String(cfg.returnAxes ?? 'both');
+    const rate = numberOr(cfg.returnRate, 4);
+    let lastT = Date.now();
+    const loop = () => {
+      if (joyDrag && joyDrag.id === id) return; // a new grab cancels the return
+      const now = Date.now();
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const { pos, settled } = joystickGlide(joyWorkingPos(control), { x: 0.5, y: 0.5 }, rate, dt, axes);
+      patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
+      emitControlPortFanout(joyControlWith(control, pos), settled ? 'commit' : 'continuous');
+      if (settled) { commitJoyPos(control, pos); patchControlSession(id, { joyPos: undefined }); return; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
     return true;
   }
 
@@ -2449,6 +2527,14 @@
       emitControlPortFanout(matrixControlWith(control, next), 'continuous'); // fan-out live
       return;
     }
+    // Vector Joystick: move the puck to the pointer (absolute), live into session.
+    if (joyDrag && joyDrag.id === getControlId(control)) {
+      const local = controlLocalPoint(event);
+      const pos = joyFromPx(local.x, local.y, joyGeomFor(control));
+      patchControlSession(getControlId(control), { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
+      emitControlPortFanout(joyControlWith(control, pos), 'continuous');
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2543,6 +2629,8 @@
     handleEnvelopePointerDown(control, pointerDownLocal, isDoubleTap);
     // Mod Matrix: grab the cell under the cursor for a knob drag.
     handleMatrixPointerDown(control, pointerDownLocal);
+    // Vector Joystick: jump the puck to the click point + start dragging.
+    handleJoystickPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2725,6 +2813,17 @@
       }
       patchControlSession(activeId, { matrixAmounts: undefined });
       matrixDrag = null;
+    }
+
+    // Release a joystick puck: commit its position, then spring-return to centre
+    // (if enabled) which glides + commits the rest position itself.
+    if (joyDrag && activeControl) {
+      const pos = joyWorkingPos(activeControl);
+      joyDrag = null;
+      if (!startJoystickReturn(activeControl)) {
+        commitJoyPos(activeControl, pos);
+        patchControlSession(activeId, { joyPos: undefined, joyTrail: undefined });
+      }
     }
 
     if (isCustomComponent(activeControl)) {

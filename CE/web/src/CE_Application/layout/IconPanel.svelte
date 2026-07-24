@@ -6,6 +6,7 @@
     Gauge,
     Spline,
     Grid2x2,
+    Crosshair,
     Grid3x3,
     Library,
     Monitor,
@@ -101,6 +102,7 @@
       { type: 'Meter',           icon: Gauge,              label: 'Insert Meter' },
       { type: 'Envelope',        icon: Spline,             label: 'Insert Envelope' },
       { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
+      { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

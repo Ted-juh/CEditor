@@ -903,6 +903,36 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Joystick — an XY vector pad: a puck blending four corners + X/Y axes. */
+  Joystick: {
+    _type: 'Joystick',
+    x: 0.5,                       // normalized 0..1 puck position (y=0 bottom)
+    y: 0.5,
+    bipolar: true,                // X/Y ports emit −1..1 (vs 0..1)
+    editable: true,
+    // Spring return-to-rest on release.
+    returnToCenter: false,
+    returnAxes: 'both',           // both | x | y
+    returnRate: 4,                // normalized units/sec glide speed
+    // Display.
+    showGrid: true,
+    gridDiv: 4,
+    showCrosshair: true,
+    showCorners: true,
+    cornerLabels: ['A', 'B', 'C', 'D'],   // TL, TR, BL, BR
+    showTrail: false,
+    trailLength: 24,
+    puckRadius: 9,
+    // Colours.
+    padColour: 'FF141414',
+    gridColour: '18FFFFFF',
+    crosshairColour: '40FFFFFF',
+    puckColour: 'FF5B9BD5',
+    trailColour: '665B9BD5',
+    cornerColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Matrix — a modulation routing grid: sources (rows) × destinations (cols). */
   Matrix: {
     _type: 'Matrix',

@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  VectorJoystick: {
+    sections: ['Background', 'Joystick', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('VectorJoystick'),
+    defaultOverrides: {
+      // A square XY pad in a dark panel by default.
+      Transform: { width: 160, height: 160 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Matrix: {
     sections: ['Background', 'Matrix', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Matrix'),

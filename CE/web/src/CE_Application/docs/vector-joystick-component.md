@@ -1,9 +1,36 @@
 # Vector Joystick (4-corner morph) — Component Design
 
-> Status: **design / ready to spec into build.** A new `controlType` reusing the
-> XY-pad engine + the Ribbon's return behavior. Full what/how/where/when. Part of
-> the [panel parts backlog](./README.md); mini-spec context in
-> [conventional-components.md](./conventional-components.md).
+> Status: **shipped 🟢** as the `VectorJoystick` controlType. Original design
+> notes follow.
+
+## Shipped
+
+An interactive XY pad — a draggable puck that blends four corner sources by
+bilinear weight and drives X/Y axes, with spring-return-to-rest.
+
+- Pure engine `utils/joystickLayout.js` (+ `test/joystickLayout.test.js`, 5
+  tests): px round-trip, bilinear corner weights, bipolar/unipolar axis mapping,
+  the fan-out port values, and the spring-return glide step.
+- `JoystickRenderer.svelte`: pad grid, crosshair, corner markers + labels, the
+  puck, and an optional fading motion trail. Visual-only.
+- Model: `VectorJoystick` controlType + `Joystick` section + six ports
+  (`x`, `y`, `cornerTL/TR/BL/BR`).
+- Interaction (`PanelPreviewSurface`): absolute puck drag (click jumps the puck),
+  live into a session copy, committed on release; **spring-return-to-centre** on
+  release (rAF glide, per-axis, configurable speed) — the pitch/mod-wheel feel.
+- **Fan-out binding:** the two axes + four corner blends are each a bindable
+  port (via `controlPortValues`), so one joystick drives up to six device
+  parameters at once (reuses the Envelope/Matrix mechanism).
+- `JoystickEditor.svelte` inspector: rest position, bipolar, return-to-rest
+  (axes + speed), corner labels, grid/crosshair/trail, colours.
+
+**Remaining:** a corner-morph *output* value (the mixed A/B/C/D result as a
+single signal) if a use case needs it — today each corner weight is its own
+port, which covers vector-synth blending and XY modulation.
+
+## Original design
+
+> A new `controlType` reusing the XY-pad engine + the Ribbon's return behavior.
 
 ## What
 
