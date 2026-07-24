@@ -75,6 +75,17 @@
     <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
       <input class="val" type="number" min="0" max="0.9" step="0.02" value={r.deadzone ?? 0} onchange={(e) => set('deadzone', Math.max(0, Math.min(0.9, num(e.target.value, 0))))} />
     </PropertyCell>
+    <PropertyCell label="Divisions" span={1} hint="Draw value-scale ticks along each destination meter, using the same major/minor tick generator as the sliders.">
+      <PropertyToggle value={r.showDivisions === true} onchange={() => set('showDivisions', !(r.showDivisions === true))} />
+    </PropertyCell>
+    {#if r.showDivisions === true}
+      <PropertyCell label="Major" span={1} hint="Major tick count (same as a slider's Major Count).">
+        <input class="val" type="number" min="2" max="21" step="1" value={r.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      </PropertyCell>
+      <PropertyCell label="Minor / gap" span={1} hint="Minor ticks between each pair of majors (same as a slider's Minor / Gap).">
+        <input class="val" type="number" min="0" max="8" step="1" value={r.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   <PropertySection title="Appearance">

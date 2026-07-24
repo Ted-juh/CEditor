@@ -8,6 +8,8 @@
     looperConfig, looperPhase, looperLanes, looperGeometry, laneRect, laneToPx,
     normalizeGesture, laneValueAt,
   } from '../utils/looperLayout.js';
+  // Reuse the SAME major/minor tick generator the sliders use for value divisions.
+  import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
   let { control = null, width = 0, height = 0 } = $props();
 
@@ -40,6 +42,11 @@
   let labelSize = $derived(Math.max(8, Math.min(n(font?.size, 10), 12)));
 
   let recLane = $derived(cfg.__recLane !== undefined && cfg.__recLane !== null ? n(cfg.__recLane, -1) : -1);
+
+  // Value-scale divisions (horizontal lines per lane), from the shared generator.
+  let divs = $derived(cfg.showDivisions === true
+    ? buildSliderTickStops({ majorTickCount: n(cfg.majorTickCount, 5), minorTickCount: n(cfg.minorTickCount, 0) })
+    : { major: [], minor: [] });
 
   // Per-lane render model: rect, colour, gesture path, live dot, playhead value.
   let rows = $derived.by(() => lanes.map((l, i) => {
@@ -75,6 +82,15 @@
       {/each}
       <line x1={row.rect.x} y1={row.rect.y + row.rect.h / 2} x2={row.rect.x + row.rect.w} y2={row.rect.y + row.rect.h / 2} stroke={gridCss} stroke-width="1" opacity="0.6" />
     {/if}
+    <!-- value-scale divisions (horizontal; same generator as the sliders' ticks) -->
+    {#each divs.minor as dv (`mn${row.i}_${dv.key}`)}
+      {@const dy = row.rect.y + (1 - dv.normalized) * row.rect.h}
+      <line x1={row.rect.x} y1={dy} x2={row.rect.x + row.rect.w} y2={dy} stroke={labelCss} stroke-width="1" opacity="0.1" />
+    {/each}
+    {#each divs.major as dv (`mj${row.i}_${dv.key}`)}
+      {@const dy = row.rect.y + (1 - dv.normalized) * row.rect.h}
+      <line x1={row.rect.x} y1={dy} x2={row.rect.x + row.rect.w} y2={dy} stroke={labelCss} stroke-width="1" opacity="0.2" />
+    {/each}
 
     {#if row.hasGesture}
       <path d={row.fill} fill={row.colour} opacity="0.16" />

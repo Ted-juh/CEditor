@@ -10,6 +10,8 @@
     shapeInput,
   } from '../utils/routerLayout.js';
   import { envPath } from '../utils/envelopeLayout.js';
+  // Reuse the SAME major/minor tick generator the sliders use for value divisions.
+  import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
   let { control = null, width = 0, height = 0 } = $props();
 
@@ -43,6 +45,11 @@
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
   let labelSize = $derived(Math.max(8, Math.min(n(font?.size, 11), 12)));
+
+  // Value-scale divisions (vertical ticks on each destination meter), shared gen.
+  let divs = $derived(cfg.showDivisions === true
+    ? buildSliderTickStops({ majorTickCount: n(cfg.majorTickCount, 5), minorTickCount: n(cfg.minorTickCount, 0) })
+    : { major: [], minor: [] });
 
   // Split the body: transfer curve on the left, destination lanes on the right.
   let bodyY = $derived(PAD + HEADER);
@@ -118,6 +125,13 @@
     {@const trackW = Math.max(8, lanesW - 8 - 34)}
     <text x={lanesX + 4} y={cy - 5} font-size={labelSize} fill={row.d.enabled ? 'rgba(220,220,228,1)' : 'rgba(150,150,160,0.5)'}>{row.d.label}</text>
     <rect x={trackX} y={cy + 1} width={trackW} height="7" rx="3.5" fill="rgba(14,14,18,1)" />
+    <!-- value-scale divisions (vertical; same generator as the sliders' ticks) -->
+    {#each divs.minor as dv (`mn${row.i}_${dv.key}`)}
+      <line x1={trackX + dv.normalized * trackW} y1={cy - 0.5} x2={trackX + dv.normalized * trackW} y2={cy + 9.5} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.14" />
+    {/each}
+    {#each divs.major as dv (`mj${row.i}_${dv.key}`)}
+      <line x1={trackX + dv.normalized * trackW} y1={cy - 1.5} x2={trackX + dv.normalized * trackW} y2={cy + 10.5} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.28" />
+    {/each}
     <rect x={trackX} y={cy + 1} width={Math.max(0, row.val * trackW)} height="7" rx="3.5" fill={row.colour} opacity={row.d.enabled ? 1 : 0.4} />
     <text x={lanesX + lanesW} y={cy + 8} font-size={Math.max(8, labelSize - 1)} fill="rgba(232,232,238,1)" text-anchor="end" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}</text>
   {/each}

@@ -7,6 +7,8 @@
     macroConfig, macroValue, macroSlots, macroSlotValue,
     macroGeometry, macroKnobAngle,
   } from '../utils/macroLayout.js';
+  // Reuse the SAME major/minor tick generator the sliders use for value divisions.
+  import { buildSliderTickStops } from '../utils/sliderGeometry.js';
 
   let { control = null, width = 0, height = 0, dragging = false } = $props();
 
@@ -68,6 +70,12 @@
     });
   });
   let labelSize = $derived(Math.max(8, Math.min(n(font?.size, 11), 12)));
+
+  // Value-scale divisions (vertical ticks along each lane track), from the shared
+  // slider generator.
+  let divs = $derived(cfg.showDivisions === true
+    ? buildSliderTickStops({ majorTickCount: n(cfg.majorTickCount, 5), minorTickCount: n(cfg.minorTickCount, 0) })
+    : { major: [], minor: [] });
 </script>
 
 <svg class="macro" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
@@ -107,6 +115,13 @@
     <text x={geom.lanesX0} y={cy} font-size={labelSize} clip-path={`url(#lbl-${row.i})`}
           fill={row.s.enabled ? 'rgba(220,220,228,1)' : 'rgba(150,150,160,0.5)'} dominant-baseline="middle" style="letter-spacing:.01em">{row.s.label}</text>
     <rect x={row.trackX} y={cy - 4} width={row.trackW} height="8" rx="4" fill={trackCss} />
+    <!-- value-scale divisions (vertical; same generator as the sliders' ticks) -->
+    {#each divs.minor as dv (`mn${row.i}_${dv.key}`)}
+      <line x1={row.trackX + dv.normalized * row.trackW} y1={cy - 5} x2={row.trackX + dv.normalized * row.trackW} y2={cy + 5} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.14" />
+    {/each}
+    {#each divs.major as dv (`mj${row.i}_${dv.key}`)}
+      <line x1={row.trackX + dv.normalized * row.trackW} y1={cy - 6} x2={row.trackX + dv.normalized * row.trackW} y2={cy + 6} stroke="rgba(255,255,255,0.5)" stroke-width="1" opacity="0.28" />
+    {/each}
     <rect x={row.trackX} y={cy - 4} width={Math.max(0, row.val * row.trackW)} height="8" rx="4" fill={row.colour} opacity={row.s.enabled ? 1 : 0.4} />
     {#if row.valW > 0}
       <text x={geom.lanesX0 + geom.lanesW} y={cy} font-size={Math.max(8, labelSize - 1)} fill="rgba(232,232,238,1)" text-anchor="end" dominant-baseline="middle" style="font-variant-numeric:tabular-nums">{Math.round(row.val * 100)}%</text>

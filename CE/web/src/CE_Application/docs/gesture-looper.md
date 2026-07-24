@@ -37,6 +37,9 @@ you played it*.
 - **`LooperEditor.svelte`** — Run / loop-length / display toggles + a lane table
   (label · colour · point-count · on/off · clear · add/remove · rest). Loader,
   Properties tab and palette entry included.
+- **Value divisions** (optional) draw a value-scale across each lane using the
+  **same `buildSliderTickStops` generator the sliders' ticks use** — one shared
+  scale system across the app (also on the Turing, Macro and Router meters).
 
 ## Compatibility (the honest bit)
 

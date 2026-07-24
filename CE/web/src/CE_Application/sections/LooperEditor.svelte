@@ -47,9 +47,20 @@
     <PropertyCell label="Playhead" span={1} hint="Show the sweeping playhead.">
       <PropertyToggle value={lp.showPlayhead !== false} onchange={() => set('showPlayhead', !(lp.showPlayhead !== false))} />
     </PropertyCell>
-    <PropertyCell label="Grid" span={1} hint="Show the quarter/half grid lines.">
+    <PropertyCell label="Grid" span={1} hint="Show the quarter/half time grid lines.">
       <PropertyToggle value={lp.showGrid !== false} onchange={() => set('showGrid', !(lp.showGrid !== false))} />
     </PropertyCell>
+    <PropertyCell label="Divisions" span={1} hint="Draw value-scale lines across each lane, using the same major/minor tick generator as the sliders.">
+      <PropertyToggle value={lp.showDivisions === true} onchange={() => set('showDivisions', !(lp.showDivisions === true))} />
+    </PropertyCell>
+    {#if lp.showDivisions === true}
+      <PropertyCell label="Major" span={1} hint="Major value-division lines (same as a slider's Major Count).">
+        <input class="val" type="number" min="2" max="21" step="1" value={lp.majorTickCount ?? 5} onchange={(e) => set('majorTickCount', Math.max(2, Math.min(21, Math.round(num(e.target.value, 5)))))} />
+      </PropertyCell>
+      <PropertyCell label="Minor / gap" span={1} hint="Minor lines between each pair of majors (same as a slider's Minor / Gap).">
+        <input class="val" type="number" min="0" max="8" step="1" value={lp.minorTickCount ?? 0} onchange={(e) => set('minorTickCount', Math.max(0, Math.min(8, Math.round(num(e.target.value, 0)))))} />
+      </PropertyCell>
+    {/if}
   </PropertySection>
 
   <PropertySection title="Appearance">

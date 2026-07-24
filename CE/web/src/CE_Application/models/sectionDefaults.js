@@ -911,6 +911,10 @@ export const SECTION_DEFAULTS = {
     showLanes: true,              // show the assignment lanes (vs knob only)
     showValues: true,             // per-lane live value readout
     label: 'Macro',
+    // Value-scale divisions on the lane meters — same generator as the sliders.
+    showDivisions: false,
+    majorTickCount: 5,
+    minorTickCount: 0,
     // Assignments: each maps the macro position to a bound device parameter with
     // its own depth (−1..1; sign = direction), curve and output range. Each slot
     // is a bindable port ("Destination").
@@ -971,6 +975,10 @@ export const SECTION_DEFAULTS = {
     deadzone: 0,                 // low-end dead-zone 0..1 (rescales the rest)
     editable: true,              // drag the transfer-curve nodes in preview
     showGrid: true,
+    // Value-scale divisions on the destination meters — same generator as sliders.
+    showDivisions: false,
+    majorTickCount: 5,
+    minorTickCount: 0,
     // Transfer curve: normalized breakpoints (x = shaped input, y = output).
     curve: [
       { id: 'c0', x: 0, y: 0, curve: 'linear' },
@@ -1029,6 +1037,10 @@ export const SECTION_DEFAULTS = {
     showPlayhead: true,
     showGrid: true,
     quantizeLoop: false,         // snap the loop length to whole beats (visual aid)
+    // Value-scale divisions — the same major/minor tick generator the sliders use.
+    showDivisions: false,
+    majorTickCount: 5,
+    minorTickCount: 0,
     // Lanes: each records a value-over-loop gesture (sorted {t,v} points, 0..1),
     // emitted live via its bindable "Lane N" port. `rest` = value when empty.
     lanes: [
