@@ -1,7 +1,7 @@
 <script>
   import {
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play, Cable,
-    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight,
+    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical,
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
@@ -128,6 +128,7 @@
     { id: 'matrix',     icon: Grid2x2,       label: 'Matrix',     section: 'Matrix' },
     { id: 'joystick',   icon: Crosshair,     label: 'Joystick',   section: 'Joystick' },
     { id: 'crossfader', icon: ArrowLeftRight, label: 'Crossfader', section: 'Crossfader' },
+    { id: 'ribbon',     icon: SlidersVertical, label: 'Ribbon',    section: 'Ribbon' },
     { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },
     { id: 'grid',       icon: Grid3x3,       label: 'Grid',       section: 'Grid' },

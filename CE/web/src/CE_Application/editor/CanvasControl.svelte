@@ -10,6 +10,7 @@
   import MatrixRenderer from './MatrixRenderer.svelte';
   import JoystickRenderer from './JoystickRenderer.svelte';
   import CrossfaderRenderer from './CrossfaderRenderer.svelte';
+  import RibbonRenderer from './RibbonRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
@@ -147,6 +148,7 @@
   let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
   let isJoystick = $derived(String(core?.controlType ?? '') === 'VectorJoystick');
   let isCrossfader = $derived(String(core?.controlType ?? '') === 'Crossfader');
+  let isRibbon = $derived(String(core?.controlType ?? '') === 'Ribbon');
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -2911,7 +2913,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4170,6 +4172,10 @@
 
     {#if isCrossfader}
       <CrossfaderRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isRibbon}
+      <RibbonRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
 
     {#if isPixelDisplay}

@@ -105,6 +105,7 @@
       { type: 'Matrix',          icon: Grid2x2,            label: 'Insert Mod Matrix' },
       { type: 'VectorJoystick',  icon: Crosshair,          label: 'Insert Vector Joystick' },
       { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
+      { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

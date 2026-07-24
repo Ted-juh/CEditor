@@ -47,6 +47,10 @@
     crossfaderDetent, crossfaderGlide,
   } from '../utils/crossfaderLayout.js';
   import {
+    ribbonConfig, ribbonValue, ribbonVertical, ribbonGeometry, ribbonValueFromPx,
+    ribbonSnap, ribbonReturnTarget, ribbonGlide,
+  } from '../utils/ribbonLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -175,7 +179,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))));
+    return applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1061,6 +1065,74 @@
     };
     requestAnimationFrame(loop);
     return true;
+  }
+
+  // --- Ribbon / pitch-mod wheel: 1-D absolute-touch strip -----------------
+  const RIB_PAD = 8;
+  let ribbonDrag = null; // { id } while touching the strip
+  function isRibbonControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Ribbon';
+  }
+  function ribGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return ribbonGeometry(numberOr(t.width, 0), numberOr(t.height, 0), RIB_PAD);
+  }
+  function ribWorkingValue(control) {
+    const sess = sessionFor(control)?.ribbonValue;
+    return typeof sess === 'number' ? sess : ribbonValue(control);
+  }
+  function commitRibbonValue(control, value) {
+    updateControlProperty(getControlId(control), 'Ribbon.value', value);
+  }
+  // Inject the live value + touch onto the resolved Ribbon (for the renderer and
+  // the fan-out — `touch` reads __touch).
+  function ribControlWith(control, value, touched) {
+    return { ...control, _children: { ...control._children, Ribbon: { ...control._children?.Ribbon, __value: value, __touch: touched === true } } };
+  }
+  function applyRibbonValueSource(control, resolved) {
+    if (!isRibbonControl(control)) return resolved;
+    const session = sessionFor(control);
+    const v = session?.ribbonValue;
+    if (typeof v !== 'number') return resolved;
+    const base = resolved?.control ?? control;
+    const r = base?._children?.Ribbon;
+    if (!r) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Ribbon: { ...r, __value: v, __touch: session?.ribbonTouch === true } } } };
+  }
+  function handleRibbonPointerDown(control, localPoint) {
+    if (!isRibbonControl(control) || ribbonConfig(control).editable === false) return false;
+    const value = ribbonSnap(ribbonValueFromPx(localPoint.x, localPoint.y, ribGeomFor(control), ribbonVertical(control)), control);
+    ribbonDrag = { id: getControlId(control) };
+    patchControlSession(getControlId(control), { ribbonValue: value, ribbonTouch: true });
+    emitControlPortFanout(ribControlWith(control, value, true), 'continuous');
+    return true;
+  }
+  // On release: fire the touch-off gate, then either latch, snap, or glide back
+  // to the rest value (returnMode).
+  function releaseRibbon(control) {
+    const id = getControlId(control);
+    const target = ribbonReturnTarget(control);
+    if (target === null) { // latch / hold
+      const v = ribWorkingValue(control);
+      commitRibbonValue(control, v);
+      patchControlSession(id, { ribbonTouch: false, ribbonValue: undefined });
+      emitControlPortFanout(ribControlWith(control, v, false), 'commit');
+      return;
+    }
+    const rate = numberOr(ribbonConfig(control).returnRate, 8);
+    let lastT = Date.now();
+    const loop = () => {
+      if (ribbonDrag && ribbonDrag.id === id) return; // a new touch cancels the return
+      const now = Date.now();
+      const dt = Math.min(0.05, (now - lastT) / 1000);
+      lastT = now;
+      const { value, settled } = ribbonGlide(ribWorkingValue(control), target, rate, dt);
+      patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
+      emitControlPortFanout(ribControlWith(control, value, false), settled ? 'commit' : 'continuous');
+      if (settled) { commitRibbonValue(control, value); patchControlSession(id, { ribbonValue: undefined }); return; }
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2606,6 +2678,14 @@
       emitControlPortFanout(xfadeControlWith(control, mix), 'continuous');
       return;
     }
+    // Ribbon: track the finger along the strip (absolute), live.
+    if (ribbonDrag && ribbonDrag.id === getControlId(control)) {
+      const local = controlLocalPoint(event);
+      const value = ribbonSnap(ribbonValueFromPx(local.x, local.y, ribGeomFor(control), ribbonVertical(control)), control);
+      patchControlSession(getControlId(control), { ribbonValue: value, ribbonTouch: true });
+      emitControlPortFanout(ribControlWith(control, value, true), 'continuous');
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2704,6 +2784,8 @@
     handleJoystickPointerDown(control, pointerDownLocal);
     // Crossfader: jump the handle to the click point + start dragging.
     handleCrossfaderPointerDown(control, pointerDownLocal);
+    // Ribbon: absolute touch — jump the value to the finger + start tracking.
+    handleRibbonPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -2907,6 +2989,12 @@
         commitXfadeMix(activeControl, mix);
         patchControlSession(activeId, { xfadeMix: undefined });
       }
+    }
+
+    // Release a ribbon: touch-off gate + latch / snap / glide to rest.
+    if (ribbonDrag && activeControl) {
+      ribbonDrag = null;
+      releaseRibbon(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

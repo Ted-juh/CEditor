@@ -1,9 +1,36 @@
 # Ribbon / Touch-strip — Component Design
 
-> Status: **design / ready to spec into build.** A new `controlType` reusing the
-> slider engine. Full what/how/where/when. Part of the
-> [panel parts backlog](./README.md); mini-spec context in
-> [conventional-components.md](./conventional-components.md).
+> Status: **shipped 🟢** as the `Ribbon` controlType (covers ribbon + pitch/mod
+> wheel). Original design notes follow.
+
+## Shipped
+
+A 1-D absolute-touch controller — touch anywhere and the value jumps there —
+with return-to-rest, in two styles (flat strip / 3-D wheel). One component
+covers the touch ribbon, the pitch wheel and the mod wheel (editor presets set
+the right fields).
+
+- Pure engine `utils/ribbonLayout.js` (+ `test/ribbonLayout.test.js`, 5 tests):
+  geometry + px round-trip (horizontal + vertical), snap, the return target by
+  mode (none/center/min/max/rest), the return glide (rate ≤ 0 = instant snap),
+  and the fan-out port values (value + touch gate).
+- `RibbonRenderer.svelte`: flat strip (groove + origin/centre fill + indicator +
+  touch glow) or wheel (gradient body + centre detent + value notch); horizontal
+  or vertical; optional readout + label. Visual-only.
+- Model: `Ribbon` controlType + `Ribbon` section + two ports (`value`,
+  `touch` gate).
+- Interaction (`PanelPreviewSurface`): absolute touch (jump-to-finger) with snap,
+  live into a session copy; on release a **touch-off gate** then latch / snap /
+  glide to the rest value (`returnMode`). Reuses the shared return-glide pattern.
+- **Fan-out binding:** `value` + `touch` each emit — bind value to pitch bend
+  and touch to a gate/enable.
+- `RibbonEditor.svelte` inspector with **Touch-ribbon / Pitch-wheel / Mod-wheel**
+  quick presets, plus style, orientation, return mode/speed, snap, glow, colours.
+
+Realizes the [return-to-rest](./return-to-rest.md) capability (the glide is now
+shared across the Joystick, Crossfader and Ribbon).
+
+## Original design
 
 ## What
 

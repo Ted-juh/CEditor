@@ -903,6 +903,32 @@ export const SECTION_DEFAULTS = {
     arcSweep: 270,
   },
 
+  /** Ribbon — a 1-D absolute-touch strip / pitch-mod wheel with return-to-rest. */
+  Ribbon: {
+    _type: 'Ribbon',
+    value: 0.5,                   // 0..1 current / rest position
+    bipolar: false,               // value port emits −1..1 (pitch bend)
+    orientation: 'vertical',      // vertical | horizontal
+    style: 'ribbon',              // ribbon (flat strip) | wheel (3-D wheel)
+    editable: true,
+    returnMode: 'none',           // none | center | min | max | rest
+    returnValue: 0.5,             // rest value when returnMode = rest
+    returnRate: 8,                // glide speed (units/sec; 0 = instant snap)
+    snap: 0,                      // value snap step (0 = continuous)
+    showGlow: true,               // touch glow while held
+    showValue: false,
+    valuePrecision: 2,
+    label: '',
+    indicatorSize: 3,
+    // Colours.
+    trackColour: 'FF181818',
+    fillColour: 'FF5B9BD5',
+    indicatorColour: 'FFFFFFFF',
+    glowColour: '885B9BD5',
+    wheelColour: 'FF2A2A2A',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Crossfader — a 1-D A/B blend with a curve law + centre detent. */
   Crossfader: {
     _type: 'Crossfader',

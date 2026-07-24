@@ -194,6 +194,10 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'continuous',
     },
   ],
+  Ribbon: [
+    { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'touch', label: 'Touch gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
   Crossfader: [
     { id: 'a', label: 'Gain A', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
     { id: 'b', label: 'Gain B', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },

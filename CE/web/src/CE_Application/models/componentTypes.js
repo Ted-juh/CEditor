@@ -612,6 +612,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Ribbon: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      // A tall vertical touch strip / wheel by default.
+      Transform: { width: 44, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Crossfader: {
     sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Crossfader'),
