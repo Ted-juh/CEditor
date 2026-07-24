@@ -1,5 +1,6 @@
 import { matrixPorts } from '../utils/matrixLayout.js';
 import { macroPorts } from '../utils/macroLayout.js';
+import { orbitPorts } from '../utils/orbitLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -320,6 +321,10 @@ export function getComponentPorts(componentOrType) {
   // Macro: one bindable port per assignment ("Destination"), from the slots.
   if (componentType === 'Macro' && typeof componentOrType === 'object') {
     return macroPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Orbit: one bindable port per satellite ("Node N"), from the nodes.
+  if (componentType === 'Orbit' && typeof componentOrType === 'object') {
+    return orbitPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

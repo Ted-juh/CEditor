@@ -927,6 +927,34 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Orbit — a spatial poly-LFO: satellites orbit a centre, each emitting a live
+   *  0..1 modulation value from its position (one bindable port per satellite). */
+  Orbit: {
+    _type: 'Orbit',
+    phase: 0,                     // global clock 0..1 (advanced by the run ticker)
+    running: true,               // animate in preview / player
+    rate: 0.25,                  // global cycles per second
+    editable: true,              // allow dragging satellites in preview
+    showTrails: true,            // comet trails behind satellites
+    showSpokes: true,            // spoke from centre to each satellite
+    showRings: true,             // faint orbit rings
+    showValues: false,           // per-satellite value readout
+    // Satellites: each sits at radius (0..1) + base angle (deg), orbits at `ratio`
+    // turns per global cycle (sign = direction), and emits a live value from its
+    // position via `output` (y | x | sine | radius), scaled by depth, optionally
+    // inverted. Each is a bindable port ("Node N").
+    nodes: [
+      { id: 'n0', label: 'Node 1', radius: 0.85, angle: 90, ratio: 1, output: 'y', depth: 1, invert: false, enabled: true, colour: 'FF39D98A' },
+      { id: 'n1', label: 'Node 2', radius: 0.55, angle: 210, ratio: -2, output: 'x', depth: 0.7, invert: false, enabled: true, colour: 'FF5B9BD5' },
+      { id: 'n2', label: 'Node 3', radius: 0.35, angle: 330, ratio: 3, output: 'sine', depth: 1, invert: true, enabled: true, colour: 'FFF2994A' },
+    ],
+    // Colours.
+    fieldColour: 'FF0D0D12',
+    ringColour: '332A6BA8',
+    centreColour: 'FF3A3A44',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Ribbon — a 1-D absolute-touch strip / pitch-mod wheel with return-to-rest. */
   Ribbon: {
     _type: 'Ribbon',

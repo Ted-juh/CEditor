@@ -10,6 +10,7 @@ import { joystickPortValues } from './joystickLayout.js';
 import { crossfaderPortValues } from './crossfaderLayout.js';
 import { ribbonPortValues } from './ribbonLayout.js';
 import { macroPortValues } from './macroLayout.js';
+import { orbitPortValues } from './orbitLayout.js';
 
 const RESOLVERS = {
   Envelope: (control) => envelopeStageValues(control),
@@ -18,6 +19,7 @@ const RESOLVERS = {
   Crossfader: (control) => crossfaderPortValues(control),
   Ribbon: (control) => ribbonPortValues(control),
   Macro: (control) => macroPortValues(control),
+  Orbit: (control) => orbitPortValues(control),
 };
 
 // The map of { portId: value } a multi-port control currently exposes, or null.

@@ -5,6 +5,7 @@
     Container,
     ArrowLeftRight,
     CircleDashed,
+    Orbit,
     Gauge,
     Spline,
     Grid2x2,
@@ -108,6 +109,7 @@
       { type: 'Crossfader',      icon: ArrowLeftRight,     label: 'Insert Crossfader' },
       { type: 'Ribbon',          icon: SlidersVertical,    label: 'Insert Ribbon / Wheel' },
       { type: 'Macro',           icon: CircleDashed,       label: 'Insert Macro' },
+      { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

@@ -628,6 +628,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Orbit: {
+    sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Orbit'),
+    defaultOverrides: {
+      // A square circular modulation field on a dark panel by default.
+      Transform: { width: 200, height: 200 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0D0D12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
   Ribbon: {
     sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Ribbon'),

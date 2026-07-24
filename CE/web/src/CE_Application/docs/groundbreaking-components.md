@@ -28,6 +28,14 @@ not DSP:
 
 ## The ideas
 
+### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
+- A modulation **source that animates itself** and that you **choreograph in
+  space**: satellites orbit a centre, each emitting a live 0–1 value from its
+  position, each a bindable fan-out port. The first *time-based, self-running*
+  native control here — see [orbit-modulator.md](./orbit-modulator.md).
+- Substrate: pure position→value math + fan-out binding; a rAF clock in the
+  preview surface. No DSP.
+
 ### 1. Macro control → Snapshot Morph (headline)
 - **Macro:** one knob drives **many** device parameters with per-target curves
   (modern soft-synth macros; rare in hardware editors).

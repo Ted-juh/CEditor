@@ -52,6 +52,9 @@
   } from '../utils/ribbonLayout.js';
   import { macroConfig, macroValue, macroGeometry, macroKnobHit } from '../utils/macroLayout.js';
   import {
+    orbitConfig, orbitNodes, orbitGeometry, orbitHitNode, pxToOrbit, nodeAngle,
+  } from '../utils/orbitLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -180,7 +183,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))));
+    return applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1169,6 +1172,119 @@
     macroDrag = { id: getControlId(control), startY: localPoint.y, startValue: macroWorkingValue(control) };
     patchControlSession(getControlId(control), { dragging: true });
     return true;
+  }
+
+  // --- Orbit: a self-running spatial poly-LFO (fan-out) -------------------
+  // The Orbit animates itself: a lazy rAF ticker advances each running Orbit's
+  // phase by rate·dt, re-renders (orbitClock), and fans out every satellite's
+  // live value to its device parameter. Satellites can also be dragged to a new
+  // radius/angle. Only runs while a running Orbit exists (self-stops).
+  const ORBIT_PAD = 10;
+  let orbitClock = $state(0);
+  const orbitPhaseState = {};   // { [id]: phase 0..1 }
+  let orbitTickerRunning = false;
+  let orbitLastMs = 0;
+  let orbitDrag = null;         // { id, index } while dragging a satellite
+  function isOrbitControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Orbit';
+  }
+  function orbitControls() {
+    return (orderedControls ?? []).filter((c) => isOrbitControl(c));
+  }
+  function orbitPhaseFor(control) {
+    const id = getControlId(control);
+    if (orbitPhaseState[id] !== undefined) return orbitPhaseState[id];
+    return ((numberOr(orbitConfig(control).phase, 0) % 1) + 1) % 1;
+  }
+  function ensureOrbitTicker() {
+    if (orbitTickerRunning) return;
+    orbitTickerRunning = true;
+    orbitLastMs = Date.now();
+    const loop = () => {
+      const running = orbitControls().filter((c) => orbitConfig(c).running !== false);
+      if (!running.length) { orbitTickerRunning = false; return; } // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - orbitLastMs) / 1000)); // clamp big gaps
+      orbitLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        const rate = numberOr(orbitConfig(c).rate, 0.25);
+        const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
+        orbitPhaseState[id] = (prev + rate * dt) % 1;
+        emitControlPortFanout(orbitControlWith(c, orbitPhaseState[id]), 'continuous');
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // A control-like with its Orbit phase (and optional node override) swapped in,
+  // for resolving fan-out / rendering from the live clock before it's committed.
+  function orbitControlWith(control, phase, nodes = null) {
+    const orbit = { ...control._children?.Orbit, __phase: phase };
+    if (Array.isArray(nodes)) orbit.nodes = nodes;
+    return { ...control, _children: { ...control._children, Orbit: orbit } };
+  }
+  function orbitGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return orbitGeometry(numberOr(t.width, 0), numberOr(t.height, 0), ORBIT_PAD);
+  }
+  // The working nodes: the live session copy while dragging, else the model.
+  function orbitWorkingNodes(control) {
+    const sess = sessionFor(control)?.orbitNodes;
+    return Array.isArray(sess) ? sess : orbitNodes(control);
+  }
+  // Inject the live clock phase (+ any drag session state) onto the resolved
+  // Orbit so the renderer animates. Reads Orbit.__phase / __drag.
+  function applyOrbitValueSource(control, resolved) {
+    if (!isOrbitControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const orbit = base?._children?.Orbit;
+    if (!orbit) return resolved;
+    if (orbit.running !== false) { ensureOrbitTicker(); void orbitClock; }
+    const nextOrbit = { ...orbit, __phase: orbitPhaseFor(control) };
+    const sess = sessionFor(control);
+    if (Array.isArray(sess?.orbitNodes)) nextOrbit.nodes = sess.orbitNodes;
+    if (typeof sess?.orbitDragIndex === 'number') nextOrbit.__drag = sess.orbitDragIndex;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Orbit: nextOrbit } } };
+  }
+  // Pointer-down on a satellite starts dragging it to a new radius/angle.
+  function handleOrbitPointerDown(control, localPoint) {
+    if (!isOrbitControl(control) || orbitConfig(control).editable === false) return false;
+    const geom = orbitGeomFor(control);
+    const phase = orbitPhaseFor(control);
+    const hit = orbitHitNode(control, phase, geom, localPoint.x, localPoint.y, 14);
+    if (hit < 0) return false;
+    orbitDrag = { id: getControlId(control), index: hit };
+    patchControlSession(getControlId(control), { orbitDragIndex: hit });
+    return true;
+  }
+  // Move a satellite: place it under the pointer at the current phase (its base
+  // angle is back-solved so it sits there now), live into session + fan-out.
+  function moveOrbitDrag(control, localPoint) {
+    const geom = orbitGeomFor(control);
+    const phase = orbitPhaseFor(control);
+    const nodes = orbitWorkingNodes(control).map((s) => ({ ...s }));
+    const node = nodes[orbitDrag.index];
+    if (!node) return;
+    const { radius, angle } = pxToOrbit(localPoint.x, localPoint.y, geom);
+    node.radius = radius;
+    // Displayed angle = base + ratio·phase·360 ⇒ base = displayed − advance.
+    const advance = numberOr(node.ratio, 1) * phase * 360;
+    let base = angle - advance;
+    base = ((base % 360) + 360) % 360;
+    node.angle = base;
+    patchControlSession(getControlId(control), { orbitNodes: nodes });
+    emitControlPortFanout(orbitControlWith(control, phase, nodes), 'continuous');
+  }
+  // Release a satellite: commit the node array, drop the session override.
+  function releaseOrbitDrag(control) {
+    const sess = sessionFor(control)?.orbitNodes;
+    if (Array.isArray(sess)) {
+      updateControlProperty(getControlId(control), 'Orbit.nodes', sess);
+      emitControlPortFanout(orbitControlWith(control, orbitPhaseFor(control), sess), 'commit');
+    }
+    patchControlSession(getControlId(control), { orbitNodes: undefined, orbitDragIndex: undefined });
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -2730,6 +2846,11 @@
       emitControlPortFanout(macroControlWith(control, value), 'continuous');
       return;
     }
+    // Orbit: drag a satellite to a new radius/angle → fan out all nodes live.
+    if (orbitDrag && orbitDrag.id === getControlId(control)) {
+      moveOrbitDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -2832,6 +2953,8 @@
     handleRibbonPointerDown(control, pointerDownLocal);
     // Macro: grab the knob for a vertical drag.
     handleMacroPointerDown(control, pointerDownLocal);
+    // Orbit: grab the satellite under the cursor for a radius/angle drag.
+    handleOrbitPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3050,6 +3173,12 @@
       commitMacroValue(activeControl, value);
       emitControlPortFanout(macroControlWith(activeControl, value), 'commit');
       patchControlSession(activeId, { macroValue: undefined, dragging: false });
+    }
+
+    // Release an orbit satellite: commit the node array, drop the override.
+    if (orbitDrag && activeControl) {
+      orbitDrag = null;
+      releaseOrbitDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {
