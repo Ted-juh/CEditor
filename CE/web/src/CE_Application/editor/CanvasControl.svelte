@@ -15,6 +15,7 @@
   import OrbitRenderer from './OrbitRenderer.svelte';
   import LooperRenderer from './LooperRenderer.svelte';
   import RouterRenderer from './RouterRenderer.svelte';
+  import TimbreRenderer from './TimbreRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
@@ -157,6 +158,7 @@
   let isOrbit = $derived(String(core?.controlType ?? '') === 'Orbit');
   let isLooper = $derived(String(core?.controlType ?? '') === 'Looper');
   let isRouter = $derived(String(core?.controlType ?? '') === 'Router');
+  let isTimbre = $derived(String(core?.controlType ?? '') === 'Timbre');
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -2921,7 +2923,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4200,6 +4202,10 @@
 
     {#if isRouter}
       <RouterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTimbre}
+      <TimbreRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
 
     {#if isPixelDisplay}

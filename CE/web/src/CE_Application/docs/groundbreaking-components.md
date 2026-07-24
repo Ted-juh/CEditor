@@ -36,6 +36,24 @@ not DSP:
 - Substrate: pure position→value math + fan-out binding; a rAF clock in the
   preview surface. No DSP.
 
+### 0b. Gesture Looper — record your motion, loop it — **shipped 🟢**
+- The **human** counterpart to the Orbit: press-and-move in a lane to record a
+  value-over-loop gesture, release and it loops into a bound parameter on the
+  clock. See [gesture-looper.md](./gesture-looper.md). Works on essentially any
+  MIDI synth (light traffic, no input dependency).
+
+### 0c. Expression Router — shape any input, fan it out — **shipped 🟢**
+- MIDI-learn an incoming signal (mod wheel / aftertouch / breath / a linked
+  control), shape it through a **drawable transfer curve** (dead-zone, invert),
+  and fan it to many parameters. See [expression-router.md](./expression-router.md).
+- Output works anywhere; input availability is synth-dependent (aftertouch/breath).
+
+### 0d. Timbre Space — control by meaning — **shipped 🟢 (v1)**
+- A 2D "sound map": axes are musical intentions, anchors are patches, the puck
+  **blends the whole patch** by inverse-distance weighting. One gesture over
+  perceptual directions. See [timbre-space.md](./timbre-space.md). A corner
+  readout reports how many targets are actually MIDI-addressable.
+
 ### 1. Macro control → Snapshot Morph (headline)
 - **Macro:** one knob drives **many** device parameters with per-target curves
   (modern soft-synth macros; rare in hardware editors).

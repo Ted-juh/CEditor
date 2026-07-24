@@ -927,6 +927,39 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Timbre — a 2D "sound map": axes are musical meanings, anchors are patches,
+   *  and the puck blends them (inverse-distance) into every target's value. */
+  Timbre: {
+    _type: 'Timbre',
+    x: 0.5,                       // puck position 0..1
+    y: 0.5,
+    power: 2,                     // blend sharpness (higher = anchors dominate sooner)
+    editable: true,              // drag the puck / anchors in preview
+    axisX: 'dark → bright',
+    axisY: 'soft → aggressive',
+    showField: true,             // heat/contour field
+    showAnchors: true,
+    showReadout: true,           // "N of M targets MIDI-addressable"
+    // Morph targets: each a bindable dimension ("target_N" port). Anchors store a
+    // value per target id; the puck blends them.
+    targets: [
+      { id: 'cutoff', label: 'Filter Cutoff', colour: 'FF39D98A' },
+      { id: 'reso', label: 'Resonance', colour: 'FF5B9BD5' },
+      { id: 'drive', label: 'Drive', colour: 'FF9B8AFF' },
+    ],
+    // Anchors: named patches placed on the pad, each with a value per target.
+    anchors: [
+      { id: 'a0', label: 'Deep Pad', x: 0.15, y: 0.2, colour: 'FF5B9BD5', values: { cutoff: 0.2, reso: 0.3, drive: 0.1 } },
+      { id: 'a1', label: 'Screaming Lead', x: 0.85, y: 0.85, colour: 'FFF2994A', values: { cutoff: 0.95, reso: 0.8, drive: 0.9 } },
+      { id: 'a2', label: 'Glass Bell', x: 0.85, y: 0.2, colour: 'FF39D98A', values: { cutoff: 0.7, reso: 0.2, drive: 0.2 } },
+      { id: 'a3', label: 'Soft Keys', x: 0.15, y: 0.8, colour: 'FF9B8AFF', values: { cutoff: 0.45, reso: 0.4, drive: 0.05 } },
+    ],
+    // Colours.
+    fieldColour: 'FF0C0C12',
+    puckColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Router — shape an incoming signal (mod wheel / aftertouch / breath / a linked
    *  control) through a transfer curve, then fan it to many device parameters. */
   Router: {

@@ -8,6 +8,7 @@
     Orbit,
     AudioWaveform,
     Waypoints,
+    Palette,
     Gauge,
     Spline,
     Grid2x2,
@@ -114,6 +115,7 @@
       { type: 'Orbit',           icon: Orbit,              label: 'Insert Orbit Modulator' },
       { type: 'Looper',          icon: AudioWaveform,      label: 'Insert Gesture Looper' },
       { type: 'Router',          icon: Waypoints,          label: 'Insert Expression Router' },
+      { type: 'Timbre',          icon: Palette,            label: 'Insert Timbre Space' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

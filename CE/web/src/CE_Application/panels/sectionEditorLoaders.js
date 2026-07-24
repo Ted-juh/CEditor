@@ -37,6 +37,7 @@ const LAZY_COMPONENT_LOADERS = {
   orbit: () => import('../sections/OrbitEditor.svelte'),
   looper: () => import('../sections/LooperEditor.svelte'),
   router: () => import('../sections/RouterEditor.svelte'),
+  timbre: () => import('../sections/TimbreEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),

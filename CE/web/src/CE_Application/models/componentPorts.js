@@ -3,6 +3,7 @@ import { macroPorts } from '../utils/macroLayout.js';
 import { orbitPorts } from '../utils/orbitLayout.js';
 import { looperPorts } from '../utils/looperLayout.js';
 import { routerPorts } from '../utils/routerLayout.js';
+import { timbrePorts } from '../utils/timbreLayout.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -335,6 +336,10 @@ export function getComponentPorts(componentOrType) {
   // Router: one bindable port per destination ("Destination N").
   if (componentType === 'Router' && typeof componentOrType === 'object') {
     return routerPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Timbre Space: one bindable port per morph target ("Target N").
+  if (componentType === 'Timbre' && typeof componentOrType === 'object') {
+    return timbrePorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

@@ -62,6 +62,9 @@
     routerConfig, routerCurvePoints, routerGeometry, routerHitNode, routerNodeFromPx,
   } from '../utils/routerLayout.js';
   import {
+    timbreConfig, timbreAnchors, timbreGeometry, timbreHitAnchor, timbreFromPx,
+  } from '../utils/timbreLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -190,7 +193,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))));
+    return applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1515,6 +1518,92 @@
     const sess = sessionFor(control)?.routerCurve;
     if (Array.isArray(sess)) updateControlProperty(getControlId(control), 'Router.curve', sess);
     patchControlSession(getControlId(control), { routerCurve: undefined, routerDragIndex: undefined });
+  }
+
+  // --- Timbre Space: control by meaning — blend patch anchors with the puck ---
+  const TIMBRE_PAD = 10;
+  let timbreDrag = null;   // { id, kind: 'puck' | 'anchor', index }
+  function isTimbreControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Timbre';
+  }
+  function timbreGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return timbreGeometry(numberOr(t.width, 0), numberOr(t.height, 0), TIMBRE_PAD);
+  }
+  function timbreWorkingAnchors(control) {
+    const sess = sessionFor(control)?.timbreAnchors;
+    return Array.isArray(sess) ? sess : timbreAnchors(control);
+  }
+  function timbrePuckWorking(control) {
+    const sess = sessionFor(control);
+    const cfg = timbreConfig(control);
+    return {
+      x: typeof sess?.timbreX === 'number' ? sess.timbreX : numberOr(cfg.x, 0.5),
+      y: typeof sess?.timbreY === 'number' ? sess.timbreY : numberOr(cfg.y, 0.5),
+    };
+  }
+  function timbreControlWith(control, puck, anchors) {
+    const timbre = { ...control._children?.Timbre, __x: puck.x, __y: puck.y };
+    if (Array.isArray(anchors)) timbre.anchors = anchors;
+    return { ...control, _children: { ...control._children, Timbre: timbre } };
+  }
+  // Inject the live puck (+ any anchor drag) and mark what's being dragged.
+  function applyTimbreValueSource(control, resolved) {
+    if (!isTimbreControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const timbre = base?._children?.Timbre;
+    if (!timbre) return resolved;
+    const sess = sessionFor(control);
+    const puck = timbrePuckWorking(control);
+    const next = { ...timbre, __x: puck.x, __y: puck.y };
+    if (Array.isArray(sess?.timbreAnchors)) next.anchors = sess.timbreAnchors;
+    if (sess?.timbreDrag) next.__drag = sess.timbreDrag;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Timbre: next } } };
+  }
+  // Pointer-down: grab an anchor if one is under the cursor, else jump + drag puck.
+  function handleTimbrePointerDown(control, localPoint) {
+    if (!isTimbreControl(control) || timbreConfig(control).editable === false) return false;
+    const id = getControlId(control);
+    const geom = timbreGeomFor(control);
+    const hit = timbreHitAnchor(control, geom, localPoint.x, localPoint.y, 13);
+    if (hit >= 0) {
+      timbreDrag = { id, kind: 'anchor', index: hit };
+      patchControlSession(id, { timbreDrag: `anchor:${hit}` });
+      return true;
+    }
+    const p = timbreFromPx(localPoint.x, localPoint.y, geom);
+    timbreDrag = { id, kind: 'puck', index: -1 };
+    patchControlSession(id, { timbreX: p.x, timbreY: p.y, timbreDrag: 'puck' });
+    emitControlPortFanout(timbreControlWith(control, p), 'continuous');
+    return true;
+  }
+  // Drag the puck (blend) or an anchor (reposition a patch on the pad).
+  function moveTimbreDrag(control, localPoint) {
+    const geom = timbreGeomFor(control);
+    const p = timbreFromPx(localPoint.x, localPoint.y, geom);
+    if (timbreDrag.kind === 'anchor') {
+      const anchors = timbreWorkingAnchors(control).map((a) => ({ ...a }));
+      if (anchors[timbreDrag.index]) { anchors[timbreDrag.index].x = p.x; anchors[timbreDrag.index].y = p.y; }
+      patchControlSession(getControlId(control), { timbreAnchors: anchors });
+      emitControlPortFanout(timbreControlWith(control, timbrePuckWorking(control), anchors), 'continuous');
+    } else {
+      patchControlSession(getControlId(control), { timbreX: p.x, timbreY: p.y });
+      emitControlPortFanout(timbreControlWith(control, p), 'continuous');
+    }
+  }
+  function releaseTimbreDrag(control) {
+    const id = getControlId(control);
+    const sess = sessionFor(control);
+    if (timbreDrag.kind === 'anchor' && Array.isArray(sess?.timbreAnchors)) {
+      updateControlProperty(id, 'Timbre.anchors', sess.timbreAnchors);
+      emitControlPortFanout(timbreControlWith(control, timbrePuckWorking(control), sess.timbreAnchors), 'commit');
+    } else if (timbreDrag.kind === 'puck') {
+      const puck = timbrePuckWorking(control);
+      updateControlProperty(id, 'Timbre.x', puck.x);
+      updateControlProperty(id, 'Timbre.y', puck.y);
+      emitControlPortFanout(timbreControlWith(control, puck), 'commit');
+    }
+    patchControlSession(id, { timbreAnchors: undefined, timbreDrag: undefined, timbreX: undefined, timbreY: undefined });
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -3091,6 +3180,11 @@
       moveRouterDrag(control, controlLocalPoint(event));
       return;
     }
+    // Timbre Space: move the blend puck or reposition an anchor.
+    if (timbreDrag && timbreDrag.id === getControlId(control)) {
+      moveTimbreDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3199,6 +3293,8 @@
     handleLooperPointerDown(control, pointerDownLocal);
     // Router: grab a transfer-curve node to reshape the response.
     handleRouterPointerDown(control, pointerDownLocal);
+    // Timbre Space: grab an anchor, or jump + drag the blend puck.
+    handleTimbrePointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3435,6 +3531,12 @@
     if (routerDrag && activeControl) {
       routerDrag = null;
       releaseRouterDrag(activeControl);
+    }
+
+    // Release a timbre puck / anchor: commit its position.
+    if (timbreDrag && activeControl) {
+      timbreDrag = null;
+      releaseTimbreDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

@@ -628,6 +628,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Timbre: {
+    sections: ['Background', 'Timbre', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Timbre'),
+    defaultOverrides: {
+      // A square perceptual sound-map on a dark panel by default.
+      Transform: { width: 220, height: 220 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0C0C12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
   Router: {
     sections: ['Background', 'Router', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Router'),
