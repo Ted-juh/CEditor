@@ -54,6 +54,12 @@ not DSP:
   perceptual directions. See [timbre-space.md](./timbre-space.md). A corner
   readout reports how many targets are actually MIDI-addressable.
 
+### 0e. Turing Modulator — lock or evolve a step sequence — **shipped 🟢**
+- The **algorithmic** motion source: a looping shift-register whose single
+  randomness knob goes from frozen loop to pure chaos. Value / gate / inverse
+  fan-out ports. Completes the motion family (Orbit = geometric, Looper = human,
+  Turing = generative). See [turing-modulator.md](./turing-modulator.md).
+
 ### 1. Macro control → Snapshot Morph (headline)
 - **Macro:** one knob drives **many** device parameters with per-target curves
   (modern soft-synth macros; rare in hardware editors).

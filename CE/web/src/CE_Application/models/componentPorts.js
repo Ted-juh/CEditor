@@ -208,6 +208,12 @@ export const DEFAULT_COMPONENT_PORTS = {
     { id: 'b', label: 'Gain B', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
     { id: 'mix', label: 'Mix', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
   ],
+  Turing: [
+    // A stepped generative modulator: the current step value, a gate, its inverse.
+    { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'gate', label: 'Gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'inverse', label: 'Inverse', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+  ],
   VectorJoystick: [
     // Two axes + four bilinear corner blends — bind any subset (fan-out).
     { id: 'x', label: 'X axis', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },

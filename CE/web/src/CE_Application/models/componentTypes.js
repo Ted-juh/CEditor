@@ -660,6 +660,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Turing: {
+    sections: ['Background', 'Turing', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Turing'),
+    defaultOverrides: {
+      // A wide step-sequence field on a dark panel by default.
+      Transform: { width: 260, height: 120 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Looper: {
     sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Looper'),

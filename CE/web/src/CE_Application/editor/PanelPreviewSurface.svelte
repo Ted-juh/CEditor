@@ -65,6 +65,10 @@
     timbreConfig, timbreAnchors, timbreGeometry, timbreHitAnchor, timbreFromPx,
   } from '../utils/timbreLayout.js';
   import {
+    turingConfig, turingSteps, turingLength, turingStepIndex, turingGeometry,
+    stepAtPoint, valueFromY, turingStepsPerSecond, mutateStep,
+  } from '../utils/turingLayout.js';
+  import {
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
@@ -193,7 +197,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))));
+    return applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -1604,6 +1608,115 @@
       emitControlPortFanout(timbreControlWith(control, puck), 'commit');
     }
     patchControlSession(id, { timbreAnchors: undefined, timbreDrag: undefined, timbreX: undefined, timbreY: undefined });
+  }
+
+  // --- Turing Modulator: a stepped generative sequence that locks or evolves --
+  // Same self-running clock as the Orbit/Looper (phase advances by rate/length).
+  // The evolving register lives in the session: when the step index advances, the
+  // incoming step mutates with probability = randomness (Math.random supplies the
+  // roll + new value; the pure mutateStep decides). Step bars are draggable to
+  // seed/edit the sequence. Generative mutations stay ephemeral (session only).
+  const TURING_PAD = 8;
+  const turingPhaseState = {};   // { [id]: phase 0..1 }
+  const turingLastIdx = {};      // { [id]: last step index }
+  let turingTickerRunning = false;
+  let turingLastMs = 0;
+  let turingDrag = null;         // { id } while painting step bars
+  function isTuringControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Turing';
+  }
+  function turingControls() {
+    return (orderedControls ?? []).filter((c) => isTuringControl(c));
+  }
+  function turingPhaseFor(control) {
+    const id = getControlId(control);
+    if (turingPhaseState[id] !== undefined) return turingPhaseState[id];
+    return ((numberOr(turingConfig(control).phase, 0) % 1) + 1) % 1;
+  }
+  function turingLiveSteps(control) {
+    const sess = sessionFor(control)?.turingSteps;
+    return Array.isArray(sess) ? sess : turingSteps(control);
+  }
+  function turingControlWith(control, phase, steps) {
+    const turing = { ...control._children?.Turing, __phase: phase };
+    if (Array.isArray(steps)) turing.__steps = steps;
+    return { ...control, _children: { ...control._children, Turing: turing } };
+  }
+  function ensureTuringTicker() {
+    if (turingTickerRunning) return;
+    turingTickerRunning = true;
+    turingLastMs = Date.now();
+    const loop = () => {
+      const running = turingControls().filter((c) => turingConfig(c).running !== false);
+      if (!running.length) { turingTickerRunning = false; return; } // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - turingLastMs) / 1000));
+      turingLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        const len = turingLength(c);
+        const prev = turingPhaseState[id] ?? turingPhaseFor(c);
+        const phase = (prev + (turingStepsPerSecond(c) / len) * dt) % 1;
+        turingPhaseState[id] = phase;
+        // Mutate when the step index advances (skip while the user is editing it).
+        const idx = Math.max(0, Math.min(len - 1, Math.floor(phase * len)));
+        if (turingLastIdx[id] !== idx) {
+          turingLastIdx[id] = idx;
+          if (!(turingDrag && turingDrag.id === id)) {
+            const randomness = Math.max(0, Math.min(1, numberOr(turingConfig(c).randomness, 0)));
+            if (randomness > 0) {
+              const base = turingLiveSteps(c);
+              const mutated = mutateStep(base, idx, Math.random(), Math.random(), randomness);
+              patchControlSession(id, { turingSteps: mutated });
+            }
+          }
+        }
+        emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  function applyTuringValueSource(control, resolved) {
+    if (!isTuringControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const turing = base?._children?.Turing;
+    if (!turing) return resolved;
+    if (turing.running !== false) { ensureTuringTicker(); void orbitClock; }
+    const next = { ...turing, __phase: turingPhaseFor(control) };
+    const sess = sessionFor(control)?.turingSteps;
+    if (Array.isArray(sess)) next.__steps = sess;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Turing: next } } };
+  }
+  function turingGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const showGate = turingConfig(control).showGate !== false;
+    return turingGeometry(numberOr(t.width, 0), numberOr(t.height, 0) - (showGate ? 10 : 0), turingLength(control), TURING_PAD);
+  }
+  // Set the step under the cursor to the pointer's value (paint the sequence).
+  function paintTuringStep(control, localPoint) {
+    const geom = turingGeomFor(control);
+    const i = stepAtPoint(geom, localPoint.x, turingLength(control));
+    if (i < 0) return;
+    const v = valueFromY(geom, localPoint.y);
+    const steps = turingLiveSteps(control).slice();
+    steps[i] = v;
+    patchControlSession(getControlId(control), { turingSteps: steps });
+    emitClockFanout(turingControlWith(control, turingPhaseFor(control), steps), Date.now(), 'turing');
+  }
+  function handleTuringPointerDown(control, localPoint) {
+    if (!isTuringControl(control) || turingConfig(control).editable === false) return false;
+    const geom = turingGeomFor(control);
+    if (stepAtPoint(geom, localPoint.x, turingLength(control)) < 0) return false;
+    turingDrag = { id: getControlId(control) };
+    paintTuringStep(control, localPoint);
+    return true;
+  }
+  function releaseTuringDrag(control) {
+    const sess = sessionFor(control)?.turingSteps;
+    if (Array.isArray(sess)) updateControlProperty(getControlId(control), 'Turing.steps', sess);
+    // Keep the session register so evolution continues from the edited seed.
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -3185,6 +3298,11 @@
       moveTimbreDrag(control, controlLocalPoint(event));
       return;
     }
+    // Turing: paint step bars as you drag across them.
+    if (turingDrag && turingDrag.id === getControlId(control)) {
+      paintTuringStep(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -3295,6 +3413,8 @@
     handleRouterPointerDown(control, pointerDownLocal);
     // Timbre Space: grab an anchor, or jump + drag the blend puck.
     handleTimbrePointerDown(control, pointerDownLocal);
+    // Turing: paint a step bar's value.
+    handleTuringPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -3537,6 +3657,12 @@
     if (timbreDrag && activeControl) {
       timbreDrag = null;
       releaseTimbreDrag(activeControl);
+    }
+
+    // Release a turing edit: commit the seeded sequence.
+    if (turingDrag && activeControl) {
+      turingDrag = null;
+      releaseTuringDrag(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

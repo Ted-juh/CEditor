@@ -992,6 +992,28 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Turing — a looping shift-register of stepped values you can lock or let
+   *  mutate; emits the current step's value, a gate and its inverse (fan-out). */
+  Turing: {
+    _type: 'Turing',
+    phase: 0,                     // global loop clock 0..1 (advanced by the ticker)
+    running: true,               // advance the sequence in preview / player
+    rate: 2,                      // steps per second
+    length: 8,                    // loop length in steps
+    randomness: 0.25,            // 0 = locked loop, 1 = new value every step
+    quantizeLevels: 0,           // 0 = continuous; ≥2 = snap values to N levels
+    gateThreshold: 0.5,          // gate port fires when a step ≥ this
+    editable: true,              // drag step bars to seed/edit the sequence
+    showGate: true,
+    // The register — one value 0..1 per step (a musical-ish seed sequence).
+    steps: [0.2, 0.8, 0.5, 1.0, 0.35, 0.65, 0.1, 0.9],
+    // Colours.
+    barColour: 'FF39D98A',
+    headColour: 'FFF2C94C',
+    fieldColour: 'FF0E0E13',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Looper — record your own control motion as a loopable clip that replays into
    *  a device parameter on the clock. Each lane is a bindable fan-out port. */
   Looper: {
