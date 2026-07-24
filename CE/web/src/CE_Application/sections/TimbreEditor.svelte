@@ -82,6 +82,11 @@
     if (!Object.keys(captured).length) return;
     setAnchors(anchors.map((a, idx) => idx === i ? { ...a, values: { ...(a.values ?? {}), ...captured } } : a));
   }
+
+  // Accent-colour swatches: the native picker edits RGB; we preserve each
+  // colour's original alpha so faint elements keep their transparency.
+  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
+  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if tb}
@@ -109,6 +114,18 @@
         <div class="note" class:warn={addr.addressable < addr.total}>{addr.addressable} of {addr.total} targets are MIDI-addressable</div>
       </PropertyCell>
     {/if}
+  </PropertySection>
+
+  <PropertySection title="Appearance">
+    <PropertyCell label="Field" span={1} hint="Pad background colour (behind the anchor heat).">
+      <input class="cswatch" type="color" value={colRgb(tb.fieldColour, 'FF0C0C12')} onchange={(e) => setCol('fieldColour', tb.fieldColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Puck" span={1} hint="The blend puck colour.">
+      <input class="cswatch" type="color" value={colRgb(tb.puckColour, 'FFF2C94C')} onchange={(e) => setCol('puckColour', tb.puckColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Labels" span={2} hint="Axis + anchor label colour.">
+      <input class="cswatch" type="color" value={colRgb(tb.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', tb.labelColour, e.target.value)} />
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Targets">
@@ -175,6 +192,7 @@
   .arow2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; border-top: 1px solid #2a2a2a; padding-top: 7px; }
   .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .03em; color: #8a8a8a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .note { font-size: 11px; color: #8a8a94; }

@@ -26,6 +26,11 @@
   function removeLane(i) { setLanes(lanes.filter((_, idx) => idx !== i)); }
   function clearLane(i) { updateLane(i, 'points', []); }
   function pointCount(l) { return Array.isArray(l?.points) ? l.points.length : 0; }
+
+  // Accent-colour swatches: the native picker edits RGB; we preserve each
+  // colour's original alpha so faint grids keep their transparency.
+  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
+  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if lp}
@@ -44,6 +49,21 @@
     </PropertyCell>
     <PropertyCell label="Grid" span={1} hint="Show the quarter/half grid lines.">
       <PropertyToggle value={lp.showGrid !== false} onchange={() => set('showGrid', !(lp.showGrid !== false))} />
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Appearance">
+    <PropertyCell label="Lane" span={1} hint="Lane background colour.">
+      <input class="cswatch" type="color" value={colRgb(lp.laneColour, 'FF0E0E13')} onchange={(e) => setCol('laneColour', lp.laneColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Grid" span={1} hint="Grid lines (stays faint — its transparency is kept).">
+      <input class="cswatch" type="color" value={colRgb(lp.gridColour, 'FFFFFFFF')} onchange={(e) => setCol('gridColour', lp.gridColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Playhead" span={1} hint="The sweeping playhead colour.">
+      <input class="cswatch" type="color" value={colRgb(lp.playheadColour, 'FFFFFFFF')} onchange={(e) => setCol('playheadColour', lp.playheadColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Labels" span={1} hint="Lane label colour.">
+      <input class="cswatch" type="color" value={colRgb(lp.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', lp.labelColour, e.target.value)} />
     </PropertyCell>
   </PropertySection>
 
@@ -88,6 +108,7 @@
   .lrow { display: flex; align-items: center; gap: 8px; }
   .lrow .name { flex: 1 1 auto; }
   .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .pts { font-size: 10px; color: #8a8a94; white-space: nowrap; }
   .lrow2 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }

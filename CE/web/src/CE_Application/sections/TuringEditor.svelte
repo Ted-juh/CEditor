@@ -33,6 +33,11 @@
     set('steps', steps);
   }
   let rndPct = $derived(Math.round(clamp01(num(tr?.randomness, 0)) * 100));
+
+  // Accent-colour swatches: the native picker edits RGB; we preserve each
+  // colour's original alpha so faint elements keep their transparency.
+  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
+  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if tr}
@@ -72,6 +77,21 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Appearance">
+    <PropertyCell label="Bars" span={1} hint="Step value bar colour.">
+      <input class="cswatch" type="color" value={colRgb(tr.barColour, 'FF39D98A')} onchange={(e) => setCol('barColour', tr.barColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Head" span={1} hint="The live (current) step colour.">
+      <input class="cswatch" type="color" value={colRgb(tr.headColour, 'FFF2C94C')} onchange={(e) => setCol('headColour', tr.headColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Field" span={1} hint="Sequence background colour.">
+      <input class="cswatch" type="color" value={colRgb(tr.fieldColour, 'FF0E0E13')} onchange={(e) => setCol('fieldColour', tr.fieldColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Labels" span={1} hint="Hint text colour.">
+      <input class="cswatch" type="color" value={colRgb(tr.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', tr.labelColour, e.target.value)} />
+    </PropertyCell>
+  </PropertySection>
+
   <PropertySection title="Outputs">
     <PropertyCell label="" span={4} hint="Three bindable ports (fan-out): Value = the current step's level; Gate = 1 when the step is above the threshold; Inverse = 1 − Value. Bind them in Device Bindings.">
       <div class="ports">
@@ -89,6 +109,7 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
+  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .rangewrap { display: flex; align-items: center; gap: 10px; }
   .range { flex: 1 1 auto; accent-color: #39D98A; }
   .pctlbl { font-size: 11px; color: #B9B9B9; min-width: 48px; text-align: right; font-variant-numeric: tabular-nums; }

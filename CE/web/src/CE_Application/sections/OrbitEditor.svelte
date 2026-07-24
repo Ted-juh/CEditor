@@ -30,6 +30,11 @@
   function removeNode(i) { setNodes(nodes.filter((_, idx) => idx !== i)); }
   // Radius / depth in percent for a friendlier UI.
   function pct(v, f = 100) { return Math.round(num(v, f / 100) * 100); }
+
+  // Accent-colour swatches: the native picker edits RGB; we preserve each
+  // colour's original alpha so faint rings/fields keep their transparency.
+  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
+  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if o}
@@ -54,6 +59,21 @@
     </PropertyCell>
     <PropertyCell label="Values" span={1} hint="Live per-satellite value readout.">
       <PropertyToggle value={o.showValues === true} onchange={() => set('showValues', !(o.showValues === true))} />
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Appearance">
+    <PropertyCell label="Field" span={1} hint="Background inside the pad.">
+      <input class="cswatch" type="color" value={colRgb(o.fieldColour, 'FF0D0D12')} onchange={(e) => setCol('fieldColour', o.fieldColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Rings" span={1} hint="Orbit rings (stays faint — its transparency is kept).">
+      <input class="cswatch" type="color" value={colRgb(o.ringColour, 'FF2A6BA8')} onchange={(e) => setCol('ringColour', o.ringColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Centre" span={1} hint="Centre hub colour.">
+      <input class="cswatch" type="color" value={colRgb(o.centreColour, 'FF3A3A44')} onchange={(e) => setCol('centreColour', o.centreColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Labels" span={1} hint="Satellite label colour.">
+      <input class="cswatch" type="color" value={colRgb(o.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', o.labelColour, e.target.value)} />
     </PropertyCell>
   </PropertySection>
 
@@ -114,6 +134,7 @@
   .nrow { display: flex; align-items: center; gap: 8px; }
   .nrow .name { flex: 1 1 auto; }
   .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .nrow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; align-items: end; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }

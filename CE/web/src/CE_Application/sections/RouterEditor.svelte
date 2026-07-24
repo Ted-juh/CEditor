@@ -37,6 +37,11 @@
   function depthPct(d) { return Math.round(num(d?.depth, 1) * 100); }
   // Which standard sources are "external" (need the synth/controller to send them).
   const EXTERNAL = new Set(['aftertouch', 'breath', 'foot', 'velocity']);
+
+  // Accent-colour swatches: the native picker edits RGB; we preserve each
+  // colour's original alpha so faint grids keep their transparency.
+  function colRgb(v, fb) { const s = String(v ?? fb).replace(/^#/, ''); return `#${s.length >= 6 ? s.slice(-6) : String(fb).slice(-6)}`; }
+  function setCol(prop, cur, hex) { const s = String(cur ?? '').replace(/^#/, ''); const a = /^[0-9a-fA-F]{8}$/.test(s) ? s.slice(0, 2) : 'FF'; set(prop, `${a}${hex.replace('#', '').toUpperCase()}`); }
 </script>
 
 {#if r}
@@ -69,6 +74,24 @@
     {/if}
     <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
       <input class="val" type="number" min="0" max="0.9" step="0.02" value={r.deadzone ?? 0} onchange={(e) => set('deadzone', Math.max(0, Math.min(0.9, num(e.target.value, 0))))} />
+    </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Appearance">
+    <PropertyCell label="Curve" span={1} hint="The transfer-curve line colour.">
+      <input class="cswatch" type="color" value={colRgb(r.curveColour, 'FF39D98A')} onchange={(e) => setCol('curveColour', r.curveColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Input" span={1} hint="The live input bar + crosshair colour.">
+      <input class="cswatch" type="color" value={colRgb(r.inputColour, 'FFF2C94C')} onchange={(e) => setCol('inputColour', r.inputColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Field" span={1} hint="Curve-area background colour.">
+      <input class="cswatch" type="color" value={colRgb(r.fieldColour, 'FF0A0A0F')} onchange={(e) => setCol('fieldColour', r.fieldColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Grid" span={1} hint="Grid lines (stays faint — its transparency is kept).">
+      <input class="cswatch" type="color" value={colRgb(r.gridColour, 'FFFFFFFF')} onchange={(e) => setCol('gridColour', r.gridColour, e.target.value)} />
+    </PropertyCell>
+    <PropertyCell label="Labels" span={1} hint="Label colour.">
+      <input class="cswatch" type="color" value={colRgb(r.labelColour, 'FFB9B9B9')} onchange={(e) => setCol('labelColour', r.labelColour, e.target.value)} />
     </PropertyCell>
   </PropertySection>
 
@@ -117,6 +140,7 @@
   .drow { display: flex; align-items: center; gap: 8px; }
   .drow .name { flex: 1 1 auto; }
   .swatch { width: 26px; height: 24px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .drow2 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .fld { display: flex; flex-direction: column; gap: 3px; }
   .fld > span { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: #8a8a8a; }
