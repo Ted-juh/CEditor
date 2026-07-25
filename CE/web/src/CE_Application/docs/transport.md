@@ -163,6 +163,54 @@ something downstream needs to follow the panel; not worth it otherwise.
 Clock-out is suppressed while following an external clock. Echoing someone
 else's clock back at them is how feedback loops start.
 
+## Loop points
+
+A bar range the position folds into: **Loop → on**, a start bar and a length.
+The face shows `⟲ 5–9` so you can see it without opening the inspector.
+
+The rule that keeps this safe is the one the whole clock rests on — the looped
+position is a pure **function** of the un-looped one, not a counter we reset:
+
+```js
+loopedBeats(beats, start, len)   // beats < start ? beats : start + ((beats - start) % len)
+```
+
+The timeline keeps running monotonically underneath and the fold happens on
+read. So there is no wrap handler that can miss a wrap, and a loop that has been
+going for an hour is still exactly on the bar line — `loopedBeats(8 + 16*1000, 8, 16)`
+is 8 on the nose, which is a test.
+
+Below the loop start the position passes through untouched, so you can **run in**
+to a loop from earlier in the song. That's also what makes a count-in work.
+
+A wrap is a **discontinuity**, and gets reported as one — same jump counter a
+host locate uses. Without that the Arp would fire every step between the loop
+end and the loop start on the frame it came round.
+
+Loop points are **master-clock only**. Following a DAW or an incoming clock, the
+other end owns the position, and folding theirs into a loop of ours would put
+the panel somewhere the master isn't. The inspector says so instead of silently
+doing nothing; use the host's own loop.
+
+## Count-in
+
+Bars of silence before the first step fires, 0–8. Press play and the transport
+**arms** rather than starting: the button becomes a pulsing ring, the position
+readout becomes a countdown (`−2.4 −2.3 −2.2 …`, bars then beats, counting down
+the way a drummer counts), and when it reaches zero the clock starts for real at
+the position it was counting in to.
+
+The implementation choice worth naming: during the count-in the transport is
+deliberately **not running**. Every follower already holds its position and
+stays silent when the transport is stopped, so a count-in needs *no change in
+any of the six*. The alternative — letting the position go negative — would mean
+asking six components to remember to check a sign, and one of them eventually
+wouldn't.
+
+Pressing play again during the count-in aborts it, as every DAW does. Zero bars
+is an ordinary start. Following a master, there's nothing to count in to: when
+the music begins is their decision, so the setting is ignored.
+
 ## Tap tempo
 
 Click anywhere on the component that isn't the play button. Taps more than two
@@ -292,7 +340,7 @@ Nothing about the transport touches the DPD profile.
 
 ## Possible next steps
 
-- **Loop points** — a bar range the position wraps inside.
-- **Count-in** — N bars of nothing before the first step fires.
 - **Song position pointer** (`F2`) — currently ignored; it would let an external
-  start mid-song land in the right place instead of at bar 1.
+  start mid-song land in the right place instead of at bar 1. The host source
+  already gets this right, because a DAW reports a position; it's only the MIDI
+  clock path that starts at bar 1 regardless.

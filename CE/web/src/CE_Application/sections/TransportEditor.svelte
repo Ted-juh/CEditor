@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import {
     TRANSPORT_SOURCES, TRANSPORT_SOURCE_LABELS, MIN_BPM, MAX_BPM, transportIsFollowing,
+    MIN_BARS, MAX_BARS, MAX_LOOP_BAR, MAX_COUNT_IN_BARS,
   } from '../utils/transportLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -55,12 +56,37 @@
     <PropertyCell label="Run on load" span={1} hint="Start the clock as soon as the panel opens, so an exported Player is already running.">
       <PropertyToggle value={t.runOnLoad === true} onchange={() => set('runOnLoad', !(t.runOnLoad === true))} />
     </PropertyCell>
+    <PropertyCell label="Count-in" span={1} hint="Bars of silence before the first step fires, when you press play. 0 = off. During the count-in the transport is deliberately not running, so every synced component holds and stays quiet — pressing play again aborts it.">
+      <input class="val" type="number" min="0" max={MAX_COUNT_IN_BARS} step="1" value={num(t.countInBars, 0)} onchange={(e) => set('countInBars', clampInt(e.target.value, 0, MAX_COUNT_IN_BARS, 0))} />
+    </PropertyCell>
     <PropertyCell label="Clock out" span={1} hint="Send MIDI clock so hardware follows this panel. That is 24 messages per quarter note — 48 a second at 120bpm — so leave it off unless something is actually listening.">
       <PropertyToggle value={t.clockOut === true} onchange={() => set('clockOut', !(t.clockOut === true))} />
     </PropertyCell>
     <PropertyCell label="" span={4} hint="Every synced component follows this one clock. Two Transports on a panel are two faces on the same clock, not two clocks.">
       <div class="note">{isHost ? 'Following the DAW playhead' : external ? 'Following MIDI clock in' : 'Master clock'}{t.clockOut === true && !external ? ' · sending clock' : ''}</div>
     </PropertyCell>
+  </PropertySection>
+
+  <PropertySection title="Loop">
+    <PropertyCell label="Loop" span={1} hint="Fold the position into a bar range, so the clock comes back round instead of running on forever.">
+      <PropertyToggle value={t.loopEnabled === true} onchange={() => set('loopEnabled', !(t.loopEnabled === true))} />
+    </PropertyCell>
+    {#if t.loopEnabled === true}
+      <PropertyCell label="From bar" span={1} hint="The first bar of the loop, counting from 1. Running in from earlier in the song is allowed — the position is only folded once it reaches here.">
+        <input class="val" type="number" min="1" max={MAX_LOOP_BAR} step="1" value={num(t.loopStartBar, 1)} onchange={(e) => set('loopStartBar', clampInt(e.target.value, 1, MAX_LOOP_BAR, 1))} />
+      </PropertyCell>
+      <PropertyCell label="Length (bars)" span={1} hint="How long the loop is. 0.25 = one beat in 4/4.">
+        <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="0.25" value={num(t.loopLengthBars, 4)} onchange={(e) => set('loopLengthBars', clampNum(e.target.value, MIN_BARS, MAX_BARS, 4))} />
+      </PropertyCell>
+      <PropertyCell label="" span={1} hint="">
+        <div class="note">bars {num(t.loopStartBar, 1)}–{num(t.loopStartBar, 1) + num(t.loopLengthBars, 4)}</div>
+      </PropertyCell>
+      {#if external}
+        <PropertyCell label="" span={4} hint="">
+          <div class="note">Inactive while following {isHost ? 'the DAW' : 'MIDI clock in'} — the master owns the position, and folding it into a loop of ours would put the panel somewhere the master isn't. Use the host's own loop.</div>
+        </PropertyCell>
+      {/if}
+    {/if}
   </PropertySection>
 
   <PropertySection title="Appearance">

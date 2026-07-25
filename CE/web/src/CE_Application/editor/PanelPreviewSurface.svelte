@@ -121,13 +121,14 @@
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
     transportSource as tpSource, tapTempo, crossedSteps, transportIsFollowing,
-    cyclePhaseAt, musicalDelta,
+    cyclePhaseAt, musicalDelta, loopRegion, countInBars,
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
     setTransportBpm, setTransportSource, setTransportClockOut,
     transportBeatsNow, isTransportRunning, transportBpmNow,
     setTransportSignature, transportBeatsPerBar, transportJumpSeq,
+    setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
@@ -2720,7 +2721,8 @@
     const base = resolved?.control ?? control;
     const cfg = base?._children?.Transport;
     if (!cfg) return resolved;
-    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`;
+    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
+      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}`;
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
@@ -2729,10 +2731,14 @@
       // The meter has to reach the store, not just the readout: the components
       // that loop in BARS ask the store how long a bar is.
       setTransportSignature(numberOr(cfg.beatsPerBar, 4));
+      const region = loopRegion(base, numberOr(cfg.beatsPerBar, 4));
+      setTransportLoop(region.enabled, region.startBeats, region.lengthBeats);
       // Run-on-load is a decision only a MASTER clock gets to make. Following a
       // DAW or an incoming clock, pressing play is the other end's job, and
       // starting ourselves would show a running transport parked at bar 1.
-      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(base))) startTransport(0);
+      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(base))) {
+        startTransportWithCountIn(countInBars(base), 0);
+      }
     }
     void $transport.seq;                       // re-render on every publish
     return {
@@ -2747,6 +2753,9 @@
             __beats: transportBeatsNow(),
             __bpm: $transport.externalBpm ?? $transport.bpm,
             __locked: $transport.externalLocked,
+            __countingIn: $transport.countingIn,
+            __countInLeft: $transport.countingIn ? countInBeatsLeft() : 0,
+            __loop: $transport.loopEnabled,
           },
         },
       },
@@ -2756,7 +2765,11 @@
     if (!isTransportControl(control) || transportConfig(control).editable === false) return false;
     const geom = tpGeomFor(control);
     if (hitTransportButton(geom, localPoint.x, localPoint.y)) {
-      toggleTransport();
+      // Pressing play runs the count-in first; pressing it again during the
+      // count-in aborts, which is what every DAW does and what you want when
+      // you started it by mistake.
+      if (isTransportRunning() || isCountingIn()) stopTransport();
+      else startTransportWithCountIn(countInBars(control));
       return true;
     }
     // Anywhere else on the face is tap tempo — but only when we're the master;

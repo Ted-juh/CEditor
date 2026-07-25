@@ -9,6 +9,8 @@ import {
   transportGeometry, hitTransportButton,
   cycleBeats, cyclePhaseAt, cycleCountAt, barsLabel, musicalDelta, MIN_BARS, MAX_BARS,
   parseHostPosition, hostJumped, transportIsFollowing, TRANSPORT_SOURCES,
+  loopRegion, loopedBeats, loopCycleIndex, formatLoopRange,
+  countInBars, countInBeats, countInMs, countInRemaining, formatCountIn, MAX_COUNT_IN_BARS,
 } from '../src/CE_Application/utils/transportLayout.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -230,4 +232,83 @@ test('a host locate is a jump, playing on is not', () => {
   assert.equal(hostJumped(8.00, 0.00), true);      // rewind to the top
   assert.equal(hostJumped(8.00, 8.02, 0.001), true); // a tighter tolerance says yes
   assert.equal(hostJumped(8.00, null), false);     // no reading is not a jump
+});
+
+// --- Loop points ------------------------------------------------------------------
+test('the loop is a fold of the timeline, not a counter that resets', () => {
+  // 4 bars from bar 3 in 4/4 → starts at beat 8, 16 beats long.
+  const c = tp({ loopEnabled: true, loopStartBar: 3, loopLengthBars: 4 });
+  const r = loopRegion(c, 4);
+  assert.equal(r.enabled, true);
+  assert.equal(r.startBeats, 8);
+  assert.equal(r.lengthBeats, 16);
+  // Before the loop start the position is untouched — you can run in to a loop.
+  assert.equal(loopedBeats(0, 8, 16), 0);
+  assert.equal(loopedBeats(7.9, 8, 16), 7.9);
+  assert.equal(loopedBeats(8, 8, 16), 8);
+  assert.equal(loopedBeats(20, 8, 16), 20);
+  assert.equal(loopedBeats(24, 8, 16), 8);          // exactly round
+  assert.equal(loopedBeats(29, 8, 16), 13);
+  // The reason to fold rather than count: a thousand passes later it is still
+  // exactly on the bar line, with no accumulated error to have gone wrong.
+  assert.equal(loopedBeats(8 + 16 * 1000, 8, 16), 8);
+  assert.ok(Math.abs(loopedBeats(8 + 16 * 1000 + 3.5, 8, 16) - 11.5) < 1e-9);
+  // A 3/4 bar is shorter, so the same bar numbers mean fewer beats.
+  assert.equal(loopRegion(c, 3).startBeats, 6);
+  assert.equal(loopRegion(c, 3).lengthBeats, 12);
+});
+
+test('the loop cycle index is how a wrap gets noticed', () => {
+  assert.equal(loopCycleIndex(4, 8, 16), -1);       // before the loop
+  assert.equal(loopCycleIndex(8, 8, 16), 0);
+  assert.equal(loopCycleIndex(23.9, 8, 16), 0);
+  assert.equal(loopCycleIndex(24, 8, 16), 1);       // ← the wrap
+  assert.equal(loopCycleIndex(40, 8, 16), 2);
+});
+
+test('loop settings clamp, and the range reads as bars', () => {
+  assert.equal(loopRegion(tp({ loopEnabled: true, loopStartBar: 0 }), 4).startBar, 1);
+  assert.equal(loopRegion(tp({ loopEnabled: true, loopLengthBars: 0 }), 4).lengthBars, MIN_BARS);
+  assert.equal(loopRegion(tp({ loopEnabled: true, loopLengthBars: 9999 }), 4).lengthBars, MAX_BARS);
+  assert.equal(formatLoopRange(loopRegion(tp({ loopEnabled: true, loopStartBar: 5, loopLengthBars: 4 }), 4)), '5–9');
+  assert.equal(formatLoopRange(loopRegion(tp({ loopEnabled: false }), 4)), '');
+});
+
+// --- Count-in ---------------------------------------------------------------------
+test('count-in length is bars at the meter, and it clamps', () => {
+  assert.equal(countInBars(tp({})), 0);
+  assert.equal(countInBars(tp({ countInBars: 2 })), 2);
+  assert.equal(countInBars(tp({ countInBars: 99 })), MAX_COUNT_IN_BARS);
+  assert.equal(countInBeats(2, 4), 8);
+  assert.equal(countInBeats(2, 3), 6);
+  assert.equal(countInBeats(0, 4), 0);
+  // 2 bars of 4/4 at 120bpm is 4 seconds.
+  assert.ok(Math.abs(countInMs(2, 4, 120) - 4000) < 1e-9);
+});
+
+test('the countdown reads the way a drummer counts it', () => {
+  // Two bars of 4/4: "2.4 2.3 2.2 2.1 1.4 1.3 1.2 1.1" then go.
+  assert.equal(formatCountIn(8, 4), '2.4');
+  assert.equal(formatCountIn(7.2, 4), '2.4');    // still inside the 8th beat back
+  assert.equal(formatCountIn(7, 4), '2.3');
+  assert.equal(formatCountIn(5, 4), '2.1');
+  assert.equal(formatCountIn(4, 4), '1.4');
+  assert.equal(formatCountIn(1, 4), '1.1');
+  assert.equal(formatCountIn(0, 4), '0.0');
+  // 3/4 counts in threes.
+  assert.equal(formatCountIn(6, 3), '2.3');
+  assert.equal(formatCountIn(3, 3), '1.3');
+});
+
+test('count-in remaining is derived from the start instant, never accumulated', () => {
+  const t0 = 1_000_000;
+  // 8 beats at 120bpm = 4000ms.
+  assert.equal(countInRemaining(t0, t0, 120, 8), 8);
+  assert.equal(countInRemaining(t0, t0 + 2000, 120, 8), 4);
+  assert.equal(countInRemaining(t0, t0 + 4000, 120, 8), 0);
+  assert.equal(countInRemaining(t0, t0 + 9999, 120, 8), 0);   // never negative
+  // Sampling coarsely gives the same answer as sampling finely, which is the
+  // whole point of deriving it.
+  assert.equal(countInRemaining(t0, t0 + 3000, 120, 8), countInRemaining(t0, t0 + 3000, 120, 8));
+  assert.equal(countInRemaining(t0, t0 + 3000, 60, 8), 5);
 });

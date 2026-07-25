@@ -167,6 +167,91 @@ export function swungBeatOffset(stepIndex, swing, division) {
   return odd ? s * 0.5 * beatsPerStep(division) : 0;
 }
 
+// --- Loop points ---------------------------------------------------------------
+// A bar range the position wraps inside. The rule that makes this safe is the
+// same one the whole clock rests on: the looped position is a pure FUNCTION of
+// the un-looped one, not a counter we reset. The timeline keeps running
+// monotonically underneath; `loopedBeats` folds it. So a loop that has been
+// going for an hour is still exactly on the bar line, and there is no wrap
+// handler that can miss a wrap.
+export const MAX_LOOP_BAR = 999;
+export function loopRegion(control, beatsPerBar = 4) {
+  const cfg = transportConfig(control);
+  const perBar = Math.max(1, clampInt(beatsPerBar, 1, 32));
+  const startBar = clampInt(cfg.loopStartBar ?? 1, 1, MAX_LOOP_BAR);
+  const lengthBars = clampNum(cfg.loopLengthBars ?? 4, MIN_BARS, MAX_BARS);
+  return {
+    enabled: cfg.loopEnabled === true,
+    startBeats: (startBar - 1) * perBar,
+    lengthBeats: Math.max(0.01, lengthBars * perBar),
+    startBar,
+    lengthBars,
+    endBar: startBar + lengthBars,
+  };
+}
+// Fold a timeline position into the loop. Before the loop start the position is
+// untouched — you can run in to a loop from earlier in the song, which is what
+// every DAW does and what a count-in needs.
+export function loopedBeats(beats, startBeats, lengthBeats) {
+  const b = Math.max(0, num(beats, 0));
+  const start = Math.max(0, num(startBeats, 0));
+  const len = Math.max(0.01, num(lengthBeats, 0.01));
+  if (b < start) return b;
+  return start + ((b - start) % len);
+}
+// Which pass through the loop we're on. The store watches this for CHANGES to
+// know a wrap happened — a wrap is a discontinuity, so followers must
+// re-baseline rather than fire every step between the loop end and its start.
+export function loopCycleIndex(beats, startBeats, lengthBeats) {
+  const b = Math.max(0, num(beats, 0));
+  const start = Math.max(0, num(startBeats, 0));
+  const len = Math.max(0.01, num(lengthBeats, 0.01));
+  if (b < start) return -1;
+  return Math.floor((b - start) / len);
+}
+export function formatLoopRange(region) {
+  if (!region?.enabled) return '';
+  const end = region.startBar + region.lengthBars;
+  const fmt = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
+  return `${fmt(region.startBar)}–${fmt(end)}`;
+}
+
+// --- Count-in --------------------------------------------------------------------
+// N bars of nothing before the first step fires. During the count-in the
+// transport is deliberately NOT "running": every follower already holds its
+// position and stays silent when the transport is stopped, so a count-in needs
+// no change in any of them — which is the whole reason to model it this way
+// rather than by letting the position go negative and asking six components to
+// remember to check the sign.
+export const MAX_COUNT_IN_BARS = 8;
+export function countInBars(control) {
+  return clampInt(transportConfig(control).countInBars ?? 0, 0, MAX_COUNT_IN_BARS);
+}
+export function countInBeats(bars, beatsPerBar = 4) {
+  return Math.max(0, clampInt(bars, 0, MAX_COUNT_IN_BARS)) * Math.max(1, clampInt(beatsPerBar, 1, 32));
+}
+export function countInMs(bars, beatsPerBar, bpm) {
+  return countInBeats(bars, beatsPerBar) * secondsPerBeat(bpm) * 1000;
+}
+// Beats left in the count-in at `nowMs`, never negative. Derived from the start
+// instant like everything else, so it can't drift out of step with the music
+// that follows it.
+export function countInRemaining(startedAtMs, nowMs, bpm, totalBeats) {
+  const elapsed = beatsAt(startedAtMs, nowMs, bpm);
+  return Math.max(0, num(totalBeats, 0) - elapsed);
+}
+// The countdown as musicians say it: bars remaining, then the beat within the
+// bar counting DOWN. Two bars of 4/4 with 5.5 beats left reads "2.2".
+export function formatCountIn(beatsLeft, beatsPerBar = 4) {
+  const perBar = Math.max(1, clampInt(beatsPerBar, 1, 32));
+  const left = Math.max(0, num(beatsLeft, 0));
+  const wholeBeatsLeft = Math.ceil(left);
+  if (wholeBeatsLeft <= 0) return '0.0';
+  const bars = Math.ceil(wholeBeatsLeft / perBar);
+  const beat = wholeBeatsLeft - (bars - 1) * perBar;
+  return `${bars}.${beat}`;
+}
+
 // --- Host playhead -----------------------------------------------------------
 // What a DAW gives an exported plugin, via juce::AudioPlayHead. This is a
 // BETTER clock than incoming MIDI clock in one specific way: the host reports a

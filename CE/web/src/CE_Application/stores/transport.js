@@ -18,6 +18,7 @@ import { splitMidiMessages, parseMidiHex } from '../utils/midiNoteInput.js';
 import {
   beatsAt, startedAtFor, transportEvent, clockPulsesBetween,
   estimateTempoFromPulses, parseHostPosition, hostJumped, transportIsFollowing,
+  loopedBeats, loopCycleIndex, countInBeats, countInRemaining,
   MIN_BPM, MAX_BPM,
 } from '../utils/transportLayout.js';
 
@@ -34,6 +35,9 @@ export const transport = writable({
   externalBpm: null,          // what the incoming clock says, when following one
   externalLocked: false,      // …and whether it has arrived recently
   hostAvailable: false,       // the DAW is reporting a playhead at all
+  loopEnabled: false,
+  countingIn: false,          // in the count-in bars before the first step
+  countInLeft: 0,             // …and how many beats of it are left
   seq: 0,
 });
 
@@ -46,6 +50,22 @@ let lastPublishAt = 0;
 let clockOut = false;
 let lastPulseBeats = 0;
 let beatsPerBar = 4;
+
+// Loop points. Only ever applied when WE own the position: following a DAW or
+// an incoming clock, the other end decides where the music is, and folding
+// their position into our loop would put the panel somewhere the master isn't.
+let loopEnabled = false;
+let loopStartBeats = 0;
+let loopLengthBeats = 16;
+let lastLoopCycle = null;
+
+// Count-in. Modelled as "not running yet" rather than a negative position, so
+// every follower's existing stopped behaviour (hold, stay silent) is exactly
+// right with no change to any of them.
+let countingIn = false;
+let countInTotal = 0;
+let countInAt = 0;
+let countInResumeBeats = 0;
 
 // Host playhead state (source 'host'). The DAW reports a POSITION, not a
 // pulse stream, so we anchor to it and extrapolate between updates with the
@@ -91,6 +111,9 @@ function publish(force = false) {
       ? (lastPulseAt > 0 && (now - lastPulseAt) < 500)
       : (source === 'host' && hostAvailable),
     hostAvailable,
+    loopEnabled: loopEnabled && source === 'internal',
+    countingIn,
+    countInLeft: countingIn ? countInRemaining(countInAt, now, bpm, countInTotal) : 0,
     seq: cur.seq + 1,
   });
 }
@@ -102,11 +125,13 @@ function sendClockBytes(count) {
 }
 
 function tick() {
+  if (countingIn) { tickCountIn(); return; }
   if (!running) return;
   const now = Date.now();
-  const next = source === 'external' ? externalBeats
+  const raw = source === 'external' ? externalBeats
     : source === 'host' ? hostBeatsAt(now)
     : beatsAt(startedAt, now, bpm);
+  const next = foldLoop(raw);
   if (clockOut && next > beats) {
     // Only when we're the master — echoing someone else's clock back is how
     // feedback loops start.
@@ -131,6 +156,8 @@ function stopTimer() {
 
 // --- Controls ---------------------------------------------------------------------
 export function startTransport(atBeat = null) {
+  countingIn = false;
+  lastLoopCycle = null;
   if (atBeat !== null) { beats = Math.max(0, Number(atBeat) || 0); bumpJump(); }
   startedAt = startedAtFor(beats, Date.now(), bpm);
   lastPulseBeats = beats;
@@ -143,6 +170,7 @@ export function startTransport(atBeat = null) {
 }
 export function stopTransport() {
   running = false;
+  countingIn = false;
   stopTimer();
   if (clockOut && source === 'internal') {
     triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_stop', message: 'FC', dryRun: false });
@@ -150,10 +178,12 @@ export function stopTransport() {
   publish(true);
 }
 export function toggleTransport() {
-  if (running) stopTransport(); else startTransport();
+  if (running || countingIn) stopTransport(); else startTransport();
 }
 export function rewindTransport() {
   bumpJump();
+  countingIn = false;
+  lastLoopCycle = null;
   beats = 0;
   externalBeats = 0;
   startedAt = Date.now();
@@ -195,7 +225,8 @@ export function transportBeatsPerBar() { return beatsPerBar; }
 export function transportBeatsNow() {
   if (source === 'host') return hostBeatsAt(Date.now());
   if (!running) return beats;
-  return source === 'external' ? externalBeats : beatsAt(startedAt, Date.now(), bpm);
+  if (source === 'external') return externalBeats;
+  return foldLoop(beatsAt(startedAt, Date.now(), bpm));
 }
 export function isTransportRunning() { return running; }
 export function transportBpmNow() {
@@ -239,6 +270,72 @@ function handleExternal(ev) {
   if (ev.kind === 'continue') { running = true; ensureTimer(); publish(true); return; }
   if (ev.kind === 'stop') { running = false; publish(true); return; }
   if (ev.kind === 'reset') { bumpJump(); externalBeats = 0; beats = 0; running = false; stopTimer(); publish(true); }
+}
+
+// --- Loop points ----------------------------------------------------------------------
+// The fold is pure (see loopedBeats); all this does is notice a WRAP, which is
+// a discontinuity like a host locate and has to be reported as one. Otherwise
+// the Arp would fire every step between the loop end and the loop start on the
+// frame it came round.
+function foldLoop(raw) {
+  if (!loopEnabled || source !== 'internal') return raw;
+  const cycle = loopCycleIndex(raw, loopStartBeats, loopLengthBeats);
+  if (lastLoopCycle !== null && cycle !== lastLoopCycle) bumpJump();
+  lastLoopCycle = cycle;
+  return loopedBeats(raw, loopStartBeats, loopLengthBeats);
+}
+export function setTransportLoop(enabled, startBeats, lengthBeats) {
+  const on = enabled === true;
+  const start = Math.max(0, Number(startBeats) || 0);
+  const len = Math.max(0.01, Number(lengthBeats) || 0.01);
+  if (on === loopEnabled && start === loopStartBeats && len === loopLengthBeats) return;
+  loopEnabled = on;
+  loopStartBeats = start;
+  loopLengthBeats = len;
+  lastLoopCycle = null;               // don't report the change itself as a wrap
+  publish(true);
+}
+export function transportLoopNow() {
+  return { enabled: loopEnabled && source === 'internal', startBeats: loopStartBeats, lengthBeats: loopLengthBeats };
+}
+
+// --- Count-in ---------------------------------------------------------------------------
+function tickCountIn() {
+  const now = Date.now();
+  if (countInRemaining(countInAt, now, bpm, countInTotal) > 0) { publish(); return; }
+  // Done. Start for real, at the position the count-in was counting in to.
+  countingIn = false;
+  beats = countInResumeBeats;
+  startedAt = startedAtFor(beats, now, bpm);
+  lastLoopCycle = null;
+  running = true;
+  bumpJump();
+  publish(true);
+}
+export function isCountingIn() { return countingIn; }
+export function countInBeatsLeft() {
+  return countingIn ? countInRemaining(countInAt, Date.now(), bpm, countInTotal) : 0;
+}
+export function cancelCountIn() {
+  if (!countingIn) return;
+  countingIn = false;
+  stopTimer();
+  publish(true);
+}
+// Start after `bars` of count-in. Zero bars is an ordinary start, and following
+// somebody else's clock there is nothing for us to count in to — the master
+// decides when the music begins.
+export function startTransportWithCountIn(bars, atBeat = null) {
+  const total = countInBeats(bars, beatsPerBar);
+  if (total <= 0 || source !== 'internal') { startTransport(atBeat); return; }
+  countInResumeBeats = atBeat !== null ? Math.max(0, Number(atBeat) || 0) : beats;
+  beats = countInResumeBeats;
+  countInTotal = total;
+  countInAt = Date.now();
+  countingIn = true;
+  running = false;
+  ensureTimer();
+  publish(true);
 }
 
 // --- Host playhead ------------------------------------------------------------------
@@ -318,5 +415,7 @@ export function resetTransportForTest() {
   clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4;
   hostAvailable = false; hostPlaying = false; hostAnchorBeats = 0; hostAnchorAt = 0; hostBpm = null;
   jumpSeq = 0;
+  loopEnabled = false; loopStartBeats = 0; loopLengthBeats = 16; lastLoopCycle = null;
+  countingIn = false; countInTotal = 0; countInAt = 0; countInResumeBeats = 0;
   publish(true);
 }

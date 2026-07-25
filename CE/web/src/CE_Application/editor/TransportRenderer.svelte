@@ -5,7 +5,7 @@
   import {
     transportConfig, transportBpm, transportSource, transportSignature,
     formatBarBeat, transportGeometry, transportButtonRect,
-    TRANSPORT_SOURCE_LABELS,
+    TRANSPORT_SOURCE_LABELS, loopRegion, formatLoopRange, formatCountIn,
   } from '../utils/transportLayout.js';
 
   let { control = null, width = 0, height = 0 } = $props();
@@ -53,6 +53,15 @@
   let onBeat = $derived(running && beatPhase < 0.18);
   let downbeat = $derived(Math.floor(beats) % Math.max(1, sig.beats) === 0);
 
+  // Count-in: the readout becomes the countdown, because during a count-in the
+  // bar you're parked on is not the information anyone wants.
+  let countingIn = $derived(cfg.__countingIn === true);
+  let countLeft = $derived(n(cfg.__countInLeft, 0));
+  // The loop range is drawn from the CONFIG, not from live state, so the author
+  // can see it while editing rather than only once the clock is running.
+  let region = $derived(loopRegion(control, sig.beats));
+  let loopActive = $derived(region.enabled && !external);
+
   let showPosition = $derived(cfg.showPosition !== false && geom.w >= 150);
   let bpmSize = $derived(Math.max(13, Math.min(22, geom.h * 0.42)));
 </script>
@@ -63,8 +72,11 @@
   <!-- play / stop -->
   <rect x={btn.x} y={btn.y} width={btn.w} height={btn.h} rx="6"
         fill={running ? accentCss : 'rgba(28,28,38,1)'} opacity={running ? 0.9 : 1}
-        stroke={running ? accentCss : 'rgba(58,58,72,1)'} />
-  {#if running}
+        stroke={countingIn ? beatCss : running ? accentCss : 'rgba(58,58,72,1)'} />
+  {#if countingIn}
+    <!-- armed, not yet playing: a pulsing ring rather than the play or stop face -->
+    <circle cx={btn.x + btn.w / 2} cy={btn.y + btn.h / 2} r="7" fill="none" stroke={beatCss} stroke-width="2" />
+  {:else if running}
     <rect x={btn.x + btn.w / 2 - 6} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill="#0b0b10" />
     <rect x={btn.x + btn.w / 2 + 1.5} y={btn.y + btn.h / 2 - 6} width="4.5" height="12" rx="1" fill="#0b0b10" />
   {:else}
@@ -76,13 +88,15 @@
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h * 0.52} font-size={bpmSize}
         fill="rgba(232,232,238,1)" style="font-weight:700">{bpm.toFixed(1)}</text>
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h - 8} font-size="8.5" fill={labelCss} opacity="0.75">
-    BPM · {sig.beats}/{sig.unit}{external ? ` · ${locked ? (host ? 'HOST' : 'EXT') : (host ? 'HOST · no DAW' : 'EXT · no clock')}` : ''}
+    BPM · {sig.beats}/{sig.unit}{external ? ` · ${locked ? (host ? 'HOST' : 'EXT') : (host ? 'HOST · no DAW' : 'EXT · no clock')}` : ''}{loopActive ? ` · ⟲ ${formatLoopRange(region)}` : ''}
   </text>
 
   <!-- position + beat pulse -->
   {#if showPosition}
     <text x={geom.x + geom.w - 10} y={geom.y + geom.h * 0.52} font-size={Math.max(11, bpmSize * 0.78)}
-          fill={labelCss} text-anchor="end" style="font-weight:600">{formatBarBeat(beats, sig)}</text>
+          fill={countingIn ? beatCss : labelCss} text-anchor="end" style="font-weight:600">
+      {countingIn ? `−${formatCountIn(countLeft, sig.beats)}` : formatBarBeat(beats, sig)}
+    </text>
     <circle cx={geom.x + geom.w - 14} cy={geom.y + geom.h - 12} r={onBeat ? (downbeat ? 5 : 3.5) : 2.5}
             fill={onBeat ? beatCss : 'rgba(80,80,92,1)'} />
   {/if}

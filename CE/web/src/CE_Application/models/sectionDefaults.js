@@ -1278,7 +1278,13 @@ export const SECTION_DEFAULTS = {
     source: 'internal',           // internal | external (follow MIDI clock in)
     beatsPerBar: 4,
     beatUnit: 4,
-    runOnLoad: false,             // start the clock as soon as the panel opens
+    runOnLoad: false,
+    // Loop points — a bar range the position folds into. Master clock only:
+    // following a DAW or an incoming clock, the other end owns the position.
+    loopEnabled: false,
+    loopStartBar: 1,             // 1-based, as musicians count
+    loopLengthBars: 4,
+    countInBars: 0,              // bars of silence before the first step (0 = off)             // start the clock as soon as the panel opens
     clockOut: false,              // send MIDI clock — 24 messages per quarter note
     editable: true,               // press play / tap tempo in preview
     showPosition: true,           // the bar.beat.tick readout

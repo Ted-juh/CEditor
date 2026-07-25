@@ -90,7 +90,10 @@ not DSP:
   [Kinetic Modulator](./kinetic-modulator.md) in musical time — with the honest
   caveat that a physics integrator can't be made drift-free the way a phase can.
   That is **every** self-clocked component in the panel; nothing here still runs
-  on a private timer. See [transport.md](./transport.md).
+  on a private timer. Adds **loop points** (a bar range the position folds into,
+  as a pure function of the timeline rather than a counter that resets) and a
+  **count-in** (armed, not running — so all six followers hold and stay silent
+  with no change to any of them). See [transport.md](./transport.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

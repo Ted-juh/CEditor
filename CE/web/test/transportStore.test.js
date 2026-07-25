@@ -6,6 +6,8 @@ import {
   setTransportBpm, setTransportSource, transportBeatsNow, isTransportRunning,
   feedTransportMidiForTest, resetTransportForTest,
   applyHostTransport, transportJumpSeq, transportBpmNow, transportBeatsPerBar,
+  setTransportLoop, transportLoopNow, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
+  setTransportSignature,
 } from '../src/CE_Application/stores/transport.js';
 
 test('start / stop / rewind', (t) => {
@@ -164,4 +166,97 @@ test('host updates are ignored while the source is internal', (t) => {
   assert.equal(transportBpmNow(), 120);
   assert.ok(transportBeatsNow() < 1, 'the DAW must not move an internal clock');
   stopTransport();
+});
+
+// --- Loop points ------------------------------------------------------------------
+test('the position folds into the loop and a wrap counts as a jump', async (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  // A very short loop at a very high tempo so a real wrap happens fast:
+  // 300bpm = 5 beats/sec, so a 1-beat loop comes round every 200ms.
+  setTransportBpm(300);
+  setTransportLoop(true, 0, 1);
+  assert.equal(transportLoopNow().enabled, true);
+  startTransport(0);
+  const jumps0 = transportJumpSeq();
+
+  await sleep(450);                       // ~2.25 beats: at least two wraps
+  const b = transportBeatsNow();
+  assert.ok(b >= 0 && b < 1, `folded position must stay inside the loop, got ${b}`);
+  assert.ok(transportJumpSeq() > jumps0, 'a wrap must register as a discontinuity');
+  stopTransport();
+});
+
+test('a loop that starts later lets the clock run in to it', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportLoop(true, 8, 16);
+  startTransport(0);
+  // Immediately after starting we are before the loop start, so untouched.
+  assert.ok(transportBeatsNow() < 1);
+  stopTransport();
+});
+
+test('loop settings are inert while following a master', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportLoop(true, 0, 1);
+  setTransportSource('host');
+  // The DAW owns the position; folding it into our loop would put the panel
+  // somewhere the master isn't.
+  assert.equal(transportLoopNow().enabled, false);
+  applyHostTransport({ bpm: 120, ppqPosition: 40, isPlaying: true });
+  assert.ok(Math.abs(transportBeatsNow() - 40) < 0.05, 'the host position must pass through unfolded');
+});
+
+// --- Count-in ---------------------------------------------------------------------
+test('the count-in holds every follower silent, then starts for real', async (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportBpm(300);                   // 5 beats/sec
+  setTransportSignature(1);               // …and 1 beat per bar, so 1 bar = 200ms
+  startTransportWithCountIn(1, 0);
+
+  assert.equal(isCountingIn(), true);
+  // The crucial bit: NOT running. Every synced component already holds and
+  // stays quiet when the transport is stopped, so the count-in needs no change
+  // in any of them.
+  assert.equal(isTransportRunning(), false);
+  assert.ok(countInBeatsLeft() > 0);
+  assert.equal(get(transport).countingIn, true);
+
+  await sleep(120);
+  assert.equal(isCountingIn(), true, 'still counting in half way through');
+  assert.equal(isTransportRunning(), false);
+
+  await sleep(200);
+  assert.equal(isCountingIn(), false, 'the count-in must end on its own');
+  assert.equal(isTransportRunning(), true);
+  assert.equal(countInBeatsLeft(), 0);
+  stopTransport();
+});
+
+test('pressing stop during a count-in aborts it', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  startTransportWithCountIn(2, 0);
+  assert.equal(isCountingIn(), true);
+  toggleTransport();                      // the play button again
+  assert.equal(isCountingIn(), false);
+  assert.equal(isTransportRunning(), false);
+});
+
+test('zero bars is an ordinary start, and a follower never counts itself in', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  startTransportWithCountIn(0, 0);
+  assert.equal(isCountingIn(), false);
+  assert.equal(isTransportRunning(), true);
+  stopTransport();
+
+  resetTransportForTest();
+  setTransportSource('external');
+  startTransportWithCountIn(4, 0);
+  // Following someone else's clock, when the music starts is their decision.
+  assert.equal(isCountingIn(), false);
 });
