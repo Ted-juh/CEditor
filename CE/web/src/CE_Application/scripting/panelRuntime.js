@@ -391,6 +391,7 @@ const setlistApi = {
   setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
   setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
+  setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
 };
 
 function buildApi(ownerName) {

@@ -7,6 +7,7 @@ import {
   FOOT_ACTIONS, sceneMessages, recallPlan, captureScene, sceneChangeCount, missingPaths,
   setlistGeometry, visibleRange, rowRect, rowAtPoint, MAX_SCENES,
   setlistScriptPatch, SETLIST_SCRIPT_ACTIONS,
+  normalizeSysex, footswitchBackEdge, footswitchBackCc, crossfadeMs, blendValues,
 } from '../src/CE_Application/utils/setlistLayout.js';
 
 function sl(c) { return { _children: { Core: { controlType: 'Setlist' }, Setlist: c } }; }
@@ -257,4 +258,58 @@ test('wrap toggles when unspecified and is idempotent when told', () => {
   assert.deepEqual(setlistScriptPatch({ scenes: [] }, 'next', {}), {});
   assert.deepEqual(setlistScriptPatch({ scenes: [] }, 'wrap', { wrap: true }), { wrap: true });
   assert.deepEqual(setlistScriptPatch(null, 'nonsense', {}), {});
+});
+
+// --- scene extras, back pedal, crossfade -----------------------------------------
+
+test('extra CCs come after the program change, not before', () => {
+  // A patch change on most synths resets its controllers, so a CC sent first
+  // would be wiped by the very patch it was meant to modify.
+  const [s] = setlistScenes(sl({ scenes: [{ program: 5, bankMsb: 1, ccs: [{ cc: 91, value: 0 }] }] }));
+  const msgs = sceneMessages(s, 1);
+  assert.deepEqual(msgs.map((m) => m.kind), ['cc', 'program', 'cc'], 'bank, program, then extras');
+  assert.deepEqual(msgs[2].bytes, [0xB0, 91, 0]);
+  // A CC may name its own channel; null means the setlist's.
+  const [own] = setlistScenes(sl({ scenes: [{ ccs: [{ cc: 7, value: 100, channel: 9 }] }] }));
+  assert.deepEqual(sceneMessages(own, 1)[0].bytes, [0xB8, 7, 100]);
+});
+
+test('sysex is framed here rather than trusted', () => {
+  // An unterminated sysex leaves the receiving device waiting for the rest of a
+  // message that never arrives.
+  assert.deepEqual(normalizeSysex([0x41, 0x10]), [0xF0, 0x41, 0x10, 0xF7]);
+  assert.deepEqual(normalizeSysex([0xF0, 0x41, 0xF7]), [0xF0, 0x41, 0xF7], 'already framed');
+  assert.deepEqual(normalizeSysex([]), [], 'nothing is nothing');
+  // A stray status byte inside the body would end the message early.
+  assert.deepEqual(normalizeSysex([0x41, 0x90, 0x10]), [0xF0, 0x41, 0x10, 0xF7]);
+  const [s] = setlistScenes(sl({ scenes: [{ sysex: [0x41, 0x10] }] }));
+  assert.deepEqual(sceneMessages(s, 1).map((m) => m.kind), ['sysex']);
+});
+
+test('a back pedal has its own held state', () => {
+  // Two pedals sharing one boolean would have each release cancel the other's
+  // press.
+  const c = sl({ scenes: THREE, footCc: 64, footBackCc: 65 });
+  assert.equal(footswitchBackEdge(c, { kind: 'cc', cc: 65, value: 127, channel: 1 }, false).step, true);
+  assert.equal(footswitchBackEdge(c, { kind: 'cc', cc: 65, value: 127, channel: 1 }, true).step, false);
+  assert.equal(footswitchBackEdge(c, { kind: 'cc', cc: 64, value: 127, channel: 1 }, false).step, false, 'not its pedal');
+  // No back pedal configured: never steps, and null is distinguishable from 0,
+  // which is a legal CC number.
+  assert.equal(footswitchBackCc(sl({})), null);
+  assert.equal(footswitchBackCc(sl({ footBackCc: 0 })), 0);
+  assert.equal(footswitchBackEdge(sl({ scenes: THREE }), { kind: 'cc', cc: 0, value: 127 }, false).step, false);
+});
+
+test('a crossfade interpolates numbers and switches everything else halfway', () => {
+  // There is no meaningful value between "sine" and "square", and writing one
+  // would put nonsense into a control.
+  assert.deepEqual(blendValues({ 'a.v': 0 }, { 'a.v': 100 }, 0.25), { 'a.v': 25 });
+  assert.deepEqual(blendValues({ 'a.v': 0 }, { 'a.v': 100 }, 1), { 'a.v': 100 });
+  assert.deepEqual(blendValues({ 'a.w': 'sine' }, { 'a.w': 'square' }, 0.4), { 'a.w': 'sine' });
+  assert.deepEqual(blendValues({ 'a.w': 'sine' }, { 'a.w': 'square' }, 0.6), { 'a.w': 'square' });
+  // A path with no start value jumps to the target rather than being skipped.
+  assert.deepEqual(blendValues({}, { 'a.v': 50 }, 0.1), { 'a.v': 50 });
+  assert.equal(crossfadeMs(sl({})), 0, 'snapping is the default — a scene change is complete');
+  assert.equal(crossfadeMs(sl({ crossfadeMs: 99999 })), 10000);
+  assert.deepEqual(setlistScriptPatch({ scenes: THREE }, 'crossfade', { ms: 500 }), { crossfadeMs: 500 });
 });

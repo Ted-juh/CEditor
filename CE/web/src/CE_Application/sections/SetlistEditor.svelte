@@ -4,7 +4,7 @@
   import {
     setlistScenes, setlistCount, setlistIndex, sceneMessages, setlistChannel,
     sceneChangeCount, missingPaths, captureScene, FOOT_ACTIONS, FOOT_ACTION_LABELS,
-    MAX_SCENES,
+    MAX_SCENES, normalizeSceneCcs, normalizeSysex, crossfadeMs, footswitchBackCc,
   } from '../utils/setlistLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -94,6 +94,26 @@
       ? { values: captureScene(scenes[i], capturePaths, readPath).values } : {});
   }
   function captureAllPathsFromPanel() { set('capturePaths', candidatePaths); }
+  // Extra MIDI, typed rather than clicked: "91=0, 93=40" is faster than four
+  // spinners, and a scene rarely has more than a couple.
+  function ccText(scene) {
+    return (scene.ccs ?? []).map((c) => `${c.cc}=${c.value}${c.channel ? `@${c.channel}` : ''}`).join(', ');
+  }
+  function setCcText(i, text) {
+    const list = String(text ?? '').split(/[,;]+/).map((t) => t.trim()).filter(Boolean).map((t) => {
+      const m = t.match(/^(\d+)\s*=\s*(\d+)(?:\s*@\s*(\d+))?$/);
+      return m ? { cc: Number(m[1]), value: Number(m[2]), channel: m[3] ? Number(m[3]) : null } : null;
+    }).filter(Boolean);
+    updateScene(i, { ccs: normalizeSceneCcs(list) });
+  }
+  function sysexText(scene) {
+    return (scene.sysex ?? []).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  }
+  function setSysexText(i, text) {
+    const bytes = String(text ?? '').trim().split(/[\s,]+/).filter(Boolean)
+      .map((t) => parseInt(t, 16)).filter((n) => Number.isFinite(n));
+    updateScene(i, { sysex: bytes.length ? normalizeSysex(bytes) : [] });
+  }
 </script>
 
 {#if p}
@@ -117,6 +137,9 @@
     </PropertyCell>
     <PropertyCell label="Recall tempo" span={1} hint="A scene's tempo drives the Transport. Songs have tempos; that is most of what a setlist is for.">
       <PropertyToggle value={p.recallTempo !== false} onchange={() => set('recallTempo', !(p.recallTempo !== false))} />
+    </PropertyCell>
+    <PropertyCell label="Crossfade" span={1} hint="Milliseconds to slide the panel values across on a recall. 0 snaps, which is what a scene change usually means — a fade is for when a hard jump is worse than a slow one. Only numbers are interpolated; anything else switches at the halfway point, because there is no value between 'sine' and 'square'.">
+      <input class="val" type="number" min="0" max="10000" step="50" value={crossfadeMs(control)} onchange={(e) => set('crossfadeMs', clampInt(e.target.value, 0, 10000, 0))} />
     </PropertyCell>
     <PropertyCell label="PC channel" span={1} hint="Where program change is sent.">
       <input class="val" type="number" min="1" max="16" step="1" value={num(p.channel, 1)} onchange={(e) => set('channel', clampInt(e.target.value, 1, 16, 1))} />
@@ -147,6 +170,9 @@
       <select class="val" value={p.footAction ?? 'next'} onchange={(e) => set('footAction', e.target.value)}>
         {#each FOOT_ACTIONS as a (a)}<option value={a}>{FOOT_ACTION_LABELS[a] ?? a}</option>{/each}
       </select>
+    </PropertyCell>
+    <PropertyCell label="Back pedal" span={1} hint="A second CC for 'previous'. Blank means there is no back pedal — defaulting it to a number would silently let some other controller step the setlist backwards. Its held state is tracked separately, so one pedal's release can't cancel the other's press.">
+      <input class="val" type="number" min="0" max="127" step="1" placeholder="none" value={footswitchBackCc(control) ?? ''} onchange={(e) => set('footBackCc', e.target.value === '' ? null : clampInt(e.target.value, 0, 127, 65))} />
     </PropertyCell>
     {#if String(p.footAction ?? 'next') === 'goto'}
       <PropertyCell label="Scene" span={1} hint="1-based, as the list shows it.">
@@ -184,6 +210,10 @@
           </div>
           <div class="line">
             <input class="val note-in" type="text" placeholder="cue note" value={s.note} onchange={(e) => updateScene(i, { note: e.target.value })} />
+          </div>
+          <div class="line">
+            <input class="val note-in" type="text" placeholder="extra CCs — 91=0, 74=90@2" value={ccText(s)} onchange={(e) => setCcText(i, e.target.value)} />
+            <input class="val note-in" type="text" placeholder="sysex hex" value={sysexText(s)} onchange={(e) => setSysexText(i, e.target.value)} />
           </div>
           <div class="meta">
             {Object.keys(s.values).length} stored ·

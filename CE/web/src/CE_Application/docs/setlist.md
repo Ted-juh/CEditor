@@ -79,6 +79,49 @@ An absent program is `null`, not `0`. Zero is a legal program number, and a
 scene without one has to stay distinguishable from a scene that selects patch 1
 — otherwise every scene you never configured silently changes the sound.
 
+## Extra MIDI per scene
+
+A program change alone can't fix *"the patch is right but the reverb is still
+on"*, so a scene can also carry **CCs** and a **sysex** message.
+
+The extras go **after** the program change. Most synths reset their controllers
+when the patch changes, so a CC sent first would be wiped by the very patch it
+was meant to modify. Order across the whole recall is therefore: bank, program,
+CCs, sysex, panel values, tempo.
+
+A CC may name its own channel; blank means the setlist's, so there's one place to
+change it later.
+
+Sysex is **framed here rather than trusted** — `F0` and `F7` are added if
+missing, and a stray status byte inside the body is dropped. An unterminated
+sysex leaves the receiving device waiting for the rest of a message that never
+comes.
+
+## Two pedals
+
+A second CC can be assigned to **previous**, so up and down are separate
+switches rather than one pedal that only goes forwards.
+
+It's blank by default. Defaulting it to a number would silently let some other
+controller start stepping the setlist backwards — and the held state is tracked
+**separately from the forward pedal**, because two pedals sharing one boolean
+would have each release cancel the other's press.
+
+## Crossfade
+
+Values snap by default, because that is what a scene change means: complete and
+instant. A fade is for the case where a hard jump is worse than a slow one — a
+filter sweeping between songs rather than snapping.
+
+**Only numbers are interpolated.** Anything else — an enum, a string, a boolean —
+switches at the halfway point, because there is no meaningful value between
+"sine" and "square" and writing one would put nonsense into a control.
+
+The starting values are read **once**, before the fade begins. A moment later
+they are the fade's own output, and reading them then would make it chase itself.
+
+The MIDI is not faded. A program change is an instant; there is no half of one.
+
 ## Capture takes an explicit list
 
 Not "everything".
@@ -129,6 +172,7 @@ setlistGoto("Set", 3)              -- 1-based, as the list shows it
 setlistGoto("Set", "Closer")       -- or by name — a name survives a reorder
 setlistEnable("Set", "Ballad", false)   -- skip one tonight
 setlistWrap("Set", true)
+setlistCrossfade("Set", 400)
 ```
 
 **These move the index. They do not recall** — and that's the design, not a
@@ -162,12 +206,9 @@ Nothing here touches the DPD profile.
 
 ## What it doesn't do
 
-- **No per-scene MIDI beyond program change.** No sysex, no CC lists. A script
-  step on the panel covers that and this doesn't duplicate it.
-- **No crossfade between scenes.** Values are written, not interpolated. The
-  [Timbre Space](./timbre-space.md) is the component for morphing between states;
-  a setlist wants the change to be instant and complete.
+- **No tap-to-hold pedal gestures.** A press is a press; there is no long-press
+  meaning something different.
+- **The MIDI isn't faded.** A program change is an instant, and there is no half
+  of one — only the panel values slide.
 - **No song sections.** One flat list. Verse/chorus within a song is what the
   scenes themselves are for if you want it — at the cost of a longer list.
-- **The footswitch is one CC.** No dual-pedal up/down on separate switches
-  without a second setlist, and no tap-to-hold gestures.

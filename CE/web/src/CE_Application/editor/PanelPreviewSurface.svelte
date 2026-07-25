@@ -143,6 +143,7 @@
   import {
     setlistConfig, setlistScenes, setlistCount, setlistIndex, setlistWraps,
     setlistGeometry, rowAtPoint, stepIndex, gotoIndex, footswitchEdge, recallPlan,
+    footswitchBackEdge, crossfadeMs, blendValues,
   } from '../utils/setlistLayout.js';
   import {
     splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
@@ -2748,6 +2749,8 @@
   const setlistFootDown = {};     // id -> is the pedal currently held
   const setlistCcSeen = {};       // id -> midiRouteEvents.seq consumed
   const setlistIndexSeen = {};    // id -> the index we last recalled for
+  const setlistBackDown = {};     // id -> is the BACK pedal held
+  const setlistFadeTimers = {};   // id -> [intervalId…] for a value crossfade
   function isSetlistControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Setlist';
   }
@@ -2771,19 +2774,58 @@
         dryRun: false,
       });
     }
-    for (const [path, value] of Object.entries(plan.values)) {
-      const dot = String(path).indexOf('.');
-      if (dot <= 0) continue;
-      const name = String(path).slice(0, dot);
-      const rest = String(path).slice(dot + 1);
-      const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === name);
-      if (target) updateControlProperty(getControlId(target), rest, value);
+    const fadeMs = crossfadeMs(control);
+    if (fadeMs <= 0) {
+      writeSceneValues(plan.values);
+    } else {
+      // Read the current values FIRST — they are the start of the fade, and a
+      // moment later they are already the fade's own output.
+      const from = {};
+      for (const path of Object.keys(plan.values)) {
+        const v = readScenePath(path);
+        if (v !== undefined) from[path] = v;
+      }
+      const id = getControlId(control);
+      for (const t of setlistFadeTimers[id] ?? []) clearInterval(t);
+      const startedAt = Date.now();
+      const tick = setInterval(() => {
+        const pos = Math.min(1, (Date.now() - startedAt) / fadeMs);
+        writeSceneValues(blendValues(from, plan.values, pos));
+        if (pos >= 1) {
+          clearInterval(tick);
+          setlistFadeTimers[id] = (setlistFadeTimers[id] ?? []).filter((x) => x !== tick);
+        }
+      }, 25);
+      (setlistFadeTimers[id] ??= []).push(tick);
     }
     if (plan.bpm !== null && plan.bpm !== undefined) setTransportBpm(plan.bpm);
   }
   // Moving the index is ALL these do. The recall is driven by the index
   // changing (see pumpSetlistIndex), so the pedal, a click, a script and a hand
   // edit in the inspector all take the same path and cannot diverge.
+  function sceneTargetFor(path) {
+    const dot = String(path).indexOf('.');
+    if (dot <= 0) return null;
+    const name = String(path).slice(0, dot);
+    const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === name);
+    return target ? { target, rest: String(path).slice(dot + 1) } : null;
+  }
+  function writeSceneValues(values) {
+    for (const [path, value] of Object.entries(values ?? {})) {
+      const hit = sceneTargetFor(path);
+      if (hit) updateControlProperty(getControlId(hit.target), hit.rest, value);
+    }
+  }
+  function readScenePath(path) {
+    const hit = sceneTargetFor(path);
+    if (!hit) return undefined;
+    let node = hit.target?._children;
+    for (const seg of hit.rest.split('.')) {
+      if (node == null) return undefined;
+      node = node[seg] !== undefined ? node[seg] : node?._children?.[seg];
+    }
+    return node;
+  }
   function setlistGo(control, index) {
     const next = gotoIndex(setlistScenes(control), index);
     if (next < 0) return;
@@ -2817,6 +2859,11 @@
     setlistCcSeen[id] = batch.seq;
     if (!batch.seq) return;
     for (const ev of batch.events) {
+      // Two pedals, two held-state booleans. Sharing one would have each
+      // pedal's release cancel the other's press.
+      const back = footswitchBackEdge(control, ev, setlistBackDown[id] === true);
+      setlistBackDown[id] = back.down;
+      if (back.step) { setlistStep(control, -1); continue; }
       const r = footswitchEdge(control, ev, setlistFootDown[id] === true);
       setlistFootDown[id] = r.down;
       if (!r.step) continue;

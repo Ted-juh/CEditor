@@ -35,7 +35,32 @@ export function setlistScenes(control) {
     bpm: s?.bpm === null || s?.bpm === undefined ? null : Math.max(20, Math.min(300, num(s.bpm, 120))),
     enabled: s?.enabled !== false,
     colour: String(s?.colour ?? ''),
+    // Extra MIDI the scene sends after its program change. CCs as
+    // { cc, value, channel? }, sysex as a byte array — because "the patch is
+    // right but the reverb is still on" is a real thing a program change alone
+    // cannot fix.
+    ccs: normalizeSceneCcs(s?.ccs),
+    sysex: normalizeSysex(s?.sysex),
   }));
+}
+export function normalizeSceneCcs(raw) {
+  return (Array.isArray(raw) ? raw : []).slice(0, 32)
+    .filter((c) => c && Number.isFinite(Number(c.cc)))
+    .map((c) => ({
+      cc: clampInt(c.cc, 0, 127),
+      value: clampInt(c.value ?? 0, 0, 127),
+      // null means "the setlist's channel" — one place to change it later.
+      channel: c.channel === null || c.channel === undefined ? null : clampInt(c.channel, 1, 16),
+    }));
+}
+export function normalizeSysex(raw) {
+  const bytes = (Array.isArray(raw) ? raw : []).map((b) => clampInt(b, 0, 255)).slice(0, 256);
+  if (!bytes.length) return [];
+  // Framed here rather than trusting the input: an unterminated sysex leaves
+  // the receiving device waiting for the rest of a message that never comes.
+  const body = bytes[0] === 0xF0 ? bytes.slice(1) : bytes;
+  const end = body[body.length - 1] === 0xF7 ? body.slice(0, -1) : body;
+  return [0xF0, ...end.filter((b) => b < 0x80), 0xF7];
 }
 export function setlistCount(control) { return setlistScenes(control).length; }
 export function setlistIndex(control) {
@@ -95,6 +120,15 @@ export const FOOT_ACTIONS = ['next', 'prev', 'goto'];
 export const FOOT_ACTION_LABELS = { next: 'Next scene', prev: 'Previous scene', goto: 'Go to a scene' };
 
 export function footswitchCc(control) { return clampInt(setlistConfig(control).footCc ?? 64, 0, 127); }
+// A second pedal for "previous". Null means there isn't one — a single pedal is
+// still the common case, and defaulting this to a CC number would silently make
+// some other controller step the setlist backwards.
+export function footswitchBackCc(control) {
+  const raw = setlistConfig(control).footBackCc;
+  if (raw === null || raw === undefined || raw === '') return null;
+  const n = Number(raw);
+  return Number.isFinite(n) ? clampInt(n, 0, 127) : null;
+}
 export function footswitchChannel(control) { return clampInt(setlistConfig(control).footChannel ?? 0, 0, 16); }
 export function footswitchThreshold(control) { return clampInt(setlistConfig(control).footThreshold ?? 64, 1, 127); }
 
@@ -108,6 +142,20 @@ export function footswitchEdge(control, event, wasDown = false) {
   const chan = footswitchChannel(control);
   const matches = String(event?.kind) === 'cc'
     && clampInt(event?.cc, 0, 127) === footswitchCc(control)
+    && (chan === 0 || clampInt(event?.channel, 1, 16) === chan);
+  if (!matches) return { step: false, down: wasDown };
+  return { step: down && !wasDown, down };
+}
+// The back pedal, on the same rising-edge rule. Its held state is tracked
+// separately: two pedals sharing one boolean would have each release cancel the
+// other's press.
+export function footswitchBackEdge(control, event, wasDown = false) {
+  const cc = footswitchBackCc(control);
+  if (cc === null) return { step: false, down: wasDown };
+  const down = clampInt(event?.value, 0, 127) >= footswitchThreshold(control);
+  const chan = footswitchChannel(control);
+  const matches = String(event?.kind) === 'cc'
+    && clampInt(event?.cc, 0, 127) === cc
     && (chan === 0 || clampInt(event?.channel, 1, 16) === chan);
   if (!matches) return { step: false, down: wasDown };
   return { step: down && !wasDown, down };
@@ -131,6 +179,14 @@ export function sceneMessages(scene, channel) {
   if (scene.program !== null && scene.program !== undefined) {
     out.push({ kind: 'program', bytes: [0xC0 | (ch - 1), scene.program] });
   }
+  // Extra CCs come AFTER the program change: a patch change on most synths
+  // resets its controllers, so a CC sent first would be wiped by the patch it
+  // was meant to modify.
+  for (const c of scene.ccs ?? []) {
+    const cch = c.channel === null || c.channel === undefined ? ch : clampInt(c.channel, 1, 16);
+    out.push({ kind: 'cc', bytes: [0xB0 | (cch - 1), c.cc, c.value] });
+  }
+  if ((scene.sysex ?? []).length) out.push({ kind: 'sysex', bytes: scene.sysex.slice() });
   return out;
 }
 
@@ -154,6 +210,32 @@ export function recallPlan(control, index) {
     // most of what a setlist is for.
     bpm: cfg.recallTempo === false ? null : scene.bpm,
   };
+}
+
+// --- Crossfade -----------------------------------------------------------------------
+// Values are written instantly by default, because a scene change should be
+// complete. A fade is for the case a hard jump is worse than a slow one — a
+// filter sweeping between songs rather than snapping.
+//
+// Pure: a start map, an end map and a 0..1 position in, the values to write out.
+// Only NUMBERS are interpolated; anything else (an enum, a string, a boolean)
+// switches at the halfway point, because there is no meaningful value between
+// "sine" and "square" and pretending otherwise would write nonsense.
+export function crossfadeMs(control) {
+  return Math.max(0, Math.min(10000, num(setlistConfig(control).crossfadeMs, 0)));
+}
+export function blendValues(from, to, position) {
+  const p = Math.max(0, Math.min(1, num(position, 1)));
+  const out = {};
+  for (const [path, target] of Object.entries(to ?? {})) {
+    const start = (from ?? {})[path];
+    if (typeof target === 'number' && typeof start === 'number') {
+      out[path] = start + (target - start) * p;
+    } else {
+      out[path] = p >= 0.5 ? target : (start === undefined ? target : start);
+    }
+  }
+  return out;
 }
 
 /**
@@ -236,7 +318,7 @@ export function rowAtPoint(geom, index, px, py) {
 // and the recall is driven by the index CHANGING — so the pedal, a click, a
 // script and a hand edit in the inspector all take the same path and cannot
 // diverge.
-export const SETLIST_SCRIPT_ACTIONS = ['next', 'prev', 'goto', 'enable', 'wrap'];
+export const SETLIST_SCRIPT_ACTIONS = ['next', 'prev', 'goto', 'enable', 'wrap', 'crossfade'];
 
 export function setlistScriptPatch(cfg, action, args = {}) {
   const c = cfg && typeof cfg === 'object' ? cfg : {};
@@ -280,6 +362,10 @@ export function setlistScriptPatch(cfg, action, args = {}) {
       const want = a.enabled !== false;
       if ((scenes[at].enabled !== false) === want) return {};
       return { scenes: scenes.map((s, i) => (i === at ? { ...s, enabled: want } : s)) };
+    }
+    case 'crossfade': {
+      const ms = Number(a.ms);
+      return Number.isFinite(ms) ? { crossfadeMs: Math.max(0, Math.min(10000, ms)) } : {};
     }
     case 'wrap': {
       const want = a.wrap === undefined ? !wrap : a.wrap !== false;

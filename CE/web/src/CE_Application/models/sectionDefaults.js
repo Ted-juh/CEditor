@@ -1312,13 +1312,15 @@ export const SECTION_DEFAULTS = {
     footChannel: 0,              // 0 = any
     footThreshold: 64,
     footAction: 'next',          // next | prev | goto
+    footBackCc: null,            // a second pedal for "previous"; null = none
+    crossfadeMs: 0,              // 0 = values snap, which is what a scene change means
     // Which panel paths a capture stores. Explicit, never "everything" — the
     // setlist's own index is a panel value too.
     capturePaths: [],
     scenes: [
-      { id: 'scene_1', name: 'Opener', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
-      { id: 'scene_2', name: 'Ballad', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
-      { id: 'scene_3', name: 'Closer', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
+      { id: 'scene_1', name: 'Opener', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '', ccs: [], sysex: [] },
+      { id: 'scene_2', name: 'Ballad', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '', ccs: [], sysex: [] },
+      { id: 'scene_3', name: 'Closer', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '', ccs: [], sysex: [] },
     ],
     editable: true,              // click a row to jump to it in preview
     showHeader: true,
