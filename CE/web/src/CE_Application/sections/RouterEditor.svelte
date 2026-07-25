@@ -1,7 +1,10 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
-  import { ROUTER_INPUT_SOURCES, routerSourceLabel } from '../utils/routerLayout.js';
+  import { ROUTER_INPUT_SOURCES, routerSourceLabel, routerSettingsForLearned } from '../utils/routerLayout.js';
+  import { learnCandidateLabel } from '../utils/midiNoteInput.js';
+  import { midiLearnState, startMidiLearn, stopMidiLearn } from '../stores/noteInput.js';
+  import { onDestroy } from 'svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -24,6 +27,27 @@
     if (!core?.id) return;
     updateControlProperty(core.id, `Router.${prop}`, value);
   }
+
+  // --- MIDI learn -------------------------------------------------------------
+  // Press Learn, wiggle the controller you want. The session adopts whatever
+  // moved the MOST, not the first message to arrive, so brushing a key on the
+  // way to the mod wheel doesn't hijack it.
+  let learning = $derived($midiLearnState.ownerId === String(core?.id ?? ''));
+  let candidate = $derived(learning ? $midiLearnState.best : null);
+  function toggleLearn() {
+    if (learning) { stopMidiLearn(); return; }
+    if (core?.id) startMidiLearn(core.id);
+  }
+  // Apply as soon as something clears the movement threshold: that's the whole
+  // point of learn, and waiting for a second click would just be a second step.
+  $effect(() => {
+    if (!learning || !candidate) return;
+    const settings = routerSettingsForLearned(candidate);
+    if (!settings) return;
+    stopMidiLearn();
+    for (const [k, v] of Object.entries(settings)) set(k, v);
+  });
+  onDestroy(() => { if ($midiLearnState.ownerId === String(core?.id ?? '')) stopMidiLearn(); });
   function num(v, f = 0) { const n = Number(v); return Number.isFinite(n) ? n : f; }
 
   function setDests(next) { set('destinations', next); }
@@ -68,6 +92,16 @@
         </select>
       </PropertyCell>
     {:else}
+      <PropertyCell label="Learn" span={2} hint="Press, then move the controller you want. It adopts whichever one moves the most over the next few seconds — a stray note or a resting controller's jitter can't win — and pins the channel it actually arrived on. Times out on its own if nothing moves.">
+        <button class="btn" class:listening={learning} type="button" onclick={toggleLearn}>
+          {learning ? (candidate ? `Got ${learnCandidateLabel(candidate)}` : 'Listening… move a control') : 'Learn from MIDI in'}
+        </button>
+      </PropertyCell>
+      {#if String(r.source ?? '') === 'cc'}
+        <PropertyCell label="CC number" span={2} hint="Which controller number to follow (0–127).">
+          <input class="val" type="number" min="0" max="127" step="1" value={num(r.ccNumber, 1)} onchange={(e) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(e.target.value, 1)))))} />
+        </PropertyCell>
+      {/if}
       <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
         <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
       </PropertyCell>
@@ -75,7 +109,7 @@
         <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
       </PropertyCell>
       <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role. No input selected there means no live signal, and the router stays on its test value.">
-        <div class="note">Reads {routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}</div>
+        <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}</div>
       </PropertyCell>
     {/if}
     <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
@@ -152,6 +186,12 @@
   }
   .val:focus { border-color: #5B9BD5; }
   .note { font-size: 11px; color: #8a8a94; }
+  .btn {
+    width: 100%; background: #1A1A1A; border: 1px solid #333; color: #DDD;
+    border-radius: 4px; padding: 4px 6px; font-size: 12px; cursor: pointer;
+  }
+  .btn:hover { border-color: #5B9BD5; }
+  .btn.listening { border-color: #F2C94C; color: #F2C94C; background: #241f10; }
   .dests { display: flex; flex-direction: column; gap: 8px; }
   .dest { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; display: flex; flex-direction: column; gap: 7px; }
   .dest.off { opacity: 0.55; }

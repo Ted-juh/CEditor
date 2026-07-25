@@ -80,6 +80,8 @@ not DSP:
   velocity, straight off the **hardware MIDI input**, or a linked on-panel
   control), shape it through a **drawable transfer curve** (dead-zone, invert),
   and fan it to many parameters. See [expression-router.md](./expression-router.md).
+- **MIDI learn**: press Learn and wiggle a control — it adopts whatever moved the
+  most, not whatever spoke first. Any CC number is selectable.
 - Output works anywhere; input availability is synth-dependent (aftertouch/breath),
   and the header reads LIVE vs TEST so a silent controller is obvious.
 

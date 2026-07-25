@@ -60,7 +60,7 @@
   } from '../utils/looperLayout.js';
   import {
     routerConfig, routerCurvePoints, routerGeometry, routerHitNode, routerNodeFromPx,
-    routerLiveInput, routerSourceIsMidi,
+    routerInputFromState, routerSourceIsMidi,
   } from '../utils/routerLayout.js';
   import {
     timbreConfig, timbreAnchors, timbreGeometry, timbreHitAnchor, timbreFromPx,
@@ -1505,7 +1505,7 @@
       // which is different from it having arrived at zero — only the former
       // falls back to the design-time test value.
       ensureNoteInput();
-      const live = routerLiveInput($midiExpressionState.expression, source, numberOr(cfg.inputChannel, 0));
+      const live = routerInputFromState(control, $midiExpressionState.expression);
       if (live !== undefined) return live;
     }
     return Math.max(0, Math.min(1, numberOr(cfg.testInput, 0)));
@@ -1518,7 +1518,7 @@
     const source = String(cfg.source ?? '');
     if (!routerSourceIsMidi(source)) return false;
     ensureNoteInput();
-    return routerLiveInput($midiExpressionState.expression, source, numberOr(cfg.inputChannel, 0)) !== undefined;
+    return routerInputFromState(control, $midiExpressionState.expression) !== undefined;
   }
   function routerControlWith(control, curve) {
     const router = { ...control._children?.Router };

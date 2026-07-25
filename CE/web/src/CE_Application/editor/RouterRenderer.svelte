@@ -6,7 +6,8 @@
   // Live input arrives via Router.__input, a dragged node index via Router.__drag.
   import {
     routerConfig, routerInput, routerCurvePoints, routerCurveValue, routerDests,
-    routerDestValue, routerGeometry, routerNodeToPx, routerCrosshairPx, routerSourceLabel,
+    routerSourceDisplay,
+    routerDestValue, routerGeometry, routerNodeToPx, routerCrosshairPx,
     shapeInput,
   } from '../utils/routerLayout.js';
   import { envPath } from '../utils/envelopeLayout.js';
@@ -89,7 +90,7 @@
   <!-- Header: source chip + live input bar -->
   <rect x={PAD} y={PAD} width={Math.min(140, (width - PAD * 2) * 0.5)} height="20" rx="10" fill="rgba(23,23,32,1)" stroke="rgba(58,58,72,1)" />
   <circle cx={PAD + 12} cy={PAD + 10} r="4" fill={inputCss} opacity={isLive ? 1 : 0.45} />
-  <text x={PAD + 21} y={PAD + 14} font-size={labelSize} fill={labelCss}>{routerSourceLabel(cfg.source ?? 'modwheel')}</text>
+  <text x={PAD + 21} y={PAD + 14} font-size={labelSize} fill={labelCss}>{routerSourceDisplay(control)}</text>
   <rect x={inBarX} y={PAD + 2} width={inBarW} height="16" rx="8" fill="rgba(10,10,15,1)" stroke="rgba(32,32,42,1)" />
   <rect x={inBarX} y={PAD + 2} width={Math.max(0, input * inBarW)} height="16" rx="8" fill={inputCss} opacity={isLive ? 0.75 : 0.4} />
   <!-- LIVE when hardware is driving it; TEST when the bar is the design value -->

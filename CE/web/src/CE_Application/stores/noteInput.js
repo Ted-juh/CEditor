@@ -13,6 +13,7 @@ import { latestMidiInputMessage } from './deviceProfiles.js';
 import {
   EMPTY_NOTE_STATE, applyMidiHex, heldNotes, heldNoteEntries,
   EMPTY_EXPRESSION_STATE, applyExpressionHex,
+  EMPTY_LEARN_STATE, applyLearnHex, learnBest,
 } from '../utils/midiNoteInput.js';
 
 // `seq` increments on every change so consumers can depend on it directly; the
@@ -23,6 +24,31 @@ export const midiNoteState = writable({ notes: EMPTY_NOTE_STATE, seq: 0 });
 // aftertouch, note velocity. Separate store so a control that only cares about
 // notes doesn't re-render on every CC of a mod-wheel sweep (and vice versa).
 export const midiExpressionState = writable({ expression: EMPTY_EXPRESSION_STATE, seq: 0 });
+
+// --- MIDI learn session -------------------------------------------------------
+// Only ever one at a time: two controls both listening for "the next thing that
+// moves" would both adopt it, which is never what anyone wants. Starting a
+// session cancels any other.
+export const midiLearnState = writable({ ownerId: '', session: EMPTY_LEARN_STATE, best: null });
+const LEARN_TIMEOUT_MS = 12000;
+let learnTimer = null;
+
+export function startMidiLearn(ownerId) {
+  stopMidiLearn();
+  startNoteInputListener();
+  midiLearnState.set({ ownerId: String(ownerId ?? 'learn'), session: EMPTY_LEARN_STATE, best: null });
+  // Give up rather than listening forever if nothing ever moves.
+  learnTimer = setTimeout(() => stopMidiLearn(), LEARN_TIMEOUT_MS);
+}
+export function stopMidiLearn() {
+  if (learnTimer) { clearTimeout(learnTimer); learnTimer = null; }
+  const cur = get(midiLearnState);
+  if (!cur.ownerId) return;
+  midiLearnState.set({ ownerId: '', session: EMPTY_LEARN_STATE, best: null });
+}
+export function isLearning(ownerId) {
+  return get(midiLearnState).ownerId === String(ownerId ?? '');
+}
 
 let started = false;
 let lastPayload = null;
@@ -47,6 +73,14 @@ export function startNoteInputListener() {
     const curX = get(midiExpressionState);
     const nextX = applyExpressionHex(curX.expression, payload.hex);
     if (nextX !== curX.expression) midiExpressionState.set({ expression: nextX, seq: curX.seq + 1 });
+    // Feed an active learn session from the same bytes.
+    const curL = get(midiLearnState);
+    if (curL.ownerId) {
+      const session = applyLearnHex(curL.session, payload.hex);
+      if (session !== curL.session) {
+        midiLearnState.set({ ...curL, session, best: learnBest(session) });
+      }
+    }
   });
 }
 
@@ -70,4 +104,9 @@ export function ingestMidiHexForTest(hex) {
   midiNoteState.set({ notes: applyMidiHex(cur.notes, hex), seq: cur.seq + 1 });
   const curX = get(midiExpressionState);
   midiExpressionState.set({ expression: applyExpressionHex(curX.expression, hex), seq: curX.seq + 1 });
+  const curL = get(midiLearnState);
+  if (curL.ownerId) {
+    const session = applyLearnHex(curL.session, hex);
+    midiLearnState.set({ ...curL, session, best: learnBest(session) });
+  }
 }

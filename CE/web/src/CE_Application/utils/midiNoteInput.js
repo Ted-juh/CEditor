@@ -237,3 +237,61 @@ export function velocityValue(state, channel = 0) {
   const ch = Math.round(num(channel, 0));
   return readBucket(s.vel, ch > 0 ? `${ch}` : null, null);
 }
+
+// --- MIDI learn ----------------------------------------------------------------
+// "Wiggle the controller you want" is a better way to pick a source than reading
+// a list, but the first message that arrives is the WRONG answer: brushing a key
+// on the way to the mod wheel sends a note, and some keyboards trickle
+// aftertouch constantly. So a learn session watches for a window and picks the
+// controller that MOVED THE MOST — largest span between its lowest and highest
+// value, ties broken by how many messages it sent. A single stray note-on can't
+// win because it has a span of zero.
+export const EMPTY_LEARN_STATE = Object.freeze({ candidates: {}, n: 0 });
+
+export function learnKey(event) {
+  if (!event) return '';
+  if (event.kind === 'cc') return `cc:${event.channel}:${event.cc}`;
+  if (event.kind === 'aftertouch') return `at:${event.channel}`;
+  if (event.kind === 'velocity') return `vel:${event.channel}`;
+  return '';
+}
+
+export function applyLearnEvent(state, event) {
+  const s = state ?? EMPTY_LEARN_STATE;
+  const key = learnKey(event);
+  if (!key) return s;
+  const prev = s.candidates[key];
+  const v = event.value;
+  const next = prev
+    ? { ...prev, min: Math.min(prev.min, v), max: Math.max(prev.max, v), count: prev.count + 1, last: v }
+    : { kind: event.kind, channel: event.channel, cc: event.cc ?? null, min: v, max: v, count: 1, last: v };
+  return { candidates: { ...s.candidates, [key]: next }, n: s.n + 1 };
+}
+export function applyLearnHex(state, hex) {
+  let s = state ?? EMPTY_LEARN_STATE;
+  for (const e of expressionEventsFromHex(hex)) s = applyLearnEvent(s, e);
+  return s;
+}
+
+// Everything seen this session, most-moved first.
+export function learnCandidates(state) {
+  return Object.entries((state ?? EMPTY_LEARN_STATE).candidates)
+    .map(([key, c]) => ({ key, ...c, span: c.max - c.min }))
+    .sort((a, b) => (b.span - a.span) || (b.count - a.count));
+}
+// The winner, or null while nothing has moved convincingly yet. The thresholds
+// are what stop a resting controller's jitter, or one stray note, from being
+// adopted the instant you press Learn.
+export function learnBest(state, { minSpan = 8, minMessages = 2 } = {}) {
+  const span = Math.max(0, num(minSpan, 8));
+  const msgs = Math.max(1, Math.round(num(minMessages, 2)));
+  return learnCandidates(state).find((c) => c.span >= span && c.count >= msgs) ?? null;
+}
+// A human description of a candidate, for the "listening…" readout.
+export function learnCandidateLabel(candidate) {
+  if (!candidate) return '';
+  const ch = ` · ch ${candidate.channel}`;
+  if (candidate.kind === 'aftertouch') return `Aftertouch${ch}`;
+  if (candidate.kind === 'velocity') return `Note velocity${ch}`;
+  return `CC ${candidate.cc}${ch}`;
+}

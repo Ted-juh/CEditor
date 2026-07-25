@@ -6,6 +6,7 @@ import {
   heldNotes, heldNoteEntries, isNoteHeld,
   EMPTY_EXPRESSION_STATE, expressionEvent, applyExpressionHex,
   ccValue, aftertouchValue, velocityValue,
+  EMPTY_LEARN_STATE, applyLearnHex, learnCandidates, learnBest, learnCandidateLabel,
 } from '../src/CE_Application/utils/midiNoteInput.js';
 
 test('hex parsing accepts the shapes the bridge and humans produce', () => {
@@ -192,4 +193,88 @@ test('note and expression states are folded from the same bytes independently', 
   // …and a CC touches only the expression side
   assert.deepEqual(heldNotes(applyMidiHex(EMPTY_NOTE_STATE, 'B0 01 40')), []);
   assert.equal(ccValue(applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 01 40'), 1), 64);
+});
+
+// --- MIDI learn ----------------------------------------------------------------
+
+// A controller sweep, as a stream of CC messages.
+function sweep(state, status, cc, from, to, step = 8) {
+  let s = state;
+  for (let v = from; step > 0 ? v <= to : v >= to; v += step) {
+    s = applyLearnHex(s, `${status} ${cc.toString(16).padStart(2, '0')} ${v.toString(16).padStart(2, '0')}`);
+  }
+  return s;
+}
+
+test('learn picks the controller that moved the most, not the first one seen', () => {
+  let s = EMPTY_LEARN_STATE;
+  // a stray note on the way to the wheel arrives FIRST…
+  s = applyLearnHex(s, '90 3C 50');
+  // …then the mod wheel sweeps
+  s = sweep(s, 'B0', 1, 0, 120);
+  const best = learnBest(s);
+  assert.equal(best.kind, 'cc');
+  assert.equal(best.cc, 1);
+  assert.equal(best.channel, 1);
+  assert.ok(best.span >= 112);
+});
+
+test('a single stray message can never win', () => {
+  // one note-on: span 0, count 1 — below both thresholds
+  const s = applyLearnHex(EMPTY_LEARN_STATE, '90 3C 50');
+  assert.equal(learnBest(s), null);
+  // a controller resting and jittering by 1 is also rejected
+  let j = applyLearnHex(EMPTY_LEARN_STATE, 'B0 01 40');
+  j = applyLearnHex(j, 'B0 01 41');
+  j = applyLearnHex(j, 'B0 01 40');
+  assert.equal(learnBest(j), null);
+  assert.equal(learnCandidates(j)[0].span, 1);
+});
+
+test('the biggest sweep wins when two controllers move together', () => {
+  let s = EMPTY_LEARN_STATE;
+  s = sweep(s, 'B0', 1, 0, 30);      // mod wheel nudged a little
+  s = sweep(s, 'B0', 74, 0, 127);    // cutoff swept fully
+  const best = learnBest(s);
+  assert.equal(best.cc, 74);
+  // both are still listed, ordered by movement
+  const all = learnCandidates(s);
+  assert.equal(all.length, 2);
+  assert.equal(all[0].cc, 74);
+  assert.equal(all[1].cc, 1);
+});
+
+test('aftertouch and velocity are learnable too', () => {
+  let a = EMPTY_LEARN_STATE;
+  for (const v of ['00', '20', '40', '60', '7F']) a = applyLearnHex(a, `D0 ${v}`);
+  assert.equal(learnBest(a).kind, 'aftertouch');
+  assert.equal(learnCandidateLabel(learnBest(a)), 'Aftertouch · ch 1');
+  // several notes at different velocities
+  let v = EMPTY_LEARN_STATE;
+  v = applyLearnHex(v, '90 3C 10');
+  v = applyLearnHex(v, '90 40 70');
+  assert.equal(learnBest(v).kind, 'velocity');
+  assert.equal(learnCandidateLabel(learnBest(v)), 'Note velocity · ch 1');
+});
+
+test('learn keeps channels apart and reports the one that moved', () => {
+  let s = EMPTY_LEARN_STATE;
+  s = sweep(s, 'B0', 1, 0, 40);    // ch 1, small move
+  s = sweep(s, 'B5', 1, 0, 127);   // ch 6, full sweep
+  const best = learnBest(s);
+  assert.equal(best.cc, 1);
+  assert.equal(best.channel, 6);
+  assert.equal(learnCandidateLabel(best), 'CC 1 · ch 6');
+  assert.equal(learnCandidates(s).length, 2);   // same CC, two channels, two candidates
+});
+
+test('learn thresholds are adjustable, and empty state is safe', () => {
+  let s = applyLearnHex(EMPTY_LEARN_STATE, 'B0 01 40');
+  s = applyLearnHex(s, 'B0 01 43');            // span 3
+  assert.equal(learnBest(s), null);            // default minSpan 8
+  assert.equal(learnBest(s, { minSpan: 2 }).cc, 1);
+  assert.equal(learnBest(EMPTY_LEARN_STATE), null);
+  assert.deepEqual(learnCandidates(null), []);
+  assert.equal(learnCandidateLabel(null), '');
+  assert.equal(applyLearnHex(EMPTY_LEARN_STATE, 'F8'), EMPTY_LEARN_STATE);   // realtime: nothing to learn
 });

@@ -5,6 +5,7 @@ import {
   routerDests, routerDestValue, routerPortValues, routerPorts,
   routerDestPortId, parseRouterDestPort, routerSourceLabel, ROUTER_INPUT_SOURCES,
   routerSourceSpec, routerSourceIsMidi, routerLiveInput,
+  routerInputFromState, routerSourceCc, routerSourceDisplay, routerSettingsForLearned,
 } from '../src/CE_Application/utils/routerLayout.js';
 import {
   EMPTY_EXPRESSION_STATE, applyExpressionHex,
@@ -125,4 +126,56 @@ test('a live input feeds straight through the existing curve', () => {
   // …and the shaping options still apply to it
   const inverted = rt({ source: 'modwheel', curve: LINE, invert: true });
   assert.ok(near(routerCurveValue(inverted, input), 0));
+});
+
+// --- free CC source + MIDI learn ----------------------------------------------
+
+test('the free CC source listens to whatever number it is given', () => {
+  const x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 4A 60');   // CC 74 -> 96
+  assert.ok(near(routerLiveInput(x, 'cc', 0, 74), 96 / 127));
+  assert.equal(routerLiveInput(x, 'cc', 0, 1), undefined);            // a CC that never moved
+  assert.equal(routerLiveInput(x, 'cc', 0, null), undefined);         // no number set yet
+  assert.equal(routerLiveInput(x, 'cc', 0, 999), undefined);          // out of range
+  // and it reads through the control's own config
+  const c = rt({ source: 'cc', ccNumber: 74, inputChannel: 0 });
+  assert.ok(near(routerInputFromState(c, x), 96 / 127));
+  assert.equal(routerSourceCc(c), 74);
+  assert.equal(routerSourceDisplay(c), 'CC 74');
+  assert.equal(routerSourceDisplay(rt({ source: 'cc' })), 'CC —');
+  assert.equal(routerSourceDisplay(rt({ source: 'modwheel' })), 'Mod Wheel');
+  assert.equal(routerSourceCc(rt({ source: 'modwheel' })), 1);
+  assert.equal(routerSourceCc(rt({ source: 'aftertouch' })), null);
+});
+
+test('routerInputFromState honours the control channel filter', () => {
+  let x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 01 10');   // ch 1
+  x = applyExpressionHex(x, 'B3 01 60');                            // ch 4
+  assert.ok(near(routerInputFromState(rt({ source: 'modwheel', inputChannel: 4 }), x), 96 / 127));
+  assert.ok(near(routerInputFromState(rt({ source: 'modwheel', inputChannel: 1 }), x), 16 / 127));
+  assert.equal(routerInputFromState(rt({ source: 'modwheel', inputChannel: 9 }), x), undefined);
+});
+
+test('a learned controller maps onto the right source', () => {
+  // a learned CC that IS a named source becomes that source, not a raw number
+  assert.deepEqual(routerSettingsForLearned({ kind: 'cc', cc: 1, channel: 1 }),
+    { source: 'modwheel', inputChannel: 1 });
+  assert.deepEqual(routerSettingsForLearned({ kind: 'cc', cc: 11, channel: 3 }),
+    { source: 'expression', inputChannel: 3 });
+  // anything else falls to the free CC source, carrying its number
+  assert.deepEqual(routerSettingsForLearned({ kind: 'cc', cc: 74, channel: 2 }),
+    { source: 'cc', ccNumber: 74, inputChannel: 2 });
+  assert.deepEqual(routerSettingsForLearned({ kind: 'aftertouch', channel: 5 }),
+    { source: 'aftertouch', inputChannel: 5 });
+  assert.deepEqual(routerSettingsForLearned({ kind: 'velocity', channel: 1 }),
+    { source: 'velocity', inputChannel: 1 });
+  assert.equal(routerSettingsForLearned(null), null);
+});
+
+test('learning round-trips: what was wiggled is what gets read', () => {
+  // CC 74 sweeps on channel 2, and the settings that produces then resolve it
+  const x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B1 4A 7F');
+  const settings = routerSettingsForLearned({ kind: 'cc', cc: 74, channel: 2 });
+  const learned = rt({ ...settings, curve: LINE });
+  assert.ok(near(routerInputFromState(learned, x), 1));
+  assert.equal(routerSourceDisplay(learned), 'CC 74');
 });

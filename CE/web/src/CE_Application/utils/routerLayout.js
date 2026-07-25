@@ -25,6 +25,9 @@ export const ROUTER_INPUT_SOURCES = [
   { id: 'expression', label: 'Expression', cc: 11 },
   { id: 'foot', label: 'Foot Pedal', cc: 4 },
   { id: 'velocity', label: 'Note Velocity', cc: null, kind: 'velocity' },
+  // A free CC number, so MIDI learn can adopt anything — without it, learning
+  // (say) CC 74 would have nowhere to go.
+  { id: 'cc', label: 'CC number…', cc: null, kind: 'customCc' },
   { id: 'link', label: 'Linked control…', cc: null, kind: 'link' },
 ];
 export function routerSourceSpec(id) {
@@ -43,14 +46,58 @@ export function routerSourceIsMidi(id) {
 // state. Returns UNDEFINED when that controller has never been seen — the
 // caller has to tell "no hardware yet" (fall back to the test value) from
 // "arrived, and it's zero". `channel` 0 = omni.
-export function routerLiveInput(expressionState, sourceId, channel = 0) {
+export function routerLiveInput(expressionState, sourceId, channel = 0, customCc = null) {
   const spec = routerSourceSpec(sourceId);
   if (!spec || spec.kind === 'link') return undefined;
   let raw;
   if (spec.kind === 'aftertouch') raw = aftertouchValue(expressionState, channel);
   else if (spec.kind === 'velocity') raw = velocityValue(expressionState, channel);
-  else if (spec.cc !== null && spec.cc !== undefined) raw = ccValue(expressionState, spec.cc, channel);
+  else if (spec.kind === 'customCc') {
+    const n = Math.round(num(customCc, -1));
+    if (n < 0 || n > 127) return undefined;
+    raw = ccValue(expressionState, n, channel);
+  } else if (spec.cc !== null && spec.cc !== undefined) raw = ccValue(expressionState, spec.cc, channel);
   return raw === undefined ? undefined : clamp01(num(raw, 0) / 127);
+}
+// The same thing, reading the control's own source / channel / CC number.
+export function routerInputFromState(control, expressionState) {
+  const cfg = routerConfig(control);
+  return routerLiveInput(expressionState, String(cfg.source ?? ''),
+    num(cfg.inputChannel, 0), cfg.ccNumber);
+}
+// Which CC number a source actually listens to (null for non-CC sources).
+export function routerSourceCc(control) {
+  const cfg = routerConfig(control);
+  const spec = routerSourceSpec(cfg.source);
+  if (!spec) return null;
+  if (spec.kind === 'customCc') {
+    const n = Math.round(num(cfg.ccNumber, -1));
+    return n >= 0 && n <= 127 ? n : null;
+  }
+  return spec.cc ?? null;
+}
+// The label to show on the source chip — the free-CC source names its number.
+export function routerSourceDisplay(control) {
+  const cfg = routerConfig(control);
+  const spec = routerSourceSpec(cfg.source);
+  if (spec?.kind === 'customCc') {
+    const n = routerSourceCc(control);
+    return n === null ? 'CC —' : `CC ${n}`;
+  }
+  return routerSourceLabel(cfg.source ?? 'modwheel');
+}
+
+// Turn a learned candidate into the Router settings that follow it. A learned
+// CC that matches one of the named sources becomes that source (so the chip
+// reads "Mod Wheel", not "CC 1"); anything else becomes the free CC source.
+// The channel is pinned to whatever actually moved — learn what you wiggled.
+export function routerSettingsForLearned(candidate) {
+  if (!candidate) return null;
+  if (candidate.kind === 'aftertouch') return { source: 'aftertouch', inputChannel: candidate.channel };
+  if (candidate.kind === 'velocity') return { source: 'velocity', inputChannel: candidate.channel };
+  const known = ROUTER_INPUT_SOURCES.find((s) => s.cc !== null && s.cc === candidate.cc);
+  if (known) return { source: known.id, inputChannel: candidate.channel };
+  return { source: 'cc', ccNumber: candidate.cc, inputChannel: candidate.channel };
 }
 
 export function routerConfig(control) {

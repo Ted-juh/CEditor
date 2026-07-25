@@ -33,8 +33,9 @@ There was already an unused pipe. The JUCE side has always emitted
 `latestMidiInputMessage` — **with no consumers at all**. This is the consumer.
 
 - **Pure engine** `utils/midiNoteInput.js` (+ `test/midiNoteInput.test.js`,
-  14 tests). Raw bytes in, held-note state out (and, for the
-  [Expression Router](./expression-router.md), continuous-controller levels):
+  20 tests). Raw bytes in, held-note state out — plus, for the
+  [Expression Router](./expression-router.md), continuous-controller levels and
+  a **MIDI-learn** reducer:
   - `parseMidiHex` takes the bridge's `"90 3C 60"` and the shapes humans write.
   - `splitMidiMessages` handles **running status** (hardware drops the repeated
     status byte on a fast run — without this a chord arrives as one note plus
@@ -46,6 +47,8 @@ There was already an unused pipe. The JUCE side has always emitted
   - The reducer is pure and **returns the same object when nothing changed**, so
     a stream of duplicate messages causes no re-renders.
   - The same pitch on two channels stays distinct, but display dedupes it.
+  - The learn reducer tracks how far each controller moved during a session, so
+    "whatever moved the most" can win instead of "whatever spoke first".
 - **`stores/noteInput.js`** — one listener for the whole app (notes are global;
   four controls watching the same stream should agree about it). It's started
   lazily by the preview surface, so importing the module headless never attaches
