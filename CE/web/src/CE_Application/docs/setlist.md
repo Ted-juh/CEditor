@@ -210,5 +210,6 @@ Nothing here touches the DPD profile.
   meaning something different.
 - **The MIDI isn't faded.** A program change is an instant, and there is no half
   of one — only the panel values slide.
-- **No song sections.** One flat list. Verse/chorus within a song is what the
-  scenes themselves are for if you want it — at the cost of a longer list.
+- **No song sections.** One flat list of scenes. Verse/chorus *within* a song is
+  [song mode](./song-mode.md)'s job, on the sequencer — a setlist steps between
+  songs, not inside one.

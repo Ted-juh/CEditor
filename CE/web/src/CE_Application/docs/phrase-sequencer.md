@@ -283,7 +283,4 @@ A chain link's repeat count is in *passes of that slot*, so a 16-step verse and 
 
 Named honestly, because each of these is a thing someone will look for:
 
-- **One pattern, no chaining.** There is no song mode, no A/B, no pattern queue.
-  A script can swap the seed on a footswitch, which covers the live case; it
-  does not cover writing a verse and a chorus.
 - **A chain is flat.** A link points at a pattern slot, not at another chain.
