@@ -7,6 +7,7 @@ import {
   stepAtBeat, crossedSteps, swungBeatOffset,
   transportEvent, clockPulsesBetween, estimateTempoFromPulses, tapTempo,
   transportGeometry, hitTransportButton,
+  cycleBeats, cyclePhaseAt, cycleCountAt, barsLabel, musicalDelta, MIN_BARS, MAX_BARS,
 } from '../src/CE_Application/utils/transportLayout.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -158,4 +159,40 @@ test('geometry + the play button hit box', () => {
   assert.equal(hitTransportButton(g, 12, 20), true);
   assert.equal(hitTransportButton(g, 200, 20), false);
   assert.equal(hitTransportButton(g, 12, 2), false);
+});
+
+// --- Cycles (the Looper / Constellation unit) ---------------------------------
+test('cycle phase comes from the position, so a long loop stays on the bar line', () => {
+  // 2 bars of 4/4 = 8 beats.
+  assert.ok(near(cycleBeats(2, 4), 8));
+  assert.ok(near(cycleBeats(2, 3), 6));            // 3/4 makes a bar shorter
+  assert.ok(near(cyclePhaseAt(0, 2, 4), 0));
+  assert.ok(near(cyclePhaseAt(4, 2, 4), 0.5));
+  assert.ok(near(cyclePhaseAt(8, 2, 4), 0));       // exactly back to the top
+  // The whole point: an hour in, the loop point is still the bar line.
+  assert.ok(near(cyclePhaseAt(8 * 900, 2, 4), 0));
+  assert.equal(cycleCountAt(8 * 900, 2, 4), 900);
+  assert.ok(near(cyclePhaseAt(8 * 900 + 2, 2, 4), 0.25));
+});
+
+test('bar counts clamp and read as English', () => {
+  assert.ok(near(cycleBeats(0, 4), cycleBeats(MIN_BARS, 4)));    // clamped, not zero
+  assert.ok(near(cycleBeats(9999, 4), cycleBeats(MAX_BARS, 4)));
+  assert.equal(barsLabel(1), '1 bar');
+  assert.equal(barsLabel(4), '4 bars');
+  assert.equal(barsLabel(0.5), '1/2 bar');
+  assert.equal(barsLabel(0.25), '1/4 bar');
+});
+
+// --- Musical time (the Kinetic unit) ------------------------------------------
+test('musical delta is a no-op at the reference tempo and scales with it', () => {
+  // One beat at 120bpm is half a second, so a beat of transport travel gives
+  // the integrator half a second of simulation — identical to unsynced at 120.
+  assert.ok(near(musicalDelta(0, 1), 0.5));
+  assert.ok(near(musicalDelta(4, 6), 1.0));
+  // Backwards or stalled: no step at all, never a negative one.
+  assert.equal(musicalDelta(5, 5), 0);
+  assert.equal(musicalDelta(5, 4), 0);
+  // A different reference scales the whole thing.
+  assert.ok(near(musicalDelta(0, 1, 60), 1.0));
 });

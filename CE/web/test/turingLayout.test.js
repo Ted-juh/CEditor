@@ -4,6 +4,7 @@ import {
   turingPhase, turingLength, turingSteps, turingStepIndex, stepOutput, gateAt,
   mutateStep, turingGeometry, stepRect, stepAtPoint, valueFromY,
   turingPorts, turingPortValues, turingStepsPerSecond,
+  turingSynced, turingDivision, turingBeatsPerStep, turingSyncedStepAt, turingSyncedPhaseAt,
 } from '../src/CE_Application/utils/turingLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -77,4 +78,21 @@ test('steps-per-second guarded', () => {
   assert.ok(near(turingStepsPerSecond(tg({ rate: 4 })), 4));
   assert.ok(near(turingStepsPerSecond(tg({ rate: 0 })), 0.1));
   assert.ok(near(turingStepsPerSecond(tg({})), 2));
+});
+
+test('synced register steps off the transport position', () => {
+  assert.equal(turingSynced(tg({})), false);
+  assert.equal(turingDivision(tg({})), '1/8');
+  assert.equal(turingDivision(tg({ division: 'nope' })), '1/8');
+  assert.equal(turingDivision(tg({ division: '1/4T' })), '1/4T');
+  const c = tg({ syncToTransport: true, division: '1/8', length: 8 });   // 0.5 beats/step
+  assert.ok(near(turingBeatsPerStep(c), 0.5));
+  assert.equal(turingSyncedStepAt(0, c), 0);
+  assert.equal(turingSyncedStepAt(0.5, c), 1);
+  assert.equal(turingSyncedStepAt(3.5, c), 7);
+  assert.equal(turingSyncedStepAt(4, c), 0);          // 8 steps = 4 beats = one bar
+  // Joining late lands on the step the bar is on, not on step 0.
+  assert.equal(turingSyncedStepAt(101.5, c), 3);
+  assert.ok(near(turingSyncedPhaseAt(2, c), 0.5));
+  assert.ok(near(turingSyncedPhaseAt(6, c), 0.5));
 });

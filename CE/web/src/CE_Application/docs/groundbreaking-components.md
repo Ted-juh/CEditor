@@ -78,8 +78,13 @@ not DSP:
   clock-out isn't jittered by the display, and it survives a backgrounded
   window) but publishes to the UI at 30Hz. Follows **incoming MIDI clock** —
   bytes that were already arriving and being thrown away — or sends it. The
-  [Arpeggiator](./arpeggiator.md) is the first component synced to it, by note
-  division. See [transport.md](./transport.md).
+  [Arpeggiator](./arpeggiator.md) and the
+  [Turing Modulator](./turing-modulator.md) follow it by note division, the
+  [Gesture Looper](./gesture-looper.md) and the
+  [Preset Constellation](./preset-constellation.md) wander by bars, and the
+  [Kinetic Modulator](./kinetic-modulator.md) in musical time — with the honest
+  caveat that a physics integrator can't be made drift-free the way a phase can.
+  See [transport.md](./transport.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

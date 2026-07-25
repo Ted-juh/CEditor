@@ -8,6 +8,8 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
   let { control = null } = $props();
 
@@ -94,9 +96,23 @@
       <PropertyToggle value={cn.running === true} onchange={() => set('running', !(cn.running === true))} />
     </PropertyCell>
     {#if cn.running === true}
-      <PropertyCell label="Wander rate" span={2} hint="Wander speed (cycles per second).">
-        <input class="val" type="number" min="0.01" max="2" step="0.01" value={cn.wanderRate ?? 0.08} onchange={(e) => set('wanderRate', Math.max(0.01, num(e.target.value, 0.08)))} />
-      </PropertyCell>
+      <TransportSyncCells
+        synced={cn.syncToTransport === true}
+        onchange={(v) => set('syncToTransport', v)}
+        span={2}
+        hint="Time the wander cycle in bars. The probe then reaches the same point of the map on the same bar every time round — an ambient drift an arrangement can be written against."
+      >
+        {#snippet children()}
+          <PropertyCell label="Wander (bars)" span={2} hint="How many bars one full pass through the map takes.">
+            <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={cn.wanderBars ?? 8} onchange={(e) => set('wanderBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 8))))} />
+          </PropertyCell>
+        {/snippet}
+      </TransportSyncCells>
+      {#if cn.syncToTransport !== true}
+        <PropertyCell label="Wander rate" span={2} hint="Wander speed (cycles per second).">
+          <input class="val" type="number" min="0.01" max="2" step="0.01" value={cn.wanderRate ?? 0.08} onchange={(e) => set('wanderRate', Math.max(0.01, num(e.target.value, 0.08)))} />
+        </PropertyCell>
+      {/if}
     {/if}
     {#if String(cn.mode ?? 'blend') === 'blend'}
       <PropertyCell label="Blend" span={2} hint="Morph sharpness — higher makes the nearest preset dominate sooner.">

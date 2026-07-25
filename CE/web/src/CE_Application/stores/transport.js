@@ -28,6 +28,7 @@ export const transport = writable({
   bpm: 120,
   beats: 0,
   source: 'internal',
+  beatsPerBar: 4,             // the meter, so "2 bars" means something to followers
   externalBpm: null,          // what the incoming clock says, when following one
   externalLocked: false,      // …and whether it has arrived recently
   seq: 0,
@@ -41,6 +42,7 @@ let beats = 0;
 let lastPublishAt = 0;
 let clockOut = false;
 let lastPulseBeats = 0;
+let beatsPerBar = 4;
 
 // External clock state.
 let source = 'internal';
@@ -60,6 +62,7 @@ function publish(force = false) {
     running,
     bpm,
     beats,
+    beatsPerBar,
     source,
     externalBpm,
     externalLocked: source === 'external' && lastPulseAt > 0 && (now - lastPulseAt) < 500,
@@ -147,6 +150,16 @@ export function setTransportSource(next) {
   publish(true);
 }
 export function setTransportClockOut(enabled) { clockOut = enabled === true; }
+// The meter. Components that loop in BARS need it; nothing else does, which is
+// why it lives here rather than being read off whichever Transport control the
+// follower happens to find first.
+export function setTransportSignature(perBar) {
+  const v = Math.min(32, Math.max(1, Math.round(Number(perBar) || 4)));
+  if (v === beatsPerBar) return;
+  beatsPerBar = v;
+  publish(true);
+}
+export function transportBeatsPerBar() { return beatsPerBar; }
 
 // Exact position, for consumers that tick themselves. Reading the store instead
 // would give them the last published value, which is up to a frame stale.
@@ -208,6 +221,6 @@ export function feedTransportMidiForTest(hex) {
 export function resetTransportForTest() {
   running = false; stopTimer(); beats = 0; externalBeats = 0; bpm = 120;
   source = 'internal'; pulseTimes = []; lastPulseAt = 0; externalBpm = null;
-  clockOut = false; startedAt = 0; lastPulseBeats = 0;
+  clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4;
   publish(true);
 }

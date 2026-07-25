@@ -4,6 +4,7 @@ import {
   looperLanes, looperPhase, normalizeGesture, laneValueAt, recordAppend,
   looperGeometry, laneRect, laneToPx, pxToLane, laneAtPoint,
   looperLanePortId, parseLooperLanePort, looperPorts, looperPortValues, looperLoopSeconds,
+  looperSynced, looperLoopBars, looperLoopSecondsAt, looperGridLines,
 } from '../src/CE_Application/utils/looperLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -83,4 +84,31 @@ test('loop seconds guarded', () => {
   assert.ok(near(looperLoopSeconds(lp({ loopSeconds: 2 })), 2));
   assert.ok(near(looperLoopSeconds(lp({ loopSeconds: 0 })), 0.05));
   assert.ok(near(looperLoopSeconds(lp({})), 4));
+});
+
+test('synced loop length is bars at a tempo', () => {
+  assert.equal(looperSynced(lp({})), false);
+  assert.equal(looperSynced(lp({ syncToTransport: true })), true);
+  assert.ok(near(looperLoopBars(lp({ loopBars: 4 })), 4));
+  assert.ok(near(looperLoopBars(lp({ loopBars: 0 })), 0.25));      // clamped
+  const sync = lp({ syncToTransport: true, loopBars: 2, loopSeconds: 4 });
+  assert.ok(near(looperLoopSecondsAt(sync, 120, 4), 4));           // 8 beats at 120bpm
+  assert.ok(near(looperLoopSecondsAt(sync, 60, 4), 8));            // half the tempo
+  assert.ok(near(looperLoopSecondsAt(sync, 120, 3), 3));           // 3/4 → 6 beats
+  // Unsynced ignores the tempo entirely.
+  assert.ok(near(looperLoopSecondsAt(lp({ loopSeconds: 4 }), 240, 4), 4));
+});
+
+test('the lane grid marks bars and beats only when synced', () => {
+  const free = looperGridLines(lp({}), 4);
+  assert.deepEqual(free.map((g) => g.t), [0.25, 0.5, 0.75]);
+  assert.equal(free.every((g) => g.major === false), true);
+  // 2 bars of 4/4 = 8 beats → 7 interior lines, the bar line at halfway major.
+  const sync = looperGridLines(lp({ syncToTransport: true, loopBars: 2 }), 4);
+  assert.equal(sync.length, 7);
+  assert.deepEqual(sync.filter((g) => g.major).map((g) => g.t), [0.5]);
+  // 1 bar of 3/4 → 2 interior beat lines, no interior bar line.
+  const waltz = looperGridLines(lp({ syncToTransport: true, loopBars: 1 }), 3);
+  assert.equal(waltz.length, 2);
+  assert.equal(waltz.some((g) => g.major), false);
 });

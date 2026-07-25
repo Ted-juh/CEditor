@@ -6,6 +6,7 @@
 // gate, and its inverse (the fan-out). Pure math (values ∈ [0,1]); the mutation
 // itself is stateful and lives in the preview surface, but every transform here
 // is a deterministic function (randomness is passed IN), so it's unit-tested.
+import { DIVISION_IDS, DIVISION_LABELS, beatsPerStep } from './transportLayout.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -123,4 +124,29 @@ export function turingPortValues(control) {
 // Steps per second implied by the loop rate (rate = loops/sec × length).
 export function turingStepsPerSecond(control) {
   return Math.max(0.1, num(turingConfig(control).rate, 2));
+}
+
+// Tempo sync. Like the Arp this is a step sequencer, so its unit is a note
+// division; unlike the Arp its steps also MUTATE, which makes syncing worth
+// more here — a shift register that lands its changes on the beat sounds
+// composed, and the same register free-running sounds like a fault.
+export function turingSynced(control) { return turingConfig(control).syncToTransport === true; }
+export function turingDivision(control) {
+  const d = String(turingConfig(control).division ?? '1/8');
+  return DIVISION_IDS.includes(d) ? d : '1/8';
+}
+export function turingDivisionLabel(control) {
+  return DIVISION_LABELS[turingDivision(control)] ?? turingDivision(control);
+}
+export function turingBeatsPerStep(control) { return beatsPerStep(turingDivision(control)); }
+// Step index + phase at a transport position — position in, nothing accumulated.
+export function turingSyncedStepAt(beats, control) {
+  const n = Math.max(1, turingLength(control));
+  const g = Math.floor(Math.max(0, num(beats, 0)) / turingBeatsPerStep(control));
+  return ((g % n) + n) % n;
+}
+export function turingSyncedPhaseAt(beats, control) {
+  const n = Math.max(1, turingLength(control));
+  const ph = (Math.max(0, num(beats, 0)) / turingBeatsPerStep(control)) / n;
+  return ((ph % 1) + 1) % 1;
 }

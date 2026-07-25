@@ -57,7 +57,12 @@ already stepped). No input dependency.
 
 ## Possible next steps
 
-- **Tempo sync** — lock `rate` to host bars/beats and retrigger on transport.
+- ~~**Tempo sync**~~ — **done**. *Turing Modulator → Sync to transport*
+  replaces steps-per-second with a note division off the panel's
+  [Transport](./transport.md). Worth more here than on the
+  [Arp](./arpeggiator.md): these steps *mutate*, and a register that lands its
+  changes on the beat sounds composed where the same register free-running
+  sounds like a fault.
 - **Register length ≠ loop length** — the true Turing Machine trick where the
   pattern length and the read length differ, for phasing sequences.
 - **Slew / glide** on the `value` output for a smoothed (non-stepped) variant.

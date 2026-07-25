@@ -49,7 +49,13 @@ dependency.
 ## Possible next steps
 
 - **Tempo-locked kicks** — sync the keep-alive kick (or a periodic impulse) to
-  host beats for rhythmic bounces.
+  the beat for rhythmic bounces. *Partly* addressed: *Kinetic → Sync to
+  transport* now advances the simulation in musical time off the
+  [Transport](./transport.md), so tempo scales the motion and stopping freezes
+  the ball. It does **not** put the bounces on the beat — this is an
+  integrator, not a phase, so unlike the other synced components it can't be
+  recomputed from the position and won't re-align after a stall. A kick fired
+  on a step boundary is still the missing piece.
 - **Multiple balls** — a small swarm, each a fan-out port (like the Orbit's
   satellites).
 - **Shaped fields** — circular / angled walls, attractors, or a paddle you can

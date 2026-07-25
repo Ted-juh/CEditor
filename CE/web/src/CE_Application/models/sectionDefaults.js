@@ -940,7 +940,9 @@ export const SECTION_DEFAULTS = {
     mode: 'blend',               // snap (recall nearest) | blend (morph)
     blendPower: 2,               // blend sharpness
     running: false,              // wander (auto-drift the probe)
-    wanderRate: 0.08,            // wander cycles per second
+    wanderRate: 0.08,            // wander cycles per second (free-running)
+    syncToTransport: false,      // run the wander off the panel's Transport
+    wanderBars: 8,               // wander cycle length in bars, when synced
     editable: true,              // drag the probe / stars in preview
     showLinks: true,             // constellation lines between similar presets
     linkCount: 2,                // k nearest neighbours per preset
@@ -1046,7 +1048,9 @@ export const SECTION_DEFAULTS = {
     _type: 'Turing',
     phase: 0,                     // global loop clock 0..1 (advanced by the ticker)
     running: true,               // advance the sequence in preview / player
-    rate: 2,                      // steps per second
+    rate: 2,                      // steps per second (free-running)
+    syncToTransport: false,       // clock the sequence off the Transport
+    division: '1/8',              // step length when synced
     length: 8,                    // loop length in steps
     randomness: 0.25,            // 0 = locked loop, 1 = new value every step
     quantizeLevels: 0,           // 0 = continuous; ≥2 = snap values to N levels
@@ -1072,7 +1076,9 @@ export const SECTION_DEFAULTS = {
     _type: 'Looper',
     phase: 0,                     // global loop clock 0..1 (advanced by the ticker)
     running: true,               // play the loops in preview / player
-    loopSeconds: 4,              // loop length (seconds)
+    loopSeconds: 4,              // loop length (seconds, free-running)
+    syncToTransport: false,      // take the loop length from the Transport
+    loopBars: 2,                 // loop length in bars, when synced
     editable: true,              // allow recording / scrubbing in preview
     showPlayhead: true,
     showGrid: true,
@@ -1311,6 +1317,7 @@ export const SECTION_DEFAULTS = {
   Kinetic: {
     _type: 'Kinetic',
     running: true,               // integrate the physics in preview / player
+    syncToTransport: false,      // advance in musical time (freezes when stopped)
     gravity: 0,                   // downward pull (0 = zero-g billiard)
     restitution: 0.92,           // wall bounce energy kept (1 = perpetual)
     friction: 0.04,              // air drag per second

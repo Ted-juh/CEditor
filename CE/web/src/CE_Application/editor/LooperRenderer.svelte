@@ -6,6 +6,7 @@
   // in-progress recording via Looper.__recLane / __recPoints.
   import {
     looperConfig, looperPhase, looperLanes, looperGeometry, laneRect, laneToPx,
+    looperGridLines,
     normalizeGesture, laneValueAt,
   } from '../utils/looperLayout.js';
   // Reuse the SAME major/minor tick generator the sliders use for value divisions.
@@ -28,6 +29,9 @@
   const LANE_PALETTE = ['rgba(57,217,138,1)', 'rgba(91,155,213,1)', 'rgba(242,153,74,1)', 'rgba(155,138,255,1)', 'rgba(242,201,76,1)', 'rgba(235,87,87,1)'];
 
   let cfg = $derived(looperConfig(control));
+  // Synced, the grid marks bars and beats rather than plain quarters. The meter
+  // arrives as __beatsPerBar from the preview surface (the transport owns it).
+  let gridLines = $derived(looperGridLines(control, cfg.__beatsPerBar ?? 4));
   let phase = $derived(looperPhase(control));
   let lanes = $derived(looperLanes(control));
   let geom = $derived(looperGeometry(width, height, Math.max(1, lanes.length), PAD));
@@ -77,8 +81,9 @@
   {#each rows as row (row.i)}
     <rect x={row.rect.x} y={row.rect.y} width={row.rect.w} height={row.rect.h} rx="6" fill={laneCss} stroke="rgba(0,0,0,0.5)" stroke-width="1" />
     {#if cfg.showGrid !== false}
-      {#each [0.25, 0.5, 0.75] as g (g)}
-        <line x1={row.rect.x + row.rect.w * g} y1={row.rect.y} x2={row.rect.x + row.rect.w * g} y2={row.rect.y + row.rect.h} stroke={gridCss} stroke-width="1" />
+      {#each gridLines as g (g.t)}
+        <line x1={row.rect.x + row.rect.w * g.t} y1={row.rect.y} x2={row.rect.x + row.rect.w * g.t} y2={row.rect.y + row.rect.h}
+              stroke={gridCss} stroke-width={g.major ? 1.5 : 1} opacity={g.major ? 1 : 0.55} />
       {/each}
       <line x1={row.rect.x} y1={row.rect.y + row.rect.h / 2} x2={row.rect.x + row.rect.w} y2={row.rect.y + row.rect.h / 2} stroke={gridCss} stroke-width="1" opacity="0.6" />
     {/if}

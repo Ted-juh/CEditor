@@ -4,6 +4,7 @@ import {
   kineticParams, kineticInitial, stepKinetic, kineticKick, kineticSpeed,
   kineticGeometry, kineticToPx, kineticFromPx, kineticPorts, kineticPortValues,
   KINETIC_MAX_SPEED,
+  kineticSynced,
 } from '../src/CE_Application/utils/kineticLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -71,4 +72,15 @@ test('static ports + fan-out values from injected state', () => {
   assert.ok(near(v.x, 0.3) && near(v.y, 0.8));
   assert.ok(near(v.speed, 1));
   assert.equal(v.bounce, 1);
+});
+
+test('sync is opt-in and does not change the physics itself', () => {
+  const kc = (c) => ({ _children: { Core: { controlType: 'Kinetic' }, Kinetic: c } });
+  assert.equal(kineticSynced(kc({})), false);
+  assert.equal(kineticSynced(kc({ syncToTransport: true })), true);
+  // The integrator is untouched by the flag — sync only changes what dt the
+  // preview surface hands it, which is the honest scope of the feature.
+  const params = kineticParams(kc({ syncToTransport: true, gravity: 1 }));
+  const plain = kineticParams(kc({ gravity: 1 }));
+  assert.deepEqual(params, plain);
 });

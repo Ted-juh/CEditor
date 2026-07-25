@@ -57,6 +57,7 @@
   import {
     looperConfig, looperLanes, looperGeometry, laneRect, laneAtPoint, pxToLane,
     recordAppend, normalizeGesture, looperLoopSeconds,
+    looperSynced, looperLoopBars,
   } from '../utils/looperLayout.js';
   import {
     routerConfig, routerCurvePoints, routerGeometry, routerHitNode, routerNodeFromPx,
@@ -68,14 +69,16 @@
   import {
     turingConfig, turingSteps, turingLength, turingStepIndex, turingGeometry,
     stepAtPoint, valueFromY, turingStepsPerSecond, mutateStep,
+    turingSynced, turingSyncedStepAt, turingSyncedPhaseAt,
   } from '../utils/turingLayout.js';
   import {
     kineticConfig, kineticParams, kineticInitial, kineticGeometry, kineticFromPx,
-    stepKinetic, kineticKick,
+    stepKinetic, kineticKick, kineticSynced,
   } from '../utils/kineticLayout.js';
   import {
     constellationConfig, constellationPresets, constellationGeometry,
     constellationHitPreset, constellationFromPx, wanderPos,
+    constellationSynced, constellationWanderBars,
   } from '../utils/constellationLayout.js';
   import {
     constraintConfig, constraintMembers, constraintMode, applyConstraint,
@@ -117,11 +120,13 @@
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
     transportSource as tpSource, tapTempo, crossedSteps,
+    cyclePhaseAt, musicalDelta,
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
     setTransportBpm, setTransportSource, setTransportClockOut,
     transportBeatsNow, isTransportRunning, transportBpmNow,
+    setTransportSignature, transportBeatsPerBar,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
@@ -1440,6 +1445,14 @@
       looperLastMs = now;
       for (const c of running) {
         const id = getControlId(c);
+        if (looperSynced(c)) {
+          // The loop point is the bar line: phase comes straight from the
+          // transport position, so a take recorded over two bars comes back
+          // over two bars however long it's been running.
+          looperPhaseState[id] = cyclePhaseAt(transportBeatsNow(), looperLoopBars(c), transportBeatsPerBar());
+          if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
+          continue;
+        }
         const prev = looperPhaseState[id] ?? looperPhaseFor(c);
         looperPhaseState[id] = (prev + dt / looperLoopSeconds(c)) % 1;
         // Don't fight a recording in progress on this control's lane.
@@ -1465,6 +1478,7 @@
     if (!looper) return resolved;
     if (looper.running !== false) { ensureLooperTicker(); void orbitClock; }
     const next = { ...looper, __phase: looperPhaseFor(control) };
+    if (looperSynced(control)) next.__beatsPerBar = $transport.beatsPerBar;
     const sess = sessionFor(control);
     if (typeof sess?.looperRecLane === 'number') { next.__recLane = sess.looperRecLane; next.__recPoints = sess.looperRecPoints ?? []; }
     return { ...resolved, control: { ...base, _children: { ...base._children, Looper: next } } };
@@ -1741,11 +1755,28 @@
       for (const c of running) {
         const id = getControlId(c);
         const len = turingLength(c);
-        const prev = turingPhaseState[id] ?? turingPhaseFor(c);
-        const phase = (prev + (turingStepsPerSecond(c) / len) * dt) % 1;
-        turingPhaseState[id] = phase;
+        let phase; let idx;
+        if (turingSynced(c)) {
+          // Position in, step out — same rule as the Arp. A stopped transport
+          // holds the register where it is rather than freezing it mid-mutation
+          // at some arbitrary point, because the step index is a function of
+          // the position and the position isn't moving.
+          const beats = transportBeatsNow();
+          phase = turingSyncedPhaseAt(beats, c);
+          idx = turingSyncedStepAt(beats, c);
+          turingPhaseState[id] = phase;
+          if (!isTransportRunning()) {
+            turingLastIdx[id] = idx;
+            emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
+            continue;
+          }
+        } else {
+          const prev = turingPhaseState[id] ?? turingPhaseFor(c);
+          phase = (prev + (turingStepsPerSecond(c) / len) * dt) % 1;
+          turingPhaseState[id] = phase;
+          idx = Math.max(0, Math.min(len - 1, Math.floor(phase * len)));
+        }
         // Mutate when the step index advances (skip while the user is editing it).
-        const idx = Math.max(0, Math.min(len - 1, Math.floor(phase * len)));
         if (turingLastIdx[id] !== idx) {
           turingLastIdx[id] = idx;
           if (!(turingDrag && turingDrag.id === id)) {
@@ -1831,6 +1862,7 @@
     if (extra) Object.assign(k, extra);
     return { ...control, _children: { ...control._children, Kinetic: k } };
   }
+  const kineticBeatsState = {};   // id -> last transport reading, for synced balls
   function pushKineticTrail(id, state) {
     const tr = kineticTrailMap[id] ?? [];
     tr.push({ x: state.x, y: state.y });
@@ -1852,7 +1884,20 @@
         if (kineticDrag && kineticDrag.id === id) continue; // driven by the fling drag
         const params = kineticParams(c);
         const prev = kineticStateMap[id] ?? kineticInitial(c);
-        let next = stepKinetic(prev, dt, params);
+        // Synced, the sim advances in MUSICAL time: the step is the beats that
+        // passed, converted at the 120bpm reference, so tempo scales the motion
+        // and a stopped transport freezes the ball. This one can't be made
+        // drift-free — it's an integrator, there's nothing to recompute from.
+        let step = dt;
+        if (kineticSynced(c)) {
+          const beats = transportBeatsNow();
+          const before = kineticBeatsState[id];
+          kineticBeatsState[id] = beats;
+          if (!isTransportRunning() || before === undefined) continue;
+          step = Math.min(0.05, musicalDelta(before, beats));
+          if (step <= 0) continue;
+        }
+        let next = stepKinetic(prev, step, params);
         // Keep-alive: a nearly-stalled ball gets a fresh random kick.
         if (params.keepAlive > 0 && Math.hypot(next.vx, next.vy) < 0.05) {
           next = { ...next, ...kineticKick(next, params.keepAlive, Math.random(), Math.random()) };
@@ -1957,8 +2002,11 @@
       for (const c of running) {
         const id = getControlId(c);
         if (constDrag && constDrag.id === id) continue;      // manual override
-        const rate = numberOr(constellationConfig(c).wanderRate, 0.08);
-        const phase = ((constPhaseState[id] ?? 0) + rate * dt) % 1;
+        // Synced, the wander cycle is a bar count: the probe reaches the same
+        // point of the field on the same bar every time round.
+        const phase = constellationSynced(c)
+          ? cyclePhaseAt(transportBeatsNow(), constellationWanderBars(c), transportBeatsPerBar())
+          : ((constPhaseState[id] ?? 0) + numberOr(constellationConfig(c).wanderRate, 0.08) * dt) % 1;
         constPhaseState[id] = phase;
         emitClockFanout(constControlWith(c, wanderPos(phase)), now, 'constellation');
       }
@@ -2653,12 +2701,15 @@
     const base = resolved?.control ?? control;
     const cfg = base?._children?.Transport;
     if (!cfg) return resolved;
-    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}`;
+    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`;
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
       if (tpSource(base) !== 'external') setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
+      // The meter has to reach the store, not just the readout: the components
+      // that loop in BARS ask the store how long a bar is.
+      setTransportSignature(numberOr(cfg.beatsPerBar, 4));
       if (cfg.runOnLoad === true && !isTransportRunning()) startTransport(0);
     }
     void $transport.seq;                       // re-render on every publish

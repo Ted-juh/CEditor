@@ -166,6 +166,18 @@ export function wanderPos(phase, ratio = 1.37) {
   };
 }
 
+// Tempo sync. The wander is a slow cycle across the field, so like the Looper
+// its unit is bars — long ones. Synced, the probe passes the same point of the
+// field on the same bar every time round, which turns an ambient drift into
+// something an arrangement can be written against.
+export function constellationSynced(control) {
+  return constellationConfig(control).syncToTransport === true;
+}
+export function constellationWanderBars(control) {
+  const n = num(constellationConfig(control).wanderBars, 8);
+  return n < 0.25 ? 0.25 : n > 64 ? 64 : n;
+}
+
 // --- Geometry ----------------------------------------------------------------
 export function constellationGeometry(width, height, pad = 10) {
   const p = Math.max(0, num(pad, 10));

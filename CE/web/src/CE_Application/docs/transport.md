@@ -110,10 +110,27 @@ seconds apart start a new measurement rather than averaging across the pause —
 otherwise the first tap after a break poisons the reading. Inactive when
 following an external clock, since there's nothing to tap.
 
-## What follows it: the Arpeggiator
+## What follows it
 
-Sync is off by default, so nothing changes until you ask for it. Turn
-**Timing → Sync to transport** on and the Arp's steps-per-second field is
+Five components can be put on the clock. Sync is off by default on every one of
+them, so nothing changes until you ask for it, and each keeps its free-running
+control for when you don't.
+
+| | unit | what sync gives you |
+|---|---|---|
+| [Arpeggiator](./arpeggiator.md) | note division | steps land on the beat |
+| [Turing Modulator](./turing-modulator.md) | note division | its *mutations* land on the beat |
+| [Gesture Looper](./gesture-looper.md) | bars | the loop point is the bar line |
+| [Preset Constellation](./preset-constellation.md) | bars | the wander cycle is an arrangement length |
+| [Kinetic Modulator](./kinetic-modulator.md) | musical time | tempo scales the motion; stop freezes it |
+
+Three different units, because these are three different kinds of thing. A
+sequencer has *steps*, so its unit is a note division. A loop has a *length*, so
+its unit is bars. And the Kinetic has neither — see below.
+
+### The Arpeggiator
+
+Turn **Timing → Sync to transport** on and the Arp's steps-per-second field is
 replaced by a **division** — 16ths, dotted 8ths, quarter triplets, and so on.
 
 The interesting part isn't the tempo, it's *how* it follows. The Arp doesn't get
@@ -135,6 +152,58 @@ because showing both would be two different answers to the same question.
 When the transport is stopped, a synced Arp holds its position and stays silent.
 That's what a stopped transport means.
 
+### The Turing Modulator
+
+The same step-from-position rule (`turingSyncedStepAt`), and sync is worth *more*
+here than on the Arp. The Turing's steps don't just play, they **mutate** as they
+recycle. A shift register that lands its changes on the beat sounds composed; the
+identical register free-running sounds like a fault. The header shows the
+division alongside the lock/evolve readout.
+
+Stopped, the register holds. It doesn't freeze mid-mutation at an arbitrary
+point, because the step index is a function of the position and the position
+isn't moving.
+
+### The Gesture Looper
+
+A take is a **loop**, so its unit is bars, not a note division — you record a
+shape over two bars and want it back over two bars. Synced, the phase comes from
+`cyclePhaseAt(beats, bars, beatsPerBar)`, so the loop point is the bar line
+rather than wherever you happened to be when you hit record, and the loop is
+still exactly on the bar an hour later.
+
+The lane grid changes too, and this is the part that makes it readable: instead
+of fixed quarters, the lines become **bar lines and beat lines** for the actual
+loop length and meter. A two-bar take in 4/4 draws seven interior lines with the
+bar line brighter. In 3/4 it draws two.
+
+`looperLoopSecondsAt(control, bpm, beatsPerBar)` gives the duration when
+something still needs one.
+
+### The Preset Constellation
+
+Bars again, but long ones — the wander is a slow drift across the preset map, so
+the default is 8 bars a cycle. Synced, the probe passes the same point of the
+field on the same bar every time round, which turns an ambient drift into
+something you can write an arrangement against.
+
+### The Kinetic Modulator — the one that doesn't fit
+
+Be clear about this one: the Kinetic is an **integrator, not a phase**. There is
+no closed form to recompute a bouncing ball from, so unlike everything else on
+this page it *cannot* be made drift-free. Two synced Kinetics will not stay in
+lockstep, and one that stalls will not re-align itself afterwards. Pretending
+otherwise would be the easy thing to write here and wrong.
+
+What sync does buy is real but narrower. The simulation advances in **musical
+time** — `musicalDelta(prevBeats, nextBeats)` converts transport travel into a
+simulation step at a 120bpm reference — so:
+
+- tempo scales the motion: double the BPM and the ball moves twice as fast;
+- a stopped transport freezes the ball mid-flight instead of letting it drift on;
+- at 120bpm it behaves exactly as it does unsynced, so turning sync on doesn't
+  silently change how an existing patch feels.
+
 ## Compatibility
 
 The clock itself is pure UI state and needs no device at all. Clock-out and
@@ -147,9 +216,12 @@ Nothing about the transport touches the DPD profile.
 
 ## Possible next steps
 
-- **Sync the rest of them** — the Looper's loop length in bars, the Turing's
-  clock, the Kinetic's step, the Constellation wander. The engine work is done;
-  each is the same three-part change the Arp got.
+- ~~**Sync the rest of them**~~ — **done**: the Turing, the Looper, the
+  Constellation and (with the caveat above) the Kinetic all follow the clock.
+  The [Orbit Modulator](./orbit-modulator.md) is the remaining self-clocked
+  component; its satellites each have their own speed, so syncing it means a
+  per-satellite division rather than one setting, which is why it's not in this
+  pass.
 - **Host tempo** — an exported VST3 can read the DAW's playhead. That's a third
   source alongside internal and external, and the obviously right default once
   it exists.

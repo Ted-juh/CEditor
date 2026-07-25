@@ -3,6 +3,8 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
   let { control = null } = $props();
 
@@ -38,9 +40,23 @@
     <PropertyCell label="Run" span={1} hint="Play the loops in preview / player.">
       <PropertyToggle value={lp.running !== false} onchange={() => set('running', !(lp.running !== false))} />
     </PropertyCell>
-    <PropertyCell label="Loop (s)" span={2} hint="Loop length in seconds — how long one pass around takes.">
-      <input class="val" type="number" min="0.1" max="60" step="0.1" value={lp.loopSeconds ?? 4} onchange={(e) => set('loopSeconds', Math.max(0.1, num(e.target.value, 4)))} />
-    </PropertyCell>
+    <TransportSyncCells
+      synced={lp.syncToTransport === true}
+      onchange={(v) => set('syncToTransport', v)}
+      span={2}
+      hint="Loop over a number of BARS instead of a number of seconds. The loop point becomes the bar line, so a take recorded over two bars comes back over two bars at any tempo."
+    >
+      {#snippet children()}
+        <PropertyCell label="Loop (bars)" span={2} hint="Loop length in bars. 0.25 = one beat in 4/4.">
+          <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="0.25" value={lp.loopBars ?? 2} onchange={(e) => set('loopBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 2))))} />
+        </PropertyCell>
+      {/snippet}
+    </TransportSyncCells>
+    {#if lp.syncToTransport !== true}
+      <PropertyCell label="Loop (s)" span={2} hint="Loop length in seconds — how long one pass around takes.">
+        <input class="val" type="number" min="0.1" max="60" step="0.1" value={lp.loopSeconds ?? 4} onchange={(e) => set('loopSeconds', Math.max(0.1, num(e.target.value, 4)))} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Record" span={1} hint="Press & move inside a lane in preview to record its motion.">
       <PropertyToggle value={lp.editable !== false} onchange={() => set('editable', !(lp.editable !== false))} />
     </PropertyCell>

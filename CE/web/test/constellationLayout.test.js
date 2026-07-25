@@ -7,6 +7,7 @@ import {
   constellationGeometry, constellationToPx, constellationFromPx, constellationHitPreset,
   constellationTargetPortId, parseConstellationTargetPort, constellationPorts, constellationPortValues,
   captureConstellationValues,
+  constellationSynced, constellationWanderBars,
 } from '../src/CE_Application/utils/constellationLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -111,4 +112,14 @@ test('dynamic ports + fan-out keyed by port id', () => {
   assert.equal(ports[0].label, 'Cutoff');
   const v = constellationPortValues(c);
   assert.ok(near(v.target_0, 0.5, 1e-3));
+});
+
+test('wander sync config clamps to a usable bar count', () => {
+  const cn = (c) => ({ _children: { Core: { controlType: 'Constellation' }, Constellation: c } });
+  assert.equal(constellationSynced(cn({})), false);
+  assert.equal(constellationSynced(cn({ syncToTransport: true })), true);
+  assert.equal(constellationWanderBars(cn({})), 8);
+  assert.equal(constellationWanderBars(cn({ wanderBars: 16 })), 16);
+  assert.equal(constellationWanderBars(cn({ wanderBars: 0 })), 0.25);
+  assert.equal(constellationWanderBars(cn({ wanderBars: 500 })), 64);
 });

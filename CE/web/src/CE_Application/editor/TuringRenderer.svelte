@@ -6,7 +6,7 @@
   // evolving register via Turing.__steps.
   import {
     turingConfig, turingSteps, turingLength, turingStepIndex, stepOutput, gateAt,
-    turingGeometry, stepRect,
+    turingGeometry, stepRect, turingSynced, turingDivisionLabel,
   } from '../utils/turingLayout.js';
   // Reuse the SAME major/minor tick generator the sliders use (pure — keyed only
   // on major/minor counts), so the value-scale divisions match across the app.
@@ -57,6 +57,7 @@
     return { i, v, r, isHead: i === head, gate: gateAt(steps, i, gateThresh) === 1 };
   }));
   let rnd = $derived(Math.max(0, Math.min(1, n(cfg.randomness, 0))));
+  let synced = $derived(turingSynced(control));
 </script>
 
 <svg class="turing" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
@@ -91,7 +92,7 @@
 
   <!-- lock ↔ evolve hint -->
   <text x={geom.x0 + geom.w} y={geom.y0 + 9} font-size="9" fill={labelCss} text-anchor="end" opacity="0.6">
-    {rnd <= 0.001 ? 'locked' : rnd >= 0.999 ? 'chaos' : `evolve ${Math.round(rnd * 100)}%`}
+    {synced ? `⧗ ${turingDivisionLabel(control)} · ` : ''}{rnd <= 0.001 ? 'locked' : rnd >= 0.999 ? 'chaos' : `evolve ${Math.round(rnd * 100)}%`}
   </text>
 </svg>
 

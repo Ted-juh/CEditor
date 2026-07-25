@@ -111,6 +111,47 @@ export function crossedSteps(prevBeats, nextBeats, division, maxSteps = 16) {
   for (let i = last - kept + 1; i <= last; i += 1) steps.push(i);
   return { steps, dropped: total - kept };
 }
+// --- Cycles -----------------------------------------------------------------
+// For the components whose "rate" is really a LOOP LENGTH rather than a step:
+// the Looper's take, the Constellation's wander. Expressed in bars, so the loop
+// lines up with the bar line instead of merely running at the right speed.
+export const MIN_BARS = 0.25;
+export const MAX_BARS = 64;
+export function cycleBeats(bars, beatsPerBar = 4) {
+  return Math.max(0.01, clampNum(bars, MIN_BARS, MAX_BARS) * Math.max(1, num(beatsPerBar, 4)));
+}
+// Phase 0..1 through a cycle at a transport position. Same rule as everything
+// else here: derived from the position, never accumulated, so a loop that has
+// been running for an hour is still exactly on the bar line.
+export function cyclePhaseAt(beats, bars, beatsPerBar = 4) {
+  const len = cycleBeats(bars, beatsPerBar);
+  return (((Math.max(0, num(beats, 0)) / len) % 1) + 1) % 1;
+}
+// How many whole cycles have completed — for anything that fires once a loop.
+export function cycleCountAt(beats, bars, beatsPerBar = 4) {
+  return Math.floor(Math.max(0, num(beats, 0)) / cycleBeats(bars, beatsPerBar));
+}
+// A bar count as a human string: "2 bars", "1/2 bar".
+export function barsLabel(bars) {
+  const b = clampNum(bars, MIN_BARS, MAX_BARS);
+  if (b >= 1) return `${Number.isInteger(b) ? b : b.toFixed(2).replace(/0+$/, '')} bar${b === 1 ? '' : 's'}`;
+  return `1/${Math.round(1 / b)} bar`;
+}
+
+// --- Musical time for continuous simulations ---------------------------------
+// The Kinetic Modulator is an integrator, not a clock — there is no closed form
+// to recompute its ball position from, so it cannot be made drift-free the way
+// a phase can. What it CAN do is advance in musical time instead of wall-clock:
+// a tempo change scales the motion, and a stopped transport freezes it. The
+// reference tempo makes the sync a no-op at 120bpm, so turning it on doesn't
+// silently change how an existing patch feels.
+export const REFERENCE_BPM = 120;
+export function musicalDelta(prevBeats, nextBeats, referenceBpm = REFERENCE_BPM) {
+  const d = num(nextBeats, 0) - num(prevBeats, 0);
+  if (!(d > 0)) return 0;
+  return d * secondsPerBeat(referenceBpm);
+}
+
 // Swing: push every odd step later, by up to half a step.
 export function swungBeatOffset(stepIndex, swing, division) {
   const s = clampNum(swing, 0, 1);

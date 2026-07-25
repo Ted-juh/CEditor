@@ -3,6 +3,8 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
 
   let { control = null } = $props();
 
@@ -45,9 +47,25 @@
     <PropertyCell label="Run" span={1} hint="Advance the sequence in preview / player.">
       <PropertyToggle value={tr.running !== false} onchange={() => set('running', !(tr.running !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rate" span={1} hint="Steps per second.">
-      <input class="val" type="number" min="0.1" max="30" step="0.5" value={tr.rate ?? 2} onchange={(e) => set('rate', Math.max(0.1, num(e.target.value, 2)))} />
-    </PropertyCell>
+    <TransportSyncCells
+      synced={tr.syncToTransport === true}
+      onchange={(v) => set('syncToTransport', v)}
+      span={1}
+      hint="Clock the sequence off the panel's Transport. A shift register that lands its mutations on the beat sounds composed; the same register free-running sounds like a fault."
+    >
+      {#snippet children()}
+        <PropertyCell label="Division" span={2} hint="Step length in musical time.">
+          <select class="val" value={String(tr.division ?? '1/8')} onchange={(e) => set('division', e.target.value)}>
+            {#each DIVISION_IDS as d (d)}<option value={d}>{d} · {DIVISION_LABELS[d]}</option>{/each}
+          </select>
+        </PropertyCell>
+      {/snippet}
+    </TransportSyncCells>
+    {#if tr.syncToTransport !== true}
+      <PropertyCell label="Rate" span={1} hint="Steps per second.">
+        <input class="val" type="number" min="0.1" max="30" step="0.5" value={tr.rate ?? 2} onchange={(e) => set('rate', Math.max(0.1, num(e.target.value, 2)))} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Length" span={2} hint="Loop length in steps (2–64).">
       <input class="val" type="number" min="2" max="64" step="1" value={tr.length ?? 8} onchange={(e) => setLength(e.target.value)} />
     </PropertyCell>

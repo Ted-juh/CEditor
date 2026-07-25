@@ -139,3 +139,38 @@ export function looperPortValues(control) {
 export function looperLoopSeconds(control) {
   return Math.max(0.05, num(looperConfig(control).loopSeconds, 4));
 }
+
+// Tempo sync. A gesture take is a LOOP, so its musical unit is bars, not a note
+// division — you record a shape over two bars and want it back over two bars.
+// The phase comes from the transport's position, so the loop point is the bar
+// line rather than "wherever it happened to be when you hit record".
+export function looperSynced(control) { return looperConfig(control).syncToTransport === true; }
+export function looperLoopBars(control) {
+  return clampBars(looperConfig(control).loopBars ?? 2);
+}
+function clampBars(v) {
+  const n = num(v, 2);
+  return n < 0.25 ? 0.25 : n > 64 ? 64 : n;
+}
+// The vertical grid inside a lane, as fractions 0..1 of the loop. Free-running
+// there's nothing musical to mark, so it stays at quarters. Synced, the lines
+// mean something: bar lines (major) and beat lines (minor), which is what makes
+// a two-bar take readable as two bars.
+export function looperGridLines(control, beatsPerBar = 4) {
+  if (!looperSynced(control)) return [{ t: 0.25 }, { t: 0.5 }, { t: 0.75 }].map((g) => ({ ...g, major: false }));
+  const perBar = Math.max(1, Math.round(num(beatsPerBar, 4)));
+  const bars = looperLoopBars(control);
+  const beats = Math.round(bars * perBar);
+  if (beats < 2 || beats > 64) return [{ t: 0.5, major: false }];
+  const out = [];
+  for (let i = 1; i < beats; i += 1) out.push({ t: i / beats, major: i % perBar === 0 });
+  return out;
+}
+
+// Loop length in seconds at a tempo — for the readout and for anything that
+// still needs a duration (the recording resampler does).
+export function looperLoopSecondsAt(control, bpm, beatsPerBar = 4) {
+  const b = num(bpm, 120);
+  if (!looperSynced(control) || !(b > 0)) return looperLoopSeconds(control);
+  return looperLoopBars(control) * Math.max(1, num(beatsPerBar, 4)) * (60 / b);
+}

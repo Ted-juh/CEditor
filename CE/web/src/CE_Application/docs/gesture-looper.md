@@ -54,6 +54,10 @@ alike it's comfortable. It only drives parameters the profile exposes.
 - **Record-any-control mode** — arm the Looper, then wiggle a *different* control
   and have the Looper capture that control's session stream (cross-control), on
   top of the current draw-in-lane mode.
-- **Tempo sync** — lock `loopSeconds` to host bars/beats and retrigger on
-  transport, instead of free-running seconds.
+- ~~**Tempo sync**~~ — **done**. *Looper → Sync to transport* swaps the
+  seconds field for a length in **bars** off the panel's
+  [Transport](./transport.md). The phase is derived from the transport
+  position, so the loop point is the bar line rather than wherever you were
+  when you hit record — and the lane grid switches from fixed quarters to the
+  real bar and beat lines for that length and meter.
 - **Per-lane quantize / smooth** — snap points to a grid, or slew the output.

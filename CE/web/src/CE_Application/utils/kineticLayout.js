@@ -32,6 +32,16 @@ export function kineticParams(control) {
   };
 }
 
+// Tempo sync. The Kinetic is an INTEGRATOR, not a phase — there's no closed
+// form to recompute the ball from, so unlike everything else on the clock it
+// can't be made drift-free. What sync buys here is real but narrower: the
+// simulation advances in musical time, so a tempo change scales the motion and
+// a stopped transport freezes the ball mid-flight. See transportLayout's
+// musicalDelta, and docs/transport.md, which says the same thing out loud.
+export function kineticSynced(control) {
+  return kineticConfig(control).syncToTransport === true;
+}
+
 // The seed state (a live __state override wins; else the config's initial).
 export function kineticInitial(control) {
   const cfg = kineticConfig(control);

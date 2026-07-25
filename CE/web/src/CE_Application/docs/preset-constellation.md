@@ -55,6 +55,11 @@ traffic); Blend/Wander are change-filtered like the other clock sources.
 
 ## Possible next steps
 
+- ~~**Tempo-synced wander**~~ — **done**. With Wander on, *Sync to transport*
+  times the cycle in **bars** off the panel's [Transport](./transport.md)
+  (8 by default) instead of cycles-per-second. The probe then reaches the same
+  point of the map on the same bar every time round, which turns an ambient
+  drift into something an arrangement can be written against.
 - **Device-runtime capture** — capture a star from the live hardware state, not
   just the panel's bound controls.
 - **True MDS layout** — replace the pivot projection with an iterative stress-

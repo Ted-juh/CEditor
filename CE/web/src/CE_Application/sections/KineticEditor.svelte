@@ -3,6 +3,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import TransportSyncCells from '../properties/TransportSyncCells.svelte';
 
   let { control = null } = $props();
 
@@ -31,6 +32,12 @@
     <PropertyCell label="Run" span={1} hint="Integrate the physics in preview / player.">
       <PropertyToggle value={k.running !== false} onchange={() => set('running', !(k.running !== false))} />
     </PropertyCell>
+    <TransportSyncCells
+      synced={k.syncToTransport === true}
+      onchange={(v) => set('syncToTransport', v)}
+      span={2}
+      hint="Advance the simulation in musical time: tempo scales the motion, and a stopped transport freezes the ball mid-flight. Unlike the other synced components this one is an integrator, not a phase — it can't be recomputed from the position, so it won't re-align itself after a stall. At 120bpm it behaves exactly as it does unsynced."
+    />
     <PropertyCell label="Fling" span={1} hint="Drag the ball to throw it in preview.">
       <PropertyToggle value={k.editable !== false} onchange={() => set('editable', !(k.editable !== false))} />
     </PropertyCell>
