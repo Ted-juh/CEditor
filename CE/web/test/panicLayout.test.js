@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   PANIC_SCOPES, panicScope, panicChannel, panicChannels, panicMessages,
   panicLabel, panicSummary, panicGeometry, panicHit, EMERGENCY_PANIC,
-  isEmergencyStopKey,
+  isEmergencyStopKey, panicCcMessages,
 } from '../src/CE_Application/utils/panicLayout.js';
 
 function pc(c) { return { _children: { Core: { controlType: 'Panic' }, Panic: c } }; }
@@ -113,4 +113,30 @@ test('other keys and key-repeat are ignored', () => {
   assert.equal(isEmergencyStopKey(key({ repeat: true })), false);    // holding it fires once
   assert.equal(isEmergencyStopKey(null), false);
   assert.equal(isEmergencyStopKey(undefined), false);
+});
+
+// --- the CC-only form (script command + code exports) ---------------------------
+
+test('the CC-only set keeps the same order, minus the bend', () => {
+  const one = panicCcMessages({ scope: 'channel', channel: 3 });
+  assert.deepEqual(one, [
+    { channel: 3, cc: 120 },   // sound off first, same reason as the button
+    { channel: 3, cc: 123 },
+    { channel: 3, cc: 121 },
+  ]);
+  // no pitch bend: CC 121 recentres it per spec, and no export target can send
+  // a bend message anyway
+  assert.equal(one.some((m) => m.cc === undefined), false);
+  assert.deepEqual(panicCcMessages({ scope: 'channel', channel: 3, resetControllers: false }),
+    [{ channel: 3, cc: 120 }, { channel: 3, cc: 123 }]);
+});
+
+test('the CC-only set covers all 16 channels by default', () => {
+  const all = panicCcMessages();
+  assert.equal(all.length, 16 * 3);
+  assert.equal(all[0].channel, 1);
+  assert.equal(all[all.length - 1].channel, 16);
+  assert.equal(new Set(all.map((m) => m.channel)).size, 16);
+  assert.deepEqual(panicCcMessages({ scope: 'channel', channel: 99 })[0].channel, 16);
+  assert.deepEqual(panicCcMessages({}), all);
 });

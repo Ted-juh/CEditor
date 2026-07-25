@@ -55,6 +55,29 @@ export function panicMessages(control) {
   return out;
 }
 
+// The CC-only form of the silence set, for callers that can only send CCs: the
+// `panic` script command, and every code-export target (their emitters know
+// sendCC and nothing else).
+//
+// Pitch bend is absent on purpose. Per the MIDI spec, CC 121 Reset All
+// Controllers already recentres pitch bend — the Panic *button* sends an
+// explicit bend message on top as belt-and-braces for devices that implement
+// 121 only partially. Emitting a `panic()` call that no target host defines
+// would cost export-safety on every language, and that is worth more than the
+// extra byte.
+export function panicCcMessages({ scope = 'all', channel = 1, resetControllers = true } = {}) {
+  const channels = String(scope) === 'channel'
+    ? [clampInt(channel, 1, 16)]
+    : Array.from({ length: 16 }, (_, i) => i + 1);
+  const out = [];
+  for (const ch of channels) {
+    out.push({ channel: ch, cc: 120 });          // all sound off, first
+    out.push({ channel: ch, cc: 123 });          // then all notes off
+    if (resetControllers !== false) out.push({ channel: ch, cc: 121 });
+  }
+  return out;
+}
+
 // The config the EMERGENCY paths use — the Esc key and auto-panic on exit.
 // Deliberately not any placed Panic button's config: someone may have set one
 // up as a narrow "drums off, ch 10" button, and an emergency that only silences

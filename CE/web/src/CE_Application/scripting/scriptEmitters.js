@@ -1,4 +1,5 @@
 import { SCRIPT_TARGETS, commandDescriptor, portabilityForScript } from './scriptCommandRegistry.js';
+import { panicCcMessages } from '../utils/panicLayout.js';
 import { expressionToText } from './scriptExpressions.js';
 
 function indent(text, spaces = 2) {
@@ -84,6 +85,7 @@ function emitLuaStep(step, lines) {
   else if (command === 'startTimer') lines.push(`  startTimer(${quoted(args.id)}, ${Number(args.ms) || 0})`);
   else if (command === 'stopTimer') lines.push(`  stopTimer(${quoted(args.id)})`);
   else if (command === 'emitEvent') lines.push(`  emitEvent(${quoted(args.event)}, ${quoted(args.target ?? '')}, ${luaExpression(args.value ?? { ref: 'event.value' })})`);
+  else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC(${m.channel}, ${m.cc}, 0)`); }
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
@@ -117,6 +119,7 @@ function ceStep(step) {
   if (command === 'startTimer') return `startTimer ${args.id} ${args.ms}ms`;
   if (command === 'stopTimer') return `stopTimer ${args.id}`;
   if (command === 'emitEvent') return `emitEvent ${args.event} target=${args.target ?? ''} value=${valueText(args.value ?? { ref: 'event.value' }, 'ce')}`;
+  if (command === 'panic') return panicStepMessages(args).map((m) => `sendCC channel=${m.channel} cc=${m.cc} value=0`).join('\n  ');
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
@@ -156,6 +159,7 @@ function emitJsLike(script, target) {
     else if (command === 'startTimer') lines.push(`  startTimer("${args.id}", ${Number(args.ms) || 0});`);
     else if (command === 'stopTimer') lines.push(`  stopTimer("${args.id}");`);
     else if (command === 'emitEvent') lines.push(`  emitEvent("${args.event}", { target: "${args.target ?? ''}", value: ${valueText(args.value ?? { ref: 'event.value' }, target)} });`);
+    else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC({ channel: ${m.channel}, cc: ${m.cc}, value: 0 });`); }
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);
@@ -190,6 +194,7 @@ function emitPython(script) {
     else if (step.command === 'showGroup') lines.push(`    show_group("${args.group}")`);
     else if (step.command === 'hideGroup') lines.push(`    hide_group("${args.group}")`);
     else if (step.command === 'setPanelState') lines.push(`    set_panel_state("${args.state}")`);
+    else if (step.command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`    send_cc(channel=${m.channel}, cc=${m.cc}, value=0)`); }
     else if (step.command === 'sendCC') lines.push(`    send_cc(channel=${args.channel}, cc=${args.cc}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendNRPN') lines.push(`    send_nrpn(channel=${args.channel}, parameter_msb=${args.parameterMsb}, parameter_lsb=${args.parameterLsb}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendSysex') lines.push(`    send_sysex([${(args.bytes ?? []).join(', ')}])`);
@@ -469,6 +474,7 @@ function emitNative(script, target) {
     else if (step.command === 'startTimer') lines.push(`  ${cfg.startTimer}(${cfg.string(args.id)}, ${Number(args.ms) || 0})${cfg.lineEnd}`);
     else if (step.command === 'stopTimer') lines.push(`  ${cfg.stopTimer}(${cfg.string(args.id)})${cfg.lineEnd}`);
     else if (step.command === 'emitEvent') lines.push(`  ${cfg.emitEvent}(${cfg.string(args.event)}, ${cfg.string(args.target ?? '')}, ${nativeExpression(args.value ?? { ref: 'event.value' }, cfg, target)})${cfg.lineEnd}`);
+    else if (step.command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  ${cfg.sendCC}(${m.channel}, ${m.cc}, 0)${cfg.lineEnd}`); }
     else if (step.command === 'sendCC') lines.push(`  ${cfg.sendCC}(${Number(args.channel) || 1}, ${Number(args.cc) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendNRPN') lines.push(`  ${cfg.sendNRPN}(${Number(args.channel) || 1}, ${Number(args.parameterMsb) || 0}, ${Number(args.parameterLsb) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendSysex') lines.push(`  ${cfg.sendSysex}(${cfg.bytes(args.bytes ?? [])})${cfg.lineEnd}`);
@@ -490,6 +496,15 @@ function emitHtml(script) {
 
 function emitCss(script) {
   return `.ce-script-${script.id} {\n  --script-event: "${script.event}";\n  --script-target: "${script.target}";\n}`;
+}
+
+// Every code target knows sendCC and nothing else, so `panic` is emitted as the
+// CC sequence it stands for rather than as a call no host would define. Keeps
+// the command export-safe on all of them.
+function panicStepMessages(args) {
+  return panicCcMessages({
+    scope: args?.scope, channel: args?.channel, resetControllers: args?.resetControllers !== false,
+  });
 }
 
 export function exportWarningsForScript(script) {

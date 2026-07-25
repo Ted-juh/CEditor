@@ -64,9 +64,34 @@ Someone may have set one up as a narrow "drums off, ch 10"; an emergency that
 silences a third of the rig is worse than useless. Esc also flashes any Panic
 buttons on the panel, so the connection is visible.
 
+## From a script
+
+Any button can fire one: `panic` is a command in the Scripts graph
+(`scripting/scriptCommandRegistry.js`), so a Program Change button can silence the rig
+on the way to the next patch, or an `onPress` route can stop everything before
+doing something else.
+
+    on panicBtn.onPress:
+      panic scope=all resetControllers=true
+
+It takes `scope`, `channel` and `resetControllers` — but **not** `centreBend`,
+and that is a deliberate trade. Every export target's emitter knows `sendCC`
+and nothing else, so emitting a `panic()` call would produce exported code
+calling a function no host defines, costing export-safety in eleven languages.
+Instead the command **expands into the CC sequence it stands for**, through the
+same `panicCcMessages` the button uses — so the sound-off-before-notes-off
+guarantee holds identically, and the exported Lua / JS / Python / C++ is three
+ordinary `sendCC` calls. Per the MIDI spec CC 121 already recentres pitch bend;
+the button's explicit bend message is belt-and-braces for devices that
+implement 121 only partially.
+
+The JSON export keeps the `panic` step intact, since that is the round-trip
+format. The text targets expand.
+
 ## How it works
 
-- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 11 tests):
+- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 13 tests,
+  plus `test/scriptPanic.test.js` for the script command end to end):
   the channel list, the message set with its optional parts, the label and the
   summary line, and the button geometry. The message *sequence* is what's
   tested — it's the whole behaviour.
@@ -93,7 +118,6 @@ buttons on the panel, so the connection is visible.
 
 - ~~Keyboard shortcut~~ — **done**: Esc, see above.
 - ~~Auto-panic on preview exit~~ — **done**, see above.
-- **Panic from a script** — the Scripts command graph could expose it as an
-  action, so any button could fire one.
+- ~~Panic from a script~~ — **done**, see above.
 - **A configurable shortcut** — Esc is hard-wired; some rigs will already have
   it bound to something.

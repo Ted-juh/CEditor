@@ -262,6 +262,22 @@ export const SCRIPT_COMMANDS = [
     description: 'Queue a MIDI CC message.',
   },
   {
+    id: 'panic',
+    label: 'panic',
+    category: 'MIDI / Device',
+    // Just CC 120/123/121 — the most standard messages in MIDI, so it exports
+    // cleanly everywhere. See panicCcMessages for why pitch bend is left out.
+    portable: true,
+    exportSafe: true,
+    scopes: ['panel', 'device'],
+    args: [
+      { name: 'scope', type: 'string', default: 'all' },
+      { name: 'channel', type: 'number', default: 1 },
+      { name: 'resetControllers', type: 'boolean', default: true },
+    ],
+    description: 'Silence the rig: all sound off, all notes off, optionally reset controllers.',
+  },
+  {
     id: 'sendNRPN',
     label: 'sendNRPN',
     category: 'MIDI / Device',

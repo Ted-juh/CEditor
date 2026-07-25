@@ -1,4 +1,5 @@
 import { commandDescriptor } from './scriptCommandRegistry.js';
+import { panicCcMessages } from '../utils/panicLayout.js';
 import { evaluateExpression, readPath } from './scriptExpressions.js';
 
 const DEFAULT_GUARDRAILS = {
@@ -227,6 +228,20 @@ function runStep(step, context, output, index) {
     };
     output.events.push(event);
     output.trace.push({ time: nowStamp(index), type: 'EVENT', message: `emit ${event.name} ${event.target} value=${formatValue(event.value)}` });
+    return { continue: true };
+  }
+
+  if (command === 'panic') {
+    // Expanded through the same pure function the Panic button uses, so the
+    // order guarantee (sound-off BEFORE notes-off) holds for scripts too.
+    const messages = panicCcMessages({
+      scope: args.scope, channel: args.channel, resetControllers: args.resetControllers !== false,
+    });
+    for (const m of messages) {
+      output.deviceMessages.push({ type: 'cc', channel: m.channel, cc: m.cc, value: 0, phase, queued: !shouldEmit });
+    }
+    const where = String(args.scope ?? 'all') === 'channel' ? `ch${Number(args.channel) || 1}` : 'all channels';
+    output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `panic ${where} (${messages.length} messages)${shouldEmit ? '' : ' queued until commit'}` });
     return { continue: true };
   }
 
