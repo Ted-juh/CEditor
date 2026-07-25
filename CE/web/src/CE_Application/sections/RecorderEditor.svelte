@@ -13,6 +13,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import SongChainCells from '../properties/SongChainCells.svelte';
 
   let { control = null } = $props();
 
@@ -230,6 +231,19 @@
           </div>
         {/each}
       </div>
+    </PropertyCell>
+    <SongChainCells
+      chain={p.chain ?? []}
+      slotNames={Array.from({ length: MAX_SLOTS }, (_, i) => slots[i]?.name ?? `Take ${i + 1}`)}
+      enabled={p.chainOn === true}
+      loop={p.chainLoop !== false}
+      unit="lap"
+      onchange={(next) => set('chain', next)}
+      ontoggle={(v) => set('chainOn', v)}
+      onloop={(v) => set('chainLoop', v)}
+    />
+    <PropertyCell label="" span={4} hint="">
+      <div class="note">A chain never advances while recording — swapping the take out from under a pass would lose it.</div>
     </PropertyCell>
   </PropertySection>
 

@@ -271,6 +271,14 @@ ties — which was the previous answer, and a worse one.
 The inspector lists every cell doing something other than playing normally, so
 you can find what you set without hunting the grid.
 
+## Song mode
+
+Patterns can be stored in eight slots and **chained** — intro once, verse twice,
+chorus — with the chain engine shared with the [Phrase Recorder](./phrase-recorder.md).
+A chain link's repeat count is in *passes of that slot*, so a 16-step verse and a
+32-step chorus can sit in one chain and each `×2` means what you'd expect. See
+[song-mode.md](./song-mode.md).
+
 ## What it doesn't do
 
 Named honestly, because each of these is a thing someone will look for:
@@ -278,5 +286,4 @@ Named honestly, because each of these is a thing someone will look for:
 - **One pattern, no chaining.** There is no song mode, no A/B, no pattern queue.
   A script can swap the seed on a footswitch, which covers the live case; it
   does not cover writing a verse and a chorus.
-- **One pattern per sequencer.** Chaining lives on the Transport's song chain
-  rather than here — see [song-mode.md](./song-mode.md).
+- **A chain is flat.** A link points at a pattern slot, not at another chain.

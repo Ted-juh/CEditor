@@ -6,7 +6,9 @@
     hiddenCellCount, trimPattern, rowToNote, rowLabel, noteLabel, phraseUseFlats,
     phraseMode, cellsInStep, MIN_STEPS, MAX_STEPS, MIN_ROWS, MAX_ROWS,
     cellAt, setCell, cellChance, cellRatchet, cellLength, MAX_RATCHET,
+    phrasePatterns, phrasePatternNames, storePattern, loadPattern, MAX_PATTERNS,
   } from '../utils/phraseLayout.js';
+  import SongChainCells from '../properties/SongChainCells.svelte';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -94,6 +96,14 @@
       }
       return out.sort();
     } catch { return []; }
+  });
+
+  let patterns = $derived.by(() => { try { return phrasePatterns(control); } catch { return []; } });
+  let patternNames = $derived.by(() => {
+    const names = patterns.map((x) => x.name);
+    // The chain picks from slots that may not exist yet, so it always offers
+    // the full set rather than only the filled ones.
+    return Array.from({ length: MAX_PATTERNS }, (_, i) => names[i] ?? `Pattern ${i + 1}`);
   });
 
   function applySeed(id) {
@@ -270,6 +280,32 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Patterns & song">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies, so editing the grid never rewrites a stored pattern behind your back.">
+      <div class="slots">
+        {#each Array.from({ length: MAX_PATTERNS }, (_, i) => i) as i (i)}
+          {@const filled = patterns[i] && Object.keys(patterns[i].cells).length}
+          <div class="slot" class:filled>
+            <span class="sn">{i + 1}</span>
+            <button type="button" class="seed" onclick={() => set('patterns', storePattern(patterns, i, phrasePattern(control)))}>Store</button>
+            <button type="button" class="seed" disabled={!filled} onclick={() => set('pattern', loadPattern(patterns, i))}>Load</button>
+            <span class="sc">{filled || '—'}</span>
+          </div>
+        {/each}
+      </div>
+    </PropertyCell>
+    <SongChainCells
+      chain={p.chain ?? []}
+      slotNames={patternNames}
+      enabled={p.chainOn === true}
+      loop={p.chainLoop !== false}
+      unit="pass"
+      onchange={(next) => set('chain', next)}
+      ontoggle={(v) => set('chainOn', v)}
+      onloop={(v) => set('chainLoop', v)}
+    />
+  </PropertySection>
+
   <PropertySection title="Appearance">
     <PropertyCell label="Face" span={1} hint=""><input class="col" type="color" value={colRgb(p.faceColour, 'FF141420')} oninput={(e) => setCol('faceColour', p.faceColour, e.target.value)} /></PropertyCell>
     <PropertyCell label="Empty cell" span={1} hint=""><input class="col" type="color" value={colRgb(p.cellColour, 'FF20202C')} oninput={(e) => setCol('cellColour', p.cellColour, e.target.value)} /></PropertyCell>
@@ -287,6 +323,12 @@
   .pair { display: flex; gap: 4px; }
   .pair .val:first-child { width: 58px; flex: none; }
   .seeds { display: flex; flex-wrap: wrap; gap: 5px; }
+  .slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .slot { display: flex; align-items: center; gap: 4px; border: 1px solid #2a2a36; border-radius: 4px; padding: 3px 5px; background: #12121a; }
+  .slot.filled { border-color: #3a3a48; }
+  .sn { font-size: 10.5px; color: #7a7a84; width: 10px; }
+  .sc { font-size: 10.5px; color: #7a7a84; margin-left: auto; }
+  .seed:disabled { opacity: 0.4; cursor: default; }
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .seed:hover { border-color: #4a4a58; color: #E8E8EE; }
   .link { background: none; border: none; color: #8FC7F5; font-size: 11px; padding: 0 0 0 4px; cursor: pointer; text-decoration: underline; }

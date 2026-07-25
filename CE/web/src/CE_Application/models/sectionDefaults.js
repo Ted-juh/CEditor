@@ -1275,6 +1275,10 @@ export const SECTION_DEFAULTS = {
     syncToTransport: false,
     division: '1/16',            // step length when synced
     accentEvery: 4,              // draw a bar line every N steps
+    patterns: [],                // stored patterns, for the song chain
+    chain: [],                   // { slot, repeats } — see songChain.js
+    chainOn: false,
+    chainLoop: true,
     // Sparse map keyed "step:row" — resizing the grid never destroys anything.
     pattern: {
       '0:0': { velocity: null, tie: false },
@@ -1377,6 +1381,9 @@ export const SECTION_DEFAULTS = {
     countIn: 0,                  // bars to wait after arming before capturing
     slot: 0,                     // which take slot is live
     slots: [],                   // stored takes — a copy in each direction
+    chain: [],                   // { slot, repeats } — the same engine the Phrase uses
+    chainOn: false,
+    chainLoop: true,
     syncToTransport: false,
     bars: 2,                     // loop length when synced
     seconds: 4,                  // loop length free-running

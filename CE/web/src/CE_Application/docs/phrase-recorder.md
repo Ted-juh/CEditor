@@ -175,6 +175,15 @@ one that worked. Storing and loading are **copies in each direction** — a
 reference would mean editing the live take silently rewrote the stored one, which
 is the kind of bug you only notice after you've lost the good take.
 
+## Song mode
+
+Takes can be **chained** — take 1 twice, take 2, take 3 — using the same engine
+the [Phrase Sequencer](./phrase-sequencer.md) chains patterns with. See
+[song-mode.md](./song-mode.md).
+
+The chain **never advances while recording.** Swapping the take out from under a
+pass would lose it, which is the one thing a recorder must not do.
+
 ## Driving it from a script
 
 A big Record button on a panel is an obvious thing to want, and it needs the

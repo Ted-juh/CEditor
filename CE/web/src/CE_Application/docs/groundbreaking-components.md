@@ -193,6 +193,20 @@ not DSP:
   changing, so pedal, click, script and hand edit are one path. See
   [setlist.md](./setlist.md).
 
+### 00m. Song mode — a chain of patterns — **shipped 🟢**
+- An ordered list of stored slots with repeat counts, shared by the
+  [Phrase Sequencer](./phrase-sequencer.md) (chaining patterns) and the
+  [Phrase Recorder](./phrase-recorder.md) (chaining takes) — one engine, because
+  a sequence of things with repeat counts is the same object either way and
+  building it twice is how two components end up disagreeing about what "three
+  bars in" means. The position is a **pure function of a rising lap counter**,
+  the same rule the transport's position and the step index follow: nothing
+  drifts, nothing sticks, and there is no "advance" call that could be missed or
+  double-fired. A repeat of zero is refused (a link that never plays and never
+  advances is an infinite loop), a disabled link is **skipped** rather than
+  played for zero laps, and a one-shot chain **holds on its last link** rather
+  than wrapping or going silent. See [song-mode.md](./song-mode.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

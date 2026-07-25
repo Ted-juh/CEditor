@@ -465,6 +465,45 @@ export function phraseSeedPattern(seedId, steps, rows, roll = () => 0.5) {
   }
 }
 
+// --- Pattern slots and the song chain ------------------------------------------------
+// The chain itself lives in songChain.js, shared with the Recorder — a sequence
+// of things with repeat counts is the same object whether the things are
+// patterns or takes, and building it twice is how the two end up disagreeing.
+// This is only the part that is specific to patterns.
+export const MAX_PATTERNS = 8;
+
+export function phrasePatterns(control) {
+  const raw = phraseConfig(control).patterns;
+  return (Array.isArray(raw) ? raw : []).slice(0, MAX_PATTERNS).map((p, i) => ({
+    id: String(p?.id ?? `pat_${i + 1}`),
+    name: String(p?.name ?? `Pattern ${i + 1}`),
+    cells: p?.cells && typeof p.cells === 'object' && !Array.isArray(p.cells) ? p.cells : {},
+  }));
+}
+export function phrasePatternNames(control) { return phrasePatterns(control).map((p) => p.name); }
+export function phraseChainOn(control) { return phraseConfig(control).chainOn === true; }
+export function phraseChainLoops(control) { return phraseConfig(control).chainLoop !== false; }
+// Store the live pattern into a slot. A copy, for the reason the Recorder's
+// slots are: otherwise editing the grid would silently rewrite the stored one.
+export function storePattern(patterns, index, pattern, name = null) {
+  const list = phrasePatterns({ _children: { Phrase: { patterns } } });
+  const i = Math.round(num(index, 0));
+  if (i < 0 || i >= MAX_PATTERNS) return list;
+  const next = list.slice();
+  while (next.length <= i) next.push({ id: `pat_${next.length + 1}`, name: `Pattern ${next.length + 1}`, cells: {} });
+  next[i] = { ...next[i], name: name ?? next[i].name, cells: { ...(pattern ?? EMPTY_PATTERN) } };
+  return next;
+}
+export function loadPattern(patterns, index) {
+  const list = phrasePatterns({ _children: { Phrase: { patterns } } });
+  const i = Math.round(num(index, 0));
+  if (i < 0 || i >= list.length) return EMPTY_PATTERN;
+  // Deep enough: each cell is a flat object, so one level of copy is a real one.
+  const out = {};
+  for (const [k, v] of Object.entries(list[i].cells)) out[k] = { ...v };
+  return out;
+}
+
 // --- Driving it from a script -------------------------------------------------------------
 // A sequencer you can't re-point mid-song is half a sequencer: the whole reason
 // to have one on a panel is that a footswitch can swap the riff, drop it a

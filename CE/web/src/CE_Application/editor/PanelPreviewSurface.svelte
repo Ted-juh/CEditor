@@ -126,13 +126,15 @@
     stepAtIndex as phraseStepAt, EMPTY_SOUNDING as PHRASE_EMPTY,
     playStep as phrasePlayStep, releaseAll as phraseReleaseAll,
     phraseBeatsPerStep, tiesForward, phraseSwingSeconds, ratchetOffsets, noteGateSeconds,
+    phraseChainOn, phraseChainLoops, loadPattern,
   } from '../utils/phraseLayout.js';
+  import { slotForLap, chainSwitches } from '../utils/songChain.js';
   import {
     recorderConfig, recorderState, recorderTake, recorderChannel, recorderPlaying,
     recorderSynced, recorderBars, recorderLoopSeconds, isRecordingState,
     recordNoteOn, recordNoteOff, closeOpenNotes, takeIsEmpty, nextPassFor,
     eventsInWindow, eventSeconds, playedNote, playedVelocity,
-    onLoopBoundary, toggleRecordState, phaseAtTime, countInLaps,
+    onLoopBoundary, toggleRecordState, phaseAtTime, countInLaps, loadSlot,
   } from '../utils/noteRecorderLayout.js';
   import { noteOutputEvents, publishNoteOutput, noteOutputFromBytes } from '../stores/noteOutput.js';
   import {
@@ -3041,6 +3043,7 @@
   const recorderHeldNotes = {};   // id -> Set of input notes seen held last time
   const recorderTapSeen = {};     // id -> noteOutputEvents.seq consumed
   const recorderArmedLaps = {};   // id -> laps spent armed, for the count-in
+  const recorderChainLap = {};    // id -> the chain lap we last resolved
   const recorderJumpState = {};   // id -> transport jump counter seen
   const recorderBeatsState = {};
   let recorderTickerRunning = false;
@@ -3211,6 +3214,7 @@
           next = ((prev + dt / Math.max(0.05, loopSecs)) % 1 + 1) % 1;
         }
         recorderPhaseState[id] = next;
+        if (next < prev) pumpRecorderChain(c, id);
         // The seam. Everything that has to happen exactly once per lap happens
         // here: the arm→record promotion, the once-through stop, and the commit.
         if (next < prev) {
@@ -3236,6 +3240,25 @@
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+  // Song mode for the recorder: the same chain engine, pointed at take slots
+  // instead of patterns. A chain never runs while recording — swapping the take
+  // out from under a pass would lose it.
+  function pumpRecorderChain(control, id) {
+    if (recorderConfig(control).chainOn !== true) return;
+    if (isRecordingState(recorderState(control))) return;
+    const chain = recorderConfig(control).chain;
+    if (!Array.isArray(chain) || !chain.length) return;
+    const loop = recorderConfig(control).chainLoop !== false;
+    const lap = (recorderChainLap[id] ?? -1) + 1;
+    const seen = recorderChainLap[id];
+    recorderChainLap[id] = lap;
+    if (seen !== undefined && !chainSwitches(chain, seen, lap, loop)) return;
+    const slot = slotForLap(chain, lap, loop);
+    if (slot === null) return;
+    const take = loadSlot(recorderConfig(control).slots, slot);
+    recorderAllOff(control);
+    setLiveTake(control, take);
   }
   // Recording just ended: close anything held and write the take to the model.
   function recorderAllOffPending(control) {
@@ -3292,6 +3315,7 @@
   const phraseJumpState = {};     // id -> transport jump counter seen
   const phraseFreeIndex = {};     // id -> free-running index accumulator
   const phraseTimers = {};        // id -> [timeoutId…] for gate note-offs
+  const phraseChainLap = {};      // id -> the chain lap we last resolved
   let phraseTickerRunning = false;
   let phraseLastMs = 0;
   function isPhraseControl(control) {
@@ -3407,9 +3431,10 @@
           const prev = phraseBeatsState[id];
           phraseBeatsState[id] = beats;
           if (jumped || prev === undefined || !isTransportRunning()) { phraseIndexState[id] = index; continue; }
-          if (index !== phraseIndexState[id]) phraseFireIndex(c, index, transportBpmNow());
+          if (index !== phraseIndexState[id]) { pumpPhraseChain(c, id, index); phraseFireIndex(c, index, transportBpmNow()); }
           continue;
         }
+        pumpPhraseChain(c, id);
         const next = (phraseFreeIndex[id] ?? 0) + phraseRate(c) * dt;
         phraseFreeIndex[id] = next;
         const index = Math.floor(next);
@@ -3419,6 +3444,27 @@
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
+  }
+  // Song mode. A lap is one complete pass of the pattern, so the chain advances
+  // on the pattern's own length rather than on a separate counter — a chain
+  // link of "2" means two passes of whatever is in that slot, whatever length
+  // that slot happens to be.
+  function pumpPhraseChain(control, id, index = null) {
+    if (!phraseChainOn(control)) return;
+    const chain = phraseConfig(control).chain;
+    if (!Array.isArray(chain) || !chain.length) return;
+    const idx = index === null ? Math.floor(phraseFreeIndex[id] ?? 0) : index;
+    const lap = Math.floor(idx / Math.max(1, phraseSteps(control)));
+    const seen = phraseChainLap[id];
+    phraseChainLap[id] = lap;
+    if (seen === lap) return;
+    // Only swap when the SLOT changes. Reloading the same pattern every lap
+    // would throw away any edit made while it was playing.
+    if (seen !== undefined && !chainSwitches(chain, seen, lap, phraseChainLoops(control))) return;
+    const slot = slotForLap(chain, lap, phraseChainLoops(control));
+    if (slot === null) return;
+    const cells = loadPattern(phraseConfig(control).patterns, slot);
+    patchControlSession(id, { phrasePattern: cells });
   }
   function applyPhraseValueSource(control, resolved) {
     if (!isPhraseControl(control)) return resolved;
