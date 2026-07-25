@@ -53,6 +53,7 @@
   import { macroConfig, macroValue, macroGeometry, macroKnobHit } from '../utils/macroLayout.js';
   import {
     orbitConfig, orbitNodes, orbitGeometry, orbitHitNode, pxToOrbit, nodeAngle,
+    orbitSynced, orbitCycleBars,
   } from '../utils/orbitLayout.js';
   import {
     looperConfig, looperLanes, looperGeometry, laneRect, laneAtPoint, pxToLane,
@@ -1302,9 +1303,15 @@
       orbitLastMs = now;
       for (const c of running) {
         const id = getControlId(c);
-        const rate = numberOr(orbitConfig(c).rate, 0.25);
-        const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
-        orbitPhaseState[id] = (prev + rate * dt) % 1;
+        if (orbitSynced(c)) {
+          // One cycle = N bars. Every satellite's `ratio` is turns per cycle,
+          // so the whole constellation inherits the tempo from this one number.
+          orbitPhaseState[id] = cyclePhaseAt(transportBeatsNow(), orbitCycleBars(c), transportBeatsPerBar());
+        } else {
+          const rate = numberOr(orbitConfig(c).rate, 0.25);
+          const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
+          orbitPhaseState[id] = (prev + rate * dt) % 1;
+        }
         emitClockFanout(orbitControlWith(c, orbitPhaseState[id]), now, 'orbit');
       }
       orbitClock = now;

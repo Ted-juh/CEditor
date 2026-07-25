@@ -21,7 +21,7 @@ phase-offset pair, invert one for a counter-sweep.
 
 ## How it works
 
-- **Pure engine** `utils/orbitLayout.js` (+ `test/orbitLayout.test.js`, 10 tests):
+- **Pure engine** `utils/orbitLayout.js` (+ `test/orbitLayout.test.js`, 11 tests):
   a global `phase` (0–1, looping) is the clock. Each satellite has a `radius`
   (0–1), a base `angle`, a `ratio` (orbits per global cycle; sign = direction),
   an `output` mode and a `depth`. `nodeAngle`/`nodePos` place it; `nodeToPx`/
@@ -38,7 +38,8 @@ phase-offset pair, invert one for a counter-sweep.
   generates one `node_N` port per satellite (like the Mod Matrix / Macro), so the
   DeviceBindings editor lists every satellite.
 - **Self-running clock** (`PanelPreviewSurface`) — a lazy rAF ticker advances
-  each running Orbit's phase by `rate·dt`, re-renders, and **fans out every
+  each running Orbit's phase by `rate·dt` (or, when synced, reads it straight off
+  the [Transport](./transport.md) position — see below), re-renders, and **fans out every
   satellite's value** to its bound parameter. It self-stops when no running Orbit
   remains (the Meter peak-hold pattern). Because the exported **Player mounts the
   same surface** (with `dryRun=false`), the Orbit runs as a **live modulation
@@ -48,8 +49,14 @@ phase-offset pair, invert one for a counter-sweep.
   Satellites can also be **dragged** to a new radius/angle (its base angle is
   back-solved so it sits under the cursor at the current phase), committed on
   release.
-- **`OrbitEditor.svelte`** — a Run toggle + global Rate + display toggles, and a
-  satellite table (label · colour · on/off · radius% · angle° · speed · output ·
+- **Tempo sync** — *Sync to transport* replaces the global Rate with a cycle
+  length in **bars**. No per-satellite setting was needed, and that's the neat
+  part: `ratio` is *already* turns per global cycle, so giving the cycle a
+  musical length hands every satellite a musical rate at once. The ratios
+  between satellites were always exact — they just had nothing to be exact
+  *against*.
+- **`OrbitEditor.svelte`** — a Run toggle + global Rate (or bar count when
+  synced) + display toggles, and a satellite table (label · colour · on/off · radius% · angle° · speed · output ·
   depth% · invert · add/remove).
 
 ## Why it fits this substrate
@@ -62,8 +69,12 @@ stays declarative and the engine stays pure and testable.
 
 ## Possible next steps
 
-- **Phase sync** — bind the global phase to a host tempo / MIDI clock instead of
-  free-running seconds (bars/beats, retrigger on transport).
+- ~~**Phase sync**~~ — **done**. *Orbit → Sync to transport* times the global
+  cycle in **bars** off the panel's [Transport](./transport.md) (which itself
+  can follow incoming MIDI clock). No per-satellite setting was needed: `ratio`
+  is already turns per global cycle, so once the cycle has a musical length,
+  a satellite at ratio 2 over a 4-bar cycle makes eight turns to the phrase —
+  exactly, and forever.
 - **Shapes beyond circles** — elliptical / Lissajous fields, or a "gravity" mode
   where satellites perturb each other.
 - **Per-satellite smoothing** — optional slew so a fast satellite emits a rounded

@@ -1341,7 +1341,9 @@ export const SECTION_DEFAULTS = {
     _type: 'Orbit',
     phase: 0,                     // global clock 0..1 (advanced by the run ticker)
     running: true,               // animate in preview / player
-    rate: 0.25,                  // global cycles per second
+    rate: 0.25,                  // global cycles per second (free-running)
+    syncToTransport: false,      // time the global cycle off the Transport
+    cycleBars: 4,                // global cycle length in bars, when synced
     editable: true,              // allow dragging satellites in preview
     showTrails: true,            // comet trails behind satellites
     showSpokes: true,            // spoke from centre to each satellite

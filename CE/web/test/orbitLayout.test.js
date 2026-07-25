@@ -6,6 +6,7 @@ import {
   nodeProjection, nodeOutput,
   orbitNodePortId, parseOrbitNodePort, orbitPorts, orbitPortValues,
   orbitHitNode,
+  orbitSynced, orbitCycleBars, orbitRateAt,
 } from '../src/CE_Application/utils/orbitLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -113,4 +114,26 @@ test('orbitHitNode finds the nearest satellite', () => {
   const q = nodeToPx(NODES[0], 0, g);               // east edge px
   assert.equal(orbitHitNode(c, 0, g, q.px, q.py, 12), 0);
   assert.equal(orbitHitNode(c, 0, g, q.px + 100, q.py + 100, 12), -1); // nothing near
+});
+
+test('the global cycle can be a bar count, and every ratio inherits it', () => {
+  const ob = (o) => ({ _children: { Core: { controlType: 'Orbit' }, Orbit: o } });
+  assert.equal(orbitSynced(ob({})), false);
+  assert.equal(orbitSynced(ob({ syncToTransport: true })), true);
+  assert.equal(orbitCycleBars(ob({})), 4);
+  assert.equal(orbitCycleBars(ob({ cycleBars: 0 })), 0.25);
+  assert.equal(orbitCycleBars(ob({ cycleBars: 999 })), 64);
+  // 4 bars of 4/4 at 120bpm = 16 beats = 8 seconds → 0.125 cycles/sec.
+  const sync = ob({ syncToTransport: true, cycleBars: 4, rate: 0.25 });
+  assert.ok(Math.abs(orbitRateAt(sync, 120, 4) - 0.125) < 1e-9);
+  assert.ok(Math.abs(orbitRateAt(sync, 240, 4) - 0.25) < 1e-9);   // twice the tempo
+  assert.ok(Math.abs(orbitRateAt(sync, 120, 3) - 1 / 6) < 1e-9);  // 3/4 bars are shorter
+  // Unsynced ignores the tempo entirely.
+  assert.ok(Math.abs(orbitRateAt(ob({ rate: 0.25 }), 240, 4) - 0.25) < 1e-9);
+  // The point of not adding a per-satellite setting: a ratio is already turns
+  // per cycle, so it becomes turns per phrase for free.
+  const nodes = orbitNodes(ob({ syncToTransport: true, cycleBars: 4,
+    nodes: [{ ratio: 2 }, { ratio: -3 }] }));
+  assert.equal(nodeAngle(nodes[0], 1) - nodeAngle(nodes[0], 0), 720);   // 2 turns a cycle
+  assert.equal(nodeAngle(nodes[1], 1) - nodeAngle(nodes[1], 0), -1080); // 3, the other way
 });

@@ -80,11 +80,13 @@ not DSP:
   bytes that were already arriving and being thrown away — or sends it. The
   [Arpeggiator](./arpeggiator.md) and the
   [Turing Modulator](./turing-modulator.md) follow it by note division, the
-  [Gesture Looper](./gesture-looper.md) and the
-  [Preset Constellation](./preset-constellation.md) wander by bars, and the
+  [Gesture Looper](./gesture-looper.md), the
+  [Preset Constellation](./preset-constellation.md) wander and the
+  [Orbit Modulator](./orbit-modulator.md) by bars, and the
   [Kinetic Modulator](./kinetic-modulator.md) in musical time — with the honest
   caveat that a physics integrator can't be made drift-free the way a phase can.
-  See [transport.md](./transport.md).
+  That is **every** self-clocked component in the panel; nothing here still runs
+  on a private timer. See [transport.md](./transport.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

@@ -112,9 +112,10 @@ following an external clock, since there's nothing to tap.
 
 ## What follows it
 
-Five components can be put on the clock. Sync is off by default on every one of
-them, so nothing changes until you ask for it, and each keeps its free-running
-control for when you don't.
+**Every self-clocked component in the panel follows it.** There are six, and
+that is all of them — nothing here still runs on a private timer. Sync is off by
+default on every one, so nothing changes until you ask for it, and each keeps
+its free-running control for when you don't.
 
 | | unit | what sync gives you |
 |---|---|---|
@@ -122,11 +123,12 @@ control for when you don't.
 | [Turing Modulator](./turing-modulator.md) | note division | its *mutations* land on the beat |
 | [Gesture Looper](./gesture-looper.md) | bars | the loop point is the bar line |
 | [Preset Constellation](./preset-constellation.md) | bars | the wander cycle is an arrangement length |
+| [Orbit Modulator](./orbit-modulator.md) | bars | every satellite ratio becomes turns per phrase |
 | [Kinetic Modulator](./kinetic-modulator.md) | musical time | tempo scales the motion; stop freezes it |
 
-Three different units, because these are three different kinds of thing. A
-sequencer has *steps*, so its unit is a note division. A loop has a *length*, so
-its unit is bars. And the Kinetic has neither — see below.
+Three units, because these are three kinds of thing. A sequencer has *steps*, so
+its unit is a note division. A cycle has a *length*, so its unit is bars. And
+the Kinetic has neither — see below.
 
 ### The Arpeggiator
 
@@ -187,6 +189,15 @@ the default is 8 bars a cycle. Synced, the probe passes the same point of the
 field on the same bar every time round, which turns an ambient drift into
 something you can write an arrangement against.
 
+### The Orbit Modulator
+
+This one needed **no new per-satellite setting**, which was not obvious until we
+looked: `ratio` is already turns per *global cycle*. Give the cycle a length in
+bars and every satellite inherits a musical rate from that one number — a
+satellite at ratio 2 over a 4-bar cycle makes eight turns to the phrase, exactly.
+The ratios between satellites were always exact; they just had nothing to be
+exact *against*.
+
 ### The Kinetic Modulator — the one that doesn't fit
 
 Be clear about this one: the Kinetic is an **integrator, not a phase**. There is
@@ -216,12 +227,6 @@ Nothing about the transport touches the DPD profile.
 
 ## Possible next steps
 
-- ~~**Sync the rest of them**~~ — **done**: the Turing, the Looper, the
-  Constellation and (with the caveat above) the Kinetic all follow the clock.
-  The [Orbit Modulator](./orbit-modulator.md) is the remaining self-clocked
-  component; its satellites each have their own speed, so syncing it means a
-  per-satellite division rather than one setting, which is why it's not in this
-  pass.
 - **Host tempo** — an exported VST3 can read the DAW's playhead. That's a third
   source alongside internal and external, and the obviously right default once
   it exists.

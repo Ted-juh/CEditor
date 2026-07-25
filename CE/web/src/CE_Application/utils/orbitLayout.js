@@ -50,6 +50,24 @@ export function nodePos(node, phase) {
   return { x: r * Math.cos(a), y: r * Math.sin(a) };
 }
 
+// --- Tempo sync ---------------------------------------------------------------
+// The Orbit needed no new per-satellite setting: `ratio` is already turns per
+// GLOBAL CYCLE, so once the cycle has a musical length every satellite inherits
+// one. A ratio of 2 over a 4-bar cycle is eight turns to the phrase, exactly,
+// forever — and the ratios between satellites were always exact, they just had
+// nothing to be exact against.
+export function orbitSynced(control) { return orbitConfig(control).syncToTransport === true; }
+export function orbitCycleBars(control) {
+  const n = num(orbitConfig(control).cycleBars, 4);
+  return n < 0.25 ? 0.25 : n > 64 ? 64 : n;
+}
+// The equivalent free-running rate, for the readout: cycles per second.
+export function orbitRateAt(control, bpm, beatsPerBar = 4) {
+  const b = num(bpm, 120);
+  if (!orbitSynced(control) || !(b > 0)) return Math.max(0, num(orbitConfig(control).rate, 0.25));
+  return 1 / (orbitCycleBars(control) * Math.max(1, num(beatsPerBar, 4)) * (60 / b));
+}
+
 // Field geometry (px): centre + max orbit radius.
 export function orbitGeometry(width, height, pad = 10) {
   const p = Math.max(0, num(pad, 10));

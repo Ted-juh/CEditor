@@ -3,6 +3,8 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import TransportSyncCells from '../properties/TransportSyncCells.svelte';
+  import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
   let { control = null } = $props();
 
@@ -42,9 +44,23 @@
     <PropertyCell label="Run" span={1} hint="Animate the satellites in preview / player.">
       <PropertyToggle value={o.running !== false} onchange={() => set('running', !(o.running !== false))} />
     </PropertyCell>
-    <PropertyCell label="Rate" span={2} hint="Global speed — cycles per second (all ratios are relative to this).">
-      <input class="val" type="number" min="0" max="10" step="0.05" value={o.rate ?? 0.25} onchange={(e) => set('rate', Math.max(0, num(e.target.value, 0.25)))} />
-    </PropertyCell>
+    <TransportSyncCells
+      synced={o.syncToTransport === true}
+      onchange={(v) => set('syncToTransport', v)}
+      span={2}
+      hint="Time the global cycle in bars off the panel's Transport. Each satellite's ratio is turns per cycle, so they all inherit the tempo from this one number — no per-satellite setting needed."
+    >
+      {#snippet children()}
+        <PropertyCell label="Cycle (bars)" span={2} hint="How many bars one global cycle takes. A satellite at ratio 2 then makes two turns per cycle, on the bar.">
+          <input class="val" type="number" min={MIN_BARS} max={MAX_BARS} step="1" value={o.cycleBars ?? 4} onchange={(e) => set('cycleBars', Math.max(MIN_BARS, Math.min(MAX_BARS, num(e.target.value, 4))))} />
+        </PropertyCell>
+      {/snippet}
+    </TransportSyncCells>
+    {#if o.syncToTransport !== true}
+      <PropertyCell label="Rate" span={2} hint="Global speed — cycles per second (all ratios are relative to this).">
+        <input class="val" type="number" min="0" max="10" step="0.05" value={o.rate ?? 0.25} onchange={(e) => set('rate', Math.max(0, num(e.target.value, 0.25)))} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Editable" span={1} hint="Drag satellites to a new radius/angle in preview.">
       <PropertyToggle value={o.editable !== false} onchange={() => set('editable', !(o.editable !== false))} />
     </PropertyCell>
