@@ -14,6 +14,8 @@ import {
   MIN_STEPS, MAX_STEPS, MAX_ROWS, tiesForward,
   phraseScriptPatch, PHRASE_SCRIPT_ACTIONS, phraseSwing, phraseSwingSeconds,
   effectiveSwing, swingSource,
+  cellChance, cellRatchet, cellLength, cellRoll, cellSounds,
+  ratchetOffsets, noteGateSeconds, MAX_RATCHET,
 } from '../src/CE_Application/utils/phraseLayout.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { swingDelay } from '../src/CE_Application/utils/arpLayout.js';
@@ -203,7 +205,8 @@ test('a note-off goes where its note-on went, even if the key changed', () => {
   const a = playStep(EMPTY_SOUNDING, BASIC, 0);
   // `row` rides along on a note-on so the caller can ask whether the next step
   // ties it — a gate must not cut a note that is about to be held.
-  assert.deepEqual(a.sends, [{ kind: 'on', channel: 1, note: 48, velocity: 100, row: 0 }]);
+  assert.deepEqual(a.sends.map((x) => ({ kind: x.kind, channel: x.channel, note: x.note, velocity: x.velocity, row: x.row })),
+    [{ kind: 'on', channel: 1, note: 48, velocity: 100, row: 0 }]);
   assert.deepEqual(soundingNotes(a.sounding), [48]);
 
   // The key moves up a fourth under the held note.
@@ -223,7 +226,9 @@ test('playing on releases the previous step and starts the next', () => {
   assert.deepEqual(soundingNotes(s), []);
   // Step 2 starts E♭3.
   r = playStep(s, BASIC, 2); s = r.sounding;
-  assert.deepEqual(r.sends, [{ kind: 'on', channel: 1, note: 51, velocity: 100, row: 2 }]);
+  assert.deepEqual(r.sends.map((x) => (x.kind === 'on'
+    ? { kind: x.kind, channel: x.channel, note: x.note, velocity: x.velocity, row: x.row }
+    : { kind: x.kind, channel: x.channel, note: x.note })), [{ kind: 'on', channel: 1, note: 51, velocity: 100, row: 2 }]);
   // And release-all cleans up.
   assert.deepEqual(releaseAll(s).sends, [{ kind: 'off', channel: 1, note: 51 }]);
   assert.deepEqual(releaseAll(EMPTY_SOUNDING).sends, [], 'nothing sounding, nothing sent');
@@ -255,7 +260,9 @@ test('a chord holds one voice and moves another', () => {
   assert.deepEqual(soundingNotes(s), [48, 51]);
   const r = playStep(s, c, 1);
   // The pedal note stays, the moving voice is released and replaced.
-  assert.deepEqual(r.sends, [
+  assert.deepEqual(r.sends.map((x) => (x.kind === 'on'
+    ? { kind: x.kind, channel: x.channel, note: x.note, velocity: x.velocity, row: x.row }
+    : { kind: x.kind, channel: x.channel, note: x.note })), [
     { kind: 'off', channel: 1, note: 51 },
     { kind: 'on', channel: 1, note: 55, velocity: 100, row: 4 },
   ]);
@@ -449,4 +456,70 @@ test('swing is inherited from the clock unless a follower opts out', () => {
   const secs = phraseStepSeconds(synced);
   assert.ok(near(phraseSwingSeconds(synced, 1, secs, 0.6), swingDelay(1, 0.6, secs)));
   assert.ok(near(phraseSwingSeconds(synced, 1, secs), swingDelay(1, 0.2, secs)), 'no clock given = own');
+});
+
+// --- probability, ratchets, per-cell length -----------------------------------
+
+test('probability is deterministic per lap, not a fresh coin every render', () => {
+  // Two sequencers on one clock with one seed must agree, and re-reading the
+  // same index must not re-roll — otherwise the grid and the notes disagree.
+  const c = ph({ steps: 4, rows: 8, seed: 7, velocity: 100, pattern: { '0:0': { chance: 0.5 } } });
+  const a = stepNotes(c, 0).notes.length;
+  assert.equal(stepNotes(c, 0).notes.length, a, 'same index, same answer');
+  assert.equal(cellRoll(0, 0, 0, 7), cellRoll(0, 0, 0, 7));
+  assert.notEqual(cellRoll(0, 0, 0, 7), cellRoll(4, 0, 0, 7), 'the next lap rolls again');
+  assert.notEqual(cellRoll(0, 0, 0, 7), cellRoll(0, 0, 0, 8), 'the seed matters');
+  // The extremes are certain, not merely likely.
+  const never = ph({ steps: 4, rows: 8, pattern: { '0:0': { chance: 0 } } });
+  const always = ph({ steps: 4, rows: 8, pattern: { '0:0': { chance: 1 } } });
+  for (let i = 0; i < 40; i += 4) {
+    assert.equal(stepNotes(never, i).notes.length, 0);
+    assert.equal(stepNotes(always, i).notes.length, 1);
+  }
+  // A cell with no chance field is certain — old patterns don't start gambling.
+  assert.equal(cellChance({}), 1);
+  assert.equal(cellChance({ chance: 'maybe' }), 1);
+});
+
+test('a 50% cell fires roughly half the time over many laps', () => {
+  const c = ph({ steps: 4, rows: 8, seed: 3, pattern: { '0:0': { chance: 0.5 } } });
+  let hits = 0;
+  for (let lap = 0; lap < 200; lap += 1) hits += stepNotes(c, lap * 4).notes.length;
+  assert.ok(hits > 60 && hits < 140, `got ${hits}/200 — should be near half`);
+});
+
+test('a ratchet divides its own step', () => {
+  const c = ph({ steps: 4, rows: 8, pattern: { '0:0': { ratchet: 3 } } });
+  const n = stepNotes(c, 0).notes[0];
+  assert.equal(n.ratchet, 3);
+  const offs = ratchetOffsets(n, 0.3);
+  assert.equal(offs.length, 3);
+  assert.ok(near(offs[0], 0));
+  assert.ok(near(offs[1], 0.1), 'evenly spaced inside the step');
+  assert.ok(near(offs[2], 0.2));
+  assert.ok(offs[offs.length - 1] < 0.3, 'and all of them inside it');
+  assert.equal(cellRatchet({}), 1, 'no ratchet field = one hit');
+  assert.equal(cellRatchet({ ratchet: 99 }), 8, 'capped');
+  assert.deepEqual(ratchetOffsets({ ratchet: 1 }, 0.3), [0]);
+});
+
+test('a cell length overrides the pattern gate and may outlast its step', () => {
+  // This is how you write a long note without a chain of ties, which is why it
+  // is a multiple of the step rather than a fraction of it.
+  const c = ph({ steps: 4, rows: 8, gate: 0.5, pattern: { '0:0': { length: 2 }, '1:0': {} } });
+  const long = stepNotes(c, 0).notes[0];
+  assert.equal(long.length, 2);
+  assert.ok(near(noteGateSeconds(c, long, 0.25), 0.5), 'two steps');
+  const plain = stepNotes(c, 1).notes[0];
+  assert.equal(plain.length, null);
+  assert.ok(near(noteGateSeconds(c, plain, 0.25), 0.125), 'falls back to the pattern gate');
+  assert.equal(cellLength({}), null);
+  assert.equal(cellLength({ length: 99 }), 4, 'capped');
+});
+
+test('the send carries what the caller needs to time it', () => {
+  const c = ph({ steps: 4, rows: 8, channel: 1, velocity: 100, pattern: { '0:0': { ratchet: 2, length: 1.5 } } });
+  const [on] = playStep(EMPTY_SOUNDING, c, 0).sends;
+  assert.equal(on.ratchet, 2);
+  assert.equal(on.length, 1.5);
 });

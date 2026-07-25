@@ -142,10 +142,15 @@ luck. Different divisions give you a polyrhythm that stays in phase over the bar
 
 ## Swing
 
-Delays every odd step by up to half a step. It uses the **Arpeggiator's own
-swing function**, not a copy of the formula — an Arp and a Phrase set to the same
-swing on the same clock have to land on the same beat, and two implementations of
-"delay the odd steps" would eventually disagree about it.
+Delays every odd step by up to half a step, and it comes from **the
+[Transport](./transport.md)** by default — swing belongs on the clock, so
+everything synced to it shuffles together instead of you keeping two numbers in
+step by hand. A sequencer can opt out ("swing from: its own") when a part wants
+its own feel against the rest, and a free-running one always uses its own,
+because there is no clock to inherit from.
+
+The maths is the **Arpeggiator's own swing function**, not a copy — two
+implementations of "delay the odd steps" would eventually disagree.
 
 It's applied to the **running index**, not the pattern step, so reverse and
 ping-pong stay an even shuffle rather than following the pattern back and forth.
@@ -235,6 +240,37 @@ Like `split`, the command is portable but **not export-safe**: it edits the
 panel's own model rather than sending MIDI, so it needs the panel runtime. The
 exported Player has that; a bare device script doesn't.
 
+## What a cell can do besides play
+
+Three per-cell fields, edited in the inspector by picking a step and a row —
+the preview cell can be four pixels wide, so clicking it is not a way to select
+it.
+
+**Chance** is how often the cell plays. The roll is **deterministic** from the
+lap, the position and the pattern seed rather than `Math.random()`. Three
+consequences, and the third is the one that matters: two sequencers on one clock
+with one seed agree; re-reading the same index doesn't re-roll, so the grid and
+the notes never disagree; and a pattern sounds the same on the take you recorded
+as on the take you play back. The next lap rolls again, which is what makes it
+feel alive rather than static.
+
+A maybe-note is drawn **hollow**, in proportion to how unlikely it is. A filled
+cell that stays silent is a grid lying about the pattern.
+
+**Ratchet** retriggers the note inside its own step — 3 is a triplet in the space
+of one step, drawn as three ticks along the bottom of the cell so you can count
+them without clicking. A **tied** note is never ratcheted: holding it and
+retriggering it are opposite instructions, and the tie is the one you asked for
+last.
+
+**Length** is the note's own gate as a multiple of the **step**, so `2` holds it
+for two steps and it is drawn as the bar it actually occupies. A multiple rather
+than a fraction because this is how you write a long note without a chain of
+ties — which was the previous answer, and a worse one.
+
+The inspector lists every cell doing something other than playing normally, so
+you can find what you set without hunting the grid.
+
 ## What it doesn't do
 
 Named honestly, because each of these is a thing someone will look for:
@@ -242,11 +278,5 @@ Named honestly, because each of these is a thing someone will look for:
 - **One pattern, no chaining.** There is no song mode, no A/B, no pattern queue.
   A script can swap the seed on a footswitch, which covers the live case; it
   does not cover writing a verse and a chorus.
-- **No per-step probability or ratcheting.** The Turing Modulator is the
-  component for "sometimes", and it modulates values rather than notes.
-- **No note length beyond ties.** Gate is per-pattern; length per note is what
-  the tie is for.
-- **Swing is per-sequencer, not on the clock.** It shares the Arp's function so
-  the two agree, but you set it in both places. Swing on the Transport, inherited
-  by everything synced, would be the better shape once more than two components
-  want it.
+- **One pattern per sequencer.** Chaining lives on the Transport's song chain
+  rather than here — see [song-mode.md](./song-mode.md).

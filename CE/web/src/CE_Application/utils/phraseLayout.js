@@ -213,6 +213,44 @@ export function stepAtIndex(index, steps, direction = 'forward', seed = 0) {
 // What a step should play. Returns the notes, their velocity, and whether each
 // is TIED to the same row in the previous step — a tie holds the note rather
 // than retriggering it, which is the difference between a line and a stutter.
+// --- Per-cell probability, ratchets and length -----------------------------------
+// A cell may carry `chance` (0..1, default 1), `ratchet` (how many times it
+// retriggers inside its step, default 1) and `length` (its own gate, overriding
+// the pattern's).
+//
+// Probability is DETERMINISTIC from the position, not Math.random(). Two
+// sequencers on one clock with one seed then agree, a re-render of the same
+// index doesn't re-roll, and — the one that actually matters — a pattern sounds
+// the same on the take you recorded as on the take you play back.
+export function cellChance(cell) {
+  const c = Number(cell?.chance);
+  return Number.isFinite(c) ? clamp01(c) : 1;
+}
+export function cellRatchet(cell) { return clampInt(cell?.ratchet ?? 1, 1, MAX_RATCHET); }
+export function cellLength(cell) {
+  const l = Number(cell?.length);
+  return Number.isFinite(l) ? Math.max(0.05, Math.min(4, l)) : null;
+}
+export const MAX_RATCHET = 8;
+
+// A hash of (index, step, row, seed) → 0..1. The same cell on the same lap
+// always rolls the same number; the NEXT lap rolls a different one, which is
+// what makes probability feel alive rather than static.
+export function cellRoll(index, step, row, seed = 0) {
+  let h = Math.imul(Math.round(num(index, 0)) + 1, 2654435761)
+    ^ Math.imul(Math.round(num(step, 0)) + 1, 40503)
+    ^ Math.imul(Math.round(num(row, 0)) + 1, 2246822519)
+    ^ Math.imul(Math.round(num(seed, 0)) + 1, 3266489917);
+  h ^= h >>> 15; h = Math.imul(h, 2246822507); h ^= h >>> 13;
+  return (h >>> 0) / 4294967296;
+}
+export function cellSounds(control, index, step, row, cell) {
+  const chance = cellChance(cell);
+  if (chance >= 1) return true;
+  if (chance <= 0) return false;
+  return cellRoll(index, step, row, phraseConfig(control).seed ?? 0) < chance;
+}
+
 export function stepNotes(control, index) {
   const steps = phraseSteps(control);
   const rows = phraseRows(control);
@@ -222,21 +260,44 @@ export function stepNotes(control, index) {
   const base = phraseVelocity(control);
   return {
     step,
-    notes: cellsInStep(pattern, step, rows).map((c) => ({
-      row: c.row,
-      note: rowToNote(control, c.row),
-      velocity: clampInt(c.velocity ?? base, 1, 127),
-      // A tie only means anything if the same row was on in the step we came
-      // FROM — otherwise there is nothing to hold, and it would swallow the
-      // note-on entirely.
-      tied: c.tie === true && index > 0 && isCellOn(pattern, prevStep, c.row),
-    })),
+    notes: cellsInStep(pattern, step, rows)
+      // A cell that loses its roll is silent for this lap only. Filtered here
+      // rather than in the caller so every consumer — playback, the readout,
+      // the tie check — agrees about what this step plays.
+      .filter((c) => cellSounds(control, index, step, c.row, c))
+      .map((c) => ({
+        row: c.row,
+        note: rowToNote(control, c.row),
+        velocity: clampInt(c.velocity ?? base, 1, 127),
+        // A tie only means anything if the same row was on in the step we came
+        // FROM — otherwise there is nothing to hold, and it would swallow the
+        // note-on entirely.
+        tied: c.tie === true && index > 0 && isCellOn(pattern, prevStep, c.row),
+        // How many times it retriggers inside its own step, and its own gate.
+        ratchet: cellRatchet(c),
+        length: cellLength(c),
+      })),
   };
 }
 // Gate length as a fraction of a step. 1 = legato into the next step.
 export function phraseGate(control) { return clamp01(num(phraseConfig(control).gate, 0.8)) || 0.01; }
 export function gateSeconds(control, stepSecs) {
   return Math.max(0.005, phraseGate(control) * Math.max(0.01, num(stepSecs, 0.1)));
+}
+// A note's own gate, if it has one. `length` is a multiple of the STEP, so 2
+// means "hold for two steps" — which is how you write a long note without a
+// chain of ties, and the reason it can exceed 1.
+export function noteGateSeconds(control, note, stepSecs) {
+  const own = note?.length;
+  const secs = Math.max(0.01, num(stepSecs, 0.1));
+  if (own === null || own === undefined) return gateSeconds(control, secs);
+  return Math.max(0.005, own * secs);
+}
+// A ratchet divides the step: 3 means three evenly spaced hits inside it.
+export function ratchetOffsets(note, stepSecs) {
+  const n = clampInt(note?.ratchet ?? 1, 1, MAX_RATCHET);
+  const secs = Math.max(0.01, num(stepSecs, 0.1));
+  return Array.from({ length: n }, (_, i) => (i * secs) / n);
 }
 // A rest is a step with nothing in it — worth naming, because "the pattern is
 // empty" and "this step is a rest" are the same thing to the player and very
@@ -277,7 +338,12 @@ export function playStep(sounding, control, index) {
   // Start the rest.
   for (const n of notes) {
     if (next[`${n.row}`]) continue;
-    sends.push({ kind: 'on', channel, note: n.note, velocity: n.velocity, row: n.row });
+    // `ratchet` and `length` ride along so the caller can time the hits and the
+    // gate without re-deriving them from the pattern.
+    sends.push({
+      kind: 'on', channel, note: n.note, velocity: n.velocity, row: n.row,
+      ratchet: n.ratchet ?? 1, length: n.length ?? null,
+    });
     next[`${n.row}`] = { channel, note: n.note };
   }
   return { sounding: next, sends, step };

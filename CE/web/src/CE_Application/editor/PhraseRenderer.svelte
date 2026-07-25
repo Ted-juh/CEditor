@@ -67,6 +67,12 @@
           accent: step % accentEvery === 0,
           loud: cell?.velocity != null && cell.velocity > 100,
           quiet: cell?.velocity != null && cell.velocity < 60,
+          // A cell that only sometimes plays, that retriggers, or that holds
+          // past its step has to LOOK different — otherwise the grid claims the
+          // pattern is something it isn't.
+          chance: cell && Number.isFinite(Number(cell.chance)) ? Math.max(0, Math.min(1, Number(cell.chance))) : 1,
+          ratchet: cell ? Math.max(1, Math.min(8, Math.round(n(cell.ratchet, 1)))) : 1,
+          long: cell && Number.isFinite(Number(cell.length)) ? Math.max(0.05, Number(cell.length)) : null,
         });
       }
     }
@@ -124,6 +130,26 @@
     {#if c.on && c.loud}
       <rect x={c.rect.x} y={c.rect.y} width={c.rect.w} height={Math.max(1.5, c.rect.h * 0.22)} rx="1"
             fill="rgba(255,255,255,0.55)" />
+    {/if}
+    {#if c.on && c.long !== null && c.long > 1}
+      <!-- a note held past its own step: drawn as the bar it actually occupies -->
+      <rect x={c.rect.x} y={c.rect.y + c.rect.h * 0.32} rx="1"
+            width={Math.max(2, (c.rect.w + geom.gap) * Math.min(c.long, 4) - geom.gap)}
+            height={Math.max(1.5, c.rect.h * 0.36)} fill={noteCss} opacity="0.55" />
+    {/if}
+    {#if c.on && c.ratchet > 1}
+      <!-- ratchet: one tick per hit, so you can count them without clicking -->
+      {#each Array.from({ length: c.ratchet }, (_, k) => k) as k (k)}
+        <rect x={c.rect.x + 1 + k * ((c.rect.w - 2) / c.ratchet)} y={c.rect.y + c.rect.h - 2.5}
+              width={Math.max(1, (c.rect.w - 2) / c.ratchet - 1)} height="1.8"
+              fill="rgba(10,10,16,0.75)" />
+      {/each}
+    {/if}
+    {#if c.on && c.chance < 1}
+      <!-- a maybe-note is drawn hollow: a filled cell that stays silent is a
+           grid that lies about the pattern -->
+      <rect x={c.rect.x + 1} y={c.rect.y + 1} width={Math.max(1, c.rect.w - 2)} height={Math.max(1, c.rect.h - 2)}
+            rx="1.5" fill={faceCss} opacity={1 - c.chance} />
     {/if}
     {#if c.tie}
       <!-- the join into the previous step: a held note should look held -->

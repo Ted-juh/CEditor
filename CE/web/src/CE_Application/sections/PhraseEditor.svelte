@@ -5,6 +5,7 @@
     PHRASE_SEEDS, phraseSeedPattern, phrasePattern, phraseSteps, phraseRows,
     hiddenCellCount, trimPattern, rowToNote, rowLabel, noteLabel, phraseUseFlats,
     phraseMode, cellsInStep, MIN_STEPS, MAX_STEPS, MIN_ROWS, MAX_ROWS,
+    cellAt, setCell, cellChance, cellRatchet, cellLength, MAX_RATCHET,
   } from '../utils/phraseLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
@@ -61,6 +62,38 @@
       }
       return out.join(' ') + (steps > 32 ? ' …' : '');
     } catch { return ''; }
+  });
+
+  // Per-cell editing. The grid is where you place notes; this is where you say
+  // what a placed note DOES — probability, ratchet, its own length. A cell is
+  // picked by step and row rather than by clicking the tiny preview, because
+  // the preview cell can be four pixels wide.
+  let selStep = $state(0);
+  let selRow = $state(0);
+  let selCell = $derived.by(() => {
+    try { return cellAt(phrasePattern(control), selStep, selRow); } catch { return null; }
+  });
+  function patchCell(patch) {
+    set('pattern', setCell(phrasePattern(control), selStep, selRow, patch));
+  }
+  // Every cell that is doing something other than "play normally" — so you can
+  // find the ones you set without hunting the grid.
+  let specialCells = $derived.by(() => {
+    try {
+      const out = [];
+      for (const [key, cell] of Object.entries(phrasePattern(control))) {
+        const bits = [];
+        if (cellChance(cell) < 1) bits.push(`${Math.round(cellChance(cell) * 100)}%`);
+        if (cellRatchet(cell) > 1) bits.push(`×${cellRatchet(cell)}`);
+        if (cellLength(cell) !== null) bits.push(`len ${cellLength(cell)}`);
+        if (cell?.tie === true) bits.push('tie');
+        if (bits.length) {
+          const [st, rw] = key.split(':').map(Number);
+          out.push(`${st + 1}/${rowLabel(control, rw)}: ${bits.join(' ')}`);
+        }
+      }
+      return out.sort();
+    } catch { return []; }
   });
 
   function applySeed(id) {
@@ -131,6 +164,42 @@
         </div>
       </PropertyCell>
     {/if}
+    <PropertyCell label="Cell" span={2} hint="Which cell the fields below edit. Step is 1-based, as the grid counts it.">
+      <div class="pair">
+        <input class="val" type="number" min="1" max={steps} step="1" value={selStep + 1} onchange={(e) => { selStep = clampInt(e.target.value, 1, steps, 1) - 1; }} />
+        <select class="val" value={String(selRow)} onchange={(e) => { selRow = clampInt(e.target.value, 0, rows - 1, 0); }}>
+          {#each Array.from({ length: rows }, (_, i) => rows - 1 - i) as r (r)}
+            <option value={String(r)}>{rowLabel(control, r)} — {noteLabel(rowToNote(control, r), phraseUseFlats(control))}</option>
+          {/each}
+        </select>
+      </div>
+    </PropertyCell>
+    <PropertyCell label="" span={2} hint="">
+      <div class="note">{selCell ? 'Editing that cell.' : 'Nothing there — place a note on the grid first.'}</div>
+    </PropertyCell>
+    {#if selCell}
+      <PropertyCell label="Chance" span={1} hint="How often it plays, 0–100%. Deterministic from the position and the seed, so the same lap always sounds the same and two sequencers on one clock agree — a maybe-note is drawn hollow so the grid doesn't claim a note that stays silent.">
+        <input class="val" type="number" min="0" max="100" step="5" value={Math.round(cellChance(selCell) * 100)} onchange={(e) => patchCell({ chance: clampInt(e.target.value, 0, 100, 100) / 100 })} />
+      </PropertyCell>
+      <PropertyCell label="Ratchet" span={1} hint="How many times it retriggers inside its own step. A tied note is never ratcheted — holding it and retriggering it are opposite instructions.">
+        <input class="val" type="number" min="1" max={MAX_RATCHET} step="1" value={cellRatchet(selCell)} onchange={(e) => patchCell({ ratchet: clampInt(e.target.value, 1, MAX_RATCHET, 1) })} />
+      </PropertyCell>
+      <PropertyCell label="Length" span={1} hint="This note's own gate, as a multiple of the STEP — 2 holds it for two steps. Blank uses the pattern gate. This is how you write a long note without a chain of ties.">
+        <input class="val" type="number" min="0.05" max="4" step="0.25" placeholder="—" value={cellLength(selCell) ?? ''} onchange={(e) => patchCell({ length: e.target.value === '' ? null : clampNum(e.target.value, 0.05, 4, 1) })} />
+      </PropertyCell>
+      <PropertyCell label="Tie" span={1} hint="Hold this note through from the step before instead of retriggering. Needs a note on the same row in the previous step, or it is just a retrigger.">
+        <PropertyToggle value={selCell.tie === true} onchange={() => patchCell({ tie: !(selCell.tie === true) })} />
+      </PropertyCell>
+      <PropertyCell label="Velocity" span={1} hint="This cell's own velocity. Blank follows the pattern's.">
+        <input class="val" type="number" min="1" max="127" step="1" placeholder="—" value={selCell.velocity ?? ''} onchange={(e) => patchCell({ velocity: e.target.value === '' ? null : clampInt(e.target.value, 1, 127, 100) })} />
+      </PropertyCell>
+    {/if}
+    {#if specialCells.length}
+      <PropertyCell label="" span={4} hint="Every cell doing something other than playing normally, so you can find what you set without hunting the grid.">
+        <div class="preview">{specialCells.join('   ·   ')}</div>
+      </PropertyCell>
+    {/if}
+
     <PropertyCell label="" span={4} hint="The notes this pattern currently plays, step by step. A dot is a rest.">
       <div class="preview">{walk || '—'}</div>
     </PropertyCell>
@@ -215,6 +284,8 @@
   .note { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
   .preview { font-size: 11.5px; color: #C8C8CE; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 6px 8px; line-height: 1.6; font-family: ui-monospace, Menlo, monospace; overflow-x: auto; white-space: nowrap; }
   .rowmap { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.6; }
+  .pair { display: flex; gap: 4px; }
+  .pair .val:first-child { width: 58px; flex: none; }
   .seeds { display: flex; flex-wrap: wrap; gap: 5px; }
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
   .seed:hover { border-color: #4a4a58; color: #E8E8EE; }

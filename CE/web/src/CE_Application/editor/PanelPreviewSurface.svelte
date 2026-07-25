@@ -125,7 +125,7 @@
     phraseGeometry, cellAtPoint as phraseCellAt, toggleCell, phrasePattern,
     stepAtIndex as phraseStepAt, EMPTY_SOUNDING as PHRASE_EMPTY,
     playStep as phrasePlayStep, releaseAll as phraseReleaseAll,
-    phraseBeatsPerStep, tiesForward, phraseSwingSeconds,
+    phraseBeatsPerStep, tiesForward, phraseSwingSeconds, ratchetOffsets, noteGateSeconds,
   } from '../utils/phraseLayout.js';
   import {
     recorderConfig, recorderState, recorderTake, recorderChannel, recorderPlaying,
@@ -3220,7 +3220,27 @@
       sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `phrase_on_${m.note}`);
       // A note the next step is about to TIE must not be cut short — that is the
       // whole point of a tie — so it skips the gate and rides to the boundary.
-      if (!gates || tiesForward(control, index, m.row)) continue;
+      const tied = tiesForward(control, index, m.row);
+      // A tied note is never ratcheted: holding it and retriggering it are
+      // opposite instructions, and the tie is the one you asked for last.
+      const offsets = tied ? [0] : ratchetOffsets(m, secs);
+      // Extra hits inside the step. The first is the note-on already sent.
+      for (let h = 1; h < offsets.length; h += 1) {
+        (phraseTimers[id] ??= []).push(setTimeout(() => {
+          sendNoteBytes(noteOffBytes(m.channel, m.note), `phrase_ratchet_off_${m.note}`);
+          sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `phrase_ratchet_${m.note}`);
+        }, offsets[h] * 1000));
+      }
+      if (tied) continue;
+      // A cell's own length overrides the pattern gate and may deliberately
+      // outlast its step, so the "a full gate is legato" shortcut only applies
+      // to notes still using the pattern's.
+      const ownGateMs = noteGateSeconds(control, m, secs) * 1000;
+      const ratcheted = offsets.length > 1;
+      if (!gates && m.length === null && !ratcheted) continue;
+      const lastMs = ratcheted
+        ? offsets[offsets.length - 1] * 1000 + Math.max(5, (secs * 1000 / offsets.length) * 0.8)
+        : ownGateMs;
       (phraseTimers[id] ??= []).push(setTimeout(() => {
         const held = phraseSounding[id]?.[`${m.row}`];
         if (!held || held.note !== m.note) return;   // already released, or moved on
@@ -3228,7 +3248,7 @@
         const next = { ...phraseSounding[id] };
         delete next[`${m.row}`];
         phraseSounding[id] = next;
-      }, gateMs));
+      }, lastMs));
     }
   }
   function phraseFireIndex(control, index, bpm) {
