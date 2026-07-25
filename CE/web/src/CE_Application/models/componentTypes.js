@@ -744,6 +744,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  NoteRibbon: {
+    // Plays notes rather than driving a parameter — no DeviceBindings, same as
+    // the ChordPad and the Arp.
+    sections: ['Background', 'NoteRibbon', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('NoteRibbon'),
+    defaultOverrides: {
+      // A wide playing strip.
+      Transform: { width: 360, height: 104 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

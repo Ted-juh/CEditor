@@ -15,6 +15,7 @@
     Link2,
     Music,
     ListMusic,
+    Piano,
     Gauge,
     Spline,
     Grid2x2,
@@ -128,6 +129,7 @@
       { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
       { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
       { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
+      { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

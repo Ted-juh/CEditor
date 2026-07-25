@@ -90,6 +90,17 @@
     stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
     arpGeometry, arpCellAt, toggleMute, arpPhase,
   } from '../utils/arpLayout.js';
+  // The touch-strip Ribbon (a parameter control) already owns the plain
+  // ribbonConfig/ribbonGeometry names, so the note ribbon's come in aliased.
+  import {
+    ribbonConfig as nrConfig, ribbonMode as nrMode, ribbonZones as nrZones,
+    ribbonHorizontal as nrHorizontal, ribbonChannel as nrChannel,
+    ribbonGeometry as nrGeometry, inRibbon as nrInside,
+    positionAlong as nrAlong, positionAcross as nrAcross,
+    snapZone as nrSnapZone, glideStep as nrGlideStep,
+    bendBytes as nrBendBytes, ccBytes as nrCcBytes,
+    touchVelocity as nrVelocity, modValue as nrModValue, modCc as nrModCc,
+  } from '../utils/noteRibbonLayout.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     createTimedButtonPreviewController,
@@ -220,7 +231,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))));
+    return applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2297,6 +2308,119 @@
     return true;
   }
 
+  // --- Ribbon Keyboard: slide along the strip to play pitch --------------------
+  // Third note-emitting control, on the same raw-MIDI path. Scale-snap and
+  // chromatic play discrete zones (sliding retriggers legato); glide holds one
+  // root and sends PITCH BEND for the fractional pitch, retriggering only when
+  // the finger travels past the bend window. The cross axis can send a CC.
+  const RIBBON_PAD = 8;
+  const RIBBON_SEND_MS = 20;      // don't stream bend/CC faster than ~50 Hz
+  const RIBBON_BEND_EPS = 24;     // …or for a move smaller than this (of 16383)
+  let ribbonPress = null;         // { id, note, root, t, across, pitch }
+  const ribbonLastSend = {};      // id -> { bend: {v, at}, cc: {v, at} }
+  function isNoteRibbonControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'NoteRibbon';
+  }
+  function ribbonGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const headerH = nrConfig(control).showHeader !== false ? 22 : 0;
+    return nrGeometry(numberOr(t.width, 0), numberOr(t.height, 0), RIBBON_PAD, headerH,
+      nrHorizontal(control) ? 'horizontal' : 'vertical');
+  }
+  // Push the live touch into the session so the renderer can draw the rail.
+  function syncRibbonSession(control, touch) {
+    patchControlSession(getControlId(control), { noteRibbonTouch: touch ?? undefined });
+  }
+  function sendRibbonBend(control, value, force = false) {
+    const id = getControlId(control);
+    const now = Date.now();
+    const last = (ribbonLastSend[id] ??= {}).bend;
+    if (!force && last && Math.abs(last.v - value) < RIBBON_BEND_EPS && (now - last.at) < RIBBON_SEND_MS) return;
+    ribbonLastSend[id].bend = { v: value, at: now };
+    sendNoteBytes(nrBendBytes(nrChannel(control), value), 'pitch_bend');
+  }
+  function sendRibbonMod(control, across) {
+    const v = nrModValue(control, across);
+    if (v === null) return;
+    const id = getControlId(control);
+    const now = Date.now();
+    const last = (ribbonLastSend[id] ??= {}).cc;
+    if (last && last.v === v && (now - last.at) < RIBBON_SEND_MS) return;
+    ribbonLastSend[id].cc = { v, at: now };
+    sendNoteBytes(nrCcBytes(nrChannel(control), nrModCc(control), v), `cc_${nrModCc(control)}`);
+  }
+  function ribbonNoteOff(control) {
+    if (!ribbonPress || ribbonPress.id !== getControlId(control)) return;
+    sendNoteBytes(noteOffBytes(nrChannel(control), ribbonPress.note), `note_off_${ribbonPress.note}`);
+  }
+  // Play the pitch at a strip position, reusing the sounding note when it hasn't
+  // changed so a slow slide doesn't machine-gun note-ons.
+  function ribbonPlayAt(control, localPoint, isNew) {
+    const geom = ribbonGeomFor(control);
+    const t = nrAlong(geom, localPoint.x, localPoint.y);
+    const across = nrAcross(geom, localPoint.x, localPoint.y);
+    const ch = nrChannel(control);
+    const mode = nrMode(control);
+    let note;
+    let pitch = null;
+    if (mode === 'glide') {
+      const step = nrGlideStep(control, t, isNew ? null : ribbonPress?.root);
+      note = step.root;
+      pitch = step.pitch;
+      if (step.retrigger) {
+        if (!isNew) ribbonNoteOff(control);
+        sendRibbonBend(control, 8192, true);          // centre before the new note
+        sendNoteBytes(noteOnBytes(ch, note, nrVelocity(control, across)), `note_on_${note}`);
+      }
+      sendRibbonBend(control, step.bend, step.retrigger);
+    } else {
+      const zone = nrSnapZone(nrZones(control), t);
+      if (!zone) return false;
+      note = zone.note;
+      if (isNew || note !== ribbonPress?.note) {
+        if (!isNew) ribbonNoteOff(control);
+        sendNoteBytes(noteOnBytes(ch, note, nrVelocity(control, across)), `note_on_${note}`);
+      }
+    }
+    sendRibbonMod(control, across);
+    ribbonPress = { id: getControlId(control), note, root: note, t, across, pitch };
+    syncRibbonSession(control, { note, t, across, pitch });
+    return true;
+  }
+  function handleNoteRibbonPointerDown(control, localPoint) {
+    if (!isNoteRibbonControl(control) || nrConfig(control).editable === false) return false;
+    if (!nrInside(ribbonGeomFor(control), localPoint.x, localPoint.y)) return false;
+    // Latch: a second touch on a latched, still-sounding ribbon silences it.
+    if (nrConfig(control).latch === true && ribbonPress && ribbonPress.id === getControlId(control)) {
+      ribbonNoteOff(control);
+      sendRibbonBend(control, 8192, true);
+      ribbonPress = null;
+      syncRibbonSession(control, null);
+      return true;
+    }
+    return ribbonPlayAt(control, localPoint, true);
+  }
+  function moveRibbonPress(control, localPoint) {
+    ribbonPlayAt(control, localPoint, false);
+  }
+  function releaseRibbonPress(control) {
+    if (nrConfig(control).latch === true) return;   // keep it ringing
+    ribbonNoteOff(control);
+    sendRibbonBend(control, 8192, true);                // leave the bend centred
+    ribbonPress = null;
+    syncRibbonSession(control, null);
+  }
+  // Inject the live touch so the renderer can draw the rail + note bubble.
+  function applyNoteRibbonValueSource(control, resolved) {
+    if (!isNoteRibbonControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const r = base?._children?.NoteRibbon;
+    if (!r) return resolved;
+    const touch = sessionFor(control)?.noteRibbonTouch;
+    if (!touch) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: { ...r, __touch: touch } } } };
+  }
+
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
@@ -3901,6 +4025,11 @@
       moveChordPress(control, controlLocalPoint(event));
       return;
     }
+    // Ribbon Keyboard: slide along the strip to change pitch.
+    if (ribbonPress && ribbonPress.id === getControlId(control)) {
+      moveRibbonPress(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -4023,6 +4152,8 @@
     handleChordPadPointerDown(control, pointerDownLocal);
     // Arp: click a step cell to mute/unmute it.
     handleArpPointerDown(control, pointerDownLocal);
+    // Ribbon Keyboard: press the strip to sound the pitch there.
+    handleNoteRibbonPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -4297,6 +4428,11 @@
       const cpc = activeControl;
       chordPress = null;
       releaseChordPress(cpc);
+    }
+
+    // Release the ribbon: note-off + recentre the bend (unless latched).
+    if (ribbonPress && activeControl && ribbonPress.id === getControlId(activeControl)) {
+      releaseRibbonPress(activeControl);
     }
 
     if (isCustomComponent(activeControl)) {

@@ -74,3 +74,5 @@ legato and each note runs into the next.
 - **Ratchets** — repeat a step N times inside its slot.
 - **Chord Pad note-order input** — an `asPlayed` order that reflects the actual
   press order rather than pitch order.
+- **More link sources** — the [Ribbon Keyboard](./ribbon-keyboard.md) holds a
+  note too; it could feed the arp the same way a Chord Pad does.

@@ -1162,6 +1162,36 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** NoteRibbon — PLAYS the synth: a strip you slide along for pitch. Scale-snap,
+   *  chromatic, or continuous glide via pitch bend. Like ChordPad/Arp it emits
+   *  notes rather than driving a parameter, so it has no DeviceBindings. */
+  NoteRibbon: {
+    _type: 'NoteRibbon',
+    mode: 'snap',                 // snap (in-key only) | chromatic | glide (pitch bend)
+    orientation: 'horizontal',    // horizontal | vertical
+    key: 0,                       // tonic pitch class (0 = C)
+    scale: 'major',
+    baseNote: 48,                 // lowest note on the strip (C3)
+    octaves: 2,                   // how far the strip reaches
+    bendRange: 2,                 // glide: semitones, MUST match the synth's setting
+    velocity: 96,
+    velocityFrom: 'fixed',        // fixed | position (across the strip)
+    channel: 1,                   // MIDI channel 1-16
+    modAxis: 'none',              // none | cc — the cross axis as an expression dimension
+    modCc: 1,                     // which CC that axis sends (1 = mod wheel)
+    latch: false,                 // the note keeps sounding after release
+    editable: true,               // play the strip in preview
+    showNames: true,              // note names on the zones
+    showHeader: true,             // key / mode / current-note strip
+    // Colours.
+    fieldColour: 'FF101017',
+    zoneColour: 'FF171720',
+    inKeyColour: 'FF5B9BD5',
+    rootColour: 'FFF2C94C',
+    touchColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Constraint — linked parameters that always preserve a relationship the synth
    *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
   Constraint: {

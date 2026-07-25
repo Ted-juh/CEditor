@@ -42,6 +42,13 @@ not DSP:
   Fed by its own key/scale chord or by a **linked Chord Pad** — which then goes
   silent so the arp does the playing. See [arpeggiator.md](./arpeggiator.md).
 
+### 00c. Ribbon Keyboard — a strip of pitch — **shipped 🟢**
+- Slide for pitch: **scale-snap** (you can't play a wrong note), chromatic, or
+  **glide** — continuous pitch via pitch bend, the Trautonium gesture a keyboard
+  can't make. The cross axis is a second expression dimension (a CC). See
+  [ribbon-keyboard.md](./ribbon-keyboard.md). Distinct from the `Ribbon`
+  touch-strip, which drives a *parameter*.
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its
@@ -125,8 +132,8 @@ not DSP:
 
 ## Also missing (conventional, `[engine-reuse]`, each its own palette entry)
 
-Ribbon / touch-strip · vector joystick (4-corner morph) · drum/performance pad
-grid · crossfader · chord/scale trigger pad.
+Drum/performance pad grid · strum pad. (Ribbon/touch-strip, vector joystick,
+crossfader and the chord/scale trigger pad are all shipped.)
 
 ## Ranking
 
