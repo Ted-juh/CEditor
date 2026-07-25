@@ -9,7 +9,7 @@ import {
   eventsInWindow, eventSeconds, playedNote, playedVelocity,
   takeNoteRange, recorderGeometry, eventRects, playheadX,
   onLoopBoundary, toggleRecordState, nextPassFor,
-  RECORDER_STATES, MAX_EVENTS,
+  RECORDER_STATES, MAX_EVENTS, recorderScriptPatch, RECORDER_SCRIPT_ACTIONS,
 } from '../src/CE_Application/utils/noteRecorderLayout.js';
 import { noteOutputFromBytes } from '../src/CE_Application/stores/noteOutput.js';
 
@@ -262,4 +262,70 @@ test('the output tap reads a note-on at velocity 0 as a note-off', () => {
   assert.equal(noteOutputFromBytes([0xB0, 1, 64]), null);
   assert.equal(noteOutputFromBytes([0x90, 60]), null, 'a truncated message is not a note');
   assert.equal(noteOutputFromBytes([]), null);
+});
+
+// --- the script API ------------------------------------------------------------------
+
+test('a recorder script patch only names what it changes', () => {
+  const cfg = { state: 'idle', playing: true, bars: 2, transpose: 0, source: 'both', take: { events: [] } };
+  assert.deepEqual(recorderScriptPatch(cfg, 'record', {}), { state: 'armed' });
+  assert.deepEqual(recorderScriptPatch(cfg, 'transpose', { transpose: -12 }), { transpose: -12 });
+  assert.deepEqual(recorderScriptPatch(cfg, 'bars', { bars: 4 }), { bars: 4 });
+  assert.deepEqual(recorderScriptPatch(cfg, 'source', { source: 'panel' }), { source: 'panel' });
+  assert.deepEqual(recorderScriptPatch(cfg, 'play', { playing: false }), { playing: false });
+  // Already in that state: nothing to say.
+  assert.deepEqual(recorderScriptPatch(cfg, 'play', { playing: true }), {});
+  assert.deepEqual(recorderScriptPatch(cfg, 'stop', {}), {});
+});
+
+test('record is idempotent when told and toggles when not', () => {
+  // A footswitch wants a toggle; a MIDI-mapped switch may fire twice and wants
+  // an explicit value to mean the same thing both times.
+  const idle = { state: 'idle', take: { events: [] } };
+  assert.deepEqual(recorderScriptPatch(idle, 'record', { on: true }), { state: 'armed' });
+  const armed = { state: 'armed', take: { events: [] } };
+  assert.deepEqual(recorderScriptPatch(armed, 'record', { on: true }), {}, 'already arming');
+  assert.deepEqual(recorderScriptPatch(armed, 'record', { on: false }), { state: 'idle' });
+  assert.deepEqual(recorderScriptPatch(armed, 'record', {}), { state: 'idle' }, 'toggle = change your mind');
+});
+
+test('take edits refuse while it is capturing', () => {
+  // The live take lives in the session while recording and is committed when it
+  // stops. A script writing the take now would be silently overwritten.
+  const busy = { state: 'recording', take: { events: [{ t: 0, note: 60, dur: 0.1, pass: 0 }] } };
+  assert.deepEqual(recorderScriptPatch(busy, 'clear', {}), {});
+  assert.deepEqual(recorderScriptPatch(busy, 'undo', {}), {});
+  assert.deepEqual(recorderScriptPatch(busy, 'quantize', { grid: 16, strength: 1 }), {});
+  // …but stopping it is always allowed.
+  assert.deepEqual(recorderScriptPatch(busy, 'stop', {}), { state: 'idle' });
+});
+
+test('clear and undo do nothing to an empty take', () => {
+  const empty = { state: 'idle', take: { events: [] } };
+  assert.deepEqual(recorderScriptPatch(empty, 'clear', {}), {});
+  assert.deepEqual(recorderScriptPatch(empty, 'undo', {}), {});
+  const one = { state: 'idle', take: { events: [{ t: 0.5, note: 60, dur: 0.1, pass: 0 }] } };
+  assert.ok(recorderScriptPatch(one, 'clear', {}).take);
+  assert.equal(recorderScriptPatch(one, 'clear', {}).state, 'idle');
+});
+
+test('a scripted quantise only goes into key when asked', () => {
+  const cfg = { state: 'idle', grid: 16, take: { events: [{ t: 0.26, note: 64, velocity: 100, dur: 0.1, pass: 0 }] } };
+  const timing = recorderScriptPatch(cfg, 'quantize', { grid: 16, strength: 1 });
+  assert.equal(timing.take.events[0].note, 64, 'pitch untouched without a scale');
+  assert.ok(near(timing.take.events[0].t, 0.25));
+  const inKey = recorderScriptPatch(cfg, 'quantize', { grid: 16, strength: 1, scale: 'minor', key: 0 });
+  assert.equal(inKey.take.events[0].note, 63, 'E is not in C minor');
+});
+
+test('a bad recorder argument is a no-op, not a throw', () => {
+  const cfg = { state: 'idle', take: { events: [] } };
+  assert.deepEqual(recorderScriptPatch(cfg, 'source', { source: 'telepathy' }), {});
+  assert.deepEqual(recorderScriptPatch(cfg, 'transpose', { transpose: 'up' }), {});
+  assert.deepEqual(recorderScriptPatch(cfg, 'bars', { bars: 'lots' }), {});
+  assert.deepEqual(recorderScriptPatch(cfg, 'nonsense', {}), {});
+  assert.deepEqual(recorderScriptPatch(null, 'stop', {}), {});
+  for (const action of RECORDER_SCRIPT_ACTIONS) {
+    assert.ok(Object.keys(recorderScriptPatch(cfg, action, {})).length <= 2);
+  }
 });

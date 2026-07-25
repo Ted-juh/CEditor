@@ -116,6 +116,37 @@ question a setlist exists to answer. Skipped scenes are struck through.
 
 Clicking a row jumps to it, through the same recall the pedal uses.
 
+## Driving it from a script
+
+The most obviously needed of the three, because without it the only ways to
+advance are a pedal and a mouse — so a panel button saying **Next** couldn't work,
+which is exactly the thing a setlist wants:
+
+```lua
+setlistNext("Set")
+setlistPrev("Set")
+setlistGoto("Set", 3)              -- 1-based, as the list shows it
+setlistGoto("Set", "Closer")       -- or by name — a name survives a reorder
+setlistEnable("Set", "Ballad", false)   -- skip one tonight
+setlistWrap("Set", true)
+```
+
+**These move the index. They do not recall** — and that's the design, not a
+limitation. The recall is driven by the index *changing*, so a scripted step, a
+footswitch press, a click on a row and a hand edit in the inspector are all the
+same event downstream and cannot drift apart.
+
+One consequence worth knowing: the first sighting of an index only **baselines**
+it. Recalling on panel load would fire a program change at the synth every time
+you open the editor, which is not what opening a panel means.
+
+A scripted step obeys the same rules the pedal does — the end of the list stays
+put without wrap, and disabled scenes are skipped.
+
+Out-of-range numbers, unknown scene names and moves that change nothing are
+**no-ops with a trace line**, not throws. Portable, but not export-safe: it edits
+the panel's own model, so it needs the panel runtime.
+
 ## Compatibility
 
 Program change and bank select go to the `mainSynth` device role — any synth

@@ -151,6 +151,9 @@ not DSP:
   funnel all six of them already send on — so a note control added later is
   captured for free. A recorder never records a recorder. Quantise strength is
   **partial by default**, because full snap is what the Phrase Sequencer is for.
+  Scriptable via `recorderRecord` / `recorderUndo` / `recorderQuantize` — the
+  take-editing ones refuse while it is capturing, rather than being silently
+  overwritten when the pass commits.
   See [phrase-recorder.md](./phrase-recorder.md).
 
 ### 00k. Harmoniser — one finger in, a full chord out — **shipped 🟢**
@@ -166,8 +169,9 @@ not DSP:
   Two bookkeeping rules: a note-off releases what its note-on **sent**, and —
   the one specific to this component — sounding pitches are **reference
   counted**, because two fingers a third apart produce overlapping chords and
-  releasing one must not punch a hole in the other. See
-  [harmoniser.md](./harmoniser.md).
+  releasing one must not punch a hole in the other. Scriptable via `harmonyKey`
+  / `harmonyScale` / `harmonyShape`, so a Setlist scene can carry the song's key.
+  See [harmoniser.md](./harmoniser.md).
 
 ### 00l. Setlist — scenes on a footswitch — **shipped 🟢**
 - Unglamorous, and the thing people actually need on stage: an ordered list of
@@ -183,7 +187,10 @@ not DSP:
   values** — a program change swaps the patch, and the stored values belong to
   the new one. Capture takes an **explicit path list**, never "everything",
   because the setlist's own index is a panel value too. A scene's tempo drives
-  the [Transport](./transport.md), so everything synced follows the song. See
+  the [Transport](./transport.md), so everything synced follows the song.
+  `setlistNext` / `setlistGoto` / `setlistEnable` drive it from a panel button —
+  and they move the **index** only, because the recall is driven by the index
+  changing, so pedal, click, script and hand edit are one path. See
   [setlist.md](./setlist.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**

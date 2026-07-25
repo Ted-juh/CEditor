@@ -6,6 +6,7 @@ import {
   footswitchCc, footswitchChannel, footswitchThreshold, footswitchEdge,
   FOOT_ACTIONS, sceneMessages, recallPlan, captureScene, sceneChangeCount, missingPaths,
   setlistGeometry, visibleRange, rowRect, rowAtPoint, MAX_SCENES,
+  setlistScriptPatch, SETLIST_SCRIPT_ACTIONS,
 } from '../src/CE_Application/utils/setlistLayout.js';
 
 function sl(c) { return { _children: { Core: { controlType: 'Setlist' }, Setlist: c } }; }
@@ -203,4 +204,57 @@ test('rows hit-test where they are drawn', () => {
   assert.equal(rowAtPoint(geom, 10, r.x + 5, r.y + 5), first + 1);
   assert.equal(rowAtPoint(geom, 10, r.x + 5, geom.y0 + geom.h + 50), null, 'below the list');
   assert.equal(rowAtPoint(geom, 10, -20, r.y + 5), null, 'left of it');
+});
+
+// --- the script API ------------------------------------------------------------------
+
+test('a scripted step moves the index and nothing else', () => {
+  // It does NOT recall. The recall is driven by the index changing, so the
+  // pedal, a click, a script and a hand edit all take one path.
+  const cfg = { scenes: THREE, index: 0, wrap: false };
+  assert.deepEqual(setlistScriptPatch(cfg, 'next', {}), { index: 1 });
+  assert.deepEqual(setlistScriptPatch({ ...cfg, index: 1 }, 'prev', {}), { index: 0 });
+  // The same rules the pedal obeys: the end stays put, disabled scenes skipped.
+  assert.deepEqual(setlistScriptPatch({ ...cfg, index: 2 }, 'next', {}), {});
+  assert.deepEqual(setlistScriptPatch({ ...cfg, index: 2, wrap: true }, 'next', {}), { index: 0 });
+  const skip = { scenes: [THREE[0], { ...THREE[1], enabled: false }, THREE[2]], index: 0 };
+  assert.deepEqual(setlistScriptPatch(skip, 'next', {}), { index: 2 });
+  for (const action of SETLIST_SCRIPT_ACTIONS) {
+    assert.ok(Object.keys(setlistScriptPatch(cfg, action, {})).length <= 1);
+  }
+});
+
+test('goto takes a 1-based number or a scene name', () => {
+  // A name survives someone reordering the set; a number doesn't.
+  const cfg = { scenes: THREE, index: 0 };
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 3 }), { index: 2 }, '1-based in');
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 'Closer' }), { index: 2 });
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 'c' }), { index: 2 }, 'by id too');
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 1 }), {}, 'already there');
+  // Out of range, missing, or a name that isn't there: no-ops, not throws.
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 99 }), {});
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 0 }), {});
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', { scene: 'Encore' }), {});
+  assert.deepEqual(setlistScriptPatch(cfg, 'goto', {}), {});
+});
+
+test('enable skips a song tonight without editing the set', () => {
+  const cfg = { scenes: THREE, index: 0 };
+  const patch = setlistScriptPatch(cfg, 'enable', { scene: 'Ballad', enabled: false });
+  assert.equal(patch.scenes[1].enabled, false);
+  assert.equal(patch.scenes[0].enabled, true, 'the others are untouched');
+  // Already in that state, or a scene that isn't there: nothing.
+  assert.deepEqual(setlistScriptPatch(cfg, 'enable', { scene: 'Ballad', enabled: true }), {});
+  assert.deepEqual(setlistScriptPatch(cfg, 'enable', { scene: 'Nope' }), {});
+  assert.deepEqual(setlistScriptPatch(cfg, 'enable', { scene: 9 }), {});
+});
+
+test('wrap toggles when unspecified and is idempotent when told', () => {
+  assert.deepEqual(setlistScriptPatch({ scenes: THREE, wrap: false }, 'wrap', {}), { wrap: true });
+  assert.deepEqual(setlistScriptPatch({ scenes: THREE, wrap: true }, 'wrap', { wrap: true }), {});
+  assert.deepEqual(setlistScriptPatch({ scenes: THREE, wrap: true }, 'wrap', { wrap: false }), { wrap: false });
+  // An empty setlist has nothing to step, but wrap is still a setting.
+  assert.deepEqual(setlistScriptPatch({ scenes: [] }, 'next', {}), {});
+  assert.deepEqual(setlistScriptPatch({ scenes: [] }, 'wrap', { wrap: true }), { wrap: true });
+  assert.deepEqual(setlistScriptPatch(null, 'nonsense', {}), {});
 });

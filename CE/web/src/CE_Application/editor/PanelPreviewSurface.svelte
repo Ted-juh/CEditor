@@ -2745,6 +2745,7 @@
   // and 0 on release, and acting on both steps the list twice per press.
   const setlistFootDown = {};     // id -> is the pedal currently held
   const setlistCcSeen = {};       // id -> midiRouteEvents.seq consumed
+  const setlistIndexSeen = {};    // id -> the index we last recalled for
   function isSetlistControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Setlist';
   }
@@ -2778,17 +2779,29 @@
     }
     if (plan.bpm !== null && plan.bpm !== undefined) setTransportBpm(plan.bpm);
   }
+  // Moving the index is ALL these do. The recall is driven by the index
+  // changing (see pumpSetlistIndex), so the pedal, a click, a script and a hand
+  // edit in the inspector all take the same path and cannot diverge.
   function setlistGo(control, index) {
     const next = gotoIndex(setlistScenes(control), index);
     if (next < 0) return;
     updateControlProperty(getControlId(control), 'Setlist.index', next);
-    recallScene(control, next);
   }
   function setlistStep(control, delta) {
     const next = stepIndex(setlistScenes(control), setlistIndex(control), delta, setlistWraps(control));
     if (next < 0 || next === setlistIndex(control)) return;
     updateControlProperty(getControlId(control), 'Setlist.index', next);
-    recallScene(control, next);
+  }
+  // Watch the index and recall when it moves. The first sighting only
+  // BASELINES: recalling on panel load would fire a program change at the synth
+  // every time you open the editor, which is not what opening a panel means.
+  function pumpSetlistIndex(control) {
+    const id = getControlId(control);
+    const now = setlistIndex(control);
+    const seen = setlistIndexSeen[id];
+    setlistIndexSeen[id] = now;
+    if (seen === undefined || seen === now || now < 0) return;
+    recallScene(control, now);
   }
   // The pedal. Read off the router's EVENT store, not the expression state
   // store: a stepper has to see each message once, when it arrives.
@@ -2816,6 +2829,7 @@
     const base = resolved?.control ?? control;
     if (!base?._children?.Setlist) return resolved;
     pumpSetlistFoot(control);
+    pumpSetlistIndex(control);
     return resolved;
   }
   // Click a row to jump to it. On stage you use the pedal; in the editor you

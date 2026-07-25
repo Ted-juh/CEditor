@@ -334,3 +334,77 @@ export function harmoniserKeys(range, width, height, pad = 8, headerH = 22) {
   }
   return out;
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// A harmoniser you can't re-key from a footswitch is a harmoniser that only
+// works for songs in one key. Same contract as the other two: a PURE reducer
+// returning a PATCH of what changes, and a no-op for anything it doesn't
+// recognise.
+export const HARMONISER_SCRIPT_ACTIONS = [
+  'mode', 'key', 'scale', 'size', 'shape', 'voicing', 'inversion', 'octave', 'outOfKey', 'keepPlayed', 'channel',
+];
+
+export function harmoniserScriptPatch(cfg, action, args = {}) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const a = args && typeof args === 'object' ? args : {};
+  switch (String(action)) {
+    case 'mode': {
+      const m = String(a.mode ?? '');
+      return HARMONY_MODES.includes(m) ? { mode: m } : {};
+    }
+    case 'key': {
+      const k = Number(a.key);
+      // Wrapped, not clamped: twelve steps of one semitone come back to where
+      // they started rather than piling up on B.
+      return Number.isFinite(k) ? { key: mod12(k) } : {};
+    }
+    case 'scale': {
+      const s = String(a.scale ?? '');
+      return SCALES[s] ? { scale: s } : {};
+    }
+    case 'size': {
+      const n = Number(a.size);
+      return Number.isFinite(n) ? { size: clampInt(n, 2, 6) } : {};
+    }
+    case 'shape': {
+      // Either a preset name or an explicit interval list. A preset id that
+      // doesn't exist is a no-op rather than silently the first preset —
+      // memoryPresetShape falls back for the UI, but a script typo should not
+      // quietly rewrite the shape.
+      if (Array.isArray(a.shape)) {
+        const list = a.shape.map((n) => Number(n)).filter((n) => Number.isFinite(n));
+        return list.length ? { shape: list.map((n) => clampInt(n, -36, 36)).slice(0, MAX_VOICES) } : {};
+      }
+      const id = String(a.preset ?? a.shape ?? '');
+      return MEMORY_PRESETS.some((p) => p.id === id) ? { shape: memoryPresetShape(id) } : {};
+    }
+    case 'voicing': {
+      const v = String(a.voicing ?? '');
+      return VOICINGS.includes(v) ? { voicing: v } : {};
+    }
+    case 'inversion': {
+      const n = Number(a.inversion);
+      return Number.isFinite(n) ? { inversion: clampInt(n, 0, 3) } : {};
+    }
+    case 'octave': {
+      const n = Number(a.octave);
+      return Number.isFinite(n) ? { octaveSpread: clampInt(n, -3, 3) } : {};
+    }
+    case 'outOfKey': {
+      const m = String(a.outOfKey ?? '');
+      return OUT_OF_KEY.includes(m) ? { outOfKey: m } : {};
+    }
+    case 'keepPlayed': {
+      const want = a.keepPlayed;
+      const now = c.keepPlayed !== false;
+      const next = want === undefined ? !now : want !== false;
+      return next === now ? {} : { keepPlayed: next };
+    }
+    case 'channel': {
+      const n = Number(a.channel);
+      return Number.isFinite(n) ? { channel: clampInt(n, 1, 16) } : {};
+    }
+    default:
+      return {};
+  }
+}

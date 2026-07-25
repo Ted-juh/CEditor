@@ -312,3 +312,79 @@ export function toggleRecordState(state, hadEvents = false) {
 export function nextPassFor(take, state) {
   return state === 'overdub' ? lastPass(take) + 1 : 0;
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// Same contract as the Phrase Sequencer's: a PURE reducer over the config that
+// returns a PATCH of only the fields that change. An empty patch is a no-op,
+// which is what every unrecognised argument produces — a script on a footswitch
+// must not take the panel down because someone typed "quantise".
+export const RECORDER_SCRIPT_ACTIONS = [
+  'record', 'stop', 'play', 'clear', 'undo', 'quantize', 'transpose', 'bars', 'source',
+];
+
+export function recorderScriptPatch(cfg, action, args = {}) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const a = args && typeof args === 'object' ? args : {};
+  const state = RECORDER_STATES.includes(String(c.state)) ? String(c.state) : 'idle';
+  const take = { events: normalizeEvents(c.take?.events), pending: {} };
+  // While it is capturing, the live take lives in the session and is committed
+  // when recording stops. A script writing the take now would be overwritten a
+  // moment later, so the take-editing actions refuse rather than pretend.
+  const busy = isRecordingState(state);
+
+  switch (String(action)) {
+    case 'record': {
+      // Explicit on/off is idempotent, for a MIDI-mapped switch that may fire
+      // twice; unspecified toggles, which is what a footswitch wants.
+      const want = a.on;
+      if (want === true) return busy || state === 'armed' ? {} : { state: 'armed' };
+      if (want === false) return state === 'idle' ? {} : { state: 'idle' };
+      return { state: toggleRecordState(state, take.events.length > 0) };
+    }
+    case 'stop':
+      return state === 'idle' ? {} : { state: 'idle' };
+    case 'play': {
+      const want = a.playing;
+      const now = c.playing !== false;
+      const next = want === undefined ? !now : want !== false;
+      return next === now ? {} : { playing: next };
+    }
+    case 'clear':
+      if (busy) return {};
+      return take.events.length ? { take: clearTake(), state: 'idle' } : {};
+    case 'undo': {
+      if (busy) return {};
+      const next = undoPass(take);
+      return next === take ? {} : { take: next };
+    }
+    case 'quantize': {
+      if (busy || !take.events.length) return {};
+      const grid = clampInt(a.grid ?? c.grid ?? 16, 1, 64);
+      const strength = clamp01(num(a.strength ?? c.quantizeStrength, 0));
+      const intoKey = a.scale !== undefined || a.key !== undefined;
+      return {
+        take: quantizeTake(take, {
+          grid,
+          strength,
+          keyPc: intoKey ? clampInt(a.key ?? c.key ?? 0, 0, 11) : null,
+          scaleName: intoKey ? String(a.scale ?? c.scale ?? 'minor') : null,
+          quantizeLength: a.lengths === true,
+        }),
+      };
+    }
+    case 'transpose': {
+      const t = Number(a.transpose);
+      return Number.isFinite(t) ? { transpose: clampInt(t, -48, 48) } : {};
+    }
+    case 'bars': {
+      const b = Number(a.bars);
+      return Number.isFinite(b) ? { bars: clampInt(b, MIN_BARS, MAX_BARS) } : {};
+    }
+    case 'source': {
+      const s = String(a.source ?? '');
+      return ['input', 'panel', 'both'].includes(s) ? { source: s } : {};
+    }
+    default:
+      return {};
+  }
+}

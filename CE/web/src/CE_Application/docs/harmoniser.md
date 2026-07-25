@@ -139,6 +139,39 @@ an exported Player. The click-to-audition path works without one.
 [Panic](./panic.md) releases everything it is holding, using the same reference
 counts. Nothing here touches the DPD profile.
 
+## Driving it from a script
+
+A harmoniser fixed to one key only works for songs in that key, so the whole
+config is reachable — through the same pure reducer the inspector uses:
+
+```lua
+harmonyKey("Harm", 5)              -- move it to F
+harmonyScale("Harm", "dorian")
+harmonyMode("Harm", "memory")
+harmonyShape("Harm", "min7")       -- a preset name, or a list of semitones
+harmonySize("Harm", 4)             -- triads → sevenths
+harmonyVoicing("Harm", "drop2")
+harmonyInversion("Harm", 1)
+harmonyOctave("Harm", -1)
+harmonyOutOfKey("Harm", "mute")
+harmonyKeepPlayed("Harm", false)   -- harmony only
+harmonyChannel("Harm", 3)
+```
+
+Pair it with the [Setlist](./setlist.md) and each scene can carry its own key —
+which is most of the reason to want this at all.
+
+The key **wraps** rather than clamping: twelve steps of one semitone come back to
+where they started instead of piling up on B.
+
+An unknown shape preset is a **no-op**, deliberately unlike the inspector's
+dropdown, which falls back to the first preset because it has to show something.
+A script typo should not quietly rewrite your chord shape.
+
+Everything else follows the house rules: bad arguments are no-ops with a trace
+line rather than throws, only changed fields are written, and the command is
+portable but not export-safe.
+
 ## What it doesn't do
 
 - **No per-degree chord overrides.** Diatonic mode stacks thirds; you cannot say

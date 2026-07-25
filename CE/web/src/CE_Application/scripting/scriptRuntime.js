@@ -277,6 +277,20 @@ function runStep(step, context, output, index) {
     return { continue: true };
   }
 
+  if (command === 'recorder' || command === 'harmony' || command === 'setlist') {
+    // Same as split/phrase: there is no panel here to read the current state
+    // from, so the trace reports the intent rather than inventing a result.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? (command === 'setlist' ? 'next' : command === 'harmony' ? 'key' : 'record'));
+    const shown = ['on', 'grid', 'strength', 'scale', 'key', 'transpose', 'bars', 'source',
+      'mode', 'size', 'shape', 'voicing', 'inversion', 'octave', 'channel', 'scene', 'enabled', 'wrap']
+      .filter((k) => args[k] !== undefined && args[k] !== '')
+      .map((k) => `${k}=${args[k]}`)
+      .join(' ');
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${command} ${target}: ${action}${shown ? ` ${shown}` : ''}` });
+    return { continue: true };
+  }
+
   if (command === 'sendCC') {
     const value = evaluateExpression(args.value, context);
     const message = {

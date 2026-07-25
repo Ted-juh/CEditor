@@ -226,3 +226,66 @@ export function rowAtPoint(geom, index, px, py) {
   }
   return null;
 }
+
+// --- Driving it from a script -------------------------------------------------------------
+// The most obviously needed of the three: a setlist you can only advance with a
+// pedal or a mouse can't be driven by a panel button, and "Next" as a button is
+// exactly what a setlist wants.
+//
+// Note what this reducer does NOT do: it does not recall. It moves the index,
+// and the recall is driven by the index CHANGING — so the pedal, a click, a
+// script and a hand edit in the inspector all take the same path and cannot
+// diverge.
+export const SETLIST_SCRIPT_ACTIONS = ['next', 'prev', 'goto', 'enable', 'wrap'];
+
+export function setlistScriptPatch(cfg, action, args = {}) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const a = args && typeof args === 'object' ? args : {};
+  const scenes = setlistScenes({ _children: { Setlist: c } });
+  if (!scenes.length && String(action) !== 'wrap') return {};
+  const index = clampInt(c.index ?? 0, 0, Math.max(0, scenes.length - 1));
+  const wrap = c.wrap === true;
+
+  switch (String(action)) {
+    case 'next': {
+      const next = stepIndex(scenes, index, 1, wrap);
+      return next === index ? {} : { index: next };
+    }
+    case 'prev': {
+      const next = stepIndex(scenes, index, -1, wrap);
+      return next === index ? {} : { index: next };
+    }
+    case 'goto': {
+      // Accepts a 1-based number as the list shows it, or a scene name/id —
+      // a name survives someone reordering the set, a number doesn't.
+      let target = -1;
+      if (a.scene !== undefined && a.scene !== null && !Number.isFinite(Number(a.scene))) {
+        const key = String(a.scene);
+        target = scenes.findIndex((s) => s.name === key || s.id === key);
+      } else {
+        const n = Number(a.scene ?? a.index);
+        if (!Number.isFinite(n)) return {};
+        target = Math.round(n) - 1;                 // 1-based in, 0-based out
+      }
+      if (target < 0 || target >= scenes.length) return {};
+      return target === index ? {} : { index: target };
+    }
+    case 'enable': {
+      // Skip a song tonight without editing the set.
+      const key = String(a.scene ?? '');
+      const at = Number.isFinite(Number(a.scene))
+        ? Math.round(Number(a.scene)) - 1
+        : scenes.findIndex((s) => s.name === key || s.id === key);
+      if (at < 0 || at >= scenes.length) return {};
+      const want = a.enabled !== false;
+      if ((scenes[at].enabled !== false) === want) return {};
+      return { scenes: scenes.map((s, i) => (i === at ? { ...s, enabled: want } : s)) };
+    }
+    case 'wrap': {
+      const want = a.wrap === undefined ? !wrap : a.wrap !== false;
+      return want === wrap ? {} : { wrap: want };
+    }
+    default:
+      return {};
+  }
+}

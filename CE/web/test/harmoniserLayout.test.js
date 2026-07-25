@@ -9,6 +9,7 @@ import {
   EMPTY_HELD, pressHarmony, releaseHarmony, releaseAllHarmony,
   soundingPitches, heldInputNotes, reconcileHarmony,
   harmoniserRange, isBlackKey, harmoniserKeys,
+  harmoniserScriptPatch, HARMONISER_SCRIPT_ACTIONS,
 } from '../src/CE_Application/utils/harmoniserLayout.js';
 
 function hm(c) { return { _children: { Core: { controlType: 'Harmoniser' }, Harmoniser: c } }; }
@@ -209,4 +210,49 @@ test('a fixed velocity overrides the played one; 0 means follow', () => {
   const organ = hm({ ...CMAJ._children.Harmoniser, velocity: 90 });
   assert.deepEqual(pressHarmony(EMPTY_HELD, organ, 60, 30).sends.map((s) => s.velocity), [90, 90, 90]);
   assert.deepEqual(pressHarmony(EMPTY_HELD, CMAJ, 60, 30).sends.map((s) => s.velocity), [30, 30, 30]);
+});
+
+// --- the script API ------------------------------------------------------------------
+
+test('a harmoniser script patch only names what it changes', () => {
+  const cfg = { mode: 'diatonic', key: 0, scale: 'major', size: 3, voicing: 'close', keepPlayed: true };
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'scale', { scale: 'dorian' }), { scale: 'dorian' });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'mode', { mode: 'memory' }), { mode: 'memory' });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'size', { size: 4 }), { size: 4 });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'voicing', { voicing: 'drop2' }), { voicing: 'drop2' });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'octave', { octave: -1 }), { octaveSpread: -1 });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'outOfKey', { outOfKey: 'mute' }), { outOfKey: 'mute' });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'keepPlayed', { keepPlayed: false }), { keepPlayed: false });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'keepPlayed', { keepPlayed: true }), {}, 'already so');
+  for (const action of HARMONISER_SCRIPT_ACTIONS) {
+    assert.ok(Object.keys(harmoniserScriptPatch(cfg, action, {})).length <= 1);
+  }
+});
+
+test('the key wraps rather than clamping', () => {
+  // Twelve steps of one semitone come back to where they started.
+  let key = 0;
+  for (let i = 0; i < 12; i += 1) key = harmoniserScriptPatch({ key }, 'key', { key: key + 1 }).key;
+  assert.equal(key, 0);
+  assert.equal(harmoniserScriptPatch({}, 'key', { key: -1 }).key, 11);
+});
+
+test('a shape comes from a preset name or an explicit list', () => {
+  assert.deepEqual(harmoniserScriptPatch({}, 'shape', { shape: 'min7' }).shape, [0, 3, 7, 10]);
+  assert.deepEqual(harmoniserScriptPatch({}, 'shape', { shape: [0, 5, 7] }).shape, [0, 5, 7]);
+  // An unknown preset is a NO-OP, not silently the first preset. The UI falls
+  // back for a dropdown; a script typo must not quietly rewrite the shape.
+  assert.deepEqual(harmoniserScriptPatch({}, 'shape', { shape: 'majorr' }), {});
+  assert.deepEqual(harmoniserScriptPatch({}, 'shape', { shape: [] }), {});
+});
+
+test('a bad harmoniser argument is a no-op, not a throw', () => {
+  const cfg = { mode: 'diatonic', key: 0, scale: 'major' };
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'scale', { scale: 'dorain' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'mode', { mode: 'telepathic' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'voicing', { voicing: 'wide' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'outOfKey', { outOfKey: 'panic' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'key', { key: 'up' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'nonsense', {}), {});
+  assert.deepEqual(harmoniserScriptPatch(null, 'nonsense', {}), {});
 });

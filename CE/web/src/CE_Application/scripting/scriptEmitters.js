@@ -88,6 +88,9 @@ function emitLuaStep(step, lines) {
   else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC(${m.channel}, ${m.cc}, 0)`); }
   else if (command === 'split') lines.push(`  ${splitCall(args, 'lua')}`);
   else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'lua')}`);
+  else if (command === 'recorder') lines.push(`  ${recorderCall(args, 'lua')}`);
+  else if (command === 'harmony') lines.push(`  ${harmonyCall(args, 'lua')}`);
+  else if (command === 'setlist') lines.push(`  ${setlistCall(args, 'lua')}`);
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
@@ -150,6 +153,69 @@ function phraseCall(args, dialect) {
   }
 }
 
+// The three newest components. Same rule as splitCall/phraseCall: only the
+// arguments the chosen action actually uses reach the line.
+function recorderCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'record')) {
+    case 'stop': return call('recorderStop');
+    case 'play': return call('recorderPlay', [String(args.on !== false)]);
+    case 'clear': return call('recorderClear');
+    case 'undo': return call('recorderUndo');
+    case 'quantize': return call('recorderQuantize', [Number(args.grid) || 16, Number(args.strength) || 0]);
+    case 'transpose': return call('recorderTranspose', [Number(args.transpose) || 0]);
+    case 'bars': return call('recorderBars', [Number(args.bars) || 2]);
+    case 'source': return call('recorderSource', [q(args.source ?? 'both')]);
+    case 'record':
+    default: return call('recorderRecord', [String(args.on !== false)]);
+  }
+}
+function harmonyCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'key')) {
+    case 'mode': return call('harmonyMode', [q(args.mode ?? 'diatonic')]);
+    case 'scale': return call('harmonyScale', [q(args.scale ?? 'major')]);
+    case 'size': return call('harmonySize', [Number(args.size) || 3]);
+    case 'shape': return call('harmonyShape', [q(args.shape ?? 'major')]);
+    case 'voicing': return call('harmonyVoicing', [q(args.voicing ?? 'close')]);
+    case 'inversion': return call('harmonyInversion', [Number(args.inversion) || 0]);
+    case 'octave': return call('harmonyOctave', [Number(args.octave) || 0]);
+    case 'outOfKey': return call('harmonyOutOfKey', [q(args.outOfKey ?? 'pass')]);
+    case 'keepPlayed': return call('harmonyKeepPlayed', [String(args.on !== false)]);
+    case 'channel': return call('harmonyChannel', [Number(args.channel) || 1]);
+    case 'key':
+    default: return call('harmonyKey', [Number(args.key) || 0]);
+  }
+}
+function setlistCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const scene = args.scene === '' || args.scene == null ? '' : args.scene;
+  const sc = () => (typeof scene === 'number' || /^\d+$/.test(String(scene)) ? Number(scene) : q(scene));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'next')) {
+    case 'prev': return call('setlistPrev');
+    case 'goto': return call('setlistGoto', [sc()]);
+    case 'enable': return call('setlistEnable', [sc(), String(args.enabled !== false)]);
+    case 'wrap': return call('setlistWrap', [String(args.wrap !== false)]);
+    case 'next':
+    default: return call('setlistNext');
+  }
+}
+
 function ceStep(step) {
   const command = step.command ?? step.cmd;
   const args = step.args ?? {};
@@ -168,6 +234,9 @@ function ceStep(step) {
   if (command === 'panic') return panicStepMessages(args).map((m) => `sendCC channel=${m.channel} cc=${m.cc} value=0`).join('\n  ');
   if (command === 'split') return splitCall(args, 'ce');
   if (command === 'phrase') return phraseCall(args, 'ce');
+  if (command === 'recorder') return recorderCall(args, 'ce');
+  if (command === 'harmony') return harmonyCall(args, 'ce');
+  if (command === 'setlist') return setlistCall(args, 'ce');
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
@@ -210,6 +279,9 @@ function emitJsLike(script, target) {
     else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC({ channel: ${m.channel}, cc: ${m.cc}, value: 0 });`); }
     else if (command === 'split') lines.push(`  ${splitCall(args, 'js')};`);
     else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'js')};`);
+    else if (command === 'recorder') lines.push(`  ${recorderCall(args, 'js')};`);
+    else if (command === 'harmony') lines.push(`  ${harmonyCall(args, 'js')};`);
+    else if (command === 'setlist') lines.push(`  ${setlistCall(args, 'js')};`);
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);

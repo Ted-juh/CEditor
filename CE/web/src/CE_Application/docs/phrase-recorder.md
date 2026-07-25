@@ -145,6 +145,42 @@ it the one recording path that works with nothing plugged in.
 [Panic](./panic.md) releases everything it is playing and closes any note still
 open in the take. Nothing here touches the DPD profile.
 
+## Driving it from a script
+
+A big Record button on a panel is an obvious thing to want, and it needs the
+recorder to be reachable from a script — so it is, through the same pure reducer
+the inspector's own buttons use:
+
+```lua
+recorderRecord("Loop")          -- arm (toggles; pass true/false to be explicit)
+recorderStop("Loop")
+recorderPlay("Loop", false)     -- mute the loop without losing it
+recorderUndo("Loop")            -- drop the last overdub pass
+recorderClear("Loop")
+recorderQuantize("Loop", 16, 0.5)          -- grid, strength
+recorderQuantize("Loop", 16, 1, "minor", 0)  -- …and into a key
+recorderTranspose("Loop", -12)
+recorderBars("Loop", 4)
+recorderSource("Loop", "panel")
+```
+
+**The take-editing actions refuse while it is capturing.** During a pass the live
+take lives in the session and is committed when recording stops, so a scripted
+`clear`, `undo` or `quantize` mid-take would be silently overwritten a moment
+later. They return nothing and say so in the trace, rather than appearing to
+work. `stop` is always allowed.
+
+`recorderRecord` **toggles** when you don't say which way — what a footswitch
+wants — and is **idempotent** when passed `true`/`false`, which is what a
+MIDI-mapped switch wants, because it may fire twice.
+
+A bad argument is a **no-op with a trace line**, not a throw. Only the fields
+that actually change are written.
+
+Like the other panel-editing commands this is portable but **not export-safe**:
+it changes the panel's own model rather than sending MIDI, so it needs the panel
+runtime. The exported Player has that; a bare device script doesn't.
+
 ## What it doesn't do
 
 - **One take, no take history.** Undo removes the last pass; there is no

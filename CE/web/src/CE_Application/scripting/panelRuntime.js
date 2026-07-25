@@ -26,6 +26,9 @@ import { isSourceScript } from './scriptModel.js';
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 import { phraseScriptPatch } from '../utils/phraseLayout.js';
+import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
+import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
+import { setlistScriptPatch } from '../utils/setlistLayout.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -320,6 +323,68 @@ const phraseApi = {
   phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
 };
 
+// --- Recorder / Harmoniser / Setlist -----------------------------------------
+// All three follow the Phrase Sequencer's shape exactly: read the section, hand
+// it to a pure reducer, write back only the fields that changed. One helper,
+// because three near-identical copies is how they drift apart.
+function sectionAction(path, section, reducer, action, args) {
+  const target = String(path ?? '');
+  const cfg = getValue(`${target}.${section}`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `${section.toLowerCase()}: "${target}" is not a ${section} (no ${section} section)`);
+    return;
+  }
+  const patch = reducer(cfg, action, args ?? {});
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    // Not an error: an unknown argument or a move that changes nothing is a
+    // no-op by design. Silence would look like a dead footswitch, though.
+    addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
+    return;
+  }
+  for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
+  addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} → ${keys.join(', ')}`);
+}
+const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
+const recorderApi = {
+  recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
+  recorderStop: (target) => recAction(target, 'stop', {}),
+  recorderPlay: (target, playing) => recAction(target, 'play', playing === undefined ? {} : { playing: playing !== false }),
+  recorderClear: (target) => recAction(target, 'clear', {}),
+  recorderUndo: (target) => recAction(target, 'undo', {}),
+  recorderQuantize: (target, grid, strength, scale, key) =>
+    recAction(target, 'quantize', { grid, strength, scale, key }),
+  recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
+  recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
+  recorderSource: (target, source) => recAction(target, 'source', { source }),
+};
+
+const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
+const harmoniserApi = {
+  harmonyMode: (target, mode) => harmAction(target, 'mode', { mode }),
+  harmonyKey: (target, key) => harmAction(target, 'key', { key }),
+  harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
+  harmonySize: (target, size) => harmAction(target, 'size', { size }),
+  harmonyShape: (target, shape) => harmAction(target, 'shape', { shape, preset: shape }),
+  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', { voicing }),
+  harmonyInversion: (target, inversion) => harmAction(target, 'inversion', { inversion }),
+  harmonyOctave: (target, octave) => harmAction(target, 'octave', { octave }),
+  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
+  harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
+  harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
+};
+
+const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
+const setlistApi = {
+  // These move the INDEX. The recall follows from the index changing, so a
+  // scripted step and a footswitch step are the same event downstream.
+  setlistNext: (target) => setAction(target, 'next', {}),
+  setlistPrev: (target) => setAction(target, 'prev', {}),
+  setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
+  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
+  setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
+};
+
 function buildApi(ownerName) {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
@@ -335,6 +400,12 @@ function buildApi(ownerName) {
     ...splitApi,
     // Phrase Sequencer — swap the riff, transpose it, run it backwards.
     ...phraseApi,
+    // Phrase Recorder — arm it, undo a pass, quantise the take.
+    ...recorderApi,
+    // Harmoniser — re-key it mid-song.
+    ...harmoniserApi,
+    // Setlist — next song, from a button or a script.
+    ...setlistApi,
     // flow — minimal for M1
     emit: () => {},
     run: () => {},
