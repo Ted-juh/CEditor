@@ -1,7 +1,7 @@
 <script>
   import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
   import { makeGuid } from '../stores/panelModel.js';
-  import { shortcutFromEvent } from '../utils/panicLayout.js';
+  import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
@@ -167,6 +167,9 @@
   // Typing "Ctrl+Shift+P" by hand is easy to get wrong, so the field records the
   // keys you actually press.
   let capturingShortcut = $state(false);
+  // Advice, never a block — the author knows their rig. The point is that a bad
+  // choice is a choice rather than a surprise.
+  let shortcutNotes = $derived(panel ? panicShortcutWarnings(panel.panicShortcut) : []);
   function shortcutKeyDown(event) {
     if (!capturingShortcut || !panel) return;
     event.preventDefault();
@@ -320,6 +323,15 @@
           {capturingShortcut ? 'Press keys…' : (panel.panicShortcut || 'Off')}
         </button>
       </PropertyCell>
+      {#if shortcutNotes.length}
+        <PropertyCell label="" span={4} hint="Nothing else on a panel binds a key, so this is not a clash with another control — it is about keys the host may take first, and keys that fire too easily.">
+          <ul class="shortcut-notes">
+            {#each shortcutNotes as note, i (i)}
+              <li class={note.level}>{note.message}</li>
+            {/each}
+          </ul>
+        </PropertyCell>
+      {/if}
       <PropertyCell label="Min W" span={2} hint="Minimum width when resizable" disabled={!panel.resizable}>
         <NumberInput value={panel.resizable ? panel.minWidth : panel.width} step={1} min={0}
                      onchange={(v) => updatePanel(panel.id, { minWidth: v })} />
@@ -640,6 +652,10 @@
   }
   .shortcut:hover { border-color: #5B9BD5; }
   .shortcut.capturing { border-color: #F2C94C; color: #F2C94C; background: #241f10; }
+  .shortcut-notes { margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 3px; }
+  .shortcut-notes li { font-size: 11px; line-height: 1.45; }
+  .shortcut-notes li.warn { color: #E0A05C; }
+  .shortcut-notes li.info { color: #8a8a94; }
   .val {
     color: #DDD;
     font-size: 11px;

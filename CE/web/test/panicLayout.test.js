@@ -5,6 +5,7 @@ import {
   panicLabel, panicSummary, panicGeometry, panicHit, EMERGENCY_PANIC,
   isPanicShortcut, panicCcMessages, DEFAULT_PANIC_SHORTCUT,
   parseShortcut, formatShortcut, shortcutFromEvent, eventMatchesShortcut,
+  panicShortcutWarnings,
 } from '../src/CE_Application/utils/panicLayout.js';
 
 function pc(c) { return { _children: { Core: { controlType: 'Panic' }, Panic: c } }; }
@@ -206,4 +207,55 @@ test('a MODIFIED shortcut still works while typing; a bare one never does', () =
   // and a claimed event is still deferred to, modifiers or not
   assert.equal(isPanicShortcut(key({ key: 'P', ctrlKey: true, altKey: true, target: field, defaultPrevented: true }),
     { shortcut: 'Ctrl+Alt+P' }), false);
+});
+
+// --- the shortcut advisor --------------------------------------------------------
+// NOT a clash check against other panel bindings: a panel binds exactly one key,
+// this one. These are the hazards that actually bite.
+
+const levels = (sc) => panicShortcutWarnings(sc).map((w) => w.level);
+const said = (sc, needle) => panicShortcutWarnings(sc).some((w) => w.message.includes(needle));
+
+test('a modified, unclaimed combo is clean', () => {
+  assert.deepEqual(panicShortcutWarnings('Ctrl+Alt+P'), []);
+  assert.deepEqual(panicShortcutWarnings('Ctrl+Shift+F9'), []);
+});
+
+test('combos the host usually eats are flagged', () => {
+  // Ctrl+P is the trap: an obvious pick for "panic" and it means print
+  assert.ok(levels('Ctrl+P').includes('warn'));
+  assert.ok(said('Ctrl+P', 'claimed by the DAW or the OS'));
+  for (const sc of ['Ctrl+S', 'Ctrl+W', 'Ctrl+Z', 'Meta+Q', 'F5', 'F12', 'Ctrl+Shift+I']) {
+    assert.ok(levels(sc).includes('warn'), sc);
+  }
+});
+
+test('bare keys are warned about in proportion to the damage', () => {
+  // space is play/stop in every DAW — its own message, not the generic one
+  assert.ok(said('Space', 'play/stop'));
+  // a bare letter fires on an ordinary keystroke
+  assert.ok(said('P', 'single keystroke'));
+  // a bare function key is fine, just noted as unavailable while typing
+  assert.deepEqual(levels('F8'), ['info']);
+  assert.ok(said('F8', 'never fire while typing'));
+});
+
+test('Escape explains its own precedence rather than complaining', () => {
+  assert.deepEqual(levels('Escape'), ['info', 'info']);
+  assert.ok(said('Escape', 'cancel key for in-place edits'));
+});
+
+test('no shortcut says what still works', () => {
+  assert.deepEqual(levels(''), ['info']);
+  assert.ok(said('', 'Panic button'));
+  assert.ok(said('', 'auto-panic'));
+});
+
+test('capturing Space binds Space instead of silently clearing it', () => {
+  // ' ' would trim away to '' and read back as "no shortcut" — so pressing
+  // Space in the capture field would have switched the shortcut OFF
+  assert.equal(shortcutFromEvent({ key: ' ' }), 'Space');
+  assert.notEqual(parseShortcut(shortcutFromEvent({ key: ' ' })), null);
+  assert.equal(isPanicShortcut(key({ key: ' ' }), { shortcut: 'Space' }), true);
+  assert.equal(eventMatchesShortcut({ key: ' ' }, parseShortcut('Space')), true);
 });

@@ -61,6 +61,24 @@ and press the keys you want; Backspace clears it, which switches the shortcut
 off. The setting lives **on the panel**, not in app preferences, so it travels
 with an exported Player — the person using the Player is the one who needs it.
 
+The field also **advises on the choice**. Not a clash check against other panel
+bindings — there aren't any: a panel binds exactly one key, this one. The
+scripting API has no key event and no control carries a shortcut. So the useful
+warnings are the hazards that actually bite:
+
+- **Combos the host usually eats.** `Ctrl+P` is the trap — an obvious pick for
+  "panic", and it means print. Same for `Ctrl+S`, `Ctrl+W`, `Meta+Q`, `F5`,
+  `Ctrl+Shift+I` and friends. A plugin window's key handling varies by host, so
+  these warn rather than forbid.
+- **Space**, which is play/stop in nearly every DAW.
+- **A bare letter**, which fires on an ordinary keystroke whenever focus isn't
+  in a field.
+- **Escape**, which gets an explanation of its own precedence rather than a
+  complaint.
+
+It is advice, never a block. The author knows their rig; the job is to make sure
+a bad choice is a choice rather than a surprise.
+
 One rule worth knowing: the "not while typing" guard applies to **bare keys
 only**. A bare key in a field is always the field's — Escape cancels, and a bare
 letter would panic on every keystroke. But `Ctrl+Alt+P` is nobody's typing, so a
@@ -103,7 +121,7 @@ format. The text targets expand.
 
 ## How it works
 
-- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 19 tests,
+- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 25 tests,
   plus `test/scriptPanic.test.js` for the script command end to end). Besides the
   messages it holds the shortcut parser / formatter / matcher, so
   `Ctrl+Shift+P`, `cmd+k` and `option+F8` all mean what you'd expect:
@@ -135,5 +153,9 @@ format. The text targets expand.
 - ~~Auto-panic on preview exit~~ — **done**, see above.
 - ~~Panic from a script~~ — **done**, see above.
 - ~~A configurable shortcut~~ — **done**, see above.
-- **A shortcut conflict check** — nothing warns you if the panic key collides
-  with something else the panel binds.
+- ~~A shortcut conflict check~~ — **done**, though not as originally framed:
+  there is nothing on a panel to collide *with*, so it became an advisor about
+  host-claimed combos and keys that fire too easily.
+- **Per-control key bindings** — if controls ever gain shortcuts, or scripting
+  gains an `onKeyDown` event, the advisor becomes a real clash check and should
+  grow one.

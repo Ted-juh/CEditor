@@ -125,8 +125,11 @@ export function formatShortcut(binding) {
 // Turn a real keydown into the shortcut text it represents — for a
 // press-the-keys-you-want capture field. Returns '' for a bare modifier.
 export function shortcutFromEvent(event) {
-  const key = String(event?.key ?? '');
-  if (!key || MODIFIER_ALIASES[key.toLowerCase()]) return '';
+  const raw = String(event?.key ?? '');
+  if (!raw || MODIFIER_ALIASES[raw.toLowerCase()]) return '';
+  // A literal space would trim away to nothing and read back as "no shortcut",
+  // so capturing Space would silently switch the key off instead of binding it.
+  const key = raw === ' ' ? 'Space' : raw;
   return formatShortcut({
     key, ctrl: !!event.ctrlKey, alt: !!event.altKey, shift: !!event.shiftKey, meta: !!event.metaKey,
   });
@@ -136,7 +139,8 @@ export function shortcutHasModifier(binding) {
 }
 export function eventMatchesShortcut(event, binding) {
   if (!event || !binding?.key) return false;
-  const k = String(event.key ?? '');
+  const raw = String(event.key ?? '');
+  const k = raw === ' ' ? 'Space' : raw;      // same normalisation as capture
   // Single characters compare case-insensitively: Shift+P reports key 'P'.
   const sameKey = k.length === 1 && binding.key.length === 1
     ? k.toLowerCase() === binding.key.toLowerCase()
@@ -146,6 +150,62 @@ export function eventMatchesShortcut(event, binding) {
     && !!event.altKey === binding.alt
     && !!event.shiftKey === binding.shift
     && !!event.metaKey === binding.meta;
+}
+
+// --- Is this shortcut a good idea? ----------------------------------------------
+// NOT a conflict check against other panel bindings: there are none. A panel
+// binds exactly one key, this one — the scripting API has no key event and no
+// control carries a shortcut. So the useful warnings are about the things that
+// actually go wrong: a combo the host eats before the panel ever sees it, and a
+// bare key that fires on an ordinary keystroke.
+//
+// Everything here is advice, never a block. The author knows their rig; the job
+// is to make sure a bad choice is a choice rather than a surprise.
+
+// Commonly claimed by a DAW or the OS. Not exhaustive and not certain — a
+// plugin window's key handling varies by host — so these warn, never forbid.
+const HOST_CLAIMED = new Set([
+  'ctrl+s', 'ctrl+z', 'ctrl+y', 'ctrl+w', 'ctrl+t', 'ctrl+n', 'ctrl+q', 'ctrl+r',
+  'ctrl+p', 'ctrl+o', 'ctrl+a', 'ctrl+c', 'ctrl+v', 'ctrl+x', 'ctrl+f',
+  'meta+s', 'meta+z', 'meta+w', 'meta+q', 'meta+n', 'meta+o', 'meta+a', 'meta+c',
+  'meta+v', 'meta+x', 'meta+f', 'meta+h', 'meta+m',
+  'ctrl+shift+i', 'ctrl+shift+j', 'ctrl+shift+c', 'alt+F4',
+  'F5', 'F11', 'F12',
+]);
+function claimKey(binding) {
+  const parts = [];
+  if (binding.ctrl) parts.push('ctrl');
+  if (binding.alt) parts.push('alt');
+  if (binding.shift) parts.push('shift');
+  if (binding.meta) parts.push('meta');
+  parts.push(binding.key.length === 1 ? binding.key.toLowerCase() : binding.key);
+  return parts.join('+');
+}
+
+export function panicShortcutWarnings(shortcut) {
+  const binding = parseShortcut(shortcut);
+  if (!binding) {
+    return [{ level: 'info', message: 'No shortcut. The Panic button, the script command and auto-panic on exit all still work.' }];
+  }
+  const out = [];
+  const bare = !shortcutHasModifier(binding);
+  const key = binding.key;
+
+  if (HOST_CLAIMED.has(claimKey(binding))) {
+    out.push({ level: 'warn', message: `${formatShortcut(binding)} is commonly claimed by the DAW or the OS — it may never reach the panel.` });
+  }
+  if (bare && (key === 'Space' || key === 'Spacebar')) {
+    out.push({ level: 'warn', message: 'Space is play/stop in nearly every DAW. Almost certainly the wrong choice.' });
+  } else if (bare && key.length === 1) {
+    out.push({ level: 'warn', message: `A bare "${key.toUpperCase()}" fires on a single keystroke whenever focus is not in a text field. Add a modifier unless that is what you want.` });
+  }
+  if (bare && key === 'Escape') {
+    out.push({ level: 'info', message: 'Escape is also the cancel key for in-place edits, so it will not fire while you are editing a field — which is the correct precedence, but worth knowing.' });
+  }
+  if (bare) {
+    out.push({ level: 'info', message: 'Bare keys never fire while typing. A shortcut with a modifier still works with focus in a text box.' });
+  }
+  return out;
 }
 
 function isEditableTarget(target) {
