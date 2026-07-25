@@ -23,6 +23,12 @@ Three ways to feed it:
 - **Incoming MIDI notes** — hold keys on an external keyboard and the arp runs
   them. See [note-input-echo.md](./note-input-echo.md).
 
+All three share the same shape: the arp **rearranges notes that already exist**.
+When you want to *write* the line rather than derive it from a chord, that's the
+[Phrase Sequencer](./phrase-sequencer.md) — a step grid whose rows are scale
+degrees. It borrows this component's swing function, so an Arp and a Phrase at
+the same swing on the same clock land on the same beat.
+
 ## How it works
 
 - **Pure engine** `utils/arpLayout.js` (+ `test/arpLayout.test.js`, 13 tests).

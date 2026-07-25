@@ -19,6 +19,7 @@
     LayoutGrid,
     OctagonAlert,
     SplitSquareHorizontal,
+    Grid2x2Check,
     Timer,
     Gauge,
     Spline,
@@ -138,6 +139,7 @@
       { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
       { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
       { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
+      { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

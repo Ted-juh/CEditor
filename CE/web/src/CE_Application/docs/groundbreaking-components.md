@@ -84,7 +84,8 @@ not DSP:
   `juce::AudioPlayHead` on the audio thread and pushed to the panel at 30Hz: a
   position rather than a pulse stream, so it cannot fall behind, and a locate in
   the DAW is recognised as a jump rather than replayed as sixteen notes. The
-  [Arpeggiator](./arpeggiator.md) and the
+  [Arpeggiator](./arpeggiator.md), the
+  [Phrase Sequencer](./phrase-sequencer.md) and the
   [Turing Modulator](./turing-modulator.md) follow it by note division, the
   [Gesture Looper](./gesture-looper.md), the
   [Preset Constellation](./preset-constellation.md) wander and the
@@ -94,7 +95,7 @@ not DSP:
   That is **every** self-clocked component in the panel; nothing here still runs
   on a private timer. Adds **loop points** (a bar range the position folds into,
   as a pure function of the timeline rather than a counter that resets) and a
-  **count-in** (armed, not running — so all six followers hold and stay silent
+  **count-in** (armed, not running — so every follower holds and stays silent
   with no change to any of them). See [transport.md](./transport.md).
 
 ### 00h. Zone Splitter — one keyboard, several synths — **shipped 🟢**
@@ -112,6 +113,27 @@ not DSP:
   a guess — while poly pressure, which does name its note, needs no rule at all.
   A footswitch can change the split live via `splitPreset` / `splitMute` /
   `splitPoint`. See [zone-splitter.md](./zone-splitter.md).
+
+### 00i. Phrase Sequencer — a step grid whose rows are degrees — **shipped 🟢**
+- The gap it fills is exact: the [Turing Modulator](./turing-modulator.md)
+  sequences **values**, the [Arpeggiator](./arpeggiator.md) walks notes you are
+  **already holding**, and nothing sequenced **pitch**. Sixteen columns, eight
+  rows, click to place a note — but the rows are **scale degrees, not
+  semitones**, so a pattern is a *shape*: change the key and it transposes,
+  change minor to major and it re-harmonises, and there is no cell you can click
+  that is out of key. A chromatic mode is there for when you want the piano roll
+  after all. The pattern is a **sparse map**, so shrinking the grid never
+  destroys anything (and the inspector says so, with a Delete-them link).
+  **Ties** hold a note across steps and are exempt from the gate — a gate that
+  cut a tie would be the retrigger the tie exists to avoid — and a tie with a
+  rest in front of it is honestly nothing, in the seeds as well as in the grid.
+  A note-off replays the **remembered** note-on, so changing key, scale or
+  transpose mid-phrase can't leave a note ringing, and **stopping releases**.
+  Synced it is position-in/index-out like the Arp, so it can't drift and a
+  locate re-baselines instead of firing the steps it skipped; swing shares the
+  Arp's own function so the two land together. Live from a script via
+  `phraseSeed` / `phraseKey` / `phraseScale` / `phraseDirection` / `phraseCell`.
+  See [phrase-sequencer.md](./phrase-sequencer.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

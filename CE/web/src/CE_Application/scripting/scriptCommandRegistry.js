@@ -301,6 +301,30 @@ export const SCRIPT_COMMANDS = [
     description: 'Change a Zone Splitter live: apply a preset, mute a zone, or move a split point.',
   },
   {
+    id: 'phrase',
+    label: 'phrase',
+    category: 'MIDI / Device',
+    // Same standing as `split`: it edits the panel's own model rather than
+    // sending MIDI, so the exported Player runs it and a bare device script
+    // cannot.
+    portable: true,
+    exportSafe: false,
+    scopes: ['panel'],
+    args: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'action', type: 'string', default: 'seed' },
+      { name: 'seed', type: 'string', default: 'riff' },
+      { name: 'key', type: 'number', default: 0 },
+      { name: 'scale', type: 'string', default: 'minor' },
+      { name: 'transpose', type: 'number', default: 0 },
+      { name: 'direction', type: 'string', default: 'forward' },
+      { name: 'running', type: 'boolean', default: true },
+      { name: 'step', type: 'number', default: 0 },
+      { name: 'row', type: 'number', default: 0 },
+    ],
+    description: 'Change a Phrase Sequencer live: swap the pattern, change key or scale, run it backwards, toggle a cell.',
+  },
+  {
     id: 'sendNRPN',
     label: 'sendNRPN',
     category: 'MIDI / Device',

@@ -17,6 +17,11 @@ when it lands somewhere good, freeze. It outputs the current step's **value**, a
 Where the Orbit gives you perfect geometric motion and the Looper your own hand,
 the Turing gives you **generative surprise you stay in control of**.
 
+It sequences **values**, not notes — the distinction matters when you're
+choosing between components. For a sequence of *pitches* you draw yourself, see
+the [Phrase Sequencer](./phrase-sequencer.md); bind this one to a filter and run
+them together.
+
 ## How it works
 
 - **Pure engine** `utils/turingLayout.js` (+ `test/turingLayout.test.js`, 8 tests):

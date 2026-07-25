@@ -260,6 +260,23 @@ function runStep(step, context, output, index) {
     return { continue: true };
   }
 
+  if (command === 'phrase') {
+    // Same as `split`: no panel here to read the pattern from, so the trace
+    // reports the intent rather than inventing a resulting grid.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? 'seed');
+    const detail = action === 'seed' ? `seed=${args.seed ?? 'riff'}`
+      : action === 'clear' ? ''
+      : action === 'key' ? `key=${Number(args.key) || 0}`
+      : action === 'scale' ? `scale=${args.scale ?? 'minor'}`
+      : action === 'transpose' ? `transpose=${Number(args.transpose) || 0}`
+      : action === 'direction' ? `direction=${args.direction ?? 'forward'}`
+      : action === 'run' ? `running=${args.running !== false}`
+      : `step=${Number(args.step) || 0} row=${Number(args.row) || 0}`;
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `phrase ${target}: ${action}${detail ? ` ${detail}` : ''}` });
+    return { continue: true };
+  }
+
   if (command === 'sendCC') {
     const value = evaluateExpression(args.value, context);
     const message = {

@@ -248,7 +248,7 @@ following an external clock, since there's nothing to tap.
 
 ## What follows it
 
-**Every self-clocked component in the panel follows it.** There are six, and
+**Every self-clocked component in the panel follows it.** There are seven, and
 that is all of them — nothing here still runs on a private timer. Sync is off by
 default on every one, so nothing changes until you ask for it, and each keeps
 its free-running control for when you don't.
@@ -256,6 +256,7 @@ its free-running control for when you don't.
 | | unit | what sync gives you |
 |---|---|---|
 | [Arpeggiator](./arpeggiator.md) | note division | steps land on the beat |
+| [Phrase Sequencer](./phrase-sequencer.md) | note division | steps land on the beat |
 | [Turing Modulator](./turing-modulator.md) | note division | its *mutations* land on the beat |
 | [Gesture Looper](./gesture-looper.md) | bars | the loop point is the bar line |
 | [Preset Constellation](./preset-constellation.md) | bars | the wander cycle is an arrangement length |

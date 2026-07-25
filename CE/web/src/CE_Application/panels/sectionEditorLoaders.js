@@ -48,6 +48,7 @@ const LAZY_COMPONENT_LOADERS = {
   drumpads: () => import('../sections/DrumPadsEditor.svelte'),
   panic: () => import('../sections/PanicEditor.svelte'),
   splitzone: () => import('../sections/SplitZoneEditor.svelte'),
+  phrase: () => import('../sections/PhraseEditor.svelte'),
   transport: () => import('../sections/TransportEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),

@@ -87,6 +87,7 @@ function emitLuaStep(step, lines) {
   else if (command === 'emitEvent') lines.push(`  emitEvent(${quoted(args.event)}, ${quoted(args.target ?? '')}, ${luaExpression(args.value ?? { ref: 'event.value' })})`);
   else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC(${m.channel}, ${m.cc}, 0)`); }
   else if (command === 'split') lines.push(`  ${splitCall(args, 'lua')}`);
+  else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'lua')}`);
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
@@ -127,6 +128,28 @@ function splitCall(args, dialect) {
   }
 }
 
+// The Phrase Sequencer's equivalent. Same rule: only the arguments the chosen
+// action actually uses reach the line.
+function phraseCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'seed')) {
+    case 'clear': return call('phraseClear');
+    case 'key': return call('phraseKey', [Number(args.key) || 0]);
+    case 'scale': return call('phraseScale', [q(args.scale ?? 'minor')]);
+    case 'transpose': return call('phraseTranspose', [Number(args.transpose) || 0]);
+    case 'direction': return call('phraseDirection', [q(args.direction ?? 'forward')]);
+    case 'run': return call('phraseRun', [String(args.running !== false)]);
+    case 'cell': return call('phraseCell', [Number(args.step) || 0, Number(args.row) || 0]);
+    case 'seed':
+    default: return call('phraseSeed', [q(args.seed ?? 'riff')]);
+  }
+}
+
 function ceStep(step) {
   const command = step.command ?? step.cmd;
   const args = step.args ?? {};
@@ -144,6 +167,7 @@ function ceStep(step) {
   if (command === 'emitEvent') return `emitEvent ${args.event} target=${args.target ?? ''} value=${valueText(args.value ?? { ref: 'event.value' }, 'ce')}`;
   if (command === 'panic') return panicStepMessages(args).map((m) => `sendCC channel=${m.channel} cc=${m.cc} value=0`).join('\n  ');
   if (command === 'split') return splitCall(args, 'ce');
+  if (command === 'phrase') return phraseCall(args, 'ce');
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
@@ -185,6 +209,7 @@ function emitJsLike(script, target) {
     else if (command === 'emitEvent') lines.push(`  emitEvent("${args.event}", { target: "${args.target ?? ''}", value: ${valueText(args.value ?? { ref: 'event.value' }, target)} });`);
     else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC({ channel: ${m.channel}, cc: ${m.cc}, value: 0 });`); }
     else if (command === 'split') lines.push(`  ${splitCall(args, 'js')};`);
+    else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'js')};`);
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);

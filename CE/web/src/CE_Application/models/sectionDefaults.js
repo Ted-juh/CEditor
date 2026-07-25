@@ -1252,6 +1252,51 @@ export const SECTION_DEFAULTS = {
   /** Panic — silence everything: the notes this panel is holding, the echoed
    *  note display, and whatever the SYNTH is still holding after a lost
    *  note-off. Emits MIDI, so no DeviceBindings. */
+  Phrase: {
+    _type: 'Phrase',
+    running: true,
+    // Rows are scale DEGREES by default: a pattern is a shape, so changing key
+    // transposes it and changing scale re-harmonises it, and neither can make a
+    // wrong note. 'chromatic' turns it into a plain piano roll.
+    mode: 'degree',
+    key: 0,                      // tonic pitch class (0 = C)
+    scale: 'minor',
+    baseOctave: 3,               // row 0 = the tonic at this octave
+    transpose: 0,                // semitones, applied after the row → pitch map
+    steps: 16,
+    rows: 8,
+    direction: 'forward',        // forward | reverse | pingpong | random
+    seed: 0,                     // makes 'random' repeatable
+    channel: 1,
+    velocity: 100,               // the default a cell uses when it has none
+    gate: 0.8,                   // note length as a fraction of the step
+    swing: 0,                    // 0 = straight, 1 = max shuffle (delays odd steps)
+    rate: 8,                     // steps per second (free-running)
+    syncToTransport: false,
+    division: '1/16',            // step length when synced
+    accentEvery: 4,              // draw a bar line every N steps
+    // Sparse map keyed "step:row" — resizing the grid never destroys anything.
+    pattern: {
+      '0:0': { velocity: null, tie: false },
+      '1:0': { velocity: null, tie: true },
+      '4:0': { velocity: null, tie: false },
+      '6:2': { velocity: null, tie: false },
+      '7:4': { velocity: null, tie: false },
+      '10:2': { velocity: 80, tie: false },
+      '11:2': { velocity: null, tie: true },
+      '14:0': { velocity: null, tie: false },
+    },
+    editable: true,              // click cells in preview
+    showHeader: true,
+    showGutter: true,            // the degree/pitch labels down the left
+    // Colours.
+    faceColour: 'FF141420',
+    cellColour: 'FF20202C',
+    noteColour: 'FF39D98A',
+    playColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   SplitZone: {
     _type: 'SplitZone',
     inputChannel: 0,             // MIDI channel to listen on (0 = omni)

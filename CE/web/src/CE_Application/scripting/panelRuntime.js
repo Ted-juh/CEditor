@@ -25,6 +25,7 @@ import { isSourceScript } from './scriptModel.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
+import { phraseScriptPatch } from '../utils/phraseLayout.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -285,6 +286,40 @@ const splitApi = {
   splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
 };
 
+// --- Phrase Sequencer --------------------------------------------------------
+// Same idea, one level up: the reducer patches the whole config rather than one
+// array, because a seed needs to know the grid size and a key change needs to
+// leave the pattern alone. Only the changed fields are written, so an undo step
+// says "direction" rather than "the sequencer".
+function phraseAction(path, action, args) {
+  const target = String(path ?? '');
+  const cfg = getValue(`${target}.Phrase`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `phrase: "${target}" is not a Phrase Sequencer (no Phrase section)`);
+    return;
+  }
+  const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    // Not an error — an unknown seed or an out-of-grid cell is a no-op by
+    // design. But silence would look like the footswitch was dead.
+    addScriptTrace('log', '', `phrase ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
+    return;
+  }
+  for (const key of keys) setValue(`${target}.Phrase.${key}`, patch[key]);
+  addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
+}
+const phraseApi = {
+  phraseSeed: (target, seed) => phraseAction(target, 'seed', { seed }),
+  phraseClear: (target) => phraseAction(target, 'clear', {}),
+  phraseKey: (target, key) => phraseAction(target, 'key', { key }),
+  phraseScale: (target, scale) => phraseAction(target, 'scale', { scale }),
+  phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
+  phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
+  phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+};
+
 function buildApi(ownerName) {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
@@ -298,6 +333,8 @@ function buildApi(ownerName) {
     ...midiApi,
     // Zone Splitter — change the split from a footswitch.
     ...splitApi,
+    // Phrase Sequencer — swap the riff, transpose it, run it backwards.
+    ...phraseApi,
     // flow — minimal for M1
     emit: () => {},
     run: () => {},

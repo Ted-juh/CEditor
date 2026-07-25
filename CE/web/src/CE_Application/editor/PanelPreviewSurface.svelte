@@ -119,6 +119,14 @@
     EMERGENCY_PANIC, isPanicShortcut, DEFAULT_PANIC_SHORTCUT,
   } from '../utils/panicLayout.js';
   import {
+    phraseConfig, phraseSteps, phraseRows, phraseSynced, phraseDivision, phraseRate,
+    phraseDirection, phraseStepSeconds, gateSeconds as phraseGateSeconds,
+    phraseGeometry, cellAtPoint as phraseCellAt, toggleCell, phrasePattern,
+    stepAtIndex as phraseStepAt, EMPTY_SOUNDING as PHRASE_EMPTY,
+    playStep as phrasePlayStep, releaseAll as phraseReleaseAll,
+    phraseBeatsPerStep, tiesForward, phraseSwingSeconds,
+  } from '../utils/phraseLayout.js';
+  import {
     splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
     noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
@@ -272,7 +280,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))));
+    return applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2711,6 +2719,174 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Phrase Sequencer: notes on a grid ----------------------------------------
+  // The third note-emitting family member with a clock, after the Arp and the
+  // Turing — and it shares their rule: the step index is derived from a rising
+  // number (the transport position when synced, a free-running counter when
+  // not), never stored, so a direction change or a stall can't corrupt a cursor.
+  //
+  // Note-off bookkeeping is the same trap as the Zone Splitter's, with a
+  // different trigger: editing the key, scale, transpose or base octave while it
+  // plays changes what a row MEANS, so a re-derived off would release a pitch
+  // that was never started. playStep() therefore remembers what it sent.
+  const PHRASE_PAD = 8;
+  const phraseSounding = {};      // id -> pure sounding map (see phraseLayout)
+  const phraseIndexState = {};    // id -> last fired sequence index
+  const phraseBeatsState = {};    // id -> last transport reading, when synced
+  const phraseJumpState = {};     // id -> transport jump counter seen
+  const phraseFreeIndex = {};     // id -> free-running index accumulator
+  const phraseTimers = {};        // id -> [timeoutId…] for gate note-offs
+  let phraseTickerRunning = false;
+  let phraseLastMs = 0;
+  function isPhraseControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Phrase';
+  }
+  function phraseControls() {
+    return (orderedControls ?? []).filter((c) => isPhraseControl(c));
+  }
+  function phraseGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const cfg = phraseConfig(control);
+    return phraseGeometry(numberOr(t.width, 0), numberOr(t.height, 0),
+      phraseSteps(control), phraseRows(control), PHRASE_PAD,
+      cfg.showHeader !== false ? 20 : 0, cfg.showGutter !== false ? 26 : 0);
+  }
+  function runPhraseSends(control, index, sends, bpm) {
+    const id = getControlId(control);
+    const secs = phraseStepSeconds(control, bpm);
+    const gateMs = phraseGateSeconds(control, secs) * 1000;
+    const gates = gateMs < secs * 1000 - 2;      // a full gate is legato: no early off
+    for (const m of sends) {
+      if (m.kind === 'off') { sendNoteBytes(noteOffBytes(m.channel, m.note), `phrase_off_${m.note}`); continue; }
+      sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `phrase_on_${m.note}`);
+      // A note the next step is about to TIE must not be cut short — that is the
+      // whole point of a tie — so it skips the gate and rides to the boundary.
+      if (!gates || tiesForward(control, index, m.row)) continue;
+      (phraseTimers[id] ??= []).push(setTimeout(() => {
+        const held = phraseSounding[id]?.[`${m.row}`];
+        if (!held || held.note !== m.note) return;   // already released, or moved on
+        sendNoteBytes(noteOffBytes(m.channel, m.note), `phrase_gate_${m.note}`);
+        const next = { ...phraseSounding[id] };
+        delete next[`${m.row}`];
+        phraseSounding[id] = next;
+      }, gateMs));
+    }
+  }
+  function phraseFireIndex(control, index, bpm) {
+    const id = getControlId(control);
+    // Swing delays the odd steps. The step is worked out at fire time rather
+    // than captured now, so a pattern edited during the delay plays as edited —
+    // and the pending timer lives in phraseTimers so Panic can cancel it.
+    const fire = () => {
+      const r = phrasePlayStep(phraseSounding[id] ?? PHRASE_EMPTY, control, index);
+      phraseSounding[id] = r.sounding;
+      runPhraseSends(control, index, r.sends, bpm);
+    };
+    // The playing column lights on the beat even when the note is swung off it:
+    // the grid shows where the sequence is, not where the shuffle put it.
+    phraseIndexState[id] = index;
+    const delayMs = phraseSwingSeconds(control, index, phraseStepSeconds(control, bpm)) * 1000;
+    if (delayMs > 0) (phraseTimers[id] ??= []).push(setTimeout(fire, delayMs));
+    else fire();
+  }
+  function phraseAllOff(control) {
+    const id = getControlId(control);
+    for (const t of phraseTimers[id] ?? []) clearTimeout(t);
+    phraseTimers[id] = [];
+    const r = phraseReleaseAll(phraseSounding[id] ?? PHRASE_EMPTY);
+    phraseSounding[id] = r.sounding;
+    for (const m of r.sends) sendNoteBytes(noteOffBytes(m.channel, m.note), `phrase_off_${m.note}`);
+  }
+  function ensurePhraseTicker() {
+    if (phraseTickerRunning) return;
+    phraseTickerRunning = true;
+    phraseLastMs = Date.now();
+    const loop = () => {
+      const all = phraseControls();
+      const running = all.filter((c) => phraseConfig(c).running !== false);
+      // Stopping must let go. Otherwise the ticker exits with the last step
+      // still held and nothing left running to ever send the note-off — a
+      // hanging note you can only clear with Panic.
+      for (const c of all) {
+        if (phraseConfig(c).running !== false) continue;
+        const id = getControlId(c);
+        if (Object.keys(phraseSounding[id] ?? PHRASE_EMPTY).length === 0 && !(phraseTimers[id] ?? []).length) continue;
+        phraseAllOff(c);
+        phraseIndexState[id] = undefined;   // and the playing column goes dark
+      }
+      if (!running.length) { phraseTickerRunning = false; return; }
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - phraseLastMs) / 1000));
+      phraseLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        if (phraseSynced(c)) {
+          // Position in, index out — the Arp's rule. A jump (a host locate, a
+          // loop wrap) re-baselines instead of firing every step it skipped.
+          const beats = transportBeatsNow();
+          const jump = transportJumpSeq();
+          const jumped = phraseJumpState[id] !== jump;
+          phraseJumpState[id] = jump;
+          const index = Math.floor(Math.max(0, beats) / phraseBeatsPerStep(c));
+          const prev = phraseBeatsState[id];
+          phraseBeatsState[id] = beats;
+          if (jumped || prev === undefined || !isTransportRunning()) { phraseIndexState[id] = index; continue; }
+          if (index !== phraseIndexState[id]) phraseFireIndex(c, index, transportBpmNow());
+          continue;
+        }
+        const next = (phraseFreeIndex[id] ?? 0) + phraseRate(c) * dt;
+        phraseFreeIndex[id] = next;
+        const index = Math.floor(next);
+        if (index !== phraseIndexState[id]) phraseFireIndex(c, index, null);
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  function applyPhraseValueSource(control, resolved) {
+    if (!isPhraseControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Phrase;
+    if (!cfg) return resolved;
+    if (cfg.running !== false) { ensurePhraseTicker(); void orbitClock; }
+    const id = getControlId(control);
+    const index = phraseIndexState[id];
+    const next = {
+      ...cfg,
+      __step: index === undefined ? -1 : phraseStepAt(index, phraseSteps(control), phraseDirection(control), cfg.seed ?? 0),
+    };
+    const sess = sessionFor(control);
+    if (sess?.phrasePattern) next.pattern = sess.phrasePattern;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Phrase: next } } };
+  }
+  // Click a cell to toggle a note; drag across to paint a run of them.
+  function handlePhrasePointerDown(control, localPoint) {
+    if (!isPhraseControl(control) || phraseConfig(control).editable === false) return false;
+    const hit = phraseCellAt(phraseGeomFor(control), localPoint.x, localPoint.y);
+    if (!hit) return false;
+    const pattern = phrasePattern(control);
+    const turningOn = !pattern[`${hit.step}:${hit.row}`];
+    phrasePaint = { id: getControlId(control), on: turningOn, seen: new Set() };
+    paintPhraseCell(control, hit);
+    return true;
+  }
+  function paintPhraseCell(control, hit) {
+    const key = `${hit.step}:${hit.row}`;
+    if (phrasePaint.seen.has(key)) return;      // one toggle per cell per drag
+    phrasePaint.seen.add(key);
+    const pattern = phrasePattern(control);
+    const isOn = !!pattern[key];
+    // A drag that started by turning cells ON only turns them on, and vice
+    // versa — otherwise dragging back over your own trail erases it.
+    if (isOn === phrasePaint.on) return;
+    updateControlProperty(getControlId(control), 'Phrase.pattern', toggleCell(pattern, hit.step, hit.row));
+  }
+  function movePhrasePaint(control, localPoint) {
+    const hit = phraseCellAt(phraseGeomFor(control), localPoint.x, localPoint.y);
+    if (hit) paintPhraseCell(control, hit);
+  }
+
   // --- Zone Splitter: one keyboard, several synths ------------------------------
   // The first control here that is purely a ROUTER: it plays nothing of its own,
   // it re-sends what arrives on the hardware input. Notes go out on the same raw
@@ -2722,6 +2898,7 @@
   // release time sends the off to the wrong channel or the wrong pitch and
   // leaves the original note ringing forever. So every note-on's routing is
   // REMEMBERED and the off replays it.
+  let phrasePaint = null;         // { id, on, seen } while painting cells
   const SPLIT_PAD = 8;
   const splitSounding = {};       // id -> pure sounding map (see splitZoneLayout)
   const splitSeen = {};           // id -> last note-input seq consumed
@@ -2999,6 +3176,7 @@
     for (const c of (orderedControls ?? [])) {
       if (isChordPadControl(c)) chordAllOff(c);
       else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
+      else if (isPhraseControl(c)) phraseAllOff(c);
       else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
       else if (isNoteRibbonControl(c)) {
         if (ribbonPress && ribbonPress.id === getControlId(c)) {
@@ -4589,6 +4767,11 @@
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
     }
+    // Phrase Sequencer: paint cells as the pointer crosses them.
+    if (phrasePaint && phrasePaint.id === getControlId(control)) {
+      movePhrasePaint(control, controlLocalPoint(event));
+      return;
+    }
     // Zone Splitter: drag a split point along the keyboard.
     if (splitEdgeDrag && splitEdgeDrag.id === getControlId(control)) {
       moveSplitDrag(control, controlLocalPoint(event));
@@ -4834,6 +5017,8 @@
     handleTransportPointerDown(control, pointerDownLocal);
     // Zone Splitter: grab a split point, or audition a key.
     handleSplitZonePointerDown(control, pointerDownLocal);
+    // Phrase Sequencer: toggle a cell, or paint a run of them.
+    handlePhrasePointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -4995,6 +5180,7 @@
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
 
+    phrasePaint = null;
     // Commit a split-point drag; release an auditioned key.
     if (splitEdgeDrag && activeControl) releaseSplitDrag(activeControl);
     if (splitKeyPress && activeControl) {

@@ -780,6 +780,23 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Phrase: {
+    // Sequences PITCH — the gap between the Turing (values) and the Arp (notes
+    // you're already holding). Emits MIDI, so no DeviceBindings.
+    sections: ['Background', 'Phrase', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Phrase'),
+    defaultOverrides: {
+      Transform: { width: 460, height: 170 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   SplitZone: {
     // A routing table: notes in on the hardware input, notes out on the raw MIDI
     // path. Like the other note controls it emits MIDI rather than parameter
