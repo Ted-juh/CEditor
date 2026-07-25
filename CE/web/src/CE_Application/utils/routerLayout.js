@@ -8,7 +8,9 @@
 import {
   normalizePoints, envValueAt, envelopeGeometry, envToPx, envFromPx, envHitNode,
 } from './envelopeLayout.js';
-import { ccValue, aftertouchValue, velocityValue } from './midiNoteInput.js';
+import {
+  ccValue, aftertouchValue, velocityValue, polyAftertouchValue,
+} from './midiNoteInput.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -21,6 +23,7 @@ function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 export const ROUTER_INPUT_SOURCES = [
   { id: 'modwheel', label: 'Mod Wheel', cc: 1 },
   { id: 'aftertouch', label: 'Aftertouch (channel)', cc: null, kind: 'aftertouch' },
+  { id: 'polyAftertouch', label: 'Aftertouch (per note)', cc: null, kind: 'polyAftertouch' },
   { id: 'breath', label: 'Breath', cc: 2 },
   { id: 'expression', label: 'Expression', cc: 11 },
   { id: 'foot', label: 'Foot Pedal', cc: 4 },
@@ -46,24 +49,26 @@ export function routerSourceIsMidi(id) {
 // state. Returns UNDEFINED when that controller has never been seen — the
 // caller has to tell "no hardware yet" (fall back to the test value) from
 // "arrived, and it's zero". `channel` 0 = omni.
-export function routerLiveInput(expressionState, sourceId, channel = 0, customCc = null) {
+export function routerLiveInput(expressionState, sourceId, channel = 0, options = {}) {
   const spec = routerSourceSpec(sourceId);
   if (!spec || spec.kind === 'link') return undefined;
   let raw;
   if (spec.kind === 'aftertouch') raw = aftertouchValue(expressionState, channel);
-  else if (spec.kind === 'velocity') raw = velocityValue(expressionState, channel);
+  else if (spec.kind === 'polyAftertouch') {
+    raw = polyAftertouchValue(expressionState, channel, options.polyMode ?? 'highest');
+  } else if (spec.kind === 'velocity') raw = velocityValue(expressionState, channel);
   else if (spec.kind === 'customCc') {
-    const n = Math.round(num(customCc, -1));
+    const n = Math.round(num(options.cc, -1));
     if (n < 0 || n > 127) return undefined;
     raw = ccValue(expressionState, n, channel);
   } else if (spec.cc !== null && spec.cc !== undefined) raw = ccValue(expressionState, spec.cc, channel);
   return raw === undefined ? undefined : clamp01(num(raw, 0) / 127);
 }
-// The same thing, reading the control's own source / channel / CC number.
+// The same thing, reading the control's own source / channel / CC / poly mode.
 export function routerInputFromState(control, expressionState) {
   const cfg = routerConfig(control);
-  return routerLiveInput(expressionState, String(cfg.source ?? ''),
-    num(cfg.inputChannel, 0), cfg.ccNumber);
+  return routerLiveInput(expressionState, String(cfg.source ?? ''), num(cfg.inputChannel, 0),
+    { cc: cfg.ccNumber, polyMode: cfg.polyMode });
 }
 // Which CC number a source actually listens to (null for non-CC sources).
 export function routerSourceCc(control) {
@@ -94,6 +99,7 @@ export function routerSourceDisplay(control) {
 export function routerSettingsForLearned(candidate) {
   if (!candidate) return null;
   if (candidate.kind === 'aftertouch') return { source: 'aftertouch', inputChannel: candidate.channel };
+  if (candidate.kind === 'polyAftertouch') return { source: 'polyAftertouch', inputChannel: candidate.channel };
   if (candidate.kind === 'velocity') return { source: 'velocity', inputChannel: candidate.channel };
   const known = ROUTER_INPUT_SOURCES.find((s) => s.cc !== null && s.cc === candidate.cc);
   if (known) return { source: known.id, inputChannel: candidate.channel };

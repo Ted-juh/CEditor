@@ -6,6 +6,7 @@ import {
   heldNotes, heldNoteEntries, isNoteHeld,
   EMPTY_EXPRESSION_STATE, expressionEvent, applyExpressionHex,
   ccValue, aftertouchValue, velocityValue,
+  polyAftertouchValue, polyPressureEntries, POLY_PRESSURE_MODES,
   EMPTY_LEARN_STATE, applyLearnHex, learnCandidates, learnBest, learnCandidateLabel,
 } from '../src/CE_Application/utils/midiNoteInput.js';
 
@@ -136,11 +137,13 @@ test('expression events: CC, channel aftertouch, note velocity', () => {
   assert.deepEqual(expressionEvent([0xD0, 40]), { kind: 'aftertouch', channel: 1, value: 40 });
   // a note-on doubles as the velocity source; a release carries no dynamics
   assert.deepEqual(expressionEvent([0x90, 60, 96]), { kind: 'velocity', channel: 1, value: 96 });
-  assert.equal(expressionEvent([0x90, 60, 0]), null);
-  assert.equal(expressionEvent([0x80, 60, 0]), null);
-  // channel-mode messages are commands, not continuous controllers
-  assert.equal(expressionEvent([0xB0, 123, 0]), null);
-  assert.equal(expressionEvent([0xB0, 120, 0]), null);
+  assert.deepEqual(expressionEvent([0x90, 60, 0]), { kind: 'pressureClear', channel: 1, note: 60 });
+  assert.deepEqual(expressionEvent([0x80, 60, 0]), { kind: 'pressureClear', channel: 1, note: 60 });
+  // channel-mode messages aren't controllers, but 120/123 must still reach the
+  // reducer so stale per-note pressure gets dropped
+  assert.deepEqual(expressionEvent([0xB0, 123, 0]), { kind: 'pressureClearAll', channel: 1 });
+  assert.deepEqual(expressionEvent([0xB0, 120, 0]), { kind: 'pressureClearAll', channel: 1 });
+  assert.equal(expressionEvent([0xB0, 121, 0]), null);        // other channel-mode: ignored
   assert.equal(expressionEvent([0xE0, 0, 64]), null);        // pitch bend isn't a router source
 });
 
@@ -277,4 +280,73 @@ test('learn thresholds are adjustable, and empty state is safe', () => {
   assert.deepEqual(learnCandidates(null), []);
   assert.equal(learnCandidateLabel(null), '');
   assert.equal(applyLearnHex(EMPTY_LEARN_STATE, 'F8'), EMPTY_LEARN_STATE);   // realtime: nothing to learn
+});
+
+// --- polyphonic key pressure ---------------------------------------------------
+
+test('poly aftertouch is tracked per note', () => {
+  assert.deepEqual(expressionEvent([0xA0, 60, 90]),
+    { kind: 'polyAftertouch', channel: 1, note: 60, value: 90 });
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, '90 3C 40');   // hold C4
+  s = applyExpressionHex(s, '90 40 40');                            // hold E4
+  s = applyExpressionHex(s, 'A0 3C 20');                            // C4 pressure 32
+  s = applyExpressionHex(s, 'A0 40 64');                            // E4 pressure 100
+  assert.equal(polyPressureEntries(s).length, 2);
+  assert.equal(polyAftertouchValue(s), 100);                        // highest wins
+  assert.equal(polyAftertouchValue(s, 0, 'last'), 100);             // E4 was also last
+  s = applyExpressionHex(s, 'A0 3C 7F');                            // now lean on C4
+  assert.equal(polyAftertouchValue(s, 0, 'highest'), 127);
+  assert.equal(polyAftertouchValue(s, 0, 'last'), 127);
+  s = applyExpressionHex(s, 'A0 3C 10');                            // ease off C4
+  assert.equal(polyAftertouchValue(s, 0, 'highest'), 100);          // E4 is now hardest
+  assert.equal(polyAftertouchValue(s, 0, 'last'), 16);              // …but C4 moved last
+});
+
+test('releasing a key drops its pressure — the stuck-finger bug', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 7F');   // C4 pressed hard
+  s = applyExpressionHex(s, 'A0 40 20');                            // E4 pressed lightly
+  assert.equal(polyAftertouchValue(s), 127);
+  s = applyExpressionHex(s, '80 3C 00');                            // let go of C4
+  assert.equal(polyAftertouchValue(s), 32);                         // not still 127
+  // note-on with velocity 0 releases too
+  s = applyExpressionHex(s, '90 40 00');
+  assert.equal(polyAftertouchValue(s), undefined);                  // nothing held
+  // releasing a key that carried no pressure is a no-op
+  const t = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 40');
+  assert.equal(applyExpressionHex(t, '80 41 00'), t);
+});
+
+test('all-notes-off clears pressure on its channel only', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 7F');   // ch 1
+  s = applyExpressionHex(s, 'A5 3C 40');                            // ch 6
+  assert.equal(polyAftertouchValue(s), 127);
+  s = applyExpressionHex(s, 'B0 7B 00');                            // all notes off, ch 1
+  assert.equal(polyAftertouchValue(s, 1), undefined);
+  assert.equal(polyAftertouchValue(s, 6), 64);
+  assert.equal(polyAftertouchValue(s, 0), 64);                      // omni sees what's left
+  // and a clear-all with nothing to clear returns the same object
+  const t = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 40');
+  assert.equal(applyExpressionHex(t, 'B9 7B 00'), t);               // different channel
+});
+
+test('poly pressure keeps channels apart and does not leak into channel AT', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 50');   // poly, ch 1
+  s = applyExpressionHex(s, 'D0 10');                               // channel AT, ch 1
+  assert.equal(polyAftertouchValue(s, 1), 80);
+  assert.equal(aftertouchValue(s, 1), 16);                          // separate buckets
+  assert.equal(polyAftertouchValue(s, 2), undefined);
+  assert.deepEqual(POLY_PRESSURE_MODES, ['highest', 'last']);
+  // re-sending the same pressure is a no-op
+  assert.equal(applyExpressionHex(s, 'A0 3C 50'), s);
+});
+
+test('poly pressure is learnable as one candidate, not one per note', () => {
+  let l = EMPTY_LEARN_STATE;
+  // lean on two different keys — that's ONE controller as far as learn is concerned
+  for (const v of ['10', '30', '50', '70']) l = applyLearnHex(l, `A0 3C ${v}`);
+  l = applyLearnHex(l, 'A0 40 60');
+  const cands = learnCandidates(l);
+  assert.equal(cands.length, 1);
+  assert.equal(cands[0].kind, 'polyAftertouch');
+  assert.equal(learnCandidateLabel(learnBest(l)), 'Poly pressure · ch 1');
 });

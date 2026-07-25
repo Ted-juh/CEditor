@@ -102,6 +102,14 @@
           <input class="val" type="number" min="0" max="127" step="1" value={num(r.ccNumber, 1)} onchange={(e) => set('ccNumber', Math.max(0, Math.min(127, Math.round(num(e.target.value, 1)))))} />
         </PropertyCell>
       {/if}
+      {#if String(r.source ?? '') === 'polyAftertouch'}
+        <PropertyCell label="Reduce by" span={2} hint="Per-note pressure is many values; a destination is one. Highest = the hardest-pressed key still down, so leaning on anything opens it. Last = the key you most recently leaned on. Released keys stop counting either way.">
+          <select class="val" value={r.polyMode ?? 'highest'} onchange={(e) => set('polyMode', e.target.value)}>
+            <option value="highest">Hardest key held</option>
+            <option value="last">Most recent key</option>
+          </select>
+        </PropertyCell>
+      {/if}
       <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
         <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
       </PropertyCell>
@@ -109,7 +117,7 @@
         <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
       </PropertyCell>
       <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role. No input selected there means no live signal, and the router stays on its test value.">
-        <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}</div>
+        <div class="note">Reads {String(r.source ?? '') === 'cc' ? `CC ${num(r.ccNumber, 1)}` : routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}{String(r.source ?? '') === 'polyAftertouch' ? ` · ${String(r.polyMode ?? 'highest') === 'last' ? 'most recent key' : 'hardest key'}` : ''}</div>
       </PropertyCell>
     {/if}
     <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">

@@ -132,10 +132,10 @@ test('a live input feeds straight through the existing curve', () => {
 
 test('the free CC source listens to whatever number it is given', () => {
   const x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 4A 60');   // CC 74 -> 96
-  assert.ok(near(routerLiveInput(x, 'cc', 0, 74), 96 / 127));
-  assert.equal(routerLiveInput(x, 'cc', 0, 1), undefined);            // a CC that never moved
-  assert.equal(routerLiveInput(x, 'cc', 0, null), undefined);         // no number set yet
-  assert.equal(routerLiveInput(x, 'cc', 0, 999), undefined);          // out of range
+  assert.ok(near(routerLiveInput(x, 'cc', 0, { cc: 74 }), 96 / 127));
+  assert.equal(routerLiveInput(x, 'cc', 0, { cc: 1 }), undefined);            // a CC that never moved
+  assert.equal(routerLiveInput(x, 'cc', 0, {}), undefined);         // no number set yet
+  assert.equal(routerLiveInput(x, 'cc', 0, { cc: 999 }), undefined);          // out of range
   // and it reads through the control's own config
   const c = rt({ source: 'cc', ccNumber: 74, inputChannel: 0 });
   assert.ok(near(routerInputFromState(c, x), 96 / 127));
@@ -178,4 +178,41 @@ test('learning round-trips: what was wiggled is what gets read', () => {
   const learned = rt({ ...settings, curve: LINE });
   assert.ok(near(routerInputFromState(learned, x), 1));
   assert.equal(routerSourceDisplay(learned), 'CC 74');
+});
+
+// --- poly aftertouch as a router source ---------------------------------------
+
+test('the poly source reduces per-note pressure to one value', () => {
+  let x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 40');   // C4 -> 64
+  x = applyExpressionHex(x, 'A0 40 7F');                            // E4 -> 127
+  assert.ok(near(routerLiveInput(x, 'polyAftertouch'), 1));                        // highest
+  assert.ok(near(routerLiveInput(x, 'polyAftertouch', 0, { polyMode: 'last' }), 1));
+  x = applyExpressionHex(x, 'A0 3C 20');                            // C4 eases to 32
+  assert.ok(near(routerLiveInput(x, 'polyAftertouch'), 1));                        // E4 still hardest
+  assert.ok(near(routerLiveInput(x, 'polyAftertouch', 0, { polyMode: 'last' }), 32 / 127));
+  // through the control config
+  const c = rt({ source: 'polyAftertouch', polyMode: 'last' });
+  assert.ok(near(routerInputFromState(c, x), 32 / 127));
+  assert.ok(near(routerInputFromState(rt({ source: 'polyAftertouch' }), x), 1));
+});
+
+test('a released key stops driving the router', () => {
+  let x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 7F');
+  const c = rt({ source: 'polyAftertouch' });
+  assert.ok(near(routerInputFromState(c, x), 1));
+  x = applyExpressionHex(x, '80 3C 00');
+  // undefined, not 1 — so the router falls back to its test value rather than
+  // staying jammed open on a finger that has lifted
+  assert.equal(routerInputFromState(c, x), undefined);
+});
+
+test('poly is a distinct source from channel aftertouch', () => {
+  const x = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 3C 40');
+  assert.ok(near(routerLiveInput(x, 'polyAftertouch'), 64 / 127));
+  assert.equal(routerLiveInput(x, 'aftertouch'), undefined);   // channel AT never sent
+  assert.equal(routerSourceIsMidi('polyAftertouch'), true);
+  assert.equal(routerSourceCc(rt({ source: 'polyAftertouch' })), null);
+  assert.equal(routerSourceDisplay(rt({ source: 'polyAftertouch' })), 'Aftertouch (per note)');
+  assert.deepEqual(routerSettingsForLearned({ kind: 'polyAftertouch', channel: 4 }),
+    { source: 'polyAftertouch', inputChannel: 4 });
 });

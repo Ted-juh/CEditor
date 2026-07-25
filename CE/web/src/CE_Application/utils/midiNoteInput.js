@@ -164,7 +164,7 @@ export function isNoteHeld(state, note, channel = 0) {
 // Entries carry a monotonically increasing `n` rather than a timestamp, so the
 // module stays clock-free (and therefore testable): "most recent" is the
 // highest n, which is what an omni lookup needs to pick between channels.
-export const EMPTY_EXPRESSION_STATE = Object.freeze({ cc: {}, at: {}, vel: {}, n: 0 });
+export const EMPTY_EXPRESSION_STATE = Object.freeze({ cc: {}, at: {}, vel: {}, pat: {}, n: 0 });
 
 export function expressionEvent(message) {
   const m = Array.isArray(message) ? message : [];
@@ -173,16 +173,28 @@ export function expressionEvent(message) {
   const channel = (m[0] & 0x0F) + 1;
   if (status === 0xB0) {
     const cc = m[1] & 0x7F;
-    // Channel-mode messages (120+) are commands, not continuous controllers.
+    // Channel-mode messages aren't continuous controllers, but 120/123 do have
+    // to reach the reducer: they silence the channel, so any per-note pressure
+    // it was holding is stale.
+    if (cc === 120 || cc === 123) return { kind: 'pressureClearAll', channel };
     if (cc >= 120) return null;
     return { kind: 'cc', channel, cc, value: (m[2] ?? 0) & 0x7F };
   }
   if (status === 0xD0) return { kind: 'aftertouch', channel, value: m[1] & 0x7F };
-  // A note-on doubles as the velocity source; a release carries no dynamics.
+  // Polyphonic key pressure: per-note, so it is keyed by note as well.
+  if (status === 0xA0) {
+    return { kind: 'polyAftertouch', channel, note: m[1] & 0x7F, value: (m[2] ?? 0) & 0x7F };
+  }
+  // A note-on doubles as the velocity source; a release carries no dynamics —
+  // but it MUST clear that note's pressure, or "hardest key" stays stuck on a
+  // key nobody is touching any more.
   if (status === 0x90) {
     const value = (m[2] ?? 0) & 0x7F;
-    return value > 0 ? { kind: 'velocity', channel, value } : null;
+    return value > 0
+      ? { kind: 'velocity', channel, value }
+      : { kind: 'pressureClear', channel, note: m[1] & 0x7F };
   }
+  if (status === 0x80) return { kind: 'pressureClear', channel, note: m[1] & 0x7F };
   return null;
 }
 export function expressionEventsFromHex(hex) {
@@ -192,13 +204,36 @@ export function expressionEventsFromHex(hex) {
 export function applyExpressionEvent(state, event) {
   const s = state ?? EMPTY_EXPRESSION_STATE;
   if (!event) return s;
-  const bucket = event.kind === 'cc' ? 'cc' : event.kind === 'aftertouch' ? 'at' : event.kind === 'velocity' ? 'vel' : null;
+  if (event.kind === 'pressureClear') {
+    const key = `${event.channel}:${event.note}`;
+    if (!(key in s.pat)) return s;
+    const pat = { ...s.pat };
+    delete pat[key];
+    return { ...s, pat, n: s.n + 1 };
+  }
+  if (event.kind === 'pressureClearAll') {
+    const pat = {};
+    let changed = false;
+    for (const [k, v] of Object.entries(s.pat)) {
+      if (v.channel === event.channel) { changed = true; continue; }
+      pat[k] = v;
+    }
+    return changed ? { ...s, pat, n: s.n + 1 } : s;
+  }
+  const bucket = event.kind === 'cc' ? 'cc'
+    : event.kind === 'aftertouch' ? 'at'
+    : event.kind === 'velocity' ? 'vel'
+    : event.kind === 'polyAftertouch' ? 'pat' : null;
   if (!bucket) return s;
-  const key = event.kind === 'cc' ? `${event.channel}:${event.cc}` : `${event.channel}`;
+  const key = event.kind === 'cc' ? `${event.channel}:${event.cc}`
+    : event.kind === 'polyAftertouch' ? `${event.channel}:${event.note}`
+    : `${event.channel}`;
   const prev = s[bucket][key];
   if (prev && prev.v === event.value) return s;          // unchanged → no churn
   const n = s.n + 1;
-  return { ...s, [bucket]: { ...s[bucket], [key]: { v: event.value, n } }, n };
+  const entry = { v: event.value, n };
+  if (event.kind === 'polyAftertouch') { entry.channel = event.channel; entry.note = event.note; }
+  return { ...s, [bucket]: { ...s[bucket], [key]: entry }, n };
 }
 export function applyExpressionEvents(state, events) {
   let s = state ?? EMPTY_EXPRESSION_STATE;
@@ -238,6 +273,25 @@ export function velocityValue(state, channel = 0) {
   return readBucket(s.vel, ch > 0 ? `${ch}` : null, null);
 }
 
+export const POLY_PRESSURE_MODES = ['highest', 'last'];
+// Poly pressure is per-note, but a router destination is one number, so it has
+// to be reduced. 'highest' = the hardest-pressed key still down (press anything
+// harder and it opens); 'last' = the key you most recently leaned on. Entries
+// for released keys are already gone, so neither can read a stale finger.
+export function polyPressureEntries(state, channel = 0) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  const ch = Math.round(num(channel, 0));
+  return Object.values(s.pat).filter((e) => ch === 0 || e.channel === ch);
+}
+export function polyAftertouchValue(state, channel = 0, mode = 'highest') {
+  const entries = polyPressureEntries(state, channel);
+  if (!entries.length) return undefined;
+  if (String(mode) === 'last') {
+    return entries.reduce((best, e) => (!best || e.n > best.n ? e : best), null).v;
+  }
+  return entries.reduce((m, e) => Math.max(m, e.v), 0);
+}
+
 // --- MIDI learn ----------------------------------------------------------------
 // "Wiggle the controller you want" is a better way to pick a source than reading
 // a list, but the first message that arrives is the WRONG answer: brushing a key
@@ -253,6 +307,9 @@ export function learnKey(event) {
   if (event.kind === 'cc') return `cc:${event.channel}:${event.cc}`;
   if (event.kind === 'aftertouch') return `at:${event.channel}`;
   if (event.kind === 'velocity') return `vel:${event.channel}`;
+  // Deliberately NOT per note: you're learning "poly pressure on this channel",
+  // not "poly pressure on middle C".
+  if (event.kind === 'polyAftertouch') return `pat:${event.channel}`;
   return '';
 }
 
@@ -292,6 +349,7 @@ export function learnCandidateLabel(candidate) {
   if (!candidate) return '';
   const ch = ` · ch ${candidate.channel}`;
   if (candidate.kind === 'aftertouch') return `Aftertouch${ch}`;
+  if (candidate.kind === 'polyAftertouch') return `Poly pressure${ch}`;
   if (candidate.kind === 'velocity') return `Note velocity${ch}`;
   return `CC ${candidate.cc}${ch}`;
 }

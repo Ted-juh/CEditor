@@ -82,6 +82,8 @@ not DSP:
   and fan it to many parameters. See [expression-router.md](./expression-router.md).
 - **MIDI learn**: press Learn and wiggle a control — it adopts whatever moved the
   most, not whatever spoke first. Any CC number is selectable.
+- Sources include **per-note (poly) aftertouch**, reduced by hardest-held or
+  most-recent key, with released keys dropped so nothing sticks.
 - Output works anywhere; input availability is synth-dependent (aftertouch/breath),
   and the header reads LIVE vs TEST so a silent controller is obvious.
 

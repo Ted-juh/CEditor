@@ -33,7 +33,7 @@ There was already an unused pipe. The JUCE side has always emitted
 `latestMidiInputMessage` — **with no consumers at all**. This is the consumer.
 
 - **Pure engine** `utils/midiNoteInput.js` (+ `test/midiNoteInput.test.js`,
-  20 tests). Raw bytes in, held-note state out — plus, for the
+  25 tests). Raw bytes in, held-note state out — plus, for the
   [Expression Router](./expression-router.md), continuous-controller levels and
   a **MIDI-learn** reducer:
   - `parseMidiHex` takes the bridge's `"90 3C 60"` and the shapes humans write.
@@ -49,6 +49,8 @@ There was already an unused pipe. The JUCE side has always emitted
   - The same pitch on two channels stays distinct, but display dedupes it.
   - The learn reducer tracks how far each controller moved during a session, so
     "whatever moved the most" can win instead of "whatever spoke first".
+  - **Per-note pressure** (poly aftertouch) is kept per note and dropped when
+    that note is released, so a lifted finger can't leave a stale reading behind.
 - **`stores/noteInput.js`** — one listener for the whole app (notes are global;
   four controls watching the same stream should agree about it). It's started
   lazily by the preview surface, so importing the module headless never attaches
@@ -74,8 +76,9 @@ There was already an unused pipe. The JUCE side has always emitted
 
 - **A panic control** — a panel button that clears both the echoed state and any
   notes the panel itself is holding.
-- **Velocity in the echo** — the held state already carries velocity; the
-  renderers currently ignore it and could vary brightness.
+- **Velocity and pressure in the echo** — the state already carries note
+  velocity and per-note aftertouch; the renderers ignore both and could vary
+  brightness with them.
 - ~~Feed the other controls~~ — **done**: the same listener now drives the
   [Expression Router](./expression-router.md)'s mod-wheel / aftertouch / breath /
   expression / foot / velocity sources. The parser gained a second reducer for

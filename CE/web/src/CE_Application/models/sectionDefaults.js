@@ -1009,6 +1009,7 @@ export const SECTION_DEFAULTS = {
     sourceControlId: '',         // when source = 'link': the on-panel control to follow
     inputChannel: 0,             // MIDI sources: channel to watch (0 = omni)
     ccNumber: 1,                 // when source = 'cc': the controller number
+    polyMode: 'highest',         // per-note aftertouch → one value: highest | last
     testInput: 0.5,              // fallback when that controller hasn't been seen (0..1)
     invert: false,               // flip the input before the curve
     deadzone: 0,                 // low-end dead-zone 0..1 (rescales the rest)
