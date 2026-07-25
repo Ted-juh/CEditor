@@ -7,7 +7,7 @@
   // SplitZone.__held, and the in-progress drag as __dragEdge.
   import {
     splitConfig, splitZones, splitRange, splitGeometry, keyRect, isBlackKey,
-    zoneBandRect, zonesAt, unclaimedNotes, splitUnmatched,
+    zoneBandRect, zonesAt, unclaimedNotes, splitUnmatched, zoneSwitchesOnVelocity,
   } from '../utils/splitZoneLayout.js';
   import { midiNoteLabel } from '../utils/arpLayout.js';
 
@@ -76,8 +76,19 @@
 
   // The header says what the split actually does, since that is the question
   // you have when you look at it: which channel, transposed how far.
+  // Terse markers for the things that are invisible on the keyboard: a velocity
+  // window, a blocked pedal, a CC filter. Without these a zone that has stopped
+  // answering looks identical to one that hasn't.
+  function marks(z) {
+    const m = [];
+    if (zoneSwitchesOnVelocity(z)) m.push(`v${z.velSwitchLow}-${z.velSwitchHigh}`);
+    if (z.sustain === false) m.push('no ped');
+    if (z.ccMode === 'none') m.push('no cc');
+    else if (z.ccMode === 'list') m.push(`cc ${(z.ccList ?? []).join('/') || '—'}`);
+    return m.length ? ` (${m.join(' ')})` : '';
+  }
   let summary = $derived(zones.filter((z) => z.enabled)
-    .map((z) => `${z.label} → ch${z.channel}${z.transpose ? (z.transpose > 0 ? ` +${z.transpose}` : ` ${z.transpose}`) : ''}`)
+    .map((z) => `${z.label} → ch${z.channel}${z.transpose ? (z.transpose > 0 ? ` +${z.transpose}` : ` ${z.transpose}`) : ''}${marks(z)}`)
     .join('   ·   '));
   let inLabel = $derived(cfg.inputChannel ? `in ch${cfg.inputChannel}` : 'in omni');
   let dragEdge = $derived(cfg.__dragEdge ?? null);

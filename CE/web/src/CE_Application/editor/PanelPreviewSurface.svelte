@@ -112,7 +112,7 @@
     drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
   } from '../utils/drumPadLayout.js';
   import {
-    midiNoteState, midiExpressionState, startNoteInputListener, clearNoteInput,
+    midiNoteState, midiExpressionState, midiCcEvents, startNoteInputListener, clearNoteInput,
   } from '../stores/noteInput.js';
   import {
     panicConfig, panicMessages, panicGeometry, panicHit,
@@ -123,6 +123,7 @@
     noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
     releaseAll as splitReleaseAll, reconcileHeld as splitReconcile, soundingNotes,
+    routeCc as splitRouteCc, trackCc as splitTrackCc, heldLatchingCcs,
   } from '../utils/splitZoneLayout.js';
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
@@ -2721,6 +2722,8 @@
   const SPLIT_PAD = 8;
   const splitSounding = {};       // id -> pure sounding map (see splitZoneLayout)
   const splitSeen = {};           // id -> last note-input seq consumed
+  const splitCcSeen = {};         // id -> last CC batch seq consumed
+  const splitLatched = {};        // id -> latching CCs currently down, per channel
   let splitEdgeDrag = null;       // { id, index, edge, note } while dragging a split point
   let splitKeyPress = null;       // { id, note } while auditioning from the keyboard
   function isSplitZoneControl(control) {
@@ -2761,6 +2764,7 @@
     const r = splitReleaseAll(splitSounding[id] ?? EMPTY_SOUNDING);
     splitSounding[id] = r.sounding;
     runSplitSends(r.sends);
+    splitReleaseLatched(control);
   }
   // Consume the live held-note state. Driven off the shared note-input store, so
   // one subscription feeds every splitter on the panel.
@@ -2776,12 +2780,42 @@
     splitSounding[id] = r.sounding;
     runSplitSends(r.sends);
   }
+  // Controllers, on the same principle as the notes: each arriving message is
+  // forwarded ONCE, to every channel a zone says should hear it. Latching ones
+  // (sustain and friends) are remembered, because a pedal left down on a channel
+  // is a synth full of notes nothing will ever stop.
+  function pumpSplitCc(control) {
+    const id = getControlId(control);
+    const batch = $midiCcEvents;
+    if (splitCcSeen[id] === batch.seq) return;
+    splitCcSeen[id] = batch.seq;
+    if (!batch.seq) return;                    // nothing has arrived yet
+    for (const ev of batch.events) {
+      if (splitInputChannel(control) && ev.channel !== splitInputChannel(control)) continue;
+      const sends = splitRouteCc(control, ev.cc, ev.value);
+      splitLatched[id] = splitTrackCc(splitLatched[id], sends);
+      for (const m of sends) {
+        sendNoteBytes([0xB0 | (m.channel - 1), m.cc, m.value], `split_cc${m.cc}`);
+      }
+    }
+  }
+  // Let go of every latching controller this splitter put down. Called by panic
+  // and by an all-off: releasing the notes but leaving the pedal down is the
+  // half-fix that looks like the panic button doesn't work.
+  function splitReleaseLatched(control) {
+    const id = getControlId(control);
+    for (const m of heldLatchingCcs(control, splitLatched[id])) {
+      sendNoteBytes([0xB0 | (m.channel - 1), m.cc, m.value], `split_cc${m.cc}_off`);
+    }
+    splitLatched[id] = {};
+  }
   function applySplitZoneValueSource(control, resolved) {
     if (!isSplitZoneControl(control)) return resolved;
     const base = resolved?.control ?? control;
     const cfg = base?._children?.SplitZone;
     if (!cfg) return resolved;
     pumpSplitInput(control);
+    pumpSplitCc(control);
     const id = getControlId(control);
     const sess = sessionFor(control);
     const next = { ...cfg, __held: soundingNotes(splitSounding[id]) };
@@ -2926,7 +2960,7 @@
   function silenceLocalNoteControls() {
     for (const c of (orderedControls ?? [])) {
       if (isChordPadControl(c)) chordAllOff(c);
-      else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; }
+      else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
       else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
       else if (isNoteRibbonControl(c)) {
         if (ribbonPress && ribbonPress.id === getControlId(c)) {

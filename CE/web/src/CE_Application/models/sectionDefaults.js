@@ -1262,10 +1262,18 @@ export const SECTION_DEFAULTS = {
     // Zones may OVERLAP — that is how you layer. A note in two zones is sent
     // twice, on two channels, with two transpositions.
     zones: [
+      // velSwitchLow/High gate the INPUT (does this zone answer a note played
+      // that hard); velLow/High scale the OUTPUT. ccMode/ccList/sustain decide
+      // which controllers the zone forwards — sustain has its own switch because
+      // it is the one everybody wants per-zone.
       { id: 'z0', label: 'Bass', lowNote: 36, highNote: 59, channel: 1, transpose: -12,
-        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100, enabled: true, colour: 'FF5B9BD5' },
+        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
+        velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+        enabled: true, colour: 'FF5B9BD5' },
       { id: 'z1', label: 'Lead', lowNote: 60, highNote: 96, channel: 2, transpose: 0,
-        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100, enabled: true, colour: 'FF39D98A' },
+        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
+        velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+        enabled: true, colour: 'FF39D98A' },
     ],
     editable: true,              // drag split points; click the keys to audition
     showHeader: true,

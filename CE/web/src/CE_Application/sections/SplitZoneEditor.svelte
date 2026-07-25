@@ -3,6 +3,7 @@
   import {
     splitZones, splitRange, zoneOverlaps, unclaimedNotes, splitUnmatched,
     VELOCITY_CURVES, VELOCITY_CURVE_LABELS, MIN_NOTE, MAX_NOTE,
+    CC_MODES, CC_MODE_LABELS, SPLIT_PRESETS, splitPresetZones, zoneSwitchesOnVelocity,
   } from '../utils/splitZoneLayout.js';
   import { midiNoteLabel } from '../utils/arpLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -39,6 +40,32 @@
     return runs;
   });
 
+  // Velocity switching can leave a hole: two zones over the same keys covering
+  // 1-60 and 80-127 means anything played at 61-79 is silent, which is the
+  // hardest kind of bug to hear because it only happens sometimes.
+  let velGaps = $derived.by(() => {
+    const out = [];
+    const active = zones.filter((z) => z.enabled && zoneSwitchesOnVelocity(z));
+    if (!active.length) return out;
+    for (const z of active) {
+      // Any velocity this zone rejects that no OTHER zone over the same keys accepts.
+      const rivals = zones.filter((o) => o !== z && o.enabled
+        && o.lowNote <= z.highNote && o.highNote >= z.lowNote);
+      const holes = [];
+      for (let v = 1; v <= 127; v += 1) {
+        const mine = v >= Math.min(z.velSwitchLow, z.velSwitchHigh) && v <= Math.max(z.velSwitchLow, z.velSwitchHigh);
+        if (mine) continue;
+        const covered = rivals.some((o) => v >= Math.min(o.velSwitchLow, o.velSwitchHigh)
+          && v <= Math.max(o.velSwitchLow, o.velSwitchHigh));
+        if (!covered) holes.push(v);
+      }
+      if (!holes.length) continue;
+      const lo = holes[0]; const hi = holes[holes.length - 1];
+      out.push(`${z.label}: velocity ${lo}–${hi} reaches no zone`);
+    }
+    return [...new Set(out)];
+  });
+
   function setZone(i, key, value) {
     const list = zones.map((z) => ({ ...z }));
     if (!list[i]) return;
@@ -51,12 +78,25 @@
     list.push({
       id: `z${Date.now().toString(36)}`, label: `Zone ${n + 1}`,
       lowNote: 60, highNote: 72, channel: Math.min(16, n + 1), transpose: 0,
-      curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100, enabled: true,
+      curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
+      velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+      enabled: true,
       colour: ['FF5B9BD5', 'FF39D98A', 'FFF2994A', 'FFBB6BD9', 'FFEB5757'][n % 5],
     });
     set('zones', list);
   }
   function removeZone(i) { set('zones', zones.filter((_, j) => j !== i)); }
+  // Presets are built from the CURRENT drawn range, so applying one to a 25-key
+  // controller gives boundaries on the keys you actually have.
+  function applyPreset(id) { set('zones', splitPresetZones(id, range.lowNote, range.highNote)); }
+  // The CC list is typed as text — "1, 11, 74" — because a set of controller
+  // numbers is a thing people already know how to write.
+  function ccListText(z) { return (Array.isArray(z.ccList) ? z.ccList : []).join(', '); }
+  function setCcList(i, text) {
+    const list = [...new Set(String(text ?? '').split(/[^0-9]+/).filter(Boolean)
+      .map((t) => clampInt(t, 0, 127, 0)))].sort((a, b) => a - b);
+    setZone(i, 'ccList', list);
+  }
   function moveZone(i, delta) {
     const j = i + delta;
     if (j < 0 || j >= zones.length) return;
@@ -102,6 +142,13 @@
     <PropertyCell label="" span={2} hint="The range actually drawn, after snapping to whole white keys.">
       <div class="note">{midiNoteLabel(range.lowNote)} – {midiNoteLabel(range.highNote)}</div>
     </PropertyCell>
+    <PropertyCell label="Preset" span={4} hint="Replace the zone list with a common arrangement, built from the drawn keyboard range. Overwrites what's there.">
+      <div class="presets">
+        {#each SPLIT_PRESETS as p (p.id)}
+          <button type="button" class="preset" title={p.hint} onclick={() => applyPreset(p.id)}>{p.label}</button>
+        {/each}
+      </div>
+    </PropertyCell>
     <PropertyCell label="Editable" span={1} hint="Drag a split point along the keyboard in preview, and click a key to audition it through the zones — useful when the hardware isn't plugged in.">
       <PropertyToggle value={s.editable !== false} onchange={() => set('editable', !(s.editable !== false))} />
     </PropertyCell>
@@ -123,6 +170,14 @@
         </div>
       </PropertyCell>
     {/if}
+    {#if velGaps.length}
+      <PropertyCell label="" span={4} hint="">
+        <div class="warn">
+          {velGaps.join('; ')} — a note played outside a zone's &ldquo;plays at&rdquo; window is not claimed by it,
+          so if no other zone catches it the note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.
+        </div>
+      </PropertyCell>
+    {/if}
     {#if overlaps.length}
       <PropertyCell label="" span={4} hint="">
         <div class="info">
@@ -141,7 +196,10 @@
           <thead>
             <tr>
               <th>On</th><th>Name</th><th>From</th><th>To</th><th>Ch</th><th>Transp</th>
-              <th>Velocity</th><th>Range</th><th>Col</th><th></th>
+              <th>Velocity</th><th>Range</th><th title="Only respond to notes played in this velocity window — the hit-it-hard layer">Plays at</th>
+              <th title="Which controllers this zone forwards">CCs</th>
+              <th title="Forward the sustain pedal (CC64) to this zone's channel">Ped</th>
+              <th>Col</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -179,6 +237,22 @@
                            onchange={(e) => setZone(i, 'velHigh', clampInt(e.target.value, 1, 127, 127))} />
                   {/if}
                 </td>
+                <td class:switched={zoneSwitchesOnVelocity(z)}>
+                  <input class="cell n" type="number" min="1" max="127" value={z.velSwitchLow}
+                         onchange={(e) => setZone(i, 'velSwitchLow', clampInt(e.target.value, 1, 127, 1))} />
+                  <input class="cell n" type="number" min="1" max="127" value={z.velSwitchHigh}
+                         onchange={(e) => setZone(i, 'velSwitchHigh', clampInt(e.target.value, 1, 127, 127))} />
+                </td>
+                <td>
+                  <select class="cell selsm" value={z.ccMode} onchange={(e) => setZone(i, 'ccMode', e.target.value)}>
+                    {#each CC_MODES as m (m)}<option value={m}>{CC_MODE_LABELS[m] ?? m}</option>{/each}
+                  </select>
+                  {#if z.ccMode === 'list'}
+                    <input class="cell cclist" type="text" placeholder="1, 11, 74" value={ccListText(z)}
+                           onchange={(e) => setCcList(i, e.target.value)} />
+                  {/if}
+                </td>
+                <td><input type="checkbox" checked={z.sustain !== false} onchange={(e) => setZone(i, 'sustain', e.target.checked)} /></td>
                 <td><input class="col" type="color" value={colRgb(z.colour, 'FF5B9BD5')} oninput={(e) => setZoneCol(i, z.colour, e.target.value)} /></td>
                 <td class="acts">
                   <button type="button" title="Move up" onclick={() => moveZone(i, -1)} disabled={i === 0}>↑</button>
@@ -188,7 +262,7 @@
               </tr>
             {/each}
             {#if !zones.length}
-              <tr><td colspan="10"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
+              <tr><td colspan="13"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
             {/if}
           </tbody>
         </table>
@@ -223,6 +297,12 @@
   .cell.n { width: 46px; }
   .cell.name { width: 82px; }
   .cell.sel { width: 96px; }
+  .cell.selsm { width: 78px; }
+  .cell.cclist { width: 76px; margin-left: 3px; }
+  td.switched { background: rgba(242, 201, 76, 0.08); }
+  .presets { display: flex; flex-wrap: wrap; gap: 5px; }
+  .preset { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+  .preset:hover { border-color: #4a4a58; color: #E8E8EE; }
   .nl { color: #6f6f78; font-size: 10px; margin-left: 3px; }
   .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
   .acts button { background: #1A1A1A; border: 1px solid #333; color: #888; font-size: 11px; padding: 1px 5px; border-radius: 3px; cursor: pointer; }

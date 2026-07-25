@@ -8,6 +8,8 @@ import {
   splitGeometry, keyRect, noteAtPoint, zoneBandRect, hitZoneEdge, moveZoneEdge,
   adjacentEdge, dragSplitPoint,
   EMPTY_SOUNDING, pressNote, releaseNote, releaseAll, reconcileHeld, soundingNotes,
+  CC_MODES, SUSTAIN_CC, zonePassesCc, routeCc, zoneAcceptsVelocity, zoneSwitchesOnVelocity,
+  LATCHING_CCS, heldLatchingCcs, trackCc, SPLIT_PRESETS, splitPresetZones,
   MIN_NOTE, MAX_NOTE,
 } from '../src/CE_Application/utils/splitZoneLayout.js';
 
@@ -434,4 +436,215 @@ test('raw MIDI hex arrives as routed output on the right channels', async () => 
   notes = applyMidiHex(notes, '90 14 64');
   assert.deepEqual(pump(), []);
   assert.deepEqual(soundingNotes(sounding), [76]);
+});
+
+test('raw MIDI hex arrives as routed controllers on the right channels', async () => {
+  const { expressionEventsFromHex } = await import('../src/CE_Application/utils/midiNoteInput.js');
+  // The same split, but the bass synth's mod wheel means something unhelpful,
+  // so that zone forwards nothing while still taking the pedal.
+  const filtered = sp({ zones: [
+    { id: 'lo', lowNote: 36, highNote: 59, channel: 1, ccMode: 'none', sustain: true },
+    { id: 'hi', lowNote: 60, highNote: 96, channel: 2, ccMode: 'all', sustain: false },
+  ] });
+  const route = (hex) => expressionEventsFromHex(hex)
+    .filter((e) => e.kind === 'cc')
+    .flatMap((e) => routeCc(filtered, e.cc, e.value));
+
+  // Mod wheel: only the lead hears it.
+  assert.deepEqual(route('B0 01 40'), [{ zoneId: 'hi', channel: 2, cc: 1, value: 64 }]);
+  // Sustain: only the bass, because the lead's pedal switch is off.
+  assert.deepEqual(route('B0 40 7F'), [{ zoneId: 'lo', channel: 1, cc: 64, value: 127 }]);
+  // Several controllers in one blob, running status and all.
+  const sweep = route('B0 01 20 01 30 01 40');
+  assert.equal(sweep.length, 3, 'running status keeps the whole sweep');
+  assert.ok(sweep.every((m) => m.channel === 2));
+  assert.deepEqual(sweep.map((m) => m.value), [32, 48, 64]);
+  // Channel-mode messages (120+) are not continuous controllers and must not be
+  // re-sent as if they were — they mean "silence the channel".
+  assert.deepEqual(route('B0 7B 00'), []);
+});
+
+// --- Per-zone CC filtering + sustain -------------------------------------------------
+test('a zone forwards the controllers it says it does', () => {
+  const all = splitZones(sp({ zones: [{ ccMode: 'all' }] }))[0];
+  const none = splitZones(sp({ zones: [{ ccMode: 'none' }] }))[0];
+  const list = splitZones(sp({ zones: [{ ccMode: 'list', ccList: [11, 1, 74, 1] }] }))[0];
+  assert.deepEqual(list.ccList, [1, 11, 74], 'deduped and sorted');
+  assert.equal(zonePassesCc(all, 1), true);
+  assert.equal(zonePassesCc(none, 1), false);
+  assert.equal(zonePassesCc(list, 11), true);
+  assert.equal(zonePassesCc(list, 7), false);
+  // An unknown mode falls back to passing everything, not to silence.
+  assert.equal(zonePassesCc(splitZones(sp({ zones: [{ ccMode: 'nope' }] }))[0], 1), true);
+});
+
+test('sustain answers to its own switch, whatever the CC mode says', () => {
+  // A pedal is not something anyone should have to discover is governed by a
+  // list of numbers three menus down.
+  const blockAllButPedal = splitZones(sp({ zones: [{ ccMode: 'none', sustain: true }] }))[0];
+  assert.equal(zonePassesCc(blockAllButPedal, 1), false);
+  assert.equal(zonePassesCc(blockAllButPedal, SUSTAIN_CC), true);
+  const passAllButPedal = splitZones(sp({ zones: [{ ccMode: 'all', sustain: false }] }))[0];
+  assert.equal(zonePassesCc(passAllButPedal, 1), true);
+  assert.equal(zonePassesCc(passAllButPedal, SUSTAIN_CC), false);
+  // Default is on: a split where the pedal silently stopped working would be
+  // reported as a bug, and rightly.
+  assert.equal(zonePassesCc(splitZones(sp({ zones: [{}] }))[0], SUSTAIN_CC), true);
+});
+
+test('a controller reaches each channel once, never twice', () => {
+  // Two zones on the SAME channel — a keyboard split into a low and high half of
+  // one patch. Doubling every mod-wheel message is twice the traffic for no
+  // audible difference, and on a busy wire that matters.
+  const sameCh = sp({ zones: [
+    { id: 'a', lowNote: 0, highNote: 59, channel: 1 },
+    { id: 'b', lowNote: 60, highNote: 127, channel: 1 },
+  ] });
+  assert.deepEqual(routeCc(sameCh, 1, 90), [{ zoneId: 'a', channel: 1, cc: 1, value: 90 }]);
+  // Different channels: once each.
+  assert.equal(routeCc(CLASSIC, 1, 90).length, 2);
+  // A zone that blocks it is skipped; a disabled zone doesn't count either.
+  const mixed = sp({ zones: [
+    { id: 'a', channel: 1, ccMode: 'none' },
+    { id: 'b', channel: 2, ccMode: 'all' },
+    { id: 'c', channel: 3, ccMode: 'all', enabled: false },
+  ] });
+  assert.deepEqual(routeCc(mixed, 1, 64), [{ zoneId: 'b', channel: 2, cc: 1, value: 64 }]);
+  // Nothing claims it and pass-through is off: silence.
+  assert.deepEqual(routeCc(sp({ zones: [{ channel: 1, ccMode: 'none' }] }), 1, 64), []);
+  // Pass-through forwards controllers too, so a half-built panel doesn't go
+  // dead the moment you touch the mod wheel.
+  const pass = sp({ unmatched: 'pass', passChannel: 9, zones: [{ channel: 1, ccMode: 'none' }] });
+  assert.deepEqual(routeCc(pass, 1, 64), [{ zoneId: '', channel: 9, cc: 1, value: 64 }]);
+  // Values clamp into range.
+  assert.equal(routeCc(CLASSIC, 1, 999)[0].value, 127);
+});
+
+test('latching controllers are remembered so they can be let go', () => {
+  // Releasing the notes but leaving the pedal down is the half-fix that looks
+  // like the panic button doesn't work.
+  assert.ok(LATCHING_CCS.includes(SUSTAIN_CC));
+  let st = trackCc({}, routeCc(CLASSIC, SUSTAIN_CC, 127));
+  assert.deepEqual(heldLatchingCcs(CLASSIC, st).sort((a, b) => a.channel - b.channel), [
+    { channel: 1, cc: SUSTAIN_CC, value: 0 },
+    { channel: 2, cc: SUSTAIN_CC, value: 0 },
+  ]);
+  // A mod wheel is not latching — leaving it at 40 is a tone, not a hung note.
+  st = trackCc(st, routeCc(CLASSIC, 1, 40));
+  assert.equal(heldLatchingCcs(CLASSIC, st).length, 2);
+  // Pedal up: nothing left to release.
+  st = trackCc(st, routeCc(CLASSIC, SUSTAIN_CC, 0));
+  assert.deepEqual(heldLatchingCcs(CLASSIC, st), []);
+  // Tracking the same value twice returns the SAME object, so a held pedal
+  // doesn't churn state on every repeat.
+  const same = trackCc(st, routeCc(CLASSIC, SUSTAIN_CC, 0));
+  assert.equal(same, st);
+});
+
+// --- Velocity switching ---------------------------------------------------------------
+test('a zone only answers notes played inside its velocity window', () => {
+  const layers = sp({ zones: [
+    { id: 'soft', lowNote: 0, highNote: 127, channel: 1, velSwitchLow: 1, velSwitchHigh: 79 },
+    { id: 'hard', lowNote: 0, highNote: 127, channel: 2, velSwitchLow: 80, velSwitchHigh: 127 },
+  ] });
+  assert.deepEqual(routeNoteOn(layers, 60, 40).map((o) => o.channel), [1]);
+  assert.deepEqual(routeNoteOn(layers, 60, 79).map((o) => o.channel), [1]);
+  assert.deepEqual(routeNoteOn(layers, 60, 80).map((o) => o.channel), [2]);
+  assert.deepEqual(routeNoteOn(layers, 60, 127).map((o) => o.channel), [2]);
+  // Windows may overlap, and then both sound — a soft pad under a hard lead.
+  const overlapping = sp({ zones: [
+    { id: 'a', lowNote: 0, highNote: 127, channel: 1, velSwitchLow: 1, velSwitchHigh: 100 },
+    { id: 'b', lowNote: 0, highNote: 127, channel: 2, velSwitchLow: 60, velSwitchHigh: 127 },
+  ] });
+  assert.deepEqual(routeNoteOn(overlapping, 60, 70).map((o) => o.channel), [1, 2]);
+  // A gap in the windows means silence, which the editor warns about.
+  const gapped = sp({ zones: [
+    { id: 'a', lowNote: 0, highNote: 127, channel: 1, velSwitchLow: 1, velSwitchHigh: 40 },
+    { id: 'b', lowNote: 0, highNote: 127, channel: 2, velSwitchLow: 90, velSwitchHigh: 127 },
+  ] });
+  assert.deepEqual(routeNoteOn(gapped, 60, 64), []);
+  // Off by default, so nothing changes until asked.
+  assert.equal(zoneSwitchesOnVelocity(splitZones(sp({ zones: [{}] }))[0]), false);
+  assert.equal(zoneAcceptsVelocity(splitZones(sp({ zones: [{}] }))[0], 1), true);
+  assert.equal(zoneAcceptsVelocity(splitZones(sp({ zones: [{}] }))[0], 127), true);
+  // Written backwards, it still behaves.
+  const rev = splitZones(sp({ zones: [{ velSwitchLow: 100, velSwitchHigh: 20 }] }))[0];
+  assert.equal(zoneAcceptsVelocity(rev, 50), true);
+  assert.equal(zoneAcceptsVelocity(rev, 10), false);
+});
+
+test('velocity switching and the release memory agree', () => {
+  // The gate is applied on the way IN, so a note that never sounded has nothing
+  // to release — and one that did is released whatever it would do now.
+  const layers = sp({ zones: [
+    { id: 'soft', lowNote: 0, highNote: 127, channel: 1, velSwitchHigh: 79 },
+    { id: 'hard', lowNote: 0, highNote: 127, channel: 2, velSwitchLow: 80 },
+  ] });
+  const soft = pressNote(EMPTY_SOUNDING, layers, 60, 40);
+  assert.deepEqual(soft.sends, [{ kind: 'on', channel: 1, note: 60, velocity: 40 }]);
+  assert.deepEqual(releaseNote(soft.sounding, 60).sends, [{ kind: 'off', channel: 1, note: 60 }]);
+});
+
+// --- Presets ---------------------------------------------------------------------------
+test('presets are built from the range you actually have', () => {
+  for (const p of SPLIT_PRESETS) {
+    const zones = splitPresetZones(p.id, 36, 96);
+    assert.ok(zones.length >= 1, p.id);
+    // Every zone must survive normalization unchanged — a preset that needs
+    // repairing is a preset that will confuse someone.
+    const normalized = splitZones(sp({ zones }));
+    assert.equal(normalized.length, zones.length, p.id);
+    for (let i = 0; i < zones.length; i += 1) {
+      assert.equal(normalized[i].lowNote, zones[i].lowNote, `${p.id} zone ${i} low`);
+      assert.equal(normalized[i].highNote, zones[i].highNote, `${p.id} zone ${i} high`);
+      assert.equal(normalized[i].channel, zones[i].channel, `${p.id} zone ${i} channel`);
+    }
+    // And nothing may stick out past the keyboard it was built for.
+    for (const z of zones) {
+      assert.ok(z.lowNote >= 36 && z.highNote <= 96, `${p.id} escaped the range`);
+    }
+  }
+});
+
+test('the classic preset splits on a white key and leaves no gap', () => {
+  const zones = splitPresetZones('classic', 36, 96);
+  assert.equal(zones.length, 2);
+  assert.equal(zones[0].transpose, -12);
+  assert.equal(zones[1].lowNote, zones[0].highNote + 1, 'contiguous');
+  assert.equal(isBlackKey(zones[1].lowNote), false, 'a split point lands where a player would put it');
+  assert.deepEqual(unclaimedNotes(sp({ zones }), 36, 96), []);
+  assert.deepEqual(zoneOverlaps(sp({ zones })), []);
+  // A 25-key controller gets boundaries on keys it actually has.
+  const small = splitPresetZones('classic', 48, 72);
+  assert.ok(small[0].lowNote === 48 && small[1].highNote === 72);
+  assert.ok(small[0].highNote < small[1].lowNote);
+});
+
+test('the layer and velocity presets do what their names say', () => {
+  const layered = splitPresetZones('splitLayer', 36, 96);
+  assert.equal(layered.length, 3);
+  // Two of them cover the same upper range on different channels — the layer.
+  const overlaps = zoneOverlaps(sp({ zones: layered }));
+  assert.equal(overlaps.length, 1);
+  assert.equal(layered[2].transpose, 12);
+
+  const vel = splitPresetZones('velLayer', 36, 96);
+  assert.equal(vel.length, 2);
+  assert.equal(vel[0].lowNote, vel[1].lowNote, 'same keys');
+  // Windows abut with no hole: every velocity reaches exactly one of them.
+  assert.equal(vel[0].velSwitchHigh + 1, vel[1].velSwitchLow);
+  const c = sp({ zones: vel });
+  for (const v of [1, 40, 79, 80, 110, 127]) {
+    assert.equal(routeNoteOn(c, 60, v).length, 1, `velocity ${v}`);
+  }
+
+  const three = splitPresetZones('threeWay', 36, 96);
+  assert.equal(three.length, 3);
+  assert.deepEqual(unclaimedNotes(sp({ zones: three }), 36, 96), []);
+  assert.deepEqual(zoneOverlaps(sp({ zones: three })), []);
+
+  const whole = splitPresetZones('whole', 36, 96);
+  assert.equal(whole.length, 1);
+  assert.equal(whole[0].lowNote, 36);
+  assert.equal(whole[0].highNote, 96);
 });

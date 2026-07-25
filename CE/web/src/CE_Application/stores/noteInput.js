@@ -12,7 +12,7 @@ import { writable, get } from 'svelte/store';
 import { latestMidiInputMessage } from './deviceProfiles.js';
 import {
   EMPTY_NOTE_STATE, applyMidiHex, heldNotes, heldNoteEntries,
-  EMPTY_EXPRESSION_STATE, applyExpressionHex,
+  EMPTY_EXPRESSION_STATE, applyExpressionHex, expressionEventsFromHex,
   EMPTY_LEARN_STATE, applyLearnHex, learnBest,
 } from '../utils/midiNoteInput.js';
 
@@ -24,6 +24,13 @@ export const midiNoteState = writable({ notes: EMPTY_NOTE_STATE, seq: 0 });
 // aftertouch, note velocity. Separate store so a control that only cares about
 // notes doesn't re-render on every CC of a mod-wheel sweep (and vice versa).
 export const midiExpressionState = writable({ expression: EMPTY_EXPRESSION_STATE, seq: 0 });
+
+// Controller EVENTS, not state. The expression store above answers "where is the
+// mod wheel now", which is right for a display and wrong for a router: a splitter
+// forwarding controllers has to forward each message once, when it arrives.
+// Re-sending a snapshot would either spam or miss. `seq` lets a consumer take
+// each batch exactly once.
+export const midiCcEvents = writable({ events: [], seq: 0 });
 
 // --- MIDI learn session -------------------------------------------------------
 // Only ever one at a time: two controls both listening for "the next thing that
@@ -73,6 +80,14 @@ export function startNoteInputListener() {
     const curX = get(midiExpressionState);
     const nextX = applyExpressionHex(curX.expression, payload.hex);
     if (nextX !== curX.expression) midiExpressionState.set({ expression: nextX, seq: curX.seq + 1 });
+    // The same bytes as an event batch, for routers rather than displays. Only
+    // published when there is something in it, so a run of notes never wakes a
+    // controller consumer.
+    const ccs = expressionEventsFromHex(payload.hex).filter((e) => e.kind === 'cc');
+    if (ccs.length) {
+      const curC = get(midiCcEvents);
+      midiCcEvents.set({ events: ccs, seq: curC.seq + 1 });
+    }
     // Feed an active learn session from the same bytes.
     const curL = get(midiLearnState);
     if (curL.ownerId) {

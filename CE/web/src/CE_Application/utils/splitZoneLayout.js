@@ -57,6 +57,13 @@ export function splitUnmatched(control) {
 }
 export function splitPassChannel(control) { return clampInt(splitConfig(control).passChannel ?? 1, 1, 16); }
 
+// Which continuous controllers a zone passes on. A split is usually two
+// different synths, and they rarely agree about what CC1 means — so a zone that
+// forwards the mod wheel and one that doesn't is a real need, not a refinement.
+export const CC_MODES = ['all', 'none', 'list'];
+export const CC_MODE_LABELS = { all: 'All', none: 'None', list: 'Only these' };
+export const SUSTAIN_CC = 64;
+
 export function splitZones(control) {
   const raw = splitConfig(control).zones;
   return (Array.isArray(raw) ? raw : []).map((z, i) => {
@@ -75,6 +82,18 @@ export function splitZones(control) {
       velLow: clampInt(z?.velLow ?? 1, 1, 127),
       velHigh: clampInt(z?.velHigh ?? 127, 1, 127),
       fixedVelocity: clampInt(z?.fixedVelocity ?? 100, 1, 127),
+      // Velocity SWITCHING gates the input: the zone only answers a note played
+      // within this window. Distinct from velLow/velHigh above, which scale the
+      // OUTPUT — one decides whether the zone speaks, the other how loudly.
+      velSwitchLow: clampInt(z?.velSwitchLow ?? 1, 1, 127),
+      velSwitchHigh: clampInt(z?.velSwitchHigh ?? 127, 1, 127),
+      ccMode: CC_MODES.includes(String(z?.ccMode)) ? String(z.ccMode) : 'all',
+      ccList: [...new Set((Array.isArray(z?.ccList) ? z.ccList : []).map((c) => clampInt(c, 0, 127)))]
+        .sort((a2, b2) => a2 - b2),
+      // Sustain gets its own switch rather than living in the CC list. It is the
+      // one controller everybody wants per-zone, and burying it in a list of
+      // numbers means nobody finds it.
+      sustain: z?.sustain !== false,
       enabled: z?.enabled !== false,
       colour: String(z?.colour ?? ''),
     };
@@ -99,6 +118,55 @@ export function zoneVelocity(zone, velocity) {
 }
 export function zoneNote(zone, note) { return Math.round(num(note, 0)) + zone.transpose; }
 
+// Velocity switching: does this zone answer a note played this hard? A window
+// rather than a single threshold, so you can have a soft layer AND a hard one
+// without the soft layer also sounding on every fortissimo.
+export function zoneAcceptsVelocity(zone, velocity) {
+  const v = clampInt(velocity, 1, 127);
+  const lo = Math.min(zone.velSwitchLow ?? 1, zone.velSwitchHigh ?? 127);
+  const hi = Math.max(zone.velSwitchLow ?? 1, zone.velSwitchHigh ?? 127);
+  return v >= lo && v <= hi;
+}
+export function zoneSwitchesOnVelocity(zone) {
+  return (zone.velSwitchLow ?? 1) > 1 || (zone.velSwitchHigh ?? 127) < 127;
+}
+// Does this zone forward a given controller? Sustain answers to its own switch,
+// always — a pedal is not something you want to discover is governed by a list
+// of numbers three menus down.
+export function zonePassesCc(zone, cc) {
+  const n = clampInt(cc, 0, 127);
+  if (n === SUSTAIN_CC) return zone.sustain !== false;
+  switch (String(zone.ccMode ?? 'all')) {
+    case 'none': return false;
+    case 'list': return (Array.isArray(zone.ccList) ? zone.ccList : []).includes(n);
+    case 'all':
+    default: return true;
+  }
+}
+// Route a controller to every channel that should hear it. Deduplicated BY
+// CHANNEL: two zones sharing a channel (a keyboard split into a low and high
+// half of the same patch) must not double every mod-wheel message — that is
+// twice the traffic for no audible difference.
+export function routeCc(control, cc, value) {
+  const n = clampInt(cc, 0, 127);
+  const v = clampInt(value, 0, 127);
+  const seen = new Set();
+  const out = [];
+  for (const zone of splitZones(control)) {
+    if (!zone.enabled || !zonePassesCc(zone, n)) continue;
+    if (seen.has(zone.channel)) continue;
+    seen.add(zone.channel);
+    out.push({ zoneId: zone.id, channel: zone.channel, cc: n, value: v });
+  }
+  if (out.length) return out;
+  // Nothing claimed it. Pass-through mode forwards controllers too, so a panel
+  // being set up doesn't go half-dead the moment you touch the mod wheel.
+  if (splitUnmatched(control) === 'pass') {
+    return [{ zoneId: '', channel: splitPassChannel(control), cc: n, value: v }];
+  }
+  return [];
+}
+
 // The routing itself. One incoming note in, every destination out — which is
 // more than one when zones overlap. A transposition that lands outside 0-127 is
 // DROPPED rather than clamped: clamping would pile every out-of-range note onto
@@ -110,6 +178,7 @@ export function routeNoteOn(control, note, velocity) {
   const out = [];
   for (const zone of zones) {
     if (!zone.enabled || !zoneContains(zone, n)) continue;
+    if (!zoneAcceptsVelocity(zone, velocity)) continue;
     const dest = zoneNote(zone, n);
     if (dest < MIN_NOTE || dest > MAX_NOTE) continue;
     out.push({ zoneId: zone.id, channel: zone.channel, note: dest, velocity: zoneVelocity(zone, velocity) });
@@ -155,6 +224,34 @@ export function releaseNote(sounding, note) {
   const next = { ...map };
   delete next[key];
   return { sounding: next, sends: outs.map((o) => ({ kind: 'off', channel: o.channel, note: o.note })) };
+}
+
+// Controllers a zone is currently holding down, so panic and a channel change
+// can put them back. Only latching ones matter — a mod wheel left at 40 is a
+// tone, a sustain pedal left down is a synth full of notes that will never stop.
+export const LATCHING_CCS = [64, 66, 67, 69];   // sustain, sostenuto, soft, hold-2
+export function heldLatchingCcs(control, ccState) {
+  const state = ccState ?? {};
+  const out = [];
+  for (const [key, value] of Object.entries(state)) {
+    const [ch, cc] = key.split(':').map(Number);
+    if (!LATCHING_CCS.includes(cc) || value < 64) continue;
+    out.push({ channel: ch, cc, value: 0 });
+  }
+  return out;
+}
+// Fold a routed CC into the "what is latched" state, so it can be released.
+export function trackCc(ccState, sends) {
+  let next = ccState ?? {};
+  let changed = false;
+  for (const m of (Array.isArray(sends) ? sends : [])) {
+    if (!LATCHING_CCS.includes(m.cc)) continue;
+    const key = `${m.channel}:${m.cc}`;
+    if (next[key] === m.value) continue;
+    if (!changed) { next = { ...next }; changed = true; }
+    next[key] = m.value;
+  }
+  return next;
 }
 
 export function releaseAll(sounding) {
@@ -226,6 +323,74 @@ export function zoneOverlaps(control) {
     }
   }
   return pairs;
+}
+
+// --- Presets ----------------------------------------------------------------------
+// The four or five splits anyone actually uses. Built from the CURRENT drawn
+// range rather than fixed note numbers, so applying one to a 25-key controller
+// gives sensible boundaries instead of zones off the end of the keyboard.
+export const SPLIT_PRESETS = [
+  { id: 'whole', label: 'Whole keyboard', hint: 'One zone, everything to channel 1.' },
+  { id: 'classic', label: 'Classic split', hint: 'Lower half to ch1 an octave down, upper half to ch2.' },
+  { id: 'splitLayer', label: 'Split + layered lead', hint: 'Bass below, two channels layered above.' },
+  { id: 'threeWay', label: 'Three-way', hint: 'Bass / pad / lead across ch1-3.' },
+  { id: 'velLayer', label: 'Velocity layers', hint: 'Same keys, soft to ch1 and hard to ch2.' },
+];
+const PRESET_COLOURS = ['FF5B9BD5', 'FF39D98A', 'FFF2994A', 'FFBB6BD9', 'FFEB5757'];
+function presetZone(i, over) {
+  return {
+    id: `z${i}`, label: `Zone ${i + 1}`, lowNote: 0, highNote: 127, channel: i + 1,
+    transpose: 0, curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
+    velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+    enabled: true, colour: PRESET_COLOURS[i % PRESET_COLOURS.length], ...over,
+  };
+}
+// Split the range at a proportion, on a white key so the boundary lands
+// somewhere a player would put it rather than mid-accidental.
+function splitPoint(lowNote, highNote, fraction) {
+  const lo = clampInt(lowNote, MIN_NOTE, MAX_NOTE);
+  const hi = clampInt(highNote, MIN_NOTE, MAX_NOTE);
+  let n = clampInt(lo + (hi - lo) * clamp01(fraction), lo, hi);
+  while (n > lo && isBlackKey(n)) n -= 1;
+  return n;
+}
+export function splitPresetZones(presetId, lowNote = 36, highNote = 96) {
+  const lo = Math.min(lowNote, highNote);
+  const hi = Math.max(lowNote, highNote);
+  switch (String(presetId)) {
+    case 'classic': {
+      const mid = splitPoint(lo, hi, 0.5);
+      return [
+        presetZone(0, { label: 'Bass', lowNote: lo, highNote: mid - 1, channel: 1, transpose: -12 }),
+        presetZone(1, { label: 'Lead', lowNote: mid, highNote: hi, channel: 2 }),
+      ];
+    }
+    case 'splitLayer': {
+      const mid = splitPoint(lo, hi, 0.4);
+      return [
+        presetZone(0, { label: 'Bass', lowNote: lo, highNote: mid - 1, channel: 1, transpose: -12 }),
+        presetZone(1, { label: 'Lead', lowNote: mid, highNote: hi, channel: 2 }),
+        presetZone(2, { label: 'Lead +8ve', lowNote: mid, highNote: hi, channel: 3, transpose: 12 }),
+      ];
+    }
+    case 'threeWay': {
+      const a = splitPoint(lo, hi, 1 / 3);
+      const b = splitPoint(lo, hi, 2 / 3);
+      return [
+        presetZone(0, { label: 'Bass', lowNote: lo, highNote: a - 1, channel: 1, transpose: -12 }),
+        presetZone(1, { label: 'Pad', lowNote: a, highNote: b - 1, channel: 2 }),
+        presetZone(2, { label: 'Lead', lowNote: b, highNote: hi, channel: 3 }),
+      ];
+    }
+    case 'velLayer':
+      return [
+        presetZone(0, { label: 'Soft', lowNote: lo, highNote: hi, channel: 1, velSwitchHigh: 79 }),
+        presetZone(1, { label: 'Hard', lowNote: lo, highNote: hi, channel: 2, velSwitchLow: 80 }),
+      ];
+    case 'whole':
+    default:
+      return [presetZone(0, { label: 'All', lowNote: lo, highNote: hi, channel: 1 })];
+  }
 }
 
 // --- Keyboard geometry -----------------------------------------------------------
