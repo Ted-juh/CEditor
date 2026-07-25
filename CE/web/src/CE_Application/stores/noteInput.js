@@ -31,8 +31,8 @@ export const midiExpressionState = writable({ expression: EMPTY_EXPRESSION_STATE
 // a snapshot would either spam or miss. `seq` lets a consumer take each batch
 // exactly once.
 //
-// Carries controllers, pitch bend and channel pressure — everything a router has
-// to pass on that isn't a note.
+// Carries controllers, pitch bend, channel pressure and poly key pressure —
+// everything a router has to pass on that isn't a note.
 export const midiRouteEvents = writable({ events: [], seq: 0 });
 
 // --- MIDI learn session -------------------------------------------------------
@@ -87,7 +87,8 @@ export function startNoteInputListener() {
     // published when there is something in it, so a run of notes never wakes a
     // controller consumer.
     const routable = expressionEventsFromHex(payload.hex)
-      .filter((e) => e.kind === 'cc' || e.kind === 'bend' || e.kind === 'aftertouch');
+      .filter((e) => e.kind === 'cc' || e.kind === 'bend'
+        || e.kind === 'aftertouch' || e.kind === 'polyAftertouch');
     if (routable.length) {
       const curR = get(midiRouteEvents);
       midiRouteEvents.set({ events: routable, seq: curR.seq + 1 });

@@ -24,6 +24,7 @@ import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -258,6 +259,32 @@ const midiApi = {
 
 /* ------------------------------------------------------------------ API + executor */
 
+// --- Zone Splitter -----------------------------------------------------------
+// `set()` can already reach SplitZone.zones, but nobody is going to hand-write a
+// zone array in a script. This reads the current zones, hands them to the same
+// pure reducer the editor's own buttons use, and writes the result back — so a
+// footswitch changing the split mid-set is one line.
+function splitAction(path, action, args) {
+  const target = String(path ?? '');
+  const zonesPath = `${target}.SplitZone.zones`;
+  const current = getValue(zonesPath);
+  if (!Array.isArray(current)) {
+    addScriptTrace('error', '', `split: "${target}" is not a Zone Splitter (no SplitZone.zones)`);
+    return;
+  }
+  const next = applySplitScriptAction(current, action, args ?? {});
+  setValue(zonesPath, next);
+  addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
+}
+const splitApi = {
+  splitPreset: (target, preset, lowNote, highNote) =>
+    splitAction(target, 'preset', { preset, lowNote, highNote }),
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', { zone, enabled: enabled !== false }),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+};
+
 function buildApi(ownerName) {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
@@ -269,6 +296,8 @@ function buildApi(ownerName) {
     log: (msg, val) => addScriptTrace('log', '', val !== undefined ? `${msg} ${JSON.stringify(val)}` : String(msg)),
     // MIDI/device — real raw send via the device bridge; bulk codec is a fast-follow.
     ...midiApi,
+    // Zone Splitter — change the split from a footswitch.
+    ...splitApi,
     // flow — minimal for M1
     emit: () => {},
     run: () => {},

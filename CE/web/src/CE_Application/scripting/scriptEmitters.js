@@ -86,6 +86,7 @@ function emitLuaStep(step, lines) {
   else if (command === 'stopTimer') lines.push(`  stopTimer(${quoted(args.id)})`);
   else if (command === 'emitEvent') lines.push(`  emitEvent(${quoted(args.event)}, ${quoted(args.target ?? '')}, ${luaExpression(args.value ?? { ref: 'event.value' })})`);
   else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC(${m.channel}, ${m.cc}, 0)`); }
+  else if (command === 'split') lines.push(`  ${splitCall(args, 'lua')}`);
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
@@ -104,6 +105,28 @@ function emitLuaStep(step, lines) {
   else lines.push(`  -- ${ceStep(step)}`);
 }
 
+// One builder for every dialect, so lua/js/text can't drift about what a split
+// step actually does. The argument set is deliberately narrow: whichever fields
+// the chosen action uses, and nothing else on the line to read past.
+function splitCall(args, dialect) {
+  const t = String(args.target ?? '');
+  const zone = args.zone === '' || args.zone == null ? '' : args.zone;
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const z = () => (typeof zone === 'number' || /^\d+$/.test(String(zone)) ? Number(zone) : q(zone));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest) => (dialect === 'ce'
+    ? `${name} ${[q(t), ...rest].join(sep)}`
+    : `${name}(${[q(t), ...rest].join(sep)})`);
+  switch (String(args.action ?? 'preset')) {
+    case 'mute': return call('splitMute', [z(), String(args.enabled !== false)]);
+    case 'channel': return call('splitChannel', [z(), Number(args.channel) || 1]);
+    case 'transpose': return call('splitTranspose', [z(), Number(args.transpose) || 0]);
+    case 'splitPoint': return call('splitPoint', [z(), Number(args.note) || 60]);
+    case 'preset':
+    default: return call('splitPreset', [q(args.preset ?? 'classic')]);
+  }
+}
+
 function ceStep(step) {
   const command = step.command ?? step.cmd;
   const args = step.args ?? {};
@@ -120,6 +143,7 @@ function ceStep(step) {
   if (command === 'stopTimer') return `stopTimer ${args.id}`;
   if (command === 'emitEvent') return `emitEvent ${args.event} target=${args.target ?? ''} value=${valueText(args.value ?? { ref: 'event.value' }, 'ce')}`;
   if (command === 'panic') return panicStepMessages(args).map((m) => `sendCC channel=${m.channel} cc=${m.cc} value=0`).join('\n  ');
+  if (command === 'split') return splitCall(args, 'ce');
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
@@ -160,6 +184,7 @@ function emitJsLike(script, target) {
     else if (command === 'stopTimer') lines.push(`  stopTimer("${args.id}");`);
     else if (command === 'emitEvent') lines.push(`  emitEvent("${args.event}", { target: "${args.target ?? ''}", value: ${valueText(args.value ?? { ref: 'event.value' }, target)} });`);
     else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC({ channel: ${m.channel}, cc: ${m.cc}, value: 0 });`); }
+    else if (command === 'split') lines.push(`  ${splitCall(args, 'js')};`);
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);

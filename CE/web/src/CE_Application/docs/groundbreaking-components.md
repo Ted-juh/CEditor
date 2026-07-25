@@ -109,7 +109,9 @@ not DSP:
   leave it ringing. Controllers, the sustain pedal, **pitch bend** and channel
   pressure route too — and since a bend carries no note, which zone hears it is
   a stated **rule** (last played / while sounding / always / never) rather than
-  a guess. See [zone-splitter.md](./zone-splitter.md).
+  a guess — while poly pressure, which does name its note, needs no rule at all.
+  A footswitch can change the split live via `splitPreset` / `splitMute` /
+  `splitPoint`. See [zone-splitter.md](./zone-splitter.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

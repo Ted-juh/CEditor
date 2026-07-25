@@ -81,7 +81,7 @@
       lowNote: 60, highNote: 72, channel: Math.min(16, n + 1), transpose: 0,
       curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
       velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
-      bendMode: 'lastPlayed', pressureMode: 'lastPlayed',
+      bendMode: 'lastPlayed', pressureMode: 'lastPlayed', polyPressure: true,
       enabled: true,
       colour: ['FF5B9BD5', 'FF39D98A', 'FFF2994A', 'FFBB6BD9', 'FFEB5757'][n % 5],
     });
@@ -203,6 +203,7 @@
               <th title="Forward the sustain pedal (CC64) to this zone's channel">Ped</th>
               <th title="A pitch bend carries no note, so who hears it is a rule rather than a fact">Bend</th>
               <th title="Channel aftertouch — same attribution rule as bend, its own switch">Press</th>
+              <th title="Poly key pressure. It names its note, so it needs no rule — just on or off.">Poly</th>
               <th>Col</th><th></th>
             </tr>
           </thead>
@@ -267,6 +268,7 @@
                     {#each BEND_MODES as m (m)}<option value={m}>{BEND_MODE_LABELS[m] ?? m}</option>{/each}
                   </select>
                 </td>
+                <td><input type="checkbox" checked={z.polyPressure !== false} onchange={(e) => setZone(i, 'polyPressure', e.target.checked)} /></td>
                 <td><input class="col" type="color" value={colRgb(z.colour, 'FF5B9BD5')} oninput={(e) => setZoneCol(i, z.colour, e.target.value)} /></td>
                 <td class="acts">
                   <button type="button" title="Move up" onclick={() => moveZone(i, -1)} disabled={i === 0}>↑</button>
@@ -276,7 +278,7 @@
               </tr>
             {/each}
             {#if !zones.length}
-              <tr><td colspan="15"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
+              <tr><td colspan="16"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
             {/if}
           </tbody>
         </table>

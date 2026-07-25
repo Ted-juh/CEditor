@@ -140,6 +140,13 @@ note.
 rule, on its own switch. A synth that responds beautifully to aftertouch and one
 that screams are a common pair.
 
+**Poly key pressure** is the easy one, and worth contrasting: it *names its
+note*, so it needs no rule at all. It goes exactly where that note went,
+transposed the same way, looked up in the same sounding map a note-off uses. A
+key that isn't sounding has nothing to apply pressure to, so nothing is sent —
+and pass-through gets it right for free, because an unclaimed note is in that
+map too, on the pass channel. The only setting is on or off per zone.
+
 The bend value is carried through as **all fourteen bits**. Re-sending it as
 seven would turn a slow glide into a staircase, which is precisely the thing a
 bend wheel exists to avoid.
@@ -212,9 +219,31 @@ remembered routings.
 
 Nothing here touches the DPD profile.
 
+## Driving it from a script
+
+A footswitch changing the split mid-set is most of the point of having one, so
+the zone list is reachable from a script — through the same pure reducers the
+editor's own buttons use, so the two can't diverge:
+
+```lua
+splitPreset("Split", "threeWay")     -- swap the whole arrangement
+splitMute("Split", "Bass", false)    -- drop the left hand out
+splitChannel("Split", "Lead", 9)
+splitTranspose("Split", "Lead", -12)
+splitPoint("Split", "Bass", 55)      -- move the split, carrying its neighbour
+```
+
+Zones are addressed **by name or by index**. A name survives someone reordering
+the zones; an index doesn't. A zone that isn't there is a **no-op, not a throw** —
+a script firing on a footswitch must not take the panel down because a zone got
+renamed. A scripted split point carries its neighbour exactly like a drag does,
+so a footswitch can't open a gap the mouse never could.
+
+The command is marked portable but **not export-safe**: it changes local routing
+rather than sending MIDI, so it needs the panel's own runtime. The exported
+Player has that; a bare device script doesn't.
+
 ## What it routes
 
-Notes, continuous controllers, the sustain pedal, pitch bend and channel
-pressure — everything a performance sends. Poly aftertouch is *not* routed, and
-that one genuinely has an answer in the message (it names its note), so it is
-simply not done rather than not decidable; almost nothing sends it.
+Notes, continuous controllers, the sustain pedal, pitch bend, channel pressure
+and poly key pressure — everything a performance sends.

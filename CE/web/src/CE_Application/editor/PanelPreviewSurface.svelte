@@ -126,6 +126,7 @@
     routeCc as splitRouteCc, trackCc as splitTrackCc, heldLatchingCcs,
     routeBend as splitRouteBend, routePressure as splitRoutePressure,
     bendBytes, pressureBytes, trackBend, offCentreBends, soundingZoneIds,
+    routePolyPressure, polyPressureBytes, applySplitScriptAction,
   } from '../utils/splitZoneLayout.js';
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
@@ -2808,6 +2809,13 @@
         const sends = splitRouteBend(control, ev.value14, attribution);
         splitBend[id] = trackBend(splitBend[id], sends);
         for (const m of sends) sendNoteBytes(bendBytes(m.channel, m.value14), 'split_bend');
+        continue;
+      }
+      if (ev.kind === 'polyAftertouch') {
+        // Named its note, so no rule needed — it follows that note's routing.
+        for (const m of routePolyPressure(control, splitSounding[id], ev.note, ev.value)) {
+          sendNoteBytes(polyPressureBytes(m.channel, m.note, m.value), 'split_pat');
+        }
         continue;
       }
       if (ev.kind === 'aftertouch') {

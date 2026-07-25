@@ -12,6 +12,9 @@ import {
   LATCHING_CCS, heldLatchingCcs, trackCc, SPLIT_PRESETS, splitPresetZones,
   BEND_MODES, BEND_CENTRE, BEND_MAX, routeBend, routePressure, bendBytes, pressureBytes,
   trackBend, offCentreBends, soundingZoneIds,
+  routePolyPressure, polyPressureBytes,
+  SPLIT_SCRIPT_ACTIONS, applySplitScriptAction, scriptApplyPreset, scriptPatchZone,
+  scriptSetZoneEnabled, scriptSetZoneChannel, scriptSetZoneTranspose, scriptSetSplitPoint,
   MIN_NOTE, MAX_NOTE,
 } from '../src/CE_Application/utils/splitZoneLayout.js';
 
@@ -822,4 +825,117 @@ test('a note nothing claims still reports an empty zone list', () => {
   const r = pressNote(EMPTY_SOUNDING, CLASSIC, 20, 100);
   assert.deepEqual(r.zoneIds, []);
   assert.deepEqual(reconcileHeld(EMPTY_SOUNDING, CLASSIC, [{ note: 20, velocity: 100 }]).zoneIds, null);
+});
+
+// --- Poly key pressure -----------------------------------------------------------
+test('poly pressure needs no rule — it names its note', () => {
+  // Unlike bend and channel pressure, this message says which key it is about,
+  // so it goes exactly where that key went, transposed the same way.
+  const down = pressNote(EMPTY_SOUNDING, CLASSIC, 48, 100);   // → ch1, note 36
+  assert.deepEqual(routePolyPressure(CLASSIC, down.sounding, 48, 90),
+    [{ zoneId: 'lo', channel: 1, note: 36, value: 90 }]);
+  assert.deepEqual(polyPressureBytes(1, 36, 90), [0xA0, 36, 90]);
+
+  // A key that isn't sounding has nothing to apply pressure to.
+  assert.deepEqual(routePolyPressure(CLASSIC, down.sounding, 72, 90), []);
+  assert.deepEqual(routePolyPressure(CLASSIC, EMPTY_SOUNDING, 48, 90), []);
+
+  // And once released, likewise — no stray pressure on a dead note.
+  assert.deepEqual(routePolyPressure(CLASSIC, releaseNote(down.sounding, 48).sounding, 48, 90), []);
+});
+
+test('poly pressure reaches every destination of a layered note', () => {
+  const layered = sp({ zones: [
+    { id: 'a', lowNote: 60, highNote: 72, channel: 1 },
+    { id: 'b', lowNote: 60, highNote: 72, channel: 3, transpose: 12 },
+  ] });
+  const down = pressNote(EMPTY_SOUNDING, layered, 64, 90);
+  assert.deepEqual(routePolyPressure(layered, down.sounding, 64, 55), [
+    { zoneId: 'a', channel: 1, note: 64, value: 55 },
+    { zoneId: 'b', channel: 3, note: 76, value: 55 },
+  ]);
+});
+
+test('a zone can refuse poly pressure while still playing the note', () => {
+  const mixed = sp({ zones: [
+    { id: 'a', lowNote: 60, highNote: 72, channel: 1, polyPressure: false },
+    { id: 'b', lowNote: 60, highNote: 72, channel: 3, polyPressure: true },
+  ] });
+  const down = pressNote(EMPTY_SOUNDING, mixed, 64, 90);
+  assert.equal(down.sends.length, 2, 'both still play it');
+  assert.deepEqual(routePolyPressure(mixed, down.sounding, 64, 55).map((m) => m.channel), [3]);
+  // On by default.
+  assert.equal(splitZones(sp({ zones: [{}] }))[0].polyPressure, true);
+  assert.equal(routePolyPressure(CLASSIC, pressNote(EMPTY_SOUNDING, CLASSIC, 48, 100).sounding, 48, 1).length, 1);
+});
+
+test('pass-through carries poly pressure without needing a zone', () => {
+  // An unclaimed note IS in the sounding map, on the pass channel, so its
+  // pressure follows it for free.
+  const pass = sp({ unmatched: 'pass', passChannel: 7, zones: [{ id: 'a', lowNote: 60, highNote: 72, channel: 1 }] });
+  const down = pressNote(EMPTY_SOUNDING, pass, 40, 88);
+  assert.deepEqual(routePolyPressure(pass, down.sounding, 40, 33),
+    [{ zoneId: '', channel: 7, note: 40, value: 33 }]);
+});
+
+// --- Scripting -----------------------------------------------------------------------
+test('every advertised script action does something', () => {
+  const base = splitPresetZones('classic', 36, 96);
+  for (const a of SPLIT_SCRIPT_ACTIONS) {
+    // enabled:false, because the default is "enable" and these are already on —
+    // "mute changed nothing" would be the correct answer to the wrong question.
+    const out = applySplitScriptAction(base, a.id, {
+      preset: 'threeWay', zone: 0, channel: 5, transpose: 7, note: 50, enabled: false,
+    });
+    assert.ok(Array.isArray(out), a.id);
+    assert.notDeepEqual(out, base, `${a.id} changed nothing`);
+    // Whatever it produced must survive normalization untouched, or a script
+    // could write a zone list the engine then quietly repairs.
+    const norm = splitZones(sp({ zones: out }));
+    assert.equal(norm.length, out.length, a.id);
+    for (let i = 0; i < out.length; i += 1) {
+      assert.equal(norm[i].channel, out[i].channel, `${a.id} zone ${i}`);
+      assert.equal(norm[i].lowNote, out[i].lowNote, `${a.id} zone ${i}`);
+      assert.equal(norm[i].highNote, out[i].highNote, `${a.id} zone ${i}`);
+    }
+  }
+  // An action nobody registered leaves the zones alone.
+  assert.deepEqual(applySplitScriptAction(base, 'nonsense', {}), base);
+});
+
+test('a script addresses a zone by name as well as by index', () => {
+  // An index breaks the moment someone reorders the zones; a name survives it.
+  const base = splitPresetZones('classic', 36, 96);   // Bass, Lead
+  assert.equal(scriptSetZoneEnabled(base, 'Bass', false)[0].enabled, false);
+  assert.equal(scriptSetZoneEnabled(base, 'bass', false)[0].enabled, false, 'case-insensitive');
+  assert.equal(scriptSetZoneEnabled(base, 0, false)[0].enabled, false);
+  assert.equal(scriptSetZoneChannel(base, 'Lead', 9)[1].channel, 9);
+  assert.equal(scriptSetZoneTranspose(base, 'Lead', -12)[1].transpose, -12);
+  // Values clamp rather than escaping the MIDI range.
+  assert.equal(scriptSetZoneChannel(base, 'Lead', 99)[1].channel, 16);
+  assert.equal(scriptSetZoneTranspose(base, 'Lead', 999)[1].transpose, 48);
+  // A zone that isn't there is a no-op, not a throw — a script firing on a
+  // footswitch must not take the panel down because a zone was renamed.
+  assert.deepEqual(scriptSetZoneEnabled(base, 'Nope', false), base);
+  assert.deepEqual(scriptSetZoneEnabled(base, 9, false), base);
+  assert.deepEqual(scriptPatchZone(base, 'Bass', null), base);
+  assert.deepEqual(scriptSetSplitPoint(base, 'Nope', 60), base);
+});
+
+test('a scripted split point carries its neighbour, like the drag does', () => {
+  // A footswitch must not be able to leave a gap the mouse never could.
+  const base = splitPresetZones('classic', 36, 96);
+  const moved = scriptSetSplitPoint(base, 'Bass', 55);
+  assert.equal(moved[0].highNote, 55);
+  assert.equal(moved[1].lowNote, 56);
+  assert.deepEqual(unclaimedNotes(sp({ zones: moved }), 36, 96), []);
+  assert.deepEqual(zoneOverlaps(sp({ zones: moved })), []);
+});
+
+test('a scripted preset is the same one the button applies', () => {
+  assert.deepEqual(scriptApplyPreset([], 'threeWay', 36, 96), splitPresetZones('threeWay', 36, 96));
+  // An unknown preset falls back to the whole keyboard rather than to nothing:
+  // a script typo should not silence the rig.
+  assert.equal(scriptApplyPreset([], 'nope', 36, 96).length, 1);
+  assert.equal(applySplitScriptAction([], 'preset', { preset: 'velLayer' }).length, 2);
 });

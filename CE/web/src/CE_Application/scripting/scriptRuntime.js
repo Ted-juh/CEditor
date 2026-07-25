@@ -245,6 +245,21 @@ function runStep(step, context, output, index) {
     return { continue: true };
   }
 
+  if (command === 'split') {
+    // The simulator has no panel to read the current zones from, so it reports
+    // the intent rather than pretending to compute the resulting array. A patch
+    // with a null value would be worse than none: it would look applied.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? 'preset');
+    const detail = action === 'preset' ? `preset=${args.preset ?? 'classic'}`
+      : action === 'mute' ? `zone=${args.zone} enabled=${args.enabled !== false}`
+      : action === 'channel' ? `zone=${args.zone} channel=${Number(args.channel) || 1}`
+      : action === 'transpose' ? `zone=${args.zone} transpose=${Number(args.transpose) || 0}`
+      : `zone=${args.zone} note=${Number(args.note) || 60}`;
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `split ${target}: ${action} ${detail}` });
+    return { continue: true };
+  }
+
   if (command === 'sendCC') {
     const value = evaluateExpression(args.value, context);
     const message = {

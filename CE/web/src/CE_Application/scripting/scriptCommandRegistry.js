@@ -278,6 +278,29 @@ export const SCRIPT_COMMANDS = [
     description: 'Silence the rig: all sound off, all notes off, optionally reset controllers.',
   },
   {
+    id: 'split',
+    label: 'split',
+    category: 'MIDI / Device',
+    // Changes local routing rather than sending MIDI, so it is portable but not
+    // "export safe" in the sense the MIDI commands are: it needs the panel's
+    // own runtime, which the exported Player has and a bare device script
+    // does not.
+    portable: true,
+    exportSafe: false,
+    scopes: ['panel'],
+    args: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'action', type: 'string', default: 'preset' },
+      { name: 'preset', type: 'string', default: 'classic' },
+      { name: 'zone', type: 'string', default: '' },
+      { name: 'channel', type: 'number', default: 1 },
+      { name: 'transpose', type: 'number', default: 0 },
+      { name: 'note', type: 'number', default: 60 },
+      { name: 'enabled', type: 'boolean', default: true },
+    ],
+    description: 'Change a Zone Splitter live: apply a preset, mute a zone, or move a split point.',
+  },
+  {
     id: 'sendNRPN',
     label: 'sendNRPN',
     category: 'MIDI / Device',

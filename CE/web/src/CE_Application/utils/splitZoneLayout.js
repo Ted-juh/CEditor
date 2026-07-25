@@ -121,6 +121,8 @@ export function splitZones(control) {
       sustain: z?.sustain !== false,
       bendMode: BEND_MODES.includes(String(z?.bendMode)) ? String(z.bendMode) : 'lastPlayed',
       pressureMode: BEND_MODES.includes(String(z?.pressureMode)) ? String(z.pressureMode) : 'lastPlayed',
+      // Poly pressure needs no mode — it names its note — just an on/off.
+      polyPressure: z?.polyPressure !== false,
       enabled: z?.enabled !== false,
       colour: String(z?.colour ?? ''),
     };
@@ -426,6 +428,32 @@ export function routePressure(control, value, attribution = null) {
   }
   return [];
 }
+// Polyphonic key pressure. Unlike bend and channel pressure this one NAMES its
+// note, so it needs no attribution rule at all — it goes exactly where that note
+// went, transposed the same way. Look it up in the sounding map rather than
+// re-deriving: same reason a note-off does.
+//
+// A note that isn't sounding has nothing to apply pressure to, so it sends
+// nothing. That also means pass-through gets it right for free: an unclaimed
+// note IS in the sounding map, on the pass channel.
+export function routePolyPressure(control, sounding, note, value) {
+  const outs = (sounding ?? EMPTY_SOUNDING)[`${Math.round(num(note, -1))}`];
+  if (!outs) return [];
+  const v = clampInt(value, 0, 127);
+  const byId = new Map(splitZones(control).map((z) => [z.id, z]));
+  const out = [];
+  for (const o of outs) {
+    // No zone id means it came through the pass-through path, which has no
+    // switch of its own — if the note got through, its pressure does too.
+    const zone = o.zoneId ? byId.get(o.zoneId) : null;
+    if (zone && zone.polyPressure === false) continue;
+    out.push({ zoneId: o.zoneId, channel: o.channel, note: o.note, value: v });
+  }
+  return out;
+}
+export function polyPressureBytes(channel, note, value) {
+  return [0xA0 | (clampInt(channel, 1, 16) - 1), clampInt(note, MIN_NOTE, MAX_NOTE), clampInt(value, 0, 127)];
+}
 export function bendBytes(channel, value14) {
   const v = clampInt(value14, 0, BEND_MAX);
   return [0xE0 | (clampInt(channel, 1, 16) - 1), v & 0x7F, (v >> 7) & 0x7F];
@@ -470,7 +498,7 @@ function presetZone(i, over) {
     id: `z${i}`, label: `Zone ${i + 1}`, lowNote: 0, highNote: 127, channel: i + 1,
     transpose: 0, curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
     velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
-    bendMode: 'lastPlayed', pressureMode: 'lastPlayed',
+    bendMode: 'lastPlayed', pressureMode: 'lastPlayed', polyPressure: true,
     enabled: true, colour: PRESET_COLOURS[i % PRESET_COLOURS.length], ...over,
   };
 }
@@ -519,6 +547,68 @@ export function splitPresetZones(presetId, lowNote = 36, highNote = 96) {
     case 'whole':
     default:
       return [presetZone(0, { label: 'All', lowNote: lo, highNote: hi, channel: 1 })];
+  }
+}
+
+// --- Scripting -------------------------------------------------------------------
+// A footswitch changing the split mid-set is the whole point of having one, so
+// the zone list has to be reachable from a script. The panel runtime's generic
+// set()/get() already reaches SplitZone.zones — but nobody is going to hand-write
+// a zone array in a script, so these compute the new array from the old one and
+// the runtime just writes it back. Pure, therefore testable, and the same
+// functions serve the editor's own buttons.
+export function scriptApplyPreset(zones, presetId, lowNote = 36, highNote = 96) {
+  return splitPresetZones(presetId, lowNote, highNote);
+}
+// Patch one zone by INDEX or by label — a script written against "Bass" keeps
+// working when the zones are reordered, which an index does not.
+function zoneIndexOf(zones, which) {
+  const list = Array.isArray(zones) ? zones : [];
+  if (typeof which === 'number') return which >= 0 && which < list.length ? which : -1;
+  const name = String(which ?? '').toLowerCase();
+  return list.findIndex((z) => String(z?.label ?? '').toLowerCase() === name);
+}
+export function scriptPatchZone(zones, which, patch) {
+  const list = (Array.isArray(zones) ? zones : []).map((z) => ({ ...z }));
+  const i = zoneIndexOf(list, which);
+  if (i < 0) return list;                         // unknown zone: a no-op, not a throw
+  list[i] = { ...list[i], ...(patch && typeof patch === 'object' ? patch : {}) };
+  return list;
+}
+export function scriptSetZoneEnabled(zones, which, on) {
+  return scriptPatchZone(zones, which, { enabled: on !== false });
+}
+export function scriptSetZoneChannel(zones, which, channel) {
+  return scriptPatchZone(zones, which, { channel: clampInt(channel, 1, 16) });
+}
+export function scriptSetZoneTranspose(zones, which, semitones) {
+  return scriptPatchZone(zones, which, { transpose: clampInt(semitones, -48, 48) });
+}
+// Move a split point from a script — the same twin-carrying rule as dragging it,
+// so a footswitch can't leave a gap the mouse never could.
+export function scriptSetSplitPoint(zones, which, note) {
+  const list = (Array.isArray(zones) ? zones : []).map((z) => ({ ...z }));
+  const i = zoneIndexOf(list, which);
+  if (i < 0) return list;
+  return dragSplitPoint(list, i, 'high', clampInt(note, MIN_NOTE, MAX_NOTE));
+}
+// Every scriptable action in one place, so the command registry, the emitters
+// and the runtime can't drift apart about what exists.
+export const SPLIT_SCRIPT_ACTIONS = [
+  { id: 'preset', label: 'preset', summary: 'Replace the zones with a named preset.' },
+  { id: 'mute', label: 'mute', summary: 'Enable or disable one zone.' },
+  { id: 'channel', label: 'channel', summary: "Set a zone's MIDI channel." },
+  { id: 'transpose', label: 'transpose', summary: "Set a zone's transposition in semitones." },
+  { id: 'splitPoint', label: 'splitPoint', summary: 'Move a split point, carrying the neighbouring zone.' },
+];
+export function applySplitScriptAction(zones, action, args = {}) {
+  switch (String(action)) {
+    case 'preset': return scriptApplyPreset(zones, args.preset, args.lowNote ?? 36, args.highNote ?? 96);
+    case 'mute': return scriptSetZoneEnabled(zones, args.zone, args.enabled !== false);
+    case 'channel': return scriptSetZoneChannel(zones, args.zone, args.channel);
+    case 'transpose': return scriptSetZoneTranspose(zones, args.zone, args.transpose);
+    case 'splitPoint': return scriptSetSplitPoint(zones, args.zone, args.note);
+    default: return Array.isArray(zones) ? zones : [];
   }
 }
 
