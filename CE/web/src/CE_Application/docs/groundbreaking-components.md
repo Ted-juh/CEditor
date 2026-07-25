@@ -76,10 +76,12 @@ not DSP:
   MIDI synth (light traffic, no input dependency).
 
 ### 0c. Expression Router — shape any input, fan it out — **shipped 🟢**
-- MIDI-learn an incoming signal (mod wheel / aftertouch / breath / a linked
+- Take an incoming signal (mod wheel / aftertouch / breath / expression / foot /
+  velocity, straight off the **hardware MIDI input**, or a linked on-panel
   control), shape it through a **drawable transfer curve** (dead-zone, invert),
   and fan it to many parameters. See [expression-router.md](./expression-router.md).
-- Output works anywhere; input availability is synth-dependent (aftertouch/breath).
+- Output works anywhere; input availability is synth-dependent (aftertouch/breath),
+  and the header reads LIVE vs TEST so a silent controller is obvious.
 
 ### 0d. Timbre Space — control by meaning — **shipped 🟢 (v1)**
 - A 2D "sound map": axes are musical intentions, anchors are patches, the puck

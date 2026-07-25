@@ -31,6 +31,10 @@
 
   let cfg = $derived(routerConfig(control));
   let input = $derived(routerInput(control));
+  // Is a real controller driving this, or is the bar showing the design-time
+  // test value? A silent mod wheel and a working one parked at 50% look
+  // identical without saying so.
+  let isLive = $derived(cfg.__live === true);
   let points = $derived(routerCurvePoints(control));
   let dests = $derived(routerDests(control));
   let curveOut = $derived(routerCurveValue(control));
@@ -84,10 +88,20 @@
 <svg class="router" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
   <!-- Header: source chip + live input bar -->
   <rect x={PAD} y={PAD} width={Math.min(140, (width - PAD * 2) * 0.5)} height="20" rx="10" fill="rgba(23,23,32,1)" stroke="rgba(58,58,72,1)" />
-  <circle cx={PAD + 12} cy={PAD + 10} r="4" fill={inputCss} />
+  <circle cx={PAD + 12} cy={PAD + 10} r="4" fill={inputCss} opacity={isLive ? 1 : 0.45} />
   <text x={PAD + 21} y={PAD + 14} font-size={labelSize} fill={labelCss}>{routerSourceLabel(cfg.source ?? 'modwheel')}</text>
   <rect x={inBarX} y={PAD + 2} width={inBarW} height="16" rx="8" fill="rgba(10,10,15,1)" stroke="rgba(32,32,42,1)" />
-  <rect x={inBarX} y={PAD + 2} width={Math.max(0, input * inBarW)} height="16" rx="8" fill={inputCss} opacity="0.6" />
+  <rect x={inBarX} y={PAD + 2} width={Math.max(0, input * inBarW)} height="16" rx="8" fill={inputCss} opacity={isLive ? 0.75 : 0.4} />
+  <!-- LIVE when hardware is driving it; TEST when the bar is the design value -->
+  {#if inBarW >= 54}
+    <!-- A dark halo keeps the badge legible where the input bar has filled
+         underneath it, which it does whenever the controller is near the top. -->
+    <text x={inBarX + inBarW - 6} y={PAD + 14} font-size="8" text-anchor="end"
+          fill={isLive ? inputCss : labelCss} opacity={isLive ? 1 : 0.7} style="font-weight:700"
+          stroke="rgba(8,8,12,0.9)" stroke-width="2.5" paint-order="stroke">
+      {isLive ? 'LIVE' : 'TEST'}
+    </text>
+  {/if}
 
   <!-- Transfer curve -->
   <g transform={`translate(0 ${gy})`}>

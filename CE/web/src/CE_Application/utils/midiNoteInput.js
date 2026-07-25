@@ -154,3 +154,86 @@ export function heldNotes(state, channel = 0) {
 export function isNoteHeld(state, note, channel = 0) {
   return heldNotes(state, channel).includes(Math.round(num(note, -1)));
 }
+
+// --- Expression state ---------------------------------------------------------
+// The other half of the input stream: continuous controllers. The Expression
+// Router advertises mod wheel / breath / expression / foot / aftertouch /
+// velocity, all of which ride the same bytes the notes do — so the same parser
+// feeds both, and there is only ever one listener.
+//
+// Entries carry a monotonically increasing `n` rather than a timestamp, so the
+// module stays clock-free (and therefore testable): "most recent" is the
+// highest n, which is what an omni lookup needs to pick between channels.
+export const EMPTY_EXPRESSION_STATE = Object.freeze({ cc: {}, at: {}, vel: {}, n: 0 });
+
+export function expressionEvent(message) {
+  const m = Array.isArray(message) ? message : [];
+  if (!m.length) return null;
+  const status = m[0] & 0xF0;
+  const channel = (m[0] & 0x0F) + 1;
+  if (status === 0xB0) {
+    const cc = m[1] & 0x7F;
+    // Channel-mode messages (120+) are commands, not continuous controllers.
+    if (cc >= 120) return null;
+    return { kind: 'cc', channel, cc, value: (m[2] ?? 0) & 0x7F };
+  }
+  if (status === 0xD0) return { kind: 'aftertouch', channel, value: m[1] & 0x7F };
+  // A note-on doubles as the velocity source; a release carries no dynamics.
+  if (status === 0x90) {
+    const value = (m[2] ?? 0) & 0x7F;
+    return value > 0 ? { kind: 'velocity', channel, value } : null;
+  }
+  return null;
+}
+export function expressionEventsFromHex(hex) {
+  return splitMidiMessages(parseMidiHex(hex)).map(expressionEvent).filter(Boolean);
+}
+
+export function applyExpressionEvent(state, event) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  if (!event) return s;
+  const bucket = event.kind === 'cc' ? 'cc' : event.kind === 'aftertouch' ? 'at' : event.kind === 'velocity' ? 'vel' : null;
+  if (!bucket) return s;
+  const key = event.kind === 'cc' ? `${event.channel}:${event.cc}` : `${event.channel}`;
+  const prev = s[bucket][key];
+  if (prev && prev.v === event.value) return s;          // unchanged → no churn
+  const n = s.n + 1;
+  return { ...s, [bucket]: { ...s[bucket], [key]: { v: event.value, n } }, n };
+}
+export function applyExpressionEvents(state, events) {
+  let s = state ?? EMPTY_EXPRESSION_STATE;
+  for (const e of (Array.isArray(events) ? events : [])) s = applyExpressionEvent(s, e);
+  return s;
+}
+export function applyExpressionHex(state, hex) {
+  return applyExpressionEvents(state, expressionEventsFromHex(hex));
+}
+
+// Read a bucket. `channel` 0 = omni, which returns the most recently updated
+// matching entry. Returns undefined when that controller has never been seen —
+// the caller needs to tell "never arrived" from "arrived as 0".
+function readBucket(map, exactKey, omniSuffix) {
+  if (exactKey !== null) return map[exactKey]?.v;
+  let best;
+  for (const [k, entry] of Object.entries(map ?? {})) {
+    if (omniSuffix !== null && !k.endsWith(omniSuffix)) continue;
+    if (!best || entry.n > best.n) best = entry;
+  }
+  return best?.v;
+}
+export function ccValue(state, cc, channel = 0) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  const c = Math.round(num(cc, -1));
+  const ch = Math.round(num(channel, 0));
+  return readBucket(s.cc, ch > 0 ? `${ch}:${c}` : null, `:${c}`);
+}
+export function aftertouchValue(state, channel = 0) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  const ch = Math.round(num(channel, 0));
+  return readBucket(s.at, ch > 0 ? `${ch}` : null, null);
+}
+export function velocityValue(state, channel = 0) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  const ch = Math.round(num(channel, 0));
+  return readBucket(s.vel, ch > 0 ? `${ch}` : null, null);
+}

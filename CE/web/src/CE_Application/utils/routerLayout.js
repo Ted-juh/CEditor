@@ -8,6 +8,7 @@
 import {
   normalizePoints, envValueAt, envelopeGeometry, envToPx, envFromPx, envHitNode,
 } from './envelopeLayout.js';
+import { ccValue, aftertouchValue, velocityValue } from './midiNoteInput.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -26,8 +27,30 @@ export const ROUTER_INPUT_SOURCES = [
   { id: 'velocity', label: 'Note Velocity', cc: null, kind: 'velocity' },
   { id: 'link', label: 'Linked control…', cc: null, kind: 'link' },
 ];
+export function routerSourceSpec(id) {
+  return ROUTER_INPUT_SOURCES.find((s) => s.id === String(id)) ?? null;
+}
 export function routerSourceLabel(id) {
-  return ROUTER_INPUT_SOURCES.find((s) => s.id === String(id))?.label ?? String(id ?? '');
+  return routerSourceSpec(id)?.label ?? String(id ?? '');
+}
+// Is this source fed by the hardware MIDI input (rather than an on-panel link)?
+export function routerSourceIsMidi(id) {
+  const spec = routerSourceSpec(id);
+  return !!spec && spec.kind !== 'link';
+}
+
+// The live 0..1 value for a source, read out of the shared MIDI expression
+// state. Returns UNDEFINED when that controller has never been seen — the
+// caller has to tell "no hardware yet" (fall back to the test value) from
+// "arrived, and it's zero". `channel` 0 = omni.
+export function routerLiveInput(expressionState, sourceId, channel = 0) {
+  const spec = routerSourceSpec(sourceId);
+  if (!spec || spec.kind === 'link') return undefined;
+  let raw;
+  if (spec.kind === 'aftertouch') raw = aftertouchValue(expressionState, channel);
+  else if (spec.kind === 'velocity') raw = velocityValue(expressionState, channel);
+  else if (spec.cc !== null && spec.cc !== undefined) raw = ccValue(expressionState, spec.cc, channel);
+  return raw === undefined ? undefined : clamp01(num(raw, 0) / 127);
 }
 
 export function routerConfig(control) {

@@ -60,6 +60,7 @@
   } from '../utils/looperLayout.js';
   import {
     routerConfig, routerCurvePoints, routerGeometry, routerHitNode, routerNodeFromPx,
+    routerLiveInput, routerSourceIsMidi,
   } from '../utils/routerLayout.js';
   import {
     timbreConfig, timbreAnchors, timbreGeometry, timbreHitAnchor, timbreFromPx,
@@ -105,7 +106,9 @@
     drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
     drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
   } from '../utils/drumPadLayout.js';
-  import { midiNoteState, startNoteInputListener, clearNoteInput } from '../stores/noteInput.js';
+  import {
+    midiNoteState, midiExpressionState, startNoteInputListener, clearNoteInput,
+  } from '../stores/noteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
@@ -1493,11 +1496,29 @@
   // The live input 0..1: a linked control's normalized value, else the test value.
   function routerInputLive(control) {
     const cfg = routerConfig(control);
-    if (String(cfg.source ?? '') === 'link' && cfg.sourceControlId) {
+    const source = String(cfg.source ?? '');
+    if (source === 'link' && cfg.sourceControlId) {
       const range = lcdRangeForSource(cfg.sourceControlId);
       if (range && range.max !== range.min) return Math.max(0, Math.min(1, (range.value - range.min) / (range.max - range.min)));
+    } else if (routerSourceIsMidi(source)) {
+      // Real hardware. `undefined` means that controller has never been seen,
+      // which is different from it having arrived at zero — only the former
+      // falls back to the design-time test value.
+      ensureNoteInput();
+      const live = routerLiveInput($midiExpressionState.expression, source, numberOr(cfg.inputChannel, 0));
+      if (live !== undefined) return live;
     }
     return Math.max(0, Math.min(1, numberOr(cfg.testInput, 0)));
+  }
+  // Is this router actually being driven by hardware right now? Drives the
+  // renderer's live/test badge, so a silent controller is obvious rather than
+  // looking like a working one parked at the test value.
+  function routerInputIsLive(control) {
+    const cfg = routerConfig(control);
+    const source = String(cfg.source ?? '');
+    if (!routerSourceIsMidi(source)) return false;
+    ensureNoteInput();
+    return routerLiveInput($midiExpressionState.expression, source, numberOr(cfg.inputChannel, 0)) !== undefined;
   }
   function routerControlWith(control, curve) {
     const router = { ...control._children?.Router };
@@ -1525,7 +1546,7 @@
     const router = base?._children?.Router;
     if (!router) return resolved;
     const input = routerInputLive(control);
-    const next = { ...router, __input: input };
+    const next = { ...router, __input: input, __live: routerInputIsLive(control) };
     const sess = sessionFor(control);
     if (Array.isArray(sess?.routerCurve)) next.curve = sess.routerCurve;
     if (typeof sess?.routerDragIndex === 'number') next.__drag = sess.routerDragIndex;

@@ -1007,7 +1007,8 @@ export const SECTION_DEFAULTS = {
     _type: 'Router',
     source: 'modwheel',          // ROUTER_INPUT_SOURCES id
     sourceControlId: '',         // when source = 'link': the on-panel control to follow
-    testInput: 0.5,              // preview input when no live source (0..1)
+    inputChannel: 0,             // MIDI sources: channel to watch (0 = omni)
+    testInput: 0.5,              // fallback when that controller hasn't been seen (0..1)
     invert: false,               // flip the input before the curve
     deadzone: 0,                 // low-end dead-zone 0..1 (rescales the rest)
     editable: true,              // drag the transfer-curve nodes in preview

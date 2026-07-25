@@ -4,6 +4,8 @@ import {
   parseMidiHex, splitMidiMessages, noteEvent, noteEventsFromHex,
   EMPTY_NOTE_STATE, applyNoteEvent, applyNoteEvents, applyMidiHex,
   heldNotes, heldNoteEntries, isNoteHeld,
+  EMPTY_EXPRESSION_STATE, expressionEvent, applyExpressionHex,
+  ccValue, aftertouchValue, velocityValue,
 } from '../src/CE_Application/utils/midiNoteInput.js';
 
 test('hex parsing accepts the shapes the bridge and humans produce', () => {
@@ -123,4 +125,71 @@ test('a chord arriving as one blob lands as one state', () => {
   // three note-ons under running status, as a keyboard would send a C major triad
   const s = applyMidiHex(EMPTY_NOTE_STATE, '90 3C 64 40 60 43 5E');
   assert.deepEqual(heldNotes(s), [60, 64, 67]);
+});
+
+// --- expression controllers ---------------------------------------------------
+
+test('expression events: CC, channel aftertouch, note velocity', () => {
+  assert.deepEqual(expressionEvent([0xB0, 1, 64]), { kind: 'cc', channel: 1, cc: 1, value: 64 });
+  assert.deepEqual(expressionEvent([0xB9, 11, 100]), { kind: 'cc', channel: 10, cc: 11, value: 100 });
+  assert.deepEqual(expressionEvent([0xD0, 40]), { kind: 'aftertouch', channel: 1, value: 40 });
+  // a note-on doubles as the velocity source; a release carries no dynamics
+  assert.deepEqual(expressionEvent([0x90, 60, 96]), { kind: 'velocity', channel: 1, value: 96 });
+  assert.equal(expressionEvent([0x90, 60, 0]), null);
+  assert.equal(expressionEvent([0x80, 60, 0]), null);
+  // channel-mode messages are commands, not continuous controllers
+  assert.equal(expressionEvent([0xB0, 123, 0]), null);
+  assert.equal(expressionEvent([0xB0, 120, 0]), null);
+  assert.equal(expressionEvent([0xE0, 0, 64]), null);        // pitch bend isn't a router source
+});
+
+test('expression state tracks the last value per controller', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 01 40');
+  assert.equal(ccValue(s, 1), 64);
+  assert.equal(ccValue(s, 2), undefined);                    // never seen ≠ zero
+  s = applyExpressionHex(s, 'B0 01 7F');
+  assert.equal(ccValue(s, 1), 127);
+  // re-sending the same value returns the SAME object (no re-render churn)
+  assert.equal(applyExpressionHex(s, 'B0 01 7F'), s);
+  // …and a real zero is distinguishable from absent
+  s = applyExpressionHex(s, 'B0 01 00');
+  assert.equal(ccValue(s, 1), 0);
+  assert.notEqual(ccValue(s, 1), undefined);
+});
+
+test('aftertouch and velocity have their own buckets', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'D0 28');
+  assert.equal(aftertouchValue(s), 40);
+  assert.equal(velocityValue(s), undefined);
+  s = applyExpressionHex(s, '90 3C 60');
+  assert.equal(velocityValue(s), 96);
+  assert.equal(aftertouchValue(s), 40);                      // untouched
+  // running status: two note-ons in one blob, the later velocity wins
+  s = applyExpressionHex(s, '90 3C 20 40 70');
+  assert.equal(velocityValue(s), 112);
+});
+
+test('omni lookup picks the most recently updated channel', () => {
+  let s = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 01 10');   // ch 1 → 16
+  s = applyExpressionHex(s, 'B9 01 60');                            // ch 10 → 96
+  assert.equal(ccValue(s, 1, 1), 16);
+  assert.equal(ccValue(s, 1, 10), 96);
+  assert.equal(ccValue(s, 1, 0), 96);        // omni → the newer one
+  assert.equal(ccValue(s, 1, 5), undefined); // a channel that never sent
+  s = applyExpressionHex(s, 'B0 01 20');     // ch 1 moves again
+  assert.equal(ccValue(s, 1, 0), 32);        // omni follows it
+  // the same for aftertouch
+  let a = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'D0 10');
+  a = applyExpressionHex(a, 'D9 60');
+  assert.equal(aftertouchValue(a, 0), 96);
+  assert.equal(aftertouchValue(a, 1), 16);
+});
+
+test('note and expression states are folded from the same bytes independently', () => {
+  const hex = '90 3C 60';   // one note-on: a held note AND a velocity reading
+  assert.deepEqual(heldNotes(applyMidiHex(EMPTY_NOTE_STATE, hex)), [60]);
+  assert.equal(velocityValue(applyExpressionHex(EMPTY_EXPRESSION_STATE, hex)), 96);
+  // …and a CC touches only the expression side
+  assert.deepEqual(heldNotes(applyMidiHex(EMPTY_NOTE_STATE, 'B0 01 40')), []);
+  assert.equal(ccValue(applyExpressionHex(EMPTY_EXPRESSION_STATE, 'B0 01 40'), 1), 64);
 });

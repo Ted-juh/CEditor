@@ -1,7 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
-  import { ROUTER_INPUT_SOURCES } from '../utils/routerLayout.js';
+  import { ROUTER_INPUT_SOURCES, routerSourceLabel } from '../utils/routerLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -68,8 +68,14 @@
         </select>
       </PropertyCell>
     {:else}
-      <PropertyCell label="Test in" span={2} hint="Simulated input in preview (0–1) when no live source is streaming.">
+      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to take this controller from. 0 = omni (any channel).">
+        <input class="val" type="number" min="0" max="16" step="1" value={num(r.inputChannel, 0)} onchange={(e) => set('inputChannel', Math.max(0, Math.min(16, Math.round(num(e.target.value, 0)))))} />
+      </PropertyCell>
+      <PropertyCell label="Test in" span={1} hint="Stand-in value (0–1) used until that controller actually sends something. Once real hardware arrives it takes over, and the header reads LIVE instead of TEST — so a silent controller is never mistaken for a working one.">
         <input class="val" type="number" min="0" max="1" step="0.01" value={r.testInput ?? 0.5} onchange={(e) => set('testInput', Math.max(0, Math.min(1, num(e.target.value, 0.5))))} />
+      </PropertyCell>
+      <PropertyCell label="" span={4} hint="The controller is read from the hardware MIDI input on the device role. No input selected there means no live signal, and the router stays on its test value.">
+        <div class="note">Reads {routerSourceLabel(r.source ?? 'modwheel')} from the MIDI input{num(r.inputChannel, 0) > 0 ? ` · ch ${num(r.inputChannel, 0)}` : ' · omni'}</div>
       </PropertyCell>
     {/if}
     <PropertyCell label="Dead-zone" span={2} hint="Ignore the bottom of the input range; the rest rescales to fill 0–1 (0 = off).">
@@ -145,6 +151,7 @@
     color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none;
   }
   .val:focus { border-color: #5B9BD5; }
+  .note { font-size: 11px; color: #8a8a94; }
   .dests { display: flex; flex-direction: column; gap: 8px; }
   .dest { border: 1px solid #303030; border-radius: 6px; background: #171717; padding: 8px; display: flex; flex-direction: column; gap: 7px; }
   .dest.off { opacity: 0.55; }

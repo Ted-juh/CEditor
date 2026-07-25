@@ -33,7 +33,8 @@ There was already an unused pipe. The JUCE side has always emitted
 `latestMidiInputMessage` — **with no consumers at all**. This is the consumer.
 
 - **Pure engine** `utils/midiNoteInput.js` (+ `test/midiNoteInput.test.js`,
-  9 tests). Raw bytes in, held-note state out:
+  14 tests). Raw bytes in, held-note state out (and, for the
+  [Expression Router](./expression-router.md), continuous-controller levels):
   - `parseMidiHex` takes the bridge's `"90 3C 60"` and the shapes humans write.
   - `splitMidiMessages` handles **running status** (hardware drops the repeated
     status byte on a fast run — without this a chord arrives as one note plus
@@ -72,7 +73,8 @@ There was already an unused pipe. The JUCE side has always emitted
   notes the panel itself is holding.
 - **Velocity in the echo** — the held state already carries velocity; the
   renderers currently ignore it and could vary brightness.
-- **Feed the other controls** — the [Expression Router](./expression-router.md)
-  advertises mod-wheel / aftertouch / breath input but is currently only wired to
-  on-panel links. The same listener could give it real hardware input; the
-  parser already splits the CC and aftertouch messages it needs.
+- ~~Feed the other controls~~ — **done**: the same listener now drives the
+  [Expression Router](./expression-router.md)'s mod-wheel / aftertouch / breath /
+  expression / foot / velocity sources. The parser gained a second reducer for
+  continuous controllers, kept in a separate store so a CC sweep never
+  re-renders the note displays.
