@@ -5,6 +5,7 @@ import {
   transport, startTransport, stopTransport, toggleTransport, rewindTransport,
   setTransportBpm, setTransportSource, transportBeatsNow, isTransportRunning,
   feedTransportMidiForTest, resetTransportForTest,
+  applyHostTransport, transportJumpSeq, transportBpmNow, transportBeatsPerBar,
 } from '../src/CE_Application/stores/transport.js';
 
 test('start / stop / rewind', (t) => {
@@ -83,4 +84,84 @@ test('a system reset stops and rewinds', (t) => {
   feedTransportMidiForTest('FF');
   assert.equal(isTransportRunning(), false);
   assert.equal(transportBeatsNow(), 0);
+});
+
+// --- Host / DAW playhead ---------------------------------------------------------
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+test('the host playhead sets tempo, position, meter and play state', async (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('host');
+
+  applyHostTransport({ bpm: 140, ppqPosition: 12, isPlaying: true, timeSigNumerator: 3, timeSigDenominator: 4 });
+  assert.equal(isTransportRunning(), true);
+  assert.equal(transportBpmNow(), 140);
+  assert.equal(transportBeatsPerBar(), 3);           // the meter reached the store
+  assert.ok(Math.abs(transportBeatsNow() - 12) < 0.02);
+  assert.equal(get(transport).hostAvailable, true);
+
+  // Between host updates the position keeps moving — the DAW only speaks ~30
+  // times a second and a readout that only moved then would be visibly steppy.
+  await sleep(120);
+  const drifted = transportBeatsNow();
+  assert.ok(drifted > 12, `expected extrapolation past 12, got ${drifted}`);
+  assert.ok(drifted < 12.5, `extrapolated far too fast: ${drifted}`);
+
+  // The host stopping stops us, and holds position rather than snapping to 0.
+  applyHostTransport({ bpm: 140, ppqPosition: 12.3, isPlaying: false });
+  assert.equal(isTransportRunning(), false);
+  await sleep(60);
+  assert.ok(Math.abs(transportBeatsNow() - 12.3) < 1e-9, 'a stopped host must not keep counting');
+});
+
+test('a host locate bumps the jump counter, playing on does not', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('host');
+
+  applyHostTransport({ bpm: 120, ppqPosition: 8, isPlaying: true });
+  const base = transportJumpSeq();
+  // An ordinary next update, a few ms of music later: not a jump.
+  applyHostTransport({ bpm: 120, ppqPosition: 8.02, isPlaying: true });
+  assert.equal(transportJumpSeq(), base);
+  // The user drags the locator to bar 40. This MUST read as a jump, or the Arp
+  // would fire every step between here and there.
+  applyHostTransport({ bpm: 120, ppqPosition: 160, isPlaying: true });
+  assert.equal(transportJumpSeq(), base + 1);
+  // A loop wrapping back to the top is the same thing.
+  applyHostTransport({ bpm: 120, ppqPosition: 0, isPlaying: true });
+  assert.equal(transportJumpSeq(), base + 2);
+});
+
+test('a host that reports nothing holds position instead of rewinding', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('host');
+  applyHostTransport({ bpm: 120, ppqPosition: 20, isPlaying: true });
+  assert.equal(get(transport).hostAvailable, true);
+
+  applyHostTransport({});                       // offline render / no playhead
+  assert.equal(get(transport).hostAvailable, false);
+  assert.equal(isTransportRunning(), false);
+  assert.ok(Math.abs(transportBeatsNow() - 20) < 0.05, 'must hold, not snap to 0');
+});
+
+test('a host with no tempo yet does not become 0 bpm', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('host');
+  applyHostTransport({ ppqPosition: 4, isPlaying: true });   // position but no bpm
+  assert.equal(transportBpmNow(), 120);                      // the default, not 0
+  assert.ok(Math.abs(transportBeatsNow() - 4) < 0.05);
+});
+
+test('host updates are ignored while the source is internal', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  startTransport(0);
+  applyHostTransport({ bpm: 200, ppqPosition: 99, isPlaying: true });
+  assert.equal(transportBpmNow(), 120);
+  assert.ok(transportBeatsNow() < 1, 'the DAW must not move an internal clock');
+  stopTransport();
 });

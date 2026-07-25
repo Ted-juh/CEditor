@@ -28,7 +28,11 @@
 
   let running = $derived(cfg.__running === true);
   let beats = $derived(n(cfg.__beats, 0));
-  let external = $derived(transportSource(control) === 'external');
+  let src = $derived(transportSource(control));
+  let host = $derived(src === 'host');
+  // Both "following" sources behave the same here: the tempo shown is the one
+  // being RECEIVED, and there's a not-locked-yet state to distinguish.
+  let external = $derived(src === 'external' || host);
   // Following an external clock, the tempo shown is the one being RECEIVED, not
   // the one configured — otherwise the readout quietly lies about the rig.
   let bpm = $derived(external ? n(cfg.__bpm, transportBpm(control)) : transportBpm(control));
@@ -72,7 +76,7 @@
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h * 0.52} font-size={bpmSize}
         fill="rgba(232,232,238,1)" style="font-weight:700">{bpm.toFixed(1)}</text>
   <text x={btn.x + btn.w + 12} y={geom.y + geom.h - 8} font-size="8.5" fill={labelCss} opacity="0.75">
-    BPM · {sig.beats}/{sig.unit}{external ? ` · ${locked ? 'EXT' : 'EXT · no clock'}` : ''}
+    BPM · {sig.beats}/{sig.unit}{external ? ` · ${locked ? (host ? 'HOST' : 'EXT') : (host ? 'HOST · no DAW' : 'EXT · no clock')}` : ''}
   </text>
 
   <!-- position + beat pulse -->

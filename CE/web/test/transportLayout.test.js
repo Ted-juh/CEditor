@@ -8,6 +8,7 @@ import {
   transportEvent, clockPulsesBetween, estimateTempoFromPulses, tapTempo,
   transportGeometry, hitTransportButton,
   cycleBeats, cyclePhaseAt, cycleCountAt, barsLabel, musicalDelta, MIN_BARS, MAX_BARS,
+  parseHostPosition, hostJumped, transportIsFollowing, TRANSPORT_SOURCES,
 } from '../src/CE_Application/utils/transportLayout.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -195,4 +196,38 @@ test('musical delta is a no-op at the reference tempo and scales with it', () =>
   assert.equal(musicalDelta(5, 4), 0);
   // A different reference scales the whole thing.
   assert.ok(near(musicalDelta(0, 1, 60), 1.0));
+});
+
+// --- Host playhead --------------------------------------------------------------
+test('the host playhead parser validates rather than casting', () => {
+  const good = parseHostPosition({ bpm: 128, ppqPosition: 37.5, isPlaying: true, timeSigNumerator: 7, timeSigDenominator: 8 });
+  assert.equal(good.ok, true);
+  assert.equal(good.bpm, 128);
+  assert.equal(good.beats, 37.5);
+  assert.equal(good.playing, true);
+  assert.equal(good.beatsPerBar, 7);
+  assert.equal(good.beatUnit, 8);
+  // Hosts that report no tempo on the first block must not become 0 bpm.
+  const noTempo = parseHostPosition({ bpm: 0, ppqPosition: 4 });
+  assert.equal(noTempo.bpm, null);
+  assert.equal(noTempo.beats, 4);
+  assert.equal(noTempo.ok, true);            // the position is still usable
+  // A count-in is a legal negative ppq; we hold at 0 rather than showing bar -1.
+  assert.equal(parseHostPosition({ bpm: 120, ppqPosition: -2 }).beats, 0);
+  // Nothing usable at all.
+  assert.equal(parseHostPosition({}).ok, false);
+  assert.equal(parseHostPosition(null), null);
+  assert.equal(parseHostPosition('nope'), null);
+  // Absurd tempos clamp into range instead of breaking every follower.
+  assert.equal(parseHostPosition({ bpm: 100000, ppqPosition: 0 }).bpm, MAX_BPM);
+});
+
+test('a host locate is a jump, playing on is not', () => {
+  // Extrapolating between host updates is fine; this is the test for "did the
+  // user hit rewind / did the loop wrap", which needs a re-anchor not a glide.
+  assert.equal(hostJumped(8.00, 8.02), false);     // ordinary update jitter
+  assert.equal(hostJumped(8.00, 8.40), true);      // loop wrapped or located
+  assert.equal(hostJumped(8.00, 0.00), true);      // rewind to the top
+  assert.equal(hostJumped(8.00, 8.02, 0.001), true); // a tighter tolerance says yes
+  assert.equal(hostJumped(8.00, null), false);     // no reading is not a jump
 });

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <atomic>
 #include <map>
 #include <vector>
 #include "PlayerHost.h"
@@ -81,7 +82,114 @@ public:
     void processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midi) override
     {
         scriptMidiCollector.removeNextBlockOfMessages (midi, buffer.getNumSamples());
+        captureHostPosition();
     }
+
+    // --- Host playhead (transport "Host / DAW" source) --------------------------------
+    // getPlayHead() is only valid inside processBlock, so the position is read HERE, on the
+    // audio thread, into plain atomics -- no allocation, no locking, nothing that could
+    // block. The editor's existing 30Hz timer reads them back on the message thread and
+    // pushes to the panel. Same shape as the parameter polling below it, and for the same
+    // reason: the audio thread must not touch the WebView.
+    //
+    // Hosts disagree about what they report and when (no tempo until playback starts, no
+    // ppq at all in some offline renders), so each field carries its own validity flag
+    // rather than a magic value -- the JS side treats "missing" and "zero" differently.
+    struct HostPositionSnapshot
+    {
+        bool  valid = false;         // the host gave us a position at all
+        bool  playing = false;
+        bool  recording = false;
+        bool  hasTempo = false;
+        bool  hasPpq = false;
+        bool  hasTimeSig = false;
+        double bpm = 0.0;
+        double ppqPosition = 0.0;
+        int   timeSigNumerator = 0;
+        int   timeSigDenominator = 0;
+    };
+
+    HostPositionSnapshot hostPosition() const noexcept
+    {
+        HostPositionSnapshot s;
+        s.valid = hostPosValid.load (std::memory_order_relaxed);
+        s.playing = hostPosPlaying.load (std::memory_order_relaxed);
+        s.recording = hostPosRecording.load (std::memory_order_relaxed);
+        s.hasTempo = hostPosHasTempo.load (std::memory_order_relaxed);
+        s.hasPpq = hostPosHasPpq.load (std::memory_order_relaxed);
+        s.hasTimeSig = hostPosHasTimeSig.load (std::memory_order_relaxed);
+        s.bpm = hostPosBpm.load (std::memory_order_relaxed);
+        s.ppqPosition = hostPosPpq.load (std::memory_order_relaxed);
+        s.timeSigNumerator = hostPosTimeSigNum.load (std::memory_order_relaxed);
+        s.timeSigDenominator = hostPosTimeSigDen.load (std::memory_order_relaxed);
+        return s;
+    }
+
+private:
+    void captureHostPosition() noexcept
+    {
+        auto* ph = getPlayHead();
+        if (ph == nullptr)
+        {
+            hostPosValid.store (false, std::memory_order_relaxed);
+            return;
+        }
+
+        const auto pos = ph->getPosition();
+        if (! pos.hasValue())
+        {
+            hostPosValid.store (false, std::memory_order_relaxed);
+            return;
+        }
+
+        if (const auto bpm = pos->getBpm())
+        {
+            hostPosBpm.store (*bpm, std::memory_order_relaxed);
+            hostPosHasTempo.store (*bpm > 0.0, std::memory_order_relaxed);
+        }
+        else
+        {
+            hostPosHasTempo.store (false, std::memory_order_relaxed);
+        }
+
+        if (const auto ppq = pos->getPpqPosition())
+        {
+            hostPosPpq.store (*ppq, std::memory_order_relaxed);
+            hostPosHasPpq.store (true, std::memory_order_relaxed);
+        }
+        else
+        {
+            hostPosHasPpq.store (false, std::memory_order_relaxed);
+        }
+
+        if (const auto sig = pos->getTimeSignature())
+        {
+            hostPosTimeSigNum.store (sig->numerator, std::memory_order_relaxed);
+            hostPosTimeSigDen.store (sig->denominator, std::memory_order_relaxed);
+            hostPosHasTimeSig.store (sig->numerator > 0 && sig->denominator > 0, std::memory_order_relaxed);
+        }
+        else
+        {
+            hostPosHasTimeSig.store (false, std::memory_order_relaxed);
+        }
+
+        hostPosPlaying.store (pos->getIsPlaying(), std::memory_order_relaxed);
+        hostPosRecording.store (pos->getIsRecording(), std::memory_order_relaxed);
+        hostPosValid.store (true, std::memory_order_relaxed);
+    }
+
+    std::atomic<bool>   hostPosValid { false };
+    std::atomic<bool>   hostPosPlaying { false };
+    std::atomic<bool>   hostPosRecording { false };
+    std::atomic<bool>   hostPosHasTempo { false };
+    std::atomic<bool>   hostPosHasPpq { false };
+    std::atomic<bool>   hostPosHasTimeSig { false };
+    std::atomic<double> hostPosBpm { 0.0 };
+    std::atomic<double> hostPosPpq { 0.0 };
+    std::atomic<int>    hostPosTimeSigNum { 0 };
+    std::atomic<int>    hostPosTimeSigDen { 0 };
+
+public:
 
     // Script-emitted MIDI is queued here on the message thread and drained into the host's output bus
     // in processBlock (above). Lives outside the value/scripting #ifs so processBlock always has it.
@@ -529,23 +637,27 @@ private:
 };
 
 class PlayerAudioProcessorEditor : public juce::AudioProcessorEditor
-                                #if CEDITOR_VALUE_LAYER
                                  , private juce::Timer
-                                #endif
 {
 public:
     explicit PlayerAudioProcessorEditor (PlayerAudioProcessor& p)
         : juce::AudioProcessorEditor (&p),
          #if CEDITOR_VALUE_LAYER
           host (p.panelFile(), &p.getDeviceService()),
-          processor (p)
          #else
-          host (p.panelFile())
+          host (p.panelFile()),
          #endif
+          processor (p)
     {
         addAndMakeVisible (host);
         setResizable (true, true);
         setSize (800, 480);
+
+        // The DAW playhead -> panel push runs whether or not the value layer is compiled
+        // in: a Transport set to "Host / DAW" needs it, and that has nothing to do with
+        // host parameters. startTimerHz is idempotent, so the value-layer block below
+        // asking for the same rate is harmless.
+        startTimerHz (30);
 
        #if CEDITOR_VALUE_LAYER
         // UI -> host parameter: the user moved a control, so record automation.
@@ -558,18 +670,18 @@ public:
        #endif
     }
 
-   #if CEDITOR_VALUE_LAYER
     ~PlayerAudioProcessorEditor() override { stopTimer(); }
-   #endif
 
     void resized() override { host.setBounds (getLocalBounds()); }
 
 private:
     PlayerHost host;
 
-   #if CEDITOR_VALUE_LAYER
     void timerCallback() override
     {
+        pushHostTransportIfChanged();
+
+       #if CEDITOR_VALUE_LAYER
         for (const auto& desc : processor.parameterDescriptors())
         {
             if (auto* raw = processor.parameters().getRawParameterValue (desc.id))
@@ -583,9 +695,64 @@ private:
                 }
             }
         }
+       #endif
+    }
+
+    // 30 pushes a second while the DAW rolls is fine; 30 a second while it sits stopped at
+    // the same bar is not, so a snapshot identical to the last one is dropped. Position is
+    // compared exactly rather than with an epsilon: a playing host changes ppq every block,
+    // and a stopped one repeats the same double bit-for-bit.
+    void pushHostTransportIfChanged()
+    {
+        const auto snap = processor.hostPosition();
+        if (! snap.valid)
+        {
+            // Nothing from the host. Tell the panel once so a Transport following it can
+            // drop its lock indicator, then stay quiet.
+            if (! sentHostUnavailable)
+            {
+                sentHostUnavailable = true;
+                hasLastHostSnap = false;
+                host.pushHostTransport ({});
+            }
+            return;
+        }
+        sentHostUnavailable = false;
+
+        if (hasLastHostSnap
+            && lastHostSnap.playing == snap.playing
+            && lastHostSnap.recording == snap.recording
+            && lastHostSnap.hasTempo == snap.hasTempo
+            && lastHostSnap.hasPpq == snap.hasPpq
+            && lastHostSnap.hasTimeSig == snap.hasTimeSig
+            && lastHostSnap.bpm == snap.bpm
+            && lastHostSnap.ppqPosition == snap.ppqPosition
+            && lastHostSnap.timeSigNumerator == snap.timeSigNumerator
+            && lastHostSnap.timeSigDenominator == snap.timeSigDenominator)
+            return;
+
+        lastHostSnap = snap;
+        hasLastHostSnap = true;
+
+        PlayerHost::HostTransport t;
+        t.playing = snap.playing;
+        t.recording = snap.recording;
+        t.hasTempo = snap.hasTempo;
+        t.hasPpq = snap.hasPpq;
+        t.hasTimeSig = snap.hasTimeSig;
+        t.bpm = snap.bpm;
+        t.ppqPosition = snap.ppqPosition;
+        t.timeSigNumerator = snap.timeSigNumerator;
+        t.timeSigDenominator = snap.timeSigDenominator;
+        host.pushHostTransport (t);
     }
 
     PlayerAudioProcessor& processor;
+    PlayerAudioProcessor::HostPositionSnapshot lastHostSnap {};
+    bool hasLastHostSnap = false;
+    bool sentHostUnavailable = false;
+
+   #if CEDITOR_VALUE_LAYER
     std::map<juce::String, float> lastPushed;
    #endif
 

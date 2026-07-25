@@ -78,7 +78,8 @@ stale.
 ## Following an external clock
 
 Set the source to **MIDI clock in** and the transport stops generating and
-starts listening. The bytes were already arriving: `splitMidiMessages` has always
+starts listening. (Inside a DAW, prefer **Host / DAW** below — it's the same
+idea done better.) The bytes were already arriving: `splitMidiMessages` has always
 recognised `F8`/`FA`/`FB`/`FC`/`FF` as single-byte realtime messages, and every
 consumer so far dropped them because nothing wanted them. See
 [note-input-echo.md](./note-input-echo.md) for the input pipe itself.
@@ -93,6 +94,65 @@ The tempo field goes read-only in this mode and shows what's being received. The
 component draws a dashed border until pulses actually arrive, so "set to
 external and nothing is plugged in" doesn't look identical to "locked and
 running".
+
+## Following the host (an exported plugin only)
+
+The best of the three sources, and the one that only exists once the panel is a
+plugin. Set the source to **Host / DAW** and the transport follows the DAW's
+playhead.
+
+Why it beats MIDI clock: a DAW reports a **position** — `ppqPosition`, quarter
+notes since the start of the song — where MIDI clock reports a *stream of
+pulses you have to count*. A dropped pulse puts a counter permanently a 24th of
+a beat behind and it never recovers. A position can't go stale that way. You
+also get the time signature and the play/record state for free, and locating in
+the DAW takes the panel with it.
+
+### How it gets here
+
+`juce::AudioPlayHead` is only valid inside `processBlock`, so the position is
+read **on the audio thread** into plain atomics — no allocation, no locking,
+nothing that could block — in
+[`PluginProcessor.h`](../../../../src/Player/PluginProcessor.h). The editor's existing
+30 Hz timer reads those atomics back on the message thread and pushes to the
+panel via `PlayerHost::pushHostTransport`. That's the same shape as the
+parameter polling that was already there, for the same reason: the audio thread
+must never touch the WebView.
+
+Hosts disagree about what they report and when — no tempo until playback starts,
+no ppq at all in some offline renders, a `bpm` of 0 on the first block. So every
+field carries its own validity flag and **absent fields are omitted from the
+payload** rather than sent as zero. `parseHostPosition` on the JS side is a
+validator, not a cast: "no tempo yet" and "0 bpm" have to stay distinguishable,
+or a panel would briefly run at zero every time a project loads.
+
+### Smooth between updates
+
+30 pushes a second is plenty for a DAW and visibly steppy for a readout, so the
+panel **anchors** to each host position and extrapolates with the same
+`beatsAt()` rule the internal clock uses. Every message re-anchors. The display
+is smooth at frame rate and never more than one update out of step with the DAW.
+
+### Locates are not playback
+
+A jump — dragging the locator, a loop wrapping, hitting return-to-zero — bumps a
+**jump counter** in the store. Followers watch it and re-baseline instead of
+catching up. Without this, `crossedSteps` does exactly what it's designed to do
+and fires every step between where you were and where you dropped the playhead:
+move the locator from bar 2 to bar 40 and the Arp spits a burst of notes nobody
+asked for. Playing on is a continuation; a locate is not, and the transport has
+to know the difference. Rewind and an incoming MIDI `start`/`reset` bump the
+same counter.
+
+### What it doesn't do
+
+The **editor preview and the standalone Player have no DAW to ask**. Set to
+Host / DAW there, the transport parks and the face reads `HOST · no DAW` — the
+editor says so too, rather than letting it look broken. Clock-out and tap tempo
+are inactive while following, same as with MIDI clock in. And only **VST3** is
+built today (`FORMATS VST3 Standalone` in `CMakeLists.txt`) — `AudioPlayHead` is
+format-agnostic, so the same code covers AU and CLAP if those are ever added,
+but that isn't a claim that they work now.
 
 ## Sending clock out
 
@@ -217,19 +277,21 @@ simulation step at a 120bpm reference — so:
 
 ## Compatibility
 
-The clock itself is pure UI state and needs no device at all. Clock-out and
-start/stop bytes need a hardware output on the `mainSynth` device role, same as
-every other note-emitting component here. External sync needs a MIDI **input**
-selected — see [expression-router.md](./expression-router.md) for the same
-caveat about input in an exported Player.
+| source | works in | needs |
+|---|---|---|
+| Internal | editor preview, standalone Player, plugin | nothing |
+| MIDI clock in | anywhere a MIDI **input** is selected | a hardware input |
+| Host / DAW | **exported plugin only** | a host that reports a playhead |
+
+Clock-out and start/stop bytes need a hardware output on the `mainSynth` device
+role, same as every other note-emitting component here. External sync needs a
+MIDI input selected — see [expression-router.md](./expression-router.md) for the
+same caveat about input in an exported Player.
 
 Nothing about the transport touches the DPD profile.
 
 ## Possible next steps
 
-- **Host tempo** — an exported VST3 can read the DAW's playhead. That's a third
-  source alongside internal and external, and the obviously right default once
-  it exists.
 - **Loop points** — a bar range the position wraps inside.
 - **Count-in** — N bars of nothing before the first step fires.
 - **Song position pointer** (`F2`) — currently ignored; it would let an external

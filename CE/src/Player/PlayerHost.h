@@ -33,6 +33,23 @@ public:
     // Push a host-parameter value into the panel UI (automation playback -> on-screen control moves).
     void pushParamToUi (const juce::String& parameterId, float value);
 
+    // Push the DAW playhead into the panel UI, for a Transport control set to "Host / DAW".
+    // Fields the host did not report are omitted from the payload rather than sent as 0 --
+    // the JS side has to be able to tell "no tempo yet" from "tempo is zero".
+    struct HostTransport
+    {
+        bool playing = false;
+        bool recording = false;
+        bool hasTempo = false;
+        bool hasPpq = false;
+        bool hasTimeSig = false;
+        double bpm = 0.0;
+        double ppqPosition = 0.0;
+        int timeSigNumerator = 0;
+        int timeSigDenominator = 0;
+    };
+    void pushHostTransport (const HostTransport& t);
+
     // The UI is ready and wants the current value of every parameter (re-push them all).
     std::function<void()> onResyncRequest;
 

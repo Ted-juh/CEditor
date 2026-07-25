@@ -120,14 +120,14 @@
   } from '../utils/panicLayout.js';
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
-    transportSource as tpSource, tapTempo, crossedSteps,
+    transportSource as tpSource, tapTempo, crossedSteps, transportIsFollowing,
     cyclePhaseAt, musicalDelta,
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
     setTransportBpm, setTransportSource, setTransportClockOut,
     transportBeatsNow, isTransportRunning, transportBpmNow,
-    setTransportSignature, transportBeatsPerBar,
+    setTransportSignature, transportBeatsPerBar, transportJumpSeq,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
@@ -1726,6 +1726,7 @@
   const TURING_PAD = 8;
   const turingPhaseState = {};   // { [id]: phase 0..1 }
   const turingLastIdx = {};      // { [id]: last step index }
+  const turingJumpState = {};    // { [id]: transport jump counter seen }
   let turingTickerRunning = false;
   let turingLastMs = 0;
   let turingDrag = null;         // { id } while painting step bars
@@ -1772,7 +1773,12 @@
           phase = turingSyncedPhaseAt(beats, c);
           idx = turingSyncedStepAt(beats, c);
           turingPhaseState[id] = phase;
-          if (!isTransportRunning()) {
+          // Same rule as the Arp: a host locate must not look like the
+          // sequence advanced, or the register mutates for steps it skipped.
+          const jump = transportJumpSeq();
+          const jumped = turingJumpState[id] !== jump;
+          turingJumpState[id] = jump;
+          if (jumped || !isTransportRunning()) {
             turingLastIdx[id] = idx;
             emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
             continue;
@@ -2310,6 +2316,7 @@
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
   const arpBeatsState = {};     // id -> last transport reading, for synced arps
+  const arpJumpState = {};      // id -> transport jump counter seen (see tickSyncedArp)
   let arpTickerRunning = false;
   let arpLastMs = 0;
   function isArpControl(control) {
@@ -2406,6 +2413,11 @@
     arpPhaseState[id] = syncedPhaseAt(beats, control, seq.length);
     const prev = arpBeatsState[id];
     arpBeatsState[id] = beats;
+    // A locate, a loop wrap or a rewind is a discontinuity, not playing on.
+    // Catching up through one would fire every step the locator skipped, which
+    // is a burst of notes nobody asked for. Re-baseline and start again.
+    const jump = transportJumpSeq();
+    if (arpJumpState[id] !== jump) { arpJumpState[id] = jump; return; }
     if (!isTransportRunning() || prev === undefined || beats <= prev) return;
     const bpm = transportBpmNow();
     const { steps } = crossedSteps(prev, beats, div);
@@ -2712,12 +2724,15 @@
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
-      if (tpSource(base) !== 'external') setTransportBpm(numberOr(cfg.bpm, 120));
+      if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
       // The meter has to reach the store, not just the readout: the components
       // that loop in BARS ask the store how long a bar is.
       setTransportSignature(numberOr(cfg.beatsPerBar, 4));
-      if (cfg.runOnLoad === true && !isTransportRunning()) startTransport(0);
+      // Run-on-load is a decision only a MASTER clock gets to make. Following a
+      // DAW or an incoming clock, pressing play is the other end's job, and
+      // starting ourselves would show a running transport parked at bar 1.
+      if (cfg.runOnLoad === true && !isTransportRunning() && !transportIsFollowing(tpSource(base))) startTransport(0);
     }
     void $transport.seq;                       // re-render on every publish
     return {
@@ -2747,7 +2762,7 @@
     // Anywhere else on the face is tap tempo — but only when we're the master;
     // tapping while following someone else's clock would do nothing and look
     // broken, so it's simply inactive.
-    if (transportConfig(control).showTap === false || tpSource(control) === 'external') return false;
+    if (transportConfig(control).showTap === false || transportIsFollowing(tpSource(control))) return false;
     if (localPoint.x < geom.x || localPoint.x > geom.x + geom.w) return false;
     tapTimes.push(Date.now());
     if (tapTimes.length > 8) tapTimes.shift();

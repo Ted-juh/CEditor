@@ -40,8 +40,16 @@ export function beatsPerStep(division) {
   return DIVISIONS[String(division)] ?? DIVISIONS['1/16'];
 }
 
-export const TRANSPORT_SOURCES = ['internal', 'external'];
-export const TRANSPORT_SOURCE_LABELS = { internal: 'Internal', external: 'MIDI clock in' };
+export const TRANSPORT_SOURCES = ['internal', 'external', 'host'];
+export const TRANSPORT_SOURCE_LABELS = {
+  internal: 'Internal', external: 'MIDI clock in', host: 'Host / DAW',
+};
+// The two sources we don't own. Tempo is read-only, tap does nothing, and
+// clock-out is suppressed for both — echoing a master's clock back at it is how
+// feedback loops start.
+export function transportIsFollowing(source) {
+  return source === 'external' || source === 'host';
+}
 
 export function transportConfig(control) {
   return control?._children?.Transport ?? {};
@@ -157,6 +165,48 @@ export function swungBeatOffset(stepIndex, swing, division) {
   const s = clampNum(swing, 0, 1);
   const odd = Math.abs(Math.round(num(stepIndex, 0))) % 2 === 1;
   return odd ? s * 0.5 * beatsPerStep(division) : 0;
+}
+
+// --- Host playhead -----------------------------------------------------------
+// What a DAW gives an exported plugin, via juce::AudioPlayHead. This is a
+// BETTER clock than incoming MIDI clock in one specific way: the host reports a
+// POSITION (ppqPosition — quarter notes since the start of the song), not a
+// stream of pulses we have to count. Counting pulses means one dropped byte
+// puts you permanently a 24th of a beat behind; a position can't do that.
+//
+// It is also messier, because hosts disagree. Some report no tempo when
+// stopped, some report ppqPosition 0 forever until you press play, some send
+// bpm 0 on the first block. So this is a validator, not just a cast: anything
+// implausible is reported as missing rather than quietly becoming 0.
+export function parseHostPosition(payload) {
+  if (!payload || typeof payload !== 'object') return null;
+  const bpmRaw = Number(payload.bpm);
+  const ppqRaw = Number(payload.ppqPosition);
+  const bpm = Number.isFinite(bpmRaw) && bpmRaw > 0 ? clampNum(bpmRaw, MIN_BPM, MAX_BPM) : null;
+  // A negative ppq is legal — it's a count-in — but we clamp the position we
+  // display to zero rather than showing bar -1.
+  const beats = Number.isFinite(ppqRaw) ? Math.max(0, ppqRaw) : null;
+  const numerator = Number(payload.timeSigNumerator);
+  const denominator = Number(payload.timeSigDenominator);
+  return {
+    ok: bpm !== null || beats !== null,
+    bpm,
+    beats,
+    playing: payload.isPlaying === true,
+    recording: payload.isRecording === true,
+    beatsPerBar: Number.isFinite(numerator) && numerator >= 1 ? clampInt(numerator, 1, 32) : null,
+    beatUnit: Number.isFinite(denominator) && denominator >= 1 ? clampInt(denominator, 1, 32) : null,
+  };
+}
+// Has the host jumped, rather than simply played on? A locate, a loop wrap or a
+// rewind all land here. Anything beyond a tolerance of drift-free extrapolation
+// is a jump, and a jump means re-anchor rather than glide.
+export function hostJumped(expectedBeats, hostBeats, tolerance = 0.05) {
+  // typeof, not Number(): Number(null) is 0, which would make "the host told us
+  // nothing" indistinguishable from "the host is at beat 0" — i.e. every silent
+  // update would look like a rewind to the top.
+  if (typeof hostBeats !== 'number' || !Number.isFinite(hostBeats)) return false;
+  return Math.abs(hostBeats - num(expectedBeats, 0)) > Math.max(0, num(tolerance, 0.05));
 }
 
 // --- MIDI realtime ----------------------------------------------------------------

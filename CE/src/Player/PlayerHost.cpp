@@ -232,6 +232,24 @@ void PlayerHost::pushParamToUi (const juce::String& parameterId, float value)
     emitToWebView ("paramSync", juce::var (obj));
 }
 
+void PlayerHost::pushHostTransport (const HostTransport& t)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("isPlaying", t.playing);
+    obj->setProperty ("isRecording", t.recording);
+    // Only set what the host actually gave us. An absent property reads as undefined in
+    // JS, which parseHostPosition() reports as null; sending 0.0 instead would make a host
+    // that hasn't reported a tempo yet look like a host running at 0 bpm.
+    if (t.hasTempo)   obj->setProperty ("bpm", t.bpm);
+    if (t.hasPpq)     obj->setProperty ("ppqPosition", t.ppqPosition);
+    if (t.hasTimeSig)
+    {
+        obj->setProperty ("timeSigNumerator", t.timeSigNumerator);
+        obj->setProperty ("timeSigDenominator", t.timeSigDenominator);
+    }
+    emitToWebView ("hostTransport", juce::var (obj));
+}
+
 void PlayerHost::loadPanelIntoWebView()
 {
     if (panelJson.isEmpty() || webView == nullptr)

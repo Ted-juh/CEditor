@@ -12,11 +12,13 @@
 // own ticker rather than reading the store — see the Arp.
 import { writable, get } from 'svelte/store';
 import { latestMidiInputMessage } from './deviceProfiles.js';
+import { onHostTransport } from '../bridge/bridge.js';
 import { triggerRawMidiAction } from '../bridge/bridge.js';
 import { splitMidiMessages, parseMidiHex } from '../utils/midiNoteInput.js';
 import {
   beatsAt, startedAtFor, transportEvent, clockPulsesBetween,
-  estimateTempoFromPulses, MIN_BPM, MAX_BPM,
+  estimateTempoFromPulses, parseHostPosition, hostJumped, transportIsFollowing,
+  MIN_BPM, MAX_BPM,
 } from '../utils/transportLayout.js';
 
 const TICK_MS = 4;            // clock resolution
@@ -31,6 +33,7 @@ export const transport = writable({
   beatsPerBar: 4,             // the meter, so "2 bars" means something to followers
   externalBpm: null,          // what the incoming clock says, when following one
   externalLocked: false,      // …and whether it has arrived recently
+  hostAvailable: false,       // the DAW is reporting a playhead at all
   seq: 0,
 });
 
@@ -43,6 +46,25 @@ let lastPublishAt = 0;
 let clockOut = false;
 let lastPulseBeats = 0;
 let beatsPerBar = 4;
+
+// Host playhead state (source 'host'). The DAW reports a POSITION, not a
+// pulse stream, so we anchor to it and extrapolate between updates with the
+// same recompute-from-start rule as everything else here — 30 host updates a
+// second would otherwise make the readout visibly steppy at display rate.
+let hostListening = false;
+let hostAvailable = false;
+let hostPlaying = false;
+let hostAnchorBeats = 0;
+let hostAnchorAt = 0;
+let hostBpm = null;
+
+// Bumped on any DISCONTINUITY in the position — a host locate, a rewind, an
+// external start/reset. Followers that fire per step watch this and re-baseline
+// instead of replaying the gap. Exposed as a plain counter rather than an event
+// so a follower that missed a frame still notices.
+let jumpSeq = 0;
+function bumpJump() { jumpSeq += 1; }
+export function transportJumpSeq() { return jumpSeq; }
 
 // External clock state.
 let source = 'internal';
@@ -65,7 +87,10 @@ function publish(force = false) {
     beatsPerBar,
     source,
     externalBpm,
-    externalLocked: source === 'external' && lastPulseAt > 0 && (now - lastPulseAt) < 500,
+    externalLocked: source === 'external'
+      ? (lastPulseAt > 0 && (now - lastPulseAt) < 500)
+      : (source === 'host' && hostAvailable),
+    hostAvailable,
     seq: cur.seq + 1,
   });
 }
@@ -79,7 +104,9 @@ function sendClockBytes(count) {
 function tick() {
   if (!running) return;
   const now = Date.now();
-  const next = source === 'external' ? externalBeats : beatsAt(startedAt, now, bpm);
+  const next = source === 'external' ? externalBeats
+    : source === 'host' ? hostBeatsAt(now)
+    : beatsAt(startedAt, now, bpm);
   if (clockOut && next > beats) {
     // Only when we're the master — echoing someone else's clock back is how
     // feedback loops start.
@@ -104,7 +131,7 @@ function stopTimer() {
 
 // --- Controls ---------------------------------------------------------------------
 export function startTransport(atBeat = null) {
-  if (atBeat !== null) beats = Math.max(0, Number(atBeat) || 0);
+  if (atBeat !== null) { beats = Math.max(0, Number(atBeat) || 0); bumpJump(); }
   startedAt = startedAtFor(beats, Date.now(), bpm);
   lastPulseBeats = beats;
   running = true;
@@ -126,6 +153,7 @@ export function toggleTransport() {
   if (running) stopTransport(); else startTransport();
 }
 export function rewindTransport() {
+  bumpJump();
   beats = 0;
   externalBeats = 0;
   startedAt = Date.now();
@@ -142,10 +170,11 @@ export function setTransportBpm(next) {
   publish(true);
 }
 export function setTransportSource(next) {
-  const v = next === 'external' ? 'external' : 'internal';
+  const v = next === 'external' ? 'external' : next === 'host' ? 'host' : 'internal';
   if (v === source) return;
   source = v;
   if (v === 'external') { ensureListener(); externalBeats = beats; }
+  else if (v === 'host') { ensureHostListener(); }
   else startedAt = startedAtFor(beats, Date.now(), bpm);
   publish(true);
 }
@@ -164,11 +193,15 @@ export function transportBeatsPerBar() { return beatsPerBar; }
 // Exact position, for consumers that tick themselves. Reading the store instead
 // would give them the last published value, which is up to a frame stale.
 export function transportBeatsNow() {
+  if (source === 'host') return hostBeatsAt(Date.now());
   if (!running) return beats;
   return source === 'external' ? externalBeats : beatsAt(startedAt, Date.now(), bpm);
 }
 export function isTransportRunning() { return running; }
-export function transportBpmNow() { return source === 'external' ? (externalBpm ?? bpm) : bpm; }
+export function transportBpmNow() {
+  if (source === 'host') return hostBpm ?? bpm;
+  return source === 'external' ? (externalBpm ?? bpm) : bpm;
+}
 
 // --- External clock ------------------------------------------------------------------
 // Its own subscription rather than sharing the note-input listener: the two
@@ -202,10 +235,71 @@ function handleExternal(ev) {
     if (running) externalBeats += 1 / 24;      // the pulses ARE the position
     return;
   }
-  if (ev.kind === 'start') { externalBeats = 0; beats = 0; running = true; ensureTimer(); publish(true); return; }
+  if (ev.kind === 'start') { bumpJump(); externalBeats = 0; beats = 0; running = true; ensureTimer(); publish(true); return; }
   if (ev.kind === 'continue') { running = true; ensureTimer(); publish(true); return; }
   if (ev.kind === 'stop') { running = false; publish(true); return; }
-  if (ev.kind === 'reset') { externalBeats = 0; beats = 0; running = false; stopTimer(); publish(true); }
+  if (ev.kind === 'reset') { bumpJump(); externalBeats = 0; beats = 0; running = false; stopTimer(); publish(true); }
+}
+
+// --- Host playhead ------------------------------------------------------------------
+// The DAW is authoritative and it hands us a POSITION (ppq — quarter notes since
+// the song start). That is strictly better than counting MIDI clock pulses: a
+// dropped pulse puts a counter permanently behind, a position cannot go stale
+// that way. But the DAW only speaks ~30 times a second, so between updates we
+// extrapolate with the same beatsAt() rule the internal clock uses, re-anchoring
+// on every message. The readout is smooth and never more than one update out.
+function hostBeatsAt(now) {
+  if (!hostPlaying) return hostAnchorBeats;
+  return hostAnchorBeats + beatsAt(hostAnchorAt, now, hostBpm ?? bpm);
+}
+
+export function applyHostTransport(payload) {
+  const info = parseHostPosition(payload);
+  const now = Date.now();
+  if (!info || !info.ok) {
+    // The host went quiet (offline render, or a wrapper with no playhead). Hold
+    // the last position and drop the lock indicator — don't snap to zero, which
+    // would look like a rewind nobody asked for.
+    hostAvailable = false;
+    hostAnchorBeats = hostBeatsAt(now);
+    hostPlaying = false;
+    if (source === 'host') { beats = hostAnchorBeats; running = false; publish(true); }
+    return;
+  }
+  hostAvailable = true;
+  if (info.bpm !== null) hostBpm = info.bpm;
+  if (info.beatsPerBar !== null) setTransportSignature(info.beatsPerBar);
+
+  if (info.beats !== null) {
+    // Re-anchor on every report — the host's position IS the truth, and
+    // extrapolation only fills the gap until the next one. But note whether
+    // this was a JUMP (locate, loop wrap, rewind) rather than playing on,
+    // because followers must not "catch up" through a jump: the Arp firing the
+    // sixteen steps between bar 2 and bar 40 because someone moved the locator
+    // is exactly the bug crossedSteps would otherwise produce.
+    if (hostJumped(hostBeatsAt(now), info.beats)) bumpJump();
+    hostAnchorBeats = info.beats;
+    hostAnchorAt = now;
+  } else if (info.playing && !hostPlaying) {
+    hostAnchorAt = now;                    // playing with no position: free-run
+  }
+  hostPlaying = info.playing;
+
+  if (source !== 'host') return;
+  running = info.playing;
+  if (hostBpm !== null) bpm = hostBpm;
+  beats = hostBeatsAt(now);
+  if (running) ensureTimer(); else stopTimer();
+  publish(true);
+}
+
+function ensureHostListener() {
+  if (hostListening) return;
+  hostListening = true;
+  // A no-op outside the exported plugin: onHostTransport returns an empty
+  // unsubscriber when window.__JUCE__ isn't there, so the editor preview just
+  // never sees an update and the component says so.
+  onHostTransport((payload) => applyHostTransport(payload));
 }
 
 // Test seam: drive the external path without a bridge.
@@ -222,5 +316,7 @@ export function resetTransportForTest() {
   running = false; stopTimer(); beats = 0; externalBeats = 0; bpm = 120;
   source = 'internal'; pulseTimes = []; lastPulseAt = 0; externalBpm = null;
   clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4;
+  hostAvailable = false; hostPlaying = false; hostAnchorBeats = 0; hostAnchorAt = 0; hostBpm = null;
+  jumpSeq = 0;
   publish(true);
 }

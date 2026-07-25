@@ -77,7 +77,11 @@ not DSP:
   instead of leaving a hole in the bar. Runs on a 4ms interval (so MIDI
   clock-out isn't jittered by the display, and it survives a backgrounded
   window) but publishes to the UI at 30Hz. Follows **incoming MIDI clock** —
-  bytes that were already arriving and being thrown away — or sends it. The
+  bytes that were already arriving and being thrown away — or sends it. In an
+  exported plugin it follows the **DAW playhead** instead, read off
+  `juce::AudioPlayHead` on the audio thread and pushed to the panel at 30Hz: a
+  position rather than a pulse stream, so it cannot fall behind, and a locate in
+  the DAW is recognised as a jump rather than replayed as sixteen notes. The
   [Arpeggiator](./arpeggiator.md) and the
   [Turing Modulator](./turing-modulator.md) follow it by note division, the
   [Gesture Looper](./gesture-looper.md), the
