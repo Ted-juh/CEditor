@@ -43,9 +43,30 @@ way to tell a working button from a dead one — you'd press it, hear nothing
 change, and have no idea whether the message went out. So it lights for 180 ms
 on fire.
 
+## Two ways to fire it without pressing it
+
+**Esc.** The whole panel surface listens, so you don't have to find the button
+while something is screaming. It defers to anything that already claimed the
+key — Escape is *also* the cancel for four in-place editors (text field,
+spinner, range entry, LCD zone), and stealing it from those would mean every
+cancelled edit panicked the rig. That guard is a pure predicate
+(`isEmergencyStopKey`) with tests for the deferral cases rather than the happy
+path, because those are the ones that would break something. It only exists in
+preview / the Player, so it can't fire while you're designing.
+
+**Leaving the panel.** Exiting preview silences the rig. A note the panel was
+holding has no other way to stop — once the surface is gone there is nothing
+left to send its note-off. It only fires if something actually sounded, so
+closing an untouched panel stays quiet.
+
+Both take the **maximal** silence set, never a placed Panic button's config.
+Someone may have set one up as a narrow "drums off, ch 10"; an emergency that
+silences a third of the rig is worse than useless. Esc also flashes any Panic
+buttons on the panel, so the connection is visible.
+
 ## How it works
 
-- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 6 tests):
+- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 11 tests):
   the channel list, the message set with its optional parts, the label and the
   summary line, and the button geometry. The message *sequence* is what's
   tested — it's the whole behaviour.
@@ -70,9 +91,9 @@ on fire.
 
 ## Possible next steps
 
-- **Keyboard shortcut** — a panel-wide Esc binding, so you don't have to find the
-  button while something is screaming.
-- **Auto-panic on preview exit** — currently leaving preview clears the echo but
-  doesn't silence the synth.
+- ~~Keyboard shortcut~~ — **done**: Esc, see above.
+- ~~Auto-panic on preview exit~~ — **done**, see above.
 - **Panic from a script** — the Scripts command graph could expose it as an
   action, so any button could fire one.
+- **A configurable shortcut** — Esc is hard-wired; some rigs will already have
+  it bound to something.

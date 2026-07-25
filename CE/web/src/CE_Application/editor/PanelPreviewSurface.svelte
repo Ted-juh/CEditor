@@ -111,6 +111,7 @@
   } from '../stores/noteInput.js';
   import {
     panicConfig, panicMessages, panicGeometry, panicHit,
+    EMERGENCY_PANIC, isEmergencyStopKey,
   } from '../utils/panicLayout.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
@@ -704,7 +705,14 @@
   onDestroy(() => overlayTimers.forEach((t) => clearTimeout(t)));
   // Leaving preview drops the echoed notes. A keyboard unplugged mid-note never
   // sends its note-off, and a pad stuck lit forever looks like a bug.
-  onDestroy(() => { if (noteInputStarted) clearNoteInput(); });
+  // Leaving preview silences the rig. A note the panel was holding has no other
+  // way to stop once this surface is gone — nothing is left to send its
+  // note-off. Only when something actually sounded, so closing an untouched
+  // panel is quiet.
+  onDestroy(() => {
+    if (sentAnyNote) firePanicEmergency({ flashButtons: false });
+    else if (noteInputStarted) clearNoteInput();
+  });
 
   // Which overlay layout is currently active (timer window, or latched until a
   // different control changes). Best-effort timing; verify in-browser.
@@ -2110,7 +2118,12 @@
   function isChordPadControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'ChordPad';
   }
+  // Set once anything on this panel actually sounds a note. Auto-panic on exit
+  // checks it, so closing a panel that never played stays silent instead of
+  // firing 64 messages at the rig for no reason.
+  let sentAnyNote = false;
   function sendNoteBytes(bytes, actionId) {
+    if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
     triggerRawMidiAction({ deviceRole: 'mainSynth', actionId, message: bytesToHex(bytes), dryRun: false });
   }
   // Push the union of every held pad's notes into the session (for the renderer).
@@ -2637,6 +2650,31 @@
     const pn = base?._children?.Panic;
     if (!pn || sessionFor(control)?.panicFlash !== true) return resolved;
     return { ...resolved, control: { ...base, _children: { ...base._children, Panic: { ...pn, __flash: true } } } };
+  }
+  // The emergency path: Esc, and leaving the panel. Always the MAXIMAL silence
+  // set, never a placed Panic button's config — someone may have set one up as
+  // a narrow "drums off, ch 10", and an emergency that silences a third of the
+  // rig is worse than useless.
+  function firePanicEmergency({ flashButtons = true } = {}) {
+    try { silenceLocalNoteControls(); } catch { /* mid-teardown: the blanket set still covers it */ }
+    for (const bytes of panicMessages(EMERGENCY_PANIC)) sendNoteBytes(bytes, 'panic');
+    clearNoteInput();
+    sentAnyNote = false;
+    if (!flashButtons) return;
+    // Light any Panic buttons on the panel, so Esc visibly does the same thing.
+    for (const c of (orderedControls ?? [])) {
+      if (!isPanicControl(c)) continue;
+      const id = getControlId(c);
+      patchControlSession(id, { panicFlash: true });
+      setTimeout(() => patchControlSession(id, { panicFlash: undefined }), 180);
+    }
+  }
+  // The guard that stops Esc stealing the per-control Escape cancels lives in
+  // panicLayout as a pure predicate, because getting it wrong means every
+  // cancelled text edit also panics the rig.
+  function handleGlobalKeyDown(event) {
+    if (!isEmergencyStopKey(event, { lcdEditing: lcdEdit.active === true })) return;
+    firePanicEmergency();
   }
 
   // Inject the sounding pads + last hit so the renderer can light up.
@@ -5019,6 +5057,10 @@
     return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }
 </script>
+
+<!-- Esc is the emergency stop. Window-level so it works wherever focus is,
+     but it defers to any control that already claimed the key. -->
+<svelte:window onkeydown={handleGlobalKeyDown} />
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PANIC_SCOPES, panicScope, panicChannel, panicChannels, panicMessages,
-  panicLabel, panicSummary, panicGeometry, panicHit,
+  panicLabel, panicSummary, panicGeometry, panicHit, EMERGENCY_PANIC,
+  isEmergencyStopKey,
 } from '../src/CE_Application/utils/panicLayout.js';
 
 function pc(c) { return { _children: { Core: { controlType: 'Panic' }, Panic: c } }; }
@@ -62,4 +63,54 @@ test('geometry + hit-test', () => {
   assert.equal(panicHit(g, 10, 10), true);
   assert.equal(panicHit(g, 2, 10), false);
   assert.equal(panicHit(g, 10, 42), false);
+});
+
+test('the emergency config is always maximal', () => {
+  // Esc and auto-panic-on-exit use this, NOT whatever a placed Panic button is
+  // set to — a narrow "drums off, ch 10" button must not become the emergency.
+  const m = panicMessages(EMERGENCY_PANIC);
+  assert.equal(m.length, 16 * 4);
+  assert.equal(panicScope(EMERGENCY_PANIC), 'all');
+  assert.deepEqual(panicChannels(EMERGENCY_PANIC).length, 16);
+  // it carries the optional parts too
+  assert.ok(m.some((b) => b[1] === 121));
+  assert.ok(m.some((b) => (b[0] & 0xF0) === 0xE0));
+  // and a narrow button really would have been narrower
+  const narrow = { _children: { Panic: { scope: 'channel', channel: 10, resetControllers: false, centreBend: false } } };
+  assert.equal(panicMessages(narrow).length, 2);
+});
+
+// --- the Esc guard --------------------------------------------------------------
+// Escape already cancels four in-place editors. If the global handler stole it,
+// every cancelled edit would also panic the rig — so these are the cases that
+// matter more than the happy path.
+
+const key = (over = {}) => ({ key: 'Escape', repeat: false, defaultPrevented: false, target: { tagName: 'DIV' }, ...over });
+
+test('Esc fires the emergency stop from the panel surface', () => {
+  assert.equal(isEmergencyStopKey(key()), true);
+  assert.equal(isEmergencyStopKey(key({ target: { tagName: 'BUTTON' } })), true);
+  assert.equal(isEmergencyStopKey(key({ target: null })), true);
+});
+
+test('Esc defers to anything that already claimed it', () => {
+  // the per-control cancels preventDefault, which is the primary signal
+  assert.equal(isEmergencyStopKey(key({ defaultPrevented: true })), false);
+  // …and an active LCD zone edit is the one that cancels without preventing
+  assert.equal(isEmergencyStopKey(key(), { lcdEditing: true }), false);
+});
+
+test('Esc never fires while typing', () => {
+  for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT', 'input', 'textarea']) {
+    assert.equal(isEmergencyStopKey(key({ target: { tagName } })), false, tagName);
+  }
+  assert.equal(isEmergencyStopKey(key({ target: { tagName: 'DIV', isContentEditable: true } })), false);
+});
+
+test('other keys and key-repeat are ignored', () => {
+  assert.equal(isEmergencyStopKey(key({ key: 'Enter' })), false);
+  assert.equal(isEmergencyStopKey(key({ key: 'esc' })), false);      // case matters
+  assert.equal(isEmergencyStopKey(key({ repeat: true })), false);    // holding it fires once
+  assert.equal(isEmergencyStopKey(null), false);
+  assert.equal(isEmergencyStopKey(undefined), false);
 });

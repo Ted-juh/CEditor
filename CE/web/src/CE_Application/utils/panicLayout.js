@@ -55,6 +55,33 @@ export function panicMessages(control) {
   return out;
 }
 
+// The config the EMERGENCY paths use — the Esc key and auto-panic on exit.
+// Deliberately not any placed Panic button's config: someone may have set one
+// up as a narrow "drums off, ch 10" button, and an emergency that only silences
+// a third of the rig is worse than useless. Emergencies are always maximal.
+export const EMERGENCY_PANIC = Object.freeze({
+  _children: { Panic: { scope: 'all', resetControllers: true, centreBend: true } },
+});
+
+// Should an Escape keypress fire the emergency stop?
+//
+// Escape is already the cancel key for four different in-place editors (a text
+// field, a spinner, a range entry, an LCD zone). Stealing it from those would
+// mean every cancelled edit also panics the rig — so a global handler has to
+// defer. Those handlers run first and call preventDefault, which is the primary
+// signal; the editable-target check covers the one that cancels without
+// preventing, and typing in any field at all.
+export function isEmergencyStopKey(event, { lcdEditing = false } = {}) {
+  if (!event || event.key !== 'Escape') return false;
+  if (event.repeat === true) return false;          // holding Esc fires once
+  if (event.defaultPrevented === true) return false;
+  if (lcdEditing) return false;
+  const tag = String(event.target?.tagName ?? '').toUpperCase();
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
+  if (event.target?.isContentEditable === true) return false;
+  return true;
+}
+
 export function panicLabel(control) {
   const text = String(panicConfig(control).label ?? '').trim();
   return text || 'PANIC';
