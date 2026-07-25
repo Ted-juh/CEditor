@@ -14,6 +14,11 @@ a slow drive swell) and you've drawn a living, personal modulation rig — no LF
 menus, no step grids. It's the most direct way to make a patch *breathe the way
 you played it*.
 
+The **notes** counterpart is the [Phrase Recorder](./phrase-recorder.md): same
+arm/record/overdub model, but capturing what you *played* rather than what you
+*moved*. Worth knowing which you want — a gesture is a sample stream you can
+interpolate, a phrase is events with duration where a missed note-on is silence.
+
 ## How it works
 
 - **Pure engine** `utils/looperLayout.js` (+ `test/looperLayout.test.js`, 8 tests):

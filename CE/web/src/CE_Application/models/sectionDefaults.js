@@ -1297,6 +1297,40 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  Recorder: {
+    _type: 'Recorder',
+    state: 'idle',               // idle | armed | recording | overdub
+    playing: true,               // the loop plays back when not recording
+    source: 'both',              // input | panel | both — where notes are captured from
+    once: false,                 // stop after one pass instead of layering
+    syncToTransport: false,
+    bars: 2,                     // loop length when synced
+    seconds: 4,                  // loop length free-running
+    channel: 1,                  // the channel playback sends on
+    transpose: 0,
+    velocityScale: 1,
+    // Quantise. Strength is partial on purpose — full snap makes a human take
+    // sound like a step sequencer, and the Phrase Sequencer is better at that.
+    grid: 16,
+    quantizeStrength: 0,         // 0 = keep the feel exactly as played
+    quantizeLength: false,
+    key: 0,
+    scale: 'minor',
+    snapToScale: false,          // pitch-correct the take into the key
+    take: { events: [], pending: {} },
+    editable: true,              // click the roll to arm/record in preview
+    showHeader: true,
+    showGutter: true,            // the pitch labels down the left
+    minSpan: 12,                 // the roll never shows fewer rows than this
+    gridDivisions: 0,            // 0 = derive from bars
+    // Colours.
+    faceColour: 'FF141420',
+    noteColour: 'FF56CCF2',
+    recordColour: 'FFEB5757',
+    playheadColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   SplitZone: {
     _type: 'SplitZone',
     inputChannel: 0,             // MIDI channel to listen on (0 = omni)

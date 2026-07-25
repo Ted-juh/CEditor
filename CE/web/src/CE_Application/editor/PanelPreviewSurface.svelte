@@ -127,6 +127,14 @@
     phraseBeatsPerStep, tiesForward, phraseSwingSeconds,
   } from '../utils/phraseLayout.js';
   import {
+    recorderConfig, recorderState, recorderTake, recorderChannel, recorderPlaying,
+    recorderSynced, recorderBars, recorderLoopSeconds, isRecordingState,
+    recordNoteOn, recordNoteOff, closeOpenNotes, takeIsEmpty, nextPassFor,
+    eventsInWindow, eventSeconds, playedNote, playedVelocity,
+    onLoopBoundary, toggleRecordState,
+  } from '../utils/noteRecorderLayout.js';
+  import { noteOutputEvents, publishNoteOutput, noteOutputFromBytes } from '../stores/noteOutput.js';
+  import {
     splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
     noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
@@ -280,7 +288,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))));
+    return applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2212,9 +2220,13 @@
   // checks it, so closing a panel that never played stays silent instead of
   // firing 64 messages at the rig for no reason.
   let sentAnyNote = false;
-  function sendNoteBytes(bytes, actionId) {
+  function sendNoteBytes(bytes, actionId, sourceType = '', sourceId = '') {
     if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
     triggerRawMidiAction({ deviceRole: 'mainSynth', actionId, message: bytesToHex(bytes), dryRun: false });
+    // Every note the panel plays passes through here, which is what makes
+    // "record what I just played" one tap instead of six integrations.
+    const tapped = noteOutputFromBytes(bytes, sourceType, sourceId);
+    if (tapped) publishNoteOutput(tapped);
   }
   // Push the union of every held pad's notes into the session (for the renderer).
   function syncChordSession(control) {
@@ -2719,6 +2731,243 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Phrase Recorder: capture what you played, loop it -------------------------
+  // The note twin of the Gesture Looper. Two capture sources, deliberately
+  // different in kind:
+  //   · the MIDI INPUT, diffed off the shared held-note store the same way the
+  //     Zone Splitter reconciles — one subscription feeds every recorder;
+  //   · the PANEL's own output, off the noteOutput tap, which every note control
+  //     already funnels through.
+  // The live take lives in the session while recording and is committed to the
+  // model when recording ends. Writing the model on every note would put a
+  // hundred undo steps in the history for one four-bar phrase.
+  const recorderTakeLive = {};    // id -> take being recorded (session truth)
+  const recorderPhaseState = {};  // id -> phase 0..1
+  const recorderPrevPhase = {};   // id -> previous frame's phase, for the play window
+  const recorderSounding = {};    // id -> { "channel:note": true } currently played back
+  const recorderTimers = {};      // id -> [timeoutId…] for playback note-offs
+  const recorderHeldSeen = {};    // id -> midiNoteState.seq consumed
+  const recorderHeldNotes = {};   // id -> Set of input notes seen held last time
+  const recorderTapSeen = {};     // id -> noteOutputEvents.seq consumed
+  const recorderJumpState = {};   // id -> transport jump counter seen
+  const recorderBeatsState = {};
+  let recorderTickerRunning = false;
+  let recorderLastMs = 0;
+  function isRecorderControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Recorder';
+  }
+  function recorderControls() {
+    return (orderedControls ?? []).filter((c) => isRecorderControl(c));
+  }
+  function liveTakeFor(control) {
+    const id = getControlId(control);
+    return recorderTakeLive[id] ?? recorderTake(control);
+  }
+  function setLiveTake(control, take) {
+    const id = getControlId(control);
+    recorderTakeLive[id] = take;
+    patchControlSession(id, { recorderTake: take });
+  }
+  // Commit to the model — one undo step for the whole take, at the moment it
+  // stops being edited.
+  function commitTake(control) {
+    const id = getControlId(control);
+    const take = recorderTakeLive[id];
+    if (!take) return;
+    updateControlProperty(id, 'Recorder.take', { events: take.events, pending: {} });
+  }
+  function setRecorderState(control, next) {
+    updateControlProperty(getControlId(control), 'Recorder.state', next);
+  }
+  function recorderAllOff(control) {
+    const id = getControlId(control);
+    for (const t of recorderTimers[id] ?? []) clearTimeout(t);
+    recorderTimers[id] = [];
+    for (const key of Object.keys(recorderSounding[id] ?? {})) {
+      const [ch, note] = key.split(':').map(Number);
+      sendNoteBytes(noteOffBytes(ch, note), `rec_off_${note}`, 'Recorder', id);
+    }
+    recorderSounding[id] = {};
+    // Anything still held when we stop gets closed, so the take has no event
+    // without an end — that would play as a stuck note on every future lap.
+    const live = recorderTakeLive[id];
+    if (live && Object.keys(live.pending).length) {
+      setLiveTake(control, closeOpenNotes(live, recorderPhaseState[id] ?? 0));
+      commitTake(control);
+    }
+  }
+  // Record one note into the live take. `t` is the phase it happened at.
+  function captureNote(control, kind, channel, note, velocity) {
+    const state = recorderState(control);
+    if (!isRecordingState(state)) return;
+    const id = getControlId(control);
+    const t = recorderPhaseState[id] ?? 0;
+    const prior = liveTakeFor(control);
+    const pass = nextPassFor(prior, state);
+    const next = kind === 'on'
+      ? recordNoteOn(prior, t, channel, note, velocity, pass)
+      : recordNoteOff(prior, t, channel, note);
+    if (next !== prior) setLiveTake(control, next);
+  }
+  // Capture from the hardware input. The store is STATE with a sequence number,
+  // so arrival is derived by diffing what is held now against what was held
+  // when we last looked — the same reconcile the splitter does.
+  function pumpRecorderInput(control) {
+    const src = String(recorderConfig(control).source ?? 'both');
+    if (src !== 'input' && src !== 'both') return;
+    ensureNoteInput();
+    const id = getControlId(control);
+    const seq = $midiNoteState.seq;
+    if (recorderHeldSeen[id] === seq) return;
+    recorderHeldSeen[id] = seq;
+    const entries = inputHeldEntries($midiNoteState.notes, 0);
+    const now = new Map(entries.map((e) => [`${e.channel ?? 1}:${e.note}`, e]));
+    const before = recorderHeldNotes[id] ?? new Map();
+    for (const [key, e] of now) {
+      if (!before.has(key)) captureNote(control, 'on', e.channel ?? 1, e.note, e.velocity ?? 100);
+    }
+    for (const [key, e] of before) {
+      if (!now.has(key)) captureNote(control, 'off', e.channel ?? 1, e.note, 0);
+    }
+    recorderHeldNotes[id] = now;
+  }
+  // Capture from the panel's own note controls, through the single funnel every
+  // one of them sends on.
+  function pumpRecorderTap(control) {
+    const src = String(recorderConfig(control).source ?? 'both');
+    if (src !== 'panel' && src !== 'both') return;
+    const id = getControlId(control);
+    const batch = $noteOutputEvents;
+    if (recorderTapSeen[id] === batch.seq) return;
+    recorderTapSeen[id] = batch.seq;
+    if (!batch.seq) return;
+    for (const ev of batch.events) {
+      // A recorder never records a recorder. Two of them pointed at each other
+      // would feed each other forever, doubling the take on every lap.
+      if (ev.sourceType === 'Recorder') continue;
+      captureNote(control, ev.kind, ev.channel, ev.note, ev.velocity);
+    }
+  }
+  // Play everything that starts in (prev, now]. Note-offs are timers off the
+  // event's own recorded length, so a legato take stays legato.
+  function playRecorderWindow(control, prev, now, loopSecs) {
+    if (!recorderPlaying(control)) return;
+    const id = getControlId(control);
+    const take = liveTakeFor(control);
+    if (!take.events.length) return;
+    const ch = recorderChannel(control);
+    for (const ev of eventsInWindow(take.events, prev, now)) {
+      const note = playedNote(control, ev);
+      if (note === null) continue;              // transposed off the end: dropped, not clamped
+      const key = `${ch}:${note}`;
+      // The same pitch already sounding from an earlier overlapping event: stop
+      // it first, or its note-off will cut the new one short.
+      if (recorderSounding[id]?.[key]) sendNoteBytes(noteOffBytes(ch, note), `rec_off_${note}`, 'Recorder', id);
+      sendNoteBytes(noteOnBytes(ch, note, playedVelocity(control, ev)), `rec_on_${note}`, 'Recorder', id);
+      (recorderSounding[id] ??= {})[key] = true;
+      const ms = eventSeconds(ev, loopSecs) * 1000;
+      (recorderTimers[id] ??= []).push(setTimeout(() => {
+        if (!recorderSounding[id]?.[key]) return;
+        sendNoteBytes(noteOffBytes(ch, note), `rec_off_${note}`, 'Recorder', id);
+        delete recorderSounding[id][key];
+      }, ms));
+    }
+  }
+  function ensureRecorderTicker() {
+    if (recorderTickerRunning) return;
+    recorderTickerRunning = true;
+    recorderLastMs = Date.now();
+    const loop = () => {
+      const all = recorderControls();
+      if (!all.length) { recorderTickerRunning = false; return; }
+      const now = Date.now();
+      const dt = Math.min(0.25, Math.max(0, (now - recorderLastMs) / 1000));
+      recorderLastMs = now;
+      for (const c of all) {
+        const id = getControlId(c);
+        const bpm = transportBpmNow();
+        const loopSecs = recorderLoopSeconds(c, recorderSynced(c) ? bpm : null, transportBeatsPerBar());
+        const prev = recorderPhaseState[id] ?? 0;
+        let next = prev;
+        if (recorderSynced(c)) {
+          // Position in, phase out — the rule every follower here obeys. A
+          // locate re-baselines rather than replaying the bars it skipped.
+          const beats = transportBeatsNow();
+          const jump = transportJumpSeq();
+          const jumped = recorderJumpState[id] !== jump;
+          recorderJumpState[id] = jump;
+          const barBeats = recorderBars(c) * transportBeatsPerBar();
+          next = ((Math.max(0, beats) / barBeats) % 1 + 1) % 1;
+          const hadPrev = recorderBeatsState[id] !== undefined;
+          recorderBeatsState[id] = beats;
+          if (jumped || !hadPrev || !isTransportRunning()) {
+            recorderPhaseState[id] = next;
+            recorderPrevPhase[id] = next;
+            continue;
+          }
+        } else {
+          next = ((prev + dt / Math.max(0.05, loopSecs)) % 1 + 1) % 1;
+        }
+        recorderPhaseState[id] = next;
+        // The seam. Everything that has to happen exactly once per lap happens
+        // here: the arm→record promotion, the once-through stop, and the commit.
+        if (next < prev) {
+          const state = recorderState(c);
+          const after = onLoopBoundary(state, {
+            hadEvents: !takeIsEmpty(liveTakeFor(c)),
+            once: recorderConfig(c).once === true,
+          });
+          if (after !== state) {
+            setRecorderState(c, after);
+            if (!isRecordingState(after)) { recorderAllOffPending(c); }
+          }
+        }
+        playRecorderWindow(c, prev, next, loopSecs);
+        recorderPrevPhase[id] = next;
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // Recording just ended: close anything held and write the take to the model.
+  function recorderAllOffPending(control) {
+    const id = getControlId(control);
+    const live = recorderTakeLive[id];
+    if (!live) return;
+    const closed = closeOpenNotes(live, recorderPhaseState[id] ?? 0);
+    if (closed !== live) setLiveTake(control, closed);
+    commitTake(control);
+  }
+  function applyRecorderValueSource(control, resolved) {
+    if (!isRecorderControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Recorder;
+    if (!cfg) return resolved;
+    ensureRecorderTicker();
+    void orbitClock;
+    pumpRecorderInput(control);
+    pumpRecorderTap(control);
+    const id = getControlId(control);
+    const next = { ...cfg, __phase: recorderPhaseState[id] ?? 0 };
+    const sess = sessionFor(control);
+    if (sess?.recorderTake) next.take = sess.recorderTake;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Recorder: next } } };
+  }
+  // Click the roll to arm; click again to change your mind. Everything else is
+  // in the inspector, because a transport you can mis-hit while playing is
+  // worse than one you have to reach for.
+  function handleRecorderPointerDown(control, localPoint) {
+    if (!isRecorderControl(control) || recorderConfig(control).editable === false) return false;
+    void localPoint;
+    const state = recorderState(control);
+    const next = toggleRecordState(state, !takeIsEmpty(liveTakeFor(control)));
+    setRecorderState(control, next);
+    if (!isRecordingState(next)) recorderAllOffPending(control);
+    ensureRecorderTicker();
+    return true;
+  }
+
   // --- Phrase Sequencer: notes on a grid ----------------------------------------
   // The third note-emitting family member with a clock, after the Arp and the
   // Turing — and it shares their rule: the step index is derived from a rising
@@ -3177,6 +3426,7 @@
       if (isChordPadControl(c)) chordAllOff(c);
       else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
       else if (isPhraseControl(c)) phraseAllOff(c);
+      else if (isRecorderControl(c)) recorderAllOff(c);
       else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
       else if (isNoteRibbonControl(c)) {
         if (ribbonPress && ribbonPress.id === getControlId(c)) {
@@ -5019,6 +5269,8 @@
     handleSplitZonePointerDown(control, pointerDownLocal);
     // Phrase Sequencer: toggle a cell, or paint a run of them.
     handlePhrasePointerDown(control, pointerDownLocal);
+    // Phrase Recorder: arm it (or change your mind).
+    handleRecorderPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {

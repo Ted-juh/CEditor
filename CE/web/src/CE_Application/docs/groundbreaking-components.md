@@ -135,6 +135,24 @@ not DSP:
   `phraseSeed` / `phraseKey` / `phraseScale` / `phraseDirection` / `phraseCell`.
   See [phrase-sequencer.md](./phrase-sequencer.md).
 
+### 00j. Phrase Recorder — the note twin of the Gesture Looper — **shipped 🟢**
+- The Looper records your *motion*; this records your *notes* — played on the
+  panel or arriving on the input — and loops them on the clock. Same interaction
+  model, different payload, and the difference shapes the engine: a gesture is a
+  sample stream you can interpolate, a phrase is events with duration where a
+  missed note-on is silence and a doubled one is a stuck note. So the careful
+  parts are the seam (a note held across it keeps its real length), the
+  retrigger with no note-off (closes the first rather than dropping it), and
+  stopping with keys down (closes them, or they ring forever).
+  **Arming waits for the top of the loop**, so the take's downbeat is the
+  loop's downbeat. **Undo is per overdub pass** — one integer per note, which
+  beats a diff history at the only job anyone wants. Captures from the MIDI
+  input *and* from the panel's own note controls, the latter through the single
+  funnel all six of them already send on — so a note control added later is
+  captured for free. A recorder never records a recorder. Quantise strength is
+  **partial by default**, because full snap is what the Phrase Sequencer is for.
+  See [phrase-recorder.md](./phrase-recorder.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

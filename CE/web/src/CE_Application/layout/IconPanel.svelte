@@ -20,6 +20,7 @@
     OctagonAlert,
     SplitSquareHorizontal,
     Grid2x2Check,
+    Disc3,
     Timer,
     Gauge,
     Spline,
@@ -140,6 +141,7 @@
       { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
       { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
       { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
+      { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

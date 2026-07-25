@@ -797,6 +797,23 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Recorder: {
+    // The note twin of the Gesture Looper: records what you play (on the panel
+    // or on the MIDI input) and loops it. Emits MIDI, so no DeviceBindings.
+    sections: ['Background', 'Recorder', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Recorder'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   SplitZone: {
     // A routing table: notes in on the hardware input, notes out on the raw MIDI
     // path. Like the other note controls it emits MIDI rather than parameter
