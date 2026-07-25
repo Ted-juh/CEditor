@@ -24,6 +24,7 @@
   import ArpRenderer from './ArpRenderer.svelte';
   import NoteRibbonRenderer from './NoteRibbonRenderer.svelte';
   import DrumPadsRenderer from './DrumPadsRenderer.svelte';
+  import PanicRenderer from './PanicRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
@@ -175,6 +176,7 @@
   let isArp = $derived(String(core?.controlType ?? '') === 'Arp');
   let isNoteRibbon = $derived(String(core?.controlType ?? '') === 'NoteRibbon');
   let isDrumPads = $derived(String(core?.controlType ?? '') === 'DrumPads');
+  let isPanic = $derived(String(core?.controlType ?? '') === 'Panic');
   let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
   // TextInput: an editable <input> styled from the Text/Font/ContentLayout
   // sections. Value + placeholder come from the preview surface.
@@ -2939,7 +2941,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -4254,6 +4256,10 @@
 
     {#if isDrumPads}
       <DrumPadsRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isPanic}
+      <PanicRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
 
     {#if isPixelDisplay}

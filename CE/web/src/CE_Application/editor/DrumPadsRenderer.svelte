@@ -37,6 +37,16 @@
   let hitCss = $derived(css(cfg.hitColour, 'rgba(242,201,76,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
   let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
+  // Echo intensity: how hard each incoming note is being played (poly pressure
+  // while a finger leans on the key, else its struck velocity). Undefined when
+  // the sender gives us nothing to go on, in which case the echo just draws
+  // full — never dimmer than it would have been before this existed.
+  let echoLevels = $derived(cfg.__echoLevels ?? null);
+  function echoAlpha(note, floor = 0.4) {
+    const l = echoLevels?.[note];
+    return l === undefined ? 1 : floor + (1 - floor) * Math.max(0, Math.min(1, l));
+  }
+
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -79,11 +89,14 @@
     {#if isHit}
       <rect x={c.r.x - 3} y={c.r.y - 3} width={c.r.w + 6} height={c.r.h + 6} rx="9" fill={hitCss} opacity="0.22" />
     {:else if isEcho}
-      <rect x={c.r.x - 2} y={c.r.y - 2} width={c.r.w + 4} height={c.r.h + 4} rx="8" fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
+      <rect x={c.r.x - 2} y={c.r.y - 2} width={c.r.w + 4} height={c.r.h + 4} rx="8" fill="none"
+            stroke={echoCss} stroke-width="2" opacity={0.9 * echoAlpha(c.p.note)} />
     {/if}
     <rect x={c.r.x} y={c.r.y} width={c.r.w} height={c.r.h} rx="6"
           fill={isHit ? 'rgba(38,38,48,1)' : (isEcho ? 'rgba(30,40,36,1)' : padCss)}
-          stroke={isHit ? hitCss : (isEcho ? echoCss : 'rgba(44,44,56,1)')} stroke-width={isHit || isEcho ? 2 : 1} />
+          stroke={isHit ? hitCss : (isEcho ? echoCss : 'rgba(44,44,56,1)')}
+          stroke-opacity={isEcho && !isHit ? echoAlpha(c.p.note) : 1}
+          stroke-width={isHit || isEcho ? 2 : 1} />
     <!-- the pad's own accent stripe: its per-pad colour, or the section accent -->
     <rect x={c.r.x + 6} y={c.r.y + 6} width={Math.max(2, c.r.w - 12)} height="3" rx="1.5"
           fill={isHit ? hitCss : accent} opacity={isHit ? 1 : 0.7} />

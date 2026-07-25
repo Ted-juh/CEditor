@@ -46,6 +46,16 @@
   let minorCss = $derived(css(cfg.minorColour, 'rgba(155,138,255,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
   let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
+  // Echo intensity: how hard each incoming note is being played (poly pressure
+  // while a finger leans on the key, else its struck velocity). Undefined when
+  // the sender gives us nothing to go on, in which case the echo just draws
+  // full — never dimmer than it would have been before this existed.
+  let echoLevels = $derived(cfg.__echoLevels ?? null);
+  function echoAlpha(note, floor = 0.4) {
+    const l = echoLevels?.[note];
+    return l === undefined ? 1 : floor + (1 - floor) * Math.max(0, Math.min(1, l));
+  }
+
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -83,6 +93,16 @@
   // Pitch classes currently sounding (for the piano strip).
   let litPcs = $derived(new Set(sounding.map((m) => ((m % 12) + 12) % 12)));
   let echoPcs = $derived(new Set(echoNotes.map((m) => ((m % 12) + 12) % 12)));
+  // The strip is pitch-class based, so a pitch class is as bright as its
+  // hardest-played octave.
+  let echoPcAlpha = $derived.by(() => {
+    const out = {};
+    for (const m of echoNotes) {
+      const pc = ((m % 12) + 12) % 12;
+      out[pc] = Math.max(out[pc] ?? 0, echoAlpha(m, 0.35));
+    }
+    return out;
+  });
   const WHITE = [0, 2, 4, 5, 7, 9, 11];
   const BLACK_AFTER = [0, 1, 3, 4, 5];
   const BLACK_PC = [1, 3, 6, 8, 10];
@@ -180,14 +200,17 @@
       {@const lit = litPcs.has(pc)}
       {@const ech = echoPcs.has(pc)}
       <rect x={PAD + i * whiteW + 0.5} y={pianoY} width={Math.max(1, whiteW - 1)} height={pianoH - 4} rx="2"
-            fill={lit ? tonicCss : (ech ? echoCss : 'rgba(233,233,238,0.92)')} />
+            fill={lit ? tonicCss : (ech ? echoCss : 'rgba(233,233,238,0.92)')}
+            fill-opacity={!lit && ech ? echoPcAlpha[pc] : 1} />
     {/each}
     {#each [0, 1] as oct (oct)}
       {#each BLACK_AFTER as wi, j (`${oct}_${j}`)}
         {@const lit = litPcs.has(BLACK_PC[j])}
         {@const ech = echoPcs.has(BLACK_PC[j])}
         <rect x={PAD + (oct * 7 + wi + 1) * whiteW - whiteW * 0.32} y={pianoY} width={whiteW * 0.64} height={(pianoH - 4) * 0.62} rx="1.5"
-              fill={lit ? tonicCss : (ech ? echoCss : 'rgba(21,21,27,1)')} stroke="rgba(0,0,0,0.8)" stroke-width="0.5" />
+              fill={lit ? tonicCss : (ech ? echoCss : 'rgba(21,21,27,1)')}
+              fill-opacity={!lit && ech ? echoPcAlpha[BLACK_PC[j]] : 1}
+              stroke="rgba(0,0,0,0.8)" stroke-width="0.5" />
       {/each}
     {/each}
   {/if}

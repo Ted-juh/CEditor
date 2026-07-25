@@ -1241,6 +1241,26 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Panic — silence everything: the notes this panel is holding, the echoed
+   *  note display, and whatever the SYNTH is still holding after a lost
+   *  note-off. Emits MIDI, so no DeviceBindings. */
+  Panic: {
+    _type: 'Panic',
+    label: 'PANIC',
+    scope: 'all',                 // all (16 channels) | channel
+    channel: 1,                   // when scope = 'channel'
+    resetControllers: true,       // also send CC 121, for a stuck mod wheel
+    centreBend: true,             // also recentre pitch bend
+    clearLocal: true,             // silence this panel's own note controls too
+    showSummary: true,            // the second line saying what it will do
+    editable: true,
+    // Colours.
+    faceColour: 'FF2A1416',
+    borderColour: 'FFE05C5C',
+    labelColour: 'FFF2C94C',
+    flashColour: 'FFE05C5C',
+  },
+
   /** Constraint — linked parameters that always preserve a relationship the synth
    *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
   Constraint: {

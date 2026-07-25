@@ -17,6 +17,7 @@
     ListMusic,
     Piano,
     LayoutGrid,
+    OctagonAlert,
     Gauge,
     Spline,
     Grid2x2,
@@ -132,6 +133,7 @@
       { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
       { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
       { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
+      { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

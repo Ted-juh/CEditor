@@ -780,6 +780,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Panic: {
+    // Emits MIDI directly, like the note-playing controls — no DeviceBindings.
+    sections: ['Background', 'Panic', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Panic'),
+    defaultOverrides: {
+      Transform: { width: 132, height: 48 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

@@ -7,6 +7,7 @@ import {
   EMPTY_EXPRESSION_STATE, expressionEvent, applyExpressionHex,
   ccValue, aftertouchValue, velocityValue,
   polyAftertouchValue, polyPressureEntries, POLY_PRESSURE_MODES,
+  notePressure, noteLevels,
   EMPTY_LEARN_STATE, applyLearnHex, learnCandidates, learnBest, learnCandidateLabel,
 } from '../src/CE_Application/utils/midiNoteInput.js';
 
@@ -349,4 +350,34 @@ test('poly pressure is learnable as one candidate, not one per note', () => {
   assert.equal(cands.length, 1);
   assert.equal(cands[0].kind, 'polyAftertouch');
   assert.equal(learnCandidateLabel(learnBest(l)), 'Poly pressure · ch 1');
+});
+
+// --- note levels (dynamics for the echo displays) ------------------------------
+
+test('note levels fall back to velocity, and pressure takes over when it arrives', () => {
+  const notes = applyMidiHex(applyMidiHex(EMPTY_NOTE_STATE, '90 3C 20'), '90 40 70');
+  let x = applyExpressionHex(applyExpressionHex(EMPTY_EXPRESSION_STATE, '90 3C 20'), '90 40 70');
+  // no pressure yet → struck velocity
+  assert.deepEqual(noteLevels(notes, x), { 60: 32 / 127, 64: 112 / 127 });
+  // lean on C4 and it overtakes its own soft velocity
+  x = applyExpressionHex(x, 'A0 3C 7F');
+  assert.equal(notePressure(x, 1, 60), 127);
+  assert.equal(noteLevels(notes, x)[60], 1);
+  assert.equal(noteLevels(notes, x)[64], 112 / 127);   // E4 untouched
+  // easing off follows it back down — pressure is continuous, velocity was not
+  x = applyExpressionHex(x, 'A0 3C 10');
+  assert.ok(Math.abs(noteLevels(notes, x)[60] - 16 / 127) < 1e-9);
+});
+
+test('note levels only cover notes actually held, and honour the channel', () => {
+  const notes = applyMidiHex(EMPTY_NOTE_STATE, '99 24 64');           // ch 10
+  const x = applyExpressionHex(EMPTY_EXPRESSION_STATE, '99 24 64');
+  assert.deepEqual(Object.keys(noteLevels(notes, x)), ['36']);
+  assert.deepEqual(noteLevels(notes, x, 10), { 36: 100 / 127 });
+  assert.deepEqual(noteLevels(notes, x, 1), {});                      // wrong channel
+  assert.deepEqual(noteLevels(EMPTY_NOTE_STATE, x), {});              // nothing held
+  // pressure for a key that isn't down doesn't invent a level
+  const stray = applyExpressionHex(EMPTY_EXPRESSION_STATE, 'A0 47 7F');
+  assert.deepEqual(noteLevels(EMPTY_NOTE_STATE, stray), {});
+  assert.equal(notePressure(stray, 1, 99), undefined);
 });

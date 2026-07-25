@@ -273,6 +273,26 @@ export function velocityValue(state, channel = 0) {
   return readBucket(s.vel, ch > 0 ? `${ch}` : null, null);
 }
 
+// The pressure on one specific held key, or undefined.
+export function notePressure(state, channel, note) {
+  const s = state ?? EMPTY_EXPRESSION_STATE;
+  return s.pat[`${Math.round(num(channel, 0))}:${Math.round(num(note, -1))}`]?.v;
+}
+
+// How hard each sounding note is being played, 0..1 — poly pressure while a
+// finger is leaning on the key, else the velocity it was struck at. This is
+// what lets an echo display show DYNAMICS rather than just on/off, and it needs
+// both states because velocity is a one-shot and pressure is continuous.
+export function noteLevels(noteState, expressionState, channel = 0) {
+  const out = {};
+  for (const e of heldNoteEntries(noteState, channel)) {
+    const p = notePressure(expressionState, e.channel, e.note);
+    const level = Math.max(0, Math.min(1, (p === undefined ? e.velocity : p) / 127));
+    out[e.note] = Math.max(out[e.note] ?? 0, level);   // same pitch, two channels
+  }
+  return out;
+}
+
 export const POLY_PRESSURE_MODES = ['highest', 'last'];
 // Poly pressure is per-note, but a router destination is one number, so it has
 // to be reduced. 'highest' = the hardest-pressed key still down (press anything

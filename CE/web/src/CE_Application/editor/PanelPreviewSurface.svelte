@@ -109,6 +109,10 @@
   import {
     midiNoteState, midiExpressionState, startNoteInputListener, clearNoteInput,
   } from '../stores/noteInput.js';
+  import {
+    panicConfig, panicMessages, panicGeometry, panicHit,
+  } from '../utils/panicLayout.js';
+  import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
@@ -240,7 +244,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))));
+    return applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2085,6 +2089,14 @@
     ensureNoteInput();
     return inputHeldNotes($midiNoteState.notes, numberOr(cfg.echoChannel, 0));
   }
+  // How hard each echoed note is being played (poly pressure if a finger is
+  // leaning on it, else the velocity it was struck at) so the echo can show
+  // dynamics instead of just on/off.
+  function echoLevelsFor(cfg) {
+    if (cfg?.echo !== true) return null;
+    ensureNoteInput();
+    return noteLevels($midiNoteState.notes, $midiExpressionState.expression, numberOr(cfg.echoChannel, 0));
+  }
 
   // --- Chord Pad: PLAY the synth (MIDI notes, not parameters) -----------------
   // The only control here that emits notes: pressing a pad sends note-on for each
@@ -2159,7 +2171,7 @@
     const echo = echoNotesFor(c);
     if (!sess?.chordHeldIds && !sess?.chordNotes && !echo.length) return resolved;
     const next = { ...c, __held: sess?.chordHeldIds ?? [], __notes: sess?.chordNotes ?? [] };
-    if (echo.length) next.__echo = echo;
+    if (echo.length) { next.__echo = echo; next.__echoLevels = echoLevelsFor(c); }
     return { ...resolved, control: { ...base, _children: { ...base._children, ChordPad: next } } };
   }
   // Which pad (if any) is under the pointer — shared by both layouts.
@@ -2480,7 +2492,7 @@
     if (!touch && !echo.length) return resolved;
     const next = { ...r };
     if (touch) next.__touch = touch;
-    if (echo.length) next.__echo = echo;
+    if (echo.length) { next.__echo = echo; next.__echoLevels = echoLevelsFor(r); }
     return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: next } } };
   }
 
@@ -2572,6 +2584,61 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Panic: silence everything ----------------------------------------------
+  // Three jobs, and the third is the one that matters. It stops the panel's own
+  // note controls, clears the echoed display, and sends the standard silence
+  // set to the synth — because a note-off lost to a cable leaves a note ringing
+  // that no amount of tidying our own bookkeeping will ever stop.
+  function isPanicControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Panic';
+  }
+  // Stop every note-playing control on this panel, whatever it happens to hold.
+  function silenceLocalNoteControls() {
+    for (const c of (orderedControls ?? [])) {
+      if (isChordPadControl(c)) chordAllOff(c);
+      else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
+      else if (isNoteRibbonControl(c)) {
+        if (ribbonPress && ribbonPress.id === getControlId(c)) {
+          ribbonNoteOff(c);
+          ribbonPress = null;
+        }
+        syncRibbonSession(c, null);
+      } else if (isDrumPadsControl(c)) {
+        const id = getControlId(c);
+        for (const t of drumTimers[id] ?? []) clearTimeout(t);
+        drumTimers[id] = [];
+        for (const padId of Object.keys(drumHits[id] ?? {})) drumNoteOff(c, padId);
+        drumPress = null;
+        syncDrumSession(c, null);
+      }
+    }
+  }
+  function firePanic(control) {
+    const id = getControlId(control);
+    if (panicConfig(control).clearLocal !== false) silenceLocalNoteControls();
+    for (const bytes of panicMessages(control)) sendNoteBytes(bytes, 'panic');
+    clearNoteInput();
+    // Flash, because the whole point is that the result is silence — without it
+    // there is no way to tell a working button from a dead one.
+    patchControlSession(id, { panicFlash: true });
+    setTimeout(() => patchControlSession(id, { panicFlash: undefined }), 180);
+  }
+  function handlePanicPointerDown(control, localPoint) {
+    if (!isPanicControl(control) || panicConfig(control).editable === false) return false;
+    const t = control?._children?.Transform ?? {};
+    const geom = panicGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 6);
+    if (!panicHit(geom, localPoint.x, localPoint.y)) return false;
+    firePanic(control);
+    return true;
+  }
+  function applyPanicValueSource(control, resolved) {
+    if (!isPanicControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const pn = base?._children?.Panic;
+    if (!pn || sessionFor(control)?.panicFlash !== true) return resolved;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Panic: { ...pn, __flash: true } } } };
+  }
+
   // Inject the sounding pads + last hit so the renderer can light up.
   function applyDrumPadsValueSource(control, resolved) {
     if (!isDrumPadsControl(control)) return resolved;
@@ -2582,7 +2649,7 @@
     const echo = echoNotesFor(d);
     if (!sess?.drumHits && !sess?.drumLast && !echo.length) return resolved;
     const next = { ...d, __hits: sess?.drumHits ?? [], __last: sess?.drumLast ?? null };
-    if (echo.length) next.__echo = echo;
+    if (echo.length) { next.__echo = echo; next.__echoLevels = echoLevelsFor(d); }
     return { ...resolved, control: { ...base, _children: { ...base._children, DrumPads: next } } };
   }
 
@@ -4326,6 +4393,8 @@
     handleNoteRibbonPointerDown(control, pointerDownLocal);
     // Drum Pads: strike the pad under the pointer.
     handleDrumPadsPointerDown(control, pointerDownLocal);
+    // Panic: silence everything.
+    handlePanicPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {

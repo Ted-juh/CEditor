@@ -44,6 +44,16 @@
   let touchCss = $derived(css(cfg.touchColour, 'rgba(242,201,76,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
   let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
+  // Echo intensity: how hard each incoming note is being played (poly pressure
+  // while a finger leans on the key, else its struck velocity). Undefined when
+  // the sender gives us nothing to go on, in which case the echo just draws
+  // full — never dimmer than it would have been before this existed.
+  let echoLevels = $derived(cfg.__echoLevels ?? null);
+  function echoAlpha(note, floor = 0.4) {
+    const l = echoLevels?.[note];
+    return l === undefined ? 1 : floor + (1 - floor) * Math.max(0, Math.min(1, l));
+  }
+
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -109,8 +119,9 @@
           stroke-width={c.z.isRoot ? 1.4 : 1}
           opacity={c.z.inScale ? 1 : 0.9} />
     {#if c.echo}
+      {@const a = echoAlpha(c.z.note)}
       <rect x={c.r.x + 0.5} y={c.r.y + 0.5} width={Math.max(1, c.r.w - 1)} height={Math.max(1, c.r.h - 1)} rx="3"
-            fill={echoCss} fill-opacity="0.18" stroke={echoCss} stroke-width="2" />
+            fill={echoCss} fill-opacity={0.18 * a} stroke={echoCss} stroke-width="2" stroke-opacity={a} />
     {/if}
     <!-- an accent stripe along the far edge marks in-key zones at a glance -->
     {#if c.z.inScale}
