@@ -726,6 +726,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Arp: {
+    // Like the ChordPad it plays notes rather than driving a parameter, so it
+    // carries no DeviceBindings section either.
+    sections: ['Background', 'Arp', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Arp'),
+    defaultOverrides: {
+      // A wide, short step lane.
+      Transform: { width: 320, height: 96 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

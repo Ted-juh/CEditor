@@ -36,6 +36,12 @@ not DSP:
 - It also builds the **note-output path**, which an Arpeggiator / ribbon-keyboard
   / strum pad can now reuse cheaply.
 
+### 00b. Arpeggiator — the pattern engine on the notes — **shipped 🟢**
+- Walks a held note set on the clock (up / down / up–down / as played / random /
+  block chord), across octaves, with gate, swing and a **Euclidean rest mask**.
+  Fed by its own key/scale chord or by a **linked Chord Pad** — which then goes
+  silent so the arp does the playing. See [arpeggiator.md](./arpeggiator.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

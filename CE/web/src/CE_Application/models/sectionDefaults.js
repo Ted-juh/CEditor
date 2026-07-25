@@ -1122,6 +1122,46 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** Arp — PLAYS the synth: walks a set of held notes on the clock. Notes come
+   *  from its own key/scale chord, or from a linked Chord Pad. Not a parameter
+   *  control, so (like ChordPad) it carries no DeviceBindings. */
+  Arp: {
+    _type: 'Arp',
+    running: true,
+    source: 'chord',              // chord (its own) | link (follow a Chord Pad)
+    linkId: '',                   // control id of the Chord Pad to follow
+    pattern: 'up',                // see ARP_PATTERNS in arpLayout.js
+    rate: 6,                      // steps per second
+    octaves: 1,                   // repeat the note set upward
+    gate: 0.6,                    // note length as a fraction of the step
+    swing: 0,                     // 0 = straight, 1 = max shuffle (delays odd steps)
+    latch: false,                 // keep arpeggiating after the source releases
+    // Its own chord (source = 'chord').
+    key: 0,                       // tonic pitch class (0 = C)
+    scale: 'minor',
+    degree: 0,                    // scale degree the chord is built on
+    chordType: 'triad',           // triad | seventh
+    baseOctave: 3,
+    velocity: 96,
+    channel: 1,                   // MIDI channel 1-16
+    // Euclidean rest pattern + hand mutes.
+    euclidEnabled: false,
+    euclidSteps: 8,
+    euclidPulses: 5,
+    euclidRotate: 0,
+    mutes: [],                    // step indices silenced by hand
+    editable: true,               // click a step to mute it in preview
+    showNotes: true,              // note names in the step cells
+    showHeader: true,             // the pattern / rate / source strip
+    phase: 0,
+    // Colours.
+    fieldColour: 'FF101017',
+    stepColour: 'FF5B9BD5',
+    headColour: 'FFF2C94C',
+    restColour: 'FF2A2A34',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Constraint — linked parameters that always preserve a relationship the synth
    *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
   Constraint: {

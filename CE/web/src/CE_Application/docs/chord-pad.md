@@ -63,9 +63,12 @@ The note-output path is the expensive part, and it now exists. An **Arpeggiator*
 scale-snap), and a **Strum pad** all reuse it plus the scale engine — each is
 cheap from here.
 
+The **Arpeggiator** is the first of those and is now
+[shipped](./arpeggiator.md) — link a pad to it and the pad goes silent while the
+arp plays its held notes.
+
 ## Possible next steps
 
-- **Arpeggiator** on the shared clock, fed by held pads.
 - **Velocity from tap position** (top of pad = harder) and **humanize** jitter.
 - **Per-pad overrides** — pin a custom chord, rename, recolour.
 - **Note input echo** — light the pads from incoming MIDI so it doubles as a

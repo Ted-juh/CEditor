@@ -85,6 +85,11 @@
     gridGeometry, gridHit, wheelGeometry, wheelHit, padNotes,
     chordPadVelocity, chordPadChannel, noteOnBytes, noteOffBytes, bytesToHex,
   } from '../utils/chordPadLayout.js';
+  import {
+    arpConfig, arpRate, arpVelocity, arpChannel, arpBaseNotes, arpSequence,
+    stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
+    arpGeometry, arpCellAt, toggleMute, arpPhase,
+  } from '../utils/arpLayout.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     createTimedButtonPreviewController,
@@ -215,7 +220,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))));
+    return applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2050,6 +2055,9 @@
     const vel = chordPadVelocity(control);
     const strum = Math.max(0, numberOr(cfg.strumMs, 0));
     (chordHeld[id] ??= {})[padId] = notes;
+    // Feeding an Arp? Record the held notes (the Arp reads them, the renderer
+    // lights up) but stay silent — the Arp does the playing.
+    if (chordPadFeedsArp(control)) { syncChordSession(control); return; }
     notes.forEach((note, i) => {
       if (strum > 0 && i > 0) {
         const t = setTimeout(() => sendNoteBytes(noteOnBytes(ch, note, vel), `note_on_${note}`), strum * i);
@@ -2068,7 +2076,9 @@
     const ch = chordPadChannel(control);
     // Only silence notes no OTHER held pad is still sounding.
     const stillHeld = new Set(Object.entries(map).filter(([k]) => k !== padId).flatMap(([, v]) => v));
-    for (const note of notes) if (!stillHeld.has(note)) sendNoteBytes(noteOffBytes(ch, note), `note_off_${note}`);
+    if (!chordPadFeedsArp(control)) {
+      for (const note of notes) if (!stillHeld.has(note)) sendNoteBytes(noteOffBytes(ch, note), `note_off_${note}`);
+    }
     delete map[padId];
     syncChordSession(control);
   }
@@ -2134,6 +2144,157 @@
   function releaseChordPress(control) {
     if (chordPadConfig(control).latch === true) return;   // latched pads keep ringing
     chordAllOff(control);
+  }
+
+  // --- Arpeggiator: walk the held notes on the clock --------------------------
+  // The second note-emitting control. It shares the Chord Pad's output path
+  // (sendNoteBytes) and the shared rAF clock the modulators use. Each fired step
+  // sends note-on for its notes and schedules the matching note-off a gate
+  // later; swing delays the odd steps. Notes come from its own key/scale chord,
+  // or from whatever a linked Chord Pad is holding.
+  const ARP_PAD = 8;
+  const arpPhaseState = {};     // id -> phase 0..1 across the whole sequence
+  const arpLastIdx = {};        // id -> last fired step index
+  const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
+  const arpSounding = {};       // id -> Set(note) currently ringing
+  const arpLatched = {};        // id -> last non-empty linked note set
+  let arpTickerRunning = false;
+  let arpLastMs = 0;
+  function isArpControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Arp';
+  }
+  function arpControls() {
+    return (orderedControls ?? []).filter((c) => isArpControl(c));
+  }
+  // A Chord Pad that feeds a running Arp goes SILENT itself — the Arp plays its
+  // notes. Otherwise you'd hear the block chord under the arpeggio.
+  function chordPadFeedsArp(control) {
+    const id = getControlId(control);
+    if (!id) return false;
+    return arpControls().some((c) => {
+      const cfg = arpConfig(c);
+      return String(cfg.source ?? 'chord') === 'link' && String(cfg.linkId ?? '') === id && cfg.running !== false;
+    });
+  }
+  // The linked Chord Pad's held notes (null when the Arp uses its own chord).
+  function arpSourceNotes(control) {
+    const cfg = arpConfig(control);
+    if (String(cfg.source ?? 'chord') !== 'link') return null;
+    const linkId = String(cfg.linkId ?? '');
+    const map = linkId ? (chordHeld[linkId] ?? {}) : {};
+    const live = [...new Set(Object.values(map).flat())].sort((a, b) => a - b);
+    const id = getControlId(control);
+    if (live.length) { arpLatched[id] = live; return live; }
+    if (cfg.latch === true && Array.isArray(arpLatched[id])) return arpLatched[id];
+    return [];
+  }
+  // A control-like carrying its live phase + linked notes, for the engine and
+  // the renderer.
+  function arpControlWith(control, phase) {
+    const notes = arpSourceNotes(control);
+    const arp = { ...control._children?.Arp };
+    if (phase !== null) arp.__phase = phase;
+    if (notes) arp.__sourceNotes = notes;
+    return { ...control, _children: { ...control._children, Arp: arp } };
+  }
+  function arpPhaseFor(control) {
+    const id = getControlId(control);
+    return arpPhaseState[id] !== undefined ? arpPhaseState[id] : arpPhase(control);
+  }
+  function arpAllOff(control) {
+    const id = getControlId(control);
+    const timers = arpTimers[id] ?? [];
+    const ringing = arpSounding[id];
+    if (!timers.length && !(ringing && ringing.size)) return;
+    for (const t of timers) clearTimeout(t);
+    arpTimers[id] = [];
+    const ch = arpChannel(control);
+    for (const note of ringing ?? []) sendNoteBytes(noteOffBytes(ch, note), `arp_off_${note}`);
+    arpSounding[id] = new Set();
+  }
+  function arpFireStep(control, notes, stepIdx) {
+    const id = getControlId(control);
+    const cfg = arpConfig(control);
+    const ch = arpChannel(control);
+    const vel = arpVelocity(control);
+    const secs = stepSeconds(control);
+    const gateMs = gateSeconds(control, secs) * 1000;
+    const push = (t) => (arpTimers[id] ??= []).push(t);
+    const fire = () => {
+      for (const note of notes) {
+        sendNoteBytes(noteOnBytes(ch, note, vel), `arp_on_${note}`);
+        (arpSounding[id] ??= new Set()).add(note);
+        push(setTimeout(() => {
+          sendNoteBytes(noteOffBytes(ch, note), `arp_off_${note}`);
+          arpSounding[id]?.delete(note);
+        }, gateMs));
+      }
+    };
+    const delayMs = swingDelay(stepIdx, numberOr(cfg.swing, 0), secs) * 1000;
+    if (delayMs > 0) push(setTimeout(fire, delayMs)); else fire();
+  }
+  function ensureArpTicker() {
+    if (arpTickerRunning) return;
+    arpTickerRunning = true;
+    arpLastMs = Date.now();
+    const loop = () => {
+      const running = arpControls().filter((c) => arpConfig(c).running !== false);
+      if (!running.length) { arpTickerRunning = false; return; }   // self-stop
+      const now = Date.now();
+      const dt = Math.min(0.1, Math.max(0, (now - arpLastMs) / 1000));
+      arpLastMs = now;
+      for (const c of running) {
+        const id = getControlId(c);
+        const live = arpControlWith(c, null);
+        const seq = arpSequence(live, arpBaseNotes(live));
+        if (!seq.length) {                       // nothing held — park at the start
+          arpPhaseState[id] = 0;
+          arpLastIdx[id] = -1;
+          arpAllOff(c);
+          continue;
+        }
+        const prev = arpPhaseState[id] ?? arpPhaseFor(c);
+        const phase = (prev + (arpRate(c) / seq.length) * dt) % 1;
+        arpPhaseState[id] = phase;
+        const idx = stepIndexAt(phase, seq.length);
+        if (arpLastIdx[id] !== idx) {
+          arpLastIdx[id] = idx;
+          if (stepFires(live, idx)) arpFireStep(c, seq[idx], idx);
+        }
+      }
+      orbitClock = now;
+      requestAnimationFrame(loop);
+    };
+    requestAnimationFrame(loop);
+  }
+  // Inject the live phase + linked notes so the renderer draws the real walk.
+  function applyArpValueSource(control, resolved) {
+    if (!isArpControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const arp = base?._children?.Arp;
+    if (!arp) return resolved;
+    if (arp.running !== false) { ensureArpTicker(); void orbitClock; }
+    const notes = arpSourceNotes(control);
+    const next = { ...arp, __phase: arpPhaseFor(control) };
+    if (notes) next.__sourceNotes = notes;
+    return { ...resolved, control: { ...base, _children: { ...base._children, Arp: next } } };
+  }
+  function arpGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const headerH = arpConfig(control).showHeader !== false ? 22 : 0;
+    const live = arpControlWith(control, null);
+    const len = Math.max(1, arpSequence(live, arpBaseNotes(live)).length);
+    return { geom: arpGeometry(numberOr(t.width, 0), numberOr(t.height, 0), len, ARP_PAD, headerH), len };
+  }
+  // Click a step cell to mute/unmute it by hand.
+  function handleArpPointerDown(control, localPoint) {
+    if (!isArpControl(control) || arpConfig(control).editable === false) return false;
+    const { geom, len } = arpGeomFor(control);
+    if (localPoint.y < geom.y0) return false;
+    const i = arpCellAt(geom, localPoint.x, len);
+    if (i < 0) return false;
+    updateControlProperty(getControlId(control), 'Arp.mutes', toggleMute(control, i));
+    return true;
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),
@@ -3860,6 +4021,8 @@
     handleConstraintPointerDown(control, pointerDownLocal);
     // Chord Pad: press a pad to sound its notes.
     handleChordPadPointerDown(control, pointerDownLocal);
+    // Arp: click a step cell to mute/unmute it.
+    handleArpPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {

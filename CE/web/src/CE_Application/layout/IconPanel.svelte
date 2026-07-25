@@ -14,6 +14,7 @@
     Sparkle,
     Link2,
     Music,
+    ListMusic,
     Gauge,
     Spline,
     Grid2x2,
@@ -126,6 +127,7 @@
       { type: 'Constellation',   icon: Sparkle,            label: 'Insert Preset Constellation' },
       { type: 'Constraint',      icon: Link2,              label: 'Insert Constraint Cell' },
       { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
+      { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
