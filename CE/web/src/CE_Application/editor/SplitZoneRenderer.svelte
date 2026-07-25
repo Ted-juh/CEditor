@@ -85,6 +85,9 @@
     if (z.sustain === false) m.push('no ped');
     if (z.ccMode === 'none') m.push('no cc');
     else if (z.ccMode === 'list') m.push(`cc ${(z.ccList ?? []).join('/') || '—'}`);
+    if (z.bendMode === 'off') m.push('no bend');
+    else if (z.bendMode === 'always') m.push('bend always');
+    else if (z.bendMode === 'sounding') m.push('bend sounding');
     return m.length ? ` (${m.join(' ')})` : '';
   }
   let summary = $derived(zones.filter((z) => z.enabled)

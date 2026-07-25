@@ -4,6 +4,7 @@
     splitZones, splitRange, zoneOverlaps, unclaimedNotes, splitUnmatched,
     VELOCITY_CURVES, VELOCITY_CURVE_LABELS, MIN_NOTE, MAX_NOTE,
     CC_MODES, CC_MODE_LABELS, SPLIT_PRESETS, splitPresetZones, zoneSwitchesOnVelocity,
+    BEND_MODES, BEND_MODE_LABELS,
   } from '../utils/splitZoneLayout.js';
   import { midiNoteLabel } from '../utils/arpLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -80,6 +81,7 @@
       lowNote: 60, highNote: 72, channel: Math.min(16, n + 1), transpose: 0,
       curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
       velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+      bendMode: 'lastPlayed', pressureMode: 'lastPlayed',
       enabled: true,
       colour: ['FF5B9BD5', 'FF39D98A', 'FFF2994A', 'FFBB6BD9', 'FFEB5757'][n % 5],
     });
@@ -199,6 +201,8 @@
               <th>Velocity</th><th>Range</th><th title="Only respond to notes played in this velocity window — the hit-it-hard layer">Plays at</th>
               <th title="Which controllers this zone forwards">CCs</th>
               <th title="Forward the sustain pedal (CC64) to this zone's channel">Ped</th>
+              <th title="A pitch bend carries no note, so who hears it is a rule rather than a fact">Bend</th>
+              <th title="Channel aftertouch — same attribution rule as bend, its own switch">Press</th>
               <th>Col</th><th></th>
             </tr>
           </thead>
@@ -253,6 +257,16 @@
                   {/if}
                 </td>
                 <td><input type="checkbox" checked={z.sustain !== false} onchange={(e) => setZone(i, 'sustain', e.target.checked)} /></td>
+                <td>
+                  <select class="cell selsm" value={z.bendMode} onchange={(e) => setZone(i, 'bendMode', e.target.value)}>
+                    {#each BEND_MODES as m (m)}<option value={m}>{BEND_MODE_LABELS[m] ?? m}</option>{/each}
+                  </select>
+                </td>
+                <td>
+                  <select class="cell selsm" value={z.pressureMode} onchange={(e) => setZone(i, 'pressureMode', e.target.value)}>
+                    {#each BEND_MODES as m (m)}<option value={m}>{BEND_MODE_LABELS[m] ?? m}</option>{/each}
+                  </select>
+                </td>
                 <td><input class="col" type="color" value={colRgb(z.colour, 'FF5B9BD5')} oninput={(e) => setZoneCol(i, z.colour, e.target.value)} /></td>
                 <td class="acts">
                   <button type="button" title="Move up" onclick={() => moveZone(i, -1)} disabled={i === 0}>↑</button>
@@ -262,10 +276,20 @@
               </tr>
             {/each}
             {#if !zones.length}
-              <tr><td colspan="13"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
+              <tr><td colspan="15"><div class="note">No zones — every note is {String(s.unmatched ?? 'drop') === 'pass' ? 'passed through' : 'dropped'}.</div></td></tr>
             {/if}
           </tbody>
         </table>
+      </div>
+    </PropertyCell>
+    <PropertyCell label="" span={4} hint="">
+      <div class="note">
+        <b>Bend</b> and <b>Press</b> answer a question the message itself can't: a pitch bend carries no note,
+        so which zone it belongs to has to be a rule. <b>Last played</b> (the default) sends it to whichever
+        zones claimed the most recent note-on — in a split that's the half you just played, and in a layer
+        it's both, because both claimed that note. <b>While sounding</b> differs when you hold a bass note
+        and play a lead over it. Before you've played anything there is nothing to attribute to, so
+        <b>Last played</b> goes everywhere until the first note.
       </div>
     </PropertyCell>
     <PropertyCell label="" span={4} hint="">

@@ -25,12 +25,15 @@ export const midiNoteState = writable({ notes: EMPTY_NOTE_STATE, seq: 0 });
 // notes doesn't re-render on every CC of a mod-wheel sweep (and vice versa).
 export const midiExpressionState = writable({ expression: EMPTY_EXPRESSION_STATE, seq: 0 });
 
-// Controller EVENTS, not state. The expression store above answers "where is the
+// Routable EVENTS, not state. The expression store above answers "where is the
 // mod wheel now", which is right for a display and wrong for a router: a splitter
-// forwarding controllers has to forward each message once, when it arrives.
-// Re-sending a snapshot would either spam or miss. `seq` lets a consumer take
-// each batch exactly once.
-export const midiCcEvents = writable({ events: [], seq: 0 });
+// forwarding messages has to forward each one once, when it arrives. Re-sending
+// a snapshot would either spam or miss. `seq` lets a consumer take each batch
+// exactly once.
+//
+// Carries controllers, pitch bend and channel pressure — everything a router has
+// to pass on that isn't a note.
+export const midiRouteEvents = writable({ events: [], seq: 0 });
 
 // --- MIDI learn session -------------------------------------------------------
 // Only ever one at a time: two controls both listening for "the next thing that
@@ -83,10 +86,11 @@ export function startNoteInputListener() {
     // The same bytes as an event batch, for routers rather than displays. Only
     // published when there is something in it, so a run of notes never wakes a
     // controller consumer.
-    const ccs = expressionEventsFromHex(payload.hex).filter((e) => e.kind === 'cc');
-    if (ccs.length) {
-      const curC = get(midiCcEvents);
-      midiCcEvents.set({ events: ccs, seq: curC.seq + 1 });
+    const routable = expressionEventsFromHex(payload.hex)
+      .filter((e) => e.kind === 'cc' || e.kind === 'bend' || e.kind === 'aftertouch');
+    if (routable.length) {
+      const curR = get(midiRouteEvents);
+      midiRouteEvents.set({ events: routable, seq: curR.seq + 1 });
     }
     // Feed an active learn session from the same bytes.
     const curL = get(midiLearnState);

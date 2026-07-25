@@ -112,7 +112,7 @@
     drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
   } from '../utils/drumPadLayout.js';
   import {
-    midiNoteState, midiExpressionState, midiCcEvents, startNoteInputListener, clearNoteInput,
+    midiNoteState, midiExpressionState, midiRouteEvents, startNoteInputListener, clearNoteInput,
   } from '../stores/noteInput.js';
   import {
     panicConfig, panicMessages, panicGeometry, panicHit,
@@ -124,6 +124,8 @@
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
     releaseAll as splitReleaseAll, reconcileHeld as splitReconcile, soundingNotes,
     routeCc as splitRouteCc, trackCc as splitTrackCc, heldLatchingCcs,
+    routeBend as splitRouteBend, routePressure as splitRoutePressure,
+    bendBytes, pressureBytes, trackBend, offCentreBends, soundingZoneIds,
   } from '../utils/splitZoneLayout.js';
   import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
@@ -2724,6 +2726,8 @@
   const splitSeen = {};           // id -> last note-input seq consumed
   const splitCcSeen = {};         // id -> last CC batch seq consumed
   const splitLatched = {};        // id -> latching CCs currently down, per channel
+  const splitBend = {};           // id -> last bend sent, per channel
+  const splitLastZones = {};      // id -> zones that claimed the most recent note-on
   let splitEdgeDrag = null;       // { id, index, edge, note } while dragging a split point
   let splitKeyPress = null;       // { id, note } while auditioning from the keyboard
   function isSplitZoneControl(control) {
@@ -2751,6 +2755,7 @@
     const id = getControlId(control);
     const r = splitPress(splitSounding[id] ?? EMPTY_SOUNDING, control, note, velocity);
     splitSounding[id] = r.sounding;
+    if (r.zoneIds.length) splitLastZones[id] = r.zoneIds;
     runSplitSends(r.sends);
   }
   function splitReleaseKey(control, note) {
@@ -2778,6 +2783,7 @@
     const keep = splitKeyPress && splitKeyPress.id === id ? splitKeyPress.note : null;
     const r = splitReconcile(splitSounding[id] ?? EMPTY_SOUNDING, control, entries, keep);
     splitSounding[id] = r.sounding;
+    if (r.zoneIds?.length) splitLastZones[id] = r.zoneIds;
     runSplitSends(r.sends);
   }
   // Controllers, on the same principle as the notes: each arriving message is
@@ -2786,12 +2792,30 @@
   // is a synth full of notes nothing will ever stop.
   function pumpSplitCc(control) {
     const id = getControlId(control);
-    const batch = $midiCcEvents;
+    const batch = $midiRouteEvents;
     if (splitCcSeen[id] === batch.seq) return;
     splitCcSeen[id] = batch.seq;
     if (!batch.seq) return;                    // nothing has arrived yet
+    // Pitch bend and channel pressure carry no note, so they're attributed:
+    // whoever claimed the most recent note-on, or whoever is sounding.
+    const attribution = {
+      lastZoneIds: splitLastZones[id] ?? [],
+      soundingZoneIds: soundingZoneIds(splitSounding[id]),
+    };
     for (const ev of batch.events) {
       if (splitInputChannel(control) && ev.channel !== splitInputChannel(control)) continue;
+      if (ev.kind === 'bend') {
+        const sends = splitRouteBend(control, ev.value14, attribution);
+        splitBend[id] = trackBend(splitBend[id], sends);
+        for (const m of sends) sendNoteBytes(bendBytes(m.channel, m.value14), 'split_bend');
+        continue;
+      }
+      if (ev.kind === 'aftertouch') {
+        for (const m of splitRoutePressure(control, ev.value, attribution)) {
+          sendNoteBytes(pressureBytes(m.channel, m.value), 'split_at');
+        }
+        continue;
+      }
       const sends = splitRouteCc(control, ev.cc, ev.value);
       splitLatched[id] = splitTrackCc(splitLatched[id], sends);
       for (const m of sends) {
@@ -2808,6 +2832,12 @@
       sendNoteBytes([0xB0 | (m.channel - 1), m.cc, m.value], `split_cc${m.cc}_off`);
     }
     splitLatched[id] = {};
+    // A bend left off-centre is a permanently detuned synth. Channels already
+    // centred send nothing, so panic on an untouched rig stays quiet.
+    for (const m of offCentreBends(splitBend[id])) {
+      sendNoteBytes(bendBytes(m.channel, m.value14), 'split_bend_centre');
+    }
+    splitBend[id] = {};
   }
   function applySplitZoneValueSource(control, resolved) {
     if (!isSplitZoneControl(control)) return resolved;

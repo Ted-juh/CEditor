@@ -203,6 +203,15 @@ export function expressionEvent(message) {
     return { kind: 'cc', channel, cc, value: (m[2] ?? 0) & 0x7F };
   }
   if (status === 0xD0) return { kind: 'aftertouch', channel, value: m[1] & 0x7F };
+  // Pitch bend: 14 bits, lsb first, centre 8192. Reported BOTH ways — `value14`
+  // for anything that has to re-send it (a router must not lose seven bits of a
+  // slow bend), and `value` scaled to 0-127 so it can sit in the same buckets
+  // as everything else here. No expression bucket consumes it today; the
+  // reducer ignores kinds it doesn't know.
+  if (status === 0xE0) {
+    const value14 = ((m[2] ?? 0) & 0x7F) << 7 | ((m[1] ?? 0) & 0x7F);
+    return { kind: 'bend', channel, value14, value: Math.round((value14 / 16383) * 127) };
+  }
   // Polyphonic key pressure: per-note, so it is keyed by note as well.
   if (status === 0xA0) {
     return { kind: 'polyAftertouch', channel, note: m[1] & 0x7F, value: (m[2] ?? 0) & 0x7F };

@@ -60,6 +60,31 @@ export function splitPassChannel(control) { return clampInt(splitConfig(control)
 // Which continuous controllers a zone passes on. A split is usually two
 // different synths, and they rarely agree about what CC1 means — so a zone that
 // forwards the mod wheel and one that doesn't is a real need, not a refinement.
+// --- Channel-wide messages: pitch bend and channel pressure ----------------------
+// These are the awkward ones. A bend carries no note, so "which zone did that
+// belong to" cannot be read off the message — it has to be a RULE. Four, because
+// the honest answer is that different rigs want different ones:
+//
+//   off         never forwarded
+//   lastPlayed  to whichever zones claimed the most recent note-on   ← default
+//   sounding    to every zone currently holding a note
+//   always      to every zone, unconditionally
+//
+// `lastPlayed` is the default because it gets the two common cases right at
+// once: in a split, bending after playing the lead bends only the lead; in a
+// LAYER, both zones claimed that same note-on, so both bend together. It is a
+// set, not a single zone, which is what makes the layer case work.
+//
+// `sounding` differs when you hold a bass note and play a lead line over it —
+// lastPlayed bends only the lead, sounding bends both. Neither is wrong; which
+// you want depends on whether the left hand is a pad or a part.
+export const BEND_MODES = ['off', 'lastPlayed', 'sounding', 'always'];
+export const BEND_MODE_LABELS = {
+  off: 'Never', lastPlayed: 'Last played', sounding: 'While sounding', always: 'Always',
+};
+export const BEND_CENTRE = 8192;
+export const BEND_MAX = 16383;
+
 export const CC_MODES = ['all', 'none', 'list'];
 export const CC_MODE_LABELS = { all: 'All', none: 'None', list: 'Only these' };
 export const SUSTAIN_CC = 64;
@@ -94,6 +119,8 @@ export function splitZones(control) {
       // one controller everybody wants per-zone, and burying it in a list of
       // numbers means nobody finds it.
       sustain: z?.sustain !== false,
+      bendMode: BEND_MODES.includes(String(z?.bendMode)) ? String(z.bendMode) : 'lastPlayed',
+      pressureMode: BEND_MODES.includes(String(z?.pressureMode)) ? String(z.pressureMode) : 'lastPlayed',
       enabled: z?.enabled !== false,
       colour: String(z?.colour ?? ''),
     };
@@ -206,14 +233,30 @@ export function pressNote(sounding, control, note, velocity) {
   const map = sounding ?? EMPTY_SOUNDING;
   const key = `${Math.round(num(note, -1))}`;
   const outs = routeNoteOn(control, note, velocity);
-  if (!outs.length) return { sounding: map, sends: [] };
+  // zoneIds is always present, even when nothing claimed the note — a caller
+  // reading `.length` off it must not have to know which path it took.
+  if (!outs.length) return { sounding: map, sends: [], zoneIds: [] };
   // A retrigger without an intervening off (running status, a stuck key, a
   // repeat) releases the old routing first, or the old one is orphaned.
   const prior = map[key];
   const sends = [];
   if (prior) for (const o of prior) sends.push({ kind: 'off', channel: o.channel, note: o.note });
   for (const o of outs) sends.push({ kind: 'on', channel: o.channel, note: o.note, velocity: o.velocity });
-  return { sounding: { ...map, [key]: outs.map((o) => ({ channel: o.channel, note: o.note })) }, sends };
+  return {
+    sounding: { ...map, [key]: outs.map((o) => ({ channel: o.channel, note: o.note, zoneId: o.zoneId })) },
+    sends,
+    // Who claimed it — the caller keeps this as "the last played zones", which
+    // is how a bend with no note information gets attributed to a zone at all.
+    zoneIds: [...new Set(outs.map((o) => o.zoneId).filter(Boolean))],
+  };
+}
+// The zones currently holding anything, for the 'sounding' attribution mode.
+export function soundingZoneIds(sounding) {
+  const out = new Set();
+  for (const outs of Object.values(sounding ?? EMPTY_SOUNDING)) {
+    for (const o of outs) if (o.zoneId) out.add(o.zoneId);
+  }
+  return [...out];
 }
 
 export function releaseNote(sounding, note) {
@@ -278,14 +321,16 @@ export function reconcileHeld(sounding, control, heldEntries, keep = null) {
     map = r.sounding;
     sends.push(...r.sends);
   }
+  let zoneIds = null;
   for (const entry of (Array.isArray(heldEntries) ? heldEntries : [])) {
     const note = Math.round(num(entry?.note, -1));
     if (map[`${note}`]) continue;
     const r = pressNote(map, control, note, entry?.velocity ?? 100);
     map = r.sounding;
     sends.push(...r.sends);
+    if (r.zoneIds.length) zoneIds = r.zoneIds;     // the newest press wins
   }
-  return { sounding: map, sends };
+  return { sounding: map, sends, zoneIds };
 }
 export function soundingNotes(sounding) {
   return Object.keys(sounding ?? EMPTY_SOUNDING).map(Number).sort((a, b) => a - b);
@@ -325,6 +370,89 @@ export function zoneOverlaps(control) {
   return pairs;
 }
 
+// Which zones should hear a channel-wide message, given a mode and what is going
+// on. `attribution` is { lastZoneIds, soundingZoneIds } — both plain id lists.
+//
+// The one case with no good answer is 'lastPlayed' before anything has been
+// played: there is nothing to attribute it to. Sending nowhere would mean
+// "I moved the bend wheel and the panel did nothing", which reads as broken, so
+// with no history it goes everywhere. Once you play a note it narrows.
+function zoneHearsChannelMessage(zone, mode, attribution) {
+  switch (String(mode)) {
+    case 'off': return false;
+    case 'always': return true;
+    case 'sounding':
+      return (attribution?.soundingZoneIds ?? []).includes(zone.id);
+    case 'lastPlayed':
+    default: {
+      const last = attribution?.lastZoneIds ?? [];
+      return last.length ? last.includes(zone.id) : true;
+    }
+  }
+}
+function routeChannelMessage(control, field, attribution) {
+  const seen = new Set();
+  const out = [];
+  for (const zone of splitZones(control)) {
+    if (!zone.enabled) continue;
+    if (!zoneHearsChannelMessage(zone, zone[field], attribution)) continue;
+    if (seen.has(zone.channel)) continue;       // one message per channel, as with CCs
+    seen.add(zone.channel);
+    out.push({ zoneId: zone.id, channel: zone.channel });
+  }
+  return out;
+}
+// Pitch bend. The 14-bit value is carried through intact: re-sending a bend as
+// 7 bits would turn a slow glide into a staircase, which is exactly the thing
+// a bend wheel exists to avoid.
+export function routeBend(control, value14, attribution = null) {
+  const v = clampInt(value14, 0, BEND_MAX);
+  const dests = routeChannelMessage(control, 'bendMode', attribution);
+  if (dests.length) return dests.map((d) => ({ ...d, value14: v }));
+  if (splitUnmatched(control) === 'pass') {
+    return [{ zoneId: '', channel: splitPassChannel(control), value14: v }];
+  }
+  return [];
+}
+// Channel pressure. Same attribution problem, same rule, its own switch —
+// a synth that responds well to aftertouch and one that screams are a common
+// pair, and you want the choice per zone.
+export function routePressure(control, value, attribution = null) {
+  const v = clampInt(value, 0, 127);
+  const dests = routeChannelMessage(control, 'pressureMode', attribution);
+  if (dests.length) return dests.map((d) => ({ ...d, value: v }));
+  if (splitUnmatched(control) === 'pass') {
+    return [{ zoneId: '', channel: splitPassChannel(control), value: v }];
+  }
+  return [];
+}
+export function bendBytes(channel, value14) {
+  const v = clampInt(value14, 0, BEND_MAX);
+  return [0xE0 | (clampInt(channel, 1, 16) - 1), v & 0x7F, (v >> 7) & 0x7F];
+}
+export function pressureBytes(channel, value) {
+  return [0xD0 | (clampInt(channel, 1, 16) - 1), clampInt(value, 0, 127)];
+}
+// A bend left off-centre is a permanently detuned synth, so — like the sustain
+// pedal — it has to be remembered and put back. Channels already at centre are
+// not re-centred, so panic on an untouched rig sends nothing.
+export function trackBend(bendState, sends) {
+  let next = bendState ?? {};
+  let changed = false;
+  for (const m of (Array.isArray(sends) ? sends : [])) {
+    const key = `${m.channel}`;
+    if (next[key] === m.value14) continue;
+    if (!changed) { next = { ...next }; changed = true; }
+    next[key] = m.value14;
+  }
+  return next;
+}
+export function offCentreBends(bendState) {
+  return Object.entries(bendState ?? {})
+    .filter(([, v]) => v !== BEND_CENTRE)
+    .map(([ch]) => ({ channel: Number(ch), value14: BEND_CENTRE }));
+}
+
 // --- Presets ----------------------------------------------------------------------
 // The four or five splits anyone actually uses. Built from the CURRENT drawn
 // range rather than fixed note numbers, so applying one to a 25-key controller
@@ -342,6 +470,7 @@ function presetZone(i, over) {
     id: `z${i}`, label: `Zone ${i + 1}`, lowNote: 0, highNote: 127, channel: i + 1,
     transpose: 0, curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100,
     velSwitchLow: 1, velSwitchHigh: 127, ccMode: 'all', ccList: [], sustain: true,
+    bendMode: 'lastPlayed', pressureMode: 'lastPlayed',
     enabled: true, colour: PRESET_COLOURS[i % PRESET_COLOURS.length], ...over,
   };
 }

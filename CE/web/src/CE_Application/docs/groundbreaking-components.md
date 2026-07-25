@@ -106,7 +106,10 @@ not DSP:
   layer mode to get wrong, and the inspector calls out both overlaps and gaps
   because both are silent-until-you-notice. A note-off replays the **remembered**
   routing of its note-on, so dragging a split point while a key is held can't
-  leave it ringing. See [zone-splitter.md](./zone-splitter.md).
+  leave it ringing. Controllers, the sustain pedal, **pitch bend** and channel
+  pressure route too — and since a bend carries no note, which zone hears it is
+  a stated **rule** (last played / while sounding / always / never) rather than
+  a guess. See [zone-splitter.md](./zone-splitter.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

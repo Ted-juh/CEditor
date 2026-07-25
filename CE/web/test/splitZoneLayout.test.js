@@ -10,6 +10,8 @@ import {
   EMPTY_SOUNDING, pressNote, releaseNote, releaseAll, reconcileHeld, soundingNotes,
   CC_MODES, SUSTAIN_CC, zonePassesCc, routeCc, zoneAcceptsVelocity, zoneSwitchesOnVelocity,
   LATCHING_CCS, heldLatchingCcs, trackCc, SPLIT_PRESETS, splitPresetZones,
+  BEND_MODES, BEND_CENTRE, BEND_MAX, routeBend, routePressure, bendBytes, pressureBytes,
+  trackBend, offCentreBends, soundingZoneIds,
   MIN_NOTE, MAX_NOTE,
 } from '../src/CE_Application/utils/splitZoneLayout.js';
 
@@ -464,6 +466,44 @@ test('raw MIDI hex arrives as routed controllers on the right channels', async (
   assert.deepEqual(route('B0 7B 00'), []);
 });
 
+test('raw MIDI hex arrives as a routed bend on the zone you played', async () => {
+  const { expressionEventsFromHex, applyMidiHex, heldNoteEntries, EMPTY_NOTE_STATE } =
+    await import('../src/CE_Application/utils/midiNoteInput.js');
+
+  // Play a note in the lead zone, then bend.
+  let notes = applyMidiHex(EMPTY_NOTE_STATE, '90 48 64');
+  const held = heldNoteEntries(notes, 0);
+  const r = reconcileHeld(EMPTY_SOUNDING, CLASSIC, held);
+  assert.deepEqual(r.zoneIds, ['hi']);
+
+  const attribution = { lastZoneIds: r.zoneIds, soundingZoneIds: soundingZoneIds(r.sounding) };
+  const bends = expressionEventsFromHex('E0 00 60')
+    .filter((e) => e.kind === 'bend')
+    .flatMap((e) => routeBend(CLASSIC, e.value14, attribution));
+  // 0x60 << 7 = 12288, on channel 2 only — the bass does not bend.
+  assert.deepEqual(bends, [{ zoneId: 'hi', channel: 2, value14: 12288 }]);
+  assert.deepEqual(bendBytes(bends[0].channel, bends[0].value14), [0xE1, 0x00, 0x60],
+    'and it goes back out with all fourteen bits intact');
+
+  // Channel pressure follows the same attribution.
+  const press = expressionEventsFromHex('D0 5A')
+    .filter((e) => e.kind === 'aftertouch')
+    .flatMap((e) => routePressure(CLASSIC, e.value, attribution));
+  assert.deepEqual(press, [{ zoneId: 'hi', channel: 2, value: 90 }]);
+
+  // A bend on a channel the splitter isn't listening to is filtered upstream by
+  // the pump, but a bend it DOES take while nothing is held still lands
+  // somewhere — 'sounding' mode is the one that goes quiet.
+  notes = applyMidiHex(notes, '80 48 00');
+  const after = reconcileHeld(r.sounding, CLASSIC, heldNoteEntries(notes, 0));
+  assert.deepEqual(soundingZoneIds(after.sounding), []);
+  const soundingOnly = sp({ zones: [
+    { id: 'lo', lowNote: 36, highNote: 59, channel: 1, bendMode: 'sounding' },
+    { id: 'hi', lowNote: 60, highNote: 96, channel: 2, bendMode: 'sounding' },
+  ] });
+  assert.deepEqual(routeBend(soundingOnly, 12288, { lastZoneIds: ['hi'], soundingZoneIds: [] }), []);
+});
+
 // --- Per-zone CC filtering + sustain -------------------------------------------------
 test('a zone forwards the controllers it says it does', () => {
   const all = splitZones(sp({ zones: [{ ccMode: 'all' }] }))[0];
@@ -647,4 +687,139 @@ test('the layer and velocity presets do what their names say', () => {
   assert.equal(whole.length, 1);
   assert.equal(whole[0].lowNote, 36);
   assert.equal(whole[0].highNote, 96);
+});
+
+// --- Pitch bend + channel pressure ----------------------------------------------------
+// The awkward ones: no note in the message, so who hears them is a RULE.
+test('a bend goes to the zone you last played, in a split', () => {
+  const down = pressNote(EMPTY_SOUNDING, CLASSIC, 72, 100);      // the lead
+  assert.deepEqual(down.zoneIds, ['hi']);
+  const bend = routeBend(CLASSIC, 12000, { lastZoneIds: down.zoneIds });
+  assert.deepEqual(bend, [{ zoneId: 'hi', channel: 2, value14: 12000 }]);
+  // Play the bass instead and the bend follows.
+  const low = pressNote(down.sounding, CLASSIC, 40, 100);
+  assert.deepEqual(routeBend(CLASSIC, 12000, { lastZoneIds: low.zoneIds }),
+    [{ zoneId: 'lo', channel: 1, value14: 12000 }]);
+});
+
+test('a bend goes to BOTH zones of a layer, because both claimed the note', () => {
+  // This is why the rule is a SET rather than one zone: in a layer the same
+  // note-on is claimed twice, so both bend together and stay in tune with each
+  // other. A single-zone rule would bend half the layer.
+  const layered = sp({ zones: [
+    { id: 'a', lowNote: 60, highNote: 72, channel: 1 },
+    { id: 'b', lowNote: 60, highNote: 72, channel: 3, transpose: 12 },
+  ] });
+  const down = pressNote(EMPTY_SOUNDING, layered, 64, 90);
+  assert.deepEqual(down.zoneIds, ['a', 'b']);
+  assert.deepEqual(routeBend(layered, 3000, { lastZoneIds: down.zoneIds }).map((m) => m.channel), [1, 3]);
+});
+
+test('before anything is played a bend goes everywhere, then narrows', () => {
+  // "I moved the bend wheel and nothing happened" reads as broken, so with no
+  // history there is nothing to attribute to and it broadcasts.
+  assert.equal(routeBend(CLASSIC, 9000, { lastZoneIds: [] }).length, 2);
+  assert.equal(routeBend(CLASSIC, 9000, null).length, 2);
+  assert.equal(routeBend(CLASSIC, 9000, { lastZoneIds: ['hi'] }).length, 1);
+});
+
+test('the four bend modes do what they say', () => {
+  const modes = (a, b) => sp({ zones: [
+    { id: 'lo', lowNote: 36, highNote: 59, channel: 1, bendMode: a },
+    { id: 'hi', lowNote: 60, highNote: 96, channel: 2, bendMode: b },
+  ] });
+  const attr = { lastZoneIds: ['hi'], soundingZoneIds: ['lo'] };
+  // off: never, whatever is playing.
+  assert.deepEqual(routeBend(modes('off', 'off'), 100, attr), []);
+  // always: unconditionally.
+  assert.equal(routeBend(modes('always', 'always'), 100, attr).length, 2);
+  // lastPlayed: the lead, which is what was played last.
+  assert.deepEqual(routeBend(modes('lastPlayed', 'lastPlayed'), 100, attr).map((m) => m.zoneId), ['hi']);
+  // sounding: the bass, which is what is still holding a note.
+  assert.deepEqual(routeBend(modes('sounding', 'sounding'), 100, attr).map((m) => m.zoneId), ['lo']);
+  // Mixed modes on the same splitter are fine.
+  assert.deepEqual(routeBend(modes('always', 'off'), 100, attr).map((m) => m.zoneId), ['lo']);
+  // An unknown mode falls back to the default rather than to silence.
+  assert.equal(routeBend(modes('nonsense', 'nonsense'), 100, attr).length, 1);
+  assert.equal(BEND_MODES.length, 4);
+});
+
+test('sounding attribution follows what is actually held', () => {
+  let m = EMPTY_SOUNDING;
+  assert.deepEqual(soundingZoneIds(m), []);
+  m = pressNote(m, CLASSIC, 40, 100).sounding;
+  m = pressNote(m, CLASSIC, 72, 100).sounding;
+  assert.deepEqual(soundingZoneIds(m).sort(), ['hi', 'lo']);
+  m = releaseNote(m, 40).sounding;
+  assert.deepEqual(soundingZoneIds(m), ['hi']);
+  m = releaseAll(m).sounding;
+  assert.deepEqual(soundingZoneIds(m), []);
+});
+
+test('a bend keeps all fourteen bits', () => {
+  // Re-sending a bend as 7 bits turns a slow glide into a staircase, which is
+  // precisely what a bend wheel exists to avoid.
+  for (const v of [0, 1, 8191, BEND_CENTRE, 8193, BEND_MAX]) {
+    const bytes = bendBytes(2, v);
+    assert.equal(bytes[0], 0xE1, 'status carries the channel');
+    assert.equal(bytes[1] & 0x80, 0);
+    assert.equal(bytes[2] & 0x80, 0);
+    assert.equal((bytes[2] << 7) | bytes[1], v, `round trip ${v}`);
+  }
+  assert.equal(routeBend(CLASSIC, 99999, { lastZoneIds: ['hi'] })[0].value14, BEND_MAX);
+  assert.equal(routeBend(CLASSIC, -5, { lastZoneIds: ['hi'] })[0].value14, 0);
+  assert.deepEqual(pressureBytes(3, 90), [0xD2, 90]);
+});
+
+test('an off-centre bend is remembered so panic can undo it', () => {
+  // A bend left off-centre is a permanently detuned synth — the same class of
+  // problem as a sustain pedal left down.
+  let st = trackBend({}, routeBend(CLASSIC, 12000, { lastZoneIds: ['hi'] }));
+  assert.deepEqual(offCentreBends(st), [{ channel: 2, value14: BEND_CENTRE }]);
+  // Released back to centre by the player: nothing left to undo.
+  st = trackBend(st, routeBend(CLASSIC, BEND_CENTRE, { lastZoneIds: ['hi'] }));
+  assert.deepEqual(offCentreBends(st), []);
+  // A rig nobody has touched sends nothing.
+  assert.deepEqual(offCentreBends({}), []);
+  assert.deepEqual(offCentreBends(null), []);
+  // Repeating the same value returns the SAME object, so a parked wheel doesn't
+  // churn state on every repeat.
+  const same = trackBend(st, routeBend(CLASSIC, BEND_CENTRE, { lastZoneIds: ['hi'] }));
+  assert.equal(same, st);
+});
+
+test('channel pressure has its own switch, sharing the rule', () => {
+  // A synth that responds well to aftertouch and one that screams are a common
+  // pair, so the choice is per zone and independent of bend.
+  const c = sp({ zones: [
+    { id: 'lo', lowNote: 36, highNote: 59, channel: 1, bendMode: 'always', pressureMode: 'off' },
+    { id: 'hi', lowNote: 60, highNote: 96, channel: 2, bendMode: 'off', pressureMode: 'always' },
+  ] });
+  const attr = { lastZoneIds: ['hi'], soundingZoneIds: ['hi'] };
+  assert.deepEqual(routeBend(c, 100, attr).map((m) => m.channel), [1]);
+  assert.deepEqual(routePressure(c, 90, attr), [{ zoneId: 'hi', channel: 2, value: 90 }]);
+  assert.equal(routePressure(c, 999, attr)[0].value, 127);
+});
+
+test('bend is deduplicated by channel and honours pass-through', () => {
+  const sameCh = sp({ zones: [
+    { id: 'a', lowNote: 0, highNote: 59, channel: 1, bendMode: 'always' },
+    { id: 'b', lowNote: 60, highNote: 127, channel: 1, bendMode: 'always' },
+  ] });
+  assert.equal(routeBend(sameCh, 5000, null).length, 1, 'one message per channel');
+  // Both switches off — pressureMode has its own default, so leaving it out
+  // would send pressure to the zone and only bend to the pass channel.
+  const off = sp({ unmatched: 'pass', passChannel: 9, zones: [{ channel: 1, bendMode: 'off', pressureMode: 'off' }] });
+  assert.deepEqual(routeBend(off, 5000, null), [{ zoneId: '', channel: 9, value14: 5000 }]);
+  assert.deepEqual(routePressure(off, 50, null), [{ zoneId: '', channel: 9, value: 50 }]);
+  const dropped = sp({ zones: [{ channel: 1, bendMode: 'off', pressureMode: 'off' }] });
+  assert.deepEqual(routeBend(dropped, 5000, null), []);
+});
+
+test('a note nothing claims still reports an empty zone list', () => {
+  // The caller reads .length off this without knowing which path pressNote
+  // took; returning it only on the success path is a crash waiting to happen.
+  const r = pressNote(EMPTY_SOUNDING, CLASSIC, 20, 100);
+  assert.deepEqual(r.zoneIds, []);
+  assert.deepEqual(reconcileHeld(EMPTY_SOUNDING, CLASSIC, [{ note: 20, velocity: 100 }]).zoneIds, null);
 });

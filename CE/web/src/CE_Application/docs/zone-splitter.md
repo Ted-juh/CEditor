@@ -103,8 +103,51 @@ the half-fix that looks like the panic button doesn't work.
 This needed a new store: the expression store answers *"where is the mod wheel
 now"*, which is right for a display and wrong for a router. A router has to
 forward each message **once, when it arrives** — re-sending a snapshot would
-either spam or miss. So `midiCcEvents` publishes event batches with a sequence
+either spam or miss. So `midiRouteEvents` publishes event batches with a sequence
 number, alongside the state store the displays use.
+
+## Pitch bend and channel pressure
+
+These are the awkward ones, and worth explaining rather than just listing.
+
+**A pitch bend carries no note.** There is nothing in the message that says
+which zone it belongs to, so it cannot be read off — it has to be a **rule**.
+Four, because different rigs genuinely want different ones:
+
+| | |
+|---|---|
+| Never | not forwarded at all |
+| **Last played** *(default)* | to whichever zones claimed the most recent note-on |
+| While sounding | to every zone currently holding a note |
+| Always | to every zone, unconditionally |
+
+**Last played** is the default because it gets the two common cases right at
+once. In a split, bending after playing the lead bends only the lead. In a
+*layer*, both zones claimed that same note-on — so both bend, together, and stay
+in tune with each other. That only works because the rule yields a **set** of
+zones rather than one; a single-zone rule would bend half your layer.
+
+**While sounding** differs when you hold a bass note and play a lead line over
+it: last-played bends only the lead, sounding bends both. Neither is wrong —
+which you want depends on whether the left hand is a pad or a part.
+
+Before you have played anything there is nothing to attribute a bend to. Sending
+it nowhere would mean *"I moved the wheel and the panel did nothing"*, which
+reads as broken, so with no history it goes everywhere and narrows on the first
+note.
+
+**Channel aftertouch** has exactly the same problem and takes exactly the same
+rule, on its own switch. A synth that responds beautifully to aftertouch and one
+that screams are a common pair.
+
+The bend value is carried through as **all fourteen bits**. Re-sending it as
+seven would turn a slow glide into a staircase, which is precisely the thing a
+bend wheel exists to avoid.
+
+And like the sustain pedal, a bend left off-centre is a **latching** problem —
+a permanently detuned synth — so it's remembered and re-centred by
+[Panic](./panic.md) and all-off. Channels already at centre send nothing, so
+panic on an untouched rig stays quiet.
 
 ## Velocity switching
 
@@ -169,13 +212,9 @@ remembered routings.
 
 Nothing here touches the DPD profile.
 
-## What it doesn't route
+## What it routes
 
-Notes and continuous controllers, and that is the whole list. **Pitch bend and
-channel aftertouch are not routed** — they arrive on the input's channel and go
-wherever that is wired, not to the zone channels. Bend in particular is a real
-omission for a split: bending in the lead zone should not bend the bass. It
-isn't done because bend is per-channel with no per-note information, so
-"which zone did that bend belong to" has no answer from the message alone —
-it needs a rule (last zone played? the zone under the last note?) and picking
-one silently would be worse than not doing it.
+Notes, continuous controllers, the sustain pedal, pitch bend and channel
+pressure — everything a performance sends. Poly aftertouch is *not* routed, and
+that one genuinely has an answer in the message (it names its note), so it is
+simply not done rather than not decidable; almost nothing sends it.

@@ -145,7 +145,14 @@ test('expression events: CC, channel aftertouch, note velocity', () => {
   assert.deepEqual(expressionEvent([0xB0, 123, 0]), { kind: 'pressureClearAll', channel: 1 });
   assert.deepEqual(expressionEvent([0xB0, 120, 0]), { kind: 'pressureClearAll', channel: 1 });
   assert.equal(expressionEvent([0xB0, 121, 0]), null);        // other channel-mode: ignored
-  assert.equal(expressionEvent([0xE0, 0, 64]), null);        // pitch bend isn't a router source
+  // Pitch bend USED to return null here — it wasn't a router source. The Zone
+  // Splitter needs to forward it, so it's parsed now, with the 14-bit value
+  // kept intact alongside a 0-127 scaling. It still reaches no expression
+  // bucket: applyExpressionEvent ignores kinds it doesn't know.
+  assert.deepEqual(expressionEvent([0xE0, 0, 64]), { kind: 'bend', channel: 1, value14: 8192, value: 64 });
+  assert.deepEqual(expressionEvent([0xE2, 0x7F, 0x7F]), { kind: 'bend', channel: 3, value14: 16383, value: 127 });
+  assert.equal(applyExpressionHex(EMPTY_EXPRESSION_STATE, 'E0 00 40'), EMPTY_EXPRESSION_STATE,
+    'and it must not disturb the expression state the Router reads');
 });
 
 test('expression state tracks the last value per controller', () => {
