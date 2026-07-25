@@ -143,6 +143,98 @@ function voiceOffsets(offsets, voicing, inversion) {
   return out;
 }
 
+// --- Per-degree overrides -----------------------------------------------------------
+// Diatonic mode stacks thirds, which is right almost always and wrong when you
+// wanted the vi to be a sus4. An override replaces the stack for ONE degree and
+// leaves the other six alone — so the mode is still "in key by construction",
+// with a named exception you asked for.
+//
+// Stored as { "<degree>": [semitones from the played note] }.
+export function degreeOverrides(control) {
+  const raw = harmoniserConfig(control).degreeChords;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  return raw;
+}
+export function overrideForDegree(control, degree) {
+  const all = degreeOverrides(control);
+  if (!all) return null;
+  const list = all[String(Math.round(num(degree, -1)))];
+  if (!Array.isArray(list) || !list.length) return null;
+  const out = list.map((n) => clampInt(n, -36, 36)).filter((n, i, a2) => a2.indexOf(n) === i).sort((a2, b2) => a2 - b2);
+  return out.length ? out.slice(0, MAX_VOICES) : null;
+}
+
+// --- Voice leading -------------------------------------------------------------------
+// "Pick the inversion that moves least from the last chord." Off by default,
+// because a bad automatic answer is worse than none — and because it makes the
+// harmony depend on WHAT YOU PLAYED BEFORE, which is a real behavioural change
+// rather than a refinement.
+//
+// Two rules rather than one, because "least motion" is only one defensible
+// answer and picking silently would be the mistake:
+//   · closest — minimise total movement of all voices. The textbook rule.
+//   · smooth  — minimise movement of the TOP voice only. Keeps the melody line
+//               still, which is what you want under a lead; the inner voices
+//               are free to jump.
+export const VOICE_LEADING = ['off', 'closest', 'smooth'];
+export const VOICE_LEADING_LABELS = {
+  off: 'Off — always root position',
+  closest: 'Closest — least total movement',
+  smooth: 'Smooth top — hold the melody still',
+};
+export function voiceLeading(control) {
+  const v = String(harmoniserConfig(control).voiceLeading ?? 'off');
+  return VOICE_LEADING.includes(v) ? v : 'off';
+}
+// Every octave-rotation of a chord, from dropping the bottom voice up. These are
+// the candidates; the rule picks one.
+function inversionsOf(notes, spread = 2) {
+  const base = notes.slice().sort((a, b) => a - b);
+  const out = [base];
+  let cur = base;
+  for (let i = 0; i < Math.max(1, base.length - 1) * spread; i += 1) {
+    cur = [...cur.slice(1), cur[0] + 12].sort((a, b) => a - b);
+    out.push(cur);
+  }
+  // …and the same going down, so a chord can move under the previous one.
+  cur = base;
+  for (let i = 0; i < Math.max(1, base.length - 1) * spread; i += 1) {
+    cur = [cur[cur.length - 1] - 12, ...cur.slice(0, -1)].sort((a, b) => a - b);
+    out.push(cur);
+  }
+  return out;
+}
+function totalMotion(a, b) {
+  // Each voice to its nearest note in the other chord — voice counts can differ
+  // (a triad following a seventh), so pairing by index would compare nonsense.
+  let sum = 0;
+  for (const n of a) sum += Math.min(...b.map((m) => Math.abs(n - m)));
+  return sum;
+}
+/**
+ * Choose the voicing of `notes` that leads best from `previous`.
+ * With no previous chord there is nothing to lead from, so the chord is returned
+ * untouched — the first chord of a phrase is always root position, which is also
+ * what makes the behaviour predictable when you start playing.
+ */
+export function leadVoicing(notes, previous, mode = 'closest') {
+  const chord = (Array.isArray(notes) ? notes : []).slice().sort((a, b) => a - b);
+  const prev = (Array.isArray(previous) ? previous : []).slice().sort((a, b) => a - b);
+  if (!chord.length || !prev.length || mode === 'off') return chord;
+  let best = chord;
+  let bestScore = Infinity;
+  for (const cand of inversionsOf(chord)) {
+    if (cand.some((n) => n < 0 || n > 127)) continue;
+    const score = mode === 'smooth'
+      ? Math.abs(cand[cand.length - 1] - prev[prev.length - 1])
+      : totalMotion(cand, prev);
+    // Strictly less, so a tie keeps the earlier (lower) candidate and the same
+    // input always gives the same answer.
+    if (score < bestScore) { bestScore = score; best = cand; }
+  }
+  return best;
+}
+
 /**
  * The notes a played pitch produces. Returns [] when the rules say silence.
  * Notes outside 0..127 are dropped, not clamped — clamping stacks strays on one
@@ -165,7 +257,8 @@ export function chordForNote(control, note) {
       if (mode === 'pass') return withBass ? [played] : [];
       return chordForNote(control, nearestScaleNote(control, played));
     }
-    offsets = relativeStack(harmoniserScale(control), degree, harmoniserSize(control));
+    offsets = overrideForDegree(control, degree)
+      ?? relativeStack(harmoniserScale(control), degree, harmoniserSize(control));
   }
   const voiced = voiceOffsets(offsets, harmoniserVoicing(control), harmoniserInversion(control));
   const notes = new Set();
@@ -207,7 +300,27 @@ export function chordLabel(control, note) {
 //     mode almost always do. Releasing one key would then stop a note the other
 //     key is still holding. So sounding pitches are REFERENCE COUNTED: the
 //     note-off is sent when the last holder lets go, not the first.
-export const EMPTY_HELD = Object.freeze({ byNote: {}, counts: {} });
+// `last` is the chord most recently started — voice leading needs somewhere to
+// lead FROM, and that somewhere is state, not a setting.
+export const EMPTY_HELD = Object.freeze({ byNote: {}, counts: {}, last: [] });
+
+// How long the chord takes to spread, in ms. 0 is all voices together.
+export function harmoniserStrum(control) {
+  return Math.max(0, Math.min(400, num(harmoniserConfig(control).strumMs, 0)));
+}
+export const STRUM_DIRECTIONS = ['up', 'down'];
+export function harmoniserStrumDown(control) {
+  return String(harmoniserConfig(control).strumDirection ?? 'up') === 'down';
+}
+// The per-voice delays for one chord, in ms, in the order the notes are given.
+export function strumDelays(control, count) {
+  const n = Math.max(0, Math.round(num(count, 0)));
+  const ms = harmoniserStrum(control);
+  if (!n || ms <= 0) return Array.from({ length: n }, () => 0);
+  const step = ms / Math.max(1, n - 1 || 1);
+  const down = harmoniserStrumDown(control);
+  return Array.from({ length: n }, (_, i) => (down ? (n - 1 - i) : i) * step);
+}
 
 export function pressHarmony(held, control, note, velocity = 100) {
   const prior = held ?? EMPTY_HELD;
@@ -227,8 +340,22 @@ export function pressHarmony(held, control, note, velocity = 100) {
     byNote = r.held.byNote; counts = r.held.counts;
     sends.push(...r.sends);
   }
-  const chord = chordForNote(control, clampInt(note, 0, 127));
-  if (!chord.length) return { held: { byNote, counts }, sends };
+  const raw = chordForNote(control, clampInt(note, 0, 127));
+  // Voice leading, if asked for: the chord moves to wherever it is closest to
+  // the one before it. Only the ADDED voices are re-voiced — the note you
+  // played stays where you played it, or the harmoniser would be transposing
+  // your own performance.
+  const mode = voiceLeading(control);
+  const played = clampInt(note, 0, 127);
+  const keep = harmoniserConfig(control).keepPlayed !== false;
+  const chord = mode === 'off' || !prior.last?.length
+    ? raw
+    : (() => {
+      const added = keep ? raw.filter((n) => n !== played) : raw;
+      const led = leadVoicing(added, prior.last, mode).filter((n) => n >= 0 && n <= 127);
+      return [...new Set(keep ? [played, ...led] : led)].sort((x, y) => x - y);
+    })();
+  if (!chord.length) return { held: { byNote, counts, last: prior.last ?? [] }, sends };
   const nextCounts = { ...counts };
   for (const n of chord) {
     const c = nextCounts[n] ?? 0;
@@ -237,7 +364,10 @@ export function pressHarmony(held, control, note, velocity = 100) {
     if (c === 0) sends.push({ kind: 'on', channel, note: n, velocity: vel });
     nextCounts[n] = c + 1;
   }
-  return { held: { byNote: { ...byNote, [key]: { channel, notes: chord } }, counts: nextCounts }, sends };
+  return {
+    held: { byNote: { ...byNote, [key]: { channel, notes: chord } }, counts: nextCounts, last: chord },
+    sends,
+  };
 }
 
 export function releaseHarmony(held, control, note) {
@@ -254,7 +384,9 @@ export function releaseHarmony(held, control, note) {
     if (c <= 0) { delete counts[n]; sends.push({ kind: 'off', channel: entry.channel, note: n }); }
     else counts[n] = c;
   }
-  return { held: { byNote, counts }, sends };
+  // `last` survives a release: the next chord still leads from the one before
+  // it, which is the whole point when you are playing one note at a time.
+  return { held: { byNote, counts, last: prior.last ?? [] }, sends };
 }
 
 export function releaseAllHarmony(held) {
@@ -342,6 +474,7 @@ export function harmoniserKeys(range, width, height, pad = 8, headerH = 22) {
 // recognise.
 export const HARMONISER_SCRIPT_ACTIONS = [
   'mode', 'key', 'scale', 'size', 'shape', 'voicing', 'inversion', 'octave', 'outOfKey', 'keepPlayed', 'channel',
+  'voiceLeading', 'strum', 'degree',
 ];
 
 export function harmoniserScriptPatch(cfg, action, args = {}) {
@@ -403,6 +536,33 @@ export function harmoniserScriptPatch(cfg, action, args = {}) {
     case 'channel': {
       const n = Number(a.channel);
       return Number.isFinite(n) ? { channel: clampInt(n, 1, 16) } : {};
+    }
+    case 'voiceLeading': {
+      const v = String(a.voiceLeading ?? a.mode ?? '');
+      return VOICE_LEADING.includes(v) ? { voiceLeading: v } : {};
+    }
+    case 'strum': {
+      const n = Number(a.ms);
+      return Number.isFinite(n) ? { strumMs: Math.max(0, Math.min(400, n)) } : {};
+    }
+    case 'degree': {
+      // Set or clear one degree's override. A degree outside the scale, or a
+      // list that isn't one, is a no-op rather than a wrong chord.
+      const d = Number(a.degree);
+      const scale = SCALES[String(c.scale ?? 'major')] ?? SCALES.major;
+      if (!Number.isFinite(d) || d < 1 || d > scale.length) return {};
+      const key = String(Math.round(d) - 1);            // 1-based in, 0-based stored
+      const prior = c.degreeChords && typeof c.degreeChords === 'object' ? c.degreeChords : {};
+      if (a.chord === null || a.chord === 'clear') {
+        if (!(key in prior)) return {};
+        const next = { ...prior };
+        delete next[key];
+        return { degreeChords: next };
+      }
+      const list = (Array.isArray(a.chord) ? a.chord : [])
+        .map((n) => Number(n)).filter((n) => Number.isFinite(n));
+      if (!list.length) return {};
+      return { degreeChords: { ...prior, [key]: list.map((n) => clampInt(n, -36, 36)).slice(0, MAX_VOICES) } };
     }
     default:
       return {};

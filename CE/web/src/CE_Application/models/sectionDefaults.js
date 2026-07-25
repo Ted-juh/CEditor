@@ -1344,6 +1344,12 @@ export const SECTION_DEFAULTS = {
     keepPlayed: true,            // sound the note you played as well as the harmony
     maxVoices: 6,
     outOfKey: 'pass',            // pass | nearest | mute — see the docs, no answer is obvious
+    degreeChords: {},            // per-degree override: { "5": [0,5,7] } makes the vi a sus4
+    voiceLeading: 'off',         // off | closest | smooth — off by default, see the docs
+    strumMs: 0,                  // spread the chord over this many ms
+    strumDirection: 'up',        // up | down
+    forwardBend: false,          // pass input pitch bend to the chord's channel
+    forwardPressure: false,      // …and channel aftertouch
     inputChannel: 0,             // 0 = any
     channel: 1,                  // the channel the chord goes out on
     velocity: 0,                 // 0 = follow the played velocity

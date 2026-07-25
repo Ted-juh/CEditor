@@ -10,6 +10,8 @@ import {
   soundingPitches, heldInputNotes, reconcileHarmony,
   harmoniserRange, isBlackKey, harmoniserKeys,
   harmoniserScriptPatch, HARMONISER_SCRIPT_ACTIONS,
+  overrideForDegree, voiceLeading, leadVoicing, VOICE_LEADING,
+  strumDelays, harmoniserStrum,
 } from '../src/CE_Application/utils/harmoniserLayout.js';
 
 function hm(c) { return { _children: { Core: { controlType: 'Harmoniser' }, Harmoniser: c } }; }
@@ -255,4 +257,79 @@ test('a bad harmoniser argument is a no-op, not a throw', () => {
   assert.deepEqual(harmoniserScriptPatch(cfg, 'key', { key: 'up' }), {});
   assert.deepEqual(harmoniserScriptPatch(cfg, 'nonsense', {}), {});
   assert.deepEqual(harmoniserScriptPatch(null, 'nonsense', {}), {});
+});
+
+// --- overrides, voice leading, strum --------------------------------------------
+
+test('an override replaces one degree and leaves the other six alone', () => {
+  // Diatonic mode is "in key by construction"; an override is a named exception
+  // you asked for, not a hole in the rule.
+  const c = hm({ ...CMAJ._children.Harmoniser, degreeChords: { 5: [0, 5, 7] } });
+  assert.deepEqual(chordForNote(c, 69), [69, 74, 76], 'the vi is now A sus4');
+  assert.deepEqual(chordForNote(c, 60), [60, 64, 67], 'the I is untouched');
+  assert.deepEqual(chordForNote(c, 62), [62, 65, 69]);
+  assert.equal(overrideForDegree(c, 5).length, 3);
+  assert.equal(overrideForDegree(c, 0), null);
+  assert.equal(overrideForDegree(CMAJ, 5), null, 'no overrides at all');
+  assert.equal(overrideForDegree(hm({ degreeChords: { 5: [] } }), 5), null, 'an empty list is not an override');
+});
+
+test('voice leading is off by default and needs something to lead from', () => {
+  // It makes the harmony depend on what you played BEFORE, which is a real
+  // behavioural change rather than a refinement — so it is opt-in.
+  assert.equal(voiceLeading(hm({})), 'off');
+  assert.equal(voiceLeading(hm({ voiceLeading: 'nonsense' })), 'off');
+  assert.deepEqual(leadVoicing([65, 69, 72], [], 'closest'), [65, 69, 72], 'no previous chord');
+  assert.deepEqual(leadVoicing([65, 69, 72], [60, 64, 67], 'off'), [65, 69, 72]);
+  assert.deepEqual(leadVoicing([], [60], 'closest'), []);
+});
+
+test('closest moves least overall; smooth holds the top voice still', () => {
+  const prev = [60, 64, 67];                        // C major
+  const f = [65, 69, 72];                           // F major, root position
+  const closest = leadVoicing(f, prev, 'closest');
+  assert.ok(closest.length === 3);
+  // Whatever it picks must move less than root position did.
+  const motion = (ch) => ch.reduce((sum, n) => sum + Math.min(...prev.map((m) => Math.abs(n - m))), 0);
+  assert.ok(motion(closest) <= motion(f));
+  // Smooth judges the TOP voice only, so its top note is at least as close.
+  const smooth = leadVoicing(f, prev, 'smooth');
+  assert.ok(Math.abs(smooth[smooth.length - 1] - prev[prev.length - 1])
+    <= Math.abs(f[f.length - 1] - prev[prev.length - 1]));
+  // Deterministic: the same input always gives the same answer.
+  assert.deepEqual(leadVoicing(f, prev, 'closest'), closest);
+});
+
+test('voice leading never moves the note you played', () => {
+  // Otherwise the harmoniser would be transposing your own performance.
+  const c = hm({ ...CMAJ._children.Harmoniser, voiceLeading: 'closest' });
+  let h = pressHarmony(EMPTY_HELD, c, 60, 100);
+  h = releaseHarmony(h.held, c, 60);
+  const next = pressHarmony(h.held, c, 65, 100);
+  assert.ok(next.sends.map((s) => s.note).includes(65), 'the played F is still an F');
+  // `last` survives a release, so one-note-at-a-time playing still leads.
+  assert.deepEqual(h.held.last, [60, 64, 67]);
+});
+
+test('strum spreads the chord and reverses on the way down', () => {
+  assert.deepEqual(strumDelays(hm({ strumMs: 60 }), 3), [0, 30, 60]);
+  assert.deepEqual(strumDelays(hm({ strumMs: 60, strumDirection: 'down' }), 3), [60, 30, 0]);
+  assert.deepEqual(strumDelays(hm({ strumMs: 0 }), 3), [0, 0, 0], 'together by default');
+  assert.deepEqual(strumDelays(hm({ strumMs: 60 }), 0), []);
+  assert.equal(harmoniserStrum(hm({ strumMs: 9999 })), 400, 'capped');
+});
+
+test('a scripted degree override sets and clears', () => {
+  const cfg = { mode: 'diatonic', key: 0, scale: 'major', degreeChords: {} };
+  const set = harmoniserScriptPatch(cfg, 'degree', { degree: 6, chord: [0, 5, 7] });
+  assert.deepEqual(set.degreeChords['5'], [0, 5, 7], '1-based in, 0-based stored');
+  const cleared = harmoniserScriptPatch({ ...cfg, degreeChords: { 5: [0, 5, 7] } }, 'degree', { degree: 6, chord: null });
+  assert.deepEqual(cleared.degreeChords, {});
+  // A degree the scale doesn't have, or a chord that isn't one: no-ops.
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'degree', { degree: 9, chord: [0, 4, 7] }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'degree', { degree: 0, chord: [0, 4, 7] }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'degree', { degree: 2, chord: 'major' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'voiceLeading', { voiceLeading: 'smooth' }), { voiceLeading: 'smooth' });
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'voiceLeading', { voiceLeading: 'psychic' }), {});
+  assert.deepEqual(harmoniserScriptPatch(cfg, 'strum', { ms: 40 }), { strumMs: 40 });
 });

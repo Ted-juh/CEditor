@@ -108,6 +108,62 @@ and with fewer they do nothing rather than something arbitrary.
 A voice that lands outside 0–127 is **dropped, not clamped**. Clamping stacks
 strays onto one pitch, which sounds like a stuck key rather than like nothing.
 
+## Per-degree overrides
+
+Diatonic mode stacks thirds, which is right almost always and wrong when you
+wanted the vi to be a sus4. An override replaces the stack for **one** degree and
+leaves the other six alone, so the mode is still "in key by construction" — with
+a named exception you asked for rather than a hole in the rule.
+
+Degrees are 1-based in the inspector, as musicians count them, and 0-based in
+storage. A degree the scale doesn't have is a **no-op**, not a wrong chord.
+
+## Voice leading
+
+*"Pick the inversion that moves least from the chord before."* **Off by default**,
+and that default is the point: it makes the harmony depend on what you played
+**previously**, which is a real behavioural change rather than a refinement.
+
+Two rules, because "least motion" is only one defensible answer and choosing
+silently would have been the mistake:
+
+| | |
+|---|---|
+| **Closest** | minimise total movement of all voices — the textbook rule |
+| **Smooth top** | minimise movement of the **top** voice only |
+
+Smooth is the one to reach for under a lead: it holds the melody line still and
+lets the inner voices jump, which is usually what you actually wanted when you
+asked for "smoother".
+
+**The note you played never moves.** Only the added voices are re-voiced —
+otherwise the harmoniser would be transposing your own performance, which is not
+harmonising.
+
+The first chord of a phrase has nothing to lead from, so it is always root
+position. That also makes the behaviour predictable when you start playing. The
+previous chord survives a release, so playing one note at a time still leads.
+
+Ties keep the earlier candidate, so the same input always gives the same answer.
+
+## Strum
+
+Spreads the chord over a few milliseconds, up or down.
+
+**Note-offs are never strummed.** A chord that lets go raggedly sounds like a
+fault; one that arrives raggedly sounds like a guitar.
+
+## Bend and pressure
+
+Pitch bend and channel aftertouch arriving on the input can be forwarded to the
+chord's channel. Unlike the [Zone Splitter](./zone-splitter.md), which needs a
+four-way attribution rule because a bend carries no note and its zones are on
+different channels, the harmoniser needs **no rule at all**: everything it plays
+is on one channel, so it is all of it or none — a switch, not a policy.
+
+Bend is carried through as all **fourteen bits**; re-sending it as seven would
+turn a glide into a staircase.
+
 ## Velocity
 
 `0` follows the velocity you played; anything else is fixed — an organ-like part
@@ -156,6 +212,10 @@ harmonyOctave("Harm", -1)
 harmonyOutOfKey("Harm", "mute")
 harmonyKeepPlayed("Harm", false)   -- harmony only
 harmonyChannel("Harm", 3)
+harmonyVoiceLeading("Harm", "smooth")
+harmonyStrum("Harm", 40)
+harmonyDegree("Harm", 6, {0, 5, 7})   -- the vi becomes a sus4
+harmonyDegree("Harm", 6, nil)         -- …and back to stacked thirds
 ```
 
 Pair it with the [Setlist](./setlist.md) and each scene can carry its own key —
@@ -174,12 +234,7 @@ portable but not export-safe.
 
 ## What it doesn't do
 
-- **No per-degree chord overrides.** Diatonic mode stacks thirds; you cannot say
-  "the vi should be a sus4". The Chord Pad is the component for arbitrary chords
-  you choose one by one.
-- **No inversion following.** It does not pick the inversion that moves least
-  from the last chord — good voice leading is a genuinely harder problem than it
-  looks and a bad automatic answer is worse than none.
-- **No strum.** The Chord Pad has one; here every voice starts together.
-- **It harmonises notes, not expression.** Pitch bend and aftertouch arriving on
-  the input pass through untouched rather than being applied to each voice.
+- **Voice leading looks back one chord, not at a phrase.** It has no plan; it
+  makes each move locally. Real part-writing considers where the line is going.
+- **No per-voice channels.** Everything goes out on one channel, which is what
+  makes bend forwarding a switch rather than a rule — and what rules out MPE.

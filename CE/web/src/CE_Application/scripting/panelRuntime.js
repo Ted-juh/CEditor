@@ -377,6 +377,9 @@ const harmoniserApi = {
   harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
   harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
   harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
+  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
+  harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
+  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
 };
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);

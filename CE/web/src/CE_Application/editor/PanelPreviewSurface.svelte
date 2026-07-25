@@ -138,6 +138,7 @@
   import {
     harmoniserConfig, harmoniserRange, harmoniserKeys, EMPTY_HELD,
     releaseAllHarmony, reconcileHarmony, soundingPitches, heldInputNotes,
+    strumDelays, harmoniserChannel,
   } from '../utils/harmoniserLayout.js';
   import {
     setlistConfig, setlistScenes, setlistCount, setlistIndex, setlistWraps,
@@ -2853,24 +2854,66 @@
   const harmHeld = {};            // id -> pure held state (see harmoniserLayout)
   const harmSeen = {};            // id -> midiNoteState.seq consumed
   let harmKeyPress = null;        // { id, note } — a key auditioned with the mouse
+  const harmTimers = {};          // id -> [timeoutId…] for strummed note-ons
+  const harmXSeen = {};           // id -> midiRouteEvents.seq consumed
   function isHarmoniserControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Harmoniser';
   }
   function harmInputChannel(control) {
     return Math.max(0, Math.round(numberOr(harmoniserConfig(control).inputChannel, 0)));
   }
-  function runHarmSends(sends) {
+  function runHarmSends(control, sends) {
+    // Strum spreads the note-ons over a few milliseconds. Note-OFFs are never
+    // strummed: a chord that lets go raggedly sounds like a fault, where one
+    // that arrives raggedly sounds like a guitar.
+    const ons = sends.filter((m) => m.kind === 'on');
+    const delays = strumDelays(control, ons.length);
+    let oi = 0;
     for (const m of sends) {
-      if (m.kind === 'on') sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser');
-      else sendNoteBytes(noteOffBytes(m.channel, m.note), `harm_off_${m.note}`, 'Harmoniser');
+      if (m.kind !== 'on') { sendNoteBytes(noteOffBytes(m.channel, m.note), `harm_off_${m.note}`, 'Harmoniser'); continue; }
+      const d = delays[oi] ?? 0;
+      oi += 1;
+      if (d <= 0) { sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser'); continue; }
+      (harmTimers[getControlId(control)] ??= []).push(setTimeout(() => {
+        sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser');
+      }, d));
+    }
+  }
+  // Pitch bend and aftertouch arriving on the input, forwarded to the channel
+  // the chord is on. The harmoniser has no note to attribute them to and needs
+  // none: everything it plays is on one channel, so "all of it or none" is the
+  // only rule there is — which is why this is a switch rather than the Zone
+  // Splitter's four-way attribution.
+  function pumpHarmExpression(control) {
+    const cfg = harmoniserConfig(control);
+    if (cfg.forwardBend !== true && cfg.forwardPressure !== true) return;
+    const id = getControlId(control);
+    const batch = $midiRouteEvents;
+    if (harmXSeen[id] === batch.seq) return;
+    harmXSeen[id] = batch.seq;
+    if (!batch.seq) return;
+    const inCh = harmInputChannel(control);
+    const outCh = harmoniserChannel(control);
+    for (const ev of batch.events) {
+      if (inCh && ev.channel !== inCh) continue;
+      if (ev.kind === 'bend' && cfg.forwardBend === true) {
+        // All fourteen bits: re-sending seven would turn a glide into a
+        // staircase, which is the thing a bend wheel exists to avoid.
+        const v = Math.max(0, Math.min(16383, Math.round(numberOr(ev.value14 ?? ev.value, 8192))));
+        sendNoteBytes([0xE0 | (outCh - 1), v & 0x7F, (v >> 7) & 0x7F], 'harm_bend', 'Harmoniser');
+      } else if (ev.kind === 'aftertouch' && cfg.forwardPressure === true) {
+        sendNoteBytes([0xD0 | (outCh - 1), Math.max(0, Math.min(127, Math.round(numberOr(ev.value, 0))))], 'harm_at', 'Harmoniser');
+      }
     }
   }
   function harmAllOff(control) {
     const id = getControlId(control);
+    for (const t of harmTimers[id] ?? []) clearTimeout(t);
+    harmTimers[id] = [];
     const r = releaseAllHarmony(harmHeld[id] ?? EMPTY_HELD);
     harmHeld[id] = r.held;
     harmKeyPress = harmKeyPress?.id === id ? null : harmKeyPress;
-    runHarmSends(r.sends);
+    runHarmSends(control, r.sends);
   }
   // Consume the live held-note state, the same reconcile the Zone Splitter does.
   function pumpHarmInput(control) {
@@ -2885,7 +2928,7 @@
     const entries = inputHeldEntries($midiNoteState.notes, harmInputChannel(control));
     const r = reconcileHarmony(harmHeld[id] ?? EMPTY_HELD, control, entries, keep);
     if (r.held !== (harmHeld[id] ?? EMPTY_HELD)) harmHeld[id] = r.held;
-    runHarmSends(r.sends);
+    runHarmSends(control, r.sends);
   }
   function applyHarmoniserValueSource(control, resolved) {
     if (!isHarmoniserControl(control)) return resolved;
@@ -2893,6 +2936,7 @@
     const cfg = base?._children?.Harmoniser;
     if (!cfg) return resolved;
     pumpHarmInput(control);
+    pumpHarmExpression(control);
     const id = getControlId(control);
     const held = harmHeld[id] ?? EMPTY_HELD;
     const next = {

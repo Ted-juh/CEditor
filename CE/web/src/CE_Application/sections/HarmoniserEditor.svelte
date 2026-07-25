@@ -5,6 +5,8 @@
     OUT_OF_KEY, OUT_OF_KEY_LABELS, MEMORY_PRESETS, memoryPresetShape,
     memoryShape, harmoniserMode, chordForNote, chordLabel, harmoniserUseFlats,
     degreeOfNote, MAX_VOICES,
+    VOICE_LEADING, VOICE_LEADING_LABELS, voiceLeading, overrideForDegree,
+    harmoniserStrum, harmoniserScale,
   } from '../utils/harmoniserLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, noteName, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -54,6 +56,29 @@
     } catch { return []; }
   });
   let example = $derived.by(() => { try { return chordLabel(control, 60 + num(p?.key, 0)); } catch { return ''; } });
+
+  // Per-degree overrides. 1-based in the UI, as musicians count degrees.
+  let selDegree = $state(1);
+  let degreeCount = $derived.by(() => { try { return harmoniserScale(control).length; } catch { return 7; } });
+  let degreeOverride = $derived.by(() => { try { return overrideForDegree(control, selDegree - 1); } catch { return null; } });
+  function setDegree(list) {
+    const prior = p.degreeChords && typeof p.degreeChords === 'object' ? p.degreeChords : {};
+    const key = String(selDegree - 1);
+    if (!list) { const next = { ...prior }; delete next[key]; set('degreeChords', next); return; }
+    set('degreeChords', { ...prior, [key]: list });
+  }
+  function setDegreeText(text) {
+    const list = String(text ?? '').split(/[,\s]+/).map((t) => Number(t.trim()))
+      .filter((n) => Number.isFinite(n)).slice(0, MAX_VOICES);
+    setDegree(list.length ? list : null);
+  }
+  let overriddenDegrees = $derived.by(() => {
+    const all = p?.degreeChords && typeof p.degreeChords === 'object' ? p.degreeChords : {};
+    return Object.entries(all)
+      .filter(([, v]) => Array.isArray(v) && v.length)
+      .map(([k, v]) => `${Number(k) + 1}: ${v.join(' ')}`)
+      .sort();
+  });
 
   function setShapeText(text) {
     const list = String(text ?? '').split(/[,\s]+/).map((t) => Number(t.trim()))
@@ -138,6 +163,55 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Voicing extras">
+    <PropertyCell label="Voice leading" span={4} hint="Pick the inversion that moves least from the chord before. OFF by default, because it makes the harmony depend on what you played PREVIOUSLY — a real behavioural change rather than a refinement. Closest minimises total movement (the textbook rule); Smooth minimises the TOP voice only, which holds a melody line still under a lead and lets the inner voices jump. The note you played never moves either way.">
+      <select class="val" value={voiceLeading(control)} onchange={(e) => set('voiceLeading', e.target.value)}>
+        {#each VOICE_LEADING as v (v)}<option value={v}>{VOICE_LEADING_LABELS[v] ?? v}</option>{/each}
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Strum" span={1} hint="Spread the chord over this many milliseconds. Note-offs are never strummed: a chord that lets go raggedly sounds like a fault, where one that arrives raggedly sounds like a guitar.">
+      <input class="val" type="number" min="0" max="400" step="5" value={harmoniserStrum(control)} onchange={(e) => set('strumMs', clampInt(e.target.value, 0, 400, 0))} />
+    </PropertyCell>
+    <PropertyCell label="Direction" span={1} hint="Which end of the chord arrives first.">
+      <select class="val" value={p.strumDirection ?? 'up'} onchange={(e) => set('strumDirection', e.target.value)}>
+        <option value="up">Up</option>
+        <option value="down">Down</option>
+      </select>
+    </PropertyCell>
+    <PropertyCell label="Forward bend" span={1} hint="Pass incoming pitch bend to the chord's channel, all fourteen bits. The harmoniser needs no attribution rule — everything it plays is on one channel, so it is all of it or none.">
+      <PropertyToggle value={p.forwardBend === true} onchange={() => set('forwardBend', !(p.forwardBend === true))} />
+    </PropertyCell>
+    <PropertyCell label="Forward pressure" span={1} hint="The same for channel aftertouch.">
+      <PropertyToggle value={p.forwardPressure === true} onchange={() => set('forwardPressure', !(p.forwardPressure === true))} />
+    </PropertyCell>
+  </PropertySection>
+
+  {#if !isMemory}
+    <PropertySection title="Per-degree chords">
+      <PropertyCell label="" span={4} hint="">
+        <div class="note">
+          Diatonic mode stacks thirds, which is right almost always and wrong when you wanted the
+          vi to be a sus4. An override replaces the stack for <b>one</b> degree and leaves the
+          others alone — the mode is still in-key by construction, with an exception you asked for.
+        </div>
+      </PropertyCell>
+      <PropertyCell label="Degree" span={1} hint="1 is the tonic.">
+        <input class="val" type="number" min="1" max={degreeCount} step="1" value={selDegree} onchange={(e) => { selDegree = clampInt(e.target.value, 1, degreeCount, 1); }} />
+      </PropertyCell>
+      <PropertyCell label="Chord" span={2} hint="Semitones from the played note, comma separated. Blank uses the stacked thirds.">
+        <input class="val" type="text" placeholder="stacked thirds" value={(degreeOverride ?? []).join(', ')} onchange={(e) => setDegreeText(e.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="" span={1} hint="">
+        <button type="button" class="seed" disabled={!degreeOverride} onclick={() => setDegree(null)}>Clear</button>
+      </PropertyCell>
+      {#if overriddenDegrees.length}
+        <PropertyCell label="" span={4} hint="Every degree currently overridden.">
+          <div class="preview">{overriddenDegrees.join('   ·   ')}</div>
+        </PropertyCell>
+      {/if}
+    </PropertySection>
+  {/if}
+
   <PropertySection title="Display">
     <PropertyCell label="Click to audition" span={1} hint="Click a key in preview to hear the chord. Most of the editor's life is spent with no keyboard plugged in.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
@@ -169,6 +243,7 @@
   .preview { font-size: 11.5px; color: #C8C8CE; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 6px 8px; line-height: 1.6; font-family: ui-monospace, Menlo, monospace; white-space: pre; overflow-x: auto; }
   .seeds { display: flex; flex-wrap: wrap; gap: 4px; }
   .seed { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 2px 7px; border-radius: 4px; cursor: pointer; }
-  .seed:hover { border-color: #4a4a58; color: #E8E8EE; }
+  .seed:hover:not(:disabled) { border-color: #4a4a58; color: #E8E8EE; }
+  .seed:disabled { opacity: 0.4; cursor: default; }
   .col { width: 26px; height: 20px; padding: 0; border: 1px solid #2a2a36; background: #141420; border-radius: 3px; }
 </style>
