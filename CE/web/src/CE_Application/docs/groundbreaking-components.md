@@ -65,9 +65,10 @@ not DSP:
 ### 00f. Panic — silence everything — **shipped 🟢**
 - Stops the panel's note controls, clears the echo, and sends the standard
   silence set (sound-off **before** notes-off) to the synth — the only cure for
-  a note-off lost to a cable. Flashes, because the result is silence. Also on
-  **Esc**, automatically when you leave the panel, and as a **script command**
-  any button can fire. See [panic.md](./panic.md).
+  a note-off lost to a cable. Flashes, because the result is silence. Also on a
+  **keyboard shortcut** (Escape by default, rebindable per panel so it travels
+  with an exported Player), automatically when you leave the panel, and as a
+  **script command** any button can fire. See [panic.md](./panic.md).
 
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in

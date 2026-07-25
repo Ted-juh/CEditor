@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   PANIC_SCOPES, panicScope, panicChannel, panicChannels, panicMessages,
   panicLabel, panicSummary, panicGeometry, panicHit, EMERGENCY_PANIC,
-  isEmergencyStopKey, panicCcMessages,
+  isPanicShortcut, panicCcMessages, DEFAULT_PANIC_SHORTCUT,
+  parseShortcut, formatShortcut, shortcutFromEvent, eventMatchesShortcut,
 } from '../src/CE_Application/utils/panicLayout.js';
 
 function pc(c) { return { _children: { Core: { controlType: 'Panic' }, Panic: c } }; }
@@ -88,31 +89,31 @@ test('the emergency config is always maximal', () => {
 const key = (over = {}) => ({ key: 'Escape', repeat: false, defaultPrevented: false, target: { tagName: 'DIV' }, ...over });
 
 test('Esc fires the emergency stop from the panel surface', () => {
-  assert.equal(isEmergencyStopKey(key()), true);
-  assert.equal(isEmergencyStopKey(key({ target: { tagName: 'BUTTON' } })), true);
-  assert.equal(isEmergencyStopKey(key({ target: null })), true);
+  assert.equal(isPanicShortcut(key()), true);
+  assert.equal(isPanicShortcut(key({ target: { tagName: 'BUTTON' } })), true);
+  assert.equal(isPanicShortcut(key({ target: null })), true);
 });
 
 test('Esc defers to anything that already claimed it', () => {
   // the per-control cancels preventDefault, which is the primary signal
-  assert.equal(isEmergencyStopKey(key({ defaultPrevented: true })), false);
+  assert.equal(isPanicShortcut(key({ defaultPrevented: true })), false);
   // …and an active LCD zone edit is the one that cancels without preventing
-  assert.equal(isEmergencyStopKey(key(), { lcdEditing: true }), false);
+  assert.equal(isPanicShortcut(key(), { lcdEditing: true }), false);
 });
 
 test('Esc never fires while typing', () => {
   for (const tagName of ['INPUT', 'TEXTAREA', 'SELECT', 'input', 'textarea']) {
-    assert.equal(isEmergencyStopKey(key({ target: { tagName } })), false, tagName);
+    assert.equal(isPanicShortcut(key({ target: { tagName } })), false, tagName);
   }
-  assert.equal(isEmergencyStopKey(key({ target: { tagName: 'DIV', isContentEditable: true } })), false);
+  assert.equal(isPanicShortcut(key({ target: { tagName: 'DIV', isContentEditable: true } })), false);
 });
 
 test('other keys and key-repeat are ignored', () => {
-  assert.equal(isEmergencyStopKey(key({ key: 'Enter' })), false);
-  assert.equal(isEmergencyStopKey(key({ key: 'esc' })), false);      // case matters
-  assert.equal(isEmergencyStopKey(key({ repeat: true })), false);    // holding it fires once
-  assert.equal(isEmergencyStopKey(null), false);
-  assert.equal(isEmergencyStopKey(undefined), false);
+  assert.equal(isPanicShortcut(key({ key: 'Enter' })), false);
+  assert.equal(isPanicShortcut(key({ key: 'esc' })), false);      // case matters
+  assert.equal(isPanicShortcut(key({ repeat: true })), false);    // holding it fires once
+  assert.equal(isPanicShortcut(null), false);
+  assert.equal(isPanicShortcut(undefined), false);
 });
 
 // --- the CC-only form (script command + code exports) ---------------------------
@@ -139,4 +140,70 @@ test('the CC-only set covers all 16 channels by default', () => {
   assert.equal(new Set(all.map((m) => m.channel)).size, 16);
   assert.deepEqual(panicCcMessages({ scope: 'channel', channel: 99 })[0].channel, 16);
   assert.deepEqual(panicCcMessages({}), all);
+});
+
+// --- the configurable shortcut ---------------------------------------------------
+
+test('shortcut text round-trips', () => {
+  assert.deepEqual(parseShortcut('Escape'), { key: 'Escape', ctrl: false, alt: false, shift: false, meta: false });
+  assert.deepEqual(parseShortcut('Ctrl+Shift+P'), { key: 'P', ctrl: true, alt: false, shift: true, meta: false });
+  // aliases people actually type
+  assert.equal(parseShortcut('Cmd+K').meta, true);
+  assert.equal(parseShortcut('control+alt+F8').ctrl, true);
+  assert.equal(parseShortcut('option+F8').alt, true);
+  assert.equal(formatShortcut(parseShortcut('shift+ctrl+p')), 'Ctrl+Shift+P');
+  assert.equal(formatShortcut(parseShortcut('F8')), 'F8');
+  // an empty shortcut is OFF, not a parse failure
+  assert.equal(parseShortcut(''), null);
+  assert.equal(parseShortcut('   '), null);
+  assert.equal(parseShortcut(null), null);
+  assert.equal(parseShortcut('Ctrl'), null);        // a modifier alone is not a shortcut
+  assert.equal(formatShortcut(null), '');
+});
+
+test('a keypress can be captured back into shortcut text', () => {
+  assert.equal(shortcutFromEvent({ key: 'Escape' }), 'Escape');
+  assert.equal(shortcutFromEvent({ key: 'P', ctrlKey: true, shiftKey: true }), 'Ctrl+Shift+P');
+  assert.equal(shortcutFromEvent({ key: 'k', metaKey: true }), 'Meta+K');
+  // holding only a modifier is not yet a shortcut — the field keeps waiting
+  assert.equal(shortcutFromEvent({ key: 'Shift', shiftKey: true }), '');
+  assert.equal(shortcutFromEvent({ key: 'Control', ctrlKey: true }), '');
+  assert.equal(shortcutFromEvent({}), '');
+});
+
+test('matching is exact about modifiers', () => {
+  const b = parseShortcut('Ctrl+P');
+  assert.equal(eventMatchesShortcut({ key: 'p', ctrlKey: true }, b), true);
+  assert.equal(eventMatchesShortcut({ key: 'P', ctrlKey: true }, b), true);   // case-insensitive
+  assert.equal(eventMatchesShortcut({ key: 'p' }, b), false);                 // missing Ctrl
+  assert.equal(eventMatchesShortcut({ key: 'p', ctrlKey: true, shiftKey: true }, b), false);  // extra Shift
+  assert.equal(eventMatchesShortcut({ key: 'Escape' }, b), false);
+  // named keys stay case-sensitive: 'escape' is not 'Escape'
+  assert.equal(eventMatchesShortcut({ key: 'escape' }, parseShortcut('Escape')), false);
+});
+
+test('a custom shortcut replaces Escape entirely', () => {
+  const opts = { shortcut: 'Ctrl+Shift+P' };
+  assert.equal(isPanicShortcut(key({ key: 'P', ctrlKey: true, shiftKey: true }), opts), true);
+  assert.equal(isPanicShortcut(key(), opts), false);            // Escape no longer fires
+  assert.equal(DEFAULT_PANIC_SHORTCUT, 'Escape');
+});
+
+test('an empty shortcut switches the key off completely', () => {
+  assert.equal(isPanicShortcut(key(), { shortcut: '' }), false);
+  assert.equal(isPanicShortcut(key(), { shortcut: '   ' }), false);
+});
+
+test('a MODIFIED shortcut still works while typing; a bare one never does', () => {
+  const field = { tagName: 'INPUT' };
+  // this is the point of allowing modifiers: when it goes wrong you are often
+  // mid-edit, and Ctrl+Alt+P is nobody's typing
+  assert.equal(isPanicShortcut(key({ key: 'P', ctrlKey: true, altKey: true, target: field }),
+    { shortcut: 'Ctrl+Alt+P' }), true);
+  // …but a bare key belongs to the field, always
+  assert.equal(isPanicShortcut(key({ key: 'F8', target: field }), { shortcut: 'F8' }), false);
+  assert.equal(isPanicShortcut(key({ target: field })), false);
+  // and a claimed event is still deferred to, modifiers or not
+  assert.equal(isPanicShortcut(key({ key: 'P', ctrlKey: true, altKey: true, target: field, defaultPrevented: true }),
+    { shortcut: 'Ctrl+Alt+P' }), false);
 });

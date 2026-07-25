@@ -77,7 +77,7 @@ There was already an unused pipe. The JUCE side has always emitted
 - **A stuck note stays lit.** If a keyboard is unplugged mid-note its note-off
   never arrives, and MIDI has no way for us to know. Leaving preview clears the
   echoed state; within a session, an all-notes-off (CC 123) from the device
-  clears it, and so does [Panic](./panic.md) — including its **Esc** shortcut.
+  clears it, and so does [Panic](./panic.md) — including its keyboard shortcut.
 - Echo is **display only** — it never re-sends anything, so it cannot create a
   MIDI loop.
 

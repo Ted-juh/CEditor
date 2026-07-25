@@ -45,14 +45,27 @@ on fire.
 
 ## Two ways to fire it without pressing it
 
-**Esc.** The whole panel surface listens, so you don't have to find the button
-while something is screaming. It defers to anything that already claimed the
-key — Escape is *also* the cancel for four in-place editors (text field,
-spinner, range entry, LCD zone), and stealing it from those would mean every
-cancelled edit panicked the rig. That guard is a pure predicate
-(`isEmergencyStopKey`) with tests for the deferral cases rather than the happy
-path, because those are the ones that would break something. It only exists in
-preview / the Player, so it can't fire while you're designing.
+**A keyboard shortcut**, Escape by default. The whole panel surface listens, so
+you don't have to find the button while something is screaming. It only exists
+in preview / the Player, so it can't fire while you're designing.
+
+It defers to anything that already claimed the key — Escape is *also* the cancel
+for four in-place editors (text field, spinner, range entry, LCD zone), and
+stealing it from those would mean every cancelled edit panicked the rig. That
+guard is a pure predicate (`isPanicShortcut`) with tests for the deferral cases
+rather than the happy path, because those are the ones that would break
+something.
+
+**Rebindable**, in Panel Properties → Constraints → *Panic key*. Click the field
+and press the keys you want; Backspace clears it, which switches the shortcut
+off. The setting lives **on the panel**, not in app preferences, so it travels
+with an exported Player — the person using the Player is the one who needs it.
+
+One rule worth knowing: the "not while typing" guard applies to **bare keys
+only**. A bare key in a field is always the field's — Escape cancels, and a bare
+letter would panic on every keystroke. But `Ctrl+Alt+P` is nobody's typing, so a
+modified shortcut still fires with focus in a text box, which is often exactly
+where you are when it goes wrong.
 
 **Leaving the panel.** Exiting preview silences the rig. A note the panel was
 holding has no other way to stop — once the surface is gone there is nothing
@@ -90,8 +103,10 @@ format. The text targets expand.
 
 ## How it works
 
-- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 13 tests,
-  plus `test/scriptPanic.test.js` for the script command end to end):
+- **Pure engine** `utils/panicLayout.js` (+ `test/panicLayout.test.js`, 19 tests,
+  plus `test/scriptPanic.test.js` for the script command end to end). Besides the
+  messages it holds the shortcut parser / formatter / matcher, so
+  `Ctrl+Shift+P`, `cmd+k` and `option+F8` all mean what you'd expect:
   the channel list, the message set with its optional parts, the label and the
   summary line, and the button geometry. The message *sequence* is what's
   tested — it's the whole behaviour.
@@ -116,8 +131,9 @@ format. The text targets expand.
 
 ## Possible next steps
 
-- ~~Keyboard shortcut~~ — **done**: Esc, see above.
+- ~~Keyboard shortcut~~ — **done**: Escape by default, rebindable per panel.
 - ~~Auto-panic on preview exit~~ — **done**, see above.
 - ~~Panic from a script~~ — **done**, see above.
-- **A configurable shortcut** — Esc is hard-wired; some rigs will already have
-  it bound to something.
+- ~~A configurable shortcut~~ — **done**, see above.
+- **A shortcut conflict check** — nothing warns you if the panic key collides
+  with something else the panel binds.

@@ -86,22 +86,94 @@ export const EMERGENCY_PANIC = Object.freeze({
   _children: { Panic: { scope: 'all', resetControllers: true, centreBend: true } },
 });
 
-// Should an Escape keypress fire the emergency stop?
+// --- The panic shortcut ---------------------------------------------------------
+// Escape by default, but it lives on the panel so it travels with an exported
+// Player, and plenty of rigs already have Escape bound to something else.
+export const DEFAULT_PANIC_SHORTCUT = 'Escape';
+
+const MODIFIER_ALIASES = {
+  ctrl: 'ctrl', control: 'ctrl',
+  alt: 'alt', option: 'alt',
+  shift: 'shift',
+  meta: 'meta', cmd: 'meta', command: 'meta', win: 'meta', super: 'meta',
+};
+
+// "Ctrl+Shift+P" / "Escape" / "F8" → a binding. An EMPTY string is not a
+// failure to parse, it means the shortcut is switched off — some rigs will want
+// no global key at all.
+export function parseShortcut(text) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return null;
+  const binding = { key: '', ctrl: false, alt: false, shift: false, meta: false };
+  for (const part of raw.split('+').map((p) => p.trim()).filter(Boolean)) {
+    const mod = MODIFIER_ALIASES[part.toLowerCase()];
+    if (mod) binding[mod] = true;
+    else binding.key = part;
+  }
+  return binding.key ? binding : null;
+}
+export function formatShortcut(binding) {
+  if (!binding?.key) return '';
+  const parts = [];
+  if (binding.ctrl) parts.push('Ctrl');
+  if (binding.alt) parts.push('Alt');
+  if (binding.shift) parts.push('Shift');
+  if (binding.meta) parts.push('Meta');
+  parts.push(binding.key.length === 1 ? binding.key.toUpperCase() : binding.key);
+  return parts.join('+');
+}
+// Turn a real keydown into the shortcut text it represents — for a
+// press-the-keys-you-want capture field. Returns '' for a bare modifier.
+export function shortcutFromEvent(event) {
+  const key = String(event?.key ?? '');
+  if (!key || MODIFIER_ALIASES[key.toLowerCase()]) return '';
+  return formatShortcut({
+    key, ctrl: !!event.ctrlKey, alt: !!event.altKey, shift: !!event.shiftKey, meta: !!event.metaKey,
+  });
+}
+export function shortcutHasModifier(binding) {
+  return !!(binding && (binding.ctrl || binding.alt || binding.shift || binding.meta));
+}
+export function eventMatchesShortcut(event, binding) {
+  if (!event || !binding?.key) return false;
+  const k = String(event.key ?? '');
+  // Single characters compare case-insensitively: Shift+P reports key 'P'.
+  const sameKey = k.length === 1 && binding.key.length === 1
+    ? k.toLowerCase() === binding.key.toLowerCase()
+    : k === binding.key;
+  return sameKey
+    && !!event.ctrlKey === binding.ctrl
+    && !!event.altKey === binding.alt
+    && !!event.shiftKey === binding.shift
+    && !!event.metaKey === binding.meta;
+}
+
+function isEditableTarget(target) {
+  const tag = String(target?.tagName ?? '').toUpperCase();
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable === true;
+}
+
+// Should this keypress fire the emergency stop?
 //
-// Escape is already the cancel key for four different in-place editors (a text
-// field, a spinner, a range entry, an LCD zone). Stealing it from those would
-// mean every cancelled edit also panics the rig — so a global handler has to
-// defer. Those handlers run first and call preventDefault, which is the primary
-// signal; the editable-target check covers the one that cancels without
-// preventing, and typing in any field at all.
-export function isEmergencyStopKey(event, { lcdEditing = false } = {}) {
-  if (!event || event.key !== 'Escape') return false;
-  if (event.repeat === true) return false;          // holding Esc fires once
+// The default, Escape, is already the cancel key for four in-place editors (a
+// text field, a spinner, a range entry, an LCD zone). Stealing it from those
+// would mean every cancelled edit also panics the rig — so a global handler has
+// to defer. Those handlers run first and call preventDefault, which is the
+// primary signal; the LCD flag covers the one that cancels without preventing.
+//
+// The editable-target guard applies to BARE keys only. A bare key in a field is
+// always the field's (Escape cancels; a bare letter would panic on every
+// keystroke) — but Ctrl+Alt+P is nobody's typing, so a modified shortcut still
+// works with focus in a text box, which is where you often are when it goes
+// wrong.
+export function isPanicShortcut(event, { shortcut = DEFAULT_PANIC_SHORTCUT, lcdEditing = false } = {}) {
+  const binding = parseShortcut(shortcut);
+  if (!binding) return false;                       // '' = switched off
+  if (!event || event.repeat === true) return false;
+  if (!eventMatchesShortcut(event, binding)) return false;
   if (event.defaultPrevented === true) return false;
   if (lcdEditing) return false;
-  const tag = String(event.target?.tagName ?? '').toUpperCase();
-  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return false;
-  if (event.target?.isContentEditable === true) return false;
+  if (!shortcutHasModifier(binding) && isEditableTarget(event.target)) return false;
   return true;
 }
 

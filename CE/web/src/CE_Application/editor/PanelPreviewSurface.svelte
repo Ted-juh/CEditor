@@ -111,7 +111,7 @@
   } from '../stores/noteInput.js';
   import {
     panicConfig, panicMessages, panicGeometry, panicHit,
-    EMERGENCY_PANIC, isEmergencyStopKey,
+    EMERGENCY_PANIC, isPanicShortcut, DEFAULT_PANIC_SHORTCUT,
   } from '../utils/panicLayout.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
@@ -2673,7 +2673,9 @@
   // panicLayout as a pure predicate, because getting it wrong means every
   // cancelled text edit also panics the rig.
   function handleGlobalKeyDown(event) {
-    if (!isEmergencyStopKey(event, { lcdEditing: lcdEdit.active === true })) return;
+    const shortcut = panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT;
+    if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) return;
+    event.preventDefault();
     firePanicEmergency();
   }
 

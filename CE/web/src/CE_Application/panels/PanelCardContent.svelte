@@ -1,6 +1,7 @@
 <script>
   import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
   import { makeGuid } from '../stores/panelModel.js';
+  import { shortcutFromEvent } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
@@ -162,6 +163,27 @@
     return false;
   }
 
+  // --- Panic shortcut capture ---------------------------------------------------
+  // Typing "Ctrl+Shift+P" by hand is easy to get wrong, so the field records the
+  // keys you actually press.
+  let capturingShortcut = $state(false);
+  function shortcutKeyDown(event) {
+    if (!capturingShortcut || !panel) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      updatePanel(panel.id, { panicShortcut: '' });     // clear = switched off
+      capturingShortcut = false;
+      event.currentTarget?.blur?.();
+      return;
+    }
+    const next = shortcutFromEvent(event);
+    if (!next) return;                                  // a bare modifier: keep waiting
+    updatePanel(panel.id, { panicShortcut: next });
+    capturingShortcut = false;
+    event.currentTarget?.blur?.();
+  }
+
   function handleToggle(prop) {
     if (!panel) return;
     const updates = { [prop]: !panel[prop] };
@@ -289,6 +311,14 @@
       <PropertyCell label="Resizable" span={2} hint="Allow end-user to resize at runtime. When Off, min/max are set to current size.">
         <PropertyToggle value={panel.resizable}
                         onchange={() => handleToggle('resizable')} />
+      </PropertyCell>
+      <PropertyCell label="Panic key" span={2} hint="The panel-wide emergency stop: silences every note this panel is holding and sends all-sound-off to the synth. Click and press the keys you want; Backspace clears it (switching the shortcut off). A bare key like Escape is ignored while you are typing in a field; a combo with a modifier still works there.">
+        <button class="shortcut" class:capturing={capturingShortcut} type="button"
+                onclick={() => { capturingShortcut = true; }}
+                onblur={() => { capturingShortcut = false; }}
+                onkeydown={shortcutKeyDown}>
+          {capturingShortcut ? 'Press keys…' : (panel.panicShortcut || 'Off')}
+        </button>
       </PropertyCell>
       <PropertyCell label="Min W" span={2} hint="Minimum width when resizable" disabled={!panel.resizable}>
         <NumberInput value={panel.resizable ? panel.minWidth : panel.width} step={1} min={0}
@@ -603,6 +633,13 @@
 {/if}
 
 <style>
+  .shortcut {
+    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
+    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; cursor: pointer;
+    text-align: left; font-family: inherit;
+  }
+  .shortcut:hover { border-color: #5B9BD5; }
+  .shortcut.capturing { border-color: #F2C94C; color: #F2C94C; background: #241f10; }
   .val {
     color: #DDD;
     font-size: 11px;
