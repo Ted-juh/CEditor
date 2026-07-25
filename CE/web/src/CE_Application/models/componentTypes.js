@@ -797,6 +797,23 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Harmoniser: {
+    // One finger in, a chord out. Reads the MIDI input and emits notes, so no
+    // DeviceBindings.
+    sections: ['Background', 'Harmoniser', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Harmoniser'),
+    defaultOverrides: {
+      Transform: { width: 340, height: 110 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Recorder: {
     // The note twin of the Gesture Looper: records what you play (on the panel
     // or on the MIDI input) and loops it. Emits MIDI, so no DeviceBindings.

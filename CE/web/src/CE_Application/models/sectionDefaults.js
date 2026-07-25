@@ -1297,6 +1297,35 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  Harmoniser: {
+    _type: 'Harmoniser',
+    mode: 'diatonic',            // diatonic (in key) | memory (fixed shape)
+    key: 0,
+    scale: 'major',
+    size: 3,                     // notes in the diatonic stack (3 = triad)
+    shape: [0, 4, 7],            // memory mode: semitones from the played note
+    voicing: 'close',            // close | open | drop2
+    inversion: 0,
+    octaveSpread: 0,             // move the added voices by whole octaves
+    keepPlayed: true,            // sound the note you played as well as the harmony
+    maxVoices: 6,
+    outOfKey: 'pass',            // pass | nearest | mute — see the docs, no answer is obvious
+    inputChannel: 0,             // 0 = any
+    channel: 1,                  // the channel the chord goes out on
+    velocity: 0,                 // 0 = follow the played velocity
+    editable: true,              // click the keyboard to audition
+    showHeader: true,
+    displayLow: 48,              // the keyboard's resting range when nothing sounds
+    displaySpan: 24,
+    // Colours.
+    faceColour: 'FF141420',
+    whiteColour: 'FFE8E8EE',
+    blackColour: 'FF1A1A22',
+    playedColour: 'FFF2C94C',    // the key you pressed
+    addedColour: 'FFBB6BD9',     // the notes the harmoniser added
+    labelColour: 'FFB9B9B9',
+  },
+
   Recorder: {
     _type: 'Recorder',
     state: 'idle',               // idle | armed | recording | overdub

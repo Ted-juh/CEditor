@@ -1,0 +1,212 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  harmoniserMode, harmoniserKey, harmoniserScaleName, harmoniserChannel,
+  harmoniserSize, harmoniserVoicing, harmoniserInversion, memoryShape,
+  MEMORY_PRESETS, memoryPresetShape, HARMONY_MODES, VOICINGS, MAX_VOICES,
+  degreeOfNote, outOfKeyMode, OUT_OF_KEY,
+  chordForNote, chordLabel,
+  EMPTY_HELD, pressHarmony, releaseHarmony, releaseAllHarmony,
+  soundingPitches, heldInputNotes, reconcileHarmony,
+  harmoniserRange, isBlackKey, harmoniserKeys,
+} from '../src/CE_Application/utils/harmoniserLayout.js';
+
+function hm(c) { return { _children: { Core: { controlType: 'Harmoniser' }, Harmoniser: c } }; }
+// C major, triads, the played note kept.
+const CMAJ = hm({ mode: 'diatonic', key: 0, scale: 'major', size: 3, channel: 1, keepPlayed: true });
+
+test('config clamps and falls back', () => {
+  assert.equal(harmoniserMode(hm({})), 'diatonic');
+  assert.equal(harmoniserMode(hm({ mode: 'nope' })), 'diatonic');
+  assert.equal(harmoniserKey(hm({ key: 14 })), 2, 'wraps');
+  assert.equal(harmoniserScaleName(hm({ scale: 'nope' })), 'major');
+  assert.equal(harmoniserChannel(hm({ channel: 0 })), 1);
+  assert.equal(harmoniserSize(hm({ size: 99 })), 6);
+  assert.equal(harmoniserVoicing(hm({ voicing: 'nope' })), 'close');
+  assert.equal(harmoniserInversion(hm({ inversion: 9 })), 3);
+  assert.equal(HARMONY_MODES.length, 2);
+  assert.equal(VOICINGS.length, 3);
+  assert.equal(OUT_OF_KEY.length, 3);
+});
+
+// --- Diatonic --------------------------------------------------------------------
+test('diatonic harmony is correct by construction', () => {
+  // Play C in C major → C E G. Play D → D F A, which is D MINOR, because that
+  // is the chord on the second degree. That is the whole point: the harmony
+  // follows the key, so it cannot be wrong.
+  assert.deepEqual(chordForNote(CMAJ, 60), [60, 64, 67]);
+  assert.deepEqual(chordForNote(CMAJ, 62), [62, 65, 69]);
+  assert.deepEqual(chordForNote(CMAJ, 71), [71, 74, 77], 'the vii° comes out diminished');
+  assert.equal(degreeOfNote(CMAJ, 60), 0);
+  assert.equal(degreeOfNote(CMAJ, 62), 1);
+  assert.equal(degreeOfNote(CMAJ, 61), null, 'C♯ is not in C major');
+});
+
+test('a bigger chord stacks further up the scale', () => {
+  const sevenths = hm({ ...CMAJ._children.Harmoniser, size: 4 });
+  assert.deepEqual(chordForNote(sevenths, 60), [60, 64, 67, 71], 'Cmaj7');
+  const ninths = hm({ ...CMAJ._children.Harmoniser, size: 5 });
+  assert.equal(chordForNote(ninths, 60).length, 5);
+});
+
+test('a note out of key is a stated rule, not a guess', () => {
+  const base = CMAJ._children.Harmoniser;
+  // Pass: you still hear what you played, with no harmony on it.
+  assert.deepEqual(chordForNote(hm({ ...base, outOfKey: 'pass' }), 61), [61]);
+  // Mute: silence.
+  assert.deepEqual(chordForNote(hm({ ...base, outOfKey: 'mute' }), 61), []);
+  // Nearest: harmonise the scale tone next door — C♯ rounds down to C.
+  assert.deepEqual(chordForNote(hm({ ...base, outOfKey: 'nearest' }), 61), [60, 64, 67]);
+  assert.equal(outOfKeyMode(hm({})), 'pass', 'the default keeps you audible');
+  // Pass with the played note dropped is genuinely nothing.
+  assert.deepEqual(chordForNote(hm({ ...base, outOfKey: 'pass', keepPlayed: false }), 61), []);
+});
+
+// --- Chord memory ----------------------------------------------------------------
+test('memory mode transposes a shape, in key or out of it', () => {
+  // This is what a hardware chord-memory button does, parallel fifths and all —
+  // and people expect exactly that.
+  const mem = hm({ mode: 'memory', shape: [0, 4, 7], channel: 1, keepPlayed: true });
+  assert.deepEqual(chordForNote(mem, 60), [60, 64, 67]);
+  assert.deepEqual(chordForNote(mem, 61), [61, 65, 68], 'C♯ major — no key to be wrong about');
+  assert.deepEqual(chordForNote(mem, 62), [62, 66, 69]);
+  // The shape is normalised: deduped, sorted, clamped, capped.
+  assert.deepEqual(memoryShape(hm({ shape: [7, 0, 4, 7] })), [0, 4, 7]);
+  assert.deepEqual(memoryShape(hm({ shape: [] })), [0], 'never empty');
+  assert.equal(memoryShape(hm({ shape: Array.from({ length: 20 }, (_, i) => i) })).length, MAX_VOICES);
+  assert.deepEqual(memoryPresetShape('min7'), [0, 3, 7, 10]);
+  assert.deepEqual(memoryPresetShape('nonsense'), MEMORY_PRESETS[0].shape, 'unknown falls back');
+});
+
+test('a shape can drop the note you played', () => {
+  // 0 is in the list rather than implied, so "harmony only" is expressible.
+  const mem = hm({ mode: 'memory', shape: [4, 7], keepPlayed: false });
+  assert.deepEqual(chordForNote(mem, 60), [64, 67], 'the root is gone');
+});
+
+// --- Voicing ---------------------------------------------------------------------
+test('inversions lift the lowest voice, one at a time', () => {
+  const base = { mode: 'memory', shape: [0, 4, 7], keepPlayed: false };
+  assert.deepEqual(chordForNote(hm({ ...base, inversion: 0 }), 60), [60, 64, 67]);
+  assert.deepEqual(chordForNote(hm({ ...base, inversion: 1 }), 60), [64, 67, 72]);
+  assert.deepEqual(chordForNote(hm({ ...base, inversion: 2 }), 60), [67, 72, 76]);
+});
+
+test('open lifts the middle and drop 2 drops the second from the top', () => {
+  const base = { mode: 'memory', shape: [0, 4, 7], keepPlayed: false };
+  assert.deepEqual(chordForNote(hm({ ...base, voicing: 'open' }), 60), [60, 67, 76]);
+  assert.deepEqual(chordForNote(hm({ ...base, voicing: 'drop2' }), 60), [52, 60, 67]);
+  // A two-note shape has no middle and no second-from-top to move.
+  assert.deepEqual(chordForNote(hm({ mode: 'memory', shape: [0, 7], keepPlayed: false, voicing: 'open' }), 60), [60, 67]);
+});
+
+test('notes off the end are dropped, not clamped, and voices are capped', () => {
+  // Clamping stacks strays on one pitch, which sounds like a stuck key.
+  const high = hm({ mode: 'memory', shape: [0, 12, 24], keepPlayed: false });
+  assert.deepEqual(chordForNote(high, 120), [120], '132 and 144 do not exist');
+  const capped = hm({ mode: 'memory', shape: [0, 3, 5, 7, 9], keepPlayed: false, maxVoices: 3 });
+  assert.equal(chordForNote(capped, 60).length, 3);
+});
+
+test('the label says what came out', () => {
+  assert.match(chordLabel(CMAJ, 60), /^C/);
+  assert.match(chordLabel(CMAJ, 62), /^D/);
+  assert.match(chordLabel(CMAJ, 61), /out of key/);
+  assert.match(chordLabel(hm({ mode: 'memory', shape: [0, 3, 7] }), 60), /^C/);
+});
+
+// --- The two rules that matter ------------------------------------------------
+test('a note-off releases what its note-on sent, not what the settings say now', () => {
+  // The trap that has now bitten the Splitter, the Sequencer and this. Change
+  // the key while a finger is down and a re-derived release lets go of pitches
+  // that were never started.
+  const down = pressHarmony(EMPTY_HELD, CMAJ, 60, 100);
+  assert.deepEqual(down.sends.map((s) => s.note), [60, 64, 67]);
+  const moved = hm({ ...CMAJ._children.Harmoniser, key: 5 });   // now F major
+  const up = releaseHarmony(down.held, moved, 60);
+  assert.deepEqual(up.sends.map((s) => s.note), [60, 64, 67], 'still the right notes');
+  assert.deepEqual(soundingPitches(up.held), []);
+});
+
+test('a pitch two fingers share is released by the LAST one, not the first', () => {
+  // In C major, C and E a third apart both contain E and G. Naively releasing
+  // C would silence notes E is still holding — the bug that only shows up when
+  // you play more than one note, which is most of the time.
+  const a = pressHarmony(EMPTY_HELD, CMAJ, 60, 100);   // C E G
+  const b = pressHarmony(a.held, CMAJ, 64, 100);       // E G B
+  // G and E are already sounding, so only B starts.
+  assert.deepEqual(b.sends.map((s) => s.note), [71]);
+  assert.deepEqual(soundingPitches(b.held), [60, 64, 67, 71]);
+  const upC = releaseHarmony(b.held, CMAJ, 60);
+  assert.deepEqual(upC.sends.map((s) => s.note), [60], 'only C stops — E and G are still held');
+  assert.deepEqual(soundingPitches(upC.held), [64, 67, 71]);
+  const upE = releaseHarmony(upC.held, CMAJ, 64);
+  assert.deepEqual(upE.sends.map((s) => s.note), [64, 67, 71]);
+  assert.deepEqual(soundingPitches(upE.held), []);
+});
+
+test('a retrigger with no release lets the old chord go first', () => {
+  const a = pressHarmony(EMPTY_HELD, CMAJ, 60, 100);
+  const b = pressHarmony(a.held, CMAJ, 60, 120);
+  assert.deepEqual(heldInputNotes(b.held), [60], 'not two entries for one key');
+  assert.deepEqual(soundingPitches(b.held), [60, 64, 67]);
+  // A release with no press invents nothing.
+  const none = releaseHarmony(EMPTY_HELD, CMAJ, 60);
+  assert.equal(none.held, EMPTY_HELD);
+  assert.deepEqual(none.sends, []);
+});
+
+test('release-all sends each sounding pitch exactly once', () => {
+  const a = pressHarmony(EMPTY_HELD, CMAJ, 60, 100);
+  const b = pressHarmony(a.held, CMAJ, 64, 100);
+  const all = releaseAllHarmony(b.held);
+  const notes = all.sends.map((s) => s.note).sort((x, y) => x - y);
+  assert.deepEqual(notes, [60, 64, 67, 71], 'a doubled pitch is one sounding note');
+  assert.deepEqual(soundingPitches(all.held), []);
+});
+
+test('reconcile sends nothing when nothing changed', () => {
+  // Otherwise the input pump retriggers every held note on every frame.
+  const first = reconcileHarmony(EMPTY_HELD, CMAJ, [{ note: 60, velocity: 100 }]);
+  assert.equal(first.sends.length, 3);
+  const same = reconcileHarmony(first.held, CMAJ, [{ note: 60, velocity: 100 }]);
+  assert.deepEqual(same.sends, []);
+  assert.equal(same.held, first.held, 'the same object, so no re-render');
+  const gone = reconcileHarmony(first.held, CMAJ, []);
+  assert.deepEqual(gone.sends.map((s) => s.note), [60, 64, 67]);
+  // A note held by the mouse survives an input pump that doesn't know about it.
+  const kept = reconcileHarmony(first.held, CMAJ, [], 60);
+  assert.deepEqual(kept.sends, []);
+});
+
+// --- Geometry -------------------------------------------------------------------
+test('the keyboard fits the chord', () => {
+  const held = pressHarmony(EMPTY_HELD, CMAJ, 60, 100).held;
+  const r = harmoniserRange(held, CMAJ);
+  assert.ok(r.lo <= 60 && r.hi >= 67);
+  const empty = harmoniserRange(EMPTY_HELD, CMAJ, 48, 24);
+  assert.deepEqual(empty, { lo: 48, hi: 72 });
+  // A wide chord is not cropped.
+  const wide = harmoniserRange({ counts: { 36: 1, 96: 1 }, byNote: {} }, CMAJ);
+  assert.ok(wide.lo <= 36 && wide.hi >= 96);
+});
+
+test('black keys sit on top of the whites, between their neighbours', () => {
+  assert.equal(isBlackKey(61), true);
+  assert.equal(isBlackKey(60), false);
+  const keys = harmoniserKeys({ lo: 60, hi: 72 }, 300, 100, 8, 22);
+  const whites = keys.filter((k) => !k.black);
+  const blacks = keys.filter((k) => k.black);
+  assert.equal(whites.length, 8, 'C to C is eight white keys');
+  assert.equal(blacks.length, 5);
+  // Drawn after, so they paint over.
+  assert.ok(keys.indexOf(blacks[0]) > keys.indexOf(whites[whites.length - 1]));
+  assert.ok(blacks.every((b) => b.h < whites[0].h), 'and they are shorter');
+});
+
+test('a fixed velocity overrides the played one; 0 means follow', () => {
+  // One number rather than a flag plus a number, which could disagree.
+  const organ = hm({ ...CMAJ._children.Harmoniser, velocity: 90 });
+  assert.deepEqual(pressHarmony(EMPTY_HELD, organ, 60, 30).sends.map((s) => s.velocity), [90, 90, 90]);
+  assert.deepEqual(pressHarmony(EMPTY_HELD, CMAJ, 60, 30).sends.map((s) => s.velocity), [30, 30, 30]);
+});

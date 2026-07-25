@@ -21,6 +21,7 @@
     SplitSquareHorizontal,
     Grid2x2Check,
     Disc3,
+    Layers,
     Timer,
     Gauge,
     Spline,
@@ -142,6 +143,7 @@
       { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
       { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
       { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
+      { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

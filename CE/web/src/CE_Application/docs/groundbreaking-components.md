@@ -153,6 +153,22 @@ not DSP:
   **partial by default**, because full snap is what the Phrase Sequencer is for.
   See [phrase-recorder.md](./phrase-recorder.md).
 
+### 00k. Harmoniser — one finger in, a full chord out — **shipped 🟢**
+- Mostly assembly — the Chord Pad's scale engine, the note-input path, the
+  note-output path — and none the worse for it: the classic "make me sound like
+  a keyboard player" box. **Diatonic** mode builds the chord belonging to the
+  played note's degree in the key (I ii iii IV V vi vii°), so the harmony is
+  correct *by construction* rather than usually right. **Chord memory** mode
+  transposes a fixed shape to whatever you play, in key or out of it — parallel
+  fifths and all, which is exactly what people reach for it expecting. A note
+  outside the key is a **stated rule** (play it alone / snap to the nearest
+  scale tone / silent), defaulting to audible.
+  Two bookkeeping rules: a note-off releases what its note-on **sent**, and —
+  the one specific to this component — sounding pitches are **reference
+  counted**, because two fingers a third apart produce overlapping chords and
+  releasing one must not punch a hole in the other. See
+  [harmoniser.md](./harmoniser.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

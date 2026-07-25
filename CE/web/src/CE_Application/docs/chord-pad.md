@@ -11,6 +11,11 @@ Pick a **key** and **scale**; the pads auto-fill with the in-key chords (or scal
 notes). Tap to play, hold to sustain, slide across pads for a legato progression.
 A piano strip shows exactly what's sounding.
 
+This is chord-**per-pad**: you choose each one. The
+[Harmoniser](./harmoniser.md) is chord-**per-note-you-play**, built from this
+same scale engine — reach for that one when the chords should follow a keyboard
+rather than be picked.
+
 Two layouts share one engine:
 
 - **Wheel (default) — the circle of fifths.** Majors on the outer ring, each

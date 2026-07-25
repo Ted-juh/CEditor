@@ -135,6 +135,10 @@
   } from '../utils/noteRecorderLayout.js';
   import { noteOutputEvents, publishNoteOutput, noteOutputFromBytes } from '../stores/noteOutput.js';
   import {
+    harmoniserConfig, harmoniserRange, harmoniserKeys, EMPTY_HELD,
+    releaseAllHarmony, reconcileHarmony, soundingPitches, heldInputNotes,
+  } from '../utils/harmoniserLayout.js';
+  import {
     splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
     noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
@@ -288,7 +292,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))));
+    return applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2731,6 +2735,94 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Harmoniser: one finger in, a chord out ------------------------------------
+  // Mostly assembly — the Chord Pad's scale engine, the note-input path, the
+  // note-output path. The work is in the bookkeeping, and it is not the usual
+  // bookkeeping: as well as "a note-off releases what its note-on sent", two
+  // input notes a third apart produce OVERLAPPING chords, so sounding pitches
+  // are reference counted. Releasing one finger must not stop notes the other
+  // is still holding.
+  const harmHeld = {};            // id -> pure held state (see harmoniserLayout)
+  const harmSeen = {};            // id -> midiNoteState.seq consumed
+  let harmKeyPress = null;        // { id, note } — a key auditioned with the mouse
+  function isHarmoniserControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Harmoniser';
+  }
+  function harmInputChannel(control) {
+    return Math.max(0, Math.round(numberOr(harmoniserConfig(control).inputChannel, 0)));
+  }
+  function runHarmSends(sends) {
+    for (const m of sends) {
+      if (m.kind === 'on') sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `harm_on_${m.note}`, 'Harmoniser');
+      else sendNoteBytes(noteOffBytes(m.channel, m.note), `harm_off_${m.note}`, 'Harmoniser');
+    }
+  }
+  function harmAllOff(control) {
+    const id = getControlId(control);
+    const r = releaseAllHarmony(harmHeld[id] ?? EMPTY_HELD);
+    harmHeld[id] = r.held;
+    harmKeyPress = harmKeyPress?.id === id ? null : harmKeyPress;
+    runHarmSends(r.sends);
+  }
+  // Consume the live held-note state, the same reconcile the Zone Splitter does.
+  function pumpHarmInput(control) {
+    ensureNoteInput();
+    const id = getControlId(control);
+    const seq = $midiNoteState.seq;
+    const keep = harmKeyPress && harmKeyPress.id === id ? harmKeyPress.note : null;
+    // The mouse-held key has no sequence number of its own, so a press has to
+    // be reconciled even when the input store hasn't moved.
+    if (harmSeen[id] === seq && keep === null) return;
+    harmSeen[id] = seq;
+    const entries = inputHeldEntries($midiNoteState.notes, harmInputChannel(control));
+    const r = reconcileHarmony(harmHeld[id] ?? EMPTY_HELD, control, entries, keep);
+    if (r.held !== (harmHeld[id] ?? EMPTY_HELD)) harmHeld[id] = r.held;
+    runHarmSends(r.sends);
+  }
+  function applyHarmoniserValueSource(control, resolved) {
+    if (!isHarmoniserControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Harmoniser;
+    if (!cfg) return resolved;
+    pumpHarmInput(control);
+    const id = getControlId(control);
+    const held = harmHeld[id] ?? EMPTY_HELD;
+    const next = {
+      ...cfg,
+      __sounding: soundingPitches(held),
+      __played: heldInputNotes(held),
+    };
+    return { ...resolved, control: { ...base, _children: { ...base._children, Harmoniser: next } } };
+  }
+  // Click a key to audition the harmony — most of the editor's life is spent
+  // with no keyboard plugged in.
+  function handleHarmoniserPointerDown(control, localPoint) {
+    if (!isHarmoniserControl(control) || harmoniserConfig(control).editable === false) return false;
+    const cfg = harmoniserConfig(control);
+    const id = getControlId(control);
+    const held = harmHeld[id] ?? EMPTY_HELD;
+    const t = control?._children?.Transform ?? {};
+    const range = harmoniserRange(held, control,
+      Math.max(0, Math.round(numberOr(cfg.displayLow, 48))),
+      Math.max(12, Math.round(numberOr(cfg.displaySpan, 24))));
+    const keys = harmoniserKeys(range, numberOr(t.width, 0), numberOr(t.height, 0), 8,
+      cfg.showHeader === false ? 0 : 22);
+    // Back to front, so a black key wins over the white it overlaps — it is
+    // drawn on top, so it has to be hit first.
+    const hit = [...keys].reverse().find((k) => localPoint.x >= k.x && localPoint.x <= k.x + k.w
+      && localPoint.y >= k.y && localPoint.y <= k.y + k.h);
+    if (!hit) return false;
+    harmKeyPress = { id, note: hit.note };
+    pumpHarmInput(control);
+    return true;
+  }
+  function releaseHarmoniserPress() {
+    if (!harmKeyPress) return;
+    const control = (orderedControls ?? []).find((c) => getControlId(c) === harmKeyPress.id);
+    harmKeyPress = null;
+    if (control) pumpHarmInput(control);
+  }
+
   // --- Phrase Recorder: capture what you played, loop it -------------------------
   // The note twin of the Gesture Looper. Two capture sources, deliberately
   // different in kind:
@@ -3427,6 +3519,7 @@
       else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; splitCcSeen[getControlId(c)] = null; }
       else if (isPhraseControl(c)) phraseAllOff(c);
       else if (isRecorderControl(c)) recorderAllOff(c);
+      else if (isHarmoniserControl(c)) harmAllOff(c);
       else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
       else if (isNoteRibbonControl(c)) {
         if (ribbonPress && ribbonPress.id === getControlId(c)) {
@@ -5271,6 +5364,8 @@
     handlePhrasePointerDown(control, pointerDownLocal);
     // Phrase Recorder: arm it (or change your mind).
     handleRecorderPointerDown(control, pointerDownLocal);
+    // Harmoniser: audition a key.
+    handleHarmoniserPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -5439,6 +5534,8 @@
       splitReleaseKey(activeControl, splitKeyPress.note);
       splitKeyPress = null;
     }
+    // Release a key auditioned on the Harmoniser.
+    releaseHarmoniserPress();
 
     // Commit an envelope node drag: persist the working points to the model,
     // then drop the live session override so the model is the source of truth.
