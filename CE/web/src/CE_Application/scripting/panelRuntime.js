@@ -357,6 +357,11 @@ const recorderApi = {
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
   recorderSource: (target, source) => recAction(target, 'source', { source }),
+  recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
+  recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
+  recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
+  recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
+  recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
 };
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);

@@ -10,6 +10,8 @@ import {
   takeNoteRange, recorderGeometry, eventRects, playheadX,
   onLoopBoundary, toggleRecordState, nextPassFor,
   RECORDER_STATES, MAX_EVENTS, recorderScriptPatch, RECORDER_SCRIPT_ACTIONS, phaseAtTime,
+  countInBars, countInLaps, editNote, deleteNote, nudgeTake, transposeTake,
+  recorderSlots, slotIndex, storeSlot, loadSlot, MAX_SLOTS,
 } from '../src/CE_Application/utils/noteRecorderLayout.js';
 import { noteOutputFromBytes } from '../src/CE_Application/stores/noteOutput.js';
 import { applyNoteEvent, EMPTY_NOTE_STATE } from '../src/CE_Application/utils/midiNoteInput.js';
@@ -353,4 +355,82 @@ test('the held-note store carries an arrival stamp', () => {
   const again = applyNoteEvent(on, { kind: 'noteOn', channel: 1, note: 60, velocity: 100 }, 9999);
   assert.equal(again, on, 'same object out');
   assert.equal(applyNoteEvent(EMPTY_NOTE_STATE, { kind: 'noteOn', channel: 1, note: 60, velocity: 100 })['1:60'].at, 0);
+});
+
+// --- count-in, editing, slots ---------------------------------------------------
+
+test('a count-in waits whole laps before it starts capturing', () => {
+  // The Transport's count-in counts the whole panel in from a stop. This one
+  // counts THIS recorder in from wherever the music already is — what you want
+  // when the band is playing and you want the next four bars.
+  const opts = { hadEvents: false, countInLaps: 2 };
+  assert.equal(onLoopBoundary('armed', { ...opts, lapsWaited: 0 }), 'armed', 'still counting');
+  assert.equal(onLoopBoundary('armed', { ...opts, lapsWaited: 1 }), 'armed');
+  assert.equal(onLoopBoundary('armed', { ...opts, lapsWaited: 2 }), 'recording');
+  // No count-in behaves exactly as before.
+  assert.equal(onLoopBoundary('armed', { hadEvents: false }), 'recording');
+  // A count-in shorter than the loop is still one lap — it lands on a boundary.
+  assert.equal(countInLaps(rc({ countIn: 1, bars: 4 })), 1);
+  assert.equal(countInLaps(rc({ countIn: 4, bars: 2 })), 2);
+  assert.equal(countInLaps(rc({ countIn: 0 })), 0);
+  assert.equal(countInBars(rc({ countIn: 99 })), 4, 'capped');
+});
+
+test('a recorded note can be repaired without a piano roll', () => {
+  // Not an editor — the Phrase Sequencer is that. This is the small set of
+  // repairs you want on a take you otherwise like.
+  let take = recordNoteOn(EMPTY_TAKE, 0.1, 1, 60, 100);
+  take = recordNoteOff(take, 0.3, 1, 60);
+  take = recordNoteOn(take, 0.5, 1, 64, 100);
+  take = recordNoteOff(take, 0.7, 1, 64);
+  assert.ok(near(editNote(take, 0, { t: 0.25 }).events[0].t, 0.25));
+  assert.equal(editNote(take, 0, { note: 62 }).events[0].note, 62);
+  assert.equal(editNote(take, 0, { velocity: 40 }).events[0].velocity, 40);
+  // Nothing actually moved: same object, so no re-render.
+  assert.equal(editNote(take, 0, { t: 0.1 }), take);
+  assert.equal(editNote(take, 9, { t: 0.5 }), take, 'no such note');
+  assert.equal(editNote(take, 0, null), take);
+  // Editing re-sorts, because everything downstream assumes time order.
+  const moved = editNote(take, 0, { t: 0.9 });
+  assert.ok(moved.events[0].t < moved.events[1].t);
+  assert.equal(deleteNote(take, 0).events.length, 1);
+  assert.equal(deleteNote(take, 9), take);
+});
+
+test('nudge moves the whole take, transpose drops what falls off the end', () => {
+  // "Consistently a hair late" is the commonest thing wrong with a take.
+  let take = recordNoteOn(EMPTY_TAKE, 0.10, 1, 60, 100);
+  take = recordNoteOff(take, 0.20, 1, 60);
+  take = recordNoteOn(take, 0.50, 1, 64, 100);
+  take = recordNoteOff(take, 0.60, 1, 64);
+  const early = nudgeTake(take, -0.02);
+  assert.ok(near(early.events[0].t, 0.08));
+  assert.ok(near(early.events[1].t, 0.48));
+  assert.equal(nudgeTake(take, 0), take);
+  // Across the seam it wraps and re-sorts rather than going negative.
+  const wrapped = nudgeTake(take, -0.15);
+  assert.ok(wrapped.events.every((e) => e.t >= 0 && e.t < 1));
+  // Transpose uses playback's rule, so the two can't disagree about the take.
+  assert.equal(transposeTake(take, 12).events[0].note, 72);
+  assert.equal(transposeTake(take, 90).events.length, 0, 'dropped, not clamped');
+  assert.equal(transposeTake(take, 0), take);
+});
+
+test('a slot is a copy in each direction', () => {
+  // Otherwise editing the live take would silently rewrite the stored one.
+  let take = recordNoteOn(EMPTY_TAKE, 0.1, 1, 60, 100);
+  take = recordNoteOff(take, 0.3, 1, 60);
+  const slots = storeSlot([], 1, take, 'Verse');
+  assert.equal(slots.length, 2, 'the gap is filled with empty takes');
+  assert.equal(slots[1].name, 'Verse');
+  assert.equal(slots[1].events.length, 1);
+  const loaded = loadSlot(slots, 1);
+  assert.equal(loaded.events.length, 1);
+  assert.notEqual(loaded.events[0], slots[1].events[0], 'a copy, not the same object');
+  loaded.events[0].note = 99;
+  assert.equal(slots[1].events[0].note, 60, 'and editing it leaves the slot alone');
+  assert.equal(loadSlot(slots, 9), EMPTY_TAKE);
+  assert.equal(storeSlot([], 99, take).length, 0, 'out of range stores nothing');
+  assert.equal(slotIndex(rc({ slots: [{}, {}], slot: 5 })), 1);
+  assert.equal(slotIndex(rc({})), -1);
 });

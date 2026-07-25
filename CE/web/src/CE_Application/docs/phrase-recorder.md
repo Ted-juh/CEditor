@@ -145,6 +145,36 @@ it the one recording path that works with nothing plugged in.
 [Panic](./panic.md) releases everything it is playing and closes any note still
 open in the take. Nothing here touches the DPD profile.
 
+## Count-in, repair and take slots
+
+**Count-in** waits a number of bars after arming before it starts capturing.
+The [Transport](./transport.md) has one too, but it counts the whole panel in
+*from a stop*; this one counts **this recorder** in from wherever the music
+already is, which is what you want when the band is playing and you want to catch
+the next four bars. It still starts on a loop boundary — just a later one — so
+the take's downbeat is still the loop's downbeat.
+
+**Repair** is a small set of fixes, not an editor. The Phrase Sequencer is the
+editor; this is for a take you otherwise like:
+
+- **Nudge** moves the whole take. *"It's consistently a hair late"* is the
+  commonest thing wrong with a recording, and it's a one-click fix.
+- **Shift** transposes the take **itself**, where the transpose setting only
+  changes playback. Two operations because they are genuinely different: one
+  rewrites what you recorded, the other leaves it alone. Shift uses playback's
+  drop-don't-clamp rule, so the two can't disagree about what the take contains.
+- **Per note**: position, pitch, velocity, length, delete. Notes are addressed by
+  index in time order, because a take has no stable ids and adding them would
+  only be for this.
+
+Editing re-sorts, since everything downstream assumes time order, and returns the
+**same object** when nothing actually moved.
+
+**Take slots** hold eight recordings, so you can try an idea without losing the
+one that worked. Storing and loading are **copies in each direction** — a
+reference would mean editing the live take silently rewrote the stored one, which
+is the kind of bug you only notice after you've lost the good take.
+
 ## Driving it from a script
 
 A big Record button on a panel is an obvious thing to want, and it needs the
@@ -162,6 +192,11 @@ recorderQuantize("Loop", 16, 1, "minor", 0)  -- …and into a key
 recorderTranspose("Loop", -12)
 recorderBars("Loop", 4)
 recorderSource("Loop", "panel")
+recorderCountIn("Loop", 2)
+recorderNudge("Loop", -0.01)     -- move the whole take earlier
+recorderShift("Loop", 12)        -- transpose the take itself
+recorderStore("Loop", 2, "Verse")
+recorderLoad("Loop", 2)
 ```
 
 **The take-editing actions refuse while it is capturing.** During a pass the live
@@ -183,13 +218,9 @@ runtime. The exported Player has that; a bare device script doesn't.
 
 ## What it doesn't do
 
-- **One take, no take history.** Undo removes the last pass; there is no
-  A/B/comparison of whole takes.
-- **No note editing.** You can quantise, transpose, scale velocity and drop a
-  pass — you cannot drag a note. Drawing notes is the Phrase Sequencer's job.
-- **No count-in of its own.** The Transport has one, and arming already waits for
-  the loop boundary, which covers the same need from the other side.
-- **Timing is frame-resolution on the input path**, because the shared note store
-  publishes state rather than timestamps. In practice that is a few milliseconds
-  of jitter on capture — inaudible for a phrase, and worth knowing before you
-  blame the take.
+- **Note-off timing is still frame-resolution.** Note-ONs now carry an arrival
+  stamp and are recorded where they happened, but a note-off has no held entry
+  left to carry one. That moves a note's *length* by a frame at worst, where a
+  missed onset moved the note itself.
+- **No dragging notes on the roll.** Repair is numeric, in the inspector. The
+  preview roll is a display.

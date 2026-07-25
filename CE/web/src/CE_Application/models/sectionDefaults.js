@@ -1366,6 +1366,9 @@ export const SECTION_DEFAULTS = {
     playing: true,               // the loop plays back when not recording
     source: 'both',              // input | panel | both — where notes are captured from
     once: false,                 // stop after one pass instead of layering
+    countIn: 0,                  // bars to wait after arming before capturing
+    slot: 0,                     // which take slot is live
+    slots: [],                   // stored takes — a copy in each direction
     syncToTransport: false,
     bars: 2,                     // loop length when synced
     seconds: 4,                  // loop length free-running

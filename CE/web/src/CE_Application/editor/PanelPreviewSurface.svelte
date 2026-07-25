@@ -132,7 +132,7 @@
     recorderSynced, recorderBars, recorderLoopSeconds, isRecordingState,
     recordNoteOn, recordNoteOff, closeOpenNotes, takeIsEmpty, nextPassFor,
     eventsInWindow, eventSeconds, playedNote, playedVelocity,
-    onLoopBoundary, toggleRecordState, phaseAtTime,
+    onLoopBoundary, toggleRecordState, phaseAtTime, countInLaps,
   } from '../utils/noteRecorderLayout.js';
   import { noteOutputEvents, publishNoteOutput, noteOutputFromBytes } from '../stores/noteOutput.js';
   import {
@@ -2949,6 +2949,7 @@
   const recorderHeldSeen = {};    // id -> midiNoteState.seq consumed
   const recorderHeldNotes = {};   // id -> Set of input notes seen held last time
   const recorderTapSeen = {};     // id -> noteOutputEvents.seq consumed
+  const recorderArmedLaps = {};   // id -> laps spent armed, for the count-in
   const recorderJumpState = {};   // id -> transport jump counter seen
   const recorderBeatsState = {};
   let recorderTickerRunning = false;
@@ -3123,10 +3124,15 @@
         // here: the arm→record promotion, the once-through stop, and the commit.
         if (next < prev) {
           const state = recorderState(c);
+          // Laps spent waiting, so a count-in can span more than one.
+          const waited = state === 'armed' ? (recorderArmedLaps[id] ?? 0) : 0;
           const after = onLoopBoundary(state, {
             hadEvents: !takeIsEmpty(liveTakeFor(c)),
             once: recorderConfig(c).once === true,
+            lapsWaited: waited,
+            countInLaps: countInLaps(c),
           });
+          recorderArmedLaps[id] = after === 'armed' ? waited + 1 : 0;
           if (after !== state) {
             setRecorderState(c, after);
             if (!isRecordingState(after)) { recorderAllOffPending(c); }

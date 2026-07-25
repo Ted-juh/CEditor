@@ -309,11 +309,15 @@ export function recorderUseFlats(control) {
 // the loop comes round" is the one rule that has to be right and is the hardest
 // to test by hand.
 export function onLoopBoundary(state, opts = {}) {
-  const { hadEvents = false, once = false } = opts;
+  const { hadEvents = false, once = false, lapsWaited = 0, countInLaps: laps = 0 } = opts;
   switch (String(state)) {
     // Armed means "start at the top of the next loop": the take's downbeat is
-    // the loop's downbeat, not wherever your hand happened to be.
-    case 'armed': return hadEvents ? 'overdub' : 'recording';
+    // the loop's downbeat, not wherever your hand happened to be. With a
+    // count-in it waits that many more laps first — still landing on a
+    // boundary, just a later one.
+    case 'armed':
+      if (laps > 0 && lapsWaited < laps) return 'armed';
+      return hadEvents ? 'overdub' : 'recording';
     // A single pass drops back to playing at the seam; otherwise it keeps
     // layering until you stop it.
     case 'recording': return once ? 'idle' : 'recording';
@@ -331,6 +335,116 @@ export function nextPassFor(take, state) {
   return state === 'overdub' ? lastPass(take) + 1 : 0;
 }
 
+// --- Take slots --------------------------------------------------------------------
+// Several takes on one recorder, so you can try an idea without losing the one
+// that worked. The live take is `take`; the others live in `slots` and swapping
+// is a copy in each direction, not a reference — otherwise editing the live take
+// would silently rewrite the stored one.
+export const MAX_SLOTS = 8;
+
+export function recorderSlots(control) {
+  const raw = recorderConfig(control).slots;
+  return (Array.isArray(raw) ? raw : []).slice(0, MAX_SLOTS).map((t, i) => ({
+    id: String(t?.id ?? `slot_${i + 1}`),
+    name: String(t?.name ?? `Take ${i + 1}`),
+    events: normalizeEvents(t?.events),
+  }));
+}
+export function slotIndex(control) {
+  const n = recorderSlots(control).length;
+  if (!n) return -1;
+  return clampInt(recorderConfig(control).slot ?? 0, 0, n - 1);
+}
+// Store the live take into a slot. Returns the whole slot list.
+export function storeSlot(slots, index, take, name = null) {
+  const list = (Array.isArray(slots) ? slots : []).slice(0, MAX_SLOTS);
+  const i = Math.round(num(index, 0));
+  if (i < 0 || i >= MAX_SLOTS) return list;
+  const events = normalizeEvents(take?.events);
+  const next = list.slice();
+  while (next.length <= i) next.push({ id: `slot_${next.length + 1}`, name: `Take ${next.length + 1}`, events: [] });
+  next[i] = { ...next[i], name: name ?? next[i].name, events };
+  return next;
+}
+// Load a slot into a live take. A COPY: the take you go on to edit must not be
+// the same array the slot is holding.
+export function loadSlot(slots, index) {
+  const list = Array.isArray(slots) ? slots : [];
+  const i = Math.round(num(index, 0));
+  if (i < 0 || i >= list.length) return EMPTY_TAKE;
+  return { events: normalizeEvents(list[i]?.events).map((e) => ({ ...e })), pending: {} };
+}
+
+// --- Editing a recorded note -------------------------------------------------------
+// Not a piano-roll editor — the Phrase Sequencer is that. This is the small set
+// of repairs you want on a take you otherwise like: move one note off the beat
+// it landed wrong on, change its pitch, make it longer, drop it.
+//
+// Notes are addressed by INDEX into the sorted event list, because a take has no
+// stable ids and adding them would only be for this.
+export function editNote(take, index, patch) {
+  const prior = take ?? EMPTY_TAKE;
+  const i = Math.round(num(index, -1));
+  if (i < 0 || i >= prior.events.length || !patch || typeof patch !== 'object') return prior;
+  const cur = prior.events[i];
+  const next = {
+    ...cur,
+    ...(patch.t !== undefined ? { t: wrap01(patch.t) } : {}),
+    ...(patch.note !== undefined ? { note: clampInt(patch.note, 0, 127) } : {}),
+    ...(patch.velocity !== undefined ? { velocity: clampInt(patch.velocity, 1, 127) } : {}),
+    ...(patch.dur !== undefined ? { dur: Math.min(1, Math.max(0.001, num(patch.dur, cur.dur))) } : {}),
+  };
+  // Same object out when nothing actually moved.
+  if (next.t === cur.t && next.note === cur.note && next.velocity === cur.velocity && next.dur === cur.dur) return prior;
+  const events = prior.events.slice();
+  events[i] = next;
+  // Re-sorted, because everything downstream assumes time order.
+  return { events: events.sort((a, b) => a.t - b.t || a.note - b.note), pending: prior.pending };
+}
+export function deleteNote(take, index) {
+  const prior = take ?? EMPTY_TAKE;
+  const i = Math.round(num(index, -1));
+  if (i < 0 || i >= prior.events.length) return prior;
+  return { events: prior.events.filter((_, k) => k !== i), pending: prior.pending };
+}
+// Nudge every note by a fraction of the loop. The whole-take version of "it is
+// consistently a hair late", which is the commonest thing wrong with a take.
+export function nudgeTake(take, delta) {
+  const prior = take ?? EMPTY_TAKE;
+  const d = num(delta, 0);
+  if (!d || !prior.events.length) return prior;
+  const events = prior.events
+    .map((e) => ({ ...e, t: wrap01(e.t + d) }))
+    .sort((a, b) => a.t - b.t || a.note - b.note);
+  return { events, pending: prior.pending };
+}
+// Transpose the take itself, rather than at playback. Notes off the end are
+// DROPPED — the same rule playback uses, so the two can't disagree about what
+// the take contains.
+export function transposeTake(take, semitones) {
+  const prior = take ?? EMPTY_TAKE;
+  const by = Math.round(num(semitones, 0));
+  if (!by || !prior.events.length) return prior;
+  const events = prior.events
+    .map((e) => ({ ...e, note: e.note + by }))
+    .filter((e) => e.note >= 0 && e.note <= 127)
+    .sort((a, b) => a.t - b.t || a.note - b.note);
+  return { events, pending: prior.pending };
+}
+
+// --- Count-in -----------------------------------------------------------------------
+// The Transport has one, but it counts the whole panel in from a stop. This one
+// counts THIS recorder in from wherever the music already is, which is what you
+// want when the band is playing and you want to catch the next four bars.
+export function countInBars(control) { return clampInt(recorderConfig(control).countIn ?? 0, 0, 4); }
+// Laps to wait before `armed` becomes `recording`. Expressed in whole loops,
+// because the loop is the unit the arming already works in.
+export function countInLaps(control) {
+  const bars = countInBars(control);
+  if (bars <= 0) return 0;
+  return Math.max(1, Math.ceil(bars / Math.max(1, recorderBars(control))));
+}
+
 // --- Driving it from a script -------------------------------------------------------------
 // Same contract as the Phrase Sequencer's: a PURE reducer over the config that
 // returns a PATCH of only the fields that change. An empty patch is a no-op,
@@ -338,6 +452,7 @@ export function nextPassFor(take, state) {
 // must not take the panel down because someone typed "quantise".
 export const RECORDER_SCRIPT_ACTIONS = [
   'record', 'stop', 'play', 'clear', 'undo', 'quantize', 'transpose', 'bars', 'source',
+  'nudge', 'shift', 'store', 'load', 'countIn',
 ];
 
 export function recorderScriptPatch(cfg, action, args = {}) {
@@ -401,6 +516,43 @@ export function recorderScriptPatch(cfg, action, args = {}) {
     case 'source': {
       const s = String(a.source ?? '');
       return ['input', 'panel', 'both'].includes(s) ? { source: s } : {};
+    }
+    case 'nudge': {
+      if (busy) return {};
+      const d = Number(a.by);
+      if (!Number.isFinite(d) || d === 0) return {};
+      const next = nudgeTake(take, d);
+      return next === take ? {} : { take: next };
+    }
+    // `shift` transposes the TAKE, where `transpose` only changes playback. Two
+    // commands because they are genuinely different: one rewrites what you
+    // recorded, the other leaves it alone.
+    case 'shift': {
+      if (busy) return {};
+      const by = Number(a.semitones);
+      if (!Number.isFinite(by) || by === 0) return {};
+      const next = transposeTake(take, by);
+      return next === take ? {} : { take: next };
+    }
+    case 'store': {
+      if (busy) return {};
+      const i = Number(a.slot);
+      if (!Number.isFinite(i)) return {};
+      const slots = storeSlot(c.slots, Math.round(i) - 1, take, a.name ? String(a.name) : null);
+      return slots.length ? { slots } : {};
+    }
+    case 'load': {
+      if (busy) return {};
+      const i = Number(a.slot);
+      if (!Number.isFinite(i)) return {};
+      const idx = Math.round(i) - 1;
+      const list = Array.isArray(c.slots) ? c.slots : [];
+      if (idx < 0 || idx >= list.length) return {};
+      return { take: loadSlot(list, idx), slot: idx };
+    }
+    case 'countIn': {
+      const n = Number(a.bars);
+      return Number.isFinite(n) ? { countIn: clampInt(n, 0, 4) } : {};
     }
     default:
       return {};

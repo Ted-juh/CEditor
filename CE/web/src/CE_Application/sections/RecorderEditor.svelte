@@ -5,6 +5,8 @@
     quantizeTake, RECORDER_STATE_LABELS, RECORDER_STATES, recorderState,
     isRecordingState, toggleRecordState, takeIsEmpty, MIN_BARS, MAX_BARS, MAX_EVENTS,
     rowLabelFor, takeNoteRange, recorderUseFlats,
+    editNote, deleteNote, nudgeTake, transposeTake,
+    recorderSlots, slotIndex, storeSlot, loadSlot, MAX_SLOTS, countInBars,
   } from '../utils/noteRecorderLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -48,6 +50,17 @@
     return `${rowLabelFor(r.lo, f)} – ${rowLabelFor(r.hi, f)}`;
   });
 
+  // Note repair. Addressed by index into the sorted list, because a take has no
+  // stable ids and adding them would only be for this.
+  let selNote = $state(0);
+  let notes = $derived(take.events);
+  let sel = $derived(notes[Math.min(selNote, Math.max(0, notes.length - 1))] ?? null);
+  let selIdx = $derived(Math.min(selNote, Math.max(0, notes.length - 1)));
+  function patchNote(patch) { set('take', editNote(take, selIdx, patch)); }
+
+  let slots = $derived.by(() => { try { return recorderSlots(control); } catch { return []; } });
+  let liveSlot = $derived.by(() => { try { return slotIndex(control); } catch { return -1; } });
+
   function applyQuantize() {
     set('take', quantizeTake(take, {
       grid: clampInt(p.grid, 1, 64, 16),
@@ -87,8 +100,11 @@
         <option value="panel">Panel only</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="One pass" span={2} hint="Stop at the end of the first lap instead of layering until you press stop.">
+    <PropertyCell label="One pass" span={1} hint="Stop at the end of the first lap instead of layering until you press stop.">
       <PropertyToggle value={p.once === true} onchange={() => set('once', !(p.once === true))} />
+    </PropertyCell>
+    <PropertyCell label="Count-in" span={1} hint="Bars to wait after arming before it starts capturing. The Transport's count-in counts the whole panel in from a stop; this one counts THIS recorder in from wherever the music already is — what you want when the band is playing and you want the next four bars. It still starts on a loop boundary, just a later one.">
+      <input class="val" type="number" min="0" max="4" step="1" value={countInBars(control)} onchange={(e) => set('countIn', clampInt(e.target.value, 0, 4, 0))} />
     </PropertyCell>
 
     <TransportSyncCells
@@ -154,6 +170,69 @@
     </PropertyCell>
   </PropertySection>
 
+  <PropertySection title="Repair">
+    <PropertyCell label="" span={4} hint="">
+      <div class="note">
+        Not a piano roll — the Phrase Sequencer is that. These are the repairs you want on a take
+        you otherwise like: it is consistently a hair late, or one note landed wrong.
+      </div>
+    </PropertyCell>
+    <PropertyCell label="Whole take" span={4} hint="Nudge moves everything; shift transposes the take itself rather than only its playback, so what you see is what is stored.">
+      <div class="transport">
+        <button type="button" class="btn" disabled={!count} onclick={() => set('take', nudgeTake(take, -0.01))}>◀ nudge</button>
+        <button type="button" class="btn" disabled={!count} onclick={() => set('take', nudgeTake(take, 0.01))}>nudge ▶</button>
+        <button type="button" class="btn" disabled={!count} onclick={() => set('take', transposeTake(take, -12))}>−8ve</button>
+        <button type="button" class="btn" disabled={!count} onclick={() => set('take', transposeTake(take, 12))}>+8ve</button>
+      </div>
+    </PropertyCell>
+    {#if count}
+      <PropertyCell label="Note" span={2} hint="Which recorded note the fields below edit, in time order.">
+        <input class="val" type="number" min="1" max={count} step="1" value={selIdx + 1} onchange={(e) => { selNote = clampInt(e.target.value, 1, count, 1) - 1; }} />
+      </PropertyCell>
+      <PropertyCell label="" span={2} hint="">
+        <div class="note">{sel ? `${rowLabelFor(sel.note, recorderUseFlats(control))} at ${(sel.t * 100).toFixed(1)}%` : '—'}</div>
+      </PropertyCell>
+      {#if sel}
+        <PropertyCell label="Position" span={1} hint="Where in the loop it starts, as a percentage.">
+          <input class="val" type="number" min="0" max="99.9" step="0.5" value={Number((sel.t * 100).toFixed(1))} onchange={(e) => patchNote({ t: clampNum(e.target.value, 0, 99.9, 0) / 100 })} />
+        </PropertyCell>
+        <PropertyCell label="Pitch" span={1} hint="MIDI note number.">
+          <input class="val" type="number" min="0" max="127" step="1" value={sel.note} onchange={(e) => patchNote({ note: clampInt(e.target.value, 0, 127, 60) })} />
+        </PropertyCell>
+        <PropertyCell label="Velocity" span={1} hint="">
+          <input class="val" type="number" min="1" max="127" step="1" value={sel.velocity} onchange={(e) => patchNote({ velocity: clampInt(e.target.value, 1, 127, 100) })} />
+        </PropertyCell>
+        <PropertyCell label="Length" span={1} hint="As a fraction of the loop.">
+          <input class="val" type="number" min="0.1" max="100" step="1" value={Number((sel.dur * 100).toFixed(1))} onchange={(e) => patchNote({ dur: clampNum(e.target.value, 0.1, 100, 10) / 100 })} />
+        </PropertyCell>
+        <PropertyCell label="" span={4} hint="">
+          <button type="button" class="btn" onclick={() => set('take', deleteNote(take, selIdx))}>Delete this note</button>
+        </PropertyCell>
+      {/if}
+    {/if}
+  </PropertySection>
+
+  <PropertySection title="Takes">
+    <PropertyCell label="" span={4} hint="Storing and loading are copies in each direction — otherwise editing the live take would silently rewrite the stored one.">
+      <div class="note">
+        {slots.length ? `${slots.length} stored${liveSlot >= 0 ? ` · slot ${liveSlot + 1} was loaded last` : ''}.` : 'No stored takes yet.'}
+      </div>
+    </PropertyCell>
+    <PropertyCell label="" span={4} hint="">
+      <div class="slots">
+        {#each Array.from({ length: MAX_SLOTS }, (_, i) => i) as i (i)}
+          {@const has = slots[i] && slots[i].events.length}
+          <div class="slot" class:filled={has} class:live={i === liveSlot}>
+            <span class="sn">{i + 1}</span>
+            <button type="button" class="mini" title="Store the live take here" disabled={!count} onclick={() => set('slots', storeSlot(slots, i, take))}>Store</button>
+            <button type="button" class="mini" title="Load this take" disabled={!has} onclick={() => { set('take', loadSlot(slots, i)); set('slot', i); }}>Load</button>
+            <span class="sc">{has ? `${slots[i].events.length}` : '—'}</span>
+          </div>
+        {/each}
+      </div>
+    </PropertyCell>
+  </PropertySection>
+
   <PropertySection title="Display">
     <PropertyCell label="Click to arm" span={1} hint="Clicking the roll in preview arms and stops it. Turn off for a display-only recorder driven by a script.">
       <PropertyToggle value={p.editable !== false} onchange={() => set('editable', !(p.editable !== false))} />
@@ -182,6 +261,15 @@
   .val { width: 100%; background: #141420; border: 1px solid #2a2a36; color: #E8E8EE; font-size: 12px; padding: 3px 6px; border-radius: 4px; }
   .note { font-size: 11px; color: #9a9aa4; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 5px 7px; line-height: 1.5; }
   .transport { display: flex; flex-wrap: wrap; gap: 5px; }
+  .slots { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .slot { display: flex; align-items: center; gap: 4px; border: 1px solid #2a2a36; border-radius: 4px; padding: 3px 5px; background: #12121a; }
+  .slot.filled { border-color: #3a3a48; }
+  .slot.live { border-color: #56CCF2; }
+  .sn { font-size: 10.5px; color: #7a7a84; width: 10px; }
+  .sc { font-size: 10.5px; color: #7a7a84; margin-left: auto; }
+  .mini { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 10.5px; padding: 2px 6px; border-radius: 3px; cursor: pointer; }
+  .mini:hover:not(:disabled) { border-color: #4a4a58; }
+  .mini:disabled { opacity: 0.35; cursor: default; }
   .btn { background: #1A1A1A; border: 1px solid #333; color: #C8C8CE; font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
   .btn:hover:not(:disabled) { border-color: #4a4a58; color: #E8E8EE; }
   .btn:disabled { opacity: 0.4; cursor: default; }
