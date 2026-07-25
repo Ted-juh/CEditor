@@ -119,6 +119,12 @@
     EMERGENCY_PANIC, isPanicShortcut, DEFAULT_PANIC_SHORTCUT,
   } from '../utils/panicLayout.js';
   import {
+    splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
+    noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
+    EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
+    releaseAll as splitReleaseAll, reconcileHeld as splitReconcile, soundingNotes,
+  } from '../utils/splitZoneLayout.js';
+  import {
     transportConfig, transportGeometry as tpGeometry, hitTransportButton,
     transportSource as tpSource, tapTempo, crossedSteps, transportIsFollowing,
     cyclePhaseAt, musicalDelta, loopRegion, countInBars,
@@ -131,7 +137,7 @@
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
-  import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
+  import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     createTimedButtonPreviewController,
@@ -262,7 +268,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))));
+    return applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2701,6 +2707,127 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Zone Splitter: one keyboard, several synths ------------------------------
+  // The first control here that is purely a ROUTER: it plays nothing of its own,
+  // it re-sends what arrives on the hardware input. Notes go out on the same raw
+  // MIDI path the Chord Pad and Arp use.
+  //
+  // The trap this has to get right is note-OFF. A note-off must go to exactly
+  // the destinations its note-on went to — if the user drags a split point, or
+  // changes a transposition, while a key is down, re-deriving the routing at
+  // release time sends the off to the wrong channel or the wrong pitch and
+  // leaves the original note ringing forever. So every note-on's routing is
+  // REMEMBERED and the off replays it.
+  const SPLIT_PAD = 8;
+  const splitSounding = {};       // id -> pure sounding map (see splitZoneLayout)
+  const splitSeen = {};           // id -> last note-input seq consumed
+  let splitEdgeDrag = null;       // { id, index, edge, note } while dragging a split point
+  let splitKeyPress = null;       // { id, note } while auditioning from the keyboard
+  function isSplitZoneControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'SplitZone';
+  }
+  function splitControls() {
+    return (orderedControls ?? []).filter((c) => isSplitZoneControl(c));
+  }
+  function splitGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const cfg = splitConfig(control);
+    const lanes = Math.max(1, splitZones(control).length);
+    return splitGeometry(numberOr(t.width, 0), numberOr(t.height, 0), SPLIT_PAD,
+      cfg.showHeader !== false ? 20 : 0, Math.min(26, Math.max(10, lanes * 8)));
+  }
+  // Everything below is a thin executor over the pure reducer in
+  // splitZoneLayout.js: it decides what to send, this sends it.
+  function runSplitSends(sends) {
+    for (const m of sends) {
+      if (m.kind === 'on') sendNoteBytes(noteOnBytes(m.channel, m.note, m.velocity), `split_on_${m.note}`);
+      else sendNoteBytes(noteOffBytes(m.channel, m.note), `split_off_${m.note}`);
+    }
+  }
+  function splitNoteOn(control, note, velocity) {
+    const id = getControlId(control);
+    const r = splitPress(splitSounding[id] ?? EMPTY_SOUNDING, control, note, velocity);
+    splitSounding[id] = r.sounding;
+    runSplitSends(r.sends);
+  }
+  function splitReleaseKey(control, note) {
+    const id = getControlId(control);
+    const r = splitRelease(splitSounding[id] ?? EMPTY_SOUNDING, note);
+    splitSounding[id] = r.sounding;
+    runSplitSends(r.sends);
+  }
+  function splitAllOff(control) {
+    const id = getControlId(control);
+    const r = splitReleaseAll(splitSounding[id] ?? EMPTY_SOUNDING);
+    splitSounding[id] = r.sounding;
+    runSplitSends(r.sends);
+  }
+  // Consume the live held-note state. Driven off the shared note-input store, so
+  // one subscription feeds every splitter on the panel.
+  function pumpSplitInput(control) {
+    ensureNoteInput();
+    const id = getControlId(control);
+    const seq = $midiNoteState.seq;
+    if (splitSeen[id] === seq) return;
+    splitSeen[id] = seq;
+    const entries = inputHeldEntries($midiNoteState.notes, splitInputChannel(control));
+    const keep = splitKeyPress && splitKeyPress.id === id ? splitKeyPress.note : null;
+    const r = splitReconcile(splitSounding[id] ?? EMPTY_SOUNDING, control, entries, keep);
+    splitSounding[id] = r.sounding;
+    runSplitSends(r.sends);
+  }
+  function applySplitZoneValueSource(control, resolved) {
+    if (!isSplitZoneControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.SplitZone;
+    if (!cfg) return resolved;
+    pumpSplitInput(control);
+    const id = getControlId(control);
+    const sess = sessionFor(control);
+    const next = { ...cfg, __held: soundingNotes(splitSounding[id]) };
+    // A drag is previewed from the session, so the keyboard follows the cursor
+    // before anything is committed to the model.
+    if (Array.isArray(sess?.splitZones)) next.zones = sess.splitZones;
+    if (splitEdgeDrag && splitEdgeDrag.id === id) next.__dragEdge = { note: splitEdgeDrag.note };
+    return { ...resolved, control: { ...base, _children: { ...base._children, SplitZone: next } } };
+  }
+  // Pointer-down: grab a split point on the band strip, or audition a key.
+  function handleSplitZonePointerDown(control, localPoint) {
+    if (!isSplitZoneControl(control) || splitConfig(control).editable === false) return false;
+    const geom = splitGeomFor(control);
+    const range = splitRange(control);
+    const id = getControlId(control);
+    const edge = hitZoneEdge(control, geom, localPoint.x, localPoint.y, range.lowNote, range.highNote);
+    if (edge) {
+      const note = splitNoteAt(geom, localPoint.x, geom.keysY + 2, range.lowNote, range.highNote);
+      splitEdgeDrag = { id, index: edge.index, edge: edge.edge, note: note >= 0 ? note : range.lowNote };
+      return true;
+    }
+    // Clicking a key plays it through the zones — auditioning a split without
+    // needing the hardware plugged in, which is most of the editor's life.
+    const note = splitNoteAt(geom, localPoint.x, localPoint.y, range.lowNote, range.highNote);
+    if (note < 0) return false;
+    splitKeyPress = { id, note };
+    splitNoteOn(control, note, 100);
+    return true;
+  }
+  function moveSplitDrag(control, localPoint) {
+    const geom = splitGeomFor(control);
+    const range = splitRange(control);
+    const note = splitNoteAt(geom, localPoint.x, geom.keysY + 2, range.lowNote, range.highNote);
+    if (note < 0 || note === splitEdgeDrag.note) return;
+    splitEdgeDrag.note = note;
+    patchControlSession(splitEdgeDrag.id, {
+      splitZones: dragSplitPoint(splitZones(control), splitEdgeDrag.index, splitEdgeDrag.edge, note),
+    });
+  }
+  function releaseSplitDrag(control) {
+    const zones = sessionFor(control)?.splitZones;
+    if (Array.isArray(zones)) updateControlProperty(getControlId(control), 'SplitZone.zones', zones);
+    patchControlSession(getControlId(control), { splitZones: undefined });
+    splitEdgeDrag = null;
+  }
+
   // --- Transport: the master clock --------------------------------------------
   // The component is a face on the shared clock in stores/transport.js, not a
   // clock of its own — two transports on a panel drive the same one, which is
@@ -2799,6 +2926,7 @@
   function silenceLocalNoteControls() {
     for (const c of (orderedControls ?? [])) {
       if (isChordPadControl(c)) chordAllOff(c);
+      else if (isSplitZoneControl(c)) { splitAllOff(c); splitSeen[getControlId(c)] = null; }
       else if (isArpControl(c)) { arpAllOff(c); arpLatched[getControlId(c)] = null; }
       else if (isNoteRibbonControl(c)) {
         if (ribbonPress && ribbonPress.id === getControlId(c)) {
@@ -4389,6 +4517,11 @@
       patchControlSession(getControlId(control), { listboxScrollTop: next });
       return;
     }
+    // Zone Splitter: drag a split point along the keyboard.
+    if (splitEdgeDrag && splitEdgeDrag.id === getControlId(control)) {
+      moveSplitDrag(control, controlLocalPoint(event));
+      return;
+    }
     // Envelope: drag the grabbed node (constrained + snapped), live into session.
     if (envDrag && envDrag.id === getControlId(control)) {
       const geom = envGeomFor(control);
@@ -4627,6 +4760,8 @@
     handlePanicPointerDown(control, pointerDownLocal);
     // Transport: play/stop, or tap tempo.
     handleTransportPointerDown(control, pointerDownLocal);
+    // Zone Splitter: grab a split point, or audition a key.
+    handleSplitZonePointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -4787,6 +4922,13 @@
     const activeControl = orderedControls.find((control) => getControlId(control) === activeId) ?? null;
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
+
+    // Commit a split-point drag; release an auditioned key.
+    if (splitEdgeDrag && activeControl) releaseSplitDrag(activeControl);
+    if (splitKeyPress && activeControl) {
+      splitReleaseKey(activeControl, splitKeyPress.note);
+      splitKeyPress = null;
+    }
 
     // Commit an envelope node drag: persist the working points to the model,
     // then drop the live session override so the model is the source of truth.

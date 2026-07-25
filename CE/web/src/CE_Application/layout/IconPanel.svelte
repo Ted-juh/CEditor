@@ -18,6 +18,7 @@
     Piano,
     LayoutGrid,
     OctagonAlert,
+    SplitSquareHorizontal,
     Timer,
     Gauge,
     Spline,
@@ -136,6 +137,7 @@
       { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
       { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
       { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
+      { type: 'SplitZone',       icon: SplitSquareHorizontal, label: 'Insert Zone Splitter (keyboard split)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

@@ -9,7 +9,9 @@ One button, three jobs — and the third is the one that matters.
 
 1. Stops the panel's own note controls: [Chord Pad](./chord-pad.md) pads, a
    running [Arpeggiator](./arpeggiator.md), a held
-   [Ribbon](./ribbon-keyboard.md), latched [Drum Pads](./drum-pads.md).
+   [Ribbon](./ribbon-keyboard.md), latched [Drum Pads](./drum-pads.md), and
+   anything a [Zone Splitter](./zone-splitter.md) is holding — using its
+   remembered routings, so the offs go where the ons went.
 2. Clears the [echoed note display](./note-input-echo.md).
 3. **Sends the standard silence set to the synth.** This is the point. A
    note-off lost to a cable, or a keyboard unplugged mid-note, leaves a note

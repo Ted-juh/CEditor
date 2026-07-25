@@ -1252,6 +1252,34 @@ export const SECTION_DEFAULTS = {
   /** Panic — silence everything: the notes this panel is holding, the echoed
    *  note display, and whatever the SYNTH is still holding after a lost
    *  note-off. Emits MIDI, so no DeviceBindings. */
+  SplitZone: {
+    _type: 'SplitZone',
+    inputChannel: 0,             // MIDI channel to listen on (0 = omni)
+    unmatched: 'drop',           // notes no zone claims: drop | pass
+    passChannel: 1,              // …and the channel to pass them on
+    lowNote: 36,                 // drawn keyboard range (snapped to white keys)
+    highNote: 96,
+    // Zones may OVERLAP — that is how you layer. A note in two zones is sent
+    // twice, on two channels, with two transpositions.
+    zones: [
+      { id: 'z0', label: 'Bass', lowNote: 36, highNote: 59, channel: 1, transpose: -12,
+        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100, enabled: true, colour: 'FF5B9BD5' },
+      { id: 'z1', label: 'Lead', lowNote: 60, highNote: 96, channel: 2, transpose: 0,
+        curve: 'linear', velLow: 1, velHigh: 127, fixedVelocity: 100, enabled: true, colour: 'FF39D98A' },
+    ],
+    editable: true,              // drag split points; click the keys to audition
+    showHeader: true,
+    showLabels: true,            // zone names on the bands
+    showGaps: true,              // mark keys no zone claims
+    // Colours.
+    faceColour: 'FF141420',
+    whiteColour: 'FFE8E8EE',
+    blackColour: 'FF1A1A22',
+    litColour: 'FFF2C94C',
+    gapColour: 'FF3A3A46',
+    labelColour: 'FFB9B9B9',
+  },
+
   Panic: {
     _type: 'Panic',
     label: 'PANIC',

@@ -96,3 +96,7 @@ There was already an unused pipe. The JUCE side has always emitted
   expression / foot / velocity sources. The parser gained a second reducer for
   continuous controllers, kept in a separate store so a CC sweep never
   re-renders the note displays.
+- ~~Route the notes, don't just display them~~ — **done**: the
+  [Zone Splitter](./zone-splitter.md) matches incoming notes against key zones
+  and re-sends each on its own channel, transposed, with its own velocity
+  response. It reads the same held-note state these displays do.

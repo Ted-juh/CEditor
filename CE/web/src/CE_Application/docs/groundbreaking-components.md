@@ -97,6 +97,17 @@ not DSP:
   **count-in** (armed, not running — so all six followers hold and stay silent
   with no change to any of them). See [transport.md](./transport.md).
 
+### 00h. Zone Splitter — one keyboard, several synths — **shipped 🟢**
+- A routing table: notes arriving on the hardware input are matched against key
+  **zones**, each re-sending on its own channel, transposed, with its own
+  velocity response. Lower half to the bass synth an octave down, upper half to
+  the lead — the most-wanted thing here, and impossible before the note-input
+  work made incoming notes visible. **Overlap is layering**; there is no separate
+  layer mode to get wrong, and the inspector calls out both overlaps and gaps
+  because both are silent-until-you-notice. A note-off replays the **remembered**
+  routing of its note-on, so dragging a split point while a key is held can't
+  leave it ringing. See [zone-splitter.md](./zone-splitter.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

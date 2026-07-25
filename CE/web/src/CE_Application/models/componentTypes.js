@@ -780,6 +780,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  SplitZone: {
+    // A routing table: notes in on the hardware input, notes out on the raw MIDI
+    // path. Like the other note controls it emits MIDI rather than parameter
+    // values, so there is no DeviceBindings section.
+    sections: ['Background', 'SplitZone', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('SplitZone'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 110 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Panic: {
     // Emits MIDI directly, like the note-playing controls — no DeviceBindings.
     sections: ['Background', 'Panic', 'Text', 'Effects', 'Scripts'],
