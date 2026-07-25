@@ -69,8 +69,11 @@ legato and each note runs into the next.
 
 ## Possible next steps
 
-- **Tempo sync** — steps per beat against a host/global BPM instead of
-  steps-per-second.
+- ~~**Tempo sync**~~ — **done**. Turn on *Timing → Sync to transport* and the
+  rate field becomes a note division locked to the panel's
+  [Transport](./transport.md). The step index is derived from the transport's
+  *position*, not from a rate, so a synced arp resumes mid-bar where the bar
+  says it should and never drifts against anything else on the clock.
 - **Per-step velocity / accent** — a second row you can paint, like the Turing
   Modulator's bars.
 - **Ratchets** — repeat a step N times inside its slot.

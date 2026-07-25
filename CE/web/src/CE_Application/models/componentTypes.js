@@ -796,6 +796,22 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Transport: {
+    // Emits MIDI clock directly rather than driving a parameter.
+    sections: ['Background', 'Transport', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Transport'),
+    defaultOverrides: {
+      Transform: { width: 230, height: 58 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

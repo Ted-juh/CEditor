@@ -6,6 +6,7 @@
 // own chord and its note-output path to sound. Pure sequencing math + geometry —
 // randomness and time come in as arguments, so it's all unit-tested.
 import { SCALES, degreeChord, chordNotes, useFlats, noteName } from './chordPadLayout.js';
+import { DIVISION_IDS, DIVISION_LABELS, beatsPerStep, secondsPerBeat } from './transportLayout.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -37,6 +38,22 @@ export function arpPhase(control) {
   return wrap01(cfg.__phase !== undefined ? cfg.__phase : cfg.phase);
 }
 export function arpRate(control) { return Math.max(0.1, num(arpConfig(control).rate, 6)); }   // steps/sec
+
+// --- Tempo sync ---------------------------------------------------------------
+// Free-running, the Arp walks at `rate` steps per second, which is a speed and
+// not a tempo: two Arps at 6/s drift apart, and neither lines up with a bar.
+// Synced, the step length comes from the transport instead — and because the
+// transport hands out a POSITION rather than a rate, the step index is derived
+// from that position, so a synced Arp is at the same step as everything else
+// following the same clock no matter when it was switched on.
+export function arpSynced(control) { return arpConfig(control).syncToTransport === true; }
+export function arpDivision(control) {
+  const d = String(arpConfig(control).division ?? '1/16');
+  return DIVISION_IDS.includes(d) ? d : '1/16';
+}
+export function arpDivisionLabel(control) { return DIVISION_LABELS[arpDivision(control)] ?? arpDivision(control); }
+// Beats per step when synced — what the transport measures its position in.
+export function arpBeatsPerStep(control) { return beatsPerStep(arpDivision(control)); }
 export function arpVelocity(control) { return clampInt(arpConfig(control).velocity ?? 96, 1, 127); }
 export function arpChannel(control) { return clampInt(arpConfig(control).channel ?? 1, 1, 16); }
 
@@ -147,7 +164,27 @@ export function gateSeconds(control, stepSeconds) {
   const g = clamp01(num(arpConfig(control).gate, 0.6));
   return Math.max(0.01, g * Math.max(0.01, num(stepSeconds, 0.1)));
 }
-export function stepSeconds(control) { return 1 / arpRate(control); }
+// How long one step lasts. Free-running that's just 1/rate; synced it's the
+// division at the transport's tempo, so gate and swing — both expressed as a
+// fraction of the step — follow the tempo without any extra plumbing.
+export function stepSeconds(control, bpm = null) {
+  if (arpSynced(control) && bpm !== null) return arpBeatsPerStep(control) * secondsPerBeat(bpm);
+  return 1 / arpRate(control);
+}
+// Which step of a `length`-step sequence a transport position lands on, and the
+// matching 0..1 phase for drawing. Position in, no accumulation: switch a synced
+// Arp off and on mid-bar and it resumes exactly where the bar says it should be.
+export function syncedStepAt(beats, control, length) {
+  const n = Math.max(1, Math.round(num(length, 1)));
+  const per = arpBeatsPerStep(control);
+  const global = Math.floor(Math.max(0, num(beats, 0)) / per);
+  return ((global % n) + n) % n;
+}
+export function syncedPhaseAt(beats, control, length) {
+  const n = Math.max(1, Math.round(num(length, 1)));
+  const per = arpBeatsPerStep(control);
+  return wrap01((Math.max(0, num(beats, 0)) / per) / n);
+}
 
 // Toggle a hand-mute on step `i`, returning the new mute list (pure).
 export function toggleMute(control, i) {

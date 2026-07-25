@@ -70,6 +70,17 @@ not DSP:
   with an exported Player), automatically when you leave the panel, and as a
   **script command** any button can fire. See [panic.md](./panic.md).
 
+### 00g. Transport — the master clock — **shipped 🟢**
+- Play / stop, tempo, bar-and-beat position, and something for everything else
+  to follow. Position is **recomputed from the start instant**, never
+  accumulated, so it cannot drift; a late frame fires the steps it slept through
+  instead of leaving a hole in the bar. Runs on a 4ms interval (so MIDI
+  clock-out isn't jittered by the display, and it survives a backgrounded
+  window) but publishes to the UI at 30Hz. Follows **incoming MIDI clock** —
+  bytes that were already arriving and being thrown away — or sends it. The
+  [Arpeggiator](./arpeggiator.md) is the first component synced to it, by note
+  division. See [transport.md](./transport.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

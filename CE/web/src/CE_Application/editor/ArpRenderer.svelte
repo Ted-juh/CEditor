@@ -8,7 +8,7 @@
   import {
     arpConfig, arpPattern, arpPhase, arpRate, arpBaseNotes, arpSequence,
     stepFires, stepIndexAt, arpUseFlats, midiNoteLabel,
-    arpGeometry, arpCell, ARP_PATTERN_LABELS,
+    arpGeometry, arpCell, ARP_PATTERN_LABELS, arpSynced, arpDivisionLabel,
   } from '../utils/arpLayout.js';
 
   let { control = null, width = 0, height = 0 } = $props();
@@ -62,7 +62,12 @@
     if (src === 'input') return sourceHeld ? 'MIDI in' : 'MIDI in · idle';
     return 'Chord';
   });
-  let rateLabel = $derived(`${arpRate(control).toFixed(arpRate(control) < 10 ? 1 : 0)}/s`);
+  // Synced, the speed IS the division — showing "6.0/s" next to a 16th note
+  // would be two different answers to the same question.
+  let synced = $derived(arpSynced(control));
+  let rateLabel = $derived(synced
+    ? `⧗ ${arpDivisionLabel(control)}`
+    : `${arpRate(control).toFixed(arpRate(control) < 10 ? 1 : 0)}/s`);
   let running = $derived(cfg.running !== false);
 </script>
 

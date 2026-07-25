@@ -47,6 +47,7 @@ const LAZY_COMPONENT_LOADERS = {
   noteribbon: () => import('../sections/NoteRibbonEditor.svelte'),
   drumpads: () => import('../sections/DrumPadsEditor.svelte'),
   panic: () => import('../sections/PanicEditor.svelte'),
+  transport: () => import('../sections/TransportEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),

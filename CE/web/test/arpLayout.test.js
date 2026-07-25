@@ -5,6 +5,7 @@ import {
   euclid, stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
   arpGeometry, arpCell, arpCellAt, arpVelocity, arpChannel, ARP_PATTERNS,
   toggleMute, midiNoteLabel, arpUseFlats, arpSource, arpSourceIsExternal, ARP_SOURCES,
+  arpSynced, arpDivision, arpBeatsPerStep, syncedStepAt, syncedPhaseAt,
 } from '../src/CE_Application/utils/arpLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -143,4 +144,52 @@ test('note labels + spelling', () => {
 test('pattern registry is complete', () => {
   assert.equal(ARP_PATTERNS.length, 7);
   for (const p of ARP_PATTERNS) assert.equal(arpPattern(ap({ pattern: p })), p);
+});
+
+// --- Tempo sync ---------------------------------------------------------------
+test('sync config falls back to a sane division', () => {
+  assert.equal(arpSynced(ap({})), false);
+  assert.equal(arpSynced(ap({ syncToTransport: true })), true);
+  assert.equal(arpDivision(ap({})), '1/16');
+  assert.equal(arpDivision(ap({ division: 'banana' })), '1/16');
+  assert.equal(arpDivision(ap({ division: '1/8T' })), '1/8T');
+  assert.ok(near(arpBeatsPerStep(ap({ division: '1/8' })), 0.5));
+  assert.ok(near(arpBeatsPerStep(ap({ division: '1/4D' })), 1.5));
+});
+
+test('synced step length is the division at the transport tempo', () => {
+  const free = ap({ rate: 4 });
+  assert.ok(near(stepSeconds(free, 120), 0.25));           // not synced: bpm ignored
+  const sync = ap({ rate: 4, syncToTransport: true, division: '1/16' });
+  assert.ok(near(stepSeconds(sync, 120), 0.125));          // 16th at 120bpm
+  assert.ok(near(stepSeconds(sync, 60), 0.25));            // half the tempo, twice as long
+  // No transport reading available yet — fall back to the free-running rate
+  // rather than guessing a tempo.
+  assert.ok(near(stepSeconds(sync, null), 0.25));
+  // Gate is a fraction of the step, so it follows the tempo for free.
+  assert.ok(near(gateSeconds(ap({ gate: 0.5, syncToTransport: true }), stepSeconds(sync, 120)), 0.0625));
+});
+
+test('synced position maps to a step without accumulating', () => {
+  const c = ap({ syncToTransport: true, division: '1/16' });   // 0.25 beats/step
+  assert.equal(syncedStepAt(0, c, 4), 0);
+  assert.equal(syncedStepAt(0.24, c, 4), 0);
+  assert.equal(syncedStepAt(0.25, c, 4), 1);
+  assert.equal(syncedStepAt(0.75, c, 4), 3);
+  assert.equal(syncedStepAt(1.0, c, 4), 0);                    // wraps with the sequence
+  // The point of position-not-phase: joining late lands on the step the bar is
+  // actually on, not on step 0.
+  assert.equal(syncedStepAt(12.5, c, 4), 2);
+  assert.ok(near(syncedPhaseAt(0.5, c, 4), 0.5));
+  assert.ok(near(syncedPhaseAt(1.5, c, 4), 0.5));              // one sequence later, same phase
+});
+
+test('two synced arps on different divisions stay in a fixed ratio', () => {
+  const eighth = ap({ syncToTransport: true, division: '1/8' });
+  const sixteenth = ap({ syncToTransport: true, division: '1/16' });
+  for (const beats of [0.5, 1.25, 3, 7.75]) {
+    const a = Math.floor(beats / arpBeatsPerStep(eighth));
+    const b = Math.floor(beats / arpBeatsPerStep(sixteenth));
+    assert.equal(b, a * 2 + (Math.floor(beats * 4) % 2));      // exactly twice as fast, always
+  }
 });

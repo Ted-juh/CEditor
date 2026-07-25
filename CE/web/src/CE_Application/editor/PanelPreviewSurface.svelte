@@ -90,6 +90,7 @@
     arpConfig, arpRate, arpVelocity, arpChannel, arpBaseNotes, arpSequence,
     stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
     arpGeometry, arpCellAt, toggleMute, arpPhase,
+    arpSynced, arpDivision, syncedPhaseAt,
   } from '../utils/arpLayout.js';
   // The touch-strip Ribbon (a parameter control) already owns the plain
   // ribbonConfig/ribbonGeometry names, so the note ribbon's come in aliased.
@@ -113,6 +114,15 @@
     panicConfig, panicMessages, panicGeometry, panicHit,
     EMERGENCY_PANIC, isPanicShortcut, DEFAULT_PANIC_SHORTCUT,
   } from '../utils/panicLayout.js';
+  import {
+    transportConfig, transportGeometry as tpGeometry, hitTransportButton,
+    transportSource as tpSource, tapTempo, crossedSteps,
+  } from '../utils/transportLayout.js';
+  import {
+    transport, startTransport, stopTransport, toggleTransport,
+    setTransportBpm, setTransportSource, setTransportClockOut,
+    transportBeatsNow, isTransportRunning, transportBpmNow,
+  } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
   import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
@@ -245,7 +255,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))));
+    return applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2244,6 +2254,7 @@
   const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
+  const arpBeatsState = {};     // id -> last transport reading, for synced arps
   let arpTickerRunning = false;
   let arpLastMs = 0;
   function isArpControl(control) {
@@ -2307,12 +2318,12 @@
     for (const note of ringing ?? []) sendNoteBytes(noteOffBytes(ch, note), `arp_off_${note}`);
     arpSounding[id] = new Set();
   }
-  function arpFireStep(control, notes, stepIdx) {
+  function arpFireStep(control, notes, stepIdx, bpm = null) {
     const id = getControlId(control);
     const cfg = arpConfig(control);
     const ch = arpChannel(control);
     const vel = arpVelocity(control);
-    const secs = stepSeconds(control);
+    const secs = stepSeconds(control, bpm);
     const gateMs = gateSeconds(control, secs) * 1000;
     const push = (t) => (arpTimers[id] ??= []).push(t);
     const fire = () => {
@@ -2327,6 +2338,27 @@
     };
     const delayMs = swingDelay(stepIdx, numberOr(cfg.swing, 0), secs) * 1000;
     if (delayMs > 0) push(setTimeout(fire, delayMs)); else fire();
+  }
+  // A synced Arp doesn't advance a phase of its own — it asks the transport
+  // where the music is and works out which step that is. Two consequences worth
+  // the extra branch: it can never drift away from anything else on the clock,
+  // and a frame that arrives late FIRES the steps it slept through (crossedSteps)
+  // instead of leaving a hole in the bar. When the transport is stopped the Arp
+  // holds its position and stays silent, which is what a stopped transport means.
+  function tickSyncedArp(control, id, live, seq) {
+    const beats = transportBeatsNow();
+    const div = arpDivision(control);
+    arpPhaseState[id] = syncedPhaseAt(beats, control, seq.length);
+    const prev = arpBeatsState[id];
+    arpBeatsState[id] = beats;
+    if (!isTransportRunning() || prev === undefined || beats <= prev) return;
+    const bpm = transportBpmNow();
+    const { steps } = crossedSteps(prev, beats, div);
+    for (const global of steps) {
+      const idx = ((global % seq.length) + seq.length) % seq.length;
+      arpLastIdx[id] = idx;
+      if (stepFires(live, idx)) arpFireStep(control, seq[idx], idx, bpm);
+    }
   }
   function ensureArpTicker() {
     if (arpTickerRunning) return;
@@ -2345,9 +2377,13 @@
         if (!seq.length) {                       // nothing held — park at the start
           arpPhaseState[id] = 0;
           arpLastIdx[id] = -1;
+          // Forget the synced reading too, or the first frame after notes come
+          // back would "catch up" every step of the silence.
+          delete arpBeatsState[id];
           arpAllOff(c);
           continue;
         }
+        if (arpSynced(c)) { tickSyncedArp(c, id, live, seq); continue; }
         const prev = arpPhaseState[id] ?? arpPhaseFor(c);
         const phase = (prev + (arpRate(c) / seq.length) * dt) % 1;
         arpPhaseState[id] = phase;
@@ -2597,6 +2633,74 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Transport: the master clock --------------------------------------------
+  // The component is a face on the shared clock in stores/transport.js, not a
+  // clock of its own — two transports on a panel drive the same one, which is
+  // the point.
+  const tapTimes = [];
+  let transportConfigured = false;
+  function isTransportControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Transport';
+  }
+  function tpGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    return tpGeometry(numberOr(t.width, 0), numberOr(t.height, 0), 8);
+  }
+  // Push the control's settings into the shared clock. Done from the value
+  // source so edits take effect live, and once per change rather than per frame.
+  function applyTransportValueSource(control, resolved) {
+    if (!isTransportControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const cfg = base?._children?.Transport;
+    if (!cfg) return resolved;
+    const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}`;
+    if (transportConfigured !== signature) {
+      transportConfigured = signature;
+      setTransportSource(tpSource(base));
+      if (tpSource(base) !== 'external') setTransportBpm(numberOr(cfg.bpm, 120));
+      setTransportClockOut(cfg.clockOut === true);
+      if (cfg.runOnLoad === true && !isTransportRunning()) startTransport(0);
+    }
+    void $transport.seq;                       // re-render on every publish
+    return {
+      ...resolved,
+      control: {
+        ...base,
+        _children: {
+          ...base._children,
+          Transport: {
+            ...cfg,
+            __running: $transport.running,
+            __beats: transportBeatsNow(),
+            __bpm: $transport.externalBpm ?? $transport.bpm,
+            __locked: $transport.externalLocked,
+          },
+        },
+      },
+    };
+  }
+  function handleTransportPointerDown(control, localPoint) {
+    if (!isTransportControl(control) || transportConfig(control).editable === false) return false;
+    const geom = tpGeomFor(control);
+    if (hitTransportButton(geom, localPoint.x, localPoint.y)) {
+      toggleTransport();
+      return true;
+    }
+    // Anywhere else on the face is tap tempo — but only when we're the master;
+    // tapping while following someone else's clock would do nothing and look
+    // broken, so it's simply inactive.
+    if (transportConfig(control).showTap === false || tpSource(control) === 'external') return false;
+    if (localPoint.x < geom.x || localPoint.x > geom.x + geom.w) return false;
+    tapTimes.push(Date.now());
+    if (tapTimes.length > 8) tapTimes.shift();
+    const bpm = tapTempo(tapTimes);
+    if (bpm !== null) {
+      setTransportBpm(bpm);
+      updateControlProperty(getControlId(control), 'Transport.bpm', Math.round(bpm * 10) / 10);
+    }
+    return true;
+  }
+
   // --- Panic: silence everything ----------------------------------------------
   // Three jobs, and the third is the one that matters. It stops the panel's own
   // note controls, clears the echoed display, and sends the standard silence
@@ -4435,6 +4539,8 @@
     handleDrumPadsPointerDown(control, pointerDownLocal);
     // Panic: silence everything.
     handlePanicPointerDown(control, pointerDownLocal);
+    // Transport: play/stop, or tap tempo.
+    handleTransportPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {

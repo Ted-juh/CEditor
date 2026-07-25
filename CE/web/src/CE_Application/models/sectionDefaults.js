@@ -1140,7 +1140,9 @@ export const SECTION_DEFAULTS = {
     linkId: '',                   // control id of the Chord Pad to follow
     inputChannel: 0,              // source 'input': MIDI channel to watch (0 = omni)
     pattern: 'up',                // see ARP_PATTERNS in arpLayout.js
-    rate: 6,                      // steps per second
+    rate: 6,                      // steps per second (free-running)
+    syncToTransport: false,       // follow the panel's Transport instead of `rate`
+    division: '1/16',             // step length when synced (see DIVISIONS)
     octaves: 1,                   // repeat the note set upward
     gate: 0.6,                    // note length as a fraction of the step
     swing: 0,                     // 0 = straight, 1 = max shuffle (delays odd steps)
@@ -1259,6 +1261,27 @@ export const SECTION_DEFAULTS = {
     borderColour: 'FFE05C5C',
     labelColour: 'FFF2C94C',
     flashColour: 'FFE05C5C',
+  },
+
+  /** Transport — the master clock. Everything time-based used to run on its own
+   *  steps-per-second and could not lock to anything; this is what they sync to.
+   *  Emits MIDI clock rather than driving a parameter, so no DeviceBindings. */
+  Transport: {
+    _type: 'Transport',
+    bpm: 120,
+    source: 'internal',           // internal | external (follow MIDI clock in)
+    beatsPerBar: 4,
+    beatUnit: 4,
+    runOnLoad: false,             // start the clock as soon as the panel opens
+    clockOut: false,              // send MIDI clock — 24 messages per quarter note
+    editable: true,               // press play / tap tempo in preview
+    showPosition: true,           // the bar.beat.tick readout
+    showTap: true,                // the tap-tempo button
+    // Colours.
+    faceColour: 'FF141420',
+    accentColour: 'FF39D98A',
+    beatColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
   },
 
   /** Constraint — linked parameters that always preserve a relationship the synth

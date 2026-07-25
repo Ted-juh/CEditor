@@ -2,6 +2,7 @@
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { ARP_PATTERNS, ARP_PATTERN_LABELS, ARP_SOURCES, ARP_SOURCE_LABELS, arpBaseNotes, arpSequence, midiNoteLabel, arpUseFlats, euclid } from '../utils/arpLayout.js';
+  import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -28,6 +29,12 @@
   function clampNum(v, lo, hi, f) { const n = num(v, f); return n < lo ? lo : n > hi ? hi : n; }
 
   let source = $derived(String(a?.source ?? 'chord'));
+  let synced = $derived(a?.syncToTransport === true);
+  // Syncing to a transport the panel doesn't have would leave the Arp silent,
+  // which looks like a bug rather than a missing component. Say so instead.
+  let hasTransport = $derived(
+    ($activePanel?.controls ?? []).some((c) => String(c?._children?.Core?.controlType ?? '') === 'Transport')
+  );
   let isLink = $derived(source === 'link');
   let isInput = $derived(source === 'input');
   let isExternal = $derived(isLink || isInput);
@@ -123,9 +130,25 @@
   </PropertySection>
 
   <PropertySection title="Timing">
-    <PropertyCell label="Rate" span={1} hint="Steps per second.">
-      <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(a.rate, 6)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 6))} />
+    <PropertyCell label="Sync to transport" span={2} hint="Take the step length from the panel's Transport instead of a free-running rate. Synced arps lock to the bar and to each other.">
+      <PropertyToggle value={synced} onchange={(v) => set('syncToTransport', v === true)} />
     </PropertyCell>
+    {#if synced}
+      <PropertyCell label="Division" span={2} hint="Step length in musical time. Gate and swing stay fractions of the step, so they follow the tempo too.">
+        <select class="val" value={String(a.division ?? '1/16')} onchange={(e) => set('division', e.target.value)}>
+          {#each DIVISION_IDS as d}<option value={d}>{d} · {DIVISION_LABELS[d]}</option>{/each}
+        </select>
+      </PropertyCell>
+      {#if !hasTransport}
+        <PropertyCell label="" span={4} hint="">
+          <div class="warn">This panel has no Transport, so there is no clock to follow — the Arp will hold at step 1. Add one from the palette.</div>
+        </PropertyCell>
+      {/if}
+    {:else}
+      <PropertyCell label="Rate" span={1} hint="Steps per second.">
+        <input class="val" type="number" min="0.1" max="40" step="0.5" value={num(a.rate, 6)} onchange={(e) => set('rate', clampNum(e.target.value, 0.1, 40, 6))} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Octaves" span={1} hint="Repeat the note set upward this many octaves.">
       <input class="val" type="number" min="1" max="4" step="1" value={num(a.octaves, 1)} onchange={(e) => set('octaves', clampInt(e.target.value, 1, 4, 1))} />
     </PropertyCell>
@@ -209,6 +232,7 @@
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
   .cswatch { width: 100%; height: 26px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
+  .warn { font-size: 11px; color: #F2C94C; background: #241f10; border: 1px solid #4a3f18; border-radius: 5px; padding: 6px 8px; line-height: 1.5; }
   .preview { font-size: 12px; color: #C8C8CE; background: #141420; border: 1px solid #2a2a36; border-radius: 5px; padding: 6px 8px; line-height: 1.6; }
   .preview.mono { font-family: ui-monospace, Menlo, Consolas, monospace; letter-spacing: 1px; }
   .note { font-size: 11px; color: #8a8a94; }

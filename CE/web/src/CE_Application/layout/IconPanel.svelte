@@ -18,6 +18,7 @@
     Piano,
     LayoutGrid,
     OctagonAlert,
+    Timer,
     Gauge,
     Spline,
     Grid2x2,
@@ -134,6 +135,7 @@
       { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
       { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
       { type: 'Panic',           icon: OctagonAlert,       label: 'Insert Panic button' },
+      { type: 'Transport',       icon: Timer,              label: 'Insert Transport (master clock)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },
