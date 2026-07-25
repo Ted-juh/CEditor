@@ -97,6 +97,17 @@
     <PropertyCell label="Playable" span={1} hint="Allow striking the pads in preview / the player. Dragging across the grid rolls through them.">
       <PropertyToggle value={d.editable !== false} onchange={() => set('editable', !(d.editable !== false))} />
     </PropertyCell>
+    <PropertyCell label="Echo MIDI in" span={1} hint="Light the matching pads from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. The grid becomes a monitor for whatever a sequencer or drum machine is playing.">
+      <PropertyToggle value={d.echo === true} onchange={() => set('echo', !(d.echo === true))} />
+    </PropertyCell>
+    {#if d.echo === true}
+      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
+        <input class="val" type="number" min="0" max="16" step="1" value={num(d.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
+      </PropertyCell>
+      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline.">
+        <input class="cswatch" type="color" value={colRgb(d.echoColour, 'FF39D98A')} onchange={(e) => setCol('echoColour', d.echoColour, e.target.value)} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
       <div class="note">Plays MIDI notes · ch {num(d.channel, 10)}</div>
     </PropertyCell>

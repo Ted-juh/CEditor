@@ -106,6 +106,17 @@
         <input class="val" type="number" min="0" max="127" step="1" value={num(r.modCc, 1)} onchange={(e) => set('modCc', clampInt(e.target.value, 0, 127, 1))} />
       </PropertyCell>
     {/if}
+    <PropertyCell label="Echo MIDI in" span={1} hint="Light the matching zones from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. Turns the strip into a pitch monitor for whatever is playing.">
+      <PropertyToggle value={r.echo === true} onchange={() => set('echo', !(r.echo === true))} />
+    </PropertyCell>
+    {#if r.echo === true}
+      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
+        <input class="val" type="number" min="0" max="16" step="1" value={num(r.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
+      </PropertyCell>
+      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline.">
+        <input class="cswatch" type="color" value={colRgb(r.echoColour, 'FF39D98A')} onchange={(e) => setCol('echoColour', r.echoColour, e.target.value)} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Playable" span={1} hint="Allow playing the strip in preview / the player.">
       <PropertyToggle value={r.editable !== false} onchange={() => set('editable', !(r.editable !== false))} />
     </PropertyCell>

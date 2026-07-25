@@ -1113,6 +1113,11 @@ export const SECTION_DEFAULTS = {
     showPiano: true,              // the sounding-notes keyboard strip
     showRomans: true,             // roman numerals on the pads
     gridCols: 4,
+    // Note input echo: light the pads from INCOMING MIDI, so the pad doubles as
+    // a chord analyser. echoChannel 0 = omni.
+    echo: false,
+    echoChannel: 0,
+    echoColour: 'FF39D98A',
     // Colours.
     fieldColour: 'FF101017',
     padColour: 'FF171720',
@@ -1128,8 +1133,9 @@ export const SECTION_DEFAULTS = {
   Arp: {
     _type: 'Arp',
     running: true,
-    source: 'chord',              // chord (its own) | link (follow a Chord Pad)
+    source: 'chord',              // chord (its own) | link (a Chord Pad) | input (MIDI in)
     linkId: '',                   // control id of the Chord Pad to follow
+    inputChannel: 0,              // source 'input': MIDI channel to watch (0 = omni)
     pattern: 'up',                // see ARP_PATTERNS in arpLayout.js
     rate: 6,                      // steps per second
     octaves: 1,                   // repeat the note set upward
@@ -1183,6 +1189,10 @@ export const SECTION_DEFAULTS = {
     editable: true,               // play the strip in preview
     showNames: true,              // note names on the zones
     showHeader: true,             // key / mode / current-note strip
+    // Note input echo: light the zones from INCOMING MIDI (0 = omni channel).
+    echo: false,
+    echoChannel: 0,
+    echoColour: 'FF39D98A',
     // Colours.
     fieldColour: 'FF101017',
     zoneColour: 'FF171720',
@@ -1211,6 +1221,11 @@ export const SECTION_DEFAULTS = {
     showNotes: true,              // the MIDI note number on each pad
     showLabels: true,             // the drum name on each pad
     showHeader: true,             // map / channel / last-hit strip
+    // Note input echo: light the pads from INCOMING MIDI, so the grid doubles as
+    // a monitor for whatever a sequencer is playing (0 = omni channel).
+    echo: false,
+    echoChannel: 0,
+    echoColour: 'FF39D98A',
     // Per-pad overrides — index-aligned, sparse. Each may set label, note,
     // colour (AARRGGBB) and choke (0 = none). Anything omitted falls back to
     // the generated map, so renaming one pad doesn't mean writing all sixteen.

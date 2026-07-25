@@ -54,6 +54,13 @@ not DSP:
   groups** (a closed hat cuts a ringing open one) and **velocity from the strike
   height**. Momentary / one-shot / toggle. See [drum-pads.md](./drum-pads.md).
 
+### 00e. Note input echo — the note controls read as well as write — **shipped 🟢**
+- Not a component: one shared MIDI-input listener that lets all four note
+  players **light up from incoming notes**. The Chord Pad becomes a chord
+  analyser, the Drum Pads a sequencer monitor, the Ribbon a pitch monitor, and
+  the Arp can be driven from an external keyboard. See
+  [note-input-echo.md](./note-input-echo.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

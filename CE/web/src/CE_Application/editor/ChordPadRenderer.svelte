@@ -8,7 +8,7 @@
   import {
     chordPadConfig, chordPadKey, chordPadScaleName, chordPadLayout, chordPadPads,
     wheelSlots, gridGeometry, gridCell, wheelGeometry, wheelSlotCenter,
-    noteName, useFlats, SCALE_LABELS,
+    noteName, useFlats, SCALE_LABELS, padNotes,
   } from '../utils/chordPadLayout.js';
 
   let { control = null, width = 0, height = 0 } = $props();
@@ -33,12 +33,19 @@
   let flats = $derived(useFlats(keyPc, scaleName));
   let held = $derived(new Set(Array.isArray(cfg.__held) ? cfg.__held : []));
   let sounding = $derived(Array.isArray(cfg.__notes) ? cfg.__notes : []);
+  // Notes arriving on the MIDI input (note input echo). Drawn distinctly from
+  // locally-played pads: an outline ring rather than a fill, so you can always
+  // tell what you pressed from what the outside world is playing.
+  let echoNotes = $derived(Array.isArray(cfg.__echo) ? cfg.__echo : []);
+  let echoSet = $derived(new Set(echoNotes));
+  let echoOn = $derived(echoNotes.length > 0);
 
   let padCss = $derived(css(cfg.padColour, 'rgba(23,23,32,1)'));
   let inKeyCss = $derived(css(cfg.inKeyColour, 'rgba(91,155,213,1)'));
   let tonicCss = $derived(css(cfg.tonicColour, 'rgba(242,201,76,1)'));
   let minorCss = $derived(css(cfg.minorColour, 'rgba(155,138,255,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
+  let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -66,8 +73,16 @@
     return out;
   });
 
+  // A pad is "echoed" when every one of its notes is arriving on the input —
+  // which is what makes the wheel double as a chord analyser.
+  function padEchoed(pad) {
+    if (!echoOn || !pad) return false;
+    const notes = padNotes(control, pad);
+    return notes.length > 0 && notes.every((n) => echoSet.has(n));
+  }
   // Pitch classes currently sounding (for the piano strip).
   let litPcs = $derived(new Set(sounding.map((m) => ((m % 12) + 12) % 12)));
+  let echoPcs = $derived(new Set(echoNotes.map((m) => ((m % 12) + 12) % 12)));
   const WHITE = [0, 2, 4, 5, 7, 9, 11];
   const BLACK_AFTER = [0, 1, 3, 4, 5];
   const BLACK_PC = [1, 3, 6, 8, 10];
@@ -88,8 +103,8 @@
   <!-- header: key + scale, mode -->
   <rect x={PAD} y={PAD - 4} width={Math.max(10, width - PAD * 2)} height={HEADER - 6} rx="8" fill="rgba(20,20,32,1)" stroke="rgba(42,42,54,1)" />
   <text x={PAD + 10} y={PAD + 13} font-size="12" fill="rgba(232,232,238,1)" style="font-weight:600">{keyLabel}</text>
-  <text x={width - PAD - 10} y={PAD + 13} font-size="10" fill={tonicCss} text-anchor="end" style="font-weight:600">
-    {heldLabel || (String(cfg.mode ?? 'chords') === 'notes' ? 'Notes' : 'Chords')}
+  <text x={width - PAD - 10} y={PAD + 13} font-size="10" fill={heldLabel ? tonicCss : (echoOn ? echoCss : tonicCss)} text-anchor="end" style="font-weight:600">
+    {heldLabel || (echoOn ? `IN · ${echoNotes.length}` : (String(cfg.mode ?? 'chords') === 'notes' ? 'Notes' : 'Chords'))}
   </text>
 
   {#if layout === 'wheel' && wGeom}
@@ -102,6 +117,8 @@
       {@const accent = nd.ch.isTonic ? tonicCss : (nd.ring === 'minor' ? minorCss : inKeyCss)}
       {#if isHeld}
         <circle cx={nd.x} cy={nd.y} r={nd.r + 6} fill={accent} opacity="0.25" />
+      {:else if padEchoed(nd.ch)}
+        <circle cx={nd.x} cy={nd.y} r={nd.r + 4} fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
       {/if}
       <circle cx={nd.x} cy={nd.y} r={nd.r}
               fill={isHeld ? 'rgba(42,42,52,1)' : padCss}
@@ -134,6 +151,8 @@
       {@const accent = g.p.isRoot ? tonicCss : inKeyCss}
       {#if isHeld}
         <rect x={g.c.x - 3} y={g.c.y - 3} width={g.c.w + 6} height={g.c.h + 6} rx="11" fill={accent} opacity="0.22" />
+      {:else if padEchoed(g.p)}
+        <rect x={g.c.x - 2} y={g.c.y - 2} width={g.c.w + 4} height={g.c.h + 4} rx="10" fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
       {/if}
       <rect x={g.c.x} y={g.c.y} width={g.c.w} height={g.c.h} rx="8"
             fill={isHeld ? 'rgba(32,32,42,1)' : padCss}
@@ -159,14 +178,16 @@
     {#each Array(14) as _, i (i)}
       {@const pc = WHITE[i % 7]}
       {@const lit = litPcs.has(pc)}
+      {@const ech = echoPcs.has(pc)}
       <rect x={PAD + i * whiteW + 0.5} y={pianoY} width={Math.max(1, whiteW - 1)} height={pianoH - 4} rx="2"
-            fill={lit ? tonicCss : 'rgba(233,233,238,0.92)'} />
+            fill={lit ? tonicCss : (ech ? echoCss : 'rgba(233,233,238,0.92)')} />
     {/each}
     {#each [0, 1] as oct (oct)}
       {#each BLACK_AFTER as wi, j (`${oct}_${j}`)}
         {@const lit = litPcs.has(BLACK_PC[j])}
+        {@const ech = echoPcs.has(BLACK_PC[j])}
         <rect x={PAD + (oct * 7 + wi + 1) * whiteW - whiteW * 0.32} y={pianoY} width={whiteW * 0.64} height={(pianoH - 4) * 0.62} rx="1.5"
-              fill={lit ? tonicCss : 'rgba(21,21,27,1)'} stroke="rgba(0,0,0,0.8)" stroke-width="0.5" />
+              fill={lit ? tonicCss : (ech ? echoCss : 'rgba(21,21,27,1)')} stroke="rgba(0,0,0,0.8)" stroke-width="0.5" />
       {/each}
     {/each}
   {/if}

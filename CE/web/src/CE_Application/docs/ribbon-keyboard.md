@@ -82,3 +82,6 @@ for you over RPN — too many devices ignore or mis-handle it.
 - **Multi-touch** — real touch hardware can hold two points on the strip.
 - **Feed the Arpeggiator** — the Arp's `link` source currently accepts a Chord
   Pad; a held ribbon note could feed it too.
+
+The strip can also **echo incoming MIDI** as a pitch monitor — see
+[note-input-echo.md](./note-input-echo.md).

@@ -4,7 +4,7 @@ import {
   arpPattern, arpPhase, arpRate, arpBaseNotes, expandOctaves, orderNotes, arpSequence,
   euclid, stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
   arpGeometry, arpCell, arpCellAt, arpVelocity, arpChannel, ARP_PATTERNS,
-  toggleMute, midiNoteLabel, arpUseFlats,
+  toggleMute, midiNoteLabel, arpUseFlats, arpSource, arpSourceIsExternal, ARP_SOURCES,
 } from '../src/CE_Application/utils/arpLayout.js';
 
 const near = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
@@ -27,10 +27,17 @@ test('own chord source builds a triad from key/scale/degree', () => {
   assert.deepEqual(notes, [48, 51, 55]);
 });
 
-test('link source takes the injected held notes (deduped + sorted)', () => {
+test('external sources take the injected held notes (deduped + sorted)', () => {
   const notes = arpBaseNotes(ap({ source: 'link', __sourceNotes: [67, 60, 64, 60] }));
   assert.deepEqual(notes, [60, 64, 67]);
   assert.deepEqual(arpBaseNotes(ap({ source: 'link' })), []);   // nothing held yet
+  // 'input' (a keyboard on the MIDI in) feeds the arp exactly the same way
+  assert.deepEqual(arpBaseNotes(ap({ source: 'input', __sourceNotes: [64, 60] })), [60, 64]);
+  assert.equal(arpSource(ap({ source: 'input' })), 'input');
+  assert.equal(arpSource(ap({ source: 'bogus' })), 'chord');
+  assert.equal(arpSourceIsExternal(ap({ source: 'chord' })), false);
+  assert.equal(arpSourceIsExternal(ap({ source: 'input' })), true);
+  assert.deepEqual(ARP_SOURCES, ['chord', 'link', 'input']);
 });
 
 test('expandOctaves repeats the set upward', () => {

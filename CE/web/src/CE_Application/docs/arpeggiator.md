@@ -12,7 +12,7 @@ as a block — spread across octaves, with a gate length, swing, and an optional
 Euclidean rest pattern. The playhead lights the step that's sounding; each cell
 prints its note.
 
-Two ways to feed it:
+Three ways to feed it:
 
 - **Its own chord** — pick a key, scale and degree; it always has something to
   play, so it works as a standalone motif generator.
@@ -20,6 +20,8 @@ Two ways to feed it:
   The pad then **goes silent** and lights up as usual while the arp does the
   playing, so you get a pad-triggered arpeggiator without hearing the block
   chord underneath. **Latch** keeps it running after you let go.
+- **Incoming MIDI notes** — hold keys on an external keyboard and the arp runs
+  them. See [note-input-echo.md](./note-input-echo.md).
 
 ## How it works
 
@@ -75,4 +77,5 @@ legato and each note runs into the next.
 - **Chord Pad note-order input** — an `asPlayed` order that reflects the actual
   press order rather than pitch order.
 - **More link sources** — the [Ribbon Keyboard](./ribbon-keyboard.md) holds a
-  note too; it could feed the arp the same way a Chord Pad does.
+  note too; it could feed the arp the same way a Chord Pad does. (An external
+  keyboard already can — see [note-input-echo.md](./note-input-echo.md).)

@@ -110,6 +110,17 @@
     <PropertyCell label="Numerals" span={1} hint="Show roman numerals (I, ii, ♭VII…) on the pads.">
       <PropertyToggle value={cp.showRomans !== false} onchange={() => set('showRomans', !(cp.showRomans !== false))} />
     </PropertyCell>
+    <PropertyCell label="Echo MIDI in" span={1} hint="Light the pads (and the piano strip) from notes arriving on the hardware MIDI input, drawn as an outline so external play never looks like your own. A pad lights when every one of its notes is sounding, so the wheel doubles as a chord analyser.">
+      <PropertyToggle value={cp.echo === true} onchange={() => set('echo', !(cp.echo === true))} />
+    </PropertyCell>
+    {#if cp.echo === true}
+      <PropertyCell label="In channel" span={1} hint="Which MIDI channel to watch. 0 = omni (any channel), which is usually what you want.">
+        <input class="val" type="number" min="0" max="16" step="1" value={num(cp.echoChannel, 0)} onchange={(e) => set('echoChannel', clampInt(e.target.value, 0, 16, 0))} />
+      </PropertyCell>
+      <PropertyCell label="Echo colour" span={1} hint="Colour of the incoming-note outline.">
+        <input class="cswatch" type="color" value={colRgb(cp.echoColour, 'FF39D98A')} onchange={(e) => setCol('echoColour', cp.echoColour, e.target.value)} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="" span={4} hint="Notes are sent as raw MIDI on the 'mainSynth' device role — pick a hardware output there for them to reach the synth.">
       <div class="note">Plays MIDI notes · ch {num(cp.channel, 1)} · vel {num(cp.velocity, 96)}</div>
     </PropertyCell>

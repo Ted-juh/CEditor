@@ -1,7 +1,7 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
-  import { ARP_PATTERNS, ARP_PATTERN_LABELS, arpBaseNotes, arpSequence, midiNoteLabel, arpUseFlats, euclid } from '../utils/arpLayout.js';
+  import { ARP_PATTERNS, ARP_PATTERN_LABELS, ARP_SOURCES, ARP_SOURCE_LABELS, arpBaseNotes, arpSequence, midiNoteLabel, arpUseFlats, euclid } from '../utils/arpLayout.js';
   import { SCALES, SCALE_LABELS, NOTE_SHARP, NOTE_FLAT, useFlats } from '../utils/chordPadLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -27,7 +27,10 @@
   function clampInt(v, lo, hi, f) { const n = Math.round(num(v, f)); return n < lo ? lo : n > hi ? hi : n; }
   function clampNum(v, lo, hi, f) { const n = num(v, f); return n < lo ? lo : n > hi ? hi : n; }
 
-  let isLink = $derived(String(a?.source ?? 'chord') === 'link');
+  let source = $derived(String(a?.source ?? 'chord'));
+  let isLink = $derived(source === 'link');
+  let isInput = $derived(source === 'input');
+  let isExternal = $derived(isLink || isInput);
   let flats = $derived(useFlats(num(a?.key, 0), String(a?.scale ?? 'minor')));
   let keyNames = $derived(flats ? NOTE_FLAT : NOTE_SHARP);
   let scaleKeys = $derived(Object.keys(SCALES));
@@ -64,12 +67,19 @@
         {#each ARP_PATTERNS as p (p)}<option value={p}>{ARP_PATTERN_LABELS[p] ?? p}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Notes from" span={2} hint="Chord = its own key/scale chord, always playing. Linked = whatever a Chord Pad on this panel is holding (that pad then goes silent — the arp does the playing).">
+    <PropertyCell label="Notes from" span={2} hint="Chord = its own key/scale chord, always playing. Linked = whatever a Chord Pad on this panel is holding (that pad then goes silent — the arp does the playing). Incoming = hold keys on the hardware MIDI input and the arp runs them.">
       <select class="val" value={a.source ?? 'chord'} onchange={(e) => set('source', e.target.value)}>
-        <option value="chord">Its own chord</option>
-        <option value="link">A linked Chord Pad</option>
+        {#each ARP_SOURCES as sc (sc)}<option value={sc}>{ARP_SOURCE_LABELS[sc] ?? sc}</option>{/each}
       </select>
     </PropertyCell>
+    {#if isInput}
+      <PropertyCell label="In channel" span={2} hint="Which MIDI channel to take notes from. 0 = omni (any channel).">
+        <input class="val" type="number" min="0" max="16" step="1" value={num(a.inputChannel, 0)} onchange={(e) => set('inputChannel', clampInt(e.target.value, 0, 16, 0))} />
+      </PropertyCell>
+      <PropertyCell label="" span={2} hint="A hardware output must be selected on the 'mainSynth' device role for the arp's own notes to come back out.">
+        <div class="note">Keyboard in → arp out</div>
+      </PropertyCell>
+    {/if}
     {#if isLink}
       <PropertyCell label="Chord Pad" span={2} hint="The pad whose held notes feed the arp.">
         <select class="val" value={a.linkId ?? ''} onchange={(e) => set('linkId', e.target.value)}>
@@ -82,7 +92,8 @@
           <div class="note">No Chord Pad on this panel yet.</div>
         </PropertyCell>
       {/if}
-    {:else}
+    {/if}
+    {#if !isExternal}
       <PropertyCell label="Key" span={1} hint="Tonic of the arp's own chord.">
         <select class="val" value={String(num(a.key, 0))} onchange={(e) => set('key', clampInt(e.target.value, 0, 11, 0))}>
           {#each keyNames as nm, i (i)}<option value={String(i)}>{nm}</option>{/each}
@@ -124,7 +135,7 @@
     <PropertyCell label="Swing" span={1} hint="Delay every odd step, up to half a step (0 = straight).">
       <input class="val" type="number" min="0" max="1" step="0.05" value={num(a.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
     </PropertyCell>
-    <PropertyCell label="Latch" span={1} hint="Link mode: keep arpeggiating the last chord after the pad is released.">
+    <PropertyCell label="Latch" span={1} hint="External sources: keep arpeggiating the last chord after the pad (or the keyboard) is released.">
       <PropertyToggle value={a.latch === true} onchange={() => set('latch', !(a.latch === true))} />
     </PropertyCell>
     <PropertyCell label="Velocity" span={1} hint="Note-on velocity (1–127).">

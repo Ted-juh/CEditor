@@ -33,6 +33,9 @@
   let horizontal = $derived(ribbonHorizontal(control));
   let zones = $derived(ribbonZones(control));
   let touch = $derived(cfg.__touch ?? null);
+  // Notes arriving on the MIDI input (note input echo) — drawn as an outline on
+  // the matching zone, so external play never looks like your own touch.
+  let echoSet = $derived(new Set(Array.isArray(cfg.__echo) ? cfg.__echo : []));
 
   let fieldCss = $derived(css(cfg.fieldColour, 'rgba(16,16,23,1)'));
   let zoneCss = $derived(css(cfg.zoneColour, 'rgba(23,23,32,1)'));
@@ -40,6 +43,7 @@
   let rootCss = $derived(css(cfg.rootColour, 'rgba(242,201,76,1)'));
   let touchCss = $derived(css(cfg.touchColour, 'rgba(242,201,76,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
+  let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -48,7 +52,7 @@
   let headerH = $derived(showHeader ? 22 : 0);
   let geom = $derived(ribbonGeometry(width, height, PAD, headerH, horizontal ? 'horizontal' : 'vertical'));
 
-  let cells = $derived(zones.map((z) => ({ z, r: zoneRect(geom, z.index, zones.length) })));
+  let cells = $derived(zones.map((z) => ({ z, r: zoneRect(geom, z.index, zones.length), echo: echoSet.has(z.note) })));
   // Names only fit when the zone is wide (or tall) enough for them.
   let nameFits = $derived.by(() => {
     if (cfg.showNames === false || !cells.length) return false;
@@ -85,8 +89,8 @@
     {#if !narrow}
       <text x={width / 2} y={PAD + 9} font-size="9" fill={labelCss} text-anchor="middle" opacity="0.8">{RIBBON_MODE_LABELS[mode] ?? mode}</text>
     {/if}
-    <text x={width - PAD - 8} y={PAD + 9} font-size="10" fill={label ? touchCss : labelCss} text-anchor="end" style="font-weight:600" opacity={label ? 1 : 0.55}>
-      {label || (veryNarrow ? `${zones.length}` : `${zones.length} zones`)}
+    <text x={width - PAD - 8} y={PAD + 9} font-size="10" fill={label ? touchCss : (echoSet.size ? echoCss : labelCss)} text-anchor="end" style="font-weight:600" opacity={label || echoSet.size ? 1 : 0.55}>
+      {label || (echoSet.size ? `IN · ${echoSet.size}` : (veryNarrow ? `${zones.length}` : `${zones.length} zones`))}
     </text>
   {/if}
 
@@ -104,6 +108,10 @@
           stroke={c.z.isRoot ? accent : 'rgba(255,255,255,0.05)'}
           stroke-width={c.z.isRoot ? 1.4 : 1}
           opacity={c.z.inScale ? 1 : 0.9} />
+    {#if c.echo}
+      <rect x={c.r.x + 0.5} y={c.r.y + 0.5} width={Math.max(1, c.r.w - 1)} height={Math.max(1, c.r.h - 1)} rx="3"
+            fill={echoCss} fill-opacity="0.18" stroke={echoCss} stroke-width="2" />
+    {/if}
     <!-- an accent stripe along the far edge marks in-key zones at a glance -->
     {#if c.z.inScale}
       {#if horizontal}

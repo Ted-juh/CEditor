@@ -62,8 +62,7 @@ and rename the pads. The notes sent are always exactly what each pad shows.
 
 ## Possible next steps
 
-- **Note input echo** — light the pads from incoming MIDI, so the grid doubles
-  as a monitor for what a sequencer is playing.
+- ~~Note input echo~~ — **shipped**: see [note-input-echo.md](./note-input-echo.md).
 - **Per-pad channel** — for multi-timbral rigs where the kick and the snare live
   on different channels.
 - **Velocity layers** — a second row of pads, or a modifier, for accent hits.

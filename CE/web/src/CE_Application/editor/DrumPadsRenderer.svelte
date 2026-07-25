@@ -27,12 +27,16 @@
   let origin = $derived(String(cfg.origin ?? 'bottomLeft'));
   let hits = $derived(new Set(Array.isArray(cfg.__hits) ? cfg.__hits : []));
   let last = $derived(cfg.__last ?? null);
+  // Notes arriving on the MIDI input (note input echo) — an outline, so a pad
+  // a sequencer is playing never looks like one you struck.
+  let echoSet = $derived(new Set(Array.isArray(cfg.__echo) ? cfg.__echo : []));
 
   let fieldCss = $derived(css(cfg.fieldColour, 'rgba(16,16,23,1)'));
   let padCss = $derived(css(cfg.padColour, 'rgba(23,23,32,1)'));
   let accentCss = $derived(css(cfg.accentColour, 'rgba(91,155,213,1)'));
   let hitCss = $derived(css(cfg.hitColour, 'rgba(242,201,76,1)'));
   let labelCss = $derived(css(cfg.labelColour, 'rgba(185,185,185,1)'));
+  let echoCss = $derived(css(cfg.echoColour, 'rgba(57,217,138,1)'));
 
   let font = $derived(control?._children?.Text?._children?.Font ?? null);
   let fontFamily = $derived(String(font?.family ?? 'Arial'));
@@ -46,7 +50,8 @@
   let labelFits = $derived(cfg.showLabels !== false && geom.cellH >= 26 && geom.cellW >= 34);
   let noteFits = $derived(cfg.showNotes !== false && geom.cellH >= 34 && geom.cellW >= 26);
   let narrow = $derived(width < 230);
-  let headRight = $derived(last ? `${last.label} · ${last.note}` : `ch ${drumChannel(control)}`);
+  let headRight = $derived(last ? `${last.label} · ${last.note}`
+    : (echoSet.size ? `IN · ${echoSet.size}` : `ch ${drumChannel(control)}`));
 </script>
 
 <svg class="drumpads" width={width} height={height} viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} style={`font-family:${fontFamily};`}>
@@ -60,7 +65,7 @@
         {drumRows(control)}×{drumCols(control)}
       </text>
     {/if}
-    <text x={width - PAD - 8} y={PAD + 9} font-size="10" fill={last ? hitCss : labelCss} text-anchor="end" style="font-weight:600" opacity={last ? 1 : 0.6}>
+    <text x={width - PAD - 8} y={PAD + 9} font-size="10" fill={last ? hitCss : (echoSet.size ? echoCss : labelCss)} text-anchor="end" style="font-weight:600" opacity={last || echoSet.size ? 1 : 0.6}>
       {headRight}
     </text>
   {/if}
@@ -70,12 +75,15 @@
   {#each cells as c (c.p.id)}
     {@const isHit = hits.has(c.p.id)}
     {@const accent = c.p.colour ? css(c.p.colour, accentCss) : accentCss}
+    {@const isEcho = echoSet.has(c.p.note)}
     {#if isHit}
       <rect x={c.r.x - 3} y={c.r.y - 3} width={c.r.w + 6} height={c.r.h + 6} rx="9" fill={hitCss} opacity="0.22" />
+    {:else if isEcho}
+      <rect x={c.r.x - 2} y={c.r.y - 2} width={c.r.w + 4} height={c.r.h + 4} rx="8" fill="none" stroke={echoCss} stroke-width="2" opacity="0.9" />
     {/if}
     <rect x={c.r.x} y={c.r.y} width={c.r.w} height={c.r.h} rx="6"
-          fill={isHit ? 'rgba(38,38,48,1)' : padCss}
-          stroke={isHit ? hitCss : 'rgba(44,44,56,1)'} stroke-width={isHit ? 2 : 1} />
+          fill={isHit ? 'rgba(38,38,48,1)' : (isEcho ? 'rgba(30,40,36,1)' : padCss)}
+          stroke={isHit ? hitCss : (isEcho ? echoCss : 'rgba(44,44,56,1)')} stroke-width={isHit || isEcho ? 2 : 1} />
     <!-- the pad's own accent stripe: its per-pad colour, or the section accent -->
     <rect x={c.r.x + 6} y={c.r.y + 6} width={Math.max(2, c.r.w - 12)} height="3" rx="1.5"
           fill={isHit ? hitCss : accent} opacity={isHit ? 1 : 0.7} />

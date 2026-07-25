@@ -15,6 +15,10 @@ function clampInt(n, lo, hi) { const v = Math.round(num(n, lo)); return v < lo ?
 function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 const wrap01 = (n) => ((num(n, 0) % 1) + 1) % 1;
 
+export const ARP_SOURCES = ['chord', 'link', 'input'];
+export const ARP_SOURCE_LABELS = {
+  chord: 'Its own chord', link: 'A linked Chord Pad', input: 'Incoming MIDI notes',
+};
 export const ARP_PATTERNS = ['up', 'down', 'updown', 'downup', 'asPlayed', 'random', 'chord'];
 export const ARP_PATTERN_LABELS = {
   up: 'Up', down: 'Down', updown: 'Up–Down', downup: 'Down–Up',
@@ -36,11 +40,18 @@ export function arpRate(control) { return Math.max(0.1, num(arpConfig(control).r
 export function arpVelocity(control) { return clampInt(arpConfig(control).velocity ?? 96, 1, 127); }
 export function arpChannel(control) { return clampInt(arpConfig(control).channel ?? 1, 1, 16); }
 
-// The base note set: either the Arp's own chord (key/scale/degree) or whatever a
-// linked Chord Pad is currently holding (injected as __sourceNotes).
+export function arpSource(control) {
+  const s = String(arpConfig(control).source ?? 'chord');
+  return ARP_SOURCES.includes(s) ? s : 'chord';
+}
+// Sources whose notes are injected from outside rather than computed here.
+export function arpSourceIsExternal(control) { return arpSource(control) !== 'chord'; }
+
+// The base note set: the Arp's own chord (key/scale/degree), or notes injected
+// as __sourceNotes — from a linked Chord Pad, or from the hardware MIDI input.
 export function arpBaseNotes(control) {
   const cfg = arpConfig(control);
-  if (String(cfg.source ?? 'chord') === 'link') {
+  if (arpSourceIsExternal(control)) {
     const live = Array.isArray(cfg.__sourceNotes) ? cfg.__sourceNotes : [];
     return [...new Set(live.map((n) => clampInt(n, 0, 127)))].sort((a, b) => a - b);
   }

@@ -73,5 +73,4 @@ choke groups).
 
 - **Velocity from tap position** (top of pad = harder) and **humanize** jitter.
 - **Per-pad overrides** — pin a custom chord, rename, recolour.
-- **Note input echo** — light the pads from incoming MIDI so it doubles as a
-  chord *analyser*.
+- ~~Note input echo~~ — **shipped**: see [note-input-echo.md](./note-input-echo.md).

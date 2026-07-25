@@ -105,6 +105,8 @@
     drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
     drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
   } from '../utils/drumPadLayout.js';
+  import { midiNoteState, startNoteInputListener, clearNoteInput } from '../stores/noteInput.js';
+  import { heldNotes as inputHeldNotes } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     createTimedButtonPreviewController,
@@ -693,6 +695,9 @@
   });
 
   onDestroy(() => overlayTimers.forEach((t) => clearTimeout(t)));
+  // Leaving preview drops the echoed notes. A keyboard unplugged mid-note never
+  // sends its note-off, and a pad stuck lit forever looks like a bug.
+  onDestroy(() => { if (noteInputStarted) clearNoteInput(); });
 
   // Which overlay layout is currently active (timer window, or latched until a
   // different control changes). Best-effort timing; verify in-browser.
@@ -2040,6 +2045,26 @@
     patchControlSession(getControlId(control), { constraintValues: undefined, constraintDrag: undefined });
   }
 
+  // --- Note input echo: light the note controls from INCOMING MIDI ------------
+  // One listener, one held-note model, four consumers. Every note-playing
+  // control can mirror what's arriving on the hardware input, which turns the
+  // Chord Pad into a chord analyser, the Drum Pads into a sequencer monitor, and
+  // lets the Arp be driven from an external keyboard.
+  let noteInputStarted = false;
+  function ensureNoteInput() {
+    if (noteInputStarted) return;
+    noteInputStarted = true;
+    startNoteInputListener();
+  }
+  // The notes a control should echo, honouring its channel filter (0 = omni).
+  // Returns [] when the control has echo switched off, so nothing is drawn and
+  // no work is done for the common case.
+  function echoNotesFor(cfg) {
+    if (cfg?.echo !== true) return [];
+    ensureNoteInput();
+    return inputHeldNotes($midiNoteState.notes, numberOr(cfg.echoChannel, 0));
+  }
+
   // --- Chord Pad: PLAY the synth (MIDI notes, not parameters) -----------------
   // The only control here that emits notes: pressing a pad sends note-on for each
   // chord tone (optionally strummed), releasing sends note-off. Notes go out as
@@ -2110,11 +2135,11 @@
     const c = base?._children?.ChordPad;
     if (!c) return resolved;
     const sess = sessionFor(control);
-    if (!sess?.chordHeldIds && !sess?.chordNotes) return resolved;
-    return {
-      ...resolved,
-      control: { ...base, _children: { ...base._children, ChordPad: { ...c, __held: sess.chordHeldIds ?? [], __notes: sess.chordNotes ?? [] } } },
-    };
+    const echo = echoNotesFor(c);
+    if (!sess?.chordHeldIds && !sess?.chordNotes && !echo.length) return resolved;
+    const next = { ...c, __held: sess?.chordHeldIds ?? [], __notes: sess?.chordNotes ?? [] };
+    if (echo.length) next.__echo = echo;
+    return { ...resolved, control: { ...base, _children: { ...base._children, ChordPad: next } } };
   }
   // Which pad (if any) is under the pointer — shared by both layouts.
   function chordPadAtPoint(control, localPoint) {
@@ -2194,10 +2219,19 @@
   // The linked Chord Pad's held notes (null when the Arp uses its own chord).
   function arpSourceNotes(control) {
     const cfg = arpConfig(control);
-    if (String(cfg.source ?? 'chord') !== 'link') return null;
-    const linkId = String(cfg.linkId ?? '');
-    const map = linkId ? (chordHeld[linkId] ?? {}) : {};
-    const live = [...new Set(Object.values(map).flat())].sort((a, b) => a - b);
+    const source = String(cfg.source ?? 'chord');
+    if (source !== 'link' && source !== 'input') return null;
+    let live;
+    if (source === 'input') {
+      // Straight off the hardware keyboard — the same held-note model the echo
+      // displays use, so an arp and a lit Chord Pad always agree.
+      ensureNoteInput();
+      live = inputHeldNotes($midiNoteState.notes, numberOr(cfg.inputChannel, 0));
+    } else {
+      const linkId = String(cfg.linkId ?? '');
+      const map = linkId ? (chordHeld[linkId] ?? {}) : {};
+      live = [...new Set(Object.values(map).flat())].sort((a, b) => a - b);
+    }
     const id = getControlId(control);
     if (live.length) { arpLatched[id] = live; return live; }
     if (cfg.latch === true && Array.isArray(arpLatched[id])) return arpLatched[id];
@@ -2421,8 +2455,12 @@
     const r = base?._children?.NoteRibbon;
     if (!r) return resolved;
     const touch = sessionFor(control)?.noteRibbonTouch;
-    if (!touch) return resolved;
-    return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: { ...r, __touch: touch } } } };
+    const echo = echoNotesFor(r);
+    if (!touch && !echo.length) return resolved;
+    const next = { ...r };
+    if (touch) next.__touch = touch;
+    if (echo.length) next.__echo = echo;
+    return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: next } } };
   }
 
   // --- Drum Pads: fixed-note trigger grid --------------------------------------
@@ -2520,11 +2558,11 @@
     const d = base?._children?.DrumPads;
     if (!d) return resolved;
     const sess = sessionFor(control);
-    if (!sess?.drumHits && !sess?.drumLast) return resolved;
-    return {
-      ...resolved,
-      control: { ...base, _children: { ...base._children, DrumPads: { ...d, __hits: sess.drumHits ?? [], __last: sess.drumLast ?? null } } },
-    };
+    const echo = echoNotesFor(d);
+    if (!sess?.drumHits && !sess?.drumLast && !echo.length) return resolved;
+    const next = { ...d, __hits: sess?.drumHits ?? [], __last: sess?.drumLast ?? null };
+    if (echo.length) next.__echo = echo;
+    return { ...resolved, control: { ...base, _children: { ...base._children, DrumPads: next } } };
   }
 
   // Drive a PixelDisplay from live control values: element sources (+ @active),

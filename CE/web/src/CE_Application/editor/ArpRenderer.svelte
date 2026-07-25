@@ -55,9 +55,13 @@
   })));
 
   // Header: where the notes come from, how they walk, how fast.
-  let sourceLabel = $derived(String(cfg.source ?? 'chord') === 'link'
-    ? (Array.isArray(cfg.__sourceNotes) && cfg.__sourceNotes.length ? 'Linked' : 'Linked · idle')
-    : 'Chord');
+  let sourceHeld = $derived(Array.isArray(cfg.__sourceNotes) && cfg.__sourceNotes.length > 0);
+  let sourceLabel = $derived.by(() => {
+    const src = String(cfg.source ?? 'chord');
+    if (src === 'link') return sourceHeld ? 'Linked' : 'Linked · idle';
+    if (src === 'input') return sourceHeld ? 'MIDI in' : 'MIDI in · idle';
+    return 'Chord';
+  });
   let rateLabel = $derived(`${arpRate(control).toFixed(arpRate(control) < 10 ? 1 : 0)}/s`);
   let running = $derived(cfg.running !== false);
 </script>
@@ -79,7 +83,9 @@
 
   {#if !seq.length}
     <text x={width / 2} y={geom.y0 + geom.h / 2 + 4} font-size="10" fill={labelCss} text-anchor="middle" opacity="0.55">
-      {String(cfg.source ?? 'chord') === 'link' ? 'hold a pad on the linked Chord Pad' : 'no notes'}
+      {String(cfg.source ?? 'chord') === 'link' ? 'hold a pad on the linked Chord Pad'
+        : String(cfg.source ?? 'chord') === 'input' ? 'hold keys on the MIDI input'
+        : 'no notes'}
     </text>
   {/if}
 
