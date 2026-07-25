@@ -1192,6 +1192,37 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  /** DrumPads — PLAYS the synth: a grid of fixed-note trigger pads (the MPC/Push
+   *  idiom). Every pad is pinned to one note, with choke groups and velocity from
+   *  the strike position. No DeviceBindings — it emits notes. */
+  DrumPads: {
+    _type: 'DrumPads',
+    rows: 4,
+    cols: 4,
+    map: 'gm',                    // gm (GM drum kit) | chromatic | custom
+    baseNote: 36,                 // pad 1's note (36 = GM Bass Drum 1)
+    origin: 'bottomLeft',         // bottomLeft (hardware) | topLeft (reading order)
+    mode: 'momentary',            // momentary | oneShot | toggle
+    gateMs: 60,                   // one-shot: how long the note is held
+    velocity: 100,
+    velocityFrom: 'fixed',        // fixed | position (top of the pad = harder)
+    channel: 10,                  // GM percussion channel
+    editable: true,               // play the pads in preview
+    showNotes: true,              // the MIDI note number on each pad
+    showLabels: true,             // the drum name on each pad
+    showHeader: true,             // map / channel / last-hit strip
+    // Per-pad overrides — index-aligned, sparse. Each may set label, note,
+    // colour (AARRGGBB) and choke (0 = none). Anything omitted falls back to
+    // the generated map, so renaming one pad doesn't mean writing all sixteen.
+    pads: [],
+    // Colours.
+    fieldColour: 'FF101017',
+    padColour: 'FF171720',
+    accentColour: 'FF5B9BD5',
+    hitColour: 'FFF2C94C',
+    labelColour: 'FFB9B9B9',
+  },
+
   /** Constraint — linked parameters that always preserve a relationship the synth
    *  can't express (sum=100% / ordered / ratio / mirror); each is a fan-out port. */
   Constraint: {

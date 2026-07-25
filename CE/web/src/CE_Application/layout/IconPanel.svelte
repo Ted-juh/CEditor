@@ -16,6 +16,7 @@
     Music,
     ListMusic,
     Piano,
+    LayoutGrid,
     Gauge,
     Spline,
     Grid2x2,
@@ -130,6 +131,7 @@
       { type: 'ChordPad',        icon: Music,              label: 'Insert Chord Pad' },
       { type: 'Arp',             icon: ListMusic,          label: 'Insert Arpeggiator' },
       { type: 'NoteRibbon',      icon: Piano,              label: 'Insert Ribbon Keyboard' },
+      { type: 'DrumPads',        icon: LayoutGrid,         label: 'Insert Drum Pads' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

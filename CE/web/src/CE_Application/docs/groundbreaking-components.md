@@ -49,6 +49,11 @@ not DSP:
   [ribbon-keyboard.md](./ribbon-keyboard.md). Distinct from the `Ribbon`
   touch-strip, which drives a *parameter*.
 
+### 00d. Drum Pads — a grid of fixed-note triggers — **shipped 🟢**
+- The MPC/Push idiom: every pad pinned to one note, GM-named, with **choke
+  groups** (a closed hat cuts a ringing open one) and **velocity from the strike
+  height**. Momentary / one-shot / toggle. See [drum-pads.md](./drum-pads.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its
@@ -132,8 +137,8 @@ not DSP:
 
 ## Also missing (conventional, `[engine-reuse]`, each its own palette entry)
 
-Drum/performance pad grid · strum pad. (Ribbon/touch-strip, vector joystick,
-crossfader and the chord/scale trigger pad are all shipped.)
+Strum pad. (Ribbon/touch-strip, vector joystick, crossfader, the chord/scale
+trigger pad and the drum/performance pad grid are all shipped.)
 
 ## Ranking
 

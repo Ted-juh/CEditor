@@ -101,6 +101,10 @@
     bendBytes as nrBendBytes, ccBytes as nrCcBytes,
     touchVelocity as nrVelocity, modValue as nrModValue, modCc as nrModCc,
   } from '../utils/noteRibbonLayout.js';
+  import {
+    drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
+    drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
+  } from '../utils/drumPadLayout.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     createTimedButtonPreviewController,
@@ -231,7 +235,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))));
+    return applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2421,6 +2425,108 @@
     return { ...resolved, control: { ...base, _children: { ...base._children, NoteRibbon: { ...r, __touch: touch } } } };
   }
 
+  // --- Drum Pads: fixed-note trigger grid --------------------------------------
+  // Fourth note-emitting control, on the shared raw-MIDI path. Three trigger
+  // modes (hold / one-shot gate / toggle), velocity from the strike height, and
+  // CHOKE GROUPS — hitting a pad silences any sounding pad in the same group,
+  // which is how a closed hi-hat cuts an open one.
+  const DRUM_PAD = 8;
+  const drumHits = {};        // id -> { [padId]: { note, mode } }
+  const drumTimers = {};      // id -> [timeoutId...]  (one-shot gates)
+  let drumPress = null;       // { id, padId } while the pointer holds a pad
+  function isDrumPadsControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'DrumPads';
+  }
+  function drumGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const headerH = drumConfig(control).showHeader !== false ? 22 : 0;
+    return drumGeometry(numberOr(t.width, 0), numberOr(t.height, 0),
+      drumRows(control), drumCols(control), DRUM_PAD, headerH, 5);
+  }
+  function drumOrigin(control) { return String(drumConfig(control).origin ?? 'bottomLeft'); }
+  function syncDrumSession(control, last) {
+    const id = getControlId(control);
+    const patch = { drumHits: Object.keys(drumHits[id] ?? {}) };
+    if (last !== undefined) patch.drumLast = last;
+    patchControlSession(id, patch);
+  }
+  function drumNoteOff(control, padId) {
+    const id = getControlId(control);
+    const held = (drumHits[id] ?? {})[padId];
+    if (!held) return;
+    sendNoteBytes(noteOffBytes(drumChannel(control), held.note), `note_off_${held.note}`);
+    delete drumHits[id][padId];
+  }
+  function drumHit(control, pad, strikeY) {
+    const id = getControlId(control);
+    const ch = drumChannel(control);
+    const mode = drumMode(control);
+    const map = (drumHits[id] ??= {});
+    // Toggle: a second hit on a sounding pad silences it instead of restriking.
+    if (mode === 'toggle' && map[pad.id]) {
+      drumNoteOff(control, pad.id);
+      syncDrumSession(control, null);
+      return;
+    }
+    // Choke: this pad's group-mates stop first.
+    for (const other of chokedBy(drumPads(control), pad)) {
+      if (map[other.id]) drumNoteOff(control, other.id);
+    }
+    if (map[pad.id]) drumNoteOff(control, pad.id);        // restrike cleanly
+    sendNoteBytes(noteOnBytes(ch, pad.note, strikeVelocity(control, strikeY)), `note_on_${pad.note}`);
+    map[pad.id] = { note: pad.note, mode };
+    if (mode === 'oneShot') {
+      (drumTimers[id] ??= []).push(setTimeout(() => {
+        drumNoteOff(control, pad.id);
+        syncDrumSession(control);
+      }, drumGateMs(control)));
+    }
+    syncDrumSession(control, { label: pad.label, note: pad.note });
+  }
+  // The pad under a point, plus how high up it you struck.
+  function drumPadAtPoint(control, localPoint) {
+    const geom = drumGeomFor(control);
+    const i = padHit(geom, localPoint.x, localPoint.y, drumOrigin(control));
+    if (i < 0) return null;
+    const pads = drumPads(control);
+    if (!pads[i]) return null;
+    return { pad: pads[i], strikeY: padStrikeY(padRect(geom, i, drumOrigin(control)), localPoint.y) };
+  }
+  function handleDrumPadsPointerDown(control, localPoint) {
+    if (!isDrumPadsControl(control) || drumConfig(control).editable === false) return false;
+    const hit = drumPadAtPoint(control, localPoint);
+    if (!hit) return false;
+    drumHit(control, hit.pad, hit.strikeY);
+    if (drumMode(control) === 'momentary') drumPress = { id: getControlId(control), padId: hit.pad.id };
+    return true;
+  }
+  // Drag across the grid to strike each pad you cross — the finger-roll gesture.
+  function moveDrumPress(control, localPoint) {
+    const hit = drumPadAtPoint(control, localPoint);
+    if (!hit || hit.pad.id === drumPress.padId) return;
+    drumNoteOff(control, drumPress.padId);
+    drumHit(control, hit.pad, hit.strikeY);
+    drumPress.padId = hit.pad.id;
+  }
+  function releaseDrumPress(control) {
+    if (drumMode(control) !== 'momentary') return;   // one-shots and toggles ring on
+    drumNoteOff(control, drumPress.padId);
+    syncDrumSession(control);
+  }
+  // Inject the sounding pads + last hit so the renderer can light up.
+  function applyDrumPadsValueSource(control, resolved) {
+    if (!isDrumPadsControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    const d = base?._children?.DrumPads;
+    if (!d) return resolved;
+    const sess = sessionFor(control);
+    if (!sess?.drumHits && !sess?.drumLast) return resolved;
+    return {
+      ...resolved,
+      control: { ...base, _children: { ...base._children, DrumPads: { ...d, __hits: sess.drumHits ?? [], __last: sess.drumLast ?? null } } },
+    };
+  }
+
   // Drive a PixelDisplay from live control values: element sources (+ @active),
   // and the brightness/backlight drives. Mirrors applyLcdValueSource for the
   // pixel-surface component.
@@ -4030,6 +4136,11 @@
       moveRibbonPress(control, controlLocalPoint(event));
       return;
     }
+    // Drum Pads: roll across the grid to strike each pad you cross.
+    if (drumPress && drumPress.id === getControlId(control)) {
+      moveDrumPress(control, controlLocalPoint(event));
+      return;
+    }
     // Listbox per-row hover: track the row under the pointer so the renderer can
     // highlight / animate it. Runs whether or not the pointer is held.
     if (isListboxControl(control) && !isDisabled(control)) {
@@ -4154,6 +4265,8 @@
     handleArpPointerDown(control, pointerDownLocal);
     // Ribbon Keyboard: press the strip to sound the pitch there.
     handleNoteRibbonPointerDown(control, pointerDownLocal);
+    // Drum Pads: strike the pad under the pointer.
+    handleDrumPadsPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
@@ -4433,6 +4546,13 @@
     // Release the ribbon: note-off + recentre the bend (unless latched).
     if (ribbonPress && activeControl && ribbonPress.id === getControlId(activeControl)) {
       releaseRibbonPress(activeControl);
+    }
+
+    // Release a drum pad: note-off for held (momentary) strikes.
+    if (drumPress && activeControl && drumPress.id === getControlId(activeControl)) {
+      const dpc = activeControl;
+      releaseDrumPress(dpc);
+      drumPress = null;
     }
 
     if (isCustomComponent(activeControl)) {

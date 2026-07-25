@@ -762,6 +762,24 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  DrumPads: {
+    // Emits notes rather than driving a parameter — no DeviceBindings, same as
+    // the ChordPad, the Arp and the NoteRibbon.
+    sections: ['Background', 'DrumPads', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('DrumPads'),
+    defaultOverrides: {
+      // A square 4x4 grid.
+      Transform: { width: 260, height: 280 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
   Constraint: {
     sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
     ports: getComponentPorts('Constraint'),

@@ -63,10 +63,11 @@ The note-output path is the expensive part, and it now exists. An **Arpeggiator*
 scale-snap), and a **Strum pad** all reuse it plus the scale engine — each is
 cheap from here.
 
-Two of those now exist: the **[Arpeggiator](./arpeggiator.md)** (link a pad to
-it and the pad goes silent while the arp plays its held notes) and the
+Three of those now exist: the **[Arpeggiator](./arpeggiator.md)** (link a pad to
+it and the pad goes silent while the arp plays its held notes), the
 **[Ribbon Keyboard](./ribbon-keyboard.md)** (continuous pitch with scale-snap
-and glide).
+and glide) and the **[Drum Pads](./drum-pads.md)** (fixed-note triggers with
+choke groups).
 
 ## Possible next steps
 
