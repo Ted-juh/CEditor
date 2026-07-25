@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
+import { latestMidiInputMessage } from '../src/CE_Application/stores/deviceProfiles.js';
 import {
   transport, startTransport, stopTransport, toggleTransport, rewindTransport,
   setTransportBpm, setTransportSource, transportBeatsNow, isTransportRunning,
@@ -259,4 +260,105 @@ test('zero bars is an ordinary start, and a follower never counts itself in', (t
   startTransportWithCountIn(4, 0);
   // Following someone else's clock, when the music starts is their decision.
   assert.equal(isCountingIn(), false);
+});
+
+// --- Song position pointer (receive side) ---------------------------------------
+test('a song position pointer + continue resumes where the master is, not at bar 1', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+
+  // The sequencer is parked at bar 9 of 4/4 = beat 32 = 128 sixteenths
+  // (lsb 0x00, msb 0x01), and says so before pressing continue.
+  feedTransportMidiForTest('F2 00 01');
+  assert.equal(transportBeatsNow(), 32);
+  assert.equal(isTransportRunning(), false, 'a position pointer must not start playback');
+
+  feedTransportMidiForTest('FB');                 // continue
+  assert.equal(isTransportRunning(), true);
+  assert.ok(Math.abs(transportBeatsNow() - 32) < 0.05, 'continue must resume from the pointer');
+});
+
+test('start still means from the top, whatever a pointer said', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+  feedTransportMidiForTest('F2 40 00');           // 64 sixteenths = beat 16
+  assert.equal(transportBeatsNow(), 16);
+  feedTransportMidiForTest('FA');                 // START, not continue
+  assert.equal(transportBeatsNow(), 0, 'start is defined as from the beginning');
+  assert.equal(isTransportRunning(), true);
+});
+
+test('a locate registers as a jump so followers re-baseline', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+  const base = transportJumpSeq();
+  feedTransportMidiForTest('F2 40 00');
+  assert.equal(transportJumpSeq(), base + 1);
+});
+
+test('a pointer buried in a stream of other traffic still lands', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+  // Notes, a clock tick, the pointer, more notes — all in one blob. This is the
+  // case that used to fail: the pointer's data bytes were dropped as orphans.
+  feedTransportMidiForTest('90 3C 64 F8 F2 40 00 80 3C 00');
+  assert.equal(transportBeatsNow(), 16);
+});
+
+test('a truncated pointer is ignored rather than read as bar 1', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+  feedTransportMidiForTest('F2 40 00');
+  assert.equal(transportBeatsNow(), 16);
+  feedTransportMidiForTest('F2 40');              // cut short
+  assert.equal(transportBeatsNow(), 16, 'a half-read pointer must not move us');
+});
+
+// --- The real input path, not the test seam --------------------------------------
+// feedTransportMidiForTest() bypasses the store subscription. This drives the
+// actual pipe the hardware uses, so the wiring itself is covered: the listener
+// registration, the duplicate-payload guard and the sysex skip.
+function fromHardware(hex, seq) {
+  latestMidiInputMessage.set({
+    ok: true, deviceRole: 'mainSynth', messageType: 'midi', hex,
+    timestampSeconds: seq, origin: 'input',
+  });
+}
+
+test('a locate arriving on the real input pipe moves the transport', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');          // registers the listener
+
+  fromHardware('F2 00 01', 1);             // 128 sixteenths = beat 32
+  assert.equal(transportBeatsNow(), 32);
+  assert.equal(isTransportRunning(), false);
+
+  fromHardware('FB', 2);
+  assert.equal(isTransportRunning(), true);
+  assert.ok(Math.abs(transportBeatsNow() - 32) < 0.05);
+
+  fromHardware('FC', 3);
+  assert.equal(isTransportRunning(), false);
+});
+
+test('sysex on the same wire cannot be mistaken for a locate', (t) => {
+  t.after(() => resetTransportForTest());
+  resetTransportForTest();
+  setTransportSource('external');
+  fromHardware('F2 40 00', 10);
+  assert.equal(transportBeatsNow(), 16);
+  // A dump whose payload happens to contain F2-looking bytes. messageType
+  // 'sysex' is skipped outright, and splitMidiMessages would swallow the body
+  // anyway — belt and braces, because a wrong locate mid-song is very visible.
+  latestMidiInputMessage.set({
+    ok: true, deviceRole: 'mainSynth', messageType: 'sysex',
+    hex: 'F0 00 20 33 F2 7F 7F F7', timestampSeconds: 11, origin: 'input',
+  });
+  assert.equal(transportBeatsNow(), 16, 'sysex must not relocate the transport');
 });

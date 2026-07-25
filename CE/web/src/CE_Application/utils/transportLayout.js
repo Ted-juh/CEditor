@@ -299,15 +299,39 @@ export function hostJumped(expectedBeats, hostBeats, tolerance = 0.05) {
 // 0xF8 and friends as single-byte messages, and every consumer so far has
 // thrown them away because nothing wanted them.
 export function transportEvent(message) {
-  const b = Array.isArray(message) ? message[0] : message;
+  const m = Array.isArray(message) ? message : [message];
+  const b = m[0];
   switch (b) {
     case 0xF8: return { kind: 'clock' };
     case 0xFA: return { kind: 'start' };
     case 0xFB: return { kind: 'continue' };
     case 0xFC: return { kind: 'stop' };
     case 0xFF: return { kind: 'reset' };
+    case 0xF2: return songPositionEvent(m);
     default: return null;
   }
+}
+// Song position pointer: `F2 lsb msb`, a 14-bit count of MIDI BEATS — which the
+// spec means as SIXTEENTH notes, not quarters. Divide by four to get the beats
+// everything else here counts in; that factor of four is the classic way to be
+// wrong about this by a factor of four.
+//
+// It is the answer to "where is the sequencer about to start". Without it a
+// `continue` after a locate resumes at bar 1 no matter where the master is.
+export const SPP_PER_BEAT = 4;              // sixteenths per quarter note
+export const MAX_SPP = 16383;               // 14 bits
+export function songPositionEvent(message) {
+  const m = Array.isArray(message) ? message : [];
+  if (m.length < 3) return null;            // truncated — better nothing than bar 1
+  const lsb = num(m[1], 0) & 0x7F;
+  const msb = num(m[2], 0) & 0x7F;
+  const sixteenths = (msb << 7) | lsb;
+  return { kind: 'songPosition', sixteenths, beats: sixteenths / SPP_PER_BEAT };
+}
+// The inverse, for sending one.
+export function songPositionBytes(beats) {
+  const sixteenths = Math.max(0, Math.min(MAX_SPP, Math.round(num(beats, 0) * SPP_PER_BEAT)));
+  return [0xF2, sixteenths & 0x7F, (sixteenths >> 7) & 0x7F];
 }
 // Clock pulses (24 PPQN) to send between two positions, for clock-OUT.
 export function clockPulsesBetween(prevBeats, nextBeats) {

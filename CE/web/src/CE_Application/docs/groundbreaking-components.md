@@ -77,7 +77,9 @@ not DSP:
   instead of leaving a hole in the bar. Runs on a 4ms interval (so MIDI
   clock-out isn't jittered by the display, and it survives a backgrounded
   window) but publishes to the UI at 30Hz. Follows **incoming MIDI clock** —
-  bytes that were already arriving and being thrown away — or sends it. In an
+  bytes that were already arriving and being thrown away — including the **song
+  position pointer**, so a sequencer that locates and continues resumes where it
+  actually is rather than at bar 1 — or sends the same. In an
   exported plugin it follows the **DAW playhead** instead, read off
   `juce::AudioPlayHead` on the audio thread and pushed to the panel at 30Hz: a
   position rather than a pulse stream, so it cannot fall behind, and a locate in

@@ -18,7 +18,7 @@ import { splitMidiMessages, parseMidiHex } from '../utils/midiNoteInput.js';
 import {
   beatsAt, startedAtFor, transportEvent, clockPulsesBetween,
   estimateTempoFromPulses, parseHostPosition, hostJumped, transportIsFollowing,
-  loopedBeats, loopCycleIndex, countInBeats, countInRemaining,
+  loopedBeats, loopCycleIndex, countInBeats, countInRemaining, songPositionBytes,
   MIN_BPM, MAX_BPM,
 } from '../utils/transportLayout.js';
 
@@ -163,10 +163,30 @@ export function startTransport(atBeat = null) {
   lastPulseBeats = beats;
   running = true;
   ensureTimer();
-  if (clockOut && source === 'internal') {
-    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_start', message: 'FA', dryRun: false });
-  }
+  if (clockOut && source === 'internal') sendStartOrContinue();
   publish(true);
+}
+// Starting at the top is START; starting anywhere else is a song POSITION
+// followed by CONTINUE. Sending FA from bar 9 is the same bug this whole
+// feature exists to fix, just pointed the other way — the follower would
+// obediently begin at bar 1 while we play from bar 9.
+function sendStartOrContinue() {
+  const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
+  if (beats <= 0) {
+    triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_start', message: 'FA', dryRun: false });
+    return;
+  }
+  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_spp', message: hex(songPositionBytes(beats)), dryRun: false });
+  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_continue', message: 'FB', dryRun: false });
+}
+// Tell followers where we moved to. Only meaningful while stopped — song
+// position is a stopped-state message, and a sequencer receiving one mid-run
+// has no defined way to act on it, so nothing sends it during playback.
+function sendSongPosition() {
+  if (!clockOut || source !== 'internal' || running) return;
+  const bytes = songPositionBytes(beats);
+  const hex = bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join('');
+  triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: 'midi_spp', message: hex, dryRun: false });
 }
 export function stopTransport() {
   running = false;
@@ -188,6 +208,7 @@ export function rewindTransport() {
   externalBeats = 0;
   startedAt = Date.now();
   lastPulseBeats = 0;
+  sendSongPosition();
   publish(true);
 }
 // Changing tempo must not jump the position: re-anchor the start instant so the
@@ -266,7 +287,23 @@ function handleExternal(ev) {
     if (running) externalBeats += 1 / 24;      // the pulses ARE the position
     return;
   }
+  // A song position pointer is sent while STOPPED, to say where a following
+  // `continue` should resume. It is the only message that carries a position
+  // rather than a tick, so it is also the only way this path can start
+  // anywhere but bar 1.
+  if (ev.kind === 'songPosition') {
+    bumpJump();
+    externalBeats = Math.max(0, ev.beats);
+    beats = externalBeats;
+    publish(true);
+    return;
+  }
+  // START always means from the top — that is the spec, and it is the
+  // difference between start and continue. Anything a preceding SPP said is
+  // deliberately discarded here.
   if (ev.kind === 'start') { bumpJump(); externalBeats = 0; beats = 0; running = true; ensureTimer(); publish(true); return; }
+  // CONTINUE resumes from wherever we are — which, after an SPP, is where the
+  // master actually is rather than bar 1.
   if (ev.kind === 'continue') { running = true; ensureTimer(); publish(true); return; }
   if (ev.kind === 'stop') { running = false; publish(true); return; }
   if (ev.kind === 'reset') { bumpJump(); externalBeats = 0; beats = 0; running = false; stopTimer(); publish(true); }

@@ -30,6 +30,17 @@ export function parseMidiHex(hex) {
 
 // How many data bytes follow a channel-voice status byte.
 function dataLength(status) {
+  // System common (0xF1-0xF7) has to be matched EXACTLY: masking with 0xF0 puts
+  // all of them in one bucket, which is how their data bytes used to end up
+  // loose in the stream.
+  if (status >= 0xF0) {
+    switch (status) {
+      case 0xF1: return 1;                      // MTC quarter frame
+      case 0xF2: return 2;                      // song position pointer
+      case 0xF3: return 1;                      // song select
+      default: return 0;                        // F4/F5 undefined, F6 tune, F7 end-sysex
+    }
+  }
   switch (status & 0xF0) {
     case 0xC0: case 0xD0: return 1;             // program change, channel pressure
     case 0x80: case 0x90: case 0xA0: case 0xB0: case 0xE0: return 2;
@@ -39,8 +50,9 @@ function dataLength(status) {
 
 // Split a byte blob into individual MIDI messages. Handles RUNNING STATUS (real
 // hardware omits the repeated status byte on a fast run of notes), skips SysEx
-// wholesale, and drops single-byte realtime clock/sense so they can't be
-// mistaken for data.
+// wholesale, and keeps realtime and system-common messages whole so they can't
+// be mistaken for data. Consumers that don't care about a message type map it
+// to null and filter, so emitting more kinds here is safe.
 export function splitMidiMessages(bytes) {
   const b = (Array.isArray(bytes) ? bytes : []).map((v) => num(v, 0) & 0xFF);
   const out = [];
@@ -56,7 +68,17 @@ export function splitMidiMessages(bytes) {
       continue;
     }
     if (byte >= 0xF8) { out.push([byte]); i += 1; continue; }   // realtime
-    if (byte >= 0xF0) { running = 0; i += 1; continue; }        // other system
+    if (byte >= 0xF0) {                                         // system common
+      // These used to be dropped along with their data bytes, which left those
+      // bytes loose in the stream — and threw away the song position pointer,
+      // the one message that says WHERE a sequencer is about to start.
+      running = 0;                                              // cancels running status
+      const width = dataLength(byte);
+      if (i + 1 + width > b.length) break;                      // truncated tail
+      out.push([byte, ...b.slice(i + 1, i + 1 + width)]);
+      i += 1 + width;
+      continue;
+    }
     let status;
     let start;
     if (byte >= 0x80) { status = byte; running = byte; start = i + 1; }

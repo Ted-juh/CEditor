@@ -46,8 +46,12 @@ There was already an unused pipe. The JUCE side has always emitted
   - `parseMidiHex` takes the bridge's `"90 3C 60"` and the shapes humans write.
   - `splitMidiMessages` handles **running status** (hardware drops the repeated
     status byte on a fast run — without this a chord arrives as one note plus
-    garbage), skips SysEx wholesale, and drops realtime clock bytes so they
-    can't be mistaken for data.
+    garbage), skips SysEx wholesale, and keeps realtime and system-common
+    messages **whole** so their data bytes can't be mistaken for note data.
+    (System-common used to be dropped a byte at a time, which left the rest
+    loose in the stream and threw away the song position pointer — see
+    [transport.md](./transport.md).) Consumers that don't care about a message
+    type map it to `null` and filter, so widening what this emits is safe.
   - `noteEvent` treats **note-on with velocity 0 as a note-off**, which is how
     most hardware releases a key, and understands CC 120/123 (all sound / all
     notes off) and system reset.

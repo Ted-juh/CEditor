@@ -11,6 +11,7 @@ import {
   parseHostPosition, hostJumped, transportIsFollowing, TRANSPORT_SOURCES,
   loopRegion, loopedBeats, loopCycleIndex, formatLoopRange,
   countInBars, countInBeats, countInMs, countInRemaining, formatCountIn, MAX_COUNT_IN_BARS,
+  songPositionBytes, songPositionEvent, SPP_PER_BEAT, MAX_SPP,
 } from '../src/CE_Application/utils/transportLayout.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
@@ -311,4 +312,49 @@ test('count-in remaining is derived from the start instant, never accumulated', 
   // whole point of deriving it.
   assert.equal(countInRemaining(t0, t0 + 3000, 120, 8), countInRemaining(t0, t0 + 3000, 120, 8));
   assert.equal(countInRemaining(t0, t0 + 3000, 60, 8), 5);
+});
+
+// --- Song position pointer --------------------------------------------------------
+test('song position pointer is 14 bits of SIXTEENTHS, not quarters', () => {
+  // The factor of four is the classic way to get this wrong. Bar 5 in 4/4 is
+  // beat 16, which is 64 sixteenths → lsb 0x40, msb 0x00.
+  const ev = transportEvent([0xF2, 0x40, 0x00]);
+  assert.equal(ev.kind, 'songPosition');
+  assert.equal(ev.sixteenths, 64);
+  assert.equal(ev.beats, 16);
+  // The msb is the high 7 bits, so 0x00 0x01 is 128 sixteenths = 32 beats.
+  assert.equal(transportEvent([0xF2, 0x00, 0x01]).beats, 32);
+  assert.equal(transportEvent([0xF2, 0x00, 0x00]).beats, 0);
+  // Full scale: 16383 sixteenths ≈ 1024 bars of 4/4.
+  assert.equal(transportEvent([0xF2, 0x7F, 0x7F]).sixteenths, MAX_SPP);
+  // A truncated pointer must produce nothing, not bar 1 — silently resuming
+  // from the top is exactly the bug this message exists to prevent.
+  assert.equal(transportEvent([0xF2, 0x40]), null);
+  assert.equal(transportEvent([0xF2]), null);
+});
+
+test('song position round-trips through bytes', () => {
+  for (const beats of [0, 1, 16, 16.25, 100, 4095.75]) {
+    const bytes = songPositionBytes(beats);
+    assert.equal(bytes[0], 0xF2);
+    assert.equal(bytes[1] & 0x80, 0, 'data bytes must have the high bit clear');
+    assert.equal(bytes[2] & 0x80, 0);
+    assert.equal(transportEvent(bytes).beats, beats);
+  }
+  // Beyond 14 bits it clamps rather than wrapping round to the start of the song.
+  assert.equal(transportEvent(songPositionBytes(99999)).sixteenths, MAX_SPP);
+  assert.equal(transportEvent(songPositionBytes(-5)).sixteenths, 0);
+  // A position finer than a sixteenth is rounded — the wire has no room for it.
+  assert.equal(transportEvent(songPositionBytes(1.1)).beats, 1);
+});
+
+test('the realtime messages still parse, and single bytes still work', () => {
+  assert.equal(transportEvent([0xF8]).kind, 'clock');
+  assert.equal(transportEvent(0xF8).kind, 'clock');       // bare byte, as before
+  assert.equal(transportEvent([0xFA]).kind, 'start');
+  assert.equal(transportEvent([0xFB]).kind, 'continue');
+  assert.equal(transportEvent([0xFC]).kind, 'stop');
+  assert.equal(transportEvent([0xFF]).kind, 'reset');
+  assert.equal(transportEvent([0x90, 0x3C, 0x64]), null);
+  assert.equal(transportEvent([0xF3, 0x02]), null);       // song select: not ours
 });

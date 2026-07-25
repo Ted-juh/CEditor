@@ -84,6 +84,34 @@ recognised `F8`/`FA`/`FB`/`FC`/`FF` as single-byte realtime messages, and every
 consumer so far dropped them because nothing wanted them. See
 [note-input-echo.md](./note-input-echo.md) for the input pipe itself.
 
+### Song position pointer
+
+`F2 lsb msb` — a 14-bit count of MIDI *beats*, which the spec means as
+**sixteenth notes**, not quarters. Divide by four to get the beats everything
+else here counts in; that factor of four is the classic way to be wrong about
+this by exactly four.
+
+It is the only message on this path that carries a **position** rather than a
+tick, and it's what makes starting anywhere but bar 1 possible. A sequencer
+locates, sends `F2`, then `FB` (continue), and the panel resumes where the
+master actually is. `FA` (start) still means *from the top* whatever a preceding
+pointer said — that's the defined difference between start and continue, and
+there's a test for it. A locate registers as a jump, so followers re-baseline
+instead of replaying the gap.
+
+Getting this to work needed a fix one level down. `splitMidiMessages` was
+dropping system-common messages **a byte at a time**, which threw the pointer
+away and left its two data bytes loose in the stream. It now keeps them whole.
+A truncated pointer is ignored rather than read as position 0 — silently
+resuming from the top is precisely the bug this message exists to prevent.
+
+Clock-**out** got the same correction. It always sent `FA`, so a follower began
+at bar 1 while the panel played from bar 9. Starting at the top still sends
+`FA`; starting anywhere else now sends the position and then `FB`. Rewinding
+while stopped sends a pointer too. Nothing sends one *during* playback, because
+song position is a stopped-state message and a running sequencer has no defined
+way to act on it — that's why a loop wrap doesn't emit one.
+
 When following, the incoming pulses **are** the position — 24 of them to the
 beat — rather than a tempo we then re-derive a position from. The displayed BPM
 is estimated from the gaps between pulses, using the **median** and not the
@@ -338,9 +366,3 @@ same caveat about input in an exported Player.
 
 Nothing about the transport touches the DPD profile.
 
-## Possible next steps
-
-- **Song position pointer** (`F2`) — currently ignored; it would let an external
-  start mid-song land in the right place instead of at bar 1. The host source
-  already gets this right, because a DAW reports a position; it's only the MIDI
-  clock path that starts at bar 1 regardless.
