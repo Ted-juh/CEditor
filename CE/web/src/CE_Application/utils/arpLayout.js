@@ -227,3 +227,19 @@ export function arpCellAt(geom, px, count) {
   }
   return -1;
 }
+
+// --- Whose swing? ------------------------------------------------------------
+// The Transport owns swing now, so everything synced to it shuffles together by
+// default. A follower can still opt out — some parts genuinely want their own
+// feel against the rest — and a FREE-RUNNING one always uses its own, because
+// there is no clock to inherit from.
+export const SWING_SOURCES = ['transport', 'own'];
+export function swingSource(control) {
+  const v = String(arpConfig(control).swingSource ?? 'transport');
+  return SWING_SOURCES.includes(v) ? v : 'transport';
+}
+export function effectiveSwing(control, transportSwing = 0) {
+  const ownSwing = clamp01(num(arpConfig(control).swing, 0));
+  if (swingSource(control) === 'own') return ownSwing;
+  return arpSynced(control) ? clamp01(num(transportSwing, 0)) : ownSwing;
+}

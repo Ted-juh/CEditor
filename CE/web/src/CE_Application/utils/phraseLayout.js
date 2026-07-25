@@ -71,8 +71,11 @@ export function phraseBeatsPerStep(control) { return beatsPerStep(phraseDivision
 // index, not the pattern step, so it stays an even shuffle in reverse and
 // ping-pong instead of following the pattern back and forth.
 export function phraseSwing(control) { return clamp01(num(phraseConfig(control).swing, 0)); }
-export function phraseSwingSeconds(control, index, stepSecs) {
-  return swingDelay(index, phraseSwing(control), stepSecs);
+// `transportSwing` is the clock's setting; effectiveSwing decides whether this
+// sequencer inherits it or keeps its own.
+export function phraseSwingSeconds(control, index, stepSecs, transportSwing = null) {
+  const s = transportSwing === null ? phraseSwing(control) : effectiveSwing(control, transportSwing);
+  return swingDelay(index, s, stepSecs);
 }
 export function phraseStepSeconds(control, bpm = null) {
   if (phraseSynced(control) && bpm !== null) return phraseBeatsPerStep(control) * secondsPerBeat(bpm);
@@ -460,4 +463,20 @@ export function phraseScriptPatch(cfg, action, args = {}, roll = () => 0.5) {
     default:
       return {};
   }
+}
+
+// --- Whose swing? ------------------------------------------------------------
+// The Transport owns swing now, so everything synced to it shuffles together by
+// default. A follower can still opt out — some parts genuinely want their own
+// feel against the rest — and a FREE-RUNNING one always uses its own, because
+// there is no clock to inherit from.
+export const SWING_SOURCES = ['transport', 'own'];
+export function swingSource(control) {
+  const v = String(phraseConfig(control).swingSource ?? 'transport');
+  return SWING_SOURCES.includes(v) ? v : 'transport';
+}
+export function effectiveSwing(control, transportSwing = 0) {
+  const ownSwing = clamp01(num(phraseConfig(control).swing, 0));
+  if (swingSource(control) === 'own') return ownSwing;
+  return phraseSynced(control) ? clamp01(num(transportSwing, 0)) : ownSwing;
 }

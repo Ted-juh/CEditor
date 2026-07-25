@@ -160,6 +160,13 @@ export function musicalDelta(prevBeats, nextBeats, referenceBpm = REFERENCE_BPM)
   return d * secondsPerBeat(referenceBpm);
 }
 
+// The panel's swing setting, 0..1. It lives on the transport so that two
+// sequencers at "the same" shuffle really are the same shuffle — setting it in
+// two places is how they stop being.
+export function transportSwing(control) {
+  return clampNum(transportConfig(control).swing, 0, 1);
+}
+
 // Swing: push every odd step later, by up to half a step.
 export function swungBeatOffset(stepIndex, swing, division) {
   const s = clampNum(swing, 0, 1);

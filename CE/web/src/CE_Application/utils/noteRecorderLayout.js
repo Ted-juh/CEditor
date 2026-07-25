@@ -62,6 +62,24 @@ export function recorderLoopSeconds(control, bpm = null, beatsPerBar = 4) {
   return recorderSeconds(control);
 }
 
+// Where the playhead WAS at a past instant. The input store publishes state, so
+// the recorder learns about a note on the frame that notices it — up to a frame
+// late. The note carries its arrival time, so the position it is recorded at can
+// be wound back to when it actually happened rather than when we looked.
+//
+// Pure, and clamped: a stamp older than one loop is not useful (it would wrap
+// round and land somewhere arbitrary), so anything beyond that falls back to now.
+export function phaseAtTime(phaseNow, nowMs, atMs, loopSeconds) {
+  const loop = Math.max(0.05, num(loopSeconds, 1));
+  // 0 means "no stamp". Guarding here rather than trusting every caller to:
+  // treating it as a real time would wind the playhead back by the whole epoch.
+  const at = num(atMs, 0);
+  if (at <= 0) return wrap01(phaseNow);
+  const back = (num(nowMs, 0) - at) / 1000;
+  if (!(back > 0) || back >= loop) return wrap01(phaseNow);
+  return wrap01(num(phaseNow, 0) - back / loop);
+}
+
 // --- The take ---------------------------------------------------------------------
 // An event is { t, note, velocity, dur, pass }: position in the loop 0..1,
 // length as a fraction of the loop, and which overdub pass laid it down. `pass`

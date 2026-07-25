@@ -38,6 +38,7 @@ export const transport = writable({
   loopEnabled: false,
   countingIn: false,          // in the count-in bars before the first step
   countInLeft: 0,             // …and how many beats of it are left
+  swing: 0,                   // shuffle, inherited by every synced step follower
   seq: 0,
 });
 
@@ -50,6 +51,10 @@ let lastPublishAt = 0;
 let clockOut = false;
 let lastPulseBeats = 0;
 let beatsPerBar = 4;
+// Swing belongs on the clock, not on each follower: two sequencers at "the same"
+// shuffle should be the same shuffle, and setting it twice is how they stop
+// being. Followers may still override, but they inherit by default.
+let swing = 0;
 
 // Loop points. Only ever applied when WE own the position: following a DAW or
 // an incoming clock, the other end decides where the music is, and folding
@@ -105,6 +110,7 @@ function publish(force = false) {
     bpm,
     beats,
     beatsPerBar,
+    swing,
     source,
     externalBpm,
     externalLocked: source === 'external'
@@ -240,6 +246,13 @@ export function setTransportSignature(perBar) {
   publish(true);
 }
 export function transportBeatsPerBar() { return beatsPerBar; }
+export function transportSwingNow() { return swing; }
+export function setTransportSwing(next) {
+  const v = Math.max(0, Math.min(1, Number(next) || 0));
+  if (v === swing) return;
+  swing = v;
+  publish(true);
+}
 
 // Exact position, for consumers that tick themselves. Reading the store instead
 // would give them the last published value, which is up to a frame stale.
@@ -449,7 +462,7 @@ export function feedTransportMidiForTest(hex) {
 export function resetTransportForTest() {
   running = false; stopTimer(); beats = 0; externalBeats = 0; bpm = 120;
   source = 'internal'; pulseTimes = []; lastPulseAt = 0; externalBpm = null;
-  clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4;
+  clockOut = false; startedAt = 0; lastPulseBeats = 0; beatsPerBar = 4; swing = 0;
   hostAvailable = false; hostPlaying = false; hostAnchorBeats = 0; hostAnchorAt = 0; hostBpm = null;
   jumpSeq = 0;
   loopEnabled = false; loopStartBeats = 0; loopLengthBeats = 16; lastLoopCycle = null;

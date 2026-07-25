@@ -75,7 +75,10 @@ export function startNoteInputListener() {
     // there's no reason to walk a multi-kilobyte blob on every arrival.
     if (String(payload.messageType ?? '') === 'sysex') return;
     const cur = get(midiNoteState);
-    const nextNotes = applyMidiHex(cur.notes, payload.hex);
+    // Stamp the arrival. The store publishes STATE, so a consumer sampling it
+    // per frame would otherwise only know a note arrived some time in the last
+    // 16ms — fine for lighting a pad, audibly loose for recording a phrase.
+    const nextNotes = applyMidiHex(cur.notes, payload.hex, Date.now());
     // Both reducers return the SAME object when nothing they track changed, so
     // a CC sweep never touches the note store and a note never touches the
     // expression store.

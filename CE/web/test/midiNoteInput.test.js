@@ -111,9 +111,12 @@ test('velocity + channel survive into the entries, and isNoteHeld filters', () =
     { kind: 'noteOn', channel: 10, note: 36, velocity: 118 },
     { kind: 'noteOn', channel: 10, note: 42, velocity: 60 },
   ]);
+  // `at` is the arrival stamp — 0 here because no clock was passed in. The
+  // Phrase Recorder uses it to place a note where it happened rather than where
+  // the frame that noticed it happened to be.
   assert.deepEqual(heldNoteEntries(s, 10), [
-    { note: 36, channel: 10, velocity: 118 },
-    { note: 42, channel: 10, velocity: 60 },
+    { note: 36, channel: 10, velocity: 118, at: 0 },
+    { note: 42, channel: 10, velocity: 60, at: 0 },
   ]);
   assert.equal(isNoteHeld(s, 36), true);
   assert.equal(isNoteHeld(s, 36, 10), true);

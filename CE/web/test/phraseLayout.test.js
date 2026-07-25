@@ -13,6 +13,7 @@ import {
   PHRASE_SEEDS, phraseSeedPattern, PHRASE_MODES, PHRASE_DIRECTIONS,
   MIN_STEPS, MAX_STEPS, MAX_ROWS, tiesForward,
   phraseScriptPatch, PHRASE_SCRIPT_ACTIONS, phraseSwing, phraseSwingSeconds,
+  effectiveSwing, swingSource,
 } from '../src/CE_Application/utils/phraseLayout.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
 import { swingDelay } from '../src/CE_Application/utils/arpLayout.js';
@@ -433,4 +434,19 @@ test('swing delays the odd steps, and shares the Arpeggiator\'s function', () =>
   // ping-pong stay an even shuffle instead of following the pattern back.
   const rev = ph({ steps: 4, rows: 8, swing: 0.5, direction: 'reverse' });
   assert.deepEqual([0, 1, 2, 3].map((i) => phraseSwingSeconds(rev, i, 1) > 0), [false, true, false, true]);
+});
+
+test('swing is inherited from the clock unless a follower opts out', () => {
+  // Setting it in two places is how two sequencers stop being the same shuffle.
+  const synced = ph({ syncToTransport: true, swing: 0.2 });
+  assert.equal(effectiveSwing(synced, 0.6), 0.6, 'the clock wins');
+  assert.equal(effectiveSwing(ph({ syncToTransport: true, swing: 0.2, swingSource: 'own' }), 0.6), 0.2);
+  // Free-running has no clock to inherit from, so it always uses its own.
+  assert.equal(effectiveSwing(ph({ syncToTransport: false, swing: 0.2 }), 0.6), 0.2);
+  assert.equal(swingSource(ph({})), 'transport', 'inherit by default');
+  assert.equal(swingSource(ph({ swingSource: 'nonsense' })), 'transport');
+  // The seconds helper routes through it when given a clock reading.
+  const secs = phraseStepSeconds(synced);
+  assert.ok(near(phraseSwingSeconds(synced, 1, secs, 0.6), swingDelay(1, 0.6, secs)));
+  assert.ok(near(phraseSwingSeconds(synced, 1, secs), swingDelay(1, 0.2, secs)), 'no clock given = own');
 });

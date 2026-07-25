@@ -9,9 +9,10 @@ import {
   eventsInWindow, eventSeconds, playedNote, playedVelocity,
   takeNoteRange, recorderGeometry, eventRects, playheadX,
   onLoopBoundary, toggleRecordState, nextPassFor,
-  RECORDER_STATES, MAX_EVENTS, recorderScriptPatch, RECORDER_SCRIPT_ACTIONS,
+  RECORDER_STATES, MAX_EVENTS, recorderScriptPatch, RECORDER_SCRIPT_ACTIONS, phaseAtTime,
 } from '../src/CE_Application/utils/noteRecorderLayout.js';
 import { noteOutputFromBytes } from '../src/CE_Application/stores/noteOutput.js';
+import { applyNoteEvent, EMPTY_NOTE_STATE } from '../src/CE_Application/utils/midiNoteInput.js';
 
 const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 function rc(c) { return { _children: { Core: { controlType: 'Recorder' }, Recorder: c } }; }
@@ -328,4 +329,28 @@ test('a bad recorder argument is a no-op, not a throw', () => {
   for (const action of RECORDER_SCRIPT_ACTIONS) {
     assert.ok(Object.keys(recorderScriptPatch(cfg, action, {})).length <= 2);
   }
+});
+
+test('a note is recorded where it arrived, not where the frame noticed it', () => {
+  // The input store publishes STATE, so the recorder learns about a note up to
+  // a frame late. The stamp winds the position back.
+  const loop = 4;                                  // seconds
+  // Playhead at 0.5; the note arrived 200ms ago = 0.05 of a 4s loop earlier.
+  assert.ok(near(phaseAtTime(0.5, 1000, 800, loop), 0.45));
+  // Across the seam it wraps rather than going negative.
+  assert.ok(near(phaseAtTime(0.01, 1000, 900, loop), 0.985));
+  // No stamp, a future stamp, or one older than a whole loop: use now. An
+  // older-than-a-loop stamp would wrap round and land somewhere arbitrary.
+  assert.equal(phaseAtTime(0.5, 1000, 0, loop), 0.5);
+  assert.equal(phaseAtTime(0.5, 1000, 1200, loop), 0.5);
+  assert.equal(phaseAtTime(0.5, 9000, 1000, loop), 0.5);
+});
+
+test('the held-note store carries an arrival stamp', () => {
+  const on = applyNoteEvent(EMPTY_NOTE_STATE, { kind: 'noteOn', channel: 1, note: 60, velocity: 100 }, 1234);
+  assert.equal(on['1:60'].at, 1234);
+  // A re-sent identical note-on is the same note, so the stamp does not move.
+  const again = applyNoteEvent(on, { kind: 'noteOn', channel: 1, note: 60, velocity: 100 }, 9999);
+  assert.equal(again, on, 'same object out');
+  assert.equal(applyNoteEvent(EMPTY_NOTE_STATE, { kind: 'noteOn', channel: 1, note: 60, velocity: 100 })['1:60'].at, 0);
 });

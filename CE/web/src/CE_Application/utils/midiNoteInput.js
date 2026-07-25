@@ -125,7 +125,11 @@ export function noteEventsFromHex(hex) {
 export const EMPTY_NOTE_STATE = Object.freeze({});
 const keyOf = (channel, note) => `${channel}:${note}`;
 
-export function applyNoteEvent(state, event) {
+// `at` is the arrival time in ms, passed IN rather than read here — this file
+// stays pure, and a test can hand it a fake clock. It rides on the held entry so
+// a consumer that cares about WHEN a note arrived (the Phrase Recorder) isn't
+// limited to the resolution of the frame that noticed it.
+export function applyNoteEvent(state, event, at = 0) {
   const s = state ?? EMPTY_NOTE_STATE;
   if (!event) return s;
   if (event.kind === 'reset') return EMPTY_NOTE_STATE;
@@ -148,17 +152,17 @@ export function applyNoteEvent(state, event) {
   if (event.kind === 'noteOn') {
     const prev = s[key];
     if (prev && prev.velocity === event.velocity) return s;
-    return { ...s, [key]: { note: event.note, channel: event.channel, velocity: event.velocity } };
+    return { ...s, [key]: { note: event.note, channel: event.channel, velocity: event.velocity, at: num(at, 0) } };
   }
   return s;
 }
-export function applyNoteEvents(state, events) {
+export function applyNoteEvents(state, events, at = 0) {
   let s = state ?? EMPTY_NOTE_STATE;
-  for (const e of (Array.isArray(events) ? events : [])) s = applyNoteEvent(s, e);
+  for (const e of (Array.isArray(events) ? events : [])) s = applyNoteEvent(s, e, at);
   return s;
 }
-export function applyMidiHex(state, hex) {
-  return applyNoteEvents(state, noteEventsFromHex(hex));
+export function applyMidiHex(state, hex, at = 0) {
+  return applyNoteEvents(state, noteEventsFromHex(hex), at);
 }
 
 // The sounding notes, low to high. `channel` 0 means omni (any channel), which

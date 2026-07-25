@@ -1455,6 +1455,7 @@ export const SECTION_DEFAULTS = {
   Transport: {
     _type: 'Transport',
     bpm: 120,
+    swing: 0,                    // shuffle for every synced step follower
     source: 'internal',           // internal | external (follow MIDI clock in)
     beatsPerBar: 4,
     beatUnit: 4,

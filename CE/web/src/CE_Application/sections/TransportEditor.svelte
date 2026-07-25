@@ -96,6 +96,9 @@
     <PropertyCell label="Position" span={1} hint="Show the bar.beat.tick readout and the beat pulse.">
       <PropertyToggle value={t.showPosition !== false} onchange={() => set('showPosition', !(t.showPosition !== false))} />
     </PropertyCell>
+    <PropertyCell label="Swing" span={1} hint="Shuffle for every follower synced to this clock — delays every odd step by up to half a step. It lives here rather than on each sequencer so two of them at the same setting really are the same shuffle; a follower can still opt out.">
+      <input class="val" type="number" min="0" max="1" step="0.05" value={num(t.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
+    </PropertyCell>
     <PropertyCell label="Tap tempo" span={1} hint="Tapping the face sets the tempo. Inactive while following an external clock or the DAW.">
       <PropertyToggle value={t.showTap !== false} onchange={() => set('showTap', !(t.showTap !== false))} />
     </PropertyCell>

@@ -155,6 +155,12 @@
     <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step (1 = legato).">
       <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(a.gate, 0.6)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.6))} />
     </PropertyCell>
+    <PropertyCell label="Swing from" span={1} hint="Where the shuffle comes from. Synced to the transport it inherits the clock's swing by default, so everything on that clock shuffles together. Its own keeps this part separate. Free-running always uses its own — there is no clock to inherit from.">
+      <select class="val" value={a.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
+        <option value="transport">The transport</option>
+        <option value="own">Its own</option>
+      </select>
+    </PropertyCell>
     <PropertyCell label="Swing" span={1} hint="Delay every odd step, up to half a step (0 = straight).">
       <input class="val" type="number" min="0" max="1" step="0.05" value={num(a.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
     </PropertyCell>

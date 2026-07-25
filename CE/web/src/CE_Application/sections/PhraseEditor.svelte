@@ -159,6 +159,12 @@
     <PropertyCell label="Gate" span={1} hint="Note length as a fraction of the step. 1 = legato. A note the next step TIES is exempt — a tie would be pointless if the gate cut it.">
       <input class="val" type="number" min="0.05" max="1" step="0.05" value={num(p.gate, 0.8)} onchange={(e) => set('gate', clampNum(e.target.value, 0.05, 1, 0.8))} />
     </PropertyCell>
+    <PropertyCell label="Swing from" span={1} hint="Where the shuffle comes from. Synced to the transport it inherits the clock's swing by default, so everything on that clock shuffles together. Its own keeps this part separate. Free-running always uses its own — there is no clock to inherit from.">
+      <select class="val" value={p.swingSource ?? 'transport'} onchange={(e) => set('swingSource', e.target.value)}>
+        <option value="transport">The transport</option>
+        <option value="own">Its own</option>
+      </select>
+    </PropertyCell>
     <PropertyCell label="Swing" span={1} hint="Delays every odd step by up to half a step. Shares the Arpeggiator's swing function, so an Arp and a Phrase at the same swing land together.">
       <input class="val" type="number" min="0" max="1" step="0.05" value={num(p.swing, 0)} onchange={(e) => set('swing', clampNum(e.target.value, 0, 1, 0))} />
     </PropertyCell>

@@ -93,6 +93,7 @@
   import {
     arpConfig, arpRate, arpVelocity, arpChannel, arpBaseNotes, arpSequence,
     stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
+    effectiveSwing as arpEffectiveSwing,
     arpGeometry, arpCellAt, toggleMute, arpPhase,
     arpSynced, arpDivision, syncedPhaseAt,
   } from '../utils/arpLayout.js';
@@ -131,7 +132,7 @@
     recorderSynced, recorderBars, recorderLoopSeconds, isRecordingState,
     recordNoteOn, recordNoteOff, closeOpenNotes, takeIsEmpty, nextPassFor,
     eventsInWindow, eventSeconds, playedNote, playedVelocity,
-    onLoopBoundary, toggleRecordState,
+    onLoopBoundary, toggleRecordState, phaseAtTime,
   } from '../utils/noteRecorderLayout.js';
   import { noteOutputEvents, publishNoteOutput, noteOutputFromBytes } from '../stores/noteOutput.js';
   import {
@@ -159,7 +160,7 @@
   } from '../utils/transportLayout.js';
   import {
     transport, startTransport, stopTransport, toggleTransport,
-    setTransportBpm, setTransportSource, setTransportClockOut,
+    setTransportBpm, setTransportSource, setTransportClockOut, transportSwingNow, setTransportSwing,
     transportBeatsNow, isTransportRunning, transportBpmNow,
     setTransportSignature, transportBeatsPerBar, transportJumpSeq,
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
@@ -2437,7 +2438,7 @@
         }, gateMs));
       }
     };
-    const delayMs = swingDelay(stepIdx, numberOr(cfg.swing, 0), secs) * 1000;
+    const delayMs = swingDelay(stepIdx, arpEffectiveSwing(control, transportSwingNow()), secs) * 1000;
     if (delayMs > 0) push(setTimeout(fire, delayMs)); else fire();
   }
   // A synced Arp doesn't advance a phase of its own — it asks the transport
@@ -2996,11 +2997,18 @@
     }
   }
   // Record one note into the live take. `t` is the phase it happened at.
-  function captureNote(control, kind, channel, note, velocity) {
+  function captureNote(control, kind, channel, note, velocity, atMs = 0) {
     const state = recorderState(control);
     if (!isRecordingState(state)) return;
     const id = getControlId(control);
-    const t = recorderPhaseState[id] ?? 0;
+    // Wind the position back to when the note actually arrived, not when this
+    // frame noticed it. Panel-played notes are captured in the same tick they
+    // are sent, so they pass 0 and use the live phase.
+    const live = recorderPhaseState[id] ?? 0;
+    const t = atMs > 0
+      ? phaseAtTime(live, Date.now(), atMs,
+          recorderLoopSeconds(control, recorderSynced(control) ? transportBpmNow() : null, transportBeatsPerBar()))
+      : live;
     const prior = liveTakeFor(control);
     const pass = nextPassFor(prior, state);
     const next = kind === 'on'
@@ -3023,9 +3031,12 @@
     const now = new Map(entries.map((e) => [`${e.channel ?? 1}:${e.note}`, e]));
     const before = recorderHeldNotes[id] ?? new Map();
     for (const [key, e] of now) {
-      if (!before.has(key)) captureNote(control, 'on', e.channel ?? 1, e.note, e.velocity ?? 100);
+      if (!before.has(key)) captureNote(control, 'on', e.channel ?? 1, e.note, e.velocity ?? 100, e.at ?? 0);
     }
     for (const [key, e] of before) {
+      // A note-off has no entry left to carry a stamp, so the release is
+      // frame-resolution. That moves a note's LENGTH by a frame at worst; a
+      // missed onset would move the note itself, which is what mattered.
       if (!now.has(key)) captureNote(control, 'off', e.channel ?? 1, e.note, 0);
     }
     recorderHeldNotes[id] = now;
@@ -3233,7 +3244,7 @@
     // The playing column lights on the beat even when the note is swung off it:
     // the grid shows where the sequence is, not where the shuffle put it.
     phraseIndexState[id] = index;
-    const delayMs = phraseSwingSeconds(control, index, phraseStepSeconds(control, bpm)) * 1000;
+    const delayMs = phraseSwingSeconds(control, index, phraseStepSeconds(control, bpm), transportSwingNow()) * 1000;
     if (delayMs > 0) (phraseTimers[id] ??= []).push(setTimeout(fire, delayMs));
     else fire();
   }
@@ -3546,12 +3557,14 @@
     const cfg = base?._children?.Transport;
     if (!cfg) return resolved;
     const signature = `${cfg.bpm}|${cfg.source}|${cfg.clockOut}|${cfg.beatsPerBar}`
-      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}`;
+      + `|${cfg.loopEnabled}|${cfg.loopStartBar}|${cfg.loopLengthBars}|${cfg.swing}`;
     if (transportConfigured !== signature) {
       transportConfigured = signature;
       setTransportSource(tpSource(base));
       if (!transportIsFollowing(tpSource(base))) setTransportBpm(numberOr(cfg.bpm, 120));
       setTransportClockOut(cfg.clockOut === true);
+      // Swing lives on the clock so every synced follower shuffles together.
+      setTransportSwing(numberOr(cfg.swing, 0));
       // The meter has to reach the store, not just the readout: the components
       // that loop in BARS ask the store how long a bar is.
       setTransportSignature(numberOr(cfg.beatsPerBar, 4));
