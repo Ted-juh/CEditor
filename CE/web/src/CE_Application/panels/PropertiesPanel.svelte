@@ -1,7 +1,7 @@
 <script>
   import {
     Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play, Cable,
-    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical, CircleDashed, Orbit, AudioWaveform, Waypoints, Palette, BarChart3, Circle, Sparkle, Link2, Music, ListMusic, Piano, LayoutGrid, OctagonAlert, Timer, SplitSquareHorizontal, Grid2x2Check, Disc3, Layers,
+    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical, CircleDashed, Orbit, AudioWaveform, Waypoints, Palette, BarChart3, Circle, Sparkle, Link2, Music, ListMusic, Piano, LayoutGrid, OctagonAlert, Timer, SplitSquareHorizontal, Grid2x2Check, Disc3, Layers, ListOrdered,
   } from 'lucide-svelte';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
@@ -147,6 +147,7 @@
     { id: 'phrase',     icon: Grid2x2Check,  label: 'Phrase',     section: 'Phrase' },
     { id: 'recorder',   icon: Disc3,         label: 'Recorder',   section: 'Recorder' },
     { id: 'harmoniser', icon: Layers,        label: 'Harmoniser', section: 'Harmoniser' },
+    { id: 'setlist',    icon: ListOrdered,   label: 'Setlist',    section: 'Setlist' },
     { id: 'transport',  icon: Timer,         label: 'Transport',  section: 'Transport' },
     { id: 'contentlayout', icon: LayoutDashboard, label: 'Content Layout', section: 'ContentLayout' },
     { id: 'mouse',      icon: MousePointer,  label: 'Mouse',      section: 'Mouse' },

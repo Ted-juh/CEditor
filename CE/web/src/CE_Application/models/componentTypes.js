@@ -797,6 +797,23 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Setlist: {
+    // An ordered list of panel states you advance with a footswitch. Sends
+    // program change and writes panel values, so no DeviceBindings of its own.
+    sections: ['Background', 'Setlist', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Setlist'),
+    defaultOverrides: {
+      Transform: { width: 260, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
   Harmoniser: {
     // One finger in, a chord out. Reads the MIDI input and emits notes, so no
     // DeviceBindings.

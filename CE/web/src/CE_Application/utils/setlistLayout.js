@@ -1,0 +1,228 @@
+// Setlist / Scene Stepper — an ordered list of panel states you advance with a
+// footswitch.
+//
+// Unglamorous, and the thing people actually need on stage. Everything it needs
+// already existed: snapshots (the Timbre Space and the Preset Constellation both
+// store them), program change is a MIDI message, and a footswitch is a CC the
+// input path already reads. This is the ordering, the stepping and the recall.
+//
+// Pure: a list and an index in, messages and a patch out. The MIDI and the
+// writes live in the preview surface.
+
+function num(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+function clampInt(n, lo, hi) { const v = Math.round(num(n, lo)); return v < lo ? lo : v > hi ? hi : v; }
+
+export const MAX_SCENES = 128;
+
+export function setlistConfig(control) {
+  return control?._children?.Setlist ?? {};
+}
+export function setlistScenes(control) {
+  const raw = setlistConfig(control).scenes;
+  return (Array.isArray(raw) ? raw : []).slice(0, MAX_SCENES).map((s, i) => ({
+    id: String(s?.id ?? `scene_${i + 1}`),
+    name: String(s?.name ?? `Scene ${i + 1}`),
+    note: String(s?.note ?? ''),                 // a cue line for the player
+    // The captured panel state: { "Control.Section.prop": value }. Only what
+    // was captured — see captureScene for why "everything" is wrong.
+    values: s?.values && typeof s.values === 'object' && !Array.isArray(s.values) ? s.values : {},
+    program: s?.program === null || s?.program === undefined ? null : clampInt(s.program, 0, 127),
+    bankMsb: s?.bankMsb === null || s?.bankMsb === undefined ? null : clampInt(s.bankMsb, 0, 127),
+    bankLsb: s?.bankLsb === null || s?.bankLsb === undefined ? null : clampInt(s.bankLsb, 0, 127),
+    bpm: s?.bpm === null || s?.bpm === undefined ? null : Math.max(20, Math.min(300, num(s.bpm, 120))),
+    enabled: s?.enabled !== false,
+    colour: String(s?.colour ?? ''),
+  }));
+}
+export function setlistCount(control) { return setlistScenes(control).length; }
+export function setlistIndex(control) {
+  const n = setlistCount(control);
+  if (!n) return -1;
+  return clampInt(setlistConfig(control).index ?? 0, 0, n - 1);
+}
+export function sceneAt(control, index) {
+  const scenes = setlistScenes(control);
+  const i = Math.round(num(index, -1));
+  return i >= 0 && i < scenes.length ? scenes[i] : null;
+}
+export function currentScene(control) { return sceneAt(control, setlistIndex(control)); }
+export function setlistChannel(control) { return clampInt(setlistConfig(control).channel ?? 1, 1, 16); }
+export function setlistWraps(control) { return setlistConfig(control).wrap === true; }
+
+/**
+ * Step the index. Disabled scenes are SKIPPED rather than landing on them —
+ * "skip this one tonight" is the whole reason to have a disable, and stepping
+ * onto a skipped scene would make the button appear to do nothing.
+ *
+ * Wrap is OFF by default. A setlist that jumps back to song one when you press
+ * next at the end of the night is a bad surprise in front of an audience; the
+ * end of the list simply stays put.
+ */
+export function stepIndex(scenes, index, delta, wrap = false) {
+  const list = Array.isArray(scenes) ? scenes : [];
+  const n = list.length;
+  if (!n) return -1;
+  const d = Math.sign(Math.round(num(delta, 0))) || 0;
+  let i = clampInt(index, 0, n - 1);
+  if (d === 0) return i;
+  for (let hop = 0; hop < n; hop += 1) {
+    i += d;
+    if (i < 0 || i >= n) {
+      if (!wrap) return clampInt(index, 0, n - 1);   // stay where you are
+      i = ((i % n) + n) % n;
+    }
+    if (list[i]?.enabled !== false) return i;
+  }
+  return clampInt(index, 0, n - 1);                  // everything is disabled
+}
+export function gotoIndex(scenes, index) {
+  const list = Array.isArray(scenes) ? scenes : [];
+  if (!list.length) return -1;
+  return clampInt(index, 0, list.length - 1);
+}
+
+// --- The footswitch --------------------------------------------------------------
+// The one rule that has to be right: advance on the RISING edge only.
+//
+// A momentary footswitch sends 127 when you press it and 0 when you let go. Both
+// are CC messages on the same number. Acting on each one steps the setlist twice
+// per press — which on stage looks like the pedal skipping a song, and is the
+// single most common way a scene stepper is broken.
+export const FOOT_ACTIONS = ['next', 'prev', 'goto'];
+export const FOOT_ACTION_LABELS = { next: 'Next scene', prev: 'Previous scene', goto: 'Go to a scene' };
+
+export function footswitchCc(control) { return clampInt(setlistConfig(control).footCc ?? 64, 0, 127); }
+export function footswitchChannel(control) { return clampInt(setlistConfig(control).footChannel ?? 0, 0, 16); }
+export function footswitchThreshold(control) { return clampInt(setlistConfig(control).footThreshold ?? 64, 1, 127); }
+
+/**
+ * Should this CC event step the list? `wasDown` is whether the pedal was already
+ * held; the caller keeps that one boolean.
+ * Returns { step, down } — `down` is the new held state, always.
+ */
+export function footswitchEdge(control, event, wasDown = false) {
+  const down = clampInt(event?.value, 0, 127) >= footswitchThreshold(control);
+  const chan = footswitchChannel(control);
+  const matches = String(event?.kind) === 'cc'
+    && clampInt(event?.cc, 0, 127) === footswitchCc(control)
+    && (chan === 0 || clampInt(event?.channel, 1, 16) === chan);
+  if (!matches) return { step: false, down: wasDown };
+  return { step: down && !wasDown, down };
+}
+
+// --- Recall ----------------------------------------------------------------------
+// The MIDI a scene sends. Bank select comes BEFORE the program change, because
+// that is what bank select means — it selects the bank the next program change
+// lands in. Sending it after would change the patch and then change the bank,
+// which does nothing until the following scene.
+export function sceneMessages(scene, channel) {
+  const ch = clampInt(channel, 1, 16);
+  const out = [];
+  if (!scene) return out;
+  if (scene.bankMsb !== null && scene.bankMsb !== undefined) {
+    out.push({ kind: 'cc', bytes: [0xB0 | (ch - 1), 0, scene.bankMsb] });
+  }
+  if (scene.bankLsb !== null && scene.bankLsb !== undefined) {
+    out.push({ kind: 'cc', bytes: [0xB0 | (ch - 1), 32, scene.bankLsb] });
+  }
+  if (scene.program !== null && scene.program !== undefined) {
+    out.push({ kind: 'program', bytes: [0xC0 | (ch - 1), scene.program] });
+  }
+  return out;
+}
+
+/**
+ * What a recall does, in order. Returned as a plan rather than performed, so the
+ * order is testable and the caller stays dumb.
+ *
+ * MIDI first, then the panel values. A program change swaps the patch on the
+ * synth; the stored values belong to that patch, so sending them first would
+ * write them into the OLD patch and then have the program change wipe them.
+ */
+export function recallPlan(control, index) {
+  const scene = sceneAt(control, index);
+  if (!scene) return { scene: null, messages: [], values: {}, bpm: null };
+  const cfg = setlistConfig(control);
+  return {
+    scene,
+    messages: cfg.sendProgram === false ? [] : sceneMessages(scene, setlistChannel(control)),
+    values: cfg.recallValues === false ? {} : scene.values,
+    // The transport tempo, if the scene carries one. Songs have tempos; that is
+    // most of what a setlist is for.
+    bpm: cfg.recallTempo === false ? null : scene.bpm,
+  };
+}
+
+/**
+ * Capture the current panel into a scene.
+ *
+ * `paths` is an explicit list. Capturing "everything" is wrong in a specific
+ * way: the setlist's own index is a panel value, so a scene would store the
+ * index it was captured at, and recalling it would move the setlist — usually
+ * to itself, occasionally to somewhere else, and always confusingly.
+ */
+export function captureScene(scene, paths, readValue) {
+  const values = {};
+  for (const path of Array.isArray(paths) ? paths : []) {
+    const v = typeof readValue === 'function' ? readValue(path) : undefined;
+    if (v !== undefined) values[path] = v;
+  }
+  return { ...(scene ?? {}), values };
+}
+// How many values a recall would actually change. "12 values change" on the
+// button is worth more than a list nobody reads.
+export function sceneChangeCount(scene, readValue) {
+  const values = scene?.values ?? {};
+  let n = 0;
+  for (const [path, v] of Object.entries(values)) {
+    const cur = typeof readValue === 'function' ? readValue(path) : undefined;
+    if (JSON.stringify(cur) !== JSON.stringify(v)) n += 1;
+  }
+  return n;
+}
+// The paths one scene has and another doesn't — the usual cause of "that knob
+// stayed where the last song left it".
+export function missingPaths(scene, referencePaths) {
+  const have = new Set(Object.keys(scene?.values ?? {}));
+  return (Array.isArray(referencePaths) ? referencePaths : []).filter((p) => !have.has(p));
+}
+
+// --- Geometry -----------------------------------------------------------------
+// A list. A setlist that isn't drawn as a list is a puzzle.
+export function setlistGeometry(width, height, count, pad = 8, headerH = 20, rowH = 18) {
+  const p = Math.max(0, num(pad, 8));
+  const hdr = Math.max(0, num(headerH, 0));
+  const h = Math.max(1, num(height, 0) - p * 2 - hdr);
+  const rh = Math.max(10, num(rowH, 18));
+  return {
+    x0: p, y0: p + hdr, w: Math.max(1, num(width, 0) - p * 2), h,
+    rowH: rh,
+    visible: Math.max(1, Math.floor(h / rh)),
+    count: Math.max(0, Math.round(num(count, 0))),
+  };
+}
+// Which rows to draw. The current scene is kept in view and, where there is
+// room, kept off the edge — a setlist that always shows the current song at the
+// bottom gives you no idea what is coming.
+export function visibleRange(geom, index) {
+  const n = geom.count;
+  const v = Math.min(geom.visible, n);
+  if (v >= n) return { first: 0, last: Math.max(0, n - 1) };
+  const lead = Math.floor(v / 3);
+  let first = clampInt(index - lead, 0, Math.max(0, n - v));
+  return { first, last: first + v - 1 };
+}
+export function rowRect(geom, row, first) {
+  return { x: geom.x0, y: geom.y0 + (row - first) * geom.rowH, w: geom.w, h: geom.rowH - 1 };
+}
+export function rowAtPoint(geom, index, px, py) {
+  const { first, last } = visibleRange(geom, index);
+  for (let r = first; r <= last; r += 1) {
+    const rect = rowRect(geom, r, first);
+    if (px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h) return r;
+  }
+  return null;
+}

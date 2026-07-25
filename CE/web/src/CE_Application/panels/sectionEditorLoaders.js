@@ -51,6 +51,7 @@ const LAZY_COMPONENT_LOADERS = {
   phrase: () => import('../sections/PhraseEditor.svelte'),
   recorder: () => import('../sections/RecorderEditor.svelte'),
   harmoniser: () => import('../sections/HarmoniserEditor.svelte'),
+  setlist: () => import('../sections/SetlistEditor.svelte'),
   transport: () => import('../sections/TransportEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),

@@ -1297,6 +1297,40 @@ export const SECTION_DEFAULTS = {
     labelColour: 'FFB9B9B9',
   },
 
+  Setlist: {
+    _type: 'Setlist',
+    index: 0,
+    wrap: false,                 // the end of the list stays put — see the docs
+    channel: 1,                  // where program change is sent
+    sendProgram: true,
+    recallValues: true,
+    recallTempo: true,           // a scene's bpm drives the Transport
+    // The footswitch. Rising edge only: a momentary pedal sends 127 then 0, and
+    // acting on both steps the setlist twice per press.
+    footEnabled: true,
+    footCc: 64,
+    footChannel: 0,              // 0 = any
+    footThreshold: 64,
+    footAction: 'next',          // next | prev | goto
+    // Which panel paths a capture stores. Explicit, never "everything" — the
+    // setlist's own index is a panel value too.
+    capturePaths: [],
+    scenes: [
+      { id: 'scene_1', name: 'Opener', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
+      { id: 'scene_2', name: 'Ballad', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
+      { id: 'scene_3', name: 'Closer', note: '', values: {}, program: null, bankMsb: null, bankLsb: null, bpm: null, enabled: true, colour: '' },
+    ],
+    editable: true,              // click a row to jump to it in preview
+    showHeader: true,
+    rowHeight: 18,
+    // Colours.
+    faceColour: 'FF141420',
+    rowColour: 'FF20202C',
+    currentColour: 'FF56CCF2',
+    textColour: 'FFE8E8EE',
+    labelColour: 'FFB9B9B9',
+  },
+
   Harmoniser: {
     _type: 'Harmoniser',
     mode: 'diatonic',            // diatonic (in key) | memory (fixed shape)

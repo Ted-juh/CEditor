@@ -169,6 +169,23 @@ not DSP:
   releasing one must not punch a hole in the other. See
   [harmoniser.md](./harmoniser.md).
 
+### 00l. Setlist — scenes on a footswitch — **shipped 🟢**
+- Unglamorous, and the thing people actually need on stage: an ordered list of
+  panel states you advance with a pedal, each carrying a name, a cue note, an
+  optional program change with bank, a tempo, and captured panel values.
+  Nothing in it is novel — snapshots, program change and a footswitch CC all
+  already existed — which is exactly why it was cheap.
+  The rule that has to be right is the **rising edge**: a momentary pedal sends
+  127 then 0, and acting on both steps twice per press, which on stage looks
+  like the pedal skipping a song. Wrap is **off by default** (a setlist that
+  jumps back to song one at the end of the night is a bad surprise), disabled
+  scenes are **skipped rather than landed on**, and recall sends **MIDI before
+  values** — a program change swaps the patch, and the stored values belong to
+  the new one. Capture takes an **explicit path list**, never "everything",
+  because the setlist's own index is a panel value too. A scene's tempo drives
+  the [Transport](./transport.md), so everything synced follows the song. See
+  [setlist.md](./setlist.md).
+
 ### 0. Orbit Modulator — spatial poly-LFO — **shipped 🟢**
 - A modulation **source that animates itself** and that you **choreograph in
   space**: satellites orbit a centre, each emitting a live 0–1 value from its

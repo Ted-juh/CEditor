@@ -22,6 +22,7 @@
     Grid2x2Check,
     Disc3,
     Layers,
+    ListOrdered,
     Timer,
     Gauge,
     Spline,
@@ -144,6 +145,7 @@
       { type: 'Phrase',          icon: Grid2x2Check,       label: 'Insert Phrase Sequencer (note grid)' },
       { type: 'Recorder',        icon: Disc3,              label: 'Insert Phrase Recorder (record + loop notes)' },
       { type: 'Harmoniser',      icon: Layers,             label: 'Insert Harmoniser (one finger, full chord)' },
+      { type: 'Setlist',         icon: ListOrdered,        label: 'Insert Setlist (scenes on a footswitch)' },
     ],
     [
       { type: 'MomentaryButton', icon: RectangleHorizontal, label: 'Insert Momentary Button' },

@@ -139,6 +139,10 @@
     releaseAllHarmony, reconcileHarmony, soundingPitches, heldInputNotes,
   } from '../utils/harmoniserLayout.js';
   import {
+    setlistConfig, setlistScenes, setlistCount, setlistIndex, setlistWraps,
+    setlistGeometry, rowAtPoint, stepIndex, gotoIndex, footswitchEdge, recallPlan,
+  } from '../utils/setlistLayout.js';
+  import {
     splitConfig, splitZones, splitRange, splitInputChannel, splitGeometry,
     noteAtPoint as splitNoteAt, hitZoneEdge, dragSplitPoint,
     EMPTY_SOUNDING, pressNote as splitPress, releaseNote as splitRelease,
@@ -292,7 +296,7 @@
     const session = sessionFor(control);
     const previewOverrides = session?.enabled === false ? {} : session;
     const resolved = resolveInteractiveControl(control, previewOverrides);
-    return applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))));
+    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))));
   }
 
   // The current numeric value + range of a value-producing control (slider,
@@ -2735,6 +2739,95 @@
     drumNoteOff(control, drumPress.padId);
     syncDrumSession(control);
   }
+  // --- Setlist: an ordered list of panel states, advanced by a footswitch --------
+  // Unglamorous, and the thing people actually need on stage. The one rule that
+  // has to be right is the footswitch EDGE: a momentary pedal sends 127 on press
+  // and 0 on release, and acting on both steps the list twice per press.
+  const setlistFootDown = {};     // id -> is the pedal currently held
+  const setlistCcSeen = {};       // id -> midiRouteEvents.seq consumed
+  function isSetlistControl(control) {
+    return String(control?._children?.Core?.controlType ?? '') === 'Setlist';
+  }
+  function setlistGeomFor(control) {
+    const t = control?._children?.Transform ?? {};
+    const cfg = setlistConfig(control);
+    return setlistGeometry(numberOr(t.width, 0), numberOr(t.height, 0), setlistCount(control), 8,
+      cfg.showHeader === false ? 0 : 20, Math.max(12, Math.round(numberOr(cfg.rowHeight, 18))));
+  }
+  // Recall: MIDI first, then the panel values, then the tempo. A program change
+  // swaps the patch on the synth, and the stored values belong to that patch —
+  // sending them first would write them into the old one.
+  function recallScene(control, index) {
+    const plan = recallPlan(control, index);
+    if (!plan.scene) return;
+    for (const m of plan.messages) {
+      triggerRawMidiAction({
+        deviceRole: 'mainSynth',
+        actionId: `setlist_${m.kind}`,
+        message: bytesToHex(m.bytes),
+        dryRun: false,
+      });
+    }
+    for (const [path, value] of Object.entries(plan.values)) {
+      const dot = String(path).indexOf('.');
+      if (dot <= 0) continue;
+      const name = String(path).slice(0, dot);
+      const rest = String(path).slice(dot + 1);
+      const target = (orderedControls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === name);
+      if (target) updateControlProperty(getControlId(target), rest, value);
+    }
+    if (plan.bpm !== null && plan.bpm !== undefined) setTransportBpm(plan.bpm);
+  }
+  function setlistGo(control, index) {
+    const next = gotoIndex(setlistScenes(control), index);
+    if (next < 0) return;
+    updateControlProperty(getControlId(control), 'Setlist.index', next);
+    recallScene(control, next);
+  }
+  function setlistStep(control, delta) {
+    const next = stepIndex(setlistScenes(control), setlistIndex(control), delta, setlistWraps(control));
+    if (next < 0 || next === setlistIndex(control)) return;
+    updateControlProperty(getControlId(control), 'Setlist.index', next);
+    recallScene(control, next);
+  }
+  // The pedal. Read off the router's EVENT store, not the expression state
+  // store: a stepper has to see each message once, when it arrives.
+  function pumpSetlistFoot(control) {
+    const cfg = setlistConfig(control);
+    if (cfg.footEnabled === false) return;
+    ensureNoteInput();
+    const id = getControlId(control);
+    const batch = $midiRouteEvents;
+    if (setlistCcSeen[id] === batch.seq) return;
+    setlistCcSeen[id] = batch.seq;
+    if (!batch.seq) return;
+    for (const ev of batch.events) {
+      const r = footswitchEdge(control, ev, setlistFootDown[id] === true);
+      setlistFootDown[id] = r.down;
+      if (!r.step) continue;
+      const action = String(cfg.footAction ?? 'next');
+      if (action === 'prev') setlistStep(control, -1);
+      else if (action === 'goto') setlistGo(control, Math.round(numberOr(cfg.footGoto, 0)));
+      else setlistStep(control, 1);
+    }
+  }
+  function applySetlistValueSource(control, resolved) {
+    if (!isSetlistControl(control)) return resolved;
+    const base = resolved?.control ?? control;
+    if (!base?._children?.Setlist) return resolved;
+    pumpSetlistFoot(control);
+    return resolved;
+  }
+  // Click a row to jump to it. On stage you use the pedal; in the editor you
+  // click, and both go through the same recall.
+  function handleSetlistPointerDown(control, localPoint) {
+    if (!isSetlistControl(control) || setlistConfig(control).editable === false) return false;
+    const row = rowAtPoint(setlistGeomFor(control), Math.max(0, setlistIndex(control)), localPoint.x, localPoint.y);
+    if (row === null) return false;
+    setlistGo(control, row);
+    return true;
+  }
+
   // --- Harmoniser: one finger in, a chord out ------------------------------------
   // Mostly assembly — the Chord Pad's scale engine, the note-input path, the
   // note-output path. The work is in the bookkeeping, and it is not the usual
@@ -5366,6 +5459,8 @@
     handleRecorderPointerDown(control, pointerDownLocal);
     // Harmoniser: audition a key.
     handleHarmoniserPointerDown(control, pointerDownLocal);
+    // Setlist: jump to the scene under the pointer.
+    handleSetlistPointerDown(control, pointerDownLocal);
     // "@active" zone source — but a display itself never counts as the active
     // control (clicking a screen shouldn't make its own zones show the screen).
     if (pointerActiveControlId && !['LcdDisplay', 'PixelDisplay'].includes(String(control?._children?.Core?.controlType ?? ''))) {
