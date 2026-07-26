@@ -5,6 +5,7 @@
   // Designer's model. The SysEx/dump layer is added afterwards from the manual or a capture.
   import { discoveredMidiCiProfiles, midiCiStatus, requestMidiCiDiscovery, setMidiCiProfile } from '../../stores/deviceProfiles.js';
   import { isJuceAvailable } from '../../bridge/bridge.js';
+  import { DEFAULT_DEVICE_ROLE } from '../../stores/deviceConstants.js';
 
   let { onPick } = $props();
   // Discovery lifecycle is owned by the service (midiCiStatus): scanning / done / error.
@@ -12,7 +13,7 @@
   let errored = $derived($midiCiStatus.state === 'error');
   let scanned = $derived($midiCiStatus.state === 'done' || errored);
 
-  function scan() { requestMidiCiDiscovery('mainSynth'); }
+  function scan() { requestMidiCiDiscovery(DEFAULT_DEVICE_ROLE); }
 
   const ctrlCount = (e) => e?.profile?.scopes?.global?.parameters?.length ?? 0;
   const presetCount = (e) => e?.profile?.imported?.presets?.length ?? 0;

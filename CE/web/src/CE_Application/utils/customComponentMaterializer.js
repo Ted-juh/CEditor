@@ -1,15 +1,7 @@
 import { createBackground, createPartNode, createText } from './customComponentFactory.js';
 import { getCustomArpeggiator, noteNameFromMidi } from './customComponentArpeggiator.js';
 import { deepClone } from './deepClone.js';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+import { numberOr, clamp } from './primitives.js';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -609,6 +601,339 @@ function materializeLeds(parts, generator, prefix, generatorName = '', hitZones 
   }
 }
 
+// Value labels along a scale (linear, vertical, or circular). Explicit
+// `labels` win; otherwise numbers interpolate min..max with `precision` and
+// an optional `suffix`.
+function materializeLabels(parts, generator, prefix, generatorName = '') {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 5)));
+  const geometry = String(generator?.geometry ?? 'linear').trim().toLowerCase();
+  const zIndex = numberOr(generator?.zIndex, 7);
+  const bounds = generatorBounds(generator);
+  const colour = generator?.colour ?? 'CCB9C8D4';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const explicitLabels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const min = numberOr(generator?.min, 0);
+  const max = numberOr(generator?.max, 100);
+  const precision = Math.max(0, Math.min(4, Math.round(numberOr(generator?.precision, 0))));
+  const suffix = String(generator?.suffix ?? '');
+  const denominator = Math.max(1, count - 1);
+
+  for (let index = 0; index < count; index += 1) {
+    const normalized = count === 1 ? 0.5 : index / denominator;
+    const text = explicitLabels?.[index] !== undefined && explicitLabels?.[index] !== null
+      ? String(explicitLabels[index])
+      : `${(min + ((max - min) * normalized)).toFixed(precision)}${suffix}`;
+
+    let x = 6 + (normalized * 88);
+    let y = 85;
+    if (geometry === 'vertical') {
+      x = 14;
+      y = 90 - (normalized * 80);
+    } else if (geometry === 'circular' || geometry === 'ring') {
+      const radius = numberOr(generator?.radius, 42);
+      const { startAngle, endAngle } = circularGeneratorAngles(generator, -135, 135);
+      const angle = startAngle + ((endAngle - startAngle) * normalized);
+      const radians = (dialAngleToCanvasAngle(angle) * Math.PI) / 180;
+      x = 50 + (Math.cos(radians) * radius);
+      y = 50 + (Math.sin(radians) * radius);
+    }
+
+    addPart(parts, `${prefix}_label_${index + 1}`, createPartNode(`${prefix}_label_${index + 1}`, {
+      role: 'generatedLabel',
+      kind: 'text',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, x),
+        y: mapGeneratorY(bounds, y),
+        width: 34,
+        height: 12,
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'px',
+        heightUnit: 'px',
+      },
+      sections: { Text: createText(text, { size: fontSize, weight: 600, colour }) },
+      meta: { generatedLabel: true, index, normalized },
+    }), generatorName);
+  }
+}
+
+// A bank of N buttons: one part per button plus (by default) a generated
+// setValue zone per button carrying its index/value payload. The button
+// matching the target channel's current raw value renders highlighted, so
+// the bank behaves like a segmented selector with zero hand wiring.
+function materializeButtons(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 4)));
+  const geometry = String(generator?.geometry ?? 'linear').trim().toLowerCase();
+  const vertical = geometry === 'vertical';
+  const zIndex = numberOr(generator?.zIndex, 7);
+  const bounds = generatorBounds(generator);
+  const labels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const values = Array.isArray(generator?.values) ? generator.values : null;
+  const activeColour = generator?.activeColour ?? 'FF5B9BD5';
+  const inactiveColour = generator?.inactiveColour ?? generator?.colour ?? 'FF232C34';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const gap = clamp(numberOr(generator?.gap, 8), 0, 60); // % of one cell kept as spacing
+
+  const channelName = String(generator?.targetValueChannel ?? generator?.valueSource ?? '').trim();
+  const currentRaw = signals?.customChannels?.[`channel.${channelName}.raw`];
+  const denominator = Math.max(1, count - 1);
+  const cell = 100 / count;
+  const size = cell * (1 - (gap / 100));
+
+  for (let index = 0; index < count; index += 1) {
+    const value = values?.[index] !== undefined ? values[index] : index;
+    const label = labels?.[index] !== undefined && labels?.[index] !== null ? String(labels[index]) : String(value);
+    const active = currentRaw !== undefined && String(currentRaw) === String(value);
+    const center = (index + 0.5) * cell;
+    const buttonName = `${prefix}_${index + 1}`;
+
+    addPart(parts, buttonName, createPartNode(buttonName, {
+      role: 'generatedButton',
+      kind: 'roundedRectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, vertical ? 50 : center),
+        y: mapGeneratorY(bounds, vertical ? center : 50),
+        width: mapGeneratorWidth(bounds, vertical ? 88 : size),
+        height: mapGeneratorHeight(bounds, vertical ? size : 76),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: {
+        Background: createBackground(active ? activeColour : inactiveColour, {
+          borderEnabled: true,
+          borderColour: active ? '99DFF3FF' : '332B3742',
+          borderThickness: 1,
+          radius: 4,
+        }),
+        Text: createText(label, { size: fontSize, weight: 700, colour: active ? 'FF10161B' : 'CCB9C8D4' }),
+      },
+      meta: { generatedButton: true, index, value, active },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && channelName) {
+      addHitZone(hitZones, `${prefix}_zone_${index + 1}`, {
+        shape: 'rectangle',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: channelName,
+        action: generator?.hitZoneAction ?? 'setValue',
+        payload: {
+          type: 'bankButton',
+          index,
+          number: index + 1,
+          value,
+          normalized: count === 1 ? 0 : index / denominator,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: vertical ? 0 : index * cell,
+          y: vertical ? index * cell : 0,
+          width: vertical ? 100 : cell,
+          height: vertical ? cell : 100,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
+// Windowed virtual list: `count` virtual items, `rows` visible at once.
+// A scroll channel (valueSource, normalized 0..1) picks the window's first
+// item; the generator re-materializes live as the channel moves, so no
+// renderer clipping is needed — edge rows snap in/out rather than clip.
+// Optional `targetValueChannel` turns rows into a selector: clicking a row
+// sets that channel to the row's item index (or its `values[i]` payload),
+// and the matching row renders highlighted.
+function materializeScrollList(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const count = Math.max(1, Math.round(numberOr(generator?.count, 12)));
+  const visibleRows = Math.max(1, Math.min(count, Math.round(numberOr(generator?.rows, 4))));
+  const zIndex = numberOr(generator?.zIndex, 6);
+  const bounds = generatorBounds(generator);
+  const labels = Array.isArray(generator?.labels) ? generator.labels : null;
+  const values = Array.isArray(generator?.values) ? generator.values : null;
+  const activeColour = generator?.activeColour ?? 'FF5B9BD5';
+  const inactiveColour = generator?.inactiveColour ?? generator?.colour ?? 'FF1B242C';
+  const fontSize = Math.max(5, numberOr(generator?.fontSize, 9));
+  const gap = clamp(numberOr(generator?.gap, 10), 0, 60);
+
+  const scrollSource = generator?.valueSource ?? generator?.scrollChannel ?? '';
+  const scrollNormalized = normalizedSignalForValueSource(signals, scrollSource);
+  const maxFirst = Math.max(0, count - visibleRows);
+  const firstIndex = clamp(Math.round(scrollNormalized * maxFirst), 0, maxFirst);
+
+  const selectChannel = String(generator?.targetValueChannel ?? '').trim();
+  const selectedRaw = selectChannel ? signals?.customChannels?.[`channel.${selectChannel}.raw`] : undefined;
+
+  const rowCell = 100 / visibleRows;
+  const rowSize = rowCell * (1 - (gap / 100));
+
+  for (let slot = 0; slot < visibleRows; slot += 1) {
+    const itemIndex = firstIndex + slot;
+    const value = values?.[itemIndex] !== undefined ? values[itemIndex] : itemIndex;
+    const label = labels?.[itemIndex] !== undefined && labels?.[itemIndex] !== null
+      ? String(labels[itemIndex])
+      : `Item ${itemIndex + 1}`;
+    const active = selectedRaw !== undefined && String(selectedRaw) === String(value);
+    const rowName = `${prefix}_row_${slot + 1}`; // slot-stable names; meta carries the virtual index
+
+    addPart(parts, rowName, createPartNode(rowName, {
+      role: 'generatedListRow',
+      kind: 'roundedRectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, 50),
+        y: mapGeneratorY(bounds, (slot + 0.5) * rowCell),
+        width: mapGeneratorWidth(bounds, 96),
+        height: mapGeneratorHeight(bounds, rowSize),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: {
+        Background: createBackground(active ? activeColour : inactiveColour, {
+          borderEnabled: true,
+          borderColour: active ? '99DFF3FF' : '22344551',
+          borderThickness: 1,
+          radius: 3,
+        }),
+        Text: createText(label, { size: fontSize, weight: 600, colour: active ? 'FF10161B' : 'CCB9C8D4' }),
+      },
+      meta: { generatedListRow: true, slot, itemIndex, value, active, firstIndex, count },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && selectChannel) {
+      addHitZone(hitZones, `${prefix}_rowZone_${slot + 1}`, {
+        shape: 'rectangle',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: selectChannel,
+        action: generator?.hitZoneAction ?? 'setValue',
+        payload: {
+          type: 'listRow',
+          slot,
+          index: itemIndex,
+          number: itemIndex + 1,
+          value,
+          normalized: count > 1 ? itemIndex / (count - 1) : 0,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: 0,
+          y: slot * rowCell,
+          width: 100,
+          height: rowCell,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
+// Indexed per-instance repeats (§12.4): one bar per item of an ARRAY channel.
+// Bar i's height follows item i live (through the channel signals), and the
+// generated zone for column i writes item i back (action setItemValue), so
+// "16 step buttons from a count" needs zero hand wiring.
+function materializeStepBars(parts, control, signals, generator, prefix, generatorName = '', hitZones = null) {
+  const channels = control?._children?.ValueChannels?._children ?? {};
+  const channelName = String(generator?.valueSource ?? generator?.targetValueChannel ?? '')
+    .replace(/^channel\./, '')
+    .replace(/\..*$/, '')
+    .trim();
+  const channel = channels[channelName] ?? null;
+  const liveItems = signals?.customChannels?.[`channel.${channelName}.items`];
+  const items = Array.isArray(liveItems)
+    ? liveItems
+    : (Array.isArray(channel?.items) ? channel.items : []);
+  const count = Math.max(1, Math.round(numberOr(generator?.count, items.length || 16)));
+  const zIndex = numberOr(generator?.zIndex, 6);
+  const bounds = generatorBounds(generator);
+  const barColour = generator?.activeColour ?? generator?.colour ?? 'FF5B9BD5';
+  const wellColour = generator?.inactiveColour ?? '22212B31';
+  const gap = clamp(numberOr(generator?.gap, 18), 0, 80); // % of one column kept as spacing
+  const minBar = clamp(numberOr(generator?.minBarHeight, 3), 0, 100); // % so a zero item stays visible
+
+  const itemMin = numberOr(channel?.min, 0);
+  const itemMax = Math.max(itemMin, numberOr(channel?.max, itemMin + 1));
+  const span = Math.max(0.000001, itemMax - itemMin);
+
+  const columnWidth = 100 / count;
+  const barWidth = columnWidth * (1 - (gap / 100));
+
+  for (let index = 0; index < count; index += 1) {
+    const centerX = (index + 0.5) * columnWidth;
+    const normalized = clamp((numberOr(items[index], itemMin) - itemMin) / span, 0, 1);
+    const heightPct = Math.max(minBar, normalized * 100);
+
+    // A faint full-height well behind each bar so empty steps still read as steps.
+    addPart(parts, `${prefix}_well_${index + 1}`, createPartNode(`${prefix}_well_${index + 1}`, {
+      role: 'generatedStepWell',
+      kind: 'rectangle',
+      zIndex: zIndex - 0.1,
+      layout: {
+        x: mapGeneratorX(bounds, centerX),
+        y: mapGeneratorY(bounds, 50),
+        width: mapGeneratorWidth(bounds, barWidth),
+        height: mapGeneratorHeight(bounds, 100),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+      },
+      sections: { Background: createBackground(wellColour, { borderEnabled: false, radius: 2 }) },
+      meta: { stepWell: true, index },
+    }), generatorName);
+
+    // The value bar, bottom-anchored inside the generator bounds.
+    addPart(parts, `${prefix}_${index + 1}`, createPartNode(`${prefix}_${index + 1}`, {
+      role: 'generatedStepBar',
+      kind: 'rectangle',
+      zIndex,
+      layout: {
+        x: mapGeneratorX(bounds, centerX),
+        y: mapGeneratorY(bounds, 100),
+        width: mapGeneratorWidth(bounds, barWidth),
+        height: mapGeneratorHeight(bounds, heightPct),
+        xUnit: 'percent',
+        yUnit: 'percent',
+        widthUnit: 'percent',
+        heightUnit: 'percent',
+        anchorY: 'bottom',
+      },
+      sections: { Background: createBackground(barColour, { borderEnabled: false, radius: 2 }) },
+      meta: {
+        stepBar: true,
+        index,
+        valueSource: channelName,
+        itemNormalized: normalized,
+      },
+    }), generatorName);
+
+    if (generator?.generatedHitZones !== false && hitZones && channelName) {
+      addHitZone(hitZones, `${prefix}_zone_${index + 1}`, {
+        shape: 'rectangle',
+        cursor: 'ns-resize',
+        targetBehavior: generator?.targetBehavior ?? '',
+        targetValueChannel: channelName,
+        action: 'setItemValue',
+        payload: {
+          type: 'stepBar',
+          index,
+          number: index + 1,
+          count,
+        },
+        bounds: mapGeneratorHitZoneBounds(bounds, {
+          x: index * columnWidth,
+          y: 0,
+          width: columnWidth,
+          height: 100,
+          unit: 'percent',
+        }),
+      }, generatorName);
+    }
+  }
+}
+
 function materializeGrid(parts, generator, prefix, generatorName = '', hitZones = null) {
   const rows = Math.max(1, Math.round(numberOr(generator?.rows, 4)));
   const columns = Math.max(1, Math.round(numberOr(generator?.columns, 4)));
@@ -833,6 +1158,14 @@ export function materializeCustomComponent(control, signals = {}) {
       materializeTicks(parts, generator, prefix, generatorName);
     } else if (type === 'repeated-leds') {
       materializeLeds(parts, generator, prefix, generatorName, hitZones, signals);
+    } else if (type === 'step-bars' || type === 'steps') {
+      materializeStepBars(parts, resolved, signals, generator, prefix, generatorName, hitZones);
+    } else if (type === 'labels') {
+      materializeLabels(parts, generator, prefix, generatorName);
+    } else if (type === 'repeated-buttons' || type === 'buttons') {
+      materializeButtons(parts, resolved, signals, generator, prefix, generatorName, hitZones);
+    } else if (type === 'scrollable-content' || type === 'scroll-list') {
+      materializeScrollList(parts, resolved, signals, generator, prefix, generatorName, hitZones);
     } else if (type === 'grid' || type === 'meter-bars' || type === 'segmented-ring') {
       materializeGrid(parts, generator, prefix, generatorName, hitZones);
     } else if (type === 'piano-keys' || type === 'piano') {

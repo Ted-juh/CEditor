@@ -18,6 +18,10 @@
 
   let { control = null } = $props();
 
+  // Preset/template cards are an add-time aid (Stage D3): collapsed by
+  // default so the editor keeps only live content on screen.
+  let showPresetGrid = $state(false);
+
   let core = $derived(getSection(control, 'Core'));
   let links = $derived(getSection(control, 'Links'));
   let channels = $derived(getSection(control, 'ValueChannels'));
@@ -384,6 +388,8 @@
       {/if}
     </PropertyCell>
     <PropertyCell label="Presets" span={4} hint="Apply a common routing pattern to the selected link or create one if none exists.">
+      <button class="preset-disclosure" type="button" onclick={() => showPresetGrid = !showPresetGrid}>{showPresetGrid ? "Hide" : "Show"} routing presets ▾</button>
+      {#if showPresetGrid}
       <div class="preset-grid">
         {#each linkPresets as preset}
           <button class="preset-btn" type="button" onclick={() => applyPreset(preset)}>
@@ -392,6 +398,7 @@
           </button>
         {/each}
       </div>
+      {/if}
     </PropertyCell>
     <PropertyCell label="Panel Routes" span={4} hint="Route this component output into another custom component's published input.">
       <div class="panel-route-card">
@@ -700,4 +707,21 @@
   .route-btn.selected { border-color: #5B9BD5; background: #26313B; }
   .route-btn span { color: #9D9D9D; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .empty-routes { color: #888; padding: 10px; }
+  .preset-disclosure {
+    width: fit-content;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #BBB;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .preset-disclosure:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
 </style>

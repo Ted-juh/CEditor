@@ -157,6 +157,50 @@ export const CUSTOM_COMPONENT_STARTERS = [
     creates: ['filmstrip asset', 'frame generator', 'dial hit zone', 'public API'],
     dimensions: { width: 126, height: 126 },
   },
+  // Display / output-only class: driven by bindings from public inputs, no
+  // pointer surface — meters, status lamps, readouts (§12.2 diversity).
+  {
+    id: 'starter.segmentLevelMeter',
+    group: 'Display',
+    label: 'Segment Level Meter',
+    summary: 'An output-only 16-segment level meter driven by a public level input.',
+    creates: ['LED generator', 'level input', 'live fill binding', 'public API'],
+    dimensions: { width: 220, height: 64 },
+  },
+  {
+    id: 'starter.statusLamp',
+    group: 'Display',
+    label: 'Status Lamp',
+    summary: 'A boolean status LED with an on/off colour rule and a caption.',
+    creates: ['status LED', 'bool input', 'rule-driven state', 'public API'],
+    dimensions: { width: 120, height: 72 },
+  },
+  {
+    id: 'starter.valueReadout',
+    group: 'Display',
+    label: 'Value Readout',
+    summary: 'A large live numeric readout bound to a public value input with unit suffix.',
+    creates: ['readout text', 'value input', 'format binding', 'public API'],
+    dimensions: { width: 160, height: 76 },
+  },
+  // Multi-point class (§12.3/§12.4): array channel + indexed step-bar repeats.
+  {
+    id: 'starter.stepSequencer',
+    group: 'Sequencer',
+    label: 'Step Sequencer',
+    summary: 'A 16-step value sequencer: one array channel, generated bars per step, drag a column to set its step.',
+    creates: ['array channel', 'step-bar generator', '16 indexed zones', 'public API'],
+    dimensions: { width: 240, height: 110 },
+  },
+  // Container class (§12.2): tabbed pages from a button bank + rule-driven states.
+  {
+    id: 'starter.tabGroup',
+    group: 'Container',
+    label: 'Tab Group',
+    summary: 'Three tabbed pages: a generated tab bank drives an enum channel; rule-driven states swap the visible page.',
+    creates: ['tab enum channel', 'button-bank generator', '3 pages', 'rule states'],
+    dimensions: { width: 260, height: 160 },
+  },
 ];
 
 export function createPartNode(name, {
@@ -313,6 +357,88 @@ export function createValueChannel(name, {
       ...constraints,
     },
   };
+}
+
+/**
+ * Array channel (PointSet primitive, §12.3): N items sharing one schema.
+ *
+ * Scalar form (default): items are numbers sharing min/max/step. The
+ * 'step-bars' generator renders one part per item and generated zones write
+ * items back by index (action 'setItemValue'). First consumer: the Step
+ * Sequencer starter.
+ *
+ * Object form (`itemFields`): items are objects, each field with its own
+ * {min, max, step, default} clamp — e.g. the arpeggiator pattern's
+ * {note, step, length, velocity} blocks. Object-array channels are variable
+ * length (`size` is a cap, not a fill target) since point sets grow and
+ * shrink as the user draws.
+ */
+export function createArrayChannel(name, {
+  label = '',
+  size = 16,
+  min = 0,
+  max = 1,
+  step = 0.01,
+  defaultValue = 0,
+  defaultItems = null,
+  itemFields = null,
+  publicInput = true,
+  publicOutput = true,
+  format = {},
+} = {}) {
+  const itemCount = Math.max(1, Math.round(size));
+  const items = itemFields
+    ? (Array.isArray(defaultItems) ? defaultItems : [])
+    : Array.from({ length: itemCount }, (_, index) => {
+      const item = Array.isArray(defaultItems) ? defaultItems[index] : undefined;
+      return typeof item === 'number' ? item : defaultValue;
+    });
+  const channel = {
+    _type: 'ValueChannel',
+    name,
+    label: label || name,
+    type: 'array',
+    size: itemCount,
+    items,
+    min,
+    max,
+    step,
+    defaultValue,
+    publicInput,
+    publicOutput,
+    deviceBindable: false,
+    format: {
+      precision: 2,
+      prefix: '',
+      suffix: '',
+      unit: '',
+      ...format,
+    },
+  };
+  if (itemFields && typeof itemFields === 'object') channel.itemFields = itemFields;
+  return channel;
+}
+
+/**
+ * The arpeggiator pattern as an object-item array channel — the arp
+ * re-expressed on the PointSet primitive (§12.3), read side. The runtime
+ * publishes the normalized block list into this channel on every sync
+ * (see syncCustomArpeggiatorValues); publicInput stays false until the
+ * write-side precedence vs. live grid edits gets its own design pass.
+ */
+export function createArpPatternChannel() {
+  return createArrayChannel('arpPattern', {
+    label: 'Arp Pattern',
+    size: 512, // cap: blocks can exceed steps (polyphony), not a fill target
+    publicInput: false,
+    publicOutput: true,
+    itemFields: {
+      note: { min: 0, max: 127, step: 1, default: 60 },
+      step: { min: 0, max: 255, step: 1, default: 0 },
+      length: { min: 1, max: 256, step: 1, default: 1 },
+      velocity: { min: 1, max: 127, step: 1, default: 96 },
+    },
+  });
 }
 
 export function createBehaviorModule(name, {
@@ -1957,6 +2083,523 @@ function createFilmstripKnobStarterPatch() {
   };
 }
 
+// --- Display / output-only starters (§12.2) -------------------------------
+// No behaviors or hit zones on purpose: these are driven entirely by their
+// public inputs (panel links, scripts, DAW automation) through live bindings.
+
+function createSegmentLevelMeterStarterPatch() {
+  const channels = {
+    level: createValueChannel('level', {
+      label: 'Level',
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0.62,
+      format: { precision: 0, suffix: '%', unit: 'percent' },
+    }),
+  };
+  return {
+    'Core.name': 'Segment Level Meter',
+    'Transform.width': 220,
+    'Transform.height': 64,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('LEVEL', 'FF12181D'),
+        meterWell: createPartNode('meterWell', {
+          role: 'track',
+          kind: 'roundedRectangle',
+          zIndex: 1,
+          layout: { x: 50, y: 62, width: 88, height: 22, widthUnit: 'percent', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('FF0B0F13', { borderColour: '332B3742', radius: 6 }),
+          },
+        }),
+        levelReadout: createPartNode('levelReadout', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 12,
+          layout: { x: 88, y: 12, width: 44, height: 14, widthUnit: 'px', heightUnit: 'px' },
+          sections: { Text: createText('62%', { size: 9, weight: 700 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        meterLeds: {
+          _type: 'Generator',
+          name: 'meterLeds',
+          type: 'repeated-leds',
+          enabled: true,
+          geometry: 'linear',
+          count: 16,
+          ledSize: 8,
+          zIndex: 6,
+          activeColour: 'FF65E6A0',
+          inactiveColour: '33212B31',
+          valueSource: 'level',
+          activationMode: 'cumulative',
+          bounds: { x: 8, y: 44, width: 84, height: 40 },
+          generatedPartPrefix: 'meterLed',
+          generatedHitZones: false,
+        },
+      },
+    },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        levelReadoutText: {
+          _type: 'Binding',
+          name: 'levelReadoutText',
+          enabled: true,
+          source: 'channel.level.raw',
+          mapMode: 'format',
+          target: 'Parts.levelReadout.Text.content',
+          multiplier: 100,
+          offset: 0,
+          precision: 0,
+          prefix: '',
+          suffix: '%',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('segmentLevelMeter', [{ id: 'levelChange', label: 'Level Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'meterWell',
+      selectedValueChannel: 'level',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'meterLeds',
+      notes: 'Output-only level meter: drive the level input from the panel, a script, or automation.',
+    },
+  };
+}
+
+function createStatusLampStarterPatch() {
+  const channels = {
+    active: createValueChannel('active', {
+      label: 'Active',
+      type: 'bool',
+      min: 0,
+      max: 1,
+      step: 1,
+      defaultValue: 0,
+      format: { precision: 0 },
+    }),
+  };
+  return {
+    'Core.name': 'Status Lamp',
+    'Transform.width': 120,
+    'Transform.height': 72,
+    Animations: createStarterAnimations(),
+    States: {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: ['lampOn', 'disabled'],
+      _children: {
+        LampOn: {
+          _type: 'State',
+          name: 'LampOn',
+          group: 'value',
+          description: 'Lights the lamp and caption while the active input is on.',
+          enabled: true,
+          // Rule-driven (non-enum): a compound condition over the bool channel.
+          rule: 'active >= 1',
+          when: {},
+          patches: {
+            component: {},
+            parts: {
+              lamp: {
+                'Background.Fill.colour': 'FF65E6A0',
+                'Background.Border.colour': '9965E6A0',
+              },
+              caption: { 'Text.Fill.colour': 'FFB9F2CF' },
+            },
+          },
+        },
+        Disabled: {
+          _type: 'State',
+          name: 'Disabled',
+          group: 'system',
+          description: 'Dims the full custom component.',
+          enabled: true,
+          when: { disabled: true },
+          patches: {
+            component: { 'Transform.opacity': 0.55 },
+            parts: {},
+          },
+        },
+      },
+    },
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('STATUS', 'FF14191E'),
+        lamp: createPartNode('lamp', {
+          role: 'indicator',
+          kind: 'circle',
+          zIndex: 4,
+          layout: { x: 32, y: 58, width: 22, height: 22, widthUnit: 'px', heightUnit: 'px' },
+          sections: {
+            Background: createBackground('FF23313B', { borderColour: '55344551', borderThickness: 2, radius: 999 }),
+          },
+        }),
+        caption: createPartNode('caption', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 66, y: 58, width: 56, height: 14, widthUnit: 'percent', heightUnit: 'px' },
+          sections: { Text: createText('OFF', { size: 11, weight: 800 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: createCustomComponentBlankGeneratorsDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        captionText: {
+          _type: 'Binding',
+          name: 'captionText',
+          enabled: true,
+          source: 'channel.active.raw',
+          mapMode: 'boolean',
+          target: 'Parts.caption.Text.content',
+          trueValue: 'ON',
+          falseValue: 'OFF',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('statusLamp', [{ id: 'activeChange', label: 'Active Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'lamp',
+      selectedValueChannel: 'active',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      notes: 'Boolean status lamp: the LampOn state is rule-driven (active >= 1); drive the input externally.',
+    },
+  };
+}
+
+function createValueReadoutStarterPatch() {
+  const channels = {
+    value: createValueChannel('value', {
+      label: 'Value',
+      min: 0,
+      max: 127,
+      step: 1,
+      defaultValue: 64,
+      format: { precision: 0 },
+    }),
+  };
+  return {
+    'Core.name': 'Value Readout',
+    'Transform.width': 160,
+    'Transform.height': 76,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('VALUE', 'FF11161B'),
+        readout: createPartNode('readout', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 50, y: 56, width: 90, height: 30, widthUnit: 'percent', heightUnit: 'px' },
+          sections: { Text: createText('64', { size: 24, weight: 800 }) },
+        }),
+        unit: createPartNode('unit', {
+          role: 'readout',
+          kind: 'text',
+          zIndex: 4,
+          layout: { x: 88, y: 66, width: 30, height: 12, widthUnit: 'px', heightUnit: 'px' },
+          sections: { Text: createText('cc', { size: 9, weight: 600 }) },
+        }),
+      },
+    },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: createCustomComponentBlankGeneratorsDefaults(),
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Bindings: {
+      _type: 'Bindings',
+      enabled: true,
+      debug: false,
+      _children: {
+        readoutText: {
+          _type: 'Binding',
+          name: 'readoutText',
+          enabled: true,
+          source: 'channel.value.raw',
+          mapMode: 'format',
+          target: 'Parts.readout.Text.content',
+          multiplier: 1,
+          offset: 0,
+          precision: 0,
+          prefix: '',
+          suffix: '',
+        },
+      },
+    },
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: valueChannelPublicEntries(channels, 'input'),
+      outputs: valueChannelPublicEntries(channels, 'output'),
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+        unit: { path: 'Parts.unit.Text.content', label: 'Unit', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('valueReadout', [{ id: 'valueChange', label: 'Value Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'readout',
+      selectedValueChannel: 'value',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      notes: 'Live numeric readout: bind or link the value input; the text follows via a format binding.',
+    },
+  };
+}
+
+function createStepSequencerStarterPatch() {
+  const channels = {
+    steps: createArrayChannel('steps', {
+      label: 'Steps',
+      size: 16,
+      min: 0,
+      max: 1,
+      step: 0.01,
+      defaultValue: 0,
+      defaultItems: [0.8, 0.2, 0.5, 0.2, 0.9, 0.2, 0.5, 0.35, 0.8, 0.2, 0.6, 0.2, 0.9, 0.45, 0.65, 0.3],
+    }),
+  };
+  return {
+    'Core.name': 'Step Sequencer',
+    'Transform.width': 240,
+    'Transform.height': 110,
+    ...createStarterLifecycleSections(),
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('STEPS', 'FF10161B'),
+        seqWell: createPartNode('seqWell', {
+          role: 'track',
+          kind: 'roundedRectangle',
+          zIndex: 1,
+          layout: { x: 50, y: 62, width: 90, height: 62, widthUnit: 'percent', heightUnit: 'percent' },
+          sections: {
+            Background: createBackground('FF0B0F13', { borderColour: '332B3742', radius: 6 }),
+          },
+        }),
+      },
+    },
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        stepBars: {
+          _type: 'Generator',
+          name: 'stepBars',
+          type: 'step-bars',
+          enabled: true,
+          geometry: 'linear',
+          count: 16,
+          zIndex: 6,
+          activeColour: 'FF5B9BD5',
+          inactiveColour: '22212B31',
+          gap: 24,
+          minBarHeight: 4,
+          valueSource: 'steps',
+          targetValueChannel: 'steps',
+          generatedHitZones: true,
+          bounds: { x: 7, y: 34, width: 86, height: 54 },
+          generatedPartPrefix: 'step',
+        },
+      },
+    },
+    Bindings: createCustomComponentBlankBindingsDefaults(),
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: { steps: { channel: 'steps', label: 'Steps', type: 'array', enabled: true } },
+      outputs: { steps: { channel: 'steps', label: 'Steps', type: 'array', enabled: true } },
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('stepSequencer', [{ id: 'stepsChange', label: 'Steps Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'seqWell',
+      selectedValueChannel: 'steps',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'stepBars',
+      notes: 'Multi-point starter: the steps array channel drives one generated bar per item; dragging a column writes that item back (indexed repeats).',
+    },
+  };
+}
+
+// Container class (§12.2): a tab group built entirely from existing
+// machinery — a repeated-buttons generator drives the enum channel, and
+// rule-driven states (state.rule over the channel) swap which page layer is
+// visible. Page ONE is the base look; TabTwo/TabThree states patch
+// `visible` while their rule holds.
+function createTabGroupStarterPatch() {
+  const channels = {
+    tab: createValueChannel('tab', {
+      label: 'Tab',
+      type: 'enum',
+      min: 0,
+      max: 2,
+      step: 1,
+      defaultValue: 'one',
+      format: { precision: 0 },
+    }),
+  };
+  channels.tab.values = ['one', 'two', 'three'];
+
+  const page = (name, text, colour, visible) => createPartNode(name, {
+    role: 'page',
+    kind: 'roundedRectangle',
+    zIndex: 3,
+    visible,
+    layout: { x: 50, y: 62, width: 90, height: 58, widthUnit: 'percent', heightUnit: 'percent' },
+    sections: {
+      Background: createBackground(colour, { borderColour: '332B3742', radius: 6 }),
+      Text: createText(text, { size: 12, weight: 700 }),
+    },
+  });
+
+  const tabState = (name, value, patches) => ({
+    _type: 'State',
+    name,
+    group: 'value',
+    description: `Shows page ${value} while the tab channel is '${value}'.`,
+    enabled: true,
+    rule: `tab == '${value}'`,
+    when: {},
+    patches: { component: {}, parts: patches },
+  });
+
+  return {
+    'Core.name': 'Tab Group',
+    'Transform.width': 260,
+    'Transform.height': 160,
+    Animations: createStarterAnimations(),
+    States: {
+      _type: 'States',
+      enabled: true,
+      debug: false,
+      priority: ['tabTwo', 'tabThree', 'disabled'],
+      _children: {
+        TabTwo: tabState('TabTwo', 'two', {
+          pageOne: { visible: false },
+          pageTwo: { visible: true },
+        }),
+        TabThree: tabState('TabThree', 'three', {
+          pageOne: { visible: false },
+          pageThree: { visible: true },
+        }),
+        Disabled: {
+          _type: 'State',
+          name: 'Disabled',
+          group: 'system',
+          description: 'Dims the full custom component.',
+          enabled: true,
+          when: { disabled: true },
+          patches: { component: { 'Transform.opacity': 0.55 }, parts: {} },
+        },
+      },
+    },
+    Parts: {
+      _type: 'Parts',
+      _children: {
+        ...starterShellParts('TABS', 'FF10161B'),
+        pageOne: page('pageOne', 'PAGE ONE', 'FF1B2A38', true),
+        pageTwo: page('pageTwo', 'PAGE TWO', 'FF20301F', false),
+        pageThree: page('pageThree', 'PAGE THREE', 'FF33251B', false),
+      },
+    },
+    ValueChannels: { _type: 'ValueChannels', _children: channels },
+    Behaviors: { _type: 'Behaviors', _children: {} },
+    HitZones: createCustomComponentBlankHitZonesDefaults(),
+    Generators: {
+      _type: 'Generators',
+      _children: {
+        tabButtons: {
+          _type: 'Generator',
+          name: 'tabButtons',
+          type: 'repeated-buttons',
+          enabled: true,
+          geometry: 'linear',
+          count: 3,
+          zIndex: 8,
+          labels: ['TAB 1', 'TAB 2', 'TAB 3'],
+          values: ['one', 'two', 'three'],
+          targetValueChannel: 'tab',
+          generatedHitZones: true,
+          gap: 10,
+          fontSize: 9,
+          bounds: { x: 5, y: 17, width: 90, height: 15 },
+          generatedPartPrefix: 'tabBtn',
+        },
+      },
+    },
+    Bindings: createCustomComponentBlankBindingsDefaults(),
+    PublishedProperties: {
+      _type: 'PublishedProperties',
+      inputs: { tab: { channel: 'tab', label: 'Tab', type: 'enum', enabled: true } },
+      outputs: { tab: { channel: 'tab', label: 'Tab', type: 'enum', enabled: true } },
+      editableProperties: {
+        label: { path: 'Parts.label.Text.content', label: 'Label', type: 'text', enabled: true },
+      },
+    },
+    ExternalAPI: createStarterExternalApiDefaults('tabGroup', [{ id: 'tabChange', label: 'Tab Change', enabled: true }]),
+    Designer: {
+      ...createCustomComponentDesignerDefaults(),
+      selectedLayer: 'pageOne',
+      selectedValueChannel: 'tab',
+      selectedBehavior: '',
+      selectedHitZone: '',
+      selectedGenerator: 'tabButtons',
+      notes: 'Container starter: the generated tab bank sets the enum channel; rule states show the matching page. Add controls onto each page layer.',
+    },
+  };
+}
+
 export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.blankCanvas') {
     return {
@@ -1988,6 +2631,11 @@ export function createCustomComponentStarterPatch(starterId) {
   if (starterId === 'starter.scrollPianoBar') return createScrollPianoBarStarterPatch();
   if (starterId === 'starter.tripleValueSlider') return createTripleValueSliderStarterPatch();
   if (starterId === 'starter.filmstripKnob') return createFilmstripKnobStarterPatch();
+  if (starterId === 'starter.segmentLevelMeter') return createSegmentLevelMeterStarterPatch();
+  if (starterId === 'starter.statusLamp') return createStatusLampStarterPatch();
+  if (starterId === 'starter.valueReadout') return createValueReadoutStarterPatch();
+  if (starterId === 'starter.stepSequencer') return createStepSequencerStarterPatch();
+  if (starterId === 'starter.tabGroup') return createTabGroupStarterPatch();
   return {};
 }
 

@@ -1,17 +1,9 @@
+import { numberOr, clamp } from './primitives.js';
 export const CUSTOM_ARP_NOTE_MIN = 0;
 export const CUSTOM_ARP_NOTE_MAX = 127;
 export const CUSTOM_ARP_DEFAULT_STEP_COUNT = 32;
 export const CUSTOM_ARP_MAX_STEP_COUNT = 256;
 export const CUSTOM_ARP_RUNTIME_KEY = '__arpeggiator';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
 
 function objectChildren(section) {
   return section?._children ?? {};
@@ -107,6 +99,15 @@ export function syncCustomArpeggiatorValues(control, values = {}) {
   if (channels.arpGate) next.arpGate = resolved.gate;
   if (channels.arpNote) next.arpNote = resolved.note;
   if (channels.arpVelocity) next.arpVelocity = resolved.velocity;
+  // Re-expression on the array primitive (§12.3), read side: when an
+  // `arpPattern` object-array channel exists, publish the normalized block
+  // list through it, so the pattern flows through the ordinary channel /
+  // published-API machinery (bench, panel links, scripts) like any value.
+  // The WRITE side (driving the pattern by setting the channel) is
+  // deliberately not wired yet: interactive grid edits write the runtime
+  // key above, and a channel write racing a grid edit has no clean
+  // precedence — that needs its own design pass before both can be sources.
+  if (channels.arpPattern) next.arpPattern = arpeggiator.blocks.map((block) => ({ ...block }));
   return next;
 }
 

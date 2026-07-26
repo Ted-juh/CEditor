@@ -39,6 +39,11 @@ export function createPanel(name = null) {
       // 'auto' = include only when the panel actually has Python scripts; 'on'/'off' force it.
       // Costs ~the size of a CPython runtime + stdlib in the exported plugin (shown in the Export tab).
       embedPython: 'auto',
+      // Compile-at-export C++/C#/Java handlers into native modules (no language runtime shipped).
+      // 'auto' = compile the native-handler languages the panel actually uses, when their toolchain is
+      // present on the export machine (clang for C++, .NET SDK for C#, GraalVM native-image for Java),
+      // warning for any that's missing; 'on' = force; 'off' = keep those handlers editor-preview-only.
+      compileNativeHandlers: 'auto',
     },
     name: name ?? `Untitled ${id}`,
     scriptId: `panel_${id}`,
@@ -179,8 +184,19 @@ export function serializePanel(panel, options = {}) {
   return JSON.stringify(data, null, 2);
 }
 
+/** Returns the panel object, or null if the document is corrupted / not a valid panel. */
 export function deserializePanel(json, filePath, name) {
-  const data = JSON.parse(json);
+  let data;
+  try {
+    data = JSON.parse(json);
+  } catch (error) {
+    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file is not valid JSON: ${error.message}`);
+    return null;
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {
+    console.error(`[panels] Cannot open panel${filePath ? ` "${filePath}"` : ''} — file does not contain a panel document`);
+    return null;
+  }
   const id = nextId++;
   if (data.deviceSession) {
     data.deviceSession = normalizeProjectDeviceSession(data.deviceSession);

@@ -31,8 +31,19 @@ export function trackViewportMetrics(state, getViewport, getContent) {
     state.height = el.clientHeight;
     const c = getContent?.();
     if (c) {
-      state.contentLeft = c.offsetLeft;
-      state.contentTop = c.offsetTop;
+      // Measure the content's real rendered offset from the viewport, then
+      // convert to content space by adding the current scroll (the ruler
+      // subtracts scrollLeft/scrollTop back out). offsetLeft/offsetTop can't be
+      // used here: the content is centred with margins, and vertical margins
+      // COLLAPSE through the non-BFC stage wrapper, so offsetTop reads 0 even
+      // when the panel sits far down the viewport — which parked the vertical
+      // ruler's 0 at the viewport top instead of the panel's top edge, while
+      // the horizontal ruler was fine (horizontal margins never collapse).
+      // getBoundingClientRect reflects the true position and is collapse-immune.
+      const cr = c.getBoundingClientRect();
+      const er = el.getBoundingClientRect();
+      state.contentLeft = cr.left - er.left + el.scrollLeft;
+      state.contentTop = cr.top - er.top + el.scrollTop;
     }
   };
 

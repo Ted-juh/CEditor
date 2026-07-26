@@ -32,12 +32,18 @@ export function isSourceScript(script) {
 
 /** Generate a starter function skeleton for an event/hook name in a given language. */
 export function defaultSource(eventName = 'onValueChanged', languageId = 'lua') {
-  const isJs = languageId === 'javascript';
+  const isJs = languageId === 'javascript' || languageId === 'typescript';
   const isPy = languageId === 'python';
+  const isCpp = languageId === 'cpp' || languageId === 'c++';
+  const isCs = languageId === 'csharp' || languageId === 'cs';
+  const isJava = languageId === 'java';
+  // C++/C#/Java handlers use a fixed (ctx, event) signature; `param` is ignored.
   const open = (name, param) =>
-    isPy ? `def ${name}(${param}):` : isJs ? `function ${name}(${param}) {` : `function ${name}(${param})`;
+    isCpp ? `void ${name}(CeContext& ctx, const CeEvent& event) {`
+    : isCs || isJava ? `void ${name}(CeContext ctx, CeEvent e) {`
+    : isPy ? `def ${name}(${param}):` : isJs ? `function ${name}(${param}) {` : `function ${name}(${param})`;
   const body = isPy ? '    pass' : '  ';
-  const close = isPy ? '' : isJs ? '}\n' : 'end\n';
+  const close = isPy ? '' : isJs || isCpp || isCs || isJava ? '}\n' : 'end\n';
   const skeleton = (name, param) => `${open(name, param)}\n${body}\n${close}`;
 
   // Lifecycle hooks — onPanelReady gets the firstTime guard.
@@ -46,6 +52,8 @@ export function defaultSource(eventName = 'onValueChanged', languageId = 'lua') 
     const param = hook.params?.[0]?.name ?? '';
     if (eventName === 'onPanelReady') {
       if (isPy) return `def onPanelReady(info):\n    if info.firstTime:\n        pass\n`;
+      if (isCpp) return `void onPanelReady(CeContext& ctx, const CeEvent& event) {\n  if (event.firstTime) {\n    \n  }\n}\n`;
+      if (isCs || isJava) return `void onPanelReady(CeContext ctx, CeEvent e) {\n  if (e.firstTime) {\n    \n  }\n}\n`;
       return isJs
         ? `function onPanelReady(info) {\n  if (info.firstTime) {\n    \n  }\n}\n`
         : `function onPanelReady(info)\n  if info.firstTime then\n    \n  end\nend\n`;
@@ -79,6 +87,9 @@ export function createScript(overrides = {}) {
     enabled: overrides.enabled !== false,
     description: String(overrides.description ?? ''),
     group: String(overrides.group ?? ''), // optional manual folder label
+    // TypeScript ships through the JS engine: the editor stores the transpiled JS here so the
+    // C++ host (no TS compiler) can run it. Only meaningful for language === 'typescript'.
+    compiledJs: language === 'typescript' && typeof overrides.compiledJs === 'string' ? overrides.compiledJs : undefined,
   };
 }
 
@@ -99,6 +110,7 @@ export function normalizeSourceScript(script, index = 0) {
     enabled: script?.enabled !== false,
     description: String(script?.description ?? ''),
     group: String(script?.group ?? ''),
+    compiledJs: language === 'typescript' && typeof script?.compiledJs === 'string' ? script.compiledJs : undefined,
   };
 }
 

@@ -1,13 +1,15 @@
 <script>
-  import { Cog, Image, Type } from 'lucide-svelte';
+  import { Cog, Image, Type, Code2 } from 'lucide-svelte';
   import GeneralSettings from '../settings/GeneralSettings.svelte';
   import FontsSettings from '../settings/FontsSettings.svelte';
   import IconsSettings from '../settings/IconsSettings.svelte';
+  import ToolchainsSettings from '../settings/ToolchainsSettings.svelte';
 
   const sections = [
     { id: 'general', label: 'General', icon: Cog, available: true },
     { id: 'fonts', label: 'Fonts', icon: Type, available: true },
     { id: 'icons', label: 'Icons', icon: Image, available: true },
+    { id: 'toolchains', label: 'Scripting Toolchains', icon: Code2, available: true },
   ];
 
   let activeSection = $state('general');
@@ -39,6 +41,8 @@
       <FontsSettings />
     {:else if activeSection === 'icons'}
       <IconsSettings />
+    {:else if activeSection === 'toolchains'}
+      <ToolchainsSettings />
     {:else}
       <div class="placeholder">
         <span>That settings section is not wired yet.</span>

@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId } from '../stores/panels.js';
 import { panelPreviewSessions, updatePanelPreviewSession } from '../stores/interactionPreview.js';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 function getControlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -85,7 +86,7 @@ function patchForBinding(control, binding, value) {
 }
 
 export function syncDeviceParameterToPanelPreview(deviceRole, parameterId, value, options = {}) {
-  const role = String(deviceRole ?? 'mainSynth');
+  const role = String(deviceRole ?? DEFAULT_DEVICE_ROLE);
   const parameter = String(parameterId ?? '');
   const skipControlId = String(options?.skipControlId ?? '');
   if (!parameter) return 0;
@@ -103,7 +104,7 @@ export function syncDeviceParameterToPanelPreview(deviceRole, parameterId, value
     if (sessions?.[controlId]?.dragging === true) continue;
 
     const binding = activeDeviceBindings(control).find((entry) =>
-      String(entry?.deviceRole ?? 'mainSynth') === role
+      String(entry?.deviceRole ?? DEFAULT_DEVICE_ROLE) === role
         && String(entry?.parameterId ?? '') === parameter
     );
     if (!binding) continue;
@@ -149,7 +150,7 @@ function flushQueuedParameterSyncs() {
 }
 
 export function queueDeviceParameterPanelPreviewSync(deviceRole, parameterId, value, options = {}) {
-  const role = String(deviceRole ?? 'mainSynth');
+  const role = String(deviceRole ?? DEFAULT_DEVICE_ROLE);
   const parameter = String(parameterId ?? '');
   if (!parameter) return;
 

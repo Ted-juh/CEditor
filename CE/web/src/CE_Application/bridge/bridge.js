@@ -4,6 +4,7 @@
  * C++ registers event listeners for: setProperty, requestFullState, undo, redo
  * C++ emits events: fullState, propUpdate
  */
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /** Check if we're running inside a JUCE WebView with native integration */
 export function isJuceAvailable() {
@@ -12,13 +13,31 @@ export function isJuceAvailable() {
          window.__JUCE__.backend;
 }
 
+let nextSetPropertyRequestId = 1;
+let setPropertyRejectionListenerInstalled = false;
+
+// C++ validates every setProperty path and emits 'setPropertyRejected' when a write did NOT land
+// (malformed or non-existent path). Without this, JS would keep local state the C++ tree never
+// accepted — surface the failure and pull the authoritative state back to resync.
+function ensureSetPropertyRejectionListener() {
+  if (setPropertyRejectionListenerInstalled) return;
+  setPropertyRejectionListenerInstalled = true;
+  window.__JUCE__.backend.addEventListener('setPropertyRejected', (payload) => {
+    console.error(
+      `[bridge] setProperty #${payload?.requestId ?? '?'} rejected: ${payload?.message ?? 'unknown error'}`
+    );
+    requestFullState();
+  });
+}
+
 /** Send a property change to C++ */
 export function setProperty(path, value) {
   if (!isJuceAvailable()) {
     console.warn('[bridge] No JUCE backend — setProperty ignored:', path, value);
     return;
   }
-  window.__JUCE__.backend.emitEvent('setProperty', { path, value });
+  ensureSetPropertyRejectionListener();
+  window.__JUCE__.backend.emitEvent('setProperty', { path, value, requestId: nextSetPropertyRequestId++ });
 }
 
 /** Request the full ValueTree state from C++ */
@@ -109,6 +128,41 @@ export function buildVst3(panelId, data, guid, productName) {
   window.__JUCE__.backend.emitEvent('buildVst3', {
     panelId: String(panelId), data, guid, productName,
   });
+}
+
+// --- Scripting Toolchains (Settings → Scripting Toolchains) ---------------------------------------
+/** Ask C++ for per-language toolchain status. C++ replies with the 'toolchainStatus' event. */
+export function requestToolchainStatus() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('toolchainStatus', {});
+}
+/** Subscribe to toolchain status ({ languages: [...] }). Returns an unsubscribe fn. */
+export function onToolchainStatus(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainStatus', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+/** Install the toolchains for the given language ids (array). Streams 'toolchainProgress', ends 'toolchainDone'. */
+export function provisionToolchains(languages) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('provisionToolchains', { languages });
+}
+/** Remove the (exclusive) toolchains for the given language ids (array). Ends with 'toolchainDone'. */
+export function removeToolchains(languages) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('removeToolchains', { languages });
+}
+/** Subscribe to toolchain provision/remove progress lines ({ line }). Returns an unsubscribe fn. */
+export function onToolchainProgress(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainProgress', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+/** Subscribe to toolchain job completion ({ ok, code }). Returns an unsubscribe fn. */
+export function onToolchainDone(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('toolchainDone', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
 /** Request an "Open" dialog. C++ will emit 'panelOpened' on success. */
@@ -354,7 +408,7 @@ export function getDeviceDiagnostics() {
   window.__JUCE__.backend.emitEvent('getDeviceDiagnostics', {});
 }
 
-export function requestMidiCiDiscovery(deviceRole = 'mainSynth') {
+export function requestMidiCiDiscovery(deviceRole = DEFAULT_DEVICE_ROLE) {
   if (!isJuceAvailable()) return;
   window.__JUCE__.backend.emitEvent('requestMidiCiDiscovery', { deviceRole });
 }

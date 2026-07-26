@@ -1,0 +1,19 @@
+# Matches the existing JUCE-style C++ in CE/src (Allman braces, 4-space
+# indent, space before call parens). Added per the project review so future
+# formatting stays consistent — no mass reformat has been run; apply to new
+# or already-touched code only.
+BasedOnStyle: LLVM
+IndentWidth: 4
+ColumnLimit: 120
+BreakBeforeBraces: Allman
+SpaceBeforeParens: Always
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+AlwaysBreakTemplateDeclarations: Yes
+Cpp11BracedListStyle: false
+SpacesInContainerLiterals: true
+IndentCaseLabels: true
+NamespaceIndentation: None
+FixNamespaceComments: true

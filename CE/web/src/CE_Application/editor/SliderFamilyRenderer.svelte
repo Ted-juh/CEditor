@@ -1,6 +1,7 @@
 <script>
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
+  import { numberOr, clamp } from '../utils/primitives.js';
   import {
     formatSliderNumericValue,
     formatSliderReadout,
@@ -28,15 +29,6 @@
     partTransitions = null,
     debug = false,
   } = $props();
-
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
 
   function argbToCss(value, fallback = 'rgba(255,255,255,1)') {
     const raw = String(value ?? '').replace(/^#/, '').trim();

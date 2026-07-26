@@ -1,7 +1,18 @@
 #include "ScriptRuntime.h"
 
+#include <juce_events/juce_events.h>
+
 namespace ceditor::scripting
 {
+
+// Every public ScriptRuntime method must run on the JUCE message thread (see the header). This
+// catches violations in debug builds. Headless tests without a MessageManager are exempt; in the
+// app/plugin one always exists long before scripts load.
+static void assertMessageThread()
+{
+    [[maybe_unused]] auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    jassert (mm == nullptr || mm->isThisTheMessageThread());
+}
 
 ScriptDefinition ScriptDefinition::fromVar (const juce::var& v)
 {
@@ -12,6 +23,7 @@ ScriptDefinition ScriptDefinition::fromVar (const juce::var& v)
         d.name     = o->getProperty ("name").toString();
         d.language = o->getProperty ("language").toString();
         d.source   = o->getProperty ("source").toString();
+        if (o->hasProperty ("compiledJs")) d.compiledSource = o->getProperty ("compiledJs").toString();
         d.scope    = o->getProperty ("scope").toString();
         d.event    = o->getProperty ("event").toString();
         d.owner    = o->getProperty ("target").toString(); // "target" in the JS model = the owner / "self"
@@ -32,14 +44,20 @@ ScriptRuntime::ScriptRuntime (ScriptHostApi& h) : host (h)
    #if CEDITOR_PYTHON
     python = createPythonEngine();   // real embedded CPython (full stdlib), window-closed only
    #endif
+   #if CEDITOR_NATIVE_HANDLERS
+    native = createNativeHandlerEngine(); // C++/C#/Java handlers compiled to native modules at export
+   #endif
 }
 
 ScriptRuntime::~ScriptRuntime() = default;
 
 ScriptEngine* ScriptRuntime::engineFor (const juce::String& language)
 {
-    if (language == "javascript") return js.get();
+    // TypeScript ships as JS: the editor transpiles it to def.compiledSource, which the JS engine runs.
+    if (language == "javascript" || language == "typescript") return js.get();
     if (language == "python")     return python.get(); // null if not built → python scripts no-op
+    // C++/C#/Java are compiled to a native module at export and loaded by the native engine.
+    if (language == "cpp" || language == "csharp" || language == "java") return native.get(); // null if not built → no-op
     return lua.get(); // default + "lua"
 }
 
@@ -52,17 +70,20 @@ void ScriptRuntime::reportError (const juce::String& scriptId, const juce::Strin
 
 void ScriptRuntime::loadScripts (const juce::var& scriptArray)
 {
+    assertMessageThread();
     scripts.clear();
     if (lua)    lua->reset();
     if (js)     js->reset();
     if (python) python->reset();
+    if (native) native->reset();
 
     // Install the API into each engine once.
     if (lua)    lua->installApi (host);
     if (js)     js->installApi (host);
     if (python) python->installApi (host);
+    if (native) native->installApi (host);
 
-    const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+    failed.clear();
 
     if (auto* arr = scriptArray.getArray())
     {
@@ -70,11 +91,29 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
         {
             auto def = ScriptDefinition::fromVar (item);
             if (! def.enabled) continue;
-            if (auto* eng = engineFor (def.language))
+
+            auto* eng = engineFor (def.language);
+            if (eng == nullptr)
             {
-                if (eng->loadScript (def, onError))
-                    scripts.push_back (def);
+                auto msg = "language '" + def.language + "' is not available in this build — script is inactive";
+                failed.push_back ({ def.id, def.name, def.language, msg });
+                reportError (def.id, msg);
+                continue;
             }
+
+            // Capture the engine's load-error detail so failedScripts() can carry it to the UI.
+            juce::String loadError;
+            const ScriptErrorSink onLoadError = [this, &loadError] (const juce::String& id, const juce::String& msg)
+            {
+                loadError = msg;
+                reportError (id, msg);
+            };
+
+            if (eng->loadScript (def, onLoadError))
+                scripts.push_back (def);
+            else
+                failed.push_back ({ def.id, def.name, def.language,
+                                    loadError.isNotEmpty() ? loadError : juce::String ("failed to load") });
         }
     }
 }
@@ -95,11 +134,13 @@ void ScriptRuntime::dispatchTo (const ScriptDefinition& def, const juce::String&
 
 void ScriptRuntime::onPanelLoad()
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelLoad") dispatchTo (s, "onPanelLoad", juce::var());
 }
 
 void ScriptRuntime::onPanelReady (bool firstTime)
 {
+    assertMessageThread();
     auto* o = new juce::DynamicObject();
     o->setProperty ("firstTime", firstTime);
     const juce::var info (o);
@@ -108,11 +149,13 @@ void ScriptRuntime::onPanelReady (bool firstTime)
 
 void ScriptRuntime::onPanelClose()
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelClose") dispatchTo (s, "onPanelClose", juce::var());
 }
 
 void ScriptRuntime::onDawSaveState (juce::var& store)
 {
+    assertMessageThread();
     if (store.getDynamicObject() == nullptr) store = juce::var (new juce::DynamicObject());
     auto* dest = store.getDynamicObject();
     for (auto& s : scripts)
@@ -133,6 +176,7 @@ void ScriptRuntime::onDawSaveState (juce::var& store)
 
 void ScriptRuntime::onDawRestoreState (const juce::var& store)
 {
+    assertMessageThread();
     for (auto& s : scripts) if (s.event == "onDawRestoreState") dispatchTo (s, "onDawRestoreState", store);
 }
 
@@ -148,6 +192,19 @@ static bool matchesTarget (const ScriptDefinition& def, const juce::String& targ
 
 void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload)
 {
+    assertMessageThread();
+
+    // Feedback-loop backstop: a handler that emit()s an event whose handler emit()s again …
+    // gets cut off (and reported) at a fixed depth instead of recursing until the stack dies.
+    if (dispatchDepth >= maxDispatchDepth)
+    {
+        reportError ("runtime", "event '" + event + "' dropped: dispatch depth exceeded "
+                     + juce::String (maxDispatchDepth) + " (emit/dispatch feedback loop?)");
+        return;
+    }
+    ++dispatchDepth;
+    struct DepthScope { int& d; ~DepthScope() { --d; } } depthScope { dispatchDepth };
+
     // 1) Named-function handlers: a script that runs on `event` and is attached to `target`.
     for (auto& s : scripts)
         if (s.event == event && matchesTarget (s, target))
@@ -158,6 +215,7 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
     if (lua)    lua->deliverEvent (target, event, payload, onError);
     if (js)     js->deliverEvent (target, event, payload, onError);
     if (python) python->deliverEvent (target, event, payload, onError);
+    if (native) native->deliverEvent (target, event, payload, onError);
 }
 
 } // namespace ceditor::scripting

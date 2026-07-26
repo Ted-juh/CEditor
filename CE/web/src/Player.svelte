@@ -17,6 +17,7 @@
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, listProfileParameters, onMidiInputMessage, onSysexInputMessage, triggerRawMidiAction } from './CE_Application/bridge/bridge.js';
   // Inbound decode maps are generated from the DPD device profile (CE/dpd), not hardcoded.
   import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
+  import { DEFAULT_DEVICE_ROLE } from './CE_Application/stores/deviceConstants.js';
 
   // $state.raw: the panel is replaced wholesale, never deep-mutated here. A deep $state
   // proxy would make PanelPreviewSurface's structuredClone() throw DataCloneError, and
@@ -149,7 +150,7 @@
     for (const b of m.bindings ?? []) {
       commitDeviceParameter({
         requestId: `automation_${parameterId}_${Date.now()}`,
-        deviceRole: b.deviceRole || 'mainSynth',
+        deviceRole: b.deviceRole || DEFAULT_DEVICE_ROLE,
         parameterId: b.parameterId,
         value: writeValue,
         interactionPhase: 'continuous',
@@ -252,7 +253,7 @@
       const body = [0xF0, 0x41, 0x7F, 0x00, 0x00, 0x41, 0x11, ...addrBytes, ...size,
         rolandChecksum([...addrBytes, ...size]), 0xF7];
       const message = body.map((v) => v.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-      triggerRawMidiAction({ deviceRole: 'mainSynth', actionId: `rq1_${parameterId}`, message, dryRun: false });
+      triggerRawMidiAction({ deviceRole: DEFAULT_DEVICE_ROLE, actionId: `rq1_${parameterId}`, message, dryRun: false });
     }
   }
 
@@ -268,9 +269,9 @@
       : null)
       ?? { type: 'none', id: 'none', name: 'No MIDI Input' };
     // Updates the role mapping AND tells C++ to open the MIDI output + input (setDeviceRoleMapping).
-    mapDeviceRole('mainSynth', profileId, { midiDestination: dest, midiInput: input });
+    mapDeviceRole(DEFAULT_DEVICE_ROLE, profileId, { midiDestination: dest, midiInput: input });
     // Load this profile's parameter list so resolveParameterSend recognizes the bound params.
-    if (profileId) listProfileParameters({ profileId, deviceRole: 'mainSynth' });
+    if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
     // Pull current values from the synth via RQ1 once the hardware port is open (SysEx read-back).
     if (dest.type === 'hardwareOutput') setTimeout(syncFromSynth, 600);
   }
@@ -290,7 +291,7 @@
       mappingAdopted = true;
       selectedOut = dest.id;
       if (m.profileId) profileId = m.profileId;
-      if (profileId) listProfileParameters({ profileId, deviceRole: 'mainSynth' });
+      if (profileId) listProfileParameters({ profileId, deviceRole: DEFAULT_DEVICE_ROLE });
       setTimeout(syncFromSynth, 600);
     }
   }

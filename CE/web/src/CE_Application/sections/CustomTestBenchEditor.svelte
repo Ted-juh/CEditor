@@ -16,10 +16,6 @@
     seedCustomValues,
     snapCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
-  import {
-    analyzeCustomComponentReadiness,
-    validateCustomComponentPackage,
-  } from '../utils/customComponentPackage.js';
   import { applyCustomBindings } from '../utils/interactionRuntime.js';
 
   let { control = null } = $props();
@@ -39,8 +35,6 @@
   let published = $derived(getSection(control, 'PublishedProperties'));
   let variants = $derived(getSection(control, 'Variants'));
   let preview = $derived(designer?.preview ?? {});
-  let packageValidation = $derived(control ? validateCustomComponentPackage(control) : { ok: false, issues: [], warnings: [] });
-  let packageReadiness = $derived(control ? analyzeCustomComponentReadiness(control) : { ok: false, score: 0, steps: [] });
 
   let partNames = $derived(Object.keys(parts?._children ?? {}));
   let valueNames = $derived(Object.keys(values?._children ?? {}));
@@ -96,22 +90,6 @@
       linked: linkedDefaults.targets?.has?.(name) === true,
     };
   }));
-  let animationDiagnostics = $derived.by(() => Object.entries(animations?._children ?? {}).map(([name, animation]) => {
-    const targets = Array.isArray(animation?.targets) ? animation.targets : [];
-    return {
-      name,
-      enabled: animation?.enabled !== false,
-      kind: animation?.kind ?? 'transition',
-      trigger: animationTriggerSummary(animation),
-      triggerState: firstAnimationTriggerState(animation),
-      active: animationMatchesPreview(animation, preview),
-      duration: Number(animation?.duration ?? 120),
-      delay: Number(animation?.delay ?? 0),
-      easing: animation?.easing ?? 'outQuad',
-      targetCount: targets.length,
-      targets: targets.map(animationTargetSummary).slice(0, 3),
-    };
-  }));
   let stateDiagnostics = $derived.by(() => Object.entries(states?._children ?? {}).map(([name, state]) => {
     const partPatches = Object.entries(state?.patches?.parts ?? {});
     const componentPatchCount = Object.keys(state?.patches?.component ?? {}).length;
@@ -130,39 +108,6 @@
       })).slice(0, 4),
     };
   }));
-  let stateCoverageDiagnostics = $derived.by(() => buildStateCoverageDiagnostics());
-  let enumGroupDiagnostics = $derived.by(() => buildEnumGroupDiagnostics());
-  let specializedInspectorDiagnostics = $derived.by(() => buildSpecializedInspectorDiagnostics());
-  let bindingDiagnostics = $derived.by(() => Object.entries(bindings?._children ?? {}).map(([name, binding]) => {
-    const sourceValue = bindingSourcePreview(binding, {
-      testValue: preview.testValue ?? 0.5,
-      state: preview.state ?? 'base',
-      channels: linkedDefaults.values ?? seededValues,
-    });
-    return {
-      name,
-      enabled: binding?.enabled !== false,
-      source: binding?.source ?? '',
-      target: binding?.target ?? '',
-      mode: binding?.mapMode ?? 'numeric',
-      sourceValue,
-      output: bindingOutputPreview(binding, sourceValue),
-    };
-  }));
-  let publicApiDiagnostics = $derived.by(() => [
-    ...publishedInputs.map((entry) => publicApiEntry('input', entry)),
-    ...publishedOutputs.map((entry) => publicApiEntry('output', entry)),
-    ...publishedPropertyEntries.map(([name, entry]) => publicApiEntry('property', entry, name)),
-  ]);
-  let linkDiagnostics = $derived.by(() => Object.entries(links?._children ?? {}).map(([name, link]) => ({
-    name,
-    type: link?.type ?? 'map',
-    source: link?.source ?? '',
-    target: link?.target ?? '',
-    enabled: link?.enabled !== false,
-    active: linkedDefaults.targets?.has?.(link?.target) === true,
-  })));
-  let channelFlowDiagnostics = $derived.by(() => buildChannelFlowDiagnostics());
   let scenarioPresets = $derived([
     { label: 'Min', value: 0, state: 'base', overlays: false },
     { label: 'Mid', value: 0.5, state: 'base', overlays: false },
@@ -171,45 +116,6 @@
     { label: 'Pressed', value: preview.testValue ?? 0.5, state: 'pressed', overlays: false },
     { label: 'Debug', value: preview.testValue ?? 0.5, state: preview.state ?? 'base', overlays: true },
   ]);
-
-  let issues = $derived.by(() => {
-    const found = [];
-    if (partNames.length === 0) found.push('No visual layers/parts exist.');
-    if (valueNames.length === 0) found.push('No value channels exist.');
-    if (behaviorNames.length > 0 && hitZoneNames.length === 0) found.push('Behaviors exist, but no hit zones target them.');
-    if (publishedInputs.length === 0 && publishedOutputs.length === 0) found.push('No public inputs or outputs are exposed for panel-level linking.');
-    for (const [name, behavior] of Object.entries(behaviors?._children ?? {})) {
-      if (behavior?.enabled === false) continue;
-      if (behavior?.valueChannel && !values?._children?.[behavior.valueChannel]) {
-        found.push(`Behavior "${name}" targets missing value channel "${behavior.valueChannel}".`);
-      }
-    }
-    for (const [name, zone] of Object.entries(hitZones?._children ?? {})) {
-      if (zone?.enabled === false) continue;
-      if (zone?.targetBehavior && !behaviors?._children?.[zone.targetBehavior]) {
-        found.push(`Hit zone "${name}" targets missing behavior "${zone.targetBehavior}".`);
-      }
-      if (zone?.targetValueChannel && !values?._children?.[zone.targetValueChannel]) {
-        found.push(`Hit zone "${name}" targets missing value channel "${zone.targetValueChannel}".`);
-      }
-    }
-    for (const [name, zone] of Object.entries(materializedHitZones ?? {})) {
-      if (zone?.enabled === false || zone?.generated !== true) continue;
-      if (zone?.targetValueChannel && !values?._children?.[zone.targetValueChannel]) {
-        found.push(`Generated hit zone "${name}" targets missing value channel "${zone.targetValueChannel}".`);
-      }
-      if (zone?.targetValueChannelY && !values?._children?.[zone.targetValueChannelY]) {
-        found.push(`Generated hit zone "${name}" targets missing Y value channel "${zone.targetValueChannelY}".`);
-      }
-    }
-    for (const [name, filmstrip] of Object.entries(assets?.filmstrips ?? {})) {
-      if (!filmstrip?.source) found.push(`Filmstrip "${name}" has no source image yet.`);
-      if (!(Number(filmstrip?.frameCount) > 0)) found.push(`Filmstrip "${name}" needs a frame count.`);
-    }
-    return found;
-  });
-  let readinessIssues = $derived([...new Set([...(packageValidation.issues ?? []), ...issues])]);
-  let readinessWarnings = $derived(packageValidation.warnings ?? []);
 
   let performance = $derived({
     layers: partNames.length,
@@ -288,75 +194,15 @@
     if (!name) return;
     focusDesigner({
       'Designer.selectedValueChannel': name,
-      'Designer.focusSection': 'valuechannels',
+      'Designer.focusSection': 'interact',
     });
   }
 
   function focusPublicApi(channelName = '') {
     focusDesigner({
       'Designer.selectedValueChannel': channelName,
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     });
-  }
-
-  function focusReadinessStep(step) {
-    if (!step) return;
-    const firstChannel = valueNames[0] ?? '';
-    const firstPart = partNames[0] ?? '';
-    const target = String(step.target ?? 'overview');
-    if (target === 'shapes') {
-      focusLayer(firstPart);
-      return;
-    }
-    if (target === 'movement') {
-      focusDesigner({
-        'Designer.focusSection': behaviorNames.length ? 'behaviors' : 'hitzones',
-        'Designer.selectedBehavior': behaviorNames[0] ?? '',
-        'Designer.selectedHitZone': hitZoneNames[0] ?? '',
-        'Designer.selectedValueChannel': firstChannel,
-        'Designer.preview.showHitZones': true,
-      });
-      return;
-    }
-    if (target === 'links') {
-      focusPublicApi(firstChannel);
-      return;
-    }
-    if (target === 'states') {
-      focusDesigner({
-        'Designer.focusSection': 'states',
-        'Designer.selectedLayer': firstPart,
-      });
-      return;
-    }
-    if (target === 'assets') {
-      focusDesigner({ 'Designer.focusSection': 'assets' });
-      return;
-    }
-    focusDesigner({
-      'Designer.focusSection': target === 'overview' ? 'valuechannels' : target,
-      'Designer.selectedValueChannel': firstChannel,
-    });
-  }
-
-  function publishAllChannels() {
-    if (!core?.id || valueNames.length === 0) return;
-    const patch = {
-      'Designer.focusSection': 'published',
-      'Designer.selectedValueChannel': valueNames[0],
-    };
-    for (const channelName of valueNames) {
-      const channel = values?._children?.[channelName] ?? {};
-      const entry = {
-        channel: channelName,
-        label: channel?.label ?? channelName,
-        type: channel?.type ?? 'float',
-        enabled: true,
-      };
-      patch[`PublishedProperties.inputs.${channelName}`] = entry;
-      patch[`PublishedProperties.outputs.${channelName}`] = entry;
-    }
-    applyControlPatch(core.id, patch);
   }
 
   function focusPublicProperty(entry) {
@@ -364,7 +210,7 @@
     focusDesigner({
       'Designer.selectedLayer': partMatch?.[1] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedPublicProperty': entry?.name ?? '',
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     });
   }
 
@@ -379,7 +225,7 @@
     };
     const patch = {
       'Designer.selectedValueChannel': channelName,
-      'Designer.focusSection': 'published',
+      'Designer.focusSection': 'publish',
     };
     if (direction === 'input' || direction === 'both') {
       patch[`PublishedProperties.inputs.${channelName}`] = entry;
@@ -398,7 +244,8 @@
       'Designer.selectedBinding': name,
       'Designer.selectedLayer': layer || (designer?.selectedLayer ?? ''),
       'Designer.selectedValueChannel': channel || (designer?.selectedValueChannel ?? ''),
-      'Designer.focusSection': 'bindings',
+      'Designer.focusSection': 'react',
+      'Designer.focusReactPane': 'bindings',
       'Designer.preview.showBounds': true,
     });
   }
@@ -423,7 +270,7 @@
       'Designer.selectedBehavior': zone?.targetBehavior ?? '',
       'Designer.selectedValueChannel': zone?.targetValueChannel ?? '',
       'Designer.selectedGenerator': detachedSource,
-      'Designer.focusSection': 'hitzones',
+      'Designer.focusSection': 'interact',
       'Designer.preview.showHitZones': true,
     });
   }
@@ -470,7 +317,7 @@
       'Designer.selectedGenerator': generatorName,
       'Designer.selectedLayer': partEntries[0]?.[0] ?? (designer?.selectedLayer ?? ''),
       'Designer.selectedHitZone': zoneEntries[0]?.[0] ?? (designer?.selectedHitZone ?? ''),
-      'Designer.focusSection': partEntries.length ? '' : 'hitzones',
+      'Designer.focusSection': partEntries.length ? '' : 'interact',
       'Designer.focusSurfaceDock': partEntries.length ? 'layers' : '',
       'Designer.preview.showHitZones': zoneEntries.length > 0,
       'Designer.preview.showBounds': true,
@@ -512,23 +359,12 @@
     }));
   }
 
-  function focusAnimation(name, animation) {
-    if (!name || !animation) return;
-    const firstTarget = (animation.targets ?? []).find((target) => layerNameFromPath(target?.path));
-    focusDesigner({
-      'Designer.selectedAnimation': name,
-      'Designer.selectedLayer': layerNameFromPath(firstTarget?.path) || (designer?.selectedLayer ?? ''),
-      'Designer.focusSection': 'animations',
-      'Designer.preview.animationsEnabled': true,
-      'Designer.preview.showBounds': true,
-    });
-  }
-
   function focusState(name) {
     if (!name) return;
     focusDesigner({
       'Designer.selectedState': name,
-      'Designer.focusSection': 'states',
+      'Designer.focusSection': 'react',
+      'Designer.focusReactPane': 'states',
       'Designer.preview.state': name,
       'Designer.preview.showBounds': true,
     });
@@ -567,84 +403,6 @@
       if (valueEnum !== undefined && valueEnum !== null && valueEnum !== '') options.add(String(valueEnum));
     }
     return [...options];
-  }
-
-  function buildStateCoverageDiagnostics() {
-    return Object.entries(values?._children ?? {})
-      .filter(([, channel]) => String(channel?.type ?? '').toLowerCase() === 'enum')
-      .map(([channelName, channel]) => {
-        const options = enumOptionsForChannel(channelName, channel);
-        const rows = options.map((option) => {
-          const matchingStates = Object.entries(states?._children ?? {})
-            .filter(([, state]) => state?.enabled !== false && String(state?.when?.valueEnum ?? '') === String(option))
-            .map(([stateName]) => stateName);
-          const matchingZones = materializedHitZoneEntries
-            .filter(([, zone]) => zone?.enabled !== false && zone?.targetValueChannel === channelName && String(zone?.payload?.value ?? zone?.value ?? '') === String(option))
-            .map(([zoneName]) => zoneName);
-          return {
-            option,
-            stateNames: matchingStates,
-            zoneNames: matchingZones,
-            covered: matchingStates.length > 0,
-            reachable: matchingZones.length > 0,
-          };
-        });
-        return {
-          channelName,
-          label: channel?.label ?? channelName,
-          rows,
-          missingStates: rows.filter((row) => !row.covered).length,
-          missingZones: rows.filter((row) => !row.reachable).length,
-        };
-      });
-  }
-
-  function buildEnumGroupDiagnostics() {
-    return Object.entries(values?._children ?? {})
-      .filter(([, channel]) => String(channel?.type ?? '').toLowerCase() === 'enum')
-      .map(([channelName, channel]) => {
-        const zones = materializedHitZoneEntries
-          .filter(([, zone]) => zone?.enabled !== false && zone?.targetValueChannel === channelName)
-          .map(([zoneName, zone]) => ({
-            name: zoneName,
-            value: zone?.payload?.value ?? zone?.value ?? '',
-            generated: zone?.generated === true,
-            source: zone?.meta?.generatedBy ?? '',
-          }));
-        const valuesCovered = new Set(zones.map((zone) => String(zone.value)).filter(Boolean));
-        return {
-          channelName,
-          label: channel?.label ?? channelName,
-          options: enumOptionsForChannel(channelName, channel),
-          zones,
-          valuesCovered: valuesCovered.size,
-          generated: zones.filter((zone) => zone.generated).length,
-        };
-      })
-      .filter((group) => group.zones.length || group.options.length);
-  }
-
-  function buildSpecializedInspectorDiagnostics() {
-    const found = [];
-    const channelKeys = new Set(Object.keys(values?._children ?? {}));
-    const behaviorTypes = Object.values(behaviors?._children ?? {}).map((behavior) => `${behavior?.type ?? ''} ${behavior?.role ?? ''} ${behavior?.geometry ?? ''}`.toLowerCase());
-    const generatorTypes = Object.values(generators?._children ?? {}).map((generator) => String(generator?.type ?? '').toLowerCase());
-    if ((channelKeys.has('x') && channelKeys.has('y')) || behaviorTypes.some((entry) => entry.includes('xy'))) {
-      found.push({ id: 'xy', label: 'XY Pad', detail: 'Two-axis behavior with X/Y channels and paired hit-zone semantics.', action: 'Behaviors', focus: () => focusDesigner({ 'Designer.focusSection': 'behaviors' }) });
-    }
-    if (generatorTypes.includes('repeated-leds') || generatorTypes.includes('meter-bars')) {
-      found.push({ id: 'meter', label: 'Meter / LED', detail: 'Generated segment count, activation mode, and hit-zone output are inspectable as one generated control.', action: 'Generators', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true }) });
-    }
-    if (enumGroupDiagnostics.length) {
-      found.push({ id: 'segmented', label: 'Segmented Enum', detail: `${enumGroupDiagnostics.length} enum group${enumGroupDiagnostics.length === 1 ? '' : 's'} with mutual exclusion and state coverage.`, action: 'Enum Groups', focus: () => {} });
-    }
-    if (designer?.arpeggiator?.enabled === true || materializedPartNames.some((name) => name.toLowerCase().includes('arp'))) {
-      found.push({ id: 'arp', label: 'Arpeggiator', detail: 'Dedicated draw, move, resize, select, and velocity edit tools are available on the design surface.', action: 'Surface', focus: () => focusDesigner({ 'Designer.focusSurfaceDock': 'layers' }) });
-    }
-    if (['attack', 'decay', 'sustain', 'release'].some((name) => channelKeys.has(name))) {
-      found.push({ id: 'env', label: 'Envelope', detail: 'ADSR channels can drive envelope path, handles, labels, and hit zones.', action: 'Channels', focus: () => focusDesigner({ 'Designer.focusSection': 'valuechannels' }) });
-    }
-    return found;
   }
 
   function setChannelTestValue(name, value) {
@@ -749,48 +507,6 @@
     applyHitZoneProbe(name, zone);
   }
 
-  function animationTriggerSummary(animation) {
-    const trigger = animation?.trigger ?? {};
-    if (trigger.type === 'valueChange') return `value ${trigger.source ?? 'value.normalized'}`;
-    const to = Array.isArray(trigger.to) ? trigger.to : [];
-    const from = Array.isArray(trigger.from) ? trigger.from : [];
-    return `${from.length ? from.join(',') : '*'} -> ${to.length ? to.join(',') : '*'}`;
-  }
-
-  function firstAnimationTriggerState(animation) {
-    const to = Array.isArray(animation?.trigger?.to) ? animation.trigger.to : [];
-    return to.find((entry) => entry && entry !== '*') ?? '';
-  }
-
-  function animationMatchesPreview(animation, currentPreview) {
-    if (!animation || animation.enabled === false) return false;
-    const trigger = animation.trigger ?? {};
-    if (trigger.type === 'valueChange') return true;
-    const targetStates = Array.isArray(trigger.to) ? trigger.to : [];
-    return targetStates.includes('*') || targetStates.includes(currentPreview.state ?? 'base');
-  }
-
-  function animationTargetSummary(target) {
-    const path = String(target?.path ?? '').trim();
-    const parts = path.split('.');
-    const part = parts[0] === 'Parts' ? parts[1] : 'component';
-    const property = parts[0] === 'Parts' ? parts.slice(2).join('.') : path;
-    const hints = Array.isArray(target?.properties) ? target.properties.join(', ') : '';
-    return {
-      label: part || 'component',
-      property: property || hints || 'target',
-      hints,
-    };
-  }
-
-  function previewAnimation(name, animation) {
-    const state = firstAnimationTriggerState(animation);
-    if (state) setPreview('state', state);
-    setPreview('animationsEnabled', true);
-    setPreview('showBounds', true);
-    focusAnimation(name, animation);
-  }
-
   function stateConditionSummary(state) {
     const entries = Object.entries(state?.when ?? {});
     if (!entries.length) return 'manual';
@@ -824,133 +540,6 @@
     setPreview('state', name);
     setPreview('showBounds', true);
     focusState(name);
-  }
-
-  function bindingSourcePreview(binding, context) {
-    const source = String(binding?.source ?? '').trim();
-    if (!source) return '';
-    if (source === 'value.normalized') return context.testValue;
-    if (source === 'value.raw') return context.channels?.mainValue ?? context.testValue;
-    if (source === 'state.hover') return context.state === 'hover';
-    if (source === 'state.pressed') return context.state === 'pressed';
-    if (source === 'state.focused') return context.state === 'focused';
-    if (source === 'state.dragging') return context.state === 'dragging';
-    if (source === 'state.disabled') return context.state === 'disabled';
-    if (source === 'state.checked') return context.state === 'checked';
-    if (source.startsWith('channel.')) {
-      const match = source.match(/^channel\.(.+)\.(raw|normalized)$/);
-      if (match?.[2] === 'raw') return context.channels?.[match[1]];
-      if (match?.[2] === 'normalized') {
-        const channel = values?._children?.[match[1]];
-        return normalizeCustomChannelValue(channel, context.channels?.[match[1]]);
-      }
-    }
-    return '';
-  }
-
-  function bindingOutputPreview(binding, sourceValue) {
-    if (binding?.mapMode === 'boolean') {
-      const boolValue = sourceValue === true || sourceValue === 'true' || Number(sourceValue) >= 0.5;
-      return binding?.invert ? (boolValue ? binding.falseValue : binding.trueValue) : (boolValue ? binding.trueValue : binding.falseValue);
-    }
-    if (binding?.mapMode === 'direct') return sourceValue;
-    const numeric = Number(sourceValue);
-    if (!Number.isFinite(numeric)) return '';
-    const inputMin = Number(binding?.inputMin ?? 0);
-    const inputMax = Number(binding?.inputMax ?? 1);
-    const outputMin = Number(binding?.outputMin ?? 0);
-    const outputMax = Number(binding?.outputMax ?? 100);
-    const span = inputMax - inputMin;
-    const normalized = Math.abs(span) < 0.000001 ? 0 : (numeric - inputMin) / span;
-    const output = outputMin + ((outputMax - outputMin) * normalized);
-    return binding?.round === true ? Math.round(output) : Number(output.toFixed(3));
-  }
-
-  function publicApiEntry(direction, entry, name = '') {
-    const channelName = entry?.channel ?? entry?.variable ?? '';
-    const channel = values?._children?.[channelName];
-    const raw = linkedDefaults.values?.[channelName] ?? seededValues?.[channelName] ?? '';
-    if (direction === 'property') {
-      return {
-        direction,
-        name,
-        label: entry?.label ?? entry?.path ?? 'property',
-        channel: entry?.path ?? '',
-        type: entry?.type ?? 'property',
-        raw: entry?.part ?? '',
-        normalized: null,
-        entry: { ...entry, name },
-      };
-    }
-    return {
-      direction,
-      label: entry?.label ?? channelName,
-      channel: channelName,
-      type: entry?.type ?? channel?.type ?? 'value',
-      raw,
-      normalized: channel ? normalizeCustomChannelValue(channel, raw) : null,
-    };
-  }
-
-  function buildChannelFlowDiagnostics() {
-    const rows = Object.entries(values?._children ?? {}).map(([name, channel]) => ({
-      name,
-      label: channel?.label ?? name,
-      type: String(channel?.type ?? 'float'),
-      publicIn: publishedInputs.filter((entry) => (entry?.channel ?? entry?.variable) === name).length,
-      publicOut: publishedOutputs.filter((entry) => (entry?.channel ?? entry?.variable) === name).length,
-      inputAllowed: channel?.publicInput !== false,
-      outputAllowed: channel?.publicOutput !== false,
-      hitZones: 0,
-      generatedZones: 0,
-      linkIn: 0,
-      linkOut: 0,
-      bindingsIn: 0,
-      bindingsOut: 0,
-      notes: [],
-    }));
-    const byName = new Map(rows.map((row) => [row.name, row]));
-
-    for (const [, zone] of materializedHitZoneEntries) {
-      for (const channelName of [zone?.targetValueChannel, zone?.targetValueChannelY].filter(Boolean)) {
-        const row = byName.get(channelName);
-        if (!row) continue;
-        row.hitZones += 1;
-        if (zone?.generated === true) row.generatedZones += 1;
-      }
-    }
-    for (const [, link] of Object.entries(links?._children ?? {})) {
-      if (link?.enabled === false) continue;
-      for (const channelName of channelsFromSignal(link?.source)) {
-        const row = byName.get(channelName);
-        if (row) row.linkOut += 1;
-      }
-      for (const channelName of channelsFromSignal(link?.target)) {
-        const row = byName.get(channelName);
-        if (row) row.linkIn += 1;
-      }
-    }
-    for (const [, binding] of Object.entries(bindings?._children ?? {})) {
-      if (binding?.enabled === false) continue;
-      for (const channelName of channelsFromSignal(binding?.source)) {
-        const row = byName.get(channelName);
-        if (row) row.bindingsOut += 1;
-      }
-      for (const channelName of channelsFromSignal(binding?.target)) {
-        const row = byName.get(channelName);
-        if (row) row.bindingsIn += 1;
-      }
-    }
-
-    for (const row of rows) {
-      if (row.publicIn || row.publicOut) row.notes.push('public');
-      if (row.hitZones) row.notes.push(`${row.hitZones} zone${row.hitZones === 1 ? '' : 's'}`);
-      if (row.generatedZones) row.notes.push(`${row.generatedZones} generated`);
-      if (row.linkIn || row.linkOut) row.notes.push(`${row.linkOut}->${row.linkIn} links`);
-      if (row.bindingsOut || row.bindingsIn) row.notes.push(`${row.bindingsOut}->${row.bindingsIn} bindings`);
-      if (!row.notes.length) row.notes.push('isolated');
-    }
-    return rows;
   }
 
   function applyScenario(scenario) {
@@ -1003,68 +592,6 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Readiness">
-    <PropertyCell label="Status" span={4} hint="Validation status for saving/sharing this component.">
-      <div class="status-card" class:ok={readinessIssues.length === 0}>
-        <strong>{readinessIssues.length === 0 ? 'Component foundation looks valid' : `${readinessIssues.length} issue${readinessIssues.length === 1 ? '' : 's'} to review`}</strong>
-        <div class="readiness-meter">
-          <span style={`width: ${packageReadiness.score ?? 0}%`}></span>
-        </div>
-        <small>{packageReadiness.score ?? 0}% package-ready · {packageReadiness.doneCount ?? 0}/{packageReadiness.totalCount ?? 0} checks complete</small>
-        {#if readinessIssues.length === 0}
-          <span>{readinessWarnings.length ? `${readinessWarnings.length} warning${readinessWarnings.length === 1 ? '' : 's'} remain before sharing.` : 'It has enough structure to save, reuse, and keep extending.'}</span>
-          {#if readinessWarnings.length}
-            <ul>
-              {#each readinessWarnings as warning}
-                <li>{warning}</li>
-              {/each}
-            </ul>
-          {/if}
-        {:else}
-          <ul>
-            {#each readinessIssues as issue}
-              <li>{issue}</li>
-            {/each}
-          </ul>
-        {/if}
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Checklist" span={4} hint="Package-readiness checks and shortcuts to the relevant designer area.">
-      <div class="readiness-checklist">
-        {#each packageReadiness.steps ?? [] as step (step.id)}
-          <button class="readiness-step" class:done={step.done} type="button" onclick={() => focusReadinessStep(step)}>
-            <span>{step.done ? '✓' : '!'}</span>
-            <strong>{step.label}</strong>
-            <em>{step.detail}</em>
-          </button>
-        {/each}
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Actions" span={4} hint="Common finishing actions before saving, exporting, or sharing this component.">
-      <div class="quick-actions">
-        <button type="button" onclick={publishAllChannels} disabled={valueNames.length === 0}>Publish all channels</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSurfaceDock': 'generators', 'Designer.preview.showHitZones': true })}>Review generators</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'links' })}>Review links</button>
-        <button type="button" onclick={() => focusDesigner({ 'Designer.focusSection': 'assets' })}>Review assets</button>
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Specialized Inspectors">
-    <PropertyCell label="Detected" span={4} hint="Domain-specific helpers inferred from channels, behaviors, generators, and arpeggiator metadata.">
-      <div class="specialized-list">
-        {#each specializedInspectorDiagnostics as item (item.id)}
-          <button class="specialized-card" type="button" onclick={item.focus}>
-            <strong>{item.label}</strong>
-            <span>{item.detail}</span>
-            <em>{item.action}</em>
-          </button>
-        {/each}
-        {#if specializedInspectorDiagnostics.length === 0}<div class="empty-row">No specialized component family detected.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
   <PropertySection title="Channel Rig">
     <PropertyCell label="Controls" span={4} hint="Drive each custom value channel directly while the bench evaluates links, generated output, and public surface.">
       <div class="channel-rig">
@@ -1091,6 +618,31 @@
                     <option value={seededValues?.[channel.name] ?? ''}>{seededValues?.[channel.name] ?? 'value'}</option>
                   {/if}
                 </select>
+              {:else if type === 'array' && definition?.itemFields}
+                <!-- Object-item array (e.g. arpPattern): published read-only view. -->
+                <div class="rig-object-array" title={JSON.stringify(seededValues?.[channel.name] ?? definition?.items ?? []).slice(0, 800)}>
+                  {(Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? [])).length} item(s) · {Object.keys(definition.itemFields).join(' / ')}
+                </div>
+              {:else if type === 'array'}
+                <div class="rig-array" title="Drag a slider to drive one item of the array channel">
+                  {#each (Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? [])) as item, index (index)}
+                    <input
+                      type="range"
+                      min={Number(definition?.min ?? 0)}
+                      max={Number(definition?.max ?? 1)}
+                      step={Number(definition?.step ?? 0.01)}
+                      value={Number(item) || 0}
+                      aria-label={`${channel.name} item ${index + 1}`}
+                      title={`Item ${index + 1}: ${Number(item).toFixed(2)}`}
+                      oninput={(event) => {
+                        const source = Array.isArray(seededValues?.[channel.name]) ? seededValues[channel.name] : (definition?.items ?? []);
+                        const items = [...source];
+                        items[index] = Number(event.currentTarget.value);
+                        setChannelTestValue(channel.name, items);
+                      }}
+                    />
+                  {/each}
+                </div>
               {:else}
                 <NumberInput
                   value={Number(seededValues?.[channel.name] ?? definition?.defaultValue ?? 0)}
@@ -1159,33 +711,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Animation Preview">
-    <PropertyCell label="Motion" span={4} hint="Preview authored animation routes and jump the bench into their trigger states.">
-      <div class="animation-list">
-        {#each animationDiagnostics as animation (animation.name)}
-          <div class="animation-card" class:active={animation.active} class:disabled={animation.enabled === false}>
-            <div class="animation-head">
-              <strong>{animation.name}</strong>
-              <span>{animation.trigger}</span>
-              <em>{animation.duration}ms{animation.delay ? ` +${animation.delay}ms` : ''} · {animation.easing}</em>
-              <button class="sample-btn" type="button" onclick={() => previewAnimation(animation.name, animations?._children?.[animation.name])} disabled={!animation.triggerState && animation.kind !== 'transition'}>Preview</button>
-              <button class="sample-btn" type="button" onclick={() => focusAnimation(animation.name, animations?._children?.[animation.name])}>Edit</button>
-            </div>
-            <div class="animation-targets">
-              {#each animation.targets as target}
-                <span>{target.label} · {target.property}</span>
-              {/each}
-              {#if animation.targetCount > animation.targets.length}<em>+{animation.targetCount - animation.targets.length}</em>{/if}
-              {#if animation.targetCount === 0}<em>no targets</em>{/if}
-            </div>
-          </div>
-        {/each}
-        {#if animationDiagnostics.length === 0}<div class="empty-row">No animations.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="State Preview">
+  <PropertySection title="Preview Workbench">
     <PropertyCell label="States" span={4} hint="Preview authored state rules and see which visual patches they apply.">
       <div class="state-list">
         {#each stateDiagnostics as state (state.name)}
@@ -1212,78 +738,6 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="State Coverage">
-    <PropertyCell label="Enum Matrix" span={4} hint="Verify each enum value has a reachable hit zone and a visual state patch.">
-      <div class="coverage-list">
-        {#each stateCoverageDiagnostics as coverage (coverage.channelName)}
-          <div class="coverage-card" class:warning={coverage.missingStates || coverage.missingZones}>
-            <div class="coverage-head">
-              <strong>{coverage.label}</strong>
-              <span>{coverage.channelName}</span>
-              <em>{coverage.rows.length} option{coverage.rows.length === 1 ? '' : 's'}</em>
-              <small>{coverage.missingStates ? `${coverage.missingStates} missing state${coverage.missingStates === 1 ? '' : 's'}` : 'states covered'}</small>
-            </div>
-            <div class="coverage-options">
-              {#each coverage.rows as row (row.option)}
-                <button class="coverage-option" class:covered={row.covered && row.reachable} class:missing={!row.covered || !row.reachable} type="button" onclick={() => setChannelTestValue(coverage.channelName, row.option)}>
-                  <strong>{row.option}</strong>
-                  <span>{row.covered ? row.stateNames.join(', ') : 'no visual state'}</span>
-                  <em>{row.reachable ? `${row.zoneNames.length} zone${row.zoneNames.length === 1 ? '' : 's'}` : 'no zone'}</em>
-                </button>
-              {/each}
-              {#if coverage.rows.length === 0}<div class="empty-row">No enum options discovered.</div>{/if}
-            </div>
-          </div>
-        {/each}
-        {#if stateCoverageDiagnostics.length === 0}<div class="empty-row">No enum channels to cover.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Enum Groups">
-    <PropertyCell label="Mutual Exclusion" span={4} hint="Enum channels act like one selected value, even when they are authored as separate buttons or generated zones.">
-      <div class="enum-group-list">
-        {#each enumGroupDiagnostics as group (group.channelName)}
-          <div class="enum-group-card">
-            <div class="enum-group-head">
-              <strong>{group.label}</strong>
-              <span>{group.channelName}</span>
-              <em>{group.valuesCovered}/{group.options.length} values reachable</em>
-              <small>{group.zones.length} zone{group.zones.length === 1 ? '' : 's'}</small>
-            </div>
-            <div class="enum-zone-pills">
-              {#each group.zones as zone (zone.name)}
-                <button type="button" onclick={() => setChannelTestValue(group.channelName, zone.value)} class:generated={zone.generated}>
-                  <strong>{zone.value || '?'}</strong>
-                  <span>{zone.name}</span>
-                </button>
-              {/each}
-              {#if group.zones.length === 0}<div class="empty-row">No zones target this enum channel.</div>{/if}
-            </div>
-          </div>
-        {/each}
-        {#if enumGroupDiagnostics.length === 0}<div class="empty-row">No enum groups.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Binding Preview">
-    <PropertyCell label="Bindings" span={4} hint="Show live source values and approximate mapped outputs for visual bindings.">
-      <div class="binding-list">
-        {#each bindingDiagnostics as binding (binding.name)}
-          <div class="binding-row" class:disabled={binding.enabled === false}>
-            <strong>{binding.name}</strong>
-            <span>{binding.source || '-'}</span>
-            <em>{binding.target || '-'}</em>
-            <small>{String(binding.sourceValue ?? '')} -> {String(binding.output ?? '')}</small>
-            <button class="sample-btn" type="button" onclick={() => focusBinding(binding.name, bindings?._children?.[binding.name])}>Edit</button>
-          </div>
-        {/each}
-        {#if bindingDiagnostics.length === 0}<div class="empty-row">No bindings.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
   <PropertySection title="Performance Budget">
     <PropertyCell label="Layers" span={1} hint="Visible/internal parts."><div class="metric">{performance.layers}</div></PropertyCell>
     <PropertyCell label="Zones" span={1} hint="Hit zones."><div class="metric">{performance.hitZones}</div></PropertyCell>
@@ -1297,50 +751,6 @@
     <PropertyCell label="Anim" span={1} hint="Authored animations."><div class="metric">{performance.animations}</div></PropertyCell>
     <PropertyCell label="Gen Parts" span={1} hint="Runtime parts created by enabled generators."><div class="metric">{performance.generatedParts}</div></PropertyCell>
     <PropertyCell label="Gen Zones" span={1} hint="Runtime hit zones created by enabled generators."><div class="metric">{performance.generatedZones}</div></PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Live Channel Matrix">
-    <PropertyCell label="Channels" span={4} hint="Default values after simple links have been evaluated.">
-      <div class="matrix-list">
-        {#each channelDiagnostics as channel (channel.name)}
-          <div class="matrix-row" class:linked={channel.linked}>
-            <strong>{channel.label}</strong>
-            <span>{channel.name}</span>
-            <span>{channel.type}</span>
-            <em>{String(channel.raw)}</em>
-            <small>{channel.normalized.toFixed(3)}</small>
-          </div>
-        {/each}
-        {#if channelDiagnostics.length === 0}<div class="empty-row">No value channels.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Channel Flow">
-    <PropertyCell label="Routes" span={4} hint="Per-channel coverage across public API, hit zones, links, and visual bindings.">
-      <div class="flow-list">
-        {#each channelFlowDiagnostics as channel (channel.name)}
-          <div class="flow-row" class:isolated={channel.notes[0] === 'isolated'}>
-            <strong>{channel.label}</strong>
-            <span>{channel.type}</span>
-            <em>api {channel.publicIn}/{channel.publicOut}</em>
-            <small>zones {channel.hitZones} · links {channel.linkOut}/{channel.linkIn} · bind {channel.bindingsOut}/{channel.bindingsIn}</small>
-            <div class="flow-tags">
-              {#each channel.notes.slice(0, 4) as note}
-                <i>{note}</i>
-              {/each}
-            </div>
-            <div class="flow-actions">
-              <button class="sample-btn" type="button" onclick={() => publishChannelEndpoint(channel.name, 'input')} disabled={!channel.inputAllowed || channel.publicIn > 0}>In</button>
-              <button class="sample-btn" type="button" onclick={() => publishChannelEndpoint(channel.name, 'output')} disabled={!channel.outputAllowed || channel.publicOut > 0}>Out</button>
-              <button class="sample-btn" type="button" onclick={() => focusPublicApi(channel.name)}>API</button>
-              <button class="sample-btn" type="button" onclick={() => focusChannel(channel.name)}>Edit</button>
-            </div>
-          </div>
-        {/each}
-        {#if channelFlowDiagnostics.length === 0}<div class="empty-row">No value channels.</div>{/if}
-      </div>
-    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Generated Output">
@@ -1379,56 +789,6 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Interaction Routes">
-    <PropertyCell label="Hit Zones" span={2} hint="All authored and generated hit zones with their behavior/value targets.">
-      <div class="route-list">
-        {#each materializedHitZoneEntries.slice(0, 12) as [name, zone] (name)}
-          <div class="route-row" class:generated={zone?.generated === true}>
-            <strong>{name}</strong>
-            <span>{zone?.action ?? '-'}</span>
-            <em>{hitZoneRuntimeNote(zone) || zone?.targetBehavior || '-'}</em>
-            <small>{zone?.targetValueChannel || '-'}{zone?.targetValueChannelY ? ` / ${zone.targetValueChannelY}` : ''}</small>
-            <button class="sample-btn" type="button" onclick={() => focusHitZone(name, zone)}>{hitZoneEditLabel(zone)}</button>
-            {#if zone?.generated === true && zone?.meta?.generatedBy}
-              <button class="sample-btn" type="button" onclick={() => detachGeneratedSource(zone.meta.generatedBy)} disabled={!canDetachGenerator(zone.meta.generatedBy)}>Detach</button>
-            {/if}
-          </div>
-        {/each}
-        {#if materializedHitZoneEntries.length > 12}<div class="empty-row">+{materializedHitZoneEntries.length - 12} more hit zones</div>{/if}
-        {#if materializedHitZoneEntries.length === 0}<div class="empty-row">No hit zones.</div>{/if}
-      </div>
-    </PropertyCell>
-    <PropertyCell label="Links" span={2} hint="Simple executable links and whether they affect the default channel snapshot.">
-      <div class="route-list">
-        {#each linkDiagnostics as link (link.name)}
-          <div class="route-row" class:linked={link.active} class:disabled={link.enabled === false}>
-            <strong>{link.name}</strong>
-            <span>{link.type}</span>
-            <em>{link.source || '-'}</em>
-            <small>{link.target || '-'}</small>
-          </div>
-        {/each}
-        {#if linkDiagnostics.length === 0}<div class="empty-row">No links.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
-
-  <PropertySection title="Public Link Surface">
-    <PropertyCell label="API" span={4} hint="Inputs and outputs exposed to panel-level links, with current bench values.">
-      <div class="api-list">
-        {#each publicApiDiagnostics as entry}
-          <div class="api-row" class:output={entry.direction === 'output'} class:property={entry.direction === 'property'}>
-            <strong>{entry.label || '-'}</strong>
-            <span>{entry.direction}</span>
-            <em>{entry.channel || '-'}</em>
-            <small>{String(entry.raw)}{entry.normalized !== null ? ` · ${entry.normalized.toFixed(3)}` : ''}</small>
-            <button class="sample-btn" type="button" onclick={() => entry.direction === 'property' ? focusPublicProperty(entry.entry) : focusChannel(entry.channel)} disabled={!entry.channel}>Edit</button>
-          </div>
-        {/each}
-        {#if publicApiDiagnostics.length === 0}<div class="empty-row">No public inputs, outputs, or editable properties.</div>{/if}
-      </div>
-    </PropertyCell>
-  </PropertySection>
 {/if}
 
 <style>
@@ -1459,16 +819,6 @@
     background: #162219;
     color: #A9DCB8;
   }
-  .status-card strong {
-    display: block;
-    color: #FFF;
-    margin-bottom: 6px;
-  }
-  .status-card ul {
-    margin: 0;
-    padding-left: 18px;
-    line-height: 1.45;
-  }
   .readiness-meter {
     width: 100%;
     height: 6px;
@@ -1478,18 +828,6 @@
     overflow: hidden;
     border: 1px solid #353535;
   }
-  .readiness-meter span {
-    display: block;
-    height: 100%;
-    min-width: 2px;
-    border-radius: inherit;
-    background: #65B87A;
-  }
-  .status-card small {
-    display: block;
-    margin-bottom: 6px;
-    color: #AAA;
-  }
   .readiness-checklist,
   .quick-actions {
     display: grid;
@@ -1497,8 +835,7 @@
     gap: 6px;
     width: 100%;
   }
-  .readiness-step,
-  .quick-actions button {
+  .readiness-step {
     min-width: 0;
     border: 1px solid #383838;
     border-radius: 4px;
@@ -1516,47 +853,9 @@
     padding: 7px;
     text-align: left;
   }
-  .readiness-step span {
-    grid-row: span 2;
-    width: 16px;
-    height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    background: #5A342B;
-    color: #FFD0C0;
-    font-weight: 700;
-  }
-  .readiness-step.done span {
-    background: #24492F;
-    color: #B9E8C4;
-  }
-  .readiness-step strong,
-  .readiness-step em {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .readiness-step strong {
-    color: #F2F2F2;
-  }
-  .readiness-step em {
-    color: #9E9E9E;
-    font-style: normal;
-  }
-  .readiness-step:hover,
-  .quick-actions button:hover:not(:disabled) {
+  .readiness-step:hover {
     border-color: #5B9BD5;
     color: #FFF;
-  }
-  .quick-actions button {
-    min-height: 28px;
-    padding: 5px 7px;
-  }
-  .quick-actions button:disabled {
-    opacity: 0.45;
-    cursor: default;
   }
   .metric {
     min-height: 26px;
@@ -1644,6 +943,28 @@
   .rig-control {
     min-width: 0;
   }
+  .rig-array {
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 3px 6px;
+  }
+  .rig-array input[type='range'] {
+    width: 100%;
+    min-width: 0;
+    height: 14px;
+    accent-color: #5B9BD5;
+  }
+  .rig-object-array {
+    padding: 4px 7px;
+    border: 1px solid #2A3036;
+    border-radius: 4px;
+    background: #15191D;
+    color: #87939E;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .rig-row em {
     color: #DDE6EC;
     font-size: 10px;
@@ -1712,29 +1033,6 @@
     border-color: #5B9BD5;
     background: #172330;
     color: #FFFFFF;
-  }
-  .specialized-card strong,
-  .specialized-card span,
-  .specialized-card em {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-style: normal;
-  }
-  .specialized-card strong {
-    white-space: nowrap;
-    color: #F0F4F7;
-    font-size: 11px;
-  }
-  .specialized-card span {
-    color: #B8C7D0;
-    font-size: 10px;
-    line-height: 1.3;
-  }
-  .specialized-card em {
-    white-space: nowrap;
-    color: #82B8E5;
-    font-size: 10px;
   }
   .probe-group {
     min-width: 0;
@@ -1890,11 +1188,6 @@
     align-items: center;
     margin-bottom: 6px;
   }
-  .animation-head strong,
-  .animation-head span,
-  .animation-head em,
-  .animation-targets span,
-  .animation-targets em,
   .state-head strong,
   .state-head span,
   .state-head em,
@@ -1906,17 +1199,14 @@
     white-space: nowrap;
     font-style: normal;
   }
-  .animation-head strong,
   .state-head strong {
     color: #F0F4F7;
     font-size: 11px;
   }
-  .animation-head span,
   .state-head span {
     color: #B8C7D0;
     font-size: 10px;
   }
-  .animation-head em,
   .state-head em {
     color: #82B8E5;
     font-size: 10px;
@@ -1937,32 +1227,6 @@
     gap: 7px;
     align-items: center;
     margin-bottom: 7px;
-  }
-  .coverage-head strong,
-  .coverage-head span,
-  .coverage-head em,
-  .coverage-head small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-  .coverage-head strong {
-    color: #F0F4F7;
-    font-size: 11px;
-  }
-  .coverage-head span {
-    color: #B8C7D0;
-    font-size: 10px;
-  }
-  .coverage-head em {
-    color: #82B8E5;
-    font-size: 10px;
-  }
-  .coverage-head small {
-    color: #D8B36A;
-    font-size: 10px;
   }
   .coverage-options {
     display: grid;
@@ -1997,24 +1261,6 @@
     border-color: #5B9BD5;
     color: #FFF;
   }
-  .coverage-option strong,
-  .coverage-option span,
-  .coverage-option em {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-  .coverage-option strong {
-    color: #F0F4F7;
-  }
-  .coverage-option span {
-    color: #CDE1EE;
-  }
-  .coverage-option em {
-    color: #82B8E5;
-  }
   .enum-group-head {
     display: grid;
     grid-template-columns: minmax(82px, 1fr) minmax(68px, 0.8fr) minmax(86px, 0.9fr) minmax(56px, 0.6fr);
@@ -2022,67 +1268,11 @@
     align-items: center;
     margin-bottom: 7px;
   }
-  .enum-group-head strong,
-  .enum-group-head span,
-  .enum-group-head em,
-  .enum-group-head small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-  .enum-group-head strong {
-    color: #F0F4F7;
-    font-size: 11px;
-  }
-  .enum-group-head span,
-  .enum-group-head small {
-    color: #B8C7D0;
-    font-size: 10px;
-  }
-  .enum-group-head em {
-    color: #A9DCB8;
-    font-size: 10px;
-  }
   .enum-zone-pills {
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
   }
-  .enum-zone-pills button {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 5px;
-    align-items: center;
-    max-width: 180px;
-    min-height: 25px;
-    border: 1px solid #34424D;
-    border-radius: 4px;
-    background: #1C252C;
-    color: #CDE1EE;
-    cursor: pointer;
-    font: inherit;
-    font-size: 10px;
-    text-align: left;
-  }
-  .enum-zone-pills button.generated {
-    border-color: #47613E;
-    background: #171D16;
-  }
-  .enum-zone-pills button:hover {
-    border-color: #5B9BD5;
-    color: #FFF;
-  }
-  .enum-zone-pills strong,
-  .enum-zone-pills span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .animation-targets span,
-  .animation-targets em,
   .state-patches span,
   .state-patches em {
     max-width: 150px;
@@ -2093,7 +1283,6 @@
     padding: 3px 6px;
     font-size: 9px;
   }
-  .animation-targets em,
   .state-patches em {
     color: #777;
     background: #1A1A1A;
@@ -2119,25 +1308,6 @@
   }
   .binding-row.disabled {
     opacity: 0.55;
-  }
-  .binding-row strong,
-  .binding-row span,
-  .binding-row em,
-  .binding-row small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-  .binding-row strong {
-    color: #F0F4F7;
-  }
-  .binding-row em {
-    color: #82B8E5;
-  }
-  .binding-row small {
-    color: #B8C7D0;
   }
   .api-list {
     display: flex;
@@ -2165,34 +1335,6 @@
   .api-row.property {
     border-color: #4B3E2C;
     background: #1D1A16;
-  }
-  .api-row strong,
-  .api-row span,
-  .api-row em,
-  .api-row small {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-style: normal;
-  }
-  .api-row strong {
-    color: #F0F4F7;
-  }
-  .api-row span {
-    color: #A9DCB8;
-  }
-  .api-row.output span {
-    color: #82B8E5;
-  }
-  .api-row.property span {
-    color: #D8B36A;
-  }
-  .api-row em {
-    color: #DDE6EC;
-  }
-  .api-row small {
-    color: #B8C7D0;
   }
   .probe-list {
     display: grid;
@@ -2283,19 +1425,6 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 4px;
   }
-  .flow-tags i {
-    max-width: 92px;
-    border: 1px solid #34424D;
-    border-radius: 4px;
-    background: #1C252C;
-    color: #B8C7D0;
-    padding: 2px 5px;
-    font-size: 9px;
-    font-style: normal;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
   .generated-source-list {
     display: flex;
     flex-direction: column;
@@ -2345,42 +1474,19 @@
   .route-row.disabled {
     opacity: 0.55;
   }
-  .matrix-row strong,
-  .route-row strong,
   .generated-source-row strong,
-  .flow-row strong,
-  .matrix-row span,
-  .route-row span,
   .generated-source-row span,
-  .flow-row span,
-  .matrix-row em,
-  .route-row em,
-  .generated-source-row em,
-  .flow-row em,
-  .matrix-row small,
-  .route-row small,
-  .flow-row small {
+  .generated-source-row em {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-style: normal;
   }
-  .matrix-row strong,
-  .route-row strong,
-  .generated-source-row strong,
-  .flow-row strong {
+  .generated-source-row strong {
     color: #F0F4F7;
   }
-  .flow-row em {
-    color: #A9DCB8;
-  }
   .generated-source-row em {
-    color: #82B8E5;
-  }
-  .matrix-row small,
-  .route-row small,
-  .flow-row small {
     color: #82B8E5;
   }
   .empty-row {

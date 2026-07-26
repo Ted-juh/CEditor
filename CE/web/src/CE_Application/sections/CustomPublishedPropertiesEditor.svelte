@@ -35,6 +35,36 @@
     ...publicWarningEntries.map((message) => ({ severity: 'warning', message })),
   ]);
   let contractStatus = $derived(createContractStatus());
+
+  // Stage B9 write-through: the contract is the single editing surface for
+  // channel public-ness, but the channel flags stay in the data because the
+  // export path (deriveExportParameters) and package format read them. Keep
+  // them in sync with the enabled contract entries whichever way the contract
+  // was mutated (add/remove/enable/re-target).
+  $effect(() => {
+    if (!core?.id) return;
+    const inputChannels = new Set(
+      Object.values(published?.inputs ?? {})
+        .filter((entry) => entry?.enabled !== false)
+        .map((entry) => String(entry?.channel ?? ''))
+        .filter(Boolean)
+    );
+    const outputChannels = new Set(
+      Object.values(published?.outputs ?? {})
+        .filter((entry) => entry?.enabled !== false)
+        .map((entry) => String(entry?.channel ?? ''))
+        .filter(Boolean)
+    );
+    const patch = {};
+    for (const [name, channel] of Object.entries(channels?._children ?? {})) {
+      const wantInput = inputChannels.has(name);
+      const wantOutput = outputChannels.has(name);
+      if ((channel?.publicInput !== false) !== wantInput) patch[`ValueChannels.${name}.publicInput`] = wantInput;
+      if ((channel?.publicOutput !== false) !== wantOutput) patch[`ValueChannels.${name}.publicOutput`] = wantOutput;
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  });
+
   let selectedInput = $state('');
   let selectedOutput = $state('');
   let selectedProperty = $state('');
@@ -146,7 +176,7 @@
 
   $effect(() => {
     const focusedChannel = designer?.selectedValueChannel;
-    if (!focusedChannel || designer?.focusSection !== 'published') return;
+    if (!focusedChannel || designer?.focusSection !== 'publish') return;
     const input = inputEntries.find(([, entry]) => (entry?.channel ?? entry?.variable) === focusedChannel);
     const output = outputEntries.find(([, entry]) => (entry?.channel ?? entry?.variable) === focusedChannel);
     if (input) selectedInput = input[0];
@@ -155,7 +185,7 @@
 
   $effect(() => {
     const focusedProperty = designer?.selectedPublicProperty;
-    if (!focusedProperty || designer?.focusSection !== 'published') return;
+    if (!focusedProperty || designer?.focusSection !== 'publish') return;
     if (published?.editableProperties?.[focusedProperty]) selectedProperty = focusedProperty;
   });
 

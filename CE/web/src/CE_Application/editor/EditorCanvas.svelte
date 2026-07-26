@@ -23,6 +23,7 @@
   import BehaviorDesigner from './BehaviorDesigner.svelte';
   import CustomDesignSurfaceEditor from '../sections/CustomDesignSurfaceEditor.svelte';
   import { addGuide, deleteSelectedGuide } from '../stores/guides.js';
+  import { activePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { createDeviceProfileDraft, deviceProfiles, deviceRoleMappings, importDeviceProfile } from '../stores/deviceProfiles.js';
   import { zoomToSelectionSignal } from '../stores/editorCommands.js';
   import { showRulers } from '../stores/editorView.js';
@@ -37,6 +38,16 @@
 
   let zoom = $derived($editorZoom);
   let scale = $derived(zoom / 100);
+
+  // Mirror the live alignment snap guides (published by the dragging control)
+  // as ruler tick markers — vertical guides mark the horizontal (X) ruler,
+  // horizontal guides mark the vertical (Y) ruler; centre guides tagged amber.
+  let rulerSnapMarkersX = $derived(
+    $activePanelSnapGuides.filter((g) => g.type === 'vertical').map((g) => ({ value: g.pos, kind: g.center ? 'center' : 'edge' }))
+  );
+  let rulerSnapMarkersY = $derived(
+    $activePanelSnapGuides.filter((g) => g.type === 'horizontal').map((g) => ({ value: g.pos, kind: g.center ? 'center' : 'edge' }))
+  );
   // The script editor is bound to a specific panel via the document's panelId, so the Paths
   // picker shows THAT panel's controls (not the ambiguous "active panel").
   let scriptDoc = $derived(
@@ -98,15 +109,22 @@
   // Re-measure panel-surface offset when zoom or panel size changes — the
   // panel surface uses a CSS transform so its layout box doesn't resize, so
   // the ResizeObserver above won't fire on zoom. We trigger it manually.
+  // Use getBoundingClientRect (not offsetLeft/offsetTop): the zoom container is
+  // centred with margins and its vertical margin collapses through the stage
+  // wrapper, so offsetTop reads 0 and the vertical ruler's 0 sticks to the
+  // viewport top. The rect-based delta is collapse-immune and matches the
+  // shared trackViewportMetrics measurement.
   $effect(() => {
     scale;
     canvasPanel?.width;
     canvasPanel?.height;
     metrics.width;
     metrics.height;
-    if (zoomContainerEl) {
-      metrics.contentLeft = zoomContainerEl.offsetLeft;
-      metrics.contentTop  = zoomContainerEl.offsetTop;
+    if (zoomContainerEl && viewportEl) {
+      const cr = zoomContainerEl.getBoundingClientRect();
+      const er = viewportEl.getBoundingClientRect();
+      metrics.contentLeft = cr.left - er.left + viewportEl.scrollLeft;
+      metrics.contentTop  = cr.top - er.top + viewportEl.scrollTop;
     }
   });
 
@@ -645,8 +663,8 @@
           </div>
         </div>
         {#if $showRulers}
-          <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
-          <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} onGuideCreate={(o, p) => addGuide(o, p)} />
+          <EditorRuler orientation="horizontal" length={metrics.width} scrollOffset={metrics.scrollLeft} contentOffset={metrics.contentLeft} {scale} markers={rulerSnapMarkersX} onGuideCreate={(o, p) => addGuide(o, p)} />
+          <EditorRuler orientation="vertical" length={metrics.height} scrollOffset={metrics.scrollTop} contentOffset={metrics.contentTop} {scale} markers={rulerSnapMarkersY} onGuideCreate={(o, p) => addGuide(o, p)} />
           <div class="ruler-corner"></div>
         {/if}
         {#if !$previewModeEnabled}

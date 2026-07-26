@@ -6,7 +6,7 @@
 .bd-app{
   --bg:#0c0e12;--bg-2:#13161c;--panel:#171b22;--panel-2:#1c2129;
   --line:#272d38;--line-2:#333b48;--txt:#e8ebf0;--txt-dim:#9aa3b2;--txt-faint:#5b6473;
-  --accent:#4dd6a0;--accent-dim:#2a6b54;--amber:#e0a23c;--blue:#5a9bf0;--red:#e0635a;
+  --accent:#4dd6a0;--accent-dim:#2a6b54;--amber:#e0a23c;--blue:#5a9bf0;--red:#e0635a;--violet:#b08cf0;
   --mono:'JetBrains Mono','Cascadia Code',ui-monospace,monospace;
   --shadow:0 12px 40px rgba(0,0,0,.55);
   display:flex;flex-direction:column;height:100%;min-height:0;width:100%;
@@ -31,9 +31,71 @@
 .bd-app .body{display:flex;flex:1;min-height:0}
 
 .bd-app .side{
-  width:236px;flex-shrink:0;background:linear-gradient(180deg,var(--bg-2),var(--bg));
-  border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;overflow-y:auto;
+  width:274px;flex-shrink:0;background:linear-gradient(180deg,var(--bg-2),var(--bg));
+  border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;min-height:0;overflow:hidden;
 }
+
+/* ---- scripts tree: search + grouping + expandable lifecycle groups ---- */
+.bd-app .treesearch{display:flex;align-items:center;gap:7px;padding:6px 9px;margin-bottom:8px;
+  background:var(--bg-2);border:1px solid var(--line-2);border-radius:8px}
+.bd-app .treesearch .si{color:var(--txt-faint);font-size:13px}
+.bd-app .treesearch .searchinput{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--txt);font-size:13px;font-family:inherit}
+.bd-app .treesearch .searchinput::placeholder{color:var(--txt-faint)}
+.bd-app .treesearch .searchclear{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:13px;padding:0 2px}
+.bd-app .treesearch .searchclear:hover{color:var(--txt)}
+.bd-app .treetools{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:0 2px 8px}
+.bd-app .btn.tiny{padding:4px 9px;font-size:12px}
+.bd-app .treebody{flex:1;min-height:0;overflow-y:auto;margin:0 -4px}
+.bd-app .treebody .scount{padding:2px 8px 6px;font-size:11px;color:var(--txt-faint)}
+.bd-app .treegroup{margin-bottom:1px}
+.bd-app .tghead{display:flex;align-items:center;gap:2px}
+.bd-app .tgtoggle{flex:1;min-width:0;display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;
+  color:var(--txt);font-size:13px;font-weight:700;padding:7px 8px;border-radius:7px;text-align:left}
+.bd-app .tgtoggle:hover{background:var(--panel);color:var(--txt)}
+.bd-app .tgcaret{width:11px;font-size:9px;color:var(--txt-faint);flex-shrink:0}
+.bd-app .tghead .ti{width:16px;text-align:center;flex-shrink:0;opacity:.85}
+.bd-app .tglabel{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-app .tghead .ct{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+.bd-app .tgnew{width:24px;height:24px;flex-shrink:0;background:none;border:1px solid transparent;border-radius:6px;
+  color:var(--txt);cursor:pointer;font-size:16px;font-weight:700;line-height:1}
+.bd-app .tgnew:hover{background:var(--accent-dim);color:#eafff5;border-color:var(--accent)}
+.bd-app .tgnew.folder{width:auto;padding:0 7px;font-size:13px;font-weight:600}
+/* Children of a lifecycle group are indented behind a guide line so the header
+   (bold, with icon) reads clearly as the parent and scripts as its contents.
+   Rows start to the RIGHT of the header label (which sits ~49px in past its
+   caret+icon) so they unambiguously read as children. */
+.bd-app .tgkids{margin-left:22px;border-left:1px solid var(--line);padding-left:3px;border-radius:0 7px 7px 0}
+.bd-app .tgkids.drop,.bd-app .tgfolderwrap.drop{background:var(--accent-dim);outline:1px dashed var(--accent);outline-offset:-2px}
+.bd-app .tgempty{padding:3px 10px 7px 35px;color:var(--txt-faint);font-size:12px}
+/* per-lifecycle folder */
+.bd-app .tgfolderwrap{border-radius:7px;margin:1px 0}
+.bd-app .tgfolder{display:flex;align-items:center;gap:2px}
+.bd-app .tgftoggle{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:none;cursor:pointer;
+  color:var(--txt-dim);font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px;text-align:left}
+.bd-app .tgftoggle:hover{background:var(--panel);color:var(--txt)}
+.bd-app .tgfolder .fi{width:14px;text-align:center;flex-shrink:0;opacity:1;font-size:12px}
+.bd-app .tgfolder .ct{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+.bd-app .tgfkids{margin-left:14px;border-left:1px solid var(--line)}
+.bd-app .tgfkids .titem{padding-left:26px}
+.bd-app .titem{display:flex;align-items:center;gap:8px;padding:6px 10px 6px 35px;border-radius:7px;cursor:pointer;
+  color:var(--txt-dim);font-size:13px;border:1px solid transparent}
+.bd-app .titem:hover{background:var(--panel)}
+.bd-app .titem.sel{background:var(--panel-2);border-color:var(--line-2);color:var(--txt)}
+.bd-app .titem.off{opacity:.5}
+.bd-app .titem .sname{flex:1;min-width:0;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-app .titem .pill{flex-shrink:0}
+.bd-app .titem .sbadge{flex-shrink:0;width:13px;text-align:center;font-size:11px;font-weight:700;line-height:1}
+.bd-app .titem .sbadge.error{color:var(--red)}
+.bd-app .titem .sbadge.warn{color:var(--amber)}
+.bd-app .titembtn{flex-shrink:0;width:20px;height:20px;background:none;border:none;border-radius:5px;
+  color:var(--txt-faint);cursor:pointer;font-size:12px;line-height:1;padding:0;opacity:0}
+.bd-app .titem:hover .titembtn,.bd-app .titem.sel .titembtn,.bd-app .tgfolder:hover .titembtn{opacity:.6}
+.bd-app .titembtn:hover{opacity:1;background:var(--panel-2);color:var(--txt)}
+.bd-app .titembtn.del{color:var(--red)}
+.bd-app .titem:hover .titembtn.del,.bd-app .titem.sel .titembtn.del,.bd-app .tgfolder:hover .titembtn.del{opacity:.9}
+.bd-app .titembtn.del:hover{opacity:1;color:#ff7a72;background:rgba(224,99,90,.18)}
+.bd-app .titem .renameinput{flex:1;min-width:0;background:var(--bg-2);border:1px solid var(--accent);border-radius:5px;
+  padding:2px 6px;color:var(--txt);font-size:13px;font-family:inherit;outline:none}
 .bd-app .profilecard{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:16px}
 .bd-app .profilecard .pn{display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px}
 .bd-app .profilecard .pn .led{width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
@@ -51,31 +113,48 @@
 .bd-app .tnode.active .ct{color:var(--accent)}
 .bd-app .sidehint{margin-top:auto;padding:12px 10px 4px;color:var(--txt-faint);font-size:11px;line-height:1.5}
 
-.bd-app .stage{flex:1;min-width:0;overflow-y:auto;position:relative}
-
-/* ---- screens: toggled via .active, never destroyed ---- */
-.bd-app .screen{display:none;padding:28px 34px 70px}
-.bd-app .screen.active{display:block}
+/* ---- stage: editor area + docked Insert column; Library/History slide over as a drawer ---- */
+.bd-app .stage{flex:1;min-width:0;display:flex;position:relative}
+.bd-app .stagemain{flex:1;min-width:0;overflow:auto;padding:22px 26px 22px;display:flex;flex-direction:column}
 .bd-app .shead{display:flex;align-items:center;gap:12px;margin-bottom:6px}
 .bd-app .shead h1{font-size:19px;font-weight:600;margin:0}
 .bd-app .sub{color:var(--txt-dim);font-size:13px;margin:0 0 20px;max-width:680px}
 .bd-app .placeholder{border:1px dashed var(--line-2);border-radius:10px;padding:34px;text-align:center;color:var(--txt-faint)}
+.bd-app .testview{max-width:780px}
+.bd-app .detail{
+  background:var(--panel);border:1px solid var(--line-2);border-radius:12px;
+  padding:12px 14px;box-shadow:var(--shadow);
+  flex:1;min-height:0;display:flex;flex-direction:column;
+}
+/* the code editor fills the leftover height so the middle section uses the whole window;
+   the header rows and the problems/actions/console stay at natural size, pinned around it */
+.bd-app .detail>.ce{flex:1 1 0;min-height:0}
+.bd-app .detail>.row2,.bd-app .detail>.codehead,.bd-app .detail>.problems,
+.bd-app .detail>.toolbar,.bd-app .detail>.consolewrap{flex-shrink:0}
 
-/* ---- editor (middle) + list (right) split ---- */
-.bd-app .split{display:flex;gap:0;align-items:stretch}
-.bd-app .editorcol{flex:1;min-width:380px;padding:26px 14px 60px 30px} /* the scripting area — main surface */
-.bd-app .stage{overflow-x:auto}                                        /* scroll rather than crush on narrow windows */
-.bd-app .listcol{width:340px;flex-shrink:0;border-left:1px solid var(--line);overflow-y:auto} /* the script list */
-.bd-app .listcol .screen{padding:22px 20px 50px}
-/* Insert picker occupying the right pane */
+/* docked Insert / Library / History column (default-open right column) */
+.bd-app .dock{width:340px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;
+  background:var(--bg-2);border-left:1px solid var(--line)}
+.bd-app .dock.float{position:absolute;top:0;right:0;bottom:0;z-index:20;box-shadow:-10px 0 30px rgba(0,0,0,.4)}
+.bd-app .docktabs{padding:7px 10px}
+.bd-app .dtabs{display:flex;gap:2px;min-width:0;overflow:hidden}
+.bd-app .dtab{padding:5px 10px;font-size:12px;border-radius:6px;color:var(--txt-dim);background:transparent;border:none;cursor:pointer;font-family:inherit;white-space:nowrap}
+.bd-app .dtab:hover{color:var(--txt)}
+.bd-app .dtab.active{background:var(--panel-2);color:var(--txt)}
+.bd-app .dtab b{color:var(--txt-faint);font-weight:600;margin-left:2px}
+.bd-app .dtab.active b{color:var(--accent)}
+.bd-app .dock .picker{margin-top:0;border:none;border-radius:0;max-height:none;flex:1;min-height:0;overflow:auto}
+
+/* tools drawer (Library / History) */
+.bd-app .drawer{
+  position:absolute;top:0;right:0;bottom:0;width:340px;flex-shrink:0;
+  background:var(--bg-2);border-left:1px solid var(--line);box-shadow:-10px 0 30px rgba(0,0,0,.4);
+  display:flex;flex-direction:column;min-height:0;z-index:20;
+}
 .bd-app .pickerpane{display:flex;flex-direction:column;height:100%;min-height:0}
 .bd-app .pickerhead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--txt-dim);flex-shrink:0}
 .bd-app .pickerhead b{color:var(--txt)}
-.bd-app .listcol .picker{margin-top:0;border:none;border-radius:0;max-height:none;flex:1;min-height:0;overflow:auto}
-.bd-app .detail{
-  background:var(--panel);border:1px solid var(--line-2);border-radius:12px;
-  padding:16px;box-shadow:var(--shadow);
-}
+.bd-app .drawer .picker{margin-top:0;border:none;border-radius:0;max-height:none;flex:1;min-height:0;overflow:auto}
 
 /* ---- script table ---- */
 .bd-app .tablewrap{border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -90,9 +169,14 @@
 .bd-app tbody tr.sel{background:var(--panel-2)}
 .bd-app tbody td{padding:9px 12px;vertical-align:middle}
 .bd-app .sname{font-weight:600}
-.bd-app .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-family:var(--mono);border:1px solid var(--line-2)}
-.bd-app .pill.lua{color:var(--blue);border-color:var(--blue)}
-.bd-app .pill.js{color:var(--amber);border-color:var(--amber)}
+.bd-app .pill{display:inline-block;padding:0;font-size:11px;font-family:var(--mono);font-weight:600;background:none;border:none}
+.bd-app .pill.lua{color:var(--blue)}
+.bd-app .pill.js{color:var(--amber)}
+.bd-app .pill.ts{color:#4a90d9}
+.bd-app .pill.py{color:var(--accent)}
+.bd-app .pill.cpp{color:var(--violet)}
+.bd-app .pill.cs{color:#7a5cff}
+.bd-app .pill.java{color:#e76f00}
 .bd-app .pill.muted{color:var(--txt-faint)}
 .bd-app .ev{font-family:var(--mono);color:var(--txt-dim);font-size:12px}
 .bd-app tr.off{opacity:.45}
@@ -127,21 +211,18 @@
 .bd-app .chip button:hover{color:var(--red)}
 
 /* ---- detail form + code editor ---- */
-.bd-app .field{margin-bottom:12px}
-.bd-app .field label{display:block;font-size:11px;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+.bd-app .field{margin-bottom:8px;min-width:0}
+.bd-app .field label{display:block;font-size:10px;color:var(--txt-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
 .bd-app .field input,.bd-app .field select{
   width:100%;background:var(--bg-2);border:1px solid var(--line-2);border-radius:7px;
-  padding:7px 9px;color:var(--txt);font-size:13px;font-family:inherit;
+  padding:6px 9px;color:var(--txt);font-size:13px;font-family:inherit;
 }
 .bd-app .row2{display:flex;gap:10px}
 .bd-app .row2>*{flex:1}
-.bd-app .code{
-  width:100%;min-height:240px;resize:vertical;background:#0a0c10;border:1px solid var(--line-2);
-  border-radius:8px;padding:12px;color:#cfe3d8;font-family:var(--mono);font-size:13px;line-height:1.55;
-  tab-size:2;white-space:pre;overflow:auto;
-}
 .bd-app .codehead{display:flex;align-items:center;justify-content:space-between;margin:6px 0 6px}
-.bd-app .codehead .lang{font-size:11px;color:var(--txt-faint);font-family:var(--mono)}
+.bd-app .codehead .lang{font-size:11px;color:var(--txt-faint);font-family:var(--mono);display:flex;align-items:center;gap:8px}
+.bd-app .previewtag{font-family:inherit;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--amber);
+  border:1px solid var(--amber);border-radius:10px;padding:1px 7px;opacity:.85;cursor:help}
 
 /* ---- buttons + footer ---- */
 .bd-app .btn{
@@ -160,6 +241,12 @@
 }
 .bd-app .stagefoot .ok{color:var(--accent)}
 .bd-app .stagefoot .warn{color:var(--amber)}
+.bd-app .stagefoot .caretpos{color:var(--txt-faint);font-family:var(--mono);font-size:11px}
+.bd-app .stagefoot .savestate{font-size:12px;display:inline-flex;align-items:center;gap:4px}
+.bd-app .stagefoot .savestate.saved{color:var(--txt-faint)}
+.bd-app .stagefoot .savestate.pending{color:var(--amber)}
+.bd-app .stagefoot .btn:disabled{opacity:.5;cursor:default}
+.bd-app .stagefoot .btn:disabled:hover{border-color:var(--line-2)}
 .bd-app .liblist{display:flex;flex-direction:column;overflow:auto}
 .bd-app .librow{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
 .bd-app .libmeta{display:flex;flex-direction:column;gap:3px;min-width:0}
@@ -168,6 +255,37 @@
 .bd-app .livetoggle input{margin:0}
 .bd-app .liveled{width:7px;height:7px;border-radius:50%;background:var(--txt-faint)}
 .bd-app .liveled.on{background:var(--accent);box-shadow:0 0 6px var(--accent)}
+
+/* ---- cross-script search ---- */
+.bd-app .searchbar{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line-2);
+  background:var(--bg-2);border-radius:8px;margin-bottom:12px}
+.bd-app .searchbar .si{color:var(--txt-faint);font-size:14px}
+.bd-app .searchinput{flex:1;min-width:0;background:transparent;border:0;outline:none;color:var(--txt);font-size:13px;font-family:inherit}
+.bd-app .searchinput::placeholder{color:var(--txt-faint)}
+.bd-app .searchbar .scount{font-size:11px;color:var(--txt-faint);white-space:nowrap}
+.bd-app .searchclear{background:none;border:none;color:var(--txt-faint);cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.bd-app .searchclear:hover{color:var(--txt)}
+.bd-app .searchresults{display:flex;flex-direction:column;gap:6px;overflow:auto}
+.bd-app .noresults{color:var(--txt-faint);font-size:13px;text-align:center;padding:22px}
+.bd-app .resrow{padding:9px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);cursor:pointer;transition:.12s}
+.bd-app .resrow:hover{border-color:var(--accent-dim)}
+.bd-app .resrow.sel{border-color:var(--accent);background:var(--panel-2)}
+.bd-app .resmeta{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}
+.bd-app .resmeta .sname{font-size:13px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-app .resmeta .pd{font-size:11px;color:var(--txt-faint);white-space:nowrap;flex-shrink:0}
+.bd-app .resmeta .rfield{color:var(--txt-faint);opacity:.8}
+.bd-app .ressnip{display:flex;gap:8px;align-items:baseline;margin-top:6px;font-family:var(--mono);font-size:11px}
+.bd-app .ressnip .rline{color:var(--txt-faint);min-width:22px;text-align:right;flex-shrink:0}
+.bd-app .ressnip code{color:var(--txt-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---- inline output console ---- */
+.bd-app .consolewrap{margin-top:14px}
+.bd-app .consoletoggle{display:flex;align-items:center;gap:7px;background:none;border:none;cursor:pointer;
+  color:var(--txt-dim);font-size:12px;text-transform:uppercase;letter-spacing:.4px;padding:4px 0}
+.bd-app .consoletoggle:hover{color:var(--txt)}
+.bd-app .consoletoggle .caret{color:var(--txt-faint);font-size:10px}
+.bd-app .consolebox{margin-top:8px;height:200px;display:flex}
+.bd-app .consolebox>*{flex:1;min-height:0}
 
 /* ---- problems list ---- */
 .bd-app .problems{margin-top:10px;display:flex;flex-direction:column;gap:4px}

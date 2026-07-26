@@ -13,6 +13,18 @@ class AppSettings;
  * JS -> C++:  receives "setProperty", "undo", "redo" via event listeners
  *             receives "savePanelAs", "savePanel", "openPanel",
  *             "loadOpenPanels", "updateOpenPanels" for file operations
+ *
+ * LIFETIME INVARIANT (load-bearing — do not break): the event listeners
+ * registered in buildOptions() and the MessageManager::callAsync bodies they
+ * queue capture `this` raw. That is safe only while
+ *   1. the WebBrowserComponent built from these Options is destroyed BEFORE
+ *      this bridge (owners must declare the browser after the bridge, or
+ *      reset it first), and
+ *   2. both are destroyed on the message thread (so no queued callAsync body
+ *      can run after ~ValueTreeBridge mid-teardown).
+ * If either ordering ever has to change, switch the captures to a
+ * weak alive-token (std::weak_ptr member) checked at the top of each lambda
+ * instead of loosening this contract.
  */
 class ValueTreeBridge : public juce::ValueTree::Listener
 {
@@ -75,8 +87,13 @@ private:
     void emitDebugLog (const juce::String& level, const juce::String& message) const;
     void emitPerfDebug (const juce::String& message) const;
 
-    // Set a property via dot-notation path (e.g., "Text.Fill.colour")
-    void setPropertyFromPath (const juce::String& path, const juce::var& value);
+    // Set a property via dot-notation path (e.g., "Text.Fill.colour"). Validates the path and
+    // returns a failure (reported to the JS console by the caller) instead of silently no-oping.
+    juce::Result setPropertyFromPath (const juce::String& path, const juce::var& value);
+
+    // Start a scripting-toolchain provision ("ensure") or "remove" run for payload.languages, streaming
+    // progress to the WebView. Implemented in ValueTreeBridgeHandlers.cpp.
+    void runToolchainJob (const juce::var& payload, const juce::String& subcommand);
 
     // Build the dot-notation path for a property change
     juce::String buildPath (const juce::ValueTree& node, const juce::Identifier& prop) const;
@@ -93,5 +110,8 @@ private:
     // VstBuildJob (it lives in the handlers .cpp). Timer has a virtual destructor, so deleting
     // through the base correctly tears down the real job. Busy-state is read via isTimerRunning().
     std::unique_ptr<juce::Timer> buildJob;
+    // Active scripting-toolchain provision/remove job (Settings → Scripting Toolchains), held as its
+    // Timer base for the same reason as buildJob (the concrete ToolchainJob lives in the handlers .cpp).
+    std::unique_ptr<juce::Timer> toolchainJob;
     ceditor::device::DeviceProfileService deviceProfileService;
 };

@@ -1,4 +1,5 @@
 import { DEFAULT_GENERAL_SETTINGS } from './runtimePreferences.js';
+import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 const BUILTIN_FONTS = [
   'Arial',
@@ -224,7 +225,7 @@ function normalizeSyncDirection(value) {
   return ['pull', 'push', 'live'].includes(direction) ? direction : 'pull';
 }
 
-function normalizeDeviceRoleMapping(mapping, role = 'mainSynth') {
+function normalizeDeviceRoleMapping(mapping, role = DEFAULT_DEVICE_ROLE) {
   return {
     role: String(mapping?.role ?? role),
     profileId: String(mapping?.profileId ?? 'test-cc-synth'),
@@ -239,7 +240,7 @@ function normalizeDeviceRoleMapping(mapping, role = 'mainSynth') {
 }
 
 export function createDefaultDeviceSession() {
-  const mainSynth = normalizeDeviceRoleMapping(null, 'mainSynth');
+  const mainSynth = normalizeDeviceRoleMapping(null, DEFAULT_DEVICE_ROLE);
 
   return {
     selectedProfileId: mainSynth.profileId,
@@ -264,7 +265,7 @@ export function normalizeDeviceSession(session) {
   }
 
   if (!roleMappings.mainSynth) {
-    roleMappings.mainSynth = normalizeDeviceRoleMapping(session?.mainSynth, 'mainSynth');
+    roleMappings.mainSynth = normalizeDeviceRoleMapping(session?.mainSynth, DEFAULT_DEVICE_ROLE);
   }
 
   const selectedProfileId = String(

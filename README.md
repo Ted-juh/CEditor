@@ -132,4 +132,7 @@ CEditor/
 
 ## License
 
-To be implemented. 
+CEditor is licensed under the **GNU Affero General Public License v3.0** (see [LICENSE](LICENSE)).
+AGPLv3 was chosen to match JUCE 8's free-tier license — the app and exported panels link JUCE, so
+distributing them requires AGPL compliance unless a commercial JUCE license is purchased
+(background in [docs/license-decision.md](docs/license-decision.md)).

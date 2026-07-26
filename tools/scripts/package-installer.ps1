@@ -138,7 +138,7 @@ function Build-Frontend([string]$RepoRoot) {
 function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$Configuration) {
     $vcvars = Find-VcVars64
     Write-Host "Using vcvars: $vcvars"
-    $buildDir = Join-Path $RepoRoot "build\package-native"
+    $buildDir = Join-Path $RepoRoot "build\package\build"
 
     Reset-Directory $buildDir
 
@@ -154,6 +154,45 @@ function Build-And-Stage-Native([string]$RepoRoot, [string]$StageDir, [string]$C
     finally {
         Pop-Location
     }
+}
+
+function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
+    # Stage the export pipeline + toolchain provisioning SCRIPTS (never the provisioned binaries — those
+    # are downloaded on demand). This makes Settings -> Scripting Toolchains work in the installed app and
+    # gives the installer's language components something to provision into. NOTE: a full VST3 export also
+    # needs the C++ build environment (source + CMake + a compiler); that is a separate "developer install"
+    # and is not staged here — see tools/docs/windows-installer.md.
+    $toolsSrc = Join-Path $RepoRoot "tools"
+    $toolsDst = Join-Path $StageDir "tools"
+
+    $scriptsDst = Join-Path $toolsDst "scripts"
+    New-Item -ItemType Directory -Path $scriptsDst -Force | Out-Null
+    Copy-Item (Join-Path $toolsSrc "scripts\*") -Destination $scriptsDst -Recurse -Force
+
+    # Toolchain provisioning scripts only: the top-level files (manifest.json, *.mjs, provision.cmd/.sh,
+    # *.cmake, README). Get-ChildItem -File skips the provisioned binary subdirs (llvm-mingw/, dotnet/, ...).
+    $tcDst = Join-Path $toolsDst "toolchains"
+    New-Item -ItemType Directory -Path $tcDst -Force | Out-Null
+    Get-ChildItem (Join-Path $toolsSrc "toolchains") -File | Copy-Item -Destination $tcDst -Force
+
+    Write-Host "Staged export pipeline + toolchain scripts -> $toolsDst"
+}
+
+function Stage-NodeRuntime([string]$StageDir) {
+    # Bundle a Node runtime beside the app (tools\node\node.exe). The app's findNodeExecutable() and the
+    # installer's provision.cmd both prefer it, so toolchain provisioning + management work on a clean
+    # machine with NO system Node. Windows node.exe is self-contained (depends only on system DLLs), so a
+    # single-file copy of the build machine's node is sufficient and pins the bundled Node to the build's.
+    $node = (Get-Command node -ErrorAction SilentlyContinue).Source
+    if (-not $node) {
+        Write-Warning "node.exe was not found on PATH; the installer will NOT bundle Node. Toolchain management on a clean machine will then require the user to install Node.js."
+        return
+    }
+
+    $nodeDst = Join-Path $StageDir "tools\node"
+    New-Item -ItemType Directory -Path $nodeDst -Force | Out-Null
+    Copy-Item -LiteralPath $node -Destination (Join-Path $nodeDst "node.exe") -Force
+    Write-Host "Bundled Node runtime: $node -> $nodeDst\node.exe"
 }
 
 function Copy-OptionalPrerequisites([string]$RepoRoot, [string]$StageDir, [string]$WebView2InstallerPath) {
@@ -196,8 +235,12 @@ function Compile-InnoInstaller([string]$RepoRoot, [string]$StageDir, [string]$Ou
 }
 
 $repoRoot = Get-RepoRoot
-$stageDir = Join-Path $repoRoot "build\package-stage\CEditor"
-$outputDir = Join-Path $repoRoot "build\installer"
+# All installer-pipeline artifacts live under build\package\ (kept apart from build\native, the dev tree):
+#   build\package\build          - the cmake/compiler work tree (DEV_MODE=OFF; wiped each run)
+#   build\package\stage\CEditor  - the assembled install tree (exactly what ships)
+#   build\package\installer      - the final CEditor-Setup-<ver>.exe
+$stageDir = Join-Path $repoRoot "build\package\stage\CEditor"
+$outputDir = Join-Path $repoRoot "build\package\installer"
 
 if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = Get-ProjectVersion
@@ -208,6 +251,8 @@ New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 
 Build-Frontend -RepoRoot $repoRoot
 Build-And-Stage-Native -RepoRoot $repoRoot -StageDir $stageDir -Configuration $Configuration
+Stage-ExportPipeline -RepoRoot $repoRoot -StageDir $stageDir
+Stage-NodeRuntime -StageDir $stageDir
 Copy-OptionalPrerequisites -RepoRoot $repoRoot -StageDir $stageDir -WebView2InstallerPath $WebView2InstallerPath
 
 if ($StageOnly) {

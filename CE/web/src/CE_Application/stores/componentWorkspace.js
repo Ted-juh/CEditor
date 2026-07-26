@@ -2,6 +2,7 @@ import { derived, get, writable } from 'svelte/store';
 import { createControl } from '../models/componentTypes.js';
 import { applyPatchObject } from './controlTreeUtils.js';
 import { createCustomComponentStarterPatch } from '../utils/customComponentFactory.js';
+import { migrateCustomComponentPlan } from '../utils/customComponentMigrations.js';
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { customComponentLibrary } from './customComponentLibrary.js';
 
@@ -34,7 +35,7 @@ function uniqueComponentDocumentId() {
 
 export function createComponentDocument({ starterId = 'starter.blankCanvas', name = 'Untitled Component', control: sourceControl = null } = {}) {
   const control = sourceControl?._children
-    ? structuredClone(sourceControl)
+    ? migrateCustomComponentPlan(structuredClone(sourceControl)).component
     : createControl('CustomComponent');
 
   if (!sourceControl?._children) {

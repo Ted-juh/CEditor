@@ -10,6 +10,7 @@
 // actual translation lives in the generated dpd/merge.mjs (a regenerated copy of CE/dpd/merge.mjs,
 // emitted by emit-library.mjs), keeping one source of truth. Pure so it unit-tests under `node --test`.
 import { dpdParamToBindingSection } from '../generated/dpd/merge.mjs';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 // The C++ profile *summary* carries only id/name/filePath, so a DPD-backed legacy profile is
 // recognised via the generated map (legacy id -> { dpdSource, version }) rather than a field on
@@ -63,7 +64,7 @@ export function enrichBindingWithDpd(binding, { parameter, profile, runtime, dpd
     profileId: runtime.profileId,
     version: runtime.version,
     port: port ?? binding?.port ?? 'value',
-    deviceRole: binding?.deviceRole ?? 'mainSynth',
+    deviceRole: binding?.deviceRole ?? DEFAULT_DEVICE_ROLE,
   });
 
   // Stamp with the DPD id@version (the slice's true origin) and graft the self-contained MIDI config.

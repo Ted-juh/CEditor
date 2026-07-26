@@ -14,6 +14,7 @@ import path from 'node:path';
 // codes shown in the editor are exactly what gets built. The self-check below still validates it
 // against the canonical C++ output (PanelExportIdentity) on every run.
 import { deriveIdentity } from '../../CE/web/src/CE_Application/utils/exportIdentity.js';
+import { panelScriptLanguages, shouldEmbedPython } from './pythonEmbed.mjs';
 
 // Self-check against the canonical C++ output (PanelExportIdentityTests).
 {
@@ -53,22 +54,90 @@ console.log('Export identity:', id);
 // 'auto' embeds the native CPython runtime only when the panel actually has Python scripts; 'on'/'off'
 // force it. Embedding links libpython into the plugin AND bundles the full stdlib next to the binary,
 // so Python scripts run window-closed + offline (matching the Lua/JS window-closed runtimes).
-function panelScriptLanguages(doc) {
-  const langs = new Set();
-  for (const s of doc.scripts ?? []) if (s?.enabled !== false) langs.add(s?.language);
-  for (const c of doc.controls ?? []) {
-    const sec = c?._children?.Scripts;
-    if (sec?.enabled === false) continue;
-    for (const s of sec?.scripts ?? []) if (s?.enabled !== false) langs.add(s?.language);
-  }
-  return langs;
-}
+// Detection (empty-stub exclusion + 'py' alias) lives in pythonEmbed.mjs so it is unit-tested and
+// matches the shipped C++ isSourceScript predicate (non-empty source + language).
 const hasPython = panelScriptLanguages(panelDoc).has('python');
 const embedMode = es.embedPython ?? 'auto';
-const embedPython = embedMode === 'on' || (embedMode === 'auto' && hasPython);
+const embedPython = shouldEmbedPython(panelDoc, embedMode);
 console.log(`Python runtime: mode=${embedMode}, panelHasPython=${hasPython} -> ${embedPython ? 'EMBED (native CPython + full stdlib)' : 'skip (no size cost)'}`);
 if (embedMode === 'off' && hasPython)
   console.warn('  ⚠ Panel has Python scripts but embed is Off — they will NOT run window-closed (only window-open).');
+// The native bundler below currently only lays out the Windows VST3 (Contents/x86_64-win + .dll). On
+// macOS/Linux the embed links libpython but the runtime files are not yet bundled, so Python would run
+// window-open only. Warn loudly rather than fail silently until the cross-platform bundler lands.
+if (embedPython && process.platform !== 'win32')
+  console.warn('  ⚠ Python embed requested, but the runtime bundler only fully supports the Windows VST3 layout yet — '
+    + 'Python may NOT run window-closed on this platform (only window-open). Lua/JS are unaffected.');
+
+// --- Native handlers (C++/C#/Java compiled-at-export) ---
+// 'auto' (default) AOT-compiles the native-handler languages the panel actually uses, when their
+// toolchain is present (index.mjs warns + skips any that's missing, so the export never hard-fails);
+// 'on' forces it; 'off' keeps those handlers preview-only. When active it also links the loader
+// (-DCEDITOR_NATIVE_HANDLERS=ON) so the shipped plugin can load the modules.
+const nhMode = es.compileNativeHandlers ?? 'auto';
+const nativeLangs = ['cpp', 'csharp', 'java'].filter((l) => panelScriptLanguages(panelDoc).has(l));
+const compileNative = nhMode === 'on' || (nhMode === 'auto' && nativeLangs.length > 0);
+console.log(`Native handlers: mode=${nhMode}, panel uses [${nativeLangs.join(', ') || 'none'}] -> ${compileNative ? 'COMPILE (toolchain permitting)' : 'skip'}`);
+
+// --- On-demand toolchain provisioning ---
+// Install ONLY the toolchains the languages THIS panel actually compiles need, and only if missing —
+// the "download what you script in" model (see docs/scripting-language-options-and-shippable-export.md).
+// Default on; set exportSettings.autoProvisionToolchains=false to manage toolchains yourself (Settings →
+// Scripting Toolchains). Failures here are non-fatal: the per-language build below warns + skips.
+if ((es.autoProvisionToolchains ?? true) && (compileNative || embedPython)) {
+  const langsToBuild = [...(compileNative ? nativeLangs : []), ...(embedPython ? ['python'] : [])];
+  try {
+    const lm = await import(pathToFileURL(path.join(repo, 'tools/toolchains/languages.mjs')).href);
+    // Only provision for languages that aren't already exportable (e.g. Python via a system python, or a
+    // toolchain already provisioned) — so we never download an unused runtime.
+    const notReady = langsToBuild.filter((l) => !lm.languageInstalled(l));
+    const missing = [...lm.requiredToolchains(notReady)].filter((t) => !lm.toolchainProvisioned(t));
+    if (missing.length) {
+      console.log(`Toolchains: panel needs [${notReady.join(', ')}]; installing missing: ${missing.join(', ')} (one-time)...`);
+      lm.provisionForLanguages(notReady);
+    }
+  } catch (e) {
+    console.warn(`  ⚠ On-demand toolchain provisioning failed (${e?.message ?? e}); any language without its toolchain will be skipped.`);
+  }
+}
+
+// True when CE/web/dist is newer than every web source/config file — i.e. a rebuild would be identical.
+// Walks src + the build config; compares the newest source mtime against the oldest dist artifact mtime.
+function webBundleFresh(webDir, dist) {
+  const indexHtml = path.join(dist, 'index.html');
+  if (!existsSync(indexHtml)) return false;
+  const newest = (p, skip) => {
+    let m = 0;
+    const walk = (d) => {
+      let ents; try { ents = readdirSync(d, { withFileTypes: true }); } catch { return; }
+      for (const e of ents) {
+        if (skip && skip(e.name)) continue;
+        const fp = path.join(d, e.name);
+        if (e.isDirectory()) walk(fp);
+        else { try { const t = statSync(fp).mtimeMs; if (t > m) m = t; } catch { /* ignore */ } }
+      }
+    };
+    if (existsSync(p)) { const st = statSync(p); st.isDirectory() ? walk(p) : (m = st.mtimeMs); }
+    return m;
+  };
+  // Newest input: src tree + the build config files (node_modules/.bin excluded — not inputs).
+  const srcNewest = newest(path.join(webDir, 'src'));
+  let cfgNewest = 0;
+  for (const f of ['vite.config.js', 'vite.config.ts', 'svelte.config.js', 'package.json', 'index.html'])
+    cfgNewest = Math.max(cfgNewest, newest(path.join(webDir, f)));
+  const inputNewest = Math.max(srcNewest, cfgNewest);
+  // Oldest dist artifact (if ANY output predates an input, the bundle is stale).
+  let distOldest = Infinity;
+  const walkDist = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const fp = path.join(d, e.name);
+      if (e.isDirectory()) walkDist(fp);
+      else { try { const t = statSync(fp).mtimeMs; if (t < distOldest) distOldest = t; } catch { /* ignore */ } }
+    }
+  };
+  walkDist(dist);
+  return distOldest >= inputNewest;
+}
 
 // --- size + python-bundling helpers ---
 const mb = (bytes) => (bytes / 1048576).toFixed(1);
@@ -81,54 +150,113 @@ function dirSize(p) {
 }
 function pythonInfo() {
   try {
-    const out = execSync(
-      'python -c "import sys; print(sys.base_prefix); print(\'%d.%d\' % sys.version_info[:2])"',
-      { encoding: 'utf8' }
-    ).trim().split(/\r?\n/);
-    return { prefix: out[0], ver: out[1] };
+    // One newline-separated query that works in both `cmd` and POSIX sh (single quotes inside, double
+    // outside). POSIX fields (libdir/ldlibrary/instsoname/stdlib/dynload) are empty on Windows.
+    const expr = "import sys,sysconfig as s;"
+      + "print(sys.base_prefix);"
+      + "print('%d.%d'%sys.version_info[:2]);"
+      + "print(s.get_config_var('LIBDIR') or '');"
+      + "print(s.get_config_var('LDLIBRARY') or '');"
+      + "print(s.get_config_var('INSTSONAME') or '');"
+      + "print(s.get_path('stdlib') or '');"
+      + "print(s.get_config_var('DESTSHARED') or '')";
+    const out = execSync(`python -c "${expr}"`, { encoding: 'utf8' }).trim().split(/\r?\n/);
+    return { prefix: out[0], ver: out[1], libdir: out[2], ldlibrary: out[3], instsoname: out[4], stdlib: out[5], dynload: out[6] };
   } catch { return null; }
 }
-// Copy the CPython runtime + full stdlib into <vst3>/Contents/x86_64-win/PythonRuntime (where the
-// engine's resolvePythonHome() looks). Returns bytes added (0 if it couldn't locate a Python install).
+// The JUCE VST3 bundle puts the binary in a platform-specific subfolder: Contents/x86_64-win (Win),
+// Contents/MacOS (mac), Contents/<arch>-linux (Linux). Pick the one that exists, with a sane default.
+function vst3BinDir(vst3Dir) {
+  const contents = path.join(vst3Dir, 'Contents');
+  if (process.platform === 'darwin') return path.join(contents, 'MacOS');
+  const want = process.platform === 'win32' ? /-win$/ : /-linux$/;
+  const sub = existsSync(contents)
+    ? readdirSync(contents).find((d) => want.test(d) && statSync(path.join(contents, d)).isDirectory())
+    : null;
+  return sub ? path.join(contents, sub)
+             : path.join(contents, process.platform === 'win32' ? 'x86_64-win' : 'x86_64-linux');
+}
+// Copy the CPython runtime + full stdlib into the VST3 bundle (where the engine's resolvePythonHome()
+// looks). Returns bytes added (0 if it couldn't locate a Python install).
+// NOTE: the Windows layout is shipped + exercised; the macOS/Linux branch is UNVERIFIED — the exact
+// PYTHONHOME stdlib layout and dylib/.so loader resolution must be confirmed against a native build.
 function bundlePythonRuntime(vst3Dir) {
   const info = pythonInfo();
   if (!info) { console.warn('  ⚠ Python not found on PATH — runtime NOT bundled. Install Python or set it on PATH.'); return 0; }
-  const binDir = path.join(vst3Dir, 'Contents', 'x86_64-win');
+  const binDir = vst3BinDir(vst3Dir);
   if (!existsSync(binDir)) { console.warn('  ⚠ VST3 binary dir not found, runtime NOT bundled:', binDir); return 0; }
-  const runtime = path.join(binDir, 'PythonRuntime');
+  // resolvePythonHome() probes <module>/PythonRuntime and <module>/Resources/PythonRuntime; on mac the
+  // binary is in Contents/MacOS so its Resources sibling is the natural home.
+  const runtime = process.platform === 'darwin'
+    ? path.join(vst3Dir, 'Contents', 'Resources', 'PythonRuntime')
+    : path.join(binDir, 'PythonRuntime');
   mkdirSync(runtime, { recursive: true });
-  const verNoDot = info.ver.replace('.', '');
   // Exclude site-packages (third-party pip installs — NOT the stdlib, can be hundreds of MB) and
-  // __pycache__ (compiled bytecode, regenerated on first import). Everything else under Lib/ is the
-  // genuine full standard library.
+  // __pycache__ (compiled bytecode, regenerated on first import). Everything else is the full stdlib.
   const skip = (src) => {
     const n = src.replace(/\\/g, '/');
     return !/\/site-packages(\/|$)/.test(n) && !/\/__pycache__(\/|$)/.test(n);
   };
   let added = 0;
-  // The interpreter DLLs are IMPLICITLY linked, so the loader must resolve them from the plugin's OWN
-  // directory at load time (it does NOT search subdirs). Place python3.dll + pythonXX.dll next to the
-  // plugin binary — NOT in PythonRuntime — or the plugin won't load on a machine without Python on PATH.
-  for (const dll of ['python3.dll', `python${verNoDot}.dll`]) {
-    const src = path.join(info.prefix, dll);
-    if (existsSync(src)) { const dst = path.join(binDir, dll); cpSync(src, dst); added += statSync(dst).size; }
-    else console.warn(`  ⚠ missing CPython DLL: ${src}`);
-  }
-  // The stdlib (Lib/) + C-extension modules (DLLs/) go in PythonRuntime/, which the engine points
-  // PYTHONHOME at (resolvePythonHome) so <home>/Lib + <home>/DLLs are on sys.path.
-  for (const dir of ['Lib', 'DLLs']) {
-    const src = path.join(info.prefix, dir);
-    if (existsSync(src)) { const dst = path.join(runtime, dir); cpSync(src, dst, { recursive: true, filter: skip }); added += dirSize(dst); }
-    else console.warn(`  ⚠ missing CPython dir: ${src}`);
+
+  if (process.platform === 'win32') {
+    const verNoDot = info.ver.replace('.', '');
+    // Interpreter DLLs are IMPLICITLY linked, so the loader must resolve them from the plugin's OWN
+    // directory (it does NOT search subdirs). Place them next to the binary, NOT in PythonRuntime.
+    for (const dll of ['python3.dll', `python${verNoDot}.dll`]) {
+      const src = path.join(info.prefix, dll);
+      if (existsSync(src)) { const dst = path.join(binDir, dll); cpSync(src, dst); added += statSync(dst).size; }
+      else console.warn(`  ⚠ missing CPython DLL: ${src}`);
+    }
+    // Stdlib (Lib/) + C-extension modules (DLLs/) go in PythonRuntime/, where PYTHONHOME points.
+    for (const dir of ['Lib', 'DLLs']) {
+      const src = path.join(info.prefix, dir);
+      if (existsSync(src)) { const dst = path.join(runtime, dir); cpSync(src, dst, { recursive: true, filter: skip }); added += dirSize(dst); }
+      else console.warn(`  ⚠ missing CPython dir: ${src}`);
+    }
+  } else {
+    // macOS/Linux: place the shared libpython next to the binary (rpath @loader_path / $ORIGIN — see
+    // CMakeLists CEDITOR_PYTHON), and the stdlib + lib-dynload under PythonRuntime/lib/pythonX.Y.
+    for (const lib of [info.ldlibrary, info.instsoname].filter(Boolean)) {
+      const src = path.join(info.libdir, lib);
+      if (existsSync(src)) { const dst = path.join(binDir, path.basename(src)); cpSync(src, dst); added += statSync(dst).size; }
+      else console.warn(`  ⚠ missing libpython: ${src}`);
+    }
+    if (info.stdlib && existsSync(info.stdlib)) {
+      const dst = path.join(runtime, 'lib', `python${info.ver}`);
+      cpSync(info.stdlib, dst, { recursive: true, filter: skip }); added += dirSize(dst);
+    } else console.warn('  ⚠ missing CPython stdlib dir:', info.stdlib);
+    if (info.dynload && existsSync(info.dynload)) {
+      const dst = path.join(runtime, 'lib', `python${info.ver}`, 'lib-dynload');
+      cpSync(info.dynload, dst, { recursive: true, filter: skip }); added += dirSize(dst);
+    }
   }
   if (added === 0) { console.warn('  ⚠ No CPython runtime files copied from', info.prefix); return 0; }
-  console.log(`  Bundled CPython ${info.ver} (full stdlib) — interpreter DLLs beside the plugin, stdlib in PythonRuntime/`);
+  console.log(`  Bundled CPython ${info.ver} (full stdlib) — interpreter lib beside the plugin, stdlib in PythonRuntime/`);
   return added;
 }
 
 // 1. Bake CURRENT exportParameters (params + device wire) into a temp copy of the panel, so the
 //    plugin is always built from up-to-date data without mutating the user's file.
 mkdirSync(outDir, { recursive: true });
+// Ensure every TypeScript handler carries compiledJs (the shipped C++ host has no TS compiler — it runs
+// the transpiled JS). The editor sets this on save, but a panel that wasn't re-saved, was imported, or
+// was generated may lack it — transpile any that are missing so TS always runs window-closed.
+{
+  const ts = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/scripting/tsService.js')).href);
+  await ts.ensureTs();
+  let fixed = 0;
+  const fixTs = (s) => {
+    if (s && s.language === 'typescript' && typeof s.source === 'string' && !(typeof s.compiledJs === 'string' && s.compiledJs)) {
+      const js = ts.transpileTs(s.source);
+      if (js != null) { s.compiledJs = js; fixed++; }
+    }
+  };
+  for (const s of panelDoc.scripts ?? []) fixTs(s);
+  for (const c of panelDoc.controls ?? []) for (const s of c?._children?.Scripts?.scripts ?? []) fixTs(s);
+  if (fixed) console.log(`TypeScript: transpiled ${fixed} handler(s) to compiledJs for the shipped runtime`);
+}
+
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
 const bakedPanel = path.join(outDir, `${productName}.cepanel`);
@@ -136,22 +264,86 @@ writeFileSync(bakedPanel, JSON.stringify(panelDoc, null, 2));
 const panelAbs = bakedPanel.replace(/\\/g, '/');
 console.log(`Baked ${panelDoc.exportParameters.length} parameters into ${bakedPanel}`);
 
-// 2. Build the web bundle (the self-contained UI embedded into the plugin).
-console.log('Building web bundle...');
-execSync('npm run build', { cwd: path.join(repo, 'CE', 'web'), stdio: 'inherit' });
+// 2. Build the web bundle (the self-contained UI embedded into the plugin). The bundle is
+//    PANEL-INDEPENDENT (the .cepanel is loaded at runtime, not baked into the JS), so we only rebuild
+//    it when the web sources changed since the last `dist/` — otherwise every export paid an ~18 s Vite
+//    build for an identical bundle. Set exportSettings.forceWebBuild=true (or env CE_FORCE_WEB=1) to force.
+{
+  const webDir = path.join(repo, 'CE', 'web');
+  const dist = path.join(webDir, 'dist');
+  const forceWeb = es.forceWebBuild === true || process.env.CE_FORCE_WEB === '1';
+  if (!forceWeb && webBundleFresh(webDir, dist)) {
+    console.log('Web bundle: up-to-date (sources unchanged since last build) — skipping Vite build.');
+  } else {
+    console.log('Building web bundle...');
+    execSync('npm run build', { cwd: webDir, stdio: 'inherit' });
+  }
+}
 
 // 3. Configure (DEV_MODE OFF -> bundled UI, not localhost) with this panel's identity, build the
 //    VST3 wrapper, copy to export-out, then restore DEV_MODE ON so the dev build dir is unchanged.
-const vcvars = 'C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat';
-const cfg = `cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
+// Locate vcvars64.bat without hardcoding a machine-specific path: ask vswhere (the supported way),
+// then fall back to the well-known VS 2022/2025 install roots.
+function findVcvars() {
+  const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  const vswhere = path.join(pf86, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
+  try {
+    if (existsSync(vswhere)) {
+      const installPath = execSync(`"${vswhere}" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`, { encoding: 'utf8' }).trim();
+      const c = installPath && path.join(installPath, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
+      if (c && existsSync(c)) return c;
+    }
+  } catch { /* fall through to known roots */ }
+  for (const root of [
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Community',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Professional',
+    'C:\\Program Files\\Microsoft Visual Studio\\2022\\Enterprise',
+    'C:\\Program Files\\Microsoft Visual Studio\\18\\Community',
+  ]) {
+    const c = path.join(root, 'VC', 'Auxiliary', 'Build', 'vcvars64.bat');
+    if (existsSync(c)) return c;
+  }
+  return null; // not found — caller falls back to the bundled LLVM-MinGW toolchain
+}
+
+// Common CMake cache vars (identity + feature flags), generator-agnostic.
+const cacheVars = `-DCEDITOR_DEV_MODE=OFF -DCEDITOR_SCRIPTING=ON`
   + ` -DCEDITOR_PYTHON=${embedPython ? 'ON' : 'OFF'}`
+  + ` -DCEDITOR_NATIVE_HANDLERS=${compileNative ? 'ON' : 'OFF'}`
   + ` -DCE_VST_PLUGIN_CODE=${id.pluginCode} "-DCE_VST_PRODUCT_NAME=${productName}"`
   + ` "-DCE_VST_COMPANY_NAME=${vendor}" -DCE_VST_MFR_CODE=${mfrCode} "-DCE_VST_VERSION=${version}"`
   + ` "-DCE_VST_PANEL_PATH=${panelAbs}"`;
-const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+
+// Pick the build backend: a system Visual Studio if present (default, fully battle-tested), else the
+// bundled self-contained LLVM-MinGW (the "done at install" path — no VS required). EXPERIMENTAL on the
+// MinGW path until validated on Windows (JUCE software renderer; VST3 wrapper link tweak).
+const { llvmMingwDir, ninjaExe } = await import(pathToFileURL(path.join(repo, 'tools/toolchains/resolveToolchain.mjs')).href);
+const vcvars = findVcvars();
+const mingw = vcvars ? null : llvmMingwDir();
+let runBuild, runRestore;
+if (vcvars) {
+  console.log('Build backend: Visual Studio —', vcvars);
+  const cfg = `cmake -S "${repo}" -B "${build}" ${cacheVars}`;
+  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3 --config Release`;
+  runBuild = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
+  runRestore = () => execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
+} else if (mingw) {
+  const ninja = ninjaExe();
+  if (!ninja) throw new Error('Ninja not found — run: node tools/toolchains/provision.mjs ninja');
+  console.log('Build backend: bundled LLVM-MinGW (no Visual Studio) —', mingw, '[EXPERIMENTAL]');
+  const tcFile = path.join(repo, 'tools/toolchains/llvm-mingw-win.cmake');
+  const cfg = `cmake -S "${repo}" -B "${build}" -G Ninja -DCMAKE_MAKE_PROGRAM="${ninja}"`
+    + ` -DCMAKE_TOOLCHAIN_FILE="${tcFile}" -DCE_LLVM_MINGW_DIR="${mingw}" -DCMAKE_BUILD_TYPE=Release ${cacheVars}`;
+  const bld = `cmake --build "${build}" --target CEditorPlayerVST_VST3`;
+  runBuild = () => { execSync(cfg, { stdio: 'inherit' }); execSync(bld, { stdio: 'inherit' }); };
+  runRestore = () => execSync(`cmake -S "${repo}" -B "${build}" -DCEDITOR_DEV_MODE=ON`, { stdio: 'inherit' });
+} else {
+  throw new Error('No C++ build toolchain found. Install Visual Studio (Desktop C++) OR run: node tools/toolchains/provision.mjs llvm-mingw ninja');
+}
+
 console.log('Configuring + building the plugin...');
 try {
-  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && ${cfg} >nul && ${bld}"`, { stdio: 'inherit' });
+  runBuild();
 
   const built = path.join(build, 'CEditorPlayerVST_artefacts', 'Release', 'VST3', `${productName}.vst3`);
   const dest = path.join(outDir, `${productName}.vst3`);
@@ -165,9 +357,15 @@ try {
       if (addedBytes > 0)
         console.log(`Python runtime: +${mb(addedBytes)} MB  →  total ${mb(baseBytes + addedBytes)} MB`);
     }
+    if (compileNative) {
+      const { compileNativeHandlers } = await import(pathToFileURL(path.join(repo, 'tools/scripts/nativeHandlers/index.mjs')).href);
+      const binDir = vst3BinDir(dest);
+      const report = await compileNativeHandlers(panelDoc, { binDir, workRoot: path.join(outDir, 'native-handlers', productName) });
+      for (const b of report.built ?? []) console.log(`Native handlers: ${b.lang} module bundled (+${mb(b.bytes)} MB)`);
+    }
   }
   else console.error('Build artifact not found:', built);
 } finally {
   // Always restore dev mode so the editor's normal build keeps loading the Vite dev server.
-  execSync(`cmd /c "\"${vcvars}\" >nul 2>&1 && cmake -S \"${repo}\" -B \"${build}\" -DCEDITOR_DEV_MODE=ON >nul"`, { stdio: 'inherit' });
+  runRestore();
 }

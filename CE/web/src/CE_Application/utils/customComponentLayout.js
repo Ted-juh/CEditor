@@ -1,14 +1,10 @@
+import { numberOr } from './primitives.js';
 // Shared layout math for custom components.
 //
 // A part's `Layout` positions an anchored box using mixed units (percent or
 // px) relative to the control's pixel size. The same math is used by the
 // package thumbnail renderer and by hit-zone follow-mode resolution, so it
 // lives here as a single source of truth.
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
 
 export function resolveLayoutUnit(value, unit, total) {
   const numeric = numberOr(value, 0);

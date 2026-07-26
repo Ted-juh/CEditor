@@ -43,8 +43,9 @@ struct ScriptDefinition
 {
     juce::String id;
     juce::String name;
-    juce::String language;  // "lua" | "javascript"
-    juce::String source;    // the real code
+    juce::String language;  // "lua" | "javascript" | "typescript"
+    juce::String source;    // the real code (the language the user wrote)
+    juce::String compiledSource; // for "typescript": the editor-transpiled JS the JS engine runs (empty otherwise)
     juce::String scope;     // component | panel | device | project
     juce::String event;     // the lifecycle hook / event handler name it runs on (e.g. "onValueChanged")
     juce::String owner;     // attached control/component name ("" for panel/project)
@@ -56,6 +57,16 @@ struct ScriptDefinition
 
 /** Reported when a script throws or a guard trips. Never crashes the panel (Q11). */
 using ScriptErrorSink = std::function<void (const juce::String& scriptId, const juce::String& message)>;
+
+/** A script that failed to load (or has no engine in this build) and is therefore inactive.
+    Kept by ScriptRuntime so hosts can tell the user instead of degrading silently. */
+struct FailedScript
+{
+    juce::String id;
+    juce::String name;
+    juce::String language;
+    juce::String message;
+};
 
 // ----------------------------------------------------------------------------------------------
 /** What a script can ask the host to do. Implemented by the app once (BridgeScriptHost), adapting
@@ -140,6 +151,7 @@ public:
 std::unique_ptr<ScriptEngine> createLuaEngine();
 std::unique_ptr<ScriptEngine> createJsEngine();
 std::unique_ptr<ScriptEngine> createPythonEngine();   // only linked when CEDITOR_PYTHON is built
+std::unique_ptr<ScriptEngine> createNativeHandlerEngine(); // C++/C#/Java compiled-at-export modules; only when CEDITOR_NATIVE_HANDLERS is built
 
 // ----------------------------------------------------------------------------------------------
 /** Owns the engines + the script set; routes lifecycle and events to the right scripts. */
@@ -156,6 +168,13 @@ public:
         sections). Re-installs the API and reloads every enabled script. */
     void loadScripts (const juce::var& scriptArray);
 
+    /** Scripts that were enabled but did NOT load (compile error, missing engine in this build).
+        They receive no events; surface these to the user rather than failing silently. */
+    const std::vector<FailedScript>& failedScripts() const { return failed; }
+
+    /** Number of scripts that loaded successfully and are live. */
+    int loadedScriptCount() const { return (int) scripts.size(); }
+
     // --- Lifecycle (task 6) ---
     void onPanelLoad();
     void onPanelReady (bool firstTime);
@@ -165,7 +184,11 @@ public:
 
     // --- Events / phase 3 (task 5) ---
     /** Fire `event` for `target`. Scripts whose (event,target/scope) match are dispatched.
-        `payload` is passed to the handler. */
+        `payload` is passed to the handler.
+
+        Guarded against feedback loops (anti-flood, redesign §7): a handler that emits an
+        event which dispatches a handler that emits again … is cut off (and reported) once
+        the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
 
     // --- Origin tracking for transmit-by-default (Q2) ---
@@ -196,12 +219,17 @@ private:
     std::unique_ptr<ScriptEngine> lua;
     std::unique_ptr<ScriptEngine> js;
     std::unique_ptr<ScriptEngine> python;   // null unless CEDITOR_PYTHON — python scripts no-op if absent
+    std::unique_ptr<ScriptEngine> native;   // null unless CEDITOR_NATIVE_HANDLERS — cpp/csharp/java no-op if absent
     std::vector<ScriptDefinition> scripts;
+    std::vector<FailedScript> failed;
     std::function<void (const juce::String&)> errorLogger;
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)
     std::vector<int> transmitStack; // nested noTransmit/transmit blocks
+
+    static constexpr int maxDispatchDepth = 16; // emit→dispatch→emit feedback-loop backstop
+    int dispatchDepth = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ScriptRuntime)
 };

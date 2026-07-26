@@ -1099,6 +1099,12 @@ export function initPanelBridge() {
     const openTimer = createPerfDebugTimer(`panel open ${label}`);
     const deserializeTimer = createPerfDebugTimer(`panel deserialize ${label}`);
     const panel = deserializePanel(panelData, filePath, payload.name);
+    if (!panel) {
+      if (filePath) pendingOpenPanelFiles.delete(filePath);
+      deserializeTimer('failed');
+      console.error(`[panels] "${label}" could not be opened — the file is corrupted or is not a .cepanel document.`);
+      return;
+    }
     restorePanelDeviceSession(panel, label);
     const controlCount = Array.isArray(panel?.controls) ? panel.controls.length : 0;
     deserializeTimer(

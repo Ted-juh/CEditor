@@ -1,3 +1,4 @@
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 // exportParameters.js — the host-automatable parameter list a panel exposes (Milestone 2).
 //
 // The exported plugin needs a FIXED, deterministic set of parameters so a DAW can automate them and
@@ -102,7 +103,7 @@ function deviceWireFor(control) {
   const b = (Array.isArray(db?.bindings) ? db.bindings : [])
     .find((x) => x?.kind === 'deviceParameter' && x?.parameterId);
   return b
-    ? { deviceRole: String(b.deviceRole || 'mainSynth'), deviceParameterId: String(b.parameterId) }
+    ? { deviceRole: String(b.deviceRole || DEFAULT_DEVICE_ROLE), deviceParameterId: String(b.parameterId) }
     : { deviceRole: '', deviceParameterId: '' };
 }
 

@@ -45,6 +45,23 @@ test('owned workspaces suppress global editor chrome', () => {
   assert.equal(state.showPropertiesPanel, false);
 });
 
+test('component workspace keeps the properties panel (author inspector)', () => {
+  const state = resolveWorkspaceChrome({
+    activeTab: { type: 'panel' },
+    componentWorkspaceMode: 'surface',
+    viewportWidth: 1440,
+    showTreePanel: true,
+    showDisplayPanel: true,
+    showPropertiesPanel: false, // even a persisted "hidden" pref cannot strand the author tabs
+  });
+
+  assert.equal(state.workspaceKind, 'component');
+  assert.equal(state.ownsChrome, true);
+  assert.equal(state.showPropertiesPanel, true);
+  assert.equal(state.showTreePanel, false);
+  assert.equal(state.showDisplayPanel, false);
+});
+
 test('compact panel view hides side chrome without changing ownership', () => {
   const state = resolveWorkspaceChrome({
     activeTab: { type: 'panel' },

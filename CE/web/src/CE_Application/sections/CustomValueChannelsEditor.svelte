@@ -9,6 +9,10 @@
 
   let { control = null } = $props();
 
+  // Preset/template cards are an add-time aid (Stage D3): collapsed by
+  // default so the editor keeps only live content on screen.
+  let showPresetGrid = $state(false);
+
   let core = $derived(getSection(control, 'Core'));
   let designer = $derived(getSection(control, 'Designer'));
   let channels = $derived(getSection(control, 'ValueChannels'));
@@ -19,6 +23,28 @@
   let channelEntries = $derived(Object.entries(channels?._children ?? {}));
   let publicInputs = $derived(channelEntries.filter(([, channel]) => channel?.publicInput !== false).length);
   let publicOutputs = $derived(channelEntries.filter(([, channel]) => channel?.publicOutput !== false).length);
+  // Publishing is owned by the Publish tab (Stage B9) — this editor only
+  // reflects the contract entries that reference the selected channel.
+  let published = $derived(getSection(control, 'PublishedProperties'));
+  let publishedAsLabel = $derived.by(() => {
+    if (!selectedName) return '';
+    const names = [];
+    for (const [kind, entries] of [['input', published?.inputs ?? {}], ['output', published?.outputs ?? {}]]) {
+      for (const [name, entry] of Object.entries(entries)) {
+        if (entry?.enabled === false) continue;
+        if (String(entry?.channel ?? '') === selectedName) names.push(`${kind} "${name}"`);
+      }
+    }
+    return names.join(' · ');
+  });
+
+  function jumpToPublish() {
+    if (!core?.id) return;
+    applyControlPatch(core.id, {
+      'Designer.focusSection': 'publish',
+      'Designer.focusApiMode': 'contract',
+    });
+  }
   let deviceBindable = $derived(channelEntries.filter(([, channel]) => channel?.deviceBindable !== false).length);
   let selectedDefault = $derived(selected?.defaultValue ?? (String(selected?.type ?? '') === 'bool' ? false : 0));
   let selectedNormalized = $derived(selected ? normalizeCustomChannelValue(selected, selectedDefault) : 0);
@@ -211,6 +237,8 @@
         </div>
       </PropertyCell>
       <PropertyCell label="Presets" span={4} hint="Apply common channel shapes without manually setting type, min/max, step, and formatting.">
+        <button class="preset-disclosure" type="button" onclick={() => showPresetGrid = !showPresetGrid}>{showPresetGrid ? "Hide" : "Show"} channel presets ▾</button>
+        {#if showPresetGrid}
         <div class="preset-grid">
           {#each CHANNEL_PRESETS as preset}
             <button class="preset-card" type="button" onclick={() => applyPreset(preset)}>
@@ -220,6 +248,7 @@
             </button>
           {/each}
         </div>
+        {/if}
       </PropertyCell>
     </PropertySection>
 
@@ -297,11 +326,11 @@
     {/if}
 
     <PropertySection title="Public API">
-      <PropertyCell label="Input" span={1} hint="Allow other components or device links to drive this value.">
-        <PropertyToggle value={selected.publicInput !== false} onchange={() => set('publicInput', !(selected.publicInput !== false))} />
-      </PropertyCell>
-      <PropertyCell label="Output" span={1} hint="Allow this value to drive other panel components.">
-        <PropertyToggle value={selected.publicOutput !== false} onchange={() => set('publicOutput', !(selected.publicOutput !== false))} />
+      <PropertyCell label="Published" span={2} hint="Publishing is edited in the Publish tab — the single source of truth. The channel flags follow the contract automatically.">
+        <div class="published-chip" class:none={!publishedAsLabel}>
+          <strong>{publishedAsLabel || 'not published'}</strong>
+          <button type="button" onclick={jumpToPublish}>Edit in Publish</button>
+        </div>
       </PropertyCell>
       <PropertyCell label="Device" span={1} hint="Allow MIDI/device binding for this value.">
         <PropertyToggle value={selected.deviceBindable !== false} onchange={() => set('deviceBindable', !(selected.deviceBindable !== false))} />
@@ -357,6 +386,51 @@
   }
   .val:focus { border-color: #5B9BD5; }
   .signal-card,
+  .published-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    min-height: 26px;
+    padding: 3px 6px;
+    box-sizing: border-box;
+    border: 1px solid #2E4A41;
+    border-radius: 4px;
+    background: #14201C;
+    color: #A9D7C4;
+    font-size: 10px;
+  }
+
+  .published-chip.none {
+    border-color: #333;
+    background: #1A1A1A;
+    color: #777;
+  }
+
+  .published-chip strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .published-chip button {
+    flex: 0 0 auto;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #C8C8C8;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 2px 7px;
+    cursor: pointer;
+  }
+
+  .published-chip button:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
+
   .surface-card {
     width: 100%;
     min-height: 112px;
@@ -560,4 +634,21 @@
   .action-btn:hover:not(:disabled) { border-color: #5B9BD5; color: #FFF; }
   .action-btn.danger:hover:not(:disabled) { border-color: #D56B6B; }
   .action-btn:disabled { opacity: 0.4; cursor: default; }
+  .preset-disclosure {
+    width: fit-content;
+    background: #252525;
+    border: 1px solid #3B3B3B;
+    border-radius: 3px;
+    color: #BBB;
+    font-size: 10px;
+    font-family: inherit;
+    padding: 3px 8px;
+    cursor: pointer;
+    margin-bottom: 4px;
+  }
+
+  .preset-disclosure:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
+  }
 </style>

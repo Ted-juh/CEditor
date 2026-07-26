@@ -4,7 +4,7 @@
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
-  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
   import { deepClone } from '../utils/deepClone.js';
@@ -116,19 +116,22 @@
   }
 
   function ensureFillGradient() {
-    if (fill?.gradient?.stops?.length >= 2) return fill.gradient;
-    const seeded = deepClone(DEFAULT_FILL_GRADIENT);
-    set(`${pathPrefix}.Fill.gradient`, seeded);
-    return seeded;
+    return ensureFillGradientSeeded({
+      fill,
+      defaultGradient: DEFAULT_FILL_GRADIENT,
+      seedGradient: (seeded) => set(`${pathPrefix}.Fill.gradient`, seeded),
+    });
   }
 
   function openGradientEditor() {
     if (!core?.id || $selectedComponentIds.size > 1) return;
-    const currentGradient = ensureFillGradient();
-    activateGradientTarget(
-      { type: 'control', controlId: core.id, path: `${pathPrefix}.Fill` },
-      currentGradient
-    );
+    openFillGradientEditor({
+      controlId: core.id,
+      targetPath: `${pathPrefix}.Fill`,
+      fill,
+      defaultGradient: DEFAULT_FILL_GRADIENT,
+      seedGradient: (seeded) => set(`${pathPrefix}.Fill.gradient`, seeded),
+    });
   }
 
   function chooseFillAsset(layerId) {

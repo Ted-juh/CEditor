@@ -2,6 +2,22 @@
 
 This project now has a basic Windows packaging flow for Inno Setup 6.
 
+## build/ layout
+
+```text
+build/
+  native/                 dev build (DEV_MODE=ON, loads UI from the Vite dev server) — what VS opens
+  package/                everything the installer pipeline produces:
+    build/                the cmake/compiler work tree (DEV_MODE=OFF; wiped each run)
+    stage/CEditor/        the assembled install tree — exactly what ships (CEditor.exe, web/dist,
+                          tools/node, toolchain scripts, prereq installers)
+    installer/            the final CEditor-Setup-<ver>.exe
+```
+
+`native` = the compiled dev build; the `package/` subtree is the release pipeline: **build → stage →
+installer**. `package/build` compiles, `cmake --install` copies only the shippable files into
+`package/stage/CEditor`, and Inno compresses that into `package/installer`.
+
 ## What must be true before an installer works
 
 The installed application cannot rely on the Vite dev server. The native app must be built with:
@@ -47,7 +63,7 @@ What the script does:
 1. Runs `npm run build` in `CE/web`.
 2. Configures CMake with `CEDITOR_DEV_MODE=OFF`.
 3. Builds the Release native app.
-4. Stages the install tree into `build\package-stage\CEditor` using `cmake --install`.
+4. Stages the install tree into `build\package\stage\CEditor` using `cmake --install`.
 5. Copies `vc_redist.x64.exe` into the staging folder if Visual Studio provides it locally.
 6. Copies `MicrosoftEdgeWebView2RuntimeInstallerX64.exe` into the staging folder if you placed it in `tools\installer\thirdparty\`.
 7. Compiles `tools/installer/CEditor.iss` with Inno Setup 6 if `ISCC.exe` is installed.
@@ -106,7 +122,7 @@ Configure and build the native app for installed mode:
 ```powershell
 cmake --preset native -DCEDITOR_DEV_MODE=OFF
 cmake --build --preset native-release
-cmake --install build/native --config Release --prefix ".\build\package-stage\CEditor"
+cmake --install build/native --config Release --prefix ".\build\package\stage\CEditor"
 ```
 
 Compile the Inno installer:
@@ -114,8 +130,8 @@ Compile the Inno installer:
 ```powershell
 "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
   "/DMyAppVersion=0.1.0" `
-  "/DMySourceDir=C:\dev\Projects\CEditor\build\package-stage\CEditor" `
-  "/DMyOutputDir=C:\dev\Projects\CEditor\build\installer" `
+  "/DMySourceDir=C:\dev\Projects\CEditor\build\package\stage\CEditor" `
+  "/DMyOutputDir=C:\dev\Projects\CEditor\build\package\installer" `
   "C:\dev\Projects\CEditor\tools\installer\CEditor.iss"
 ```
 
@@ -125,7 +141,7 @@ Best option:
 
 1. Test on a clean Windows VM.
 2. Ensure the VM does not already have your local source tree, build tools, or dev server running.
-3. Run the generated installer from `build\installer`.
+3. Run the generated installer from `build\package\installer`.
 4. Launch from the Start Menu shortcut, not from your repo folder.
 5. Confirm the UI loads without `localhost:5173`.
 6. Confirm `%APPDATA%\CEditor` is created after the first run and settings persist between launches.
@@ -134,7 +150,7 @@ Best option:
 Good local smoke test:
 
 1. Run `tools/scripts/package-installer.ps1 -StageOnly`.
-2. Launch `build\package-stage\CEditor\CEditor.exe`.
+2. Launch `build\package\stage\CEditor\CEditor.exe`.
 3. Verify it opens without the Vite dev server running.
 
 ## Current external prerequisites
@@ -145,3 +161,52 @@ The built Release executable depends on:
 - Microsoft Visual C++ runtime (`MSVCP140.dll`, `VCRUNTIME140.dll`, `VCRUNTIME140_1.dll`)
 
 That is why the installer supports bundling both prerequisite installers.
+
+## Scripting-language components
+
+The installer offers a **Select Components** page (Inno `[Types]`/`[Components]`):
+
+- **Standard** — Lua, JavaScript, TypeScript (built in; no toolchain).
+- **Full** — adds Python, C++, C#, Java scripting.
+- **Custom** — pick languages individually.
+
+Each non-builtin component runs `{app}\tools\toolchains\provision.cmd <ids>` (best-effort,
+`skipifdoesntexist`) to download its toolchain: Python `python-embed` (~11 MB), C++/C#/Java the
+`llvm-mingw`+`ninja` build toolchain, C# `dotnet` (~230 MB), Java `jdk` (~195 MB). These can also be
+installed later from the app (**Settings → Scripting Toolchains**) or fetched automatically the first
+time you export a panel that uses them. `package-installer.ps1` stages `tools/` (the export + provision
+scripts only — toolchain binaries are downloaded on demand, never bundled).
+
+### Bundled Node + per-user toolchain dir
+
+Provisioning and export shell out to Node. The installer **bundles a Node runtime** at
+`{app}\tools\node\node.exe` (a single self-contained `node.exe`, staged by `package-installer.ps1` from
+the build machine's Node), so a clean machine needs **no** system Node install — both `provision.cmd` and
+the app's `findNodeExecutable()` prefer the bundled Node, falling back to a system Node for source
+checkouts. If Node is somehow absent, the Scripting Toolchains panel shows a clear "Node not found" note
+instead of an empty list.
+
+Install-time provisioning ([Run] steps, elevated) writes toolchains into `{app}\tools\toolchains`. The
+installed app runs non-elevated and cannot write under Program Files, so **runtime** Install/Remove (and
+on-demand provisioning at first export) writes to a per-user dir instead:
+`%LOCALAPPDATA%\CEditor\toolchains`. The app sets `CEDITOR_TOOLCHAIN_DIR` to that path before launching
+Node; `resolveToolchain.mjs` checks the per-user dir first, then the bundled `{app}` dir, so toolchains
+installed either way resolve. (Removing an install-time-provisioned toolchain under Program Files needs
+elevation and is left in place by the in-app Remove.)
+
+### Important: export needs the C++ build environment
+
+The installed `CEditor.exe` is the **panel designer** + toolchain manager. A full **VST3 export** still
+requires the C++ build environment — the player source, JUCE, CMake, and a compiler — because each
+exported VST3 needs a **unique compile-time identity (FUID)**; a single prebuilt binary can't serve
+multiple panels without DAW session collisions (see
+`docs/scripting-language-options-and-shippable-export.md` §3a). So:
+
+- A GUI-only install can **manage/provision toolchains** but cannot by itself export a VST3.
+- Full VST3 export runs from a **source checkout** (or a future "developer install" that stages the
+  whole build tree).
+- A **compiler-free path exists only for standalone/CLAP** (no FUID contract) — future work.
+
+The app locates the exporter via `ceditorSourceRoot()`, which checks the executable's directory (and its
+parent) and the working dir, so the same binary works from a source checkout or an install that staged
+`tools/`.

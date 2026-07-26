@@ -4,7 +4,7 @@
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
-  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
@@ -184,19 +184,22 @@
   }
 
   function ensureTextGradient() {
-    if (textFill?.gradient?.stops?.length >= 2) return textFill.gradient;
-    const seeded = deepClone(DEFAULT_TEXT_FILL_GRADIENT);
-    set('Text.Fill.gradient', seeded);
-    return seeded;
+    return ensureFillGradientSeeded({
+      fill: textFill,
+      defaultGradient: DEFAULT_TEXT_FILL_GRADIENT,
+      seedGradient: (seeded) => set('Text.Fill.gradient', seeded),
+    });
   }
 
   function openTextGradientEditor() {
     if (!core?.id || $selectedComponentIds.size > 1) return;
-    const currentGradient = ensureTextGradient();
-    activateGradientTarget(
-      { type: 'control', controlId: core.id, path: scopeTextPath('Text.Fill') },
-      currentGradient
-    );
+    openFillGradientEditor({
+      controlId: core.id,
+      targetPath: scopeTextPath('Text.Fill'),
+      fill: textFill,
+      defaultGradient: DEFAULT_TEXT_FILL_GRADIENT,
+      seedGradient: (seeded) => set('Text.Fill.gradient', seeded),
+    });
   }
 
   function chooseTextFillAsset(kind) {

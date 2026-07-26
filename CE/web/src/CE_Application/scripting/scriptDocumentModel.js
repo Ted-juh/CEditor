@@ -73,6 +73,11 @@ export function normalizeScript(script, index = 0) {
     language: script?.language,
     source: typeof script?.source === 'string' ? script.source : undefined,
     group: script?.group ?? '',
+    // TypeScript ships as JS: the editor transpiles TS → JS on save and stores it here so the
+    // C++ host (which has no TS compiler) runs it through its JS engine. Only kept for TS scripts.
+    compiledJs: script?.language === 'typescript' && typeof script?.compiledJs === 'string'
+      ? script.compiledJs
+      : undefined,
   };
 }
 
@@ -104,7 +109,7 @@ export function sanitizeScriptDocument(document) {
       markNonPortable: document.rawCodePolicy?.markNonPortable !== false,
       allowedLanguages: asArray(document.rawCodePolicy?.allowedLanguages).length
         ? asArray(document.rawCodePolicy.allowedLanguages).map(String)
-        : ['javascript', 'lua', 'python', 'cpp'],
+        : ['javascript', 'typescript', 'lua', 'python', 'cpp'],
     },
     scripts,
   };

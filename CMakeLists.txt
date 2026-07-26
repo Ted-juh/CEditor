@@ -4,6 +4,10 @@ project(CEditor VERSION 0.2.0)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CE_ROOT "${CMAKE_SOURCE_DIR}/CE")
+
+# Register the test executables below with CTest so `ctest --test-dir <build> -C <config>` (and CI)
+# discovers and runs them all; each exe returns non-zero on failure.
+enable_testing()
 option(CEDITOR_DEV_MODE "Load the frontend from the Vite dev server" ON)
 
 # JUCE 8.0.7 from local install
@@ -44,6 +48,12 @@ target_sources(CEditor PRIVATE
     "${CE_ROOT}/src/Main.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     "${CE_ROOT}/src/WebViewHost.cpp"
@@ -93,6 +103,12 @@ target_sources(CEditorPlayer PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
@@ -134,7 +150,13 @@ set(CE_VST_PLUGIN_CODE  "Cep1"               CACHE STRING "Per-panel 4-char plug
 set(CE_VST_COMPANY_NAME "Tedjuh-inc"         CACHE STRING "Plugin vendor / company name")
 set(CE_VST_MFR_CODE     "Tdjh"               CACHE STRING "4-char plugin manufacturer code")
 set(CE_VST_VERSION      "1.0.0"              CACHE STRING "Plugin version string")
-set(CE_VST_PANEL_PATH   "C:/tmp/gaia-filter.cepanel" CACHE STRING "Panel document the plugin loads")
+# Empty by default: the export pipeline always passes the real panel via -DCE_VST_PANEL_PATH.
+# A plugin built without it loads no panel (blank player) — warn so a manual build isn't confusing.
+set(CE_VST_PANEL_PATH   ""                   CACHE STRING "Panel document the plugin loads")
+if (CE_VST_PANEL_PATH STREQUAL "")
+    message(WARNING "CE_VST_PANEL_PATH is not set — CEditorPlayerVST will build but load no panel. "
+                    "Pass -DCE_VST_PANEL_PATH=<your.cepanel> for a usable plugin (the export pipeline does this automatically).")
+endif()
 
 juce_add_plugin(CEditorPlayerVST
     PRODUCT_NAME "${CE_VST_PRODUCT_NAME}"
@@ -155,6 +177,12 @@ target_sources(CEditorPlayerVST PRIVATE
     "${CE_ROOT}/src/Player/PlayerHost.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
 )
@@ -194,6 +222,12 @@ target_link_libraries(CEditorPlayerVST PRIVATE
 add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileEngine.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileService.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiIO.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMessages.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceRequests.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceJobs.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
+    "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
     "${CE_ROOT}/tests/DeviceProfileEngineTests.cpp"
 )
@@ -213,6 +247,8 @@ target_link_libraries(CEditorDeviceProfileTests PRIVATE
     juce::juce_midi_ci
 )
 
+add_test(NAME DeviceProfileEngine COMMAND CEditorDeviceProfileTests)
+
 # --- Export pipeline: compile-per-panel identity (Phase D1) ---
 add_executable(CEditorExportIdentityTests
     "${CE_ROOT}/tests/PanelExportIdentityTests.cpp"
@@ -225,6 +261,8 @@ target_include_directories(CEditorExportIdentityTests PRIVATE
 target_link_libraries(CEditorExportIdentityTests PRIVATE
     juce::juce_core
 )
+
+add_test(NAME PanelExportIdentity COMMAND CEditorExportIdentityTests)
 
 # --- Window-closed script runtime (M2): C++ panel value model (full mirror) ---
 # Pure juce_core; verifies PanelValueModel.h resolves get/set paths identically to the WebView JS
@@ -243,6 +281,8 @@ target_link_libraries(CEditorPanelValueTests PRIVATE
     juce::juce_core
 )
 
+add_test(NAME PanelValueModel COMMAND CEditorPanelValueTests)
+
 # --- Panel scripting runtime (Milestone 1): Lua (Sol3) + JavaScript (juce_javascript) ----------
 # OFF by default so the existing build is unaffected. Turn on with -DCEDITOR_SCRIPTING=ON.
 # After enabling, add `ceditor_scripting` to the link libraries of whichever target hosts scripts
@@ -257,6 +297,12 @@ option(CEDITOR_SCRIPTING "Build the panel scripting runtime (Lua via Sol3 + JS v
 # Point at a specific interpreter with -DPython3_EXECUTABLE=... if CMake picks the wrong one.
 option(CEDITOR_PYTHON "Embed native CPython (full stdlib) as a third window-closed script language" OFF)
 
+# Optional: load COMPILE-AT-EXPORT native handler modules (C++/C#/Java). No language runtime is
+# embedded — the exporter AOT-compiles each panel's handlers into a small native shared library that
+# the player loads via the flat C ABI in CE/src/Scripting/NativeHandlerAbi.h. Requires CEDITOR_SCRIPTING.
+# See CE/src/Scripting/native-handlers-design.md. OFF by default (feature is build-unverified).
+option(CEDITOR_NATIVE_HANDLERS "Load compile-at-export native handler modules (C++/C#/Java) in the player" OFF)
+
 if (CEDITOR_SCRIPTING)
     include(FetchContent)
 
@@ -264,6 +310,10 @@ if (CEDITOR_SCRIPTING)
     set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 
     # Lua 5.4 — CMake-friendly mirror (provides the `lua_static` target). Adjust tag/source as needed.
+    # Its own test registration is switched off: with enable_testing() on, it would add upstream's
+    # full interpreter testsuite (lua-testsuite) to OUR ctest run — not a CEditor test, and it fails
+    # when run outside upstream's harness.
+    set(LUA_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
     FetchContent_Declare(lua
         GIT_REPOSITORY https://github.com/walterschell/Lua.git
         GIT_TAG        v5.4.5)
@@ -305,17 +355,37 @@ if (CEDITOR_SCRIPTING)
         add_executable(CEditorPythonScriptTests "${CE_ROOT}/tests/PythonScriptEngineTests.cpp")
         target_link_libraries(CEditorPythonScriptTests PRIVATE ceditor_scripting juce::juce_core)
         target_include_directories(CEditorPythonScriptTests PRIVATE "${CE_ROOT}/src")
+        add_test(NAME PythonScriptEngine COMMAND CEditorPythonScriptTests)
+        # The embedded interpreter needs a stdlib home. Exports stage a PythonRuntime folder next to
+        # the plugin; for the bare test exe, point CEDITOR_PYTHONHOME at the dev Python found above
+        # (its runtime-DLL dir is the install root on Windows).
+        if (Python3_RUNTIME_LIBRARY_DIRS)
+            list(GET Python3_RUNTIME_LIBRARY_DIRS 0 _ce_python_home)
+            set_tests_properties(PythonScriptEngine PROPERTIES
+                ENVIRONMENT "CEDITOR_PYTHONHOME=${_ce_python_home}")
+        endif()
+    endif()
+
+    # --- Optional: compile-at-export native handler loader (C++/C#/Java) ---
+    # Only the loader links into the player; the handler MODULES are built separately at export by
+    # tools/scripts/nativeHandlers and loaded at runtime via juce::DynamicLibrary (no extra deps here).
+    if (CEDITOR_NATIVE_HANDLERS)
+        target_sources(ceditor_scripting PRIVATE "${CE_ROOT}/src/Scripting/NativeHandlerEngine.cpp")
+        target_compile_definitions(ceditor_scripting PUBLIC CEDITOR_NATIVE_HANDLERS=1)
+        message(STATUS "CEditor: native handler loader ENABLED (C++/C#/Java compiled-at-export modules).")
     endif()
 
     # Smoke test: verifies the runtime actually executes Lua + JS. Run ./CEditorScriptingTests
     add_executable(CEditorScriptingTests "${CE_ROOT}/tests/ScriptRuntimeTests.cpp")
     target_link_libraries(CEditorScriptingTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorScriptingTests PRIVATE "${CE_ROOT}/src")
+    add_test(NAME ScriptRuntime COMMAND CEditorScriptingTests)
 
     # Window-closed integration: panel -> gathered scripts -> runtime -> dispatch -> API callbacks.
     add_executable(CEditorPlayerScriptTests "${CE_ROOT}/tests/PlayerScriptIntegrationTests.cpp")
     target_link_libraries(CEditorPlayerScriptTests PRIVATE ceditor_scripting juce::juce_core)
     target_include_directories(CEditorPlayerScriptTests PRIVATE "${CE_ROOT}/src")
+    add_test(NAME PlayerScriptIntegration COMMAND CEditorPlayerScriptTests)
 
     # Window-closed scripts in the exported plugin: link the runtime into the VST/standalone player.
     # Gated so the default (scripting OFF) player build is unchanged; PluginProcessor.h guards its
@@ -323,6 +393,25 @@ if (CEDITOR_SCRIPTING)
     if (TARGET CEditorPlayerVST)
         target_link_libraries(CEditorPlayerVST PRIVATE ceditor_scripting)
         message(STATUS "CEditor: scripting runtime LINKED into CEditorPlayerVST (window-closed scripts).")
+
+        # When CPython is embedded, the bundled libpython is co-located with the plugin binary (the
+        # exporter copies it there). libpython is a runtime shared-lib dependency (DT_NEEDED / dylib
+        # load command) recorded with the BUILD machine's path, so a clean end-user box can't resolve
+        # it without a self-relative runpath. Lua/JS are static (no runtime dep) and need none.
+        # UNVERIFIED until a native mac/Linux build; on mac also rewrite libpython's install-name to
+        # @loader_path/<lib> (install_name_tool) where the bundler places it.
+        if (CEDITOR_PYTHON)
+            foreach(_fmt VST3 Standalone)
+                set(_t CEditorPlayerVST_${_fmt})
+                if (TARGET ${_t})
+                    if (APPLE)
+                        set_target_properties(${_t} PROPERTIES BUILD_WITH_INSTALL_RPATH ON INSTALL_RPATH "@loader_path")
+                    elseif (UNIX)
+                        set_target_properties(${_t} PROPERTIES BUILD_WITH_INSTALL_RPATH ON INSTALL_RPATH "$ORIGIN")
+                    endif()
+                endif()
+            endforeach()
+        endif()
     endif()
 
     message(STATUS "CEditor: scripting runtime ENABLED (link `ceditor_scripting` into your host target).")

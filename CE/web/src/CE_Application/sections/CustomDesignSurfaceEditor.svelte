@@ -15,42 +15,122 @@
     Scissors,
     Trash2,
     Unlock,
+    Zap,
   } from 'lucide-svelte';
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
-  import { activateGradientTarget } from '../stores/gradientTarget.js';
+  import { openFillGradientEditor } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { isPolygonKind, clipPathForKind } from '../utils/shapeGeometry.js';
+  import { clipPathForKind } from '../utils/shapeGeometry.js';
   import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { setActiveEditorTab } from '../stores/panels.js';
   import EditorRuler from '../editor/EditorRuler.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
+    CUSTOM_ASSISTANT_RECIPES,
+    CUSTOM_COMPONENT_STARTERS,
     createBackground,
     createBehaviorModule,
     createCustomComponentBlankBindingsDefaults,
     createCustomComponentBlankGeneratorsDefaults,
     createCustomComponentBlankHitZonesDefaults,
     createCustomComponentBlankPartsDefaults,
+    createCustomComponentStarterPatch,
     createHitZone,
     createPartNode,
     createText,
     createValueChannel,
+    createArpPatternChannel,
   } from '../utils/customComponentFactory.js';
+  import { buildRecipePatch } from '../utils/customComponentRecipes.js';
+  import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
+  import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
-  import { noteNameFromMidi, normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
+  import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
+  import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { creatorMode } from '../stores/creatorMode.js';
+  import {
+    ENVELOPE_SHAPE_PRESETS,
+    RENDERER_COLOR_PRESETS,
+    WAVEFORM_SHAPES,
+    envelopePathPresetPatch,
+    waveformIconPresetPatch,
+  } from '../utils/customComponentRendererPresets.js';
   import CustomGeneratorsEditor from './CustomGeneratorsEditor.svelte';
+  import CustomArpeggiatorEditor from './CustomArpeggiatorEditor.svelte';
+  import CustomStateFilmstrip from './CustomStateFilmstrip.svelte';
+  import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
+  import { numberOr } from '../utils/primitives.js';
   import {
     angleFromCenter,
     computeResizedRect,
     computeRotation,
     normalizeRotation,
   } from '../utils/transformMath.js';
+  import {
+    alignFramesWithinSelection,
+    applySmartSnap,
+    arcPointStyle,
+    boundsForFrames,
+    clampNumber,
+    defaultDrawSize,
+    distributeFramesWithinSelection,
+    draftRect as draftRectBase,
+    feedbackLabelStyle as feedbackLabelStyleBase,
+    frameCenter,
+    frameReadout,
+    isTinyFrame,
+    measurementLinesBetween,
+    partFrame as partFrameBase,
+    patchFromFrameForLayer as patchFromFrameForLayerBase,
+    patchFromZoneFrameFor as patchFromZoneFrameForBase,
+    pointInArtboardFromElement,
+    roundLayoutValue,
+    selectionBoundsStyle,
+    smartGuideStyle,
+    smartSnapTargets,
+    snapGuides as snapGuidesBase,
+    zoneFrame as zoneFrameBase,
+  } from '../utils/customDesignSurfaceGeometry.js';
+  import {
+    buildPastePatch,
+    getPartClipboard,
+    hasPartClipboard,
+    setPartClipboard,
+  } from '../utils/customComponentClipboard.js';
+  import {
+    alphaFromColour,
+    cloneValue,
+    colourFromInput,
+    drawPreviewClip,
+    generatedSourceForNode,
+    generatorNameForEntry,
+    handleStyle,
+    hitZoneStyle as hitZoneStyleBase,
+    inlineTextEditorStyle as inlineTextEditorStyleBase,
+    isArcCenterPart,
+    isEditablePart,
+    isEditableZone,
+    isGeneratedPart,
+    kitIdFor,
+    layerKind,
+    layerKindClass,
+    layerKindLabel,
+    layerThumbPartStyle as layerThumbPartStyleBase,
+    numericInputValue,
+    partOverlayStyle as partOverlayStyleBase,
+    previewSignals,
+    stopSelectionAction,
+    swatchCss,
+    uniqueNodeName,
+    valueControlStyleLabel,
+    zoneThumbPartStyle as zoneThumbPartStyleBase,
+  } from '../utils/customDesignSurfaceHelpers.js';
 
   let { control = null } = $props();
 
@@ -99,6 +179,38 @@
   let surfaceZoom = $state(1);
   let snapEnabled = $state(true);
   let snapSize = $state(10);
+  // Object-relative smart guides: snap moves to other parts' edges/centers
+  // and the artboard edges/center; Alt bypasses, grid snap is the fallback.
+  let smartSnapEnabled = $state(true);
+  let activeSmartGuides = $state([]);
+  // Split active guides per ruler axis, tagging the artboard-center guide so
+  // both the ruler and the on-canvas line can draw it distinctly.
+  let smartGuideCenterEps = 0.75;
+  function taggedGuide(guide, centerValue) {
+    return { value: guide.value, kind: Math.abs(guide.value - centerValue) <= smartGuideCenterEps ? 'center' : 'edge' };
+  }
+  let rulerMarkersX = $derived(
+    activeSmartGuides.filter((g) => g.axis === 'x').map((g) => taggedGuide(g, artboardWidth / 2))
+  );
+  let rulerMarkersY = $derived(
+    activeSmartGuides.filter((g) => g.axis === 'y').map((g) => taggedGuide(g, artboardHeight / 2))
+  );
+  function isCenterGuide(guide) {
+    const centerValue = guide.axis === 'x' ? artboardWidth / 2 : artboardHeight / 2;
+    return Math.abs(guide.value - centerValue) <= smartGuideCenterEps;
+  }
+  // Distance readouts between exactly two selected layers.
+  let measureEnabled = $state(false);
+  // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
+  let helpOverlayOpen = $state(false);
+  let surfaceShellEl = $state(null);
+  // Inline readiness nudge: open required/recommended steps, dismissible.
+  let readinessNudgeDismissed = $state(false);
+  let readinessNudgeSteps = $derived.by(() => {
+    if (!control) return [];
+    return analyzeCustomComponentReadiness(control).steps
+      .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity));
+  });
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -165,6 +277,15 @@
         : (selectedSurfaceKind === 'hitZone' && selectedZone ? 'hitZone' : 'layer'))
   );
   let multiSelectionActive = $derived(activeSelectionKind === 'layer' && selectedLayerNames.length > 1);
+  // Distance readouts between exactly two selected layers ("Measure" toggle).
+  let measurementLines = $derived.by(() => {
+    if (!measureEnabled || designerPreviewing) return [];
+    if (activeSelectionKind !== 'layer' || selectedLayerNames.length !== 2) return [];
+    const [frameA, frameB] = selectedLayerNames.map((name) => (
+      parts?._children?.[name] ? partFrame(parts._children[name]) : null
+    ));
+    return measurementLinesBetween(frameA, frameB);
+  });
   let selectedPartEditable = $derived(isEditablePart(selectedAuthoredPart));
   let selectedZoneEditable = $derived(isEditableZone(selectedAuthoredZone));
   let selectedBackground = $derived(selectedAuthoredPart?._children?.Background ?? null);
@@ -183,7 +304,7 @@
       && (selectedPart?.generated === true || selectedPart?.meta?.generated === true)
   );
   let selectedFrame = $derived(selectedPart ? partFrame(selectedPart) : null);
-  let selectedZoneFrame = $derived(selectedZone ? zoneFrame(selectedZone) : null);
+  let selectedZoneFrame = $derived(selectedZone ? displayZoneFrame(selectedZone) : null);
   let activeFrame = $state(null);
   let activeLayerFrames = $state({});
   let activeZoneFrame = $state(null);
@@ -192,6 +313,8 @@
   let lastShapeTool = $state('rectangle');
   let shapeFlyoutOpen = $state(false);
   let interactiveFlyoutOpen = $state(false);
+  let starterFlyoutOpen = $state(false);
+  let assistantFlyoutOpen = $state(false);
   let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
@@ -199,7 +322,6 @@
   let lastDrawCreatedAt = 0;
   let zoneDisplayMode = $state('selected');
   let arpTool = $state('draw');
-  let arpDraftBlock = $state(null);
   let selectionPulseTarget = $state('');
   let selectionPulseTimer = null;
   let surfaceScrollEl = $state(null);
@@ -225,8 +347,6 @@
   let surfaceGridCols = $derived(
     `${paletteCollapsed ? '--palette-w:46px;' : ''}${dockHidden ? '--dock-w:0px;' : ''}`
   );
-  let rulerScrollX = $state(0);
-  let rulerScrollY = $state(0);
   let rulerViewWidth = $state(0);
   let rulerViewHeight = $state(0);
   // Rendered top-left of the (centered, zoomed) artboard within the scroll content.
@@ -244,15 +364,28 @@
     if (!board) return;
     const b = board.getBoundingClientRect();
     const s = surfaceScrollEl.getBoundingClientRect();
-    boardOffsetX = b.left - s.left + surfaceScrollEl.scrollLeft;
-    boardOffsetY = b.top - s.top + surfaceScrollEl.scrollTop;
+    // Measure the artboard's LIVE VISUAL top-left relative to the scroll
+    // viewport's top-left. Both rulers are inset 20px and the scroll area is
+    // inset 20px too, so each ruler's 0 sits exactly on the scroll viewport's
+    // corner — which makes this delta the on-screen pixel where ruler-0 must
+    // land. getBoundingClientRect already folds in centering, the zoom
+    // transform, AND the current scroll, so we pass scrollOffset=0 to the
+    // rulers and just re-measure this (cheap) on scroll. The old approach
+    // added scrollLeft/Top back in and subtracted it again in the ruler, which
+    // drifted whenever the board was flex-centered rather than scrolled.
+    boardOffsetX = b.left - s.left;
+    boardOffsetY = b.top - s.top;
   }
 
   $effect(() => {
     // Re-measure whenever anything that repositions or rescales the artboard changes.
     const deps = `${surfaceZoom}:${artboardWidth}:${artboardHeight}:${rulerViewWidth}:${rulerViewHeight}`;
     void deps;
-    measureBoardOffset();
+    // Defer to after layout/paint so flex-centering + scrollbars have settled;
+    // measuring synchronously catches a pre-centering position that never
+    // corrects itself.
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(measureBoardOffset);
+    else measureBoardOffset();
   });
   let authoredPartNames = $derived(Object.keys(authoredParts?._children ?? {}));
   let valueChannelEntries = $derived(Object.entries(valueChannels?._children ?? {}));
@@ -316,12 +449,13 @@
     return entries;
   });
 
+  // Dock inspector = per-object + spatial concerns only (Stage B8). The
+  // component-wide States/API/Bindings lists moved to their panel homes.
   const INSPECTOR_TABS = [
     { id: 'object', label: 'Object' },
     { id: 'display', label: 'Display' },
     { id: 'behavior', label: 'Behavior' },
-    { id: 'states', label: 'States' },
-    { id: 'device', label: 'Device' },
+    { id: 'states', label: 'Preview' },
   ];
 
   const RESIZE_HANDLES = [
@@ -343,6 +477,7 @@
     { id: 'arcTrack', label: 'Arc', key: 'A' },
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
+    { id: 'interactive', label: 'Interactive', key: 'I' },
     { id: 'text', label: 'Text', key: 'T' },
     // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
     { id: 'line', label: 'Line', key: 'L' },
@@ -358,6 +493,12 @@
     { id: 'arrow', label: 'Arrow', key: '' },
     { id: 'plus', label: 'Plus', key: '' },
   ];
+  // Arpeggiator tool modes and their 1–5 shortcuts (shown in the toolbar +
+  // cheatsheet; handled in handleSurfaceKeydown while an arp surface is active).
+  const ARP_TOOLS = ['select', 'draw', 'move', 'resize', 'velocity'];
+  const ARP_TOOL_KEYS = Object.fromEntries(ARP_TOOLS.map((tool, index) => [String(index + 1), tool]));
+
+  // Shortcut cheatsheet + glossary live in SurfaceHelpOverlay.svelte.
   const POLYGON_TOOL_IDS = ['triangle', 'rightTriangle', 'parallelogram', 'trapezoid', 'diamond', 'pentagon', 'hexagon', 'star', 'chevron', 'arrow', 'plus'];
   // "Lines & Polygons" palette section: line first, then the flat polygons.
   const VECTOR_SHAPE_TOOL_IDS = ['line', ...POLYGON_TOOL_IDS];
@@ -434,6 +575,24 @@
   let shapeToolActive = $derived(SHAPE_TOOL_IDS.has(activeTool));
   let selectedArcMeta = $derived(selectedAuthoredPart?.meta?.arcTrack ?? null);
   let selectedIsArc = $derived(activeSelectionKind === 'layer' && selectedPartEditable && !!selectedArcMeta);
+  // Waveform-icon / envelope-path parts get preset strips (color + shape).
+  let selectedIsWaveformIcon = $derived(
+    activeSelectionKind === 'layer' && selectedPartEditable
+    && (String(selectedPart?.kind ?? '').toLowerCase() === 'waveformicon'
+      || String(selectedPart?.meta?.renderer ?? '').toLowerCase() === 'waveformicon')
+  );
+  let selectedIsEnvelopePath = $derived(
+    activeSelectionKind === 'layer' && selectedPartEditable
+    && (String(selectedPart?.kind ?? '').toLowerCase() === 'envelopepath'
+      || String(selectedPart?.meta?.renderer ?? '').toLowerCase() === 'envelopepath')
+  );
+  let selectedWaveformMeta = $derived(selectedAuthoredPart?.meta?.waveformIcon ?? selectedPart?.meta?.waveformIcon ?? null);
+  let selectedEnvelopeMeta = $derived(selectedAuthoredPart?.meta?.envelopePath ?? selectedPart?.meta?.envelopePath ?? null);
+
+  function applyRendererPreset(patch) {
+    if (!core?.id || !selectedLayer || !Object.keys(patch ?? {}).length) return;
+    applyControlPatch(core.id, patch);
+  }
   let selectedArcPivotTarget = $derived.by(() => nearestArcPivotTarget());
   let arpeggiator = $derived.by(() => normalizeArpeggiator(designer?.arpeggiator));
   let arpeggiatorEnabled = $derived(arpeggiator?.enabled === true);
@@ -441,7 +600,6 @@
   let arpStepCount = $derived(Math.max(1, Math.min(256, Math.round(numberOr(arpeggiator?.stepCount, 32)))));
   let arpViewNote = $derived(Math.max(0, Math.min(116, Math.round(numberOr(arpeggiator?.viewNote, 60)))));
   let arpSelectedBlock = $derived(String(arpeggiator?.selectedBlock ?? ''));
-  let arpVisibleNotes = $derived(Array.from({ length: 12 }, (_, index) => arpViewNote + 11 - index));
   let zoneOverlayEntries = $derived.by(() => {
     if (!showHitZones) return [];
     if (zoneDisplayMode === 'selected') {
@@ -494,6 +652,8 @@
     event?.stopPropagation?.();
     shapeFlyoutOpen = !shapeFlyoutOpen;
     interactiveFlyoutOpen = false;
+    starterFlyoutOpen = false;
+    assistantFlyoutOpen = false;
     if (shapeFlyoutOpen && !SHAPE_TOOL_IDS.has(activeTool)) {
       activeTool = lastShapeTool;
       cancelDraw();
@@ -504,10 +664,45 @@
     event?.stopPropagation?.();
     interactiveFlyoutOpen = !interactiveFlyoutOpen;
     shapeFlyoutOpen = false;
+    starterFlyoutOpen = false;
+    assistantFlyoutOpen = false;
     if (interactiveFlyoutOpen && activeTool !== 'interactive') {
       setActiveTool('interactive');
       interactiveFlyoutOpen = true;
     }
+  }
+
+  // Starters + Assistant recipes moved here from the dissolved Designer tab
+  // (Stage B4) — creation flows live on the surface, not in a properties tab.
+  function toggleStarterFlyout(event) {
+    event?.stopPropagation?.();
+    starterFlyoutOpen = !starterFlyoutOpen;
+    assistantFlyoutOpen = false;
+    shapeFlyoutOpen = false;
+    interactiveFlyoutOpen = false;
+  }
+
+  function toggleAssistantFlyout(event) {
+    event?.stopPropagation?.();
+    assistantFlyoutOpen = !assistantFlyoutOpen;
+    starterFlyoutOpen = false;
+    shapeFlyoutOpen = false;
+    interactiveFlyoutOpen = false;
+  }
+
+  function applyStarterFromFlyout(event, starter) {
+    event?.stopPropagation?.();
+    starterFlyoutOpen = false;
+    if (!core?.id || !starter) return;
+    applyControlPatch(core.id, createCustomComponentStarterPatch(starter.id));
+  }
+
+  function applyRecipeFromFlyout(event, recipe) {
+    event?.stopPropagation?.();
+    assistantFlyoutOpen = false;
+    if (!core?.id || !recipe) return;
+    const patch = buildRecipePatch(control, recipe);
+    if (patch) applyControlPatch(core.id, patch);
   }
 
   function selectInteractiveArchetype(event, id) {
@@ -516,43 +711,8 @@
     setActiveTool('interactive');
   }
 
-  function numberOr(value, fallback = 0) {
-    const numeric = Number(value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
-  function clampNumber(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function noteName(note) {
-    return noteNameFromMidi(note);
-  }
-
   function normalizeArpeggiator(value = {}) {
     return normalizeCustomArpeggiator(value);
-  }
-
-  function nextArpBlockId(blocks = arpBlocks) {
-    let index = blocks.length + 1;
-    const names = new Set(blocks.map((block) => block.id));
-    while (names.has(`note${index}`)) index += 1;
-    return `note${index}`;
-  }
-
-  function arpCellFromEvent(event) {
-    const stage = event.currentTarget?.closest?.('.arp-grid-stage') ?? event.currentTarget;
-    const rect = stage?.getBoundingClientRect?.();
-    return arpCellFromRect(event, rect);
-  }
-
-  function arpCellFromRect(event, rect) {
-    if (!rect) return { step: 0, note: arpViewNote };
-    const x = clampNumber((event.clientX - rect.left) / Math.max(1, rect.width), 0, 0.999999);
-    const y = clampNumber((event.clientY - rect.top) / Math.max(1, rect.height), 0, 0.999999);
-    const step = Math.max(0, Math.min(arpStepCount - 1, Math.floor(x * arpStepCount)));
-    const row = Math.max(0, Math.min(11, Math.floor(y * 12)));
-    return { step, note: arpViewNote + 11 - row };
   }
 
   function withArpPatch(patch = {}) {
@@ -595,124 +755,9 @@
     withArpPatch({ selectedBlock: String(id ?? '') });
   }
 
-  function arpBlockStyle(block) {
-    const left = (block.step / arpStepCount) * 100;
-    const width = (block.length / arpStepCount) * 100;
-    const row = arpViewNote + 11 - block.note;
-    const top = (row / 12) * 100;
-    const height = 100 / 12;
-    return `left:${left}%;top:${top}%;width:${width}%;height:${height}%;`;
-  }
-
-  function arpVelocityStyle(block) {
-    return `height:${(clampNumber(numberOr(block?.velocity, 1), 1, 127) / 127) * 100}%;`;
-  }
-
-  function beginArpDraw(event) {
-    if (arpTool !== 'draw' || !arpeggiatorEnabled || event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    const block = {
-      id: nextArpBlockId(),
-      note: start.note,
-      step: start.step,
-      length: 1,
-      velocity: 96,
-    };
-    arpDraftBlock = block;
-    interaction = {
-      type: 'arpDraw',
-      start,
-      block,
-      stageRect: event.currentTarget?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpBlockMove(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    selectArpBlock(block.id);
-    interaction = {
-      type: 'arpMove',
-      id: block.id,
-      start,
-      block,
-      stageRect: event.currentTarget?.closest?.('.arp-grid-stage')?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpBlockResize(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    const start = arpCellFromEvent(event);
-    selectArpBlock(block.id);
-    interaction = {
-      type: 'arpResize',
-      id: block.id,
-      start,
-      block,
-      stageRect: event.currentTarget?.closest?.('.arp-grid-stage')?.getBoundingClientRect?.(),
-    };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-  }
-
-  function beginArpVelocityDrag(block, event) {
-    if (event.button !== 0) return;
-    event.stopPropagation();
-    event.preventDefault();
-    selectArpBlock(block.id);
-    interaction = { type: 'arpVelocity', id: block.id, block };
-    window.addEventListener('mousemove', handleInteractionMove);
-    window.addEventListener('mouseup', handleInteractionEnd);
-    updateArpVelocityFromEvent(block.id, event);
-  }
-
-  function handleArpBlockPointer(block, event) {
-    if (!block || event.button !== 0) return;
-    if (arpTool === 'draw' || arpTool === 'select') {
-      event.stopPropagation();
-      selectArpBlock(block.id);
-      return;
-    }
-    if (arpTool === 'resize') {
-      beginArpBlockResize(block, event);
-      return;
-    }
-    if (arpTool === 'velocity') {
-      beginArpVelocityDrag(block, event);
-      return;
-    }
-    beginArpBlockMove(block, event);
-  }
-
-  function updateArpVelocityFromEvent(id, event) {
-    const blockEl = event.currentTarget?.closest?.('.arp-block') ?? document.querySelector(`.arp-block[data-block-id="${id}"]`);
-    const rect = blockEl?.getBoundingClientRect?.();
-    if (!rect) return;
-    const normalized = clampNumber(1 - ((event.clientY - rect.top) / Math.max(1, rect.height)), 0, 1);
-    const velocity = Math.max(1, Math.min(127, Math.round(normalized * 127)));
-    setArpBlocks(arpBlocks.map((block) => block.id === id ? { ...block, velocity } : block), id);
-  }
-
   function removeSelectedArpBlock() {
     if (!arpSelectedBlock) return;
     setArpBlocks(arpBlocks.filter((block) => block.id !== arpSelectedBlock), '');
-  }
-
-  function previewSignals(value = {}) {
-    return {
-      valueNormalized: Math.max(0, Math.min(1, numberOr(value?.testValue, 0.5))),
-      customChannels: {},
-    };
   }
 
   $effect(() => {
@@ -742,68 +787,12 @@
     };
   }
 
-  function resolveUnit(value, unit, total) {
-    const numeric = numberOr(value, 0);
-    return String(unit ?? 'px') === 'percent' ? (total * numeric) / 100 : numeric;
-  }
-
-  function anchorOffset(anchor, size) {
-    switch (String(anchor ?? 'center')) {
-      case 'left':
-      case 'top':
-        return 0;
-      case 'right':
-      case 'bottom':
-        return size;
-      default:
-        return size / 2;
-    }
-  }
-
   function partFrame(part) {
-    const layout = part?._children?.Layout ?? {};
-    if (String(layout.mode ?? 'absolute') === 'fill') {
-      return { left: 0, top: 0, width: artboardWidth, height: artboardHeight };
-    }
-
-    const width = resolveUnit(layout.width, layout.widthUnit, artboardWidth);
-    const height = resolveUnit(layout.height, layout.heightUnit, artboardHeight);
-    const x = resolveUnit(layout.x, layout.xUnit, artboardWidth);
-    const y = resolveUnit(layout.y, layout.yUnit, artboardHeight);
-    return {
-      left: x - anchorOffset(layout.anchorX, width) + numberOr(layout.offsetX, 0),
-      top: y - anchorOffset(layout.anchorY, height) + numberOr(layout.offsetY, 0),
-      width,
-      height,
-    };
-  }
-
-  function isEditablePart(part) {
-    if (!part) return false;
-    if (part?.locked === true || part?.meta?.locked === true) return false;
-    if (part?.generated === true || part?.meta?.generated === true) {
-      return !!(part?.detachedFromGenerator || part?.meta?.detachedFromGenerator);
-    }
-    return true;
-  }
-
-  function isGeneratedPart(part) {
-    return part?.generated === true || part?.meta?.generated === true;
+    return partFrameBase(part, artboardWidth, artboardHeight);
   }
 
   function canManagePartName(name) {
     return !!authoredParts?._children?.[name];
-  }
-
-  function generatorNameForEntry(part) {
-    return String(part?.meta?.generatedBy ?? part?.generatedBy ?? '').trim();
-  }
-
-  function generatedSourceForNode(node) {
-    const source = String(node?.meta?.generatedBy ?? node?.generatedBy ?? '').trim();
-    if (source) return source;
-    if (node?.generated === true || node?.meta?.generated === true) return 'generated';
-    return '';
   }
 
   function isGeneratedSourceCollapsed(source) {
@@ -870,10 +859,6 @@
     });
   }
 
-  function kitIdFor(node) {
-    return String(node?.meta?.kitId ?? '');
-  }
-
   function kitFrame(kit) {
     if (!kit?.layerNames?.length) return null;
     return boundsForFrames(
@@ -883,90 +868,24 @@
     );
   }
 
-  function isEditableZone(zone) {
-    if (!zone) return false;
-    if (zone?.locked === true || zone?.meta?.locked === true) return false;
-    if (zone?.generated === true || zone?.meta?.generated === true) {
-      return !!(zone?.detachedFromGenerator || zone?.meta?.detachedFromGenerator);
-    }
-    return true;
-  }
-
-  function cloneValue(value) {
-    return JSON.parse(JSON.stringify(value));
-  }
-
   function nextPartName(base) {
-    const safeBase = String(base || 'layer').replace(/[^a-zA-Z0-9_]/g, '') || 'layer';
-    let name = safeBase;
-    let index = 1;
-    const existing = new Set(authoredPartNames);
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(authoredPartNames), 'layer');
   }
 
   function nextHitZoneName(base = 'hitZone') {
-    const existing = new Set(Object.keys(authoredHitZones?._children ?? {}));
-    const safeBase = String(base || 'hitZone').replace(/[^a-zA-Z0-9_]/g, '') || 'hitZone';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(authoredHitZones?._children ?? {})), 'hitZone');
   }
 
   function nextValueChannelName(base = 'valueControl') {
-    const existing = new Set(Object.keys(valueChannels?._children ?? {}));
-    const safeBase = String(base || 'valueControl').replace(/[^a-zA-Z0-9_]/g, '') || 'valueControl';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(valueChannels?._children ?? {})), 'valueControl');
   }
 
   function nextBehaviorName(base = 'valueDrag') {
-    const existing = new Set(Object.keys(behaviors?._children ?? {}));
-    const safeBase = String(base || 'valueDrag').replace(/[^a-zA-Z0-9_]/g, '') || 'valueDrag';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(behaviors?._children ?? {})), 'valueDrag');
   }
 
   function nextKitName(base = 'kit') {
-    const existing = new Set(kitEntries.map((entry) => entry.id));
-    const safeBase = String(base || 'kit').replace(/[^a-zA-Z0-9_]/g, '') || 'kit';
-    let name = safeBase;
-    let index = 1;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
-  }
-
-  function valueControlStyleLabel(style = 'dial') {
-    if (style === 'horizontal') return 'Horizontal Scale';
-    if (style === 'vertical') return 'Vertical Scale';
-    return 'Dial Control';
-  }
-
-  function defaultDrawSize(tool = activeTool) {
-    if (tool === 'text') return { width: 96, height: 28 };
-    if (tool === 'hitZone') return { width: 96, height: 52 };
-    if (['ellipse', 'ring', 'arcTrack'].includes(tool)) return { width: 72, height: 72 };
-    return { width: 72, height: 52 };
+    return uniqueNodeName(base, new Set(kitEntries.map((entry) => entry.id)), 'kit');
   }
 
   function frameFromClick(point, tool = activeTool) {
@@ -979,19 +898,11 @@
     });
   }
 
-  function emptySection(type) {
-    return { _type: type, _children: {} };
-  }
-
   function frameForPart(name, part) {
     if (activeLayerFrames?.[name]) return activeLayerFrames[name];
     return activeSelectionKind === 'layer' && name === selectedLayer && activeFrame
       ? activeFrame
       : partFrame(part);
-  }
-
-  function isTinyFrame(frame) {
-    return !!frame && (frame.width < 28 || frame.height < 18);
   }
 
   function isTinyPart(name, part) {
@@ -1026,21 +937,6 @@
     };
   }
 
-  function isArcCenterPart(part) {
-    const kind = String(part?.kind ?? '').trim();
-    return kind === 'arcTrack'
-      || kind === 'valueArc'
-      || !!part?.meta?.arcTrack
-      || !!part?.meta?.valueArc;
-  }
-
-  function frameCenter(frame) {
-    return {
-      x: numberOr(frame?.left, 0) + (numberOr(frame?.width, 0) / 2),
-      y: numberOr(frame?.top, 0) + (numberOr(frame?.height, 0) / 2),
-    };
-  }
-
   function nearestArcPivotTarget() {
     if (activeSelectionKind !== 'layer' || !selectedPart || !selectedFrame) return null;
     const selectedCenter = frameCenter(selectedFrame);
@@ -1058,45 +954,6 @@
       })
       .sort((left, right) => left.distance - right.distance);
     return candidates[0] ?? null;
-  }
-
-  const STATE_ACCENTS = ['#14B8A6', '#5B9BD5', '#E5A029', '#9B7FEA', '#70C08F', '#E26D6D'];
-
-  function hashIndex(value, size) {
-    const text = String(value ?? '');
-    let hash = 0;
-    for (let index = 0; index < text.length; index += 1) {
-      hash = ((hash << 5) - hash) + text.charCodeAt(index);
-      hash |= 0;
-    }
-    return Math.abs(hash) % Math.max(1, size);
-  }
-
-  function stateLabel(name, state, base = false) {
-    if (base) return 'Base';
-    return String(state?.label ?? state?.name ?? name ?? 'State');
-  }
-
-  function stateDescription(name, state, base = false) {
-    if (base) return 'Default component look';
-    const flags = Object.entries(state?.when ?? {})
-      .filter(([, value]) => value === true)
-      .map(([key]) => key);
-    if (flags.length) return flags.join(' + ');
-    return state?.description || state?.group || name;
-  }
-
-  function statePatchCount(state) {
-    const patches = state?.patches ?? {};
-    return Object.values(patches).reduce((total, patch) => {
-      if (!patch || typeof patch !== 'object') return total;
-      return total + Object.keys(patch).length;
-    }, 0);
-  }
-
-  function stateCardStyle(name, index = 0) {
-    const accent = STATE_ACCENTS[(hashIndex(name, STATE_ACCENTS.length) + index) % STATE_ACCENTS.length];
-    return `--state-accent:${accent};`;
   }
 
   function statePreviewCard(entry, index = 0) {
@@ -1121,20 +978,6 @@
     };
   }
 
-  function statePreviewStageStyle(entry) {
-    const previewWidth = Math.max(1, numberOr(entry?.previewWidth, artboardWidth));
-    const previewHeight = Math.max(1, numberOr(entry?.previewHeight, artboardHeight));
-    const scale = Math.min(44 / previewWidth, 30 / previewHeight);
-    const left = Math.max(0, (44 - (previewWidth * scale)) / 2);
-    const top = Math.max(0, (30 - (previewHeight * scale)) / 2);
-    return [
-      `width:${previewWidth}px`,
-      `height:${previewHeight}px`,
-      `transform:translate(${left}px, ${top}px) scale(${scale})`,
-      'transform-origin:top left',
-    ].join(';');
-  }
-
   function selectStateCard(name) {
     if (!core?.id) return;
     const stateName = String(name || 'base');
@@ -1143,16 +986,7 @@
   }
 
   function nextStateName(base = 'State') {
-    const existing = new Set(Object.keys(states?._children ?? {}));
-    const safeBase = String(base || 'State').replace(/[^a-zA-Z0-9_]/g, '') || 'State';
-    if (!existing.has(safeBase)) return safeBase;
-    let index = 2;
-    let name = `${safeBase}_${index}`;
-    while (existing.has(name)) {
-      index += 1;
-      name = `${safeBase}_${index}`;
-    }
-    return name;
+    return uniqueNodeName(base, new Set(Object.keys(states?._children ?? {})), 'State');
   }
 
   function addQuickState(event = null) {
@@ -1174,26 +1008,11 @@
       },
     });
     selectStateCard(name);
-    inspectorTab = 'states';
   }
 
   function setFilmstripStateWhen(stateName, flag, value) {
     if (!core?.id || !stateName || stateName === 'base') return;
     updateControlProperty(core.id, `States.${stateName}.when.${flag}`, value);
-  }
-
-  function stateTriggerLabel(state, base = false) {
-    if (base) return '';
-    const when = state?.when ?? {};
-    if (when.hover) return 'Hover';
-    if (when.pressed) return 'Pressed';
-    if (when.disabled) return 'Disabled';
-    if (when.focused) return 'Focused';
-    if (when.dragging) return 'Dragging';
-    if (when.checked) return 'Checked';
-    const flags = Object.entries(when).filter(([, v]) => v === true).map(([k]) => k);
-    if (flags.length) return flags[0];
-    return 'No trigger';
   }
 
   function duplicateStateCard(name, state, event = null) {
@@ -1209,7 +1028,6 @@
       name: nextName,
     });
     selectStateCard(nextName);
-    inspectorTab = 'states';
   }
 
   function removeStateCard(name, event = null) {
@@ -1219,83 +1037,12 @@
     if (designer?.preview?.state === name) selectStateCard('base');
   }
 
-  function partBackground(part) {
-    return part?._children?.Background ?? {};
-  }
-
-  function partFillColour(part, fallback = '#14B8A6') {
-    return colorInputValue(partBackground(part)?._children?.Fill?.colour, fallback);
-  }
-
-  function partStrokeColour(part, fallback = '#DCEBFA') {
-    return colorInputValue(partBackground(part)?._children?.Border?.colour, fallback);
-  }
-
-  function partCornerRadius(part) {
-    return numberOr(partBackground(part)?._children?.Corners?.radius, 4);
-  }
-
-  function layerKind(part) {
-    return String(part?.kind ?? part?.role ?? 'part');
-  }
-
-  function layerKindLabel(part) {
-    const kind = layerKind(part);
-    const labels = {
-      roundedRectangle: 'Rounded',
-      rectangle: 'Rect',
-      circle: 'Circle',
-      ellipse: 'Ellipse',
-      text: 'Text',
-      arcTrack: 'Arc',
-      valueArc: 'Arc',
-      capsule: 'Capsule',
-      ring: 'Ring',
-      viewport: 'View',
-    };
-    return labels[kind] ?? kind;
-  }
-
-  function layerKindClass(part) {
-    const kind = layerKind(part);
-    if (['circle', 'ellipse', 'ring'].includes(kind)) return 'ellipse';
-    if (['arcTrack', 'valueArc'].includes(kind)) return 'arc';
-    if (kind === 'text') return 'text';
-    if (kind === 'capsule') return 'capsule';
-    return 'rect';
-  }
-
   function layerThumbPartStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const left = clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100);
-    const top = clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100);
-    const width = clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 6, 110);
-    const height = clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 6, 110);
-    const radius = ['circle', 'ellipse', 'ring'].includes(layerKind(part))
-      ? 999
-      : Math.min(999, Math.max(2, partCornerRadius(part) / 3));
-    return [
-      `left:${left}%`,
-      `top:${top}%`,
-      `width:${width}%`,
-      `height:${height}%`,
-      `border-radius:${radius}px`,
-      `background:${partFillColour(part, '#23323B')}`,
-      `border-color:${partStrokeColour(part, '#5B9BD5')}`,
-      `opacity:${clampNumber(numberOr(part?.opacity, 1), 0.18, 1)}`,
-    ].join(';');
+    return layerThumbPartStyleBase(frameForPart(name, part), part, artboardWidth, artboardHeight);
   }
 
   function zoneThumbPartStyle(name, zone) {
-    const frame = zoneFrame(zone);
-    const shape = String(zone?.shape ?? 'rectangle');
-    return [
-      `left:${clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100)}%`,
-      `top:${clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100)}%`,
-      `width:${clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 8, 110)}%`,
-      `height:${clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 8, 110)}%`,
-      `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
-    ].join(';');
+    return zoneThumbPartStyleBase(zoneFrame(zone), zone, artboardWidth, artboardHeight);
   }
 
   function isLayerSelected(name) {
@@ -1306,15 +1053,6 @@
     return selectedLayerNames
       .map((name) => [name, authoredParts?._children?.[name], parts?._children?.[name]])
       .filter(([, authoredPart, part]) => part && isEditablePart(authoredPart));
-  }
-
-  function boundsForFrames(frames = []) {
-    if (!frames.length) return null;
-    const left = Math.min(...frames.map((frame) => frame.left));
-    const top = Math.min(...frames.map((frame) => frame.top));
-    const right = Math.max(...frames.map((frame) => frame.left + frame.width));
-    const bottom = Math.max(...frames.map((frame) => frame.top + frame.height));
-    return { left, top, width: right - left, height: bottom - top };
   }
 
   function multiSelectionBounds() {
@@ -1330,7 +1068,7 @@
     const artboard = event.currentTarget?.classList?.contains?.('artboard')
       ? event.currentTarget
       : event.currentTarget?.closest?.('.artboard');
-    return pointInArtboardFromElement(event, artboard);
+    return pointInArtboardFromElement(event, artboard, artboardWidth, artboardHeight, surfaceZoom);
   }
 
   function snapValue(value, event = null) {
@@ -1350,22 +1088,7 @@
   }
 
   function draftRect(draft = drawDraft) {
-    if (!draft) return null;
-    let x2 = draft.current.x;
-    let y2 = draft.current.y;
-    if (draft.constrain) {
-      const size = Math.max(Math.abs(x2 - draft.start.x), Math.abs(y2 - draft.start.y));
-      x2 = draft.start.x + Math.sign(x2 - draft.start.x || 1) * size;
-      y2 = draft.start.y + Math.sign(y2 - draft.start.y || 1) * size;
-      x2 = Math.max(0, Math.min(artboardWidth, x2));
-      y2 = Math.max(0, Math.min(artboardHeight, y2));
-    }
-    return {
-      left: Math.min(draft.start.x, x2),
-      top: Math.min(draft.start.y, y2),
-      width: Math.abs(x2 - draft.start.x),
-      height: Math.abs(y2 - draft.start.y),
-    };
+    return draftRectBase(draft, artboardWidth, artboardHeight);
   }
 
   function drawPreviewStyle() {
@@ -1374,28 +1097,8 @@
     return `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`;
   }
 
-  // Clip the drag preview to the shape being drawn (polygons + a thin line bar).
-  function drawPreviewClip(tool) {
-    if (tool === 'line') return 'polygon(0% 42%, 100% 42%, 100% 58%, 0% 58%)';
-    if (isPolygonKind(tool)) return clipPathForKind(tool);
-    return 'none';
-  }
-
-  function frameReadout(frame = feedbackFrame) {
-    if (!frame) return '';
-    return `${Math.round(frame.width)} x ${Math.round(frame.height)}  X ${Math.round(frame.left)}  Y ${Math.round(frame.top)}`;
-  }
-
   function feedbackLabelStyle(frame = feedbackFrame) {
-    if (!frame) return '';
-    const left = Math.max(4, Math.min(artboardWidth - 118, frame.left + frame.width + 8));
-    const top = Math.max(4, Math.min(artboardHeight - 24, frame.top + frame.height + 8));
-    return `left:${left}px;top:${top}px;`;
-  }
-
-  function selectionBoundsStyle(frame = activeSelectionFrame) {
-    if (!frame) return '';
-    return `left:${frame.left}px;top:${frame.top}px;width:${frame.width}px;height:${frame.height}px;`;
+    return feedbackLabelStyleBase(frame, artboardWidth, artboardHeight);
   }
 
   function pulseSelection(target) {
@@ -1409,11 +1112,6 @@
     });
   }
 
-  function stopSelectionAction(event) {
-    event?.preventDefault?.();
-    event?.stopPropagation?.();
-  }
-
   function showDrawNotice(message) {
     drawNotice = message;
     if (drawNoticeTimer) clearTimeout(drawNoticeTimer);
@@ -1422,37 +1120,13 @@
     }, 3000);
   }
 
-  function pointInArtboardFromElement(event, element) {
-    const rect = element?.getBoundingClientRect?.();
-    if (!rect) return { x: 0, y: 0 };
-    return {
-      x: Math.max(0, Math.min(artboardWidth, (event.clientX - rect.left) / surfaceZoom)),
-      y: Math.max(0, Math.min(artboardHeight, (event.clientY - rect.top) / surfaceZoom)),
-    };
-  }
-
   function focusOnMount(node) {
     requestAnimationFrame(() => node?.focus?.());
     return {};
   }
 
   function snapGuides(frame = feedbackFrame) {
-    if (!frame || !snapEnabled) return [];
-    const size = Math.max(1, numberOr(snapSize, 10));
-    const candidates = [
-      { axis: 'x', value: frame.left },
-      { axis: 'x', value: frame.left + frame.width },
-      { axis: 'y', value: frame.top },
-      { axis: 'y', value: frame.top + frame.height },
-    ];
-    return candidates
-      .filter((guide) => Math.abs(guide.value - Math.round(guide.value / size) * size) < 0.01)
-      .map((guide) => ({
-        ...guide,
-        style: guide.axis === 'x'
-          ? `left:${guide.value}px;top:0;height:${artboardHeight}px;`
-          : `top:${guide.value}px;left:0;width:${artboardWidth}px;`,
-      }));
+    return snapGuidesBase(frame, snapEnabled, snapSize, artboardWidth, artboardHeight);
   }
 
   function makeDrawnPart(kind, rect) {
@@ -1525,8 +1199,48 @@
     return zone;
   }
 
+  // "Make Interactive" scaffolding (§3 archetypes): one action creates the
+  // visual part(s) plus the channel + behavior + hit-zone set, pre-wired.
+  // The patch builder lives in utils/customComponentScaffold.js (shared with
+  // the Interact tab's add action).
+
+  function commitInteractiveDraw(rect) {
+    const built = buildInteractivePatch(control, interactiveArchetype, { x: rect.left, y: rect.top, width: rect.width, height: rect.height });
+    if (!built) return;
+    localSelectedLayerNames = [built.partName];
+    applyControlPatch(core.id, {
+      ...built.patch,
+      'Designer.selectedLayer': built.partName,
+      'Designer.selectedLayers': [built.partName],
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+      'Designer.preview.showHitZones': true,
+    });
+    activeTool = 'select';
+    zoneDisplayMode = 'all';
+    lastDrawCreatedAt = Date.now();
+    pulseSelection(`layer:${built.partName}`);
+  }
+
+  function makeSelectedLayerInteractive() {
+    if (!core?.id || !selectedLayer || !canManageLayer || !selectedFrame) return;
+    const frame = { x: selectedFrame.left, y: selectedFrame.top, width: selectedFrame.width, height: selectedFrame.height };
+    const built = buildInteractivePatch(control, interactiveArchetype, frame, selectedLayer);
+    if (!built) return;
+    applyControlPatch(core.id, {
+      ...built.patch,
+      'Designer.preview.showHitZones': true,
+    });
+    zoneDisplayMode = 'all';
+    pulseSelection(`layer:${selectedLayer}`);
+  }
+
   function commitDrawnFrame(tool, rect, event = null) {
     if (!core?.id || !rect) return;
+    if (tool === 'interactive') {
+      commitInteractiveDraw(rect);
+      return;
+    }
     if (tool === 'hitZone') {
       const zone = makeDrawnHitZone(rect, event?.shiftKey ? 'circle' : 'rectangle');
       applyControlPatch(core.id, {
@@ -1626,11 +1340,13 @@
       [`ValueChannels.arpNote`]: createValueChannel('arpNote', { label: 'Arp Note', type: 'int', defaultValue: 60, min: 0, max: 127, step: 1 }),
       [`ValueChannels.arpVelocity`]: createValueChannel('arpVelocity', { label: 'Arp Velocity', type: 'int', defaultValue: 0, min: 0, max: 127, step: 1 }),
       [`ValueChannels.arpGate`]: createValueChannel('arpGate', { label: 'Arp Gate', type: 'bool', defaultValue: false, min: 0, max: 1, step: 1 }),
+      [`ValueChannels.arpPattern`]: createArpPatternChannel(),
       'PublishedProperties.inputs.arpCurrentStep': { channel: 'arpCurrentStep', label: 'Arp Step In', type: 'int', enabled: true, min: 0, max: 31, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpCurrentStep': { channel: 'arpCurrentStep', label: 'Arp Step', type: 'int', enabled: true, min: 0, max: 31, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpNote': { channel: 'arpNote', label: 'Arp Note', type: 'int', enabled: true, min: 0, max: 127, step: 1, defaultValue: 60 },
       'PublishedProperties.outputs.arpVelocity': { channel: 'arpVelocity', label: 'Arp Velocity', type: 'int', enabled: true, min: 0, max: 127, step: 1, defaultValue: 0 },
       'PublishedProperties.outputs.arpGate': { channel: 'arpGate', label: 'Arp Gate', type: 'bool', enabled: true, defaultValue: false },
+      'PublishedProperties.outputs.arpPattern': { channel: 'arpPattern', label: 'Arp Pattern', type: 'array', enabled: true },
       'PublishedProperties.editableProperties.arpSteps': { path: 'Designer.arpeggiator.stepCount', label: 'Arp Steps', type: 'int', enabled: true, min: 1, max: 256, step: 1, defaultValue: 32 },
       'ExternalAPI.events': [
         ...(Array.isArray(control?._children?.ExternalAPI?.events) ? control._children.ExternalAPI.events : []),
@@ -1943,101 +1659,39 @@
   }
 
   function partOverlayStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const layout = part?._children?.Layout ?? {};
-    const rotation = numberOr(layout.rotation, 0);
-    const scale = Math.max(0.01, numberOr(layout.scale, 1));
-    const transforms = [];
-    if (Math.abs(rotation) > 0.001) transforms.push(`rotate(${rotation}deg)`);
-    if (Math.abs(scale - 1) > 0.001) transforms.push(`scale(${scale})`);
-
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${frame.width}px`,
-      `height:${frame.height}px`,
-      `z-index:${1000 + numberOr(part?.zIndex, 0)}`,
-      transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout.pivotX, 50)}% ${numberOr(layout.pivotY, 50)}%` : '',
-    ].filter(Boolean).join(';');
+    return partOverlayStyleBase(frameForPart(name, part), part);
   }
 
   function zoneFrame(zone) {
-    const bounds = zone?.bounds ?? {};
-    const unit = String(bounds.unit ?? 'percent') === 'px' ? 'px' : '%';
-    const x = numberOr(bounds.x, 0);
-    const y = numberOr(bounds.y, 0);
-    const width = Math.max(0, numberOr(bounds.width, 100));
-    const height = Math.max(0, numberOr(bounds.height, 100));
-    return unit === 'px'
-      ? { left: x, top: y, width, height }
-      : {
-        left: (artboardWidth * x) / 100,
-        top: (artboardHeight * y) / 100,
-        width: (artboardWidth * width) / 100,
-        height: (artboardHeight * height) / 100,
-      };
+    return zoneFrameBase(zone, artboardWidth, artboardHeight);
+  }
+
+  function isFollowZone(zone) {
+    return String(zone?.source ?? 'independent') !== 'independent';
+  }
+
+  // Follow-mode zones live where their source part (or the face) is, grown by
+  // inflate/minTouch — the runtime ignores their authored bounds, so the
+  // surface must show the resolved grab area instead.
+  function displayZoneFrame(zone) {
+    if (!isFollowZone(zone)) return zoneFrame(zone);
+    const resolved = customHitZoneRect(zone, { width: artboardWidth, height: artboardHeight }, parts?._children ?? null);
+    return { left: resolved.x, top: resolved.y, width: resolved.width, height: resolved.height };
   }
 
   function hitZoneStyle(name, zone) {
     const frame = activeSelectionKind === 'hitZone' && name === selectedHitZone && activeZoneFrame
       ? activeZoneFrame
-      : zoneFrame(zone);
-    const shape = String(zone?.shape ?? 'rectangle');
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${Math.max(0, frame.width)}px`,
-      `height:${Math.max(0, frame.height)}px`,
-      `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
-      `z-index:${1800 + numberOr(zone?.priority, 0)}`,
-    ].join(';');
+      : displayZoneFrame(zone);
+    return hitZoneStyleBase(frame, zone);
   }
 
   function patchFromZoneFrameFor(name, zone, frame) {
-    const unit = String(zone?.bounds?.unit ?? 'percent') === 'px' ? 'px' : 'percent';
-    const left = Math.max(0, frame.left);
-    const top = Math.max(0, frame.top);
-    const width = Math.max(1, frame.width);
-    const height = Math.max(1, frame.height);
-    return {
-      [`HitZones.${name}.bounds.x`]: unit === 'px' ? roundLayoutValue(left) : roundLayoutValue((left / artboardWidth) * 100),
-      [`HitZones.${name}.bounds.y`]: unit === 'px' ? roundLayoutValue(top) : roundLayoutValue((top / artboardHeight) * 100),
-      [`HitZones.${name}.bounds.width`]: unit === 'px' ? roundLayoutValue(width) : roundLayoutValue((width / artboardWidth) * 100),
-      [`HitZones.${name}.bounds.height`]: unit === 'px' ? roundLayoutValue(height) : roundLayoutValue((height / artboardHeight) * 100),
-      [`HitZones.${name}.bounds.unit`]: unit,
-    };
+    return patchFromZoneFrameForBase(name, zone, frame, artboardWidth, artboardHeight);
   }
 
   function patchFromZoneFrame(zone, frame) {
     return patchFromZoneFrameFor(selectedHitZone, zone, frame);
-  }
-
-  function handleStyle(id) {
-    const offset = -4;
-    const middle = 'calc(50% - 4px)';
-    const positions = {
-      tl: `left:${offset}px;top:${offset}px;`,
-      t: `left:${middle};top:${offset}px;`,
-      tr: `right:${offset}px;top:${offset}px;`,
-      r: `right:${offset}px;top:${middle};`,
-      br: `right:${offset}px;bottom:${offset}px;`,
-      b: `left:${middle};bottom:${offset}px;`,
-      bl: `left:${offset}px;bottom:${offset}px;`,
-      l: `left:${offset}px;top:${middle};`,
-    };
-    return positions[id] ?? '';
-  }
-
-  function roundLayoutValue(value) {
-    return Math.round(value * 1000) / 1000;
-  }
-
-  function colorInputValue(value, fallback = '#5B9BD5') {
-    const raw = String(value ?? '').trim();
-    if (/^[0-9a-f]{8}$/i.test(raw)) return `#${raw.slice(2)}`;
-    if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
-    if (/^#[0-9a-f]{6}$/i.test(raw)) return raw;
-    return fallback;
   }
 
   const DEFAULT_LAYER_GRADIENT = {
@@ -2045,26 +1699,6 @@
     radiusX: 50, radiusY: 50, edge: 0,
     stops: [{ color: '555555', position: 0 }, { color: 'AAAAAA', position: 100 }],
   };
-
-  function swatchCss(value, fallback = '5B9BD5') {
-    const raw = String(value ?? '').trim().replace(/^#/, '');
-    if (/^[0-9a-f]{8}$/i.test(raw)) {
-      const a = parseInt(raw.slice(0, 2), 16) / 255;
-      const rgb = raw.slice(2);
-      // Opaque: just paint the solid colour.
-      if (a >= 0.999) return `background:#${rgb}`;
-      // Semi-transparent: layer the colour over a checkerboard so alpha shows.
-      // The colour must be a linear-gradient() to be a valid background-image layer.
-      const r = parseInt(raw.slice(2, 4), 16);
-      const g = parseInt(raw.slice(4, 6), 16);
-      const b = parseInt(raw.slice(6, 8), 16);
-      const c = `rgba(${r},${g},${b},${a})`;
-      return `background-image:linear-gradient(${c},${c}),repeating-conic-gradient(#555 0% 25%,#333 0% 50%);background-size:auto,8px 8px`;
-    }
-    // 6-digit RRGGBB (no alpha) — fully opaque.
-    if (/^[0-9a-f]{6}$/i.test(raw)) return `background:#${raw}`;
-    return `background:#${fallback}`;
-  }
 
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
@@ -2084,16 +1718,13 @@
 
   function openLayerGradient() {
     if (!core?.id || !selectedLayer || !selectedFill) return;
-    const gradient = selectedFill.gradient?.stops?.length >= 2
-      ? selectedFill.gradient
-      : DEFAULT_LAYER_GRADIENT;
-    if (!selectedFill.gradient?.stops?.length) {
-      setLayerProperty('Background.Fill.gradient', gradient);
-    }
-    activateGradientTarget(
-      { type: 'control', controlId: core.id, path: `Parts.${selectedLayer}.Background.Fill` },
-      gradient
-    );
+    openFillGradientEditor({
+      controlId: core.id,
+      targetPath: `Parts.${selectedLayer}.Background.Fill`,
+      fill: selectedFill,
+      defaultGradient: DEFAULT_LAYER_GRADIENT,
+      seedGradient: (seeded) => setLayerProperty('Background.Fill.gradient', seeded),
+    });
   }
 
   function toggleFillGradient() {
@@ -2102,23 +1733,29 @@
     if (next) openLayerGradient();
   }
 
-  function alphaFromColour(value, fallback = 'FF') {
-    const raw = String(value ?? '').trim();
-    return /^[0-9a-f]{8}$/i.test(raw) ? raw.slice(0, 2).toUpperCase() : fallback;
-  }
-
-  function colourFromInput(value, alpha = 'FF', fallback = '5B9BD5') {
-    const raw = String(value ?? '').replace('#', '').trim();
-    return /^[0-9a-f]{6}$/i.test(raw) ? `${alpha}${raw.toUpperCase()}` : `${alpha}${fallback}`;
-  }
-
-  function numericInputValue(event, fallback = 0) {
-    const numeric = Number(event?.target?.value);
-    return Number.isFinite(numeric) ? numeric : fallback;
-  }
-
   function setZoom(value) {
     surfaceZoom = Math.max(0.25, Math.min(5, numberOr(value, 1)));
+  }
+
+  // Wheel zoom on the design canvas (parity with the panel editor). Ctrl/Cmd
+  // + wheel, or a trackpad pinch (which arrives as ctrlKey wheel), zooms
+  // toward the cursor; a plain wheel keeps native scrolling. Holding the zoom
+  // point fixed keeps the part under the cursor put while zooming.
+  function handleSurfaceWheel(event) {
+    if (!(event.ctrlKey || event.metaKey) || !surfaceScrollEl) return;
+    event.preventDefault();
+    const rect = surfaceScrollEl.getBoundingClientRect();
+    const pointerX = event.clientX - rect.left + surfaceScrollEl.scrollLeft;
+    const pointerY = event.clientY - rect.top + surfaceScrollEl.scrollTop;
+    const before = surfaceZoom;
+    const factor = Math.exp(-event.deltaY * 0.0015);
+    setZoom(before * factor);
+    const ratio = surfaceZoom / before;
+    if (ratio !== 1) {
+      // Keep the cursor's content point stationary after the scale change.
+      surfaceScrollEl.scrollLeft += (pointerX * ratio) - pointerX;
+      surfaceScrollEl.scrollTop += (pointerY * ratio) - pointerY;
+    }
   }
 
   // Bottom zoom bar helpers (percent-based, like the Panel Designer's ZoomBar).
@@ -2172,25 +1809,8 @@
     });
   }
 
-  function valueFromPx(px, unit, total) {
-    return String(unit ?? 'px') === 'percent'
-      ? roundLayoutValue(total > 0 ? (px / total) * 100 : 0)
-      : roundLayoutValue(px);
-  }
-
   function patchFromFrameForLayer(name, part, frame) {
-    const layout = part?._children?.Layout ?? {};
-    const width = Math.max(1, frame.width);
-    const height = Math.max(1, frame.height);
-    const coordinateX = frame.left + anchorOffset(layout.anchorX, width) - numberOr(layout.offsetX, 0);
-    const coordinateY = frame.top + anchorOffset(layout.anchorY, height) - numberOr(layout.offsetY, 0);
-
-    return {
-      [`Parts.${name}.Layout.x`]: valueFromPx(coordinateX, layout.xUnit, artboardWidth),
-      [`Parts.${name}.Layout.y`]: valueFromPx(coordinateY, layout.yUnit, artboardHeight),
-      [`Parts.${name}.Layout.width`]: valueFromPx(width, layout.widthUnit, artboardWidth),
-      [`Parts.${name}.Layout.height`]: valueFromPx(height, layout.heightUnit, artboardHeight),
-    };
+    return patchFromFrameForLayerBase(name, part, frame, artboardWidth, artboardHeight);
   }
 
   function patchFromFrame(part, frame) {
@@ -2259,21 +1879,7 @@
   }
 
   function inlineTextEditorStyle(name, part) {
-    const frame = frameForPart(name, part);
-    const text = part?._children?.Text ?? {};
-    const font = text?._children?.Font ?? {};
-    const fill = text?._children?.Fill ?? {};
-    return [
-      `left:${frame.left}px`,
-      `top:${frame.top}px`,
-      `width:${frame.width}px`,
-      `height:${frame.height}px`,
-      `z-index:${2500 + numberOr(part?.zIndex, 0)}`,
-      `color:#${String(fill?.colour ?? 'FFFFFFFF').slice(-6)}`,
-      `font-family:${font?.family ?? 'Arial'}`,
-      `font-size:${numberOr(font?.size, 12)}px`,
-      `font-weight:${numberOr(font?.weightValue, 600)}`,
-    ].join(';');
+    return inlineTextEditorStyleBase(frameForPart(name, part), part);
   }
 
   function renameSelectedLayer(event) {
@@ -2618,6 +2224,88 @@
     if (Object.keys(patch).length) applyControlPatch(core.id, patch);
   }
 
+  function smartTargetsExcluding(excludedNames = []) {
+    const excluded = new Set(excludedNames);
+    const frames = partEntries
+      .filter(([name]) => !excluded.has(name))
+      .map(([, part]) => partFrame(part));
+    return smartSnapTargets(frames, artboardWidth, artboardHeight);
+  }
+
+  // Align the selected layers to each other (the selection's bounding box);
+  // alignSelection() above keeps aligning to the artboard.
+  function alignSelectedLayers(mode) {
+    if (!core?.id || selectedLayerNames.length < 2) return;
+    const entries = selectedEditableLayerEntries();
+    const aligned = alignFramesWithinSelection(
+      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      mode
+    );
+    const patch = {};
+    for (const [name, authoredPart] of entries) {
+      const frame = aligned.get(name);
+      if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  function distributeSelectedLayers(axis) {
+    if (!core?.id || selectedLayerNames.length < 3) return;
+    const entries = selectedEditableLayerEntries();
+    const distributed = distributeFramesWithinSelection(
+      entries.map(([name, , renderedPart]) => [name, partFrame(renderedPart)]),
+      axis
+    );
+    const patch = {};
+    for (const [name, authoredPart] of entries) {
+      const frame = distributed.get(name);
+      if (frame) Object.assign(patch, patchFromFrameForLayer(name, authoredPart, frame));
+    }
+    if (Object.keys(patch).length) applyControlPatch(core.id, patch);
+  }
+
+  function copySelectedLayers() {
+    const copiedParts = selectedLayerNames
+      .map((name) => authoredParts?._children?.[name])
+      .filter(Boolean);
+    if (!copiedParts.length) return;
+    const partSet = new Set(selectedLayerNames);
+    const followingZones = Object.values(authoredHitZones?._children ?? {}).filter((zone) => {
+      const followed = /^part:(.+)$/.exec(String(zone?.source ?? ''));
+      return followed && partSet.has(followed[1]);
+    });
+    setPartClipboard(copiedParts, followingZones);
+    showDrawNotice(`Copied ${copiedParts.length} layer${copiedParts.length === 1 ? '' : 's'}`);
+  }
+
+  function cutSelectedLayers() {
+    if (!canManageLayer && !multiSelectionActive) return;
+    copySelectedLayers();
+    removeSelectedLayer();
+  }
+
+  function pasteClipboardLayers() {
+    if (!core?.id || !hasPartClipboard()) return;
+    const result = buildPastePatch(
+      getPartClipboard(),
+      Object.keys(authoredParts?._children ?? {}),
+      Object.keys(authoredHitZones?._children ?? {}),
+      maxLayerZIndex()
+    );
+    if (!result?.partNames?.length) return;
+    localSelectedLayerNames = result.partNames;
+    applyControlPatch(core.id, {
+      ...result.patch,
+      'Designer.selectedLayer': result.partNames[0],
+      'Designer.selectedLayers': result.partNames,
+      'Designer.selectedSurfaceKind': 'layer',
+      'Designer.selectedHitZone': '',
+      'Designer.selectedKit': '',
+    });
+    pulseSelection(`layer:${result.partNames[0]}`);
+    showDrawNotice(`Pasted ${result.partNames.length} layer${result.partNames.length === 1 ? '' : 's'}`);
+  }
+
   function setPreviewFlag(path, value) {
     if (!core?.id) return;
     updateControlProperty(core.id, `Designer.preview.${path}`, value);
@@ -2722,6 +2410,8 @@
           name,
           startMouse: { x: event.clientX, y: event.clientY },
           startFrames,
+          startBounds: boundsForFrames(Object.values(startFrames)),
+          smartTargets: smartTargetsExcluding(Object.keys(startFrames)),
         };
         activeLayerFrames = startFrames;
         window.addEventListener('mousemove', handleInteractionMove);
@@ -2734,6 +2424,7 @@
       name,
       startMouse: { x: event.clientX, y: event.clientY },
       startFrame: frame,
+      smartTargets: smartTargetsExcluding([name]),
     };
     activeFrame = frame;
     window.addEventListener('mousemove', handleInteractionMove);
@@ -2782,16 +2473,6 @@
     window.addEventListener('mouseup', handleInteractionEnd);
   }
 
-  function arcPointStyle(frame, angleDeg) {
-    if (!frame) return '';
-    const radians = (numberOr(angleDeg, 0) * Math.PI) / 180;
-    const rx = frame.width / 2;
-    const ry = frame.height / 2;
-    const x = rx + Math.cos(radians) * rx;
-    const y = ry + Math.sin(radians) * ry;
-    return `left:${x - 6}px;top:${y - 6}px;`;
-  }
-
   function beginArcHandleDrag(handle, event) {
     if (event.button !== 0 || !selectedIsArc || !selectedFrame) return;
     event.stopPropagation();
@@ -2810,64 +2491,56 @@
 
   function handleInteractionMove(event) {
     if (!interaction) return;
-    if (interaction.type === 'arpDraw') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      const step = Math.min(interaction.start.step, current.step);
-      const endStep = Math.max(interaction.start.step, current.step);
-      arpDraftBlock = {
-        ...interaction.block,
-        note: current.note,
-        step,
-        length: Math.max(1, endStep - step + 1),
-      };
-      return;
-    }
-    if (interaction.type === 'arpMove') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      const stepDelta = current.step - interaction.start.step;
-      const noteDelta = current.note - interaction.start.note;
-      setArpBlocks(arpBlocks.map((block) => {
-        if (block.id !== interaction.id) return block;
-        const step = clampNumber(interaction.block.step + stepDelta, 0, Math.max(0, arpStepCount - interaction.block.length));
-        const note = clampNumber(interaction.block.note + noteDelta, 0, 127);
-        return { ...block, step, note };
-      }), interaction.id);
-      return;
-    }
-    if (interaction.type === 'arpResize') {
-      const current = arpCellFromRect(event, interaction.stageRect);
-      setArpBlocks(arpBlocks.map((block) => {
-        if (block.id !== interaction.id) return block;
-        const endStep = Math.max(block.step, current.step);
-        return { ...block, length: clampNumber(endStep - block.step + 1, 1, arpStepCount - block.step) };
-      }), interaction.id);
-      return;
-    }
-    if (interaction.type === 'arpVelocity') {
-      updateArpVelocityFromEvent(interaction.id, event);
-      return;
-    }
     if (interaction.type === 'move') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
-      activeFrame = snapFrame({
+      const raw = {
         ...interaction.startFrame,
         left: interaction.startFrame.left + dx,
         top: interaction.startFrame.top + dy,
-      }, event);
+      };
+      const gridded = snapFrame(raw, event);
+      if (smartSnapEnabled && !event.altKey) {
+        const snapped = applySmartSnap(raw, gridded, interaction.smartTargets);
+        activeFrame = snapped.frame;
+        activeSmartGuides = snapped.guides;
+      } else {
+        activeFrame = gridded;
+        activeSmartGuides = [];
+      }
       return;
     }
 
     if (interaction.type === 'groupMove') {
       const dx = (event.clientX - interaction.startMouse.x) / surfaceZoom;
       const dy = (event.clientY - interaction.startMouse.y) / surfaceZoom;
+      // Snap the selection's bounding box as a whole so the layers keep
+      // their relative offsets while dragging.
+      const startBounds = interaction.startBounds
+        ?? boundsForFrames(Object.values(interaction.startFrames ?? {}));
+      let boundsDx = dx;
+      let boundsDy = dy;
+      if (startBounds) {
+        const rawBounds = { ...startBounds, left: startBounds.left + dx, top: startBounds.top + dy };
+        const griddedBounds = snapFrame(rawBounds, event);
+        let finalBounds = griddedBounds;
+        if (smartSnapEnabled && !event.altKey) {
+          const snapped = applySmartSnap(rawBounds, griddedBounds, interaction.smartTargets);
+          finalBounds = snapped.frame;
+          activeSmartGuides = snapped.guides;
+        } else {
+          activeSmartGuides = [];
+        }
+        boundsDx = finalBounds.left - startBounds.left;
+        boundsDy = finalBounds.top - startBounds.top;
+      }
       const nextFrames = {};
       for (const [name, startFrame] of Object.entries(interaction.startFrames ?? {})) {
-        nextFrames[name] = snapFrame({
+        nextFrames[name] = {
           ...startFrame,
-          left: startFrame.left + dx,
-          top: startFrame.top + dy,
-        }, event);
+          left: startFrame.left + boundsDx,
+          top: startFrame.top + boundsDy,
+        };
       }
       activeLayerFrames = nextFrames;
       return;
@@ -3023,19 +2696,6 @@
     window.removeEventListener('mousemove', handleInteractionMove);
     window.removeEventListener('mouseup', handleInteractionEnd);
 
-    if (interaction.type === 'arpDraw') {
-      const block = arpDraftBlock;
-      arpDraftBlock = null;
-      if (block) setArpBlocks([...arpBlocks, block], block.id);
-      interaction = null;
-      return;
-    }
-    if (['arpMove', 'arpResize', 'arpVelocity'].includes(interaction.type)) {
-      arpDraftBlock = null;
-      interaction = null;
-      return;
-    }
-
     if ((interaction.type === 'move' || interaction.type === 'resize') && activeFrame && selectedAuthoredPart) {
       applyLayerPatch(patchFromFrame(selectedAuthoredPart, activeFrame));
     }
@@ -3054,6 +2714,7 @@
     activeFrame = null;
     activeLayerFrames = {};
     activeZoneFrame = null;
+    activeSmartGuides = [];
   }
 
   function nudgeSelected(dx, dy) {
@@ -3169,6 +2830,9 @@
     event.stopPropagation();
     selectHitZone(name);
     if (!isEditableZone(authoredHitZones?._children?.[name])) return;
+    // Follow-mode zones derive their rect from the source part — moving the
+    // overlay would be meaningless, so select-only.
+    if (isFollowZone(zone)) return;
     const frame = zoneFrame(zone);
     interaction = {
       type: 'zoneMove',
@@ -3209,9 +2873,10 @@
     window.addEventListener('mouseup', endSurfacePan);
   }
 
-  function handleSurfaceScroll(event) {
-    rulerScrollX = event.currentTarget.scrollLeft;
-    rulerScrollY = event.currentTarget.scrollTop;
+  function handleSurfaceScroll() {
+    // Re-measure the board's visual corner: since the rulers hold scrollOffset
+    // at 0, the contentOffset itself must move as the content scrolls.
+    measureBoardOffset();
   }
 
   function handleSurfaceScrollMouseDown(event) {
@@ -3272,10 +2937,26 @@
     selectHitZone(names[nextIndex]);
   }
 
-  function handleSurfaceKeydown(event) {
-    if (event.defaultPrevented) return;
+  // Window-level so nudge/delete/duplicate/tool keys keep working when focus
+  // drifts off the surface — guarded so form fields and other focused editor
+  // regions (e.g. the panel canvas) still receive their own keys.
+  function surfaceKeyEventAllowed(event) {
+    if (core?.controlType !== 'CustomComponent') return false;
+    if (event.defaultPrevented) return false;
     const targetTag = String(event.target?.tagName ?? '').toLowerCase();
-    if (['input', 'select', 'textarea'].includes(targetTag)) return;
+    if (['input', 'select', 'textarea'].includes(targetTag) || event.target?.isContentEditable) return false;
+    const active = document.activeElement;
+    if (active && active !== document.body && surfaceShellEl && !surfaceShellEl.contains(active)) return false;
+    return true;
+  }
+
+  function handleSurfaceKeydown(event) {
+    if (!surfaceKeyEventAllowed(event)) return;
+    if (event.key === '?' && !(event.ctrlKey || event.metaKey || event.altKey)) {
+      event.preventDefault();
+      helpOverlayOpen = !helpOverlayOpen;
+      return;
+    }
     if (event.code === 'Space') {
       event.preventDefault();
       spacePanActive = true;
@@ -3283,6 +2964,10 @@
     }
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (helpOverlayOpen) {
+        helpOverlayOpen = false;
+        return;
+      }
       if (inlineTextEditLayer) {
         finishInlineTextEdit();
         return;
@@ -3300,6 +2985,30 @@
         return;
       }
       clearSurfaceSelection();
+      return;
+    }
+    // Arpeggiator tool modes: 1–5 while an arpeggiator surface is active.
+    if (arpeggiatorEnabled && !designerPreviewing && !(event.ctrlKey || event.metaKey || event.altKey)) {
+      const nextArpTool = ARP_TOOL_KEYS[event.key];
+      if (nextArpTool) {
+        event.preventDefault();
+        arpTool = nextArpTool;
+        return;
+      }
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'c' && activeSelectionKind === 'layer' && selectedLayerNames.length) {
+      event.preventDefault();
+      copySelectedLayers();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'x' && activeSelectionKind === 'layer' && selectedLayerNames.length) {
+      event.preventDefault();
+      cutSelectedLayers();
+      return;
+    }
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'v' && hasPartClipboard()) {
+      event.preventDefault();
+      pasteClipboardLayers();
       return;
     }
     if (event.key === 'Tab') {
@@ -3348,12 +3057,15 @@
   }
 
   function handleSurfaceKeyup(event) {
+    if (core?.controlType !== 'CustomComponent') return;
     if (event.code === 'Space') {
       spacePanActive = false;
       endSurfacePan();
     }
   }
 </script>
+
+<svelte:window onkeydown={handleSurfaceKeydown} onkeyup={handleSurfaceKeyup} />
 
 {#if core?.controlType === 'CustomComponent'}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
@@ -3367,8 +3079,7 @@
     role="application"
     aria-label="Custom component design surface"
     tabindex="0"
-    onkeydown={handleSurfaceKeydown}
-    onkeyup={handleSurfaceKeyup}
+    bind:this={surfaceShellEl}
   >
     {#if !designerPreviewing}
     <div class="surface-lookbar" aria-label="Component look bar">
@@ -3719,8 +3430,69 @@
       </div>
     {/if}
 
+    {#if !designerPreviewing && selectedIsWaveformIcon}
+      <div class="arc-strip" aria-label="Waveform presets">
+        <strong>Waveform</strong>
+        <div class="arc-toggle-group">
+          {#each WAVEFORM_SHAPES as shape (shape.id)}
+            <button
+              type="button"
+              class:active={String(selectedWaveformMeta?.type ?? 'sine') === shape.id}
+              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { shape }))}
+              title={`${shape.label} waveform`}
+            >{shape.label}</button>
+          {/each}
+        </div>
+        <span class="preset-label">Colour</span>
+        <div class="preset-swatches">
+          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
+            <button
+              type="button"
+              class="mini-swatch-btn"
+              class:active={String(selectedWaveformMeta?.stroke ?? '') === preset.stroke}
+              style={swatchCss(preset.stroke, 'EAF0F6')}
+              onclick={() => applyRendererPreset(waveformIconPresetPatch(selectedLayer, { colorPreset: preset }))}
+              title={`${preset.label} colour preset`}
+            ></button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
+    {#if !designerPreviewing && selectedIsEnvelopePath}
+      <div class="arc-strip" aria-label="Envelope presets">
+        <strong>Envelope</strong>
+        <div class="arc-toggle-group">
+          {#each ENVELOPE_SHAPE_PRESETS as shape (shape.id)}
+            <button
+              type="button"
+              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { shape }))}
+              title={`${shape.label}: A ${shape.attack} D ${shape.decay} S ${shape.sustain} R ${shape.release}`}
+            >{shape.label}</button>
+          {/each}
+        </div>
+        <span class="preset-label">Colour</span>
+        <div class="preset-swatches">
+          {#each RENDERER_COLOR_PRESETS as preset (preset.id)}
+            <button
+              type="button"
+              class="mini-swatch-btn"
+              class:active={String(selectedEnvelopeMeta?.stroke ?? '') === preset.stroke}
+              style={swatchCss(preset.stroke, '65E6A0')}
+              onclick={() => applyRendererPreset(envelopePathPresetPatch(selectedLayer, { colorPreset: preset }))}
+              title={`${preset.label} colour preset`}
+            ></button>
+          {/each}
+        </div>
+      </div>
+    {/if}
+
     <div class="surface-options-strip" aria-label="Surface view + zoom options">
       <div class="surface-toolbar-left">
+      <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows the full component graph">
+        <button type="button" class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
+        <button type="button" class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
+      </div>
       <label class="toggle-option">
         <input type="checkbox" checked={snapEnabled} onchange={(event) => { snapEnabled = event.currentTarget.checked; }} />
         <span>Snap</span>
@@ -3736,6 +3508,14 @@
           disabled={!snapEnabled}
           onchange={(event) => setSnapSize(event.currentTarget.value)}
         />
+      </label>
+      <label class="toggle-option" title="Snap moves to other parts' edges/centers and the artboard (Alt bypasses)">
+        <input type="checkbox" checked={smartSnapEnabled} onchange={(event) => { smartSnapEnabled = event.currentTarget.checked; }} />
+        <span>Smart</span>
+      </label>
+      <label class="toggle-option" title="Show pixel gaps between two selected layers">
+        <input type="checkbox" checked={measureEnabled} onchange={(event) => { measureEnabled = event.currentTarget.checked; }} />
+        <span>Measure</span>
       </label>
       <label class="toggle-option">
         <input type="checkbox" checked={showBounds} onchange={(event) => setPreviewFlag('showBounds', event.currentTarget.checked)} />
@@ -3778,6 +3558,7 @@
       <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
       <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
       <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
+      <button type="button" class="surface-command" class:accent={helpOverlayOpen} onclick={() => { helpOverlayOpen = !helpOverlayOpen; }} title="Shortcuts &amp; glossary (?)">?</button>
       </div>
 
       <div class="surface-zoombar" aria-label="Zoom controls">
@@ -4018,18 +3799,20 @@
         <EditorRuler
           orientation="horizontal"
           length={rulerViewWidth}
-          scrollOffset={rulerScrollX}
+          scrollOffset={0}
           contentOffset={boardOffsetX}
           scale={surfaceZoom}
           gridStep={snapSize}
+          markers={rulerMarkersX}
         />
         <EditorRuler
           orientation="vertical"
           length={rulerViewHeight}
-          scrollOffset={rulerScrollY}
+          scrollOffset={0}
           contentOffset={boardOffsetY}
           scale={surfaceZoom}
           gridStep={snapSize}
+          markers={rulerMarkersY}
         />
         {/if}
         <div
@@ -4044,9 +3827,19 @@
           bind:clientHeight={rulerViewHeight}
           onscroll={handleSurfaceScroll}
           onmousedown={handleSurfaceScrollMouseDown}
+          onwheel={handleSurfaceWheel}
         >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
+        {/if}
+        {#if !designerPreviewing && !readinessNudgeDismissed && readinessNudgeSteps.length}
+          <div class="readiness-nudge" role="status">
+            <strong>Not reusable yet:</strong>
+            {#each readinessNudgeSteps as step (step.id)}
+              <span class={`nudge-step ${step.severity}`}>{step.label} — {step.detail}</span>
+            {/each}
+            <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
+          </div>
         {/if}
         <div class="surface-pad">
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -4100,71 +3893,17 @@
             {/each}
 
             {#if !designerPreviewing && arpeggiatorEnabled}
-              <div class="arp-editor" style={`--arp-steps:${arpStepCount};`} onmousedown={stopSelectionAction} onclick={stopSelectionAction}>
-                <div class="arp-tool-strip" role="toolbar" aria-label="Arpeggiator edit tools">
-                  {#each ['select', 'draw', 'move', 'resize', 'velocity'] as tool}
-                    <button type="button" class:active={arpTool === tool} onclick={() => { arpTool = tool; }} title={`Arpeggiator ${tool} tool`}>
-                      {tool}
-                    </button>
-                  {/each}
-                </div>
-                <div class="arp-ruler">
-                  <span></span>
-                  {#each Array.from({ length: arpStepCount }, (_, index) => index) as step (step)}
-                    <strong class:bar-start={step % 4 === 0}>{step + 1}</strong>
-                  {/each}
-                </div>
-                <div class="arp-note-labels">
-                  {#each arpVisibleNotes as note (note)}
-                    <span class:black-key={noteName(note).includes('#')}>{noteName(note)}</span>
-                  {/each}
-                </div>
-                <div
-                  class="arp-grid-stage"
-                  style={`--arp-steps:${arpStepCount};`}
-                  onmousedown={beginArpDraw}
-                  aria-label="Arpeggiator pattern grid"
-                >
-                  {#each arpVisibleNotes as note (note)}
-                    <span class="arp-row" class:black-key={noteName(note).includes('#')}></span>
-                  {/each}
-                  {#each Array.from({ length: arpStepCount }, (_, index) => index) as step (step)}
-                    <span class="arp-step" class:bar-start={step % 4 === 0}></span>
-                  {/each}
-                  {#each arpBlocks.filter((block) => block.note >= arpViewNote && block.note < arpViewNote + 12) as block (block.id)}
-                    <button
-                      type="button"
-                      class="arp-block"
-                      class:selected={arpSelectedBlock === block.id}
-                      data-block-id={block.id}
-                      style={arpBlockStyle(block)}
-                      title={`${noteName(block.note)} · step ${block.step + 1} · length ${block.length} · velocity ${block.velocity}`}
-                      onmousedown={(event) => handleArpBlockPointer(block, event)}
-                      onclick={(event) => { event.stopPropagation(); selectArpBlock(block.id); }}
-                    >
-                      <span class="arp-velocity-fill" style={arpVelocityStyle(block)}></span>
-                      <strong>{noteName(block.note)}</strong>
-                      <em>{block.velocity}</em>
-                      <span
-                        class="arp-velocity-handle"
-                        title="Drag up/down for velocity"
-                        onmousedown={(event) => beginArpVelocityDrag(block, event)}
-                      ></span>
-                      <span
-                        class="arp-resize-handle"
-                        title="Drag to change duration"
-                        onmousedown={(event) => beginArpBlockResize(block, event)}
-                      ></span>
-                    </button>
-                  {/each}
-                  {#if arpDraftBlock && arpDraftBlock.note >= arpViewNote && arpDraftBlock.note < arpViewNote + 12}
-                    <div class="arp-block draft" style={arpBlockStyle(arpDraftBlock)}>
-                      <span class="arp-velocity-fill" style={arpVelocityStyle(arpDraftBlock)}></span>
-                      <strong>{noteName(arpDraftBlock.note)}</strong>
-                    </div>
-                  {/if}
-                </div>
-              </div>
+              <CustomArpeggiatorEditor
+                {arpeggiatorEnabled}
+                {arpBlocks}
+                {arpStepCount}
+                {arpViewNote}
+                {arpSelectedBlock}
+                {arpTool}
+                onArpToolChange={(tool) => { arpTool = tool; }}
+                {setArpBlocks}
+                {selectArpBlock}
+              />
             {/if}
 
             {#if !designerPreviewing}
@@ -4240,6 +3979,26 @@
               <div class="multi-selection-bound" style={selectionBoundsStyle(activeSelectionFrame)}>
                 <span>{selectedLayerNames.length} layers</span>
               </div>
+              {#if !interaction}
+                <div
+                  class="align-toolbar"
+                  style={`left:${Math.max(0, activeSelectionFrame.left)}px;top:${Math.max(2, activeSelectionFrame.top - 30)}px;`}
+                  role="toolbar"
+                  tabindex="-1"
+                  aria-label="Align and distribute selection"
+                  onmousedown={stopSelectionAction}
+                >
+                  <button type="button" onclick={() => alignSelectedLayers('left')} title="Align left edges">⇤</button>
+                  <button type="button" onclick={() => alignSelectedLayers('centerX')} title="Align horizontal centers">⇹</button>
+                  <button type="button" onclick={() => alignSelectedLayers('right')} title="Align right edges">⇥</button>
+                  <button type="button" onclick={() => alignSelectedLayers('top')} title="Align top edges">⤒</button>
+                  <button type="button" onclick={() => alignSelectedLayers('centerY')} title="Align vertical centers">⇳</button>
+                  <button type="button" onclick={() => alignSelectedLayers('bottom')} title="Align bottom edges">⤓</button>
+                  <span class="align-divider"></span>
+                  <button type="button" onclick={() => distributeSelectedLayers('x')} disabled={selectedLayerNames.length < 3} title="Distribute horizontally (3+ layers)">⇸</button>
+                  <button type="button" onclick={() => distributeSelectedLayers('y')} disabled={selectedLayerNames.length < 3} title="Distribute vertically (3+ layers)">⇊</button>
+                </div>
+              {/if}
             {/if}
 
             {#each partEntries as [name, part] (name)}
@@ -4277,16 +4036,17 @@
                   class:dimmed={zoneDisplayMode === 'dim' && !(activeSelectionKind === 'hitZone' && selectedHitZone === name)}
                   class:locked={activeSelectionKind === 'hitZone' && selectedHitZone === name && !selectedZoneEditable}
                   class:pulse={selectionPulseTarget === `zone:${name}`}
+                  class:follow={isFollowZone(zone)}
                   type="button"
                   style={hitZoneStyle(name, zone)}
-                  title={`${name}: ${zone?.action ?? 'action'}`}
+                  title={`${name}: ${zone?.action ?? 'action'}${isFollowZone(zone) ? ` — grab area follows ${String(zone.source) === 'face' ? 'the face' : String(zone.source).slice('part:'.length)}` : ''}`}
                   onclick={(event) => { event.stopPropagation(); selectHitZone(name); }}
                   onpointerenter={() => setSurfaceHover('hitZone', name)}
                   onpointerleave={() => clearSurfaceHover('hitZone', name)}
                   onmousedown={(event) => beginZoneMove(name, zone, event)}
                 >
                   <span class="selection-label">{name}</span>
-                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable}
+                  {#if activeSelectionKind === 'hitZone' && selectedHitZone === name && selectedZoneEditable && !isFollowZone(zone)}
                     {#each RESIZE_HANDLES as handle (handle.id)}
                       <span
                         class="resize-handle"
@@ -4314,6 +4074,22 @@
                 <span>{frameReadout(feedbackFrame)}</span>
               </div>
             {/if}
+
+            {#if !designerPreviewing}
+              {#each activeSmartGuides as guide, index (`${guide.axis}-${guide.value}-${index}`)}
+                <span class={`smart-guide ${guide.axis}`} class:center={isCenterGuide(guide)} style={smartGuideStyle(guide, artboardWidth, artboardHeight)}></span>
+              {/each}
+              {#each measurementLines as line, index (`${line.axis}-${index}`)}
+                <div
+                  class={`measure-line ${line.axis}`}
+                  style={line.axis === 'x'
+                    ? `left:${line.left}px;top:${line.top}px;width:${line.length}px;`
+                    : `left:${line.left}px;top:${line.top}px;height:${line.length}px;`}
+                >
+                  <span>{line.label}</span>
+                </div>
+              {/each}
+            {/if}
           </div>
         </div>
         {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
@@ -4330,6 +4106,12 @@
               <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
                 <Copy size={13} aria-hidden="true" />
               </button>
+              <button type="button" class="quick-text" onclick={copySelectedLayers} disabled={!selectedLayerNames.length} title="Copy layers (Ctrl+C)">
+                C
+              </button>
+              <button type="button" class="quick-text" onclick={pasteClipboardLayers} disabled={!hasPartClipboard()} title="Paste layers (Ctrl+V)">
+                P
+              </button>
               <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
                 <ArrowUp size={13} aria-hidden="true" />
               </button>
@@ -4341,6 +4123,14 @@
               </button>
               <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
                 B
+              </button>
+              <button
+                type="button"
+                onclick={makeSelectedLayerInteractive}
+                disabled={!canManageLayer}
+                title={`Make interactive: ${activeInteractiveMeta.label} — scaffold a wired channel + behavior + grab zone on this layer`}
+              >
+                <Zap size={13} aria-hidden="true" />
               </button>
               <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
                 {#if selectedAuthoredPart?.locked === true}
@@ -4369,6 +4159,7 @@
               <button type="button" class:active={dockTab === 'layers'} role="tab" aria-selected={dockTab === 'layers'} onclick={() => { dockTab = 'layers'; }}>Layers</button>
               <button type="button" class:active={dockTab === 'generators'} role="tab" aria-selected={dockTab === 'generators'} onclick={() => { dockTab = 'generators'; }}>Generators</button>
               <button type="button" class:active={dockTab === 'assets'} role="tab" aria-selected={dockTab === 'assets'} onclick={() => { dockTab = 'assets'; }} title="Assets stay in the inspector for now">Assets</button>
+              <button type="button" class:active={dockTab === 'live'} role="tab" aria-selected={dockTab === 'live'} onclick={() => { dockTab = 'live'; }} title="Persistent live preview — what you build is what runs">Live</button>
             </div>
             <strong>{dockTab === 'generators' ? generatorEntries.length : topLevelPartEntries.length + kitEntries.length + generatedSourceEntries.length}</strong>
           </div>
@@ -4450,7 +4241,7 @@
                 {#if source.hasGenerator}
                   <button
                     type="button"
-                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source, 'Designer.focusSection': 'generators' }); }}
+                    onclick={(event) => { event.stopPropagation(); dockTab = 'generators'; applyControlPatch(core.id, { 'Designer.selectedGenerator': source.source }); }}
                     title={`Edit ${source.source} generator`}
                   >
                     Gen
@@ -4568,6 +4359,24 @@
           {:else if dockTab === 'generators'}
             <div class="dock-generator-editor">
               <CustomGeneratorsEditor {control} />
+            </div>
+          {:else if dockTab === 'live'}
+            <!-- Persistent live preview (§12.6): the runtime component, always
+                 interactive while editing — shares the session the full-canvas
+                 preview mode uses, so values scrubbed here carry over. -->
+            <div class="dock-live-preview">
+              <InteractiveTestSurface
+                {control}
+                session={livePreviewSession ?? createInteractionPreviewSession(control)}
+                onpatchsession={patchLivePreviewSession}
+                compact={true}
+              />
+              <button
+                type="button"
+                class="dock-live-reset"
+                onclick={() => { livePreviewSession = createInteractionPreviewSession(control); }}
+                title="Reset the live session to the component defaults"
+              >Reset session</button>
             </div>
           {:else}
             <div class="dock-empty dock-empty-tab">
@@ -4851,6 +4660,17 @@
                       {/if}
                     </div>
                     {#if activeSelectionKind === 'layer'}
+                      <label class="dock-field" title="Pin size: with the instance resize policy 'Scale internals', this part keeps its authored size and font (position still tracks the scale) — for labels and readouts.">
+                        <span>Pin size</span>
+                        <input
+                          type="checkbox"
+                          checked={selectedAuthoredPart?._children?.Layout?.pinned === true}
+                          disabled={!selectedPartEditable}
+                          onchange={(event) => setLayerLayoutProperty('pinned', event.currentTarget.checked)}
+                        />
+                      </label>
+                    {/if}
+                    {#if activeSelectionKind === 'layer'}
                       <div class="dock-section-subtitle">Rotation Pivot</div>
                       <div class="pivot-actions">
                         <button
@@ -5013,16 +4833,6 @@
                 {:else}
                   <div class="dock-note">Use hit zones to make artwork interactive. Selected artwork can still be animated by bindings and states.</div>
                 {/if}
-                <div class="mini-list">
-                  {#each behaviorEntries.slice(0, 6) as [name, behavior] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{behavior?.type ?? behavior?.role ?? 'behavior'} / {behavior?.valueChannel ?? 'no channel'}</span>
-                    </div>
-                  {:else}
-                    <div><span>No behaviors yet</span></div>
-                  {/each}
-                </div>
               </div>
             {:else if inspectorTab === 'states'}
               <div class="dock-section">
@@ -5047,59 +4857,7 @@
               </div>
               <div class="dock-section">
                 <div class="dock-section-title">States</div>
-                <div class="mini-list">
-                  {#each stateEntries.slice(0, 8) as [name, state] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{state?.label ?? state?.trigger ?? 'state'}</span>
-                    </div>
-                  {:else}
-                    <div><span>No states authored yet</span></div>
-                  {/each}
-                </div>
-              </div>
-            {:else if inspectorTab === 'device'}
-              <div class="dock-section">
-                <div class="dock-section-title">Component API</div>
-                <label class="dock-field">
-                  <span>Selected Channel</span>
-                  <select value={designer?.selectedValueChannel ?? ''} onchange={(event) => updateControlProperty(core.id, 'Designer.selectedValueChannel', event.currentTarget.value)}>
-                    {#each valueChannelEntries as [name] (name)}
-                      <option value={name}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <label class="dock-field">
-                  <span>Selected Behavior</span>
-                  <select value={designer?.selectedBehavior ?? ''} onchange={(event) => updateControlProperty(core.id, 'Designer.selectedBehavior', event.currentTarget.value)}>
-                    {#each behaviorEntries as [name] (name)}
-                      <option value={name}>{name}</option>
-                    {/each}
-                  </select>
-                </label>
-                <div class="mini-list">
-                  {#each valueChannelEntries.slice(0, 8) as [name, channel] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{channel?.type ?? 'value'} / {numberOr(channel?.min, 0)}-{numberOr(channel?.max, 127)}</span>
-                    </div>
-                  {:else}
-                    <div><span>No public channels yet</span></div>
-                  {/each}
-                </div>
-              </div>
-              <div class="dock-section">
-                <div class="dock-section-title">Bindings</div>
-                <div class="mini-list">
-                  {#each bindingEntries.slice(0, 6) as [name, binding] (name)}
-                    <div>
-                      <strong>{name}</strong>
-                      <span>{binding?.targetPart ?? binding?.part ?? 'target'} / {binding?.source ?? binding?.valueChannel ?? 'source'}</span>
-                    </div>
-                  {:else}
-                    <div><span>No bindings authored yet</span></div>
-                  {/each}
-                </div>
+                <div class="dock-note">States are authored on the filmstrip below the canvas and in the panel's States tab (rules, patches, coverage).</div>
               </div>
             {/if}
           </div>
@@ -5198,89 +4956,81 @@
           </div>
         {/if}
       </div>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          title="Starters — load a complete editable archetype into this component"
+          aria-haspopup="menu"
+          aria-expanded={starterFlyoutOpen}
+          onclick={toggleStarterFlyout}
+        >
+          <span class="tool-icon rectangle"></span>
+          <strong>Starters</strong>
+        </button>
+        {#if starterFlyoutOpen}
+          <div class="tool-flyout rich" role="menu" aria-label="Starter components">
+            {#each CUSTOM_COMPONENT_STARTERS as starter (starter.id)}
+              <button type="button" role="menuitem" title={starter.summary} onclick={(event) => applyStarterFromFlyout(event, starter)}>
+                <span class="rich-copy">
+                  <span>{starter.label}</span>
+                  <small>{starter.creates.join(' + ')}</small>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="tool-flyout-host">
+        <button
+          type="button"
+          title="Assistant — apply a setup recipe (uses the selected layer/channel)"
+          aria-haspopup="menu"
+          aria-expanded={assistantFlyoutOpen}
+          onclick={toggleAssistantFlyout}
+        >
+          <span class="tool-icon hitZone"></span>
+          <strong>Assistant</strong>
+        </button>
+        {#if assistantFlyoutOpen}
+          <div class="tool-flyout rich" role="menu" aria-label="Assistant recipes">
+            {#each CUSTOM_ASSISTANT_RECIPES as recipe (recipe.id)}
+              <button type="button" role="menuitem" title={recipe.summary} onclick={(event) => applyRecipeFromFlyout(event, recipe)}>
+                <span class="rich-copy">
+                  <span>{recipe.label}</span>
+                  <small>{recipe.group} · {recipe.creates.join(' + ')}</small>
+                </span>
+              </button>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </div>
     {/if}
 
     {#if !designerPreviewing}
-    <div class="state-filmstrip" class:collapsed={filmstripCollapsed} aria-label="Component states">
-      <div class="state-title">
-        <button type="button" class="filmstrip-collapse-btn" onclick={() => { filmstripCollapsed = !filmstripCollapsed; }} title={filmstripCollapsed ? 'Expand states' : 'Collapse states'}>
-          <strong>States</strong>
-          <span>{Math.max(1, stateFilmstripEntries.length)}</span>
-        </button>
-      </div>
-      <div class="state-chip-row">
-        {#each statePreviewCards as entry (entry.name)}
-          <div
-            class="state-card"
-            class:active={(designer?.preview?.state ?? 'base') === entry.name}
-            class:base={entry.base}
-            style={stateCardStyle(entry.name, entry.index)}
-            title={stateDescription(entry.name, entry.state, entry.base)}
-          >
-            <button
-              type="button"
-              class="state-main"
-              onclick={() => selectStateCard(entry.name)}
-            >
-              <span class="state-thumb" aria-hidden="true">
-                <span class="state-preview-stage" style={statePreviewStageStyle(entry)}>
-                  {#each entry.previewParts as [partName, part] (partName)}
-                    <InteractivePartRenderer
-                      part={part}
-                      parentWidth={entry.previewWidth}
-                      parentHeight={entry.previewHeight}
-                    />
-                  {/each}
-                </span>
-              </span>
-              <span class="state-copy">
-                <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
-                <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
-              </span>
-              <div class="state-count-trigger">
-                <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
-                {#if !entry.base}
-                  <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean)}>{stateTriggerLabel(entry.state, entry.base)}</span>
-                {/if}
-              </div>
-            </button>
-            <div class="state-actions" aria-label={`${entry.name} state actions`}>
-              {#if !entry.base}
-                <div class="when-toggles">
-                  {#each [['hover','H'],['pressed','P'],['disabled','D']] as [flag, label] (flag)}
-                    <button type="button"
-                      class:active={entry.state?.when?.[flag] === true}
-                      onclick={(e) => { e.stopPropagation(); setFilmstripStateWhen(entry.name, flag, !(entry.state?.when?.[flag] === true)); }}
-                      title={flag}
-                    >{label}</button>
-                  {/each}
-                </div>
-              {/if}
-              <button type="button" onclick={(event) => { event.stopPropagation(); inspectorTab = 'states'; selectStateCard(entry.name); }} title="Edit state">
-                Edit
-              </button>
-              <button type="button" onclick={(event) => duplicateStateCard(entry.name, entry.state, event)} title={entry.base ? 'Create state from base' : 'Duplicate state'}>
-                Copy
-              </button>
-              {#if !entry.base}
-                <button type="button" class="danger" onclick={(event) => removeStateCard(entry.name, event)} title="Delete state">
-                  Del
-                </button>
-              {/if}
-            </div>
-          </div>
-        {/each}
-        <button type="button" class="add-state" title="Add state" onclick={addQuickState}>
-          +
-        </button>
-      </div>
-    </div>
+    <CustomStateFilmstrip
+      {statePreviewCards}
+      activeStateName={designer?.preview?.state ?? 'base'}
+      {artboardWidth}
+      {artboardHeight}
+      {filmstripCollapsed}
+      onToggleCollapsed={() => { filmstripCollapsed = !filmstripCollapsed; }}
+      {selectStateCard}
+      onEditState={(name) => { selectStateCard(name); if (core?.id) applyControlPatch(core.id, { 'Designer.focusSection': 'react', 'Designer.focusReactPane': 'states' }); }}
+      {setFilmstripStateWhen}
+      {duplicateStateCard}
+      {removeStateCard}
+      {addQuickState}
+    />
     {/if}
 
     {#if !designerPreviewing && !displayDockHidden}
       <div class="surface-display-dock"><DisplayPanel /></div>
     {/if}
+
+    <SurfaceHelpOverlay open={helpOverlayOpen} onclose={() => { helpOverlayOpen = false; }} />
   </div>
 {:else}
   <div class="empty-state">Select a custom component to use the design surface.</div>
@@ -5310,7 +5060,6 @@
   .palette-panel { grid-area: palette; }
   .surface-viewport { grid-area: canvas; }
   .surface-dock { grid-area: dock; }
-  .state-filmstrip { grid-area: states; }
   .surface-display-dock { grid-area: display; }
   /* The floating tool-strip overlaps the bottom of the canvas cell. */
   .tool-strip { grid-area: canvas; align-self: end; }
@@ -5340,7 +5089,6 @@
     border-color: #3D6688;
   }
 
-  .surface-shell > .paint-strip,
   .surface-shell > .layer-action-strip,
   .surface-shell > .precision-strip,
   .surface-shell > .arc-strip {
@@ -5443,6 +5191,37 @@
     border-radius: 5px;
     background: #151B21;
     box-shadow: 0 18px 34px rgba(0, 0, 0, 0.42);
+  }
+
+  /* Starters/Assistant flyouts: two-line entries, scroll when long. */
+  .tool-flyout.rich {
+    width: 236px;
+    max-height: 340px;
+    overflow-y: auto;
+  }
+
+  .tool-flyout.rich button {
+    height: auto;
+    min-height: 36px;
+    grid-template-columns: minmax(0, 1fr);
+    padding: 5px 7px;
+  }
+
+  .rich-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    text-align: left;
+  }
+
+  .rich-copy small {
+    color: #7E8B98;
+    font-size: 9px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   .tool-flyout button {
@@ -5933,6 +5712,23 @@
     overflow-x: auto;
   }
 
+  .preset-label {
+    font-size: 9px;
+    color: #7A8894;
+    text-transform: uppercase;
+  }
+
+  .preset-swatches {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .preset-swatches .mini-swatch-btn.active {
+    outline: 2px solid #5B9BD5;
+    outline-offset: 1px;
+  }
+
   .arc-strip > strong {
     color: #E5C06B;
     font-size: 10px;
@@ -6048,11 +5844,6 @@
     border-color: rgba(229, 160, 41, 0.5);
     background: rgba(229, 160, 41, 0.16);
     color: #FFE6B2;
-  }
-
-  .surface-options-strip input[type='range'] {
-    width: 92px;
-    accent-color: #5B9BD5;
   }
 
   .surface-options-strip input[type='checkbox'] {
@@ -6310,6 +6101,33 @@
 
   .dock-empty-tab {
     margin: 10px;
+  }
+
+  .dock-live-preview {
+    min-height: 0;
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    gap: 6px;
+    padding: 8px;
+    overflow: hidden;
+  }
+
+  .dock-live-reset {
+    justify-self: end;
+    padding: 3px 9px;
+    border: 1px solid #2E3C46;
+    border-radius: 4px;
+    background: #1B252C;
+    color: #AFC0CB;
+    font-size: 10px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .dock-live-reset:hover {
+    border-color: #5B9BD5;
+    color: #FFF;
   }
 
   .inspector-head {
@@ -6634,6 +6452,13 @@
 
   .mini-list strong {
     color: #D4DEE7;
+  }
+
+  .dock-hint {
+    margin-bottom: 6px;
+    color: #6E7B87;
+    font-size: 9.5px;
+    line-height: 1.45;
   }
 
   .list-row {
@@ -7010,6 +6835,61 @@
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
   }
 
+  .readiness-nudge {
+    position: absolute;
+    left: 50%;
+    bottom: 12px;
+    z-index: 2590;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-width: calc(100% - 48px);
+    padding: 5px 8px;
+    border: 1px solid rgba(120, 130, 150, 0.4);
+    border-radius: 6px;
+    background: rgba(28, 30, 38, 0.95);
+    color: rgba(222, 228, 238, 0.9);
+    font-size: 10px;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .readiness-nudge strong {
+    color: rgba(232, 192, 138, 0.95);
+    font-size: 10px;
+  }
+
+  .readiness-nudge .nudge-step {
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(106, 87, 57, 0.6);
+    background: rgba(33, 29, 25, 0.9);
+    color: #E8C08A;
+  }
+
+  .readiness-nudge .nudge-step.required {
+    border-color: rgba(106, 57, 57, 0.7);
+    background: rgba(37, 23, 23, 0.9);
+    color: #E8A0A0;
+  }
+
+  .readiness-nudge button {
+    width: 18px;
+    height: 18px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.7);
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .readiness-nudge button:hover {
+    background: rgba(220, 90, 90, 0.3);
+  }
+
   .surface-scroll.space-pan {
     cursor: grab;
   }
@@ -7056,212 +6936,6 @@
     cursor: crosshair;
   }
 
-  .arp-editor {
-    position: absolute;
-    inset: 12px;
-    z-index: 1850;
-    display: grid;
-    grid-template-columns: 46px 1fr;
-    grid-template-rows: 28px 24px 1fr;
-    overflow: hidden;
-    border: 1px solid #344653;
-    border-radius: 4px;
-    background: #10151A;
-    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
-    color: #D9E7F0;
-    user-select: none;
-  }
-
-  .arp-tool-strip {
-    grid-column: 1 / 3;
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 4px;
-    padding: 4px;
-    border-bottom: 1px solid #2D3A43;
-    background: #12191F;
-  }
-
-  .arp-tool-strip button {
-    min-width: 0;
-    border: 1px solid #2E3C46;
-    border-radius: 3px;
-    background: #1B252C;
-    color: #AFC0CB;
-    cursor: pointer;
-    font: inherit;
-    font-size: 10px;
-    font-weight: 800;
-    text-transform: capitalize;
-  }
-
-  .arp-tool-strip button.active,
-  .arp-tool-strip button:hover {
-    border-color: #5B9BD5;
-    background: #173449;
-    color: #FFFFFF;
-  }
-
-  .arp-ruler {
-    grid-column: 1 / 3;
-    display: grid;
-    grid-template-columns: 46px repeat(var(--arp-steps, 32), minmax(12px, 1fr));
-    border-bottom: 1px solid #2D3A43;
-    background: #151C22;
-  }
-
-  .arp-ruler strong {
-    display: grid;
-    place-items: center;
-    min-width: 0;
-    border-left: 1px solid #24313A;
-    color: #8498A8;
-    font-size: 9px;
-    font-weight: 700;
-  }
-
-  .arp-ruler strong.bar-start {
-    color: #E5C06B;
-    background: rgba(229, 192, 107, 0.08);
-  }
-
-  .arp-note-labels {
-    display: grid;
-    grid-template-rows: repeat(12, 1fr);
-    border-right: 1px solid #2D3A43;
-    background: #141A1F;
-  }
-
-  .arp-note-labels span {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    padding: 0 7px 0 3px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    color: #AABBC8;
-    font-size: 10px;
-    font-weight: 700;
-  }
-
-  .arp-note-labels span.black-key {
-    background: #0F1418;
-    color: #7F929F;
-  }
-
-  .arp-grid-stage {
-    position: relative;
-    display: grid;
-    grid-template-columns: repeat(var(--arp-steps, 32), minmax(12px, 1fr));
-    grid-template-rows: repeat(12, 1fr);
-    overflow: hidden;
-    cursor: crosshair;
-    touch-action: none;
-  }
-
-  .arp-row,
-  .arp-step {
-    pointer-events: none;
-  }
-
-  .arp-row {
-    grid-column: 1 / -1;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.055);
-  }
-
-  .arp-row.black-key {
-    background: rgba(0, 0, 0, 0.18);
-  }
-
-  .arp-step {
-    grid-row: 1 / -1;
-    border-left: 1px solid rgba(255, 255, 255, 0.045);
-  }
-
-  .arp-step.bar-start {
-    border-left-color: rgba(229, 192, 107, 0.34);
-    background: rgba(229, 192, 107, 0.025);
-  }
-
-  .arp-block {
-    position: absolute;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    min-width: 12px;
-    margin: 1px;
-    padding: 0 13px 0 7px;
-    border: 1px solid rgba(125, 196, 243, 0.72);
-    border-radius: 3px;
-    background: rgba(45, 108, 146, 0.78);
-    color: #F2FAFF;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
-    cursor: move;
-    overflow: hidden;
-    font: inherit;
-    text-align: left;
-    touch-action: none;
-  }
-
-  .arp-block.selected {
-    border-color: #FFE08A;
-    box-shadow:
-      0 0 0 1px rgba(255, 255, 255, 0.75),
-      0 0 0 4px rgba(229, 192, 107, 0.16),
-      0 2px 8px rgba(0, 0, 0, 0.32);
-  }
-
-  .arp-block.draft {
-    border-style: dashed;
-    opacity: 0.82;
-    pointer-events: none;
-  }
-
-  .arp-block strong,
-  .arp-block em {
-    position: relative;
-    z-index: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 9px;
-    line-height: 1;
-  }
-
-  .arp-block em {
-    color: #CFEAFF;
-    font-style: normal;
-    font-weight: 700;
-  }
-
-  .arp-velocity-fill {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(0deg, rgba(229, 192, 107, 0.58), rgba(125, 196, 243, 0.1));
-    pointer-events: none;
-  }
-
-  .arp-velocity-handle {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: ns-resize;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  .arp-resize-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 10px;
-    cursor: ew-resize;
-    background: rgba(255, 255, 255, 0.14);
-  }
 
   .part-bound,
   .hit-zone {
@@ -7500,6 +7174,32 @@
     border-color: rgba(229, 160, 41, 0.42);
     background: rgba(229, 160, 41, 0.045);
     opacity: 0.55;
+  }
+
+  /* Follow-mode zones show the resolved grab area (source part + inflate +
+     minTouch) as a teal halo — distinct from authored amber zones. */
+  .hit-zone.follow {
+    border: 1px dashed rgba(45, 212, 191, 0.9);
+    background: rgba(45, 212, 191, 0.07);
+    color: #C8FFF6;
+    box-shadow:
+      0 0 0 3px rgba(45, 212, 191, 0.12),
+      0 0 14px rgba(45, 212, 191, 0.18);
+  }
+
+  .hit-zone.follow.selected {
+    border-width: 2px;
+    background: rgba(45, 212, 191, 0.16);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.55),
+      0 0 0 4px rgba(45, 212, 191, 0.16),
+      0 0 18px rgba(45, 212, 191, 0.26);
+  }
+
+  .hit-zone.follow > .selection-label {
+    background: rgba(10, 56, 50, 0.96);
+    border-color: rgba(45, 212, 191, 0.4);
+    color: #C8FFF6;
   }
 
   .hit-zone.selected {
@@ -7754,6 +7454,110 @@
     height: 1px;
   }
 
+  /* Object-relative smart guides — magenta, so they read differently from grid snaps. */
+  .smart-guide {
+    position: absolute;
+    z-index: 2385;
+    pointer-events: none;
+    background: rgba(236, 72, 153, 0.92);
+    box-shadow: 0 0 7px rgba(236, 72, 153, 0.5);
+  }
+
+  .smart-guide.x {
+    width: 1px;
+  }
+
+  .smart-guide.y {
+    height: 1px;
+  }
+
+  /* Artboard-centre guide reads distinct (amber) so "centered" is obvious. */
+  .smart-guide.center {
+    background: rgba(250, 204, 21, 0.95);
+    box-shadow: 0 0 8px rgba(250, 204, 21, 0.55);
+  }
+
+  .smart-guide.center.x {
+    width: 2px;
+  }
+
+  .smart-guide.center.y {
+    height: 2px;
+  }
+
+  .measure-line {
+    position: absolute;
+    z-index: 2395;
+    pointer-events: none;
+  }
+
+  .measure-line.x {
+    height: 0;
+    border-top: 1px dashed rgba(250, 204, 21, 0.95);
+  }
+
+  .measure-line.y {
+    width: 0;
+    border-left: 1px dashed rgba(250, 204, 21, 0.95);
+  }
+
+  .measure-line span {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    padding: 1px 5px;
+    border-radius: 4px;
+    background: rgba(30, 30, 36, 0.92);
+    border: 1px solid rgba(250, 204, 21, 0.6);
+    color: rgba(250, 224, 120, 0.98);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .align-toolbar {
+    position: absolute;
+    z-index: 2420;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    border-radius: 6px;
+    background: rgba(30, 30, 36, 0.94);
+    border: 1px solid rgba(120, 130, 150, 0.4);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.35);
+  }
+
+  .align-toolbar button {
+    min-width: 22px;
+    height: 20px;
+    padding: 0 3px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(222, 228, 238, 0.92);
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .align-toolbar button:hover:not(:disabled) {
+    background: rgba(91, 155, 213, 0.3);
+  }
+
+  .align-toolbar button:disabled {
+    opacity: 0.35;
+    cursor: default;
+  }
+
+  .align-divider {
+    width: 1px;
+    height: 14px;
+    margin: 0 2px;
+    background: rgba(120, 130, 150, 0.4);
+  }
+
+
   .measure-badge {
     position: absolute;
     z-index: 2410;
@@ -7967,7 +7771,6 @@
     color: #BFFAF2;
   }
 
-  .surface-options-strip input[type='range'],
   .surface-options-strip input[type='checkbox'] {
     accent-color: #14B8A6;
   }
@@ -8299,7 +8102,6 @@
   }
 
   .palette-swatch-row code,
-  .palette-swatch-row strong,
   .palette-stepper strong,
   .palette-corner strong {
     min-width: 0;
@@ -8512,267 +8314,6 @@
   .dock-field input[type='checkbox'],
   .dock-field input[type='range'] {
     accent-color: #14B8A6;
-  }
-
-  .state-filmstrip {
-    display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: stretch;
-    min-height: 86px;
-    border-top: 1px solid #2A3741;
-    background: linear-gradient(180deg, #151E25, #10171D);
-  }
-
-  .state-filmstrip.collapsed .state-chip-row {
-    display: none;
-  }
-
-  .state-filmstrip.collapsed {
-    min-height: 0;
-  }
-
-  .filmstrip-collapse-btn {
-    display: grid;
-    gap: 4px;
-    align-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100%;
-    padding: 0 14px;
-    border: none;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-  }
-
-  .state-count-trigger {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    font-size: 9px;
-  }
-
-  .state-trigger-badge {
-    padding: 1px 5px;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 3px;
-    background: rgba(255,255,255,0.06);
-    color: #8FEDE3;
-    font-size: 9px;
-    white-space: nowrap;
-  }
-
-  .state-trigger-badge.no-trigger {
-    color: #6B7A86;
-    border-color: rgba(255,255,255,0.06);
-  }
-
-  .when-toggles {
-    display: flex;
-    gap: 2px;
-  }
-
-  .when-toggles button {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid #2E3B45;
-    border-radius: 3px;
-    background: #1A242D;
-    color: #6B7A86;
-    font-size: 9px;
-    font-weight: 800;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  .when-toggles button.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.22);
-    color: #8FEDE3;
-  }
-
-  .state-title {
-    display: grid;
-    align-content: stretch;
-    gap: 0;
-    align-items: stretch;
-    padding: 0;
-    border-right: 1px solid #2A3741;
-    color: #D8E6EE;
-    font-size: 11px;
-    font-weight: 900;
-  }
-
-  .state-title strong,
-  .state-title span {
-    display: block;
-  }
-
-  .state-title span {
-    width: max-content;
-    min-width: 24px;
-    padding: 2px 6px;
-    border: 1px solid #31404A;
-    border-radius: 999px;
-    background: #10181E;
-    color: #8FEDE3;
-    font-size: 10px;
-    text-align: center;
-  }
-
-  .state-chip-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-    overflow-x: auto;
-    padding: 9px 12px;
-  }
-
-  .state-card {
-    display: grid;
-    grid-template-rows: minmax(0, 1fr) 22px;
-    flex: 0 0 160px;
-    height: 68px;
-    overflow: hidden;
-    border: 1px solid #2E3B45;
-    border-radius: 6px;
-    background:
-      linear-gradient(180deg, color-mix(in srgb, var(--state-accent) 12%, #1A252D), #141D24 62%),
-      #1A252D;
-    color: #C9D6DF;
-    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--state-accent) 82%, #FFFFFF);
-  }
-
-  .state-card.active {
-    border-color: var(--state-accent);
-    box-shadow:
-      inset 3px 0 0 var(--state-accent),
-      inset 0 0 0 1px color-mix(in srgb, var(--state-accent) 34%, transparent),
-      0 0 18px color-mix(in srgb, var(--state-accent) 16%, transparent);
-  }
-
-  .state-main {
-    display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    padding: 7px 8px 5px;
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-  }
-
-  .state-thumb {
-    position: relative;
-    width: 46px;
-    height: 32px;
-    overflow: hidden;
-    border: 1px solid color-mix(in srgb, var(--state-accent) 46%, #31404A);
-    border-radius: 4px;
-    background:
-      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-      linear-gradient(0deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-      #0B1116;
-    background-size: 7px 7px;
-  }
-
-  .state-preview-stage {
-    position: absolute;
-    left: 0;
-    top: 0;
-    overflow: hidden;
-    pointer-events: none;
-  }
-
-  .state-copy {
-    display: grid;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .state-count {
-    align-self: start;
-    padding: 2px 5px;
-    border: 1px solid color-mix(in srgb, var(--state-accent) 34%, #2E3B45);
-    border-radius: 999px;
-    background: rgba(8, 13, 17, 0.48);
-    color: color-mix(in srgb, var(--state-accent) 72%, #FFFFFF);
-    font-size: 8px;
-    font-weight: 900;
-    white-space: nowrap;
-  }
-
-  .state-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 0 7px 6px 57px;
-  }
-
-  .state-actions button {
-    height: 18px;
-    padding: 0 6px;
-    border: 1px solid #33434E;
-    border-radius: 3px;
-    background: rgba(11, 17, 22, 0.62);
-    color: #9FB2BF;
-    cursor: pointer;
-    font: inherit;
-    font-size: 9px;
-    font-weight: 800;
-  }
-
-  .state-actions button:hover {
-    border-color: var(--state-accent);
-    color: #F0FFFC;
-  }
-
-  .state-actions button.danger:hover {
-    border-color: #E26D6D;
-    color: #FFD2D2;
-  }
-
-  .state-chip-row button.add-state {
-    flex: 0 0 44px;
-    min-width: 44px;
-    height: 68px;
-    place-items: center;
-    border: 1px solid #2E3B45;
-    border-radius: 6px;
-    background: #172129;
-    color: #8FEDE3;
-    cursor: pointer;
-    font-size: 20px;
-    font-weight: 300;
-  }
-
-  .state-copy strong,
-  .state-copy em {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .state-copy strong {
-    color: #F2F8FB;
-    font-size: 11px;
-    font-weight: 800;
-  }
-
-  .state-copy em {
-    color: #8FA4B0;
-    font-size: 10px;
-    font-style: normal;
   }
 
   @media (max-width: 1380px) {

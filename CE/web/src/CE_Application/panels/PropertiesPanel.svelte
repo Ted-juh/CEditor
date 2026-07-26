@@ -6,6 +6,7 @@
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
+  import { creatorMode, CREATOR_SIMPLE_HIDDEN_TABS } from '../stores/creatorMode.js';
   import { selectedControl, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
@@ -18,31 +19,31 @@
   import { setSegmentEditScopeAll } from '../stores/segmentEditScope.js';
   import { activeComponentPropertiesTab } from '../stores/propertiesPanelContext.js';
   import { propertiesTabRequest } from '../stores/propertiesTab.js';
-  import { openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { componentWorkspaceMode, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { getComponentPorts } from '../models/componentPorts.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { BASE_STATE_TARGET, buildStateTargetOptions, findStateTargetOption } from '../utils/stateTargets.js';
+  import {
+    PROPERTIES_UI_STATE_KEY_V1,
+    PROPERTIES_UI_STATE_KEY_V2,
+    migratePropertiesUiState,
+    tabAllowedForAudience,
+    tabAudience,
+  } from '../utils/propertiesTabAudience.js';
 
   const MIN_PROPERTIES_PANEL_WIDTH = 600;
-  const UI_STATE_STORAGE_KEY = 'ce.propertiesPanel.uiState.v1';
   const PREVIEW_INFO_TEXT = 'Preview is active. The canvas is running panel behavior; debug inspection is optional.';
 
   function readStoredUiState() {
-    const stored = readStoredJson(UI_STATE_STORAGE_KEY, {});
+    const state = migratePropertiesUiState(
+      readStoredJson(PROPERTIES_UI_STATE_KEY_V2, null),
+      readStoredJson(PROPERTIES_UI_STATE_KEY_V1, null)
+    );
     return {
-      viewMode: stored?.viewMode === 'multi' ? 'multi' : 'single',
-      pinPanelProps: stored?.pinPanelProps === true,
-      singleTab: String(stored?.singleTab ?? 'core'),
-      multiTabs: new Set(Array.isArray(stored?.multiTabs) && stored.multiTabs.length > 0 ? stored.multiTabs : ['core']),
-      pinnedPanelTab: String(stored?.pinnedPanelTab ?? 'core'),
-      pinnedPanelMultiTabs: new Set(
-        Array.isArray(stored?.pinnedPanelMultiTabs) && stored.pinnedPanelMultiTabs.length > 0
-          ? stored.pinnedPanelMultiTabs
-          : ['core']
-      ),
-      collapsedCards: stored?.collapsedCards && typeof stored.collapsedCards === 'object'
-        ? stored.collapsedCards
-        : {},
+      ...state,
+      multiTabs: new Set(state.multiTabs),
+      authorMultiTabs: new Set(state.authorMultiTabs),
+      pinnedPanelMultiTabs: new Set(state.pinnedPanelMultiTabs),
     };
   }
 
@@ -78,9 +79,30 @@
   // Pin panel properties — show panel props at top even when a component is selected
   let pinPanelProps = $state(storedUiState.pinPanelProps);
 
-  // Main tab state (component tabs, or panel tabs when contextMode === 'panel')
+  // Main tab state (component tabs, or panel tabs when contextMode === 'panel').
+  // Custom components keep two selections — instance vs author context — so
+  // opening/closing the Designer workspace never clobbers the other side.
   let singleTab = $state(storedUiState.singleTab);
   let multiTabs = $state(storedUiState.multiTabs);
+  let authorSingleTab = $state(storedUiState.authorSingleTab);
+  let authorMultiTabs = $state(storedUiState.authorMultiTabs);
+
+  // Audience context (Stage A): authoring tabs render only while the Designer
+  // workspace is open; instance tabs only while it is closed.
+  let audienceContext = $derived($componentWorkspaceMode === 'surface' ? 'author' : 'instance');
+  let useAuthorTabState = $derived(selectedIsCustomComponent && audienceContext === 'author');
+  let activeSingleTab = $derived(useAuthorTabState ? authorSingleTab : singleTab);
+  let activeMultiTabs = $derived(useAuthorTabState ? authorMultiTabs : multiTabs);
+
+  function setActiveSingleTab(value) {
+    if (useAuthorTabState) authorSingleTab = value;
+    else singleTab = value;
+  }
+
+  function setActiveMultiTabs(value) {
+    if (useAuthorTabState) authorMultiTabs = value;
+    else multiTabs = value;
+  }
 
   // Pinned-panel tab state (only used when showPinnedPanel is true)
   let pinnedPanelTab = $state(storedUiState.pinnedPanelTab);
@@ -89,8 +111,8 @@
   // Controllers — closures bind to the state vars above. handleClick/isActive
   // are used by both the main tab bar and the pinned panel tab bar.
   const main = createTabViewState({
-    getSingle: () => singleTab, setSingle: (v) => singleTab = v,
-    getMulti:  () => multiTabs, setMulti:  (v) => multiTabs = v,
+    getSingle: () => activeSingleTab, setSingle: setActiveSingleTab,
+    getMulti:  () => activeMultiTabs, setMulti:  setActiveMultiTabs,
     getViewMode: () => viewMode, setViewMode: (v) => viewMode = v,
   });
   const pinnedPanel = createTabViewState({
@@ -157,26 +179,28 @@
     { id: 'behavior',   icon: Settings2,     label: 'Behavior',   section: 'Behavior' },
     { id: 'slider',     icon: SlidersHorizontal, label: 'Slider', section: 'Behavior', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
     { id: 'label',      icon: Type,          label: 'Label',      section: 'Parts', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
-    { id: 'states',     icon: Workflow,      label: 'States',     section: 'States' },
+    // Custom components edit states/bindings/animations (and links) inside
+    // the React tab; the standalone tabs remain for every other control.
+    { id: 'states',     icon: Workflow,      label: 'States',     section: 'States', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },
     { id: 'value',      icon: Link,          label: 'Value',      section: 'Value' },
     { id: 'segments',   icon: Rows3,         label: 'Segments',   section: 'Value', when: (control) => String(getSection(control, 'Behavior')?.buttonType ?? '').trim().toLowerCase() === 'radio' },
-    { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings' },
+    { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },
     { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
-    { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations' },
-    { id: 'designer',   icon: LayoutDashboard, label: 'Designer', section: 'Designer' },
-    { id: 'surface',    icon: Frame,           label: 'Surface',  section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
-    { id: 'valuechannels', icon: Link,       label: 'Channels',   section: 'ValueChannels' },
-    { id: 'behaviors',  icon: Settings2,     label: 'Behaviors',  section: 'Behaviors' },
-    { id: 'hitzones',   icon: MousePointer,  label: 'Hit Zones',  section: 'HitZones' },
+    { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },
+    { id: 'properties', icon: SlidersHorizontal, label: 'Properties', section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
+    { id: 'interact',   icon: Settings2,     label: 'Interact',   section: 'ValueChannels' },
+    { id: 'react',      icon: Workflow,      label: 'React',      section: 'Links', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
-    { id: 'links',      icon: Workflow,      label: 'Links',      section: 'Links' },
-    { id: 'published',  icon: Cable,         label: 'API',        section: 'PublishedProperties' },
-    { id: 'variants',   icon: Rows3,         label: 'Variants',   section: 'Variants' },
+    { id: 'publish',    icon: Cable,         label: 'Publish',    section: 'PublishedProperties' },
     { id: 'testbench',  icon: Play,          label: 'Test Bench', section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
   ];
 
-  // Only show tabs for sections that exist on the selected component
+  // Only show tabs for sections that exist on the selected component.
+  // Custom components are additionally audience-gated (Stage A): instance
+  // context hides authoring tabs, author context hides instance ones. Simple
+  // creator mode further hides the raw-graph list managers (§11.2) — same
+  // data, progressively disclosed.
   let componentTabs = $derived(
     $selectedControl
       ? allComponentTabs.filter((tab) => (
@@ -184,6 +208,8 @@
           || hasSection($selectedControl, tab.section)
           || (tab.id === 'devicebindings' && getComponentPorts($selectedControl).length > 0))
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
+        && tabAllowedForAudience(tab.id, audienceContext, selectedIsCustomComponent)
+        && !(selectedIsCustomComponent && $creatorMode === 'simple' && CREATOR_SIMPLE_HIDDEN_TABS.has(tab.id))
       ))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
@@ -218,19 +244,17 @@
   // When not pinned: show panel or component tabs based on context
   // When pinned + component: icon bar shows both groups
   let tabs = $derived(contextMode === 'panel' ? panelTabs : componentTabs);
-  let contentTabs = $derived(tabs.filter((tab) => tab.id !== 'surface'));
-  let componentContentTabs = $derived(componentTabs.filter((tab) => tab.id !== 'surface'));
 
   let visibleTabs = $derived(
     viewMode === 'single'
-      ? contentTabs.filter(t => t.id === singleTab)
-      : contentTabs.filter(t => multiTabs.has(t.id))
+      ? tabs.filter(t => t.id === activeSingleTab)
+      : tabs.filter(t => activeMultiTabs.has(t.id))
   );
 
   let visibleComponentTabs = $derived(
     viewMode === 'single'
-      ? componentContentTabs.filter(t => t.id === singleTab)
-      : componentContentTabs.filter(t => multiTabs.has(t.id))
+      ? componentTabs.filter(t => t.id === activeSingleTab)
+      : componentTabs.filter(t => activeMultiTabs.has(t.id))
   );
 
   let visiblePinnedPanelTabs = $derived(
@@ -240,21 +264,21 @@
   );
 
   function ensureValidMainTabs() {
-    const validIds = new Set(contentTabs.map((tab) => tab.id));
+    const validIds = new Set(tabs.map((tab) => tab.id));
     if (validIds.size === 0) return;
 
-    if (!validIds.has(singleTab)) {
-      singleTab = tabs[0]?.id ?? 'core';
+    if (!validIds.has(activeSingleTab)) {
+      setActiveSingleTab(tabs[0]?.id ?? 'core');
     }
 
-    const filteredMultiTabs = [...multiTabs].filter((id) => validIds.has(id));
-    const nextMultiTabs = filteredMultiTabs.length > 0 ? filteredMultiTabs : [singleTab];
-    const currentMultiTabs = [...multiTabs];
+    const filteredMultiTabs = [...activeMultiTabs].filter((id) => validIds.has(id));
+    const nextMultiTabs = filteredMultiTabs.length > 0 ? filteredMultiTabs : [activeSingleTab];
+    const currentMultiTabs = [...activeMultiTabs];
     if (
       nextMultiTabs.length !== currentMultiTabs.length
       || nextMultiTabs.some((id, index) => id !== currentMultiTabs[index])
     ) {
-      multiTabs = new Set(nextMultiTabs);
+      setActiveMultiTabs(new Set(nextMultiTabs));
     }
   }
 
@@ -281,7 +305,7 @@
     if (!req?.tabId) return;
     if (contextMode === 'component' && componentTabs.some((tab) => tab.id === req.tabId)) {
       if (viewMode !== 'single') viewMode = 'single';
-      singleTab = req.tabId;
+      setActiveSingleTab(req.tabId);
     }
     propertiesTabRequest.set(null);
   });
@@ -295,11 +319,13 @@
   });
 
   $effect(() => {
-    writeStoredJson(UI_STATE_STORAGE_KEY, {
+    writeStoredJson(PROPERTIES_UI_STATE_KEY_V2, {
       viewMode,
       pinPanelProps,
       singleTab,
       multiTabs: [...multiTabs],
+      authorSingleTab,
+      authorMultiTabs: [...authorMultiTabs],
       pinnedPanelTab,
       pinnedPanelMultiTabs: [...pinnedPanelMultiTabs],
       collapsedCards,
@@ -331,18 +357,31 @@
       return;
     }
 
-    activeComponentPropertiesTab.set(String(singleTab ?? ''));
+    activeComponentPropertiesTab.set(String(activeSingleTab ?? ''));
   });
 
   $effect(() => {
     const focusTab = String(designerFocusSection ?? '').trim();
     if (contextMode !== 'component' || !selectedControlId || !focusTab) return;
-    if (!componentTabs.some((tab) => tab.id === focusTab)) return;
+    if (!componentTabs.some((tab) => tab.id === focusTab)) {
+      // A focus request can target an author tab while the workspace is
+      // closed (Stage A6): open the workspace first — this effect re-runs
+      // once the tab becomes visible and finishes the focus.
+      if (
+        selectedIsCustomComponent
+        && audienceContext === 'instance'
+        && tabAudience(focusTab) === 'author'
+        && allComponentTabs.some((tab) => tab.id === focusTab)
+      ) {
+        openComponentSurfaceWorkspace();
+      }
+      return;
+    }
 
     if (viewMode === 'single') {
-      singleTab = focusTab;
-    } else if (!multiTabs.has(focusTab)) {
-      multiTabs = new Set([...multiTabs, focusTab]);
+      setActiveSingleTab(focusTab);
+    } else if (!activeMultiTabs.has(focusTab)) {
+      setActiveMultiTabs(new Set([...activeMultiTabs, focusTab]));
     }
 
     updateControlProperty(selectedControlId, 'Designer.focusSection', '');
@@ -351,23 +390,15 @@
   function toggleViewMode() {
     if (viewMode === 'single') {
       viewMode = 'multi';
-      multiTabs = new Set([singleTab]);
+      setActiveMultiTabs(new Set([activeSingleTab]));
     } else {
       viewMode = 'single';
-      if (multiTabs.size > 0) singleTab = [...multiTabs][0];
+      if (activeMultiTabs.size > 0) setActiveSingleTab([...activeMultiTabs][0]);
     }
   }
 
   function toggleCollapse(id) {
     collapsedCards = { ...collapsedCards, [id]: !collapsedCards[id] };
-  }
-
-  function handleComponentTabClick(id, event) {
-    if (id === 'surface') {
-      openComponentSurfaceWorkspace();
-      return;
-    }
-    main.handleClick(id, event);
   }
 
   function handleOpenComponentDesigner(event) {
@@ -389,32 +420,6 @@
       ontoggleview={toggleViewMode}
       ontogglepreview={togglePreviewMode}
     />
-
-    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
-      <button
-        type="button"
-        class="component-designer-entry"
-        data-testid="properties-component-designer-launch"
-        onclick={handleOpenComponentDesigner}
-      >
-        Open Component Designer
-      </button>
-    {/if}
-
-    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
-      <div class="property-search">
-        <input
-          type="text"
-          placeholder="Search properties…"
-          value={$propertyFilter}
-          oninput={(event) => propertyFilter.set(event.currentTarget.value)}
-          aria-label="Search properties"
-        />
-        {#if $propertyFilter}
-          <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
-        {/if}
-      </div>
-    {/if}
 
     {#if $previewModeEnabled}
       <div class="preview-wrapper">
@@ -458,14 +463,14 @@
           <TabIconBar
             tabs={componentTabs}
             isActive={main.isActive}
-            onclick={handleComponentTabClick}
+            onclick={main.handleClick}
           />
           <div class="split-content-area">
             <TabContentArea
               {viewMode}
               tabs={componentTabs}
               visibleTabs={visibleComponentTabs}
-              singleTabId={singleTab}
+              singleTabId={activeSingleTab}
               contextMode="component"
               control={$selectedControl}
               scopedControl={scopedComponentControl}
@@ -486,7 +491,7 @@
         <TabIconBar
           {tabs}
           isActive={main.isActive}
-          onclick={contextMode === 'component' ? handleComponentTabClick : main.handleClick}
+          onclick={main.handleClick}
         />
 
         <div class="card-area">
@@ -495,7 +500,7 @@
               {viewMode}
               {tabs}
               {visibleTabs}
-              singleTabId={singleTab}
+              singleTabId={activeSingleTab}
               {contextMode}
               control={$selectedControl}
               scopedControl={contextMode === 'component' ? scopedComponentControl : null}
@@ -524,6 +529,49 @@
         <span class="info-text">{$propertyHint || 'Hover a property for details'}</span>
       </div>
     {/if}
+
+    {#if !$previewModeEnabled && contextMode === 'component' && selectedIsCustomComponent}
+      <!-- Custom-component footer: search + Simple/Advanced + the prominent
+           designer launch, docked at the bottom of the panel (was at the top). -->
+      <div class="component-footer">
+        <div class="component-footer-row">
+          <div class="property-search">
+            <input
+              type="text"
+              placeholder="Search properties…"
+              value={$propertyFilter}
+              oninput={(event) => propertyFilter.set(event.currentTarget.value)}
+              aria-label="Search properties"
+            />
+            {#if $propertyFilter}
+              <button type="button" class="property-search-clear" aria-label="Clear search" onclick={clearPropertyFilter}>&times;</button>
+            {/if}
+          </div>
+          <div class="creator-mode-toggle" role="radiogroup" aria-label="Creator mode">
+            <button
+              type="button"
+              class:active={$creatorMode === 'simple'}
+              onclick={() => creatorMode.set('simple')}
+              title="Hide the raw graph editors (Channels, Behaviors, Hit Zones, Bindings, Links, Variants). Nothing is removed — Advanced brings them back."
+            >Simple</button>
+            <button
+              type="button"
+              class:active={$creatorMode === 'advanced'}
+              onclick={() => creatorMode.set('advanced')}
+              title="Expose the full component graph."
+            >Advanced</button>
+          </div>
+        </div>
+        <button
+          type="button"
+          class="component-designer-entry"
+          data-testid="properties-component-designer-launch"
+          onclick={handleOpenComponentDesigner}
+        >
+          Open Component Designer
+        </button>
+      </div>
+    {/if}
   {:else}
     <div class="empty-panel">
       <span class="empty-text">No panel open</span>
@@ -541,9 +589,38 @@
     border-left: 1px solid #1A1A1A;
   }
 
+  /* Docked footer at the bottom of the panel for a selected custom component. */
+  .component-footer {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border-top: 1px solid #2A2A2A;
+    background: #1B1B1B;
+  }
+
+  .component-footer-row {
+    display: flex;
+    gap: 6px;
+    align-items: stretch;
+  }
+
+  .component-footer-row .property-search {
+    flex: 1;
+    margin: 0;
+  }
+
+  .component-footer-row .creator-mode-toggle {
+    margin: 0;
+    flex: 0 0 auto;
+    width: 132px;
+  }
+
   .component-designer-entry {
-    flex: 0 0 32px;
-    margin: 6px 8px 0 58px;
+    flex: 0 0 34px;
+    height: 34px;
+    margin: 0;
     border: 1px solid #335371;
     border-radius: 4px;
     background: #142538;
@@ -556,6 +633,36 @@
   .component-designer-entry:hover {
     border-color: #5B9BD5;
     background: #20344B;
+  }
+
+  .creator-mode-toggle {
+    flex: 0 0 auto;
+    display: flex;
+    margin: 6px 8px 0 8px;
+    border: 1px solid #333;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .creator-mode-toggle button {
+    flex: 1;
+    padding: 4px 0;
+    border: none;
+    background: #1A1A1A;
+    color: #8A949E;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .creator-mode-toggle button.active {
+    background: #173449;
+    color: #C7D9EA;
+  }
+
+  .creator-mode-toggle button:hover:not(.active) {
+    color: #C6CDD4;
   }
 
   .property-search {

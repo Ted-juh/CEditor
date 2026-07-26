@@ -22,6 +22,7 @@
   import { getBindableComponentPorts, getPreferredPort, getBindingCompatibility } from '../models/componentPorts.js';
   import { resolveDeviceAddress } from '../utils/deviceAddress.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
   let control = $derived($selectedControl);
   let core = $derived(getSection(control, 'Core'));
@@ -33,7 +34,7 @@
   let bindings = $derived(Array.isArray(deviceBindings?.bindings) ? deviceBindings.bindings : []);
   let primary = $derived(bindings[0] ?? null);
 
-  let deviceRole = $derived(String(primary?.deviceRole ?? 'mainSynth'));
+  let deviceRole = $derived(String(primary?.deviceRole ?? DEFAULT_DEVICE_ROLE));
   let roleMapping = $derived($deviceRoleMappings?.[deviceRole] ?? null);
   let profileId = $derived(String(roleMapping?.profileId ?? ''));
   let profile = $derived($deviceProfiles.find((entry) => String(entry?.id ?? '') === profileId) ?? null);

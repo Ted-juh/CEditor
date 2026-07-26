@@ -2,6 +2,8 @@
 #include "AppSettings.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
 
+#include <cstdlib>
+
 namespace
 {
 juce::String perfFileLabel (const juce::String& path)
@@ -9,10 +11,36 @@ juce::String perfFileLabel (const juce::String& path)
     return juce::File (path).getFileName().isNotEmpty() ? juce::File (path).getFileName() : path;
 }
 
-// Locate node.exe for the in-app VST3 build. GUI processes inherit the system PATH, so a PATH
-// scan covers the common case; fall back to the default installer location. Empty file = not found.
+// The per-user, writable toolchain root the Node scripts provision into at runtime. The bundled dir
+// (tools/toolchains beside the exe) is under Program Files for an installed build and is not writable by
+// the non-elevated app, so resolveToolchain.mjs / provision.mjs honour CEDITOR_TOOLCHAIN_DIR and we point
+// it at a per-user path here. Lookups still also see the bundled dir, so install-time toolchains resolve.
+// Idempotent — cheap to call before every node spawn.
+void setToolchainDirEnv()
+{
+    const auto dir = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                        .getChildFile ("CEditor").getChildFile ("toolchains");
+    dir.createDirectory();
+   #if JUCE_WINDOWS
+    _wputenv_s (L"CEDITOR_TOOLCHAIN_DIR", dir.getFullPathName().toWideCharPointer());
+   #else
+    setenv ("CEDITOR_TOOLCHAIN_DIR", dir.getFullPathName().toRawUTF8(), 1);
+   #endif
+}
+
+// Locate node.exe for the in-app VST3 build + toolchain management. Prefer a Node bundled beside the app
+// (installed builds ship tools/node/node.exe so a clean machine needs no system Node); then a Node on the
+// inherited PATH (source-checkout / dev case); then the default installer locations. Empty file = none.
 juce::File findNodeExecutable()
 {
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    for (const auto& base : { exeDir, exeDir.getParentDirectory() })
+    {
+        const auto bundled = base.getChildFile ("tools").getChildFile ("node").getChildFile ("node.exe");
+        if (bundled.existsAsFile())
+            return bundled;
+    }
+
     const auto pathVar = juce::SystemStats::getEnvironmentVariable ("PATH", {});
     for (auto& dir : juce::StringArray::fromTokens (pathVar, ";", "\""))
     {
@@ -118,8 +146,147 @@ private:
     juce::String pending, exportPath;
 };
 
+/**
+ * Streams a `node tools/toolchains/languages.mjs ensure|remove <lang...>` run (Settings → Scripting
+ * Toolchains). Each line -> "toolchainProgress" { line }; terminal -> "toolchainDone" { ok, code }.
+ * The JS side then re-requests "toolchainStatus" to refresh the panel. Mirrors VstBuildJob.
+ */
+class ToolchainJob : public juce::Timer
+{
+public:
+    ToolchainJob (juce::WebBrowserComponent* browserToUse, const juce::StringArray& command)
+        : browser (browserToUse)
+    {
+        emitLine ("$ " + command.joinIntoString (" "));
+        if (! process.start (command, juce::ChildProcess::wantStdOut | juce::ChildProcess::wantStdErr))
+        {
+            emitDone (false, -1);
+            return;
+        }
+        startTimerHz (8);
+    }
+
+private:
+    void timerCallback() override
+    {
+        char buffer[1 << 14];
+        for (;;)
+        {
+            const int n = process.readProcessOutput (buffer, (int) sizeof (buffer));
+            if (n <= 0) break;
+            pending += juce::String::fromUTF8 (buffer, n);
+        }
+        flushLines (false);
+        if (! process.isRunning())
+        {
+            flushLines (true);
+            stopTimer();
+            const int code = process.getExitCode();
+            emitDone (code == 0, code);
+        }
+    }
+
+    void flushLines (bool flushRemainder)
+    {
+        for (int nl; (nl = pending.indexOfChar ('\n')) >= 0; )
+        {
+            emitLine (pending.substring (0, nl).trimEnd());
+            pending = pending.substring (nl + 1);
+        }
+        if (flushRemainder && pending.trim().isNotEmpty()) { emitLine (pending.trimEnd()); pending.clear(); }
+    }
+
+    void emitLine (const juce::String& line)
+    {
+        if (browser == nullptr || line.isEmpty()) return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("line", line);
+        browser->emitEventIfBrowserIsVisible ("toolchainProgress", juce::var (obj));
+    }
+
+    void emitDone (bool ok, int code)
+    {
+        if (browser == nullptr) return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("ok", ok);
+        obj->setProperty ("code", code);
+        browser->emitEventIfBrowserIsVisible ("toolchainDone", juce::var (obj));
+    }
+
+    juce::WebBrowserComponent* browser = nullptr;
+    juce::ChildProcess process;
+    juce::String pending;
+};
+
+// Resolve the root that holds the export pipeline (tools/scripts/export-panel-vst3.mjs). A dev build
+// runs from a source checkout (CEDITOR_SOURCE_ROOT / cwd); an installed build has tools/ staged beside
+// the executable. Try, in order: the compile-time source root, the executable's dir (and its parent),
+// then the current working dir — returning the first that actually contains the exporter, so the same
+// binary works in both layouts. Falls back to the compile-time root / cwd if none match.
+static juce::File ceditorSourceRoot()
+{
+    const auto hasExporter = [] (const juce::File& d)
+    {
+        return d.getChildFile ("tools").getChildFile ("scripts")
+                .getChildFile ("export-panel-vst3.mjs").existsAsFile();
+    };
+
+    juce::Array<juce::File> candidates;
+   #if defined (CEDITOR_SOURCE_ROOT)
+    candidates.add (juce::File (CEDITOR_SOURCE_ROOT));
+   #endif
+    const auto exeDir = juce::File::getSpecialLocation (juce::File::currentExecutableFile).getParentDirectory();
+    candidates.add (exeDir);
+    candidates.add (exeDir.getParentDirectory());
+    candidates.add (juce::File::getCurrentWorkingDirectory());
+
+    for (const auto& c : candidates)
+        if (c != juce::File() && hasExporter (c))
+            return c;
+
+   #if defined (CEDITOR_SOURCE_ROOT)
+    return juce::File (CEDITOR_SOURCE_ROOT);
+   #else
+    return juce::File::getCurrentWorkingDirectory();
+   #endif
+}
+
+// Start a languages.mjs `ensure`/`remove` run for the languages in payload.languages (an array of ids),
+// streaming progress to the UI. Refuses if a toolchain job is already running.
+void ValueTreeBridge::runToolchainJob (const juce::var& payload, const juce::String& subcommand)
+{
+    if (browser == nullptr) return;
+
+    auto emitDone = [this] (bool ok, int code)
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("ok", ok);
+        o->setProperty ("code", code);
+        browser->emitEventIfBrowserIsVisible ("toolchainDone", juce::var (o));
+    };
+
+    if (toolchainJob != nullptr && toolchainJob->isTimerRunning()) { emitDone (false, -1); return; }
+
+    juce::StringArray langs;
+    if (auto* obj = payload.getDynamicObject())
+        if (auto* arr = obj->getProperty ("languages").getArray())
+            for (const auto& v : *arr) langs.add (v.toString());
+    if (langs.isEmpty()) { emitDone (false, -1); return; }
+
+    const auto node   = findNodeExecutable();
+    const auto script = ceditorSourceRoot().getChildFile ("tools").getChildFile ("toolchains").getChildFile ("languages.mjs");
+    if (node == juce::File() || ! script.existsAsFile()) { emitDone (false, -1); return; }
+
+    juce::StringArray command { node.getFullPathName(), script.getFullPathName(), subcommand };
+    command.addArray (langs);
+    toolchainJob = std::make_unique<ToolchainJob> (browser, command);
+}
+
 juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::WebBrowserComponent::Options& base)
 {
+    // Point the Node toolchain scripts at a per-user, writable provisioning dir before any node spawn.
+    setToolchainDirEnv();
+
     deviceProfileService.setEventCallback ([this] (const juce::String& eventName, const juce::var& payload)
     {
         juce::MessageManager::callAsync ([this, eventName, payload]()
@@ -137,12 +304,23 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 auto path = obj->getProperty ("path").toString();
                 auto value = obj->getProperty ("value");
+                auto requestId = obj->getProperty ("requestId");
 
-                juce::MessageManager::callAsync ([this, path, value]()
+                juce::MessageManager::callAsync ([this, path, value, requestId]()
                 {
                     suppressOutgoing = true;
-                    setPropertyFromPath (path, value);
+                    auto result = setPropertyFromPath (path, value);
                     suppressOutgoing = false;
+                    if (result.failed() && browser != nullptr)
+                    {
+                        // Tell JS the write never landed so it can resync (bridge.js listens for
+                        // this, logs it, and re-requests the full state).
+                        auto* rejection = new juce::DynamicObject();
+                        rejection->setProperty ("requestId", requestId);
+                        rejection->setProperty ("path", path);
+                        rejection->setProperty ("message", result.getErrorMessage());
+                        browser->emitEventIfBrowserIsVisible ("setPropertyRejected", juce::var (rejection));
+                    }
                 });
             }
         })
@@ -900,11 +1078,7 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
                 }
 
-               #if defined (CEDITOR_SOURCE_ROOT)
-                const juce::File sourceRoot (CEDITOR_SOURCE_ROOT);
-               #else
-                const auto sourceRoot = juce::File::getCurrentWorkingDirectory();
-               #endif
+                const auto sourceRoot = ceditorSourceRoot();   // dev checkout OR installed tools/ beside the exe
 
                 const auto script = sourceRoot.getChildFile ("tools")
                                               .getChildFile ("scripts")
@@ -915,10 +1089,26 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     return;
                 }
 
+                // A full VST3 export AOT-compiles a unique-identity plugin, which needs the C++ build
+                // environment (player source + CMake + a compiler). A GUI-only install ships the exporter
+                // script + toolchains but not the source tree, so fail with a clear message instead of the
+                // raw node module-resolution error from the exporter's source-tree imports.
+                const bool hasBuildEnv = sourceRoot.getChildFile ("CMakeLists.txt").existsAsFile()
+                                       && sourceRoot.getChildFile ("CE").getChildFile ("web")
+                                                    .getChildFile ("src").isDirectory();
+                if (! hasBuildEnv)
+                {
+                    emitFail ("Full VST3 export needs the C++ build environment (the player source, CMake "
+                              "and a compiler), which isn't part of this install. Run exports from a source "
+                              "checkout. This install can still design panels and manage scripting toolchains.");
+                    return;
+                }
+
                 const auto node = findNodeExecutable();
                 if (node == juce::File())
                 {
-                    emitFail ("Node.js (node.exe) was not found on PATH. Install Node.js, then relaunch CEditor.");
+                    emitFail ("Node.js (node.exe) was not found. Reinstall CEditor (it bundles Node) or "
+                              "install Node.js, then relaunch.");
                     return;
                 }
 
@@ -941,6 +1131,42 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                 buildJob = std::make_unique<VstBuildJob> (browser, command, exportPath);
             });
+        })
+        // --- Scripting Toolchains (Settings panel): status / provision / remove, all via
+        //     tools/toolchains/languages.mjs (the same engine the exporter's on-demand provisioning uses).
+        .withEventListener ("toolchainStatus", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr) return;
+                const auto node   = findNodeExecutable();
+                const auto script = ceditorSourceRoot().getChildFile ("tools").getChildFile ("toolchains").getChildFile ("languages.mjs");
+                if (node == juce::File() || ! script.existsAsFile())
+                {
+                    // Surface the cause instead of leaving the panel mysteriously empty. Installed builds
+                    // bundle Node (tools/node), so this is mainly a bare source-checkout safeguard.
+                    auto* o = new juce::DynamicObject();
+                    o->setProperty ("nodeMissing", node == juce::File());
+                    o->setProperty ("languages", juce::var (juce::Array<juce::var>{}));
+                    browser->emitEventIfBrowserIsVisible ("toolchainStatus", juce::var (o));
+                    return;
+                }
+                juce::ChildProcess proc;
+                if (! proc.start (juce::StringArray { node.getFullPathName(), script.getFullPathName(), "status" }))
+                    return;
+                const auto out = proc.readAllProcessOutput();   // `status` is a fast dir scan; OK to block briefly
+                const auto parsed = juce::JSON::parse (out);
+                if (parsed.isObject())
+                    browser->emitEventIfBrowserIsVisible ("toolchainStatus", parsed);
+            });
+        })
+        .withEventListener ("provisionToolchains", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]() { runToolchainJob (payload, "ensure"); });
+        })
+        .withEventListener ("removeToolchains", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]() { runToolchainJob (payload, "remove"); });
         });
 
     options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,

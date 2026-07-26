@@ -27,7 +27,9 @@ import {
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
-import { constrainCustomValues } from './customComponentInteraction.js';
+import { applyCustomInternalScale } from './customComponentScale.js';
+import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
+import { clamp } from './primitives.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 
 function getNodeChild(node, key) {
@@ -91,10 +93,6 @@ function normalizeRange(value, min, max) {
   const span = max - min;
   if (!Number.isFinite(span) || Math.abs(span) < 0.000001) return 0;
   return (value - min) / span;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function easingToCss(name) {
@@ -285,8 +283,27 @@ function stateSignalValue(key, signals) {
   }
 }
 
+// Flat name -> value map for state rules: bare channel names carry their raw
+// values, interaction flags come along so rules like `hover == true` work.
+function stateRuleValues(signals) {
+  const values = {};
+  for (const [key, value] of Object.entries(signals?.customChannels ?? {})) {
+    const match = /^channel\.([^.]+)\.raw$/.exec(key);
+    if (match) values[match[1]] = value;
+  }
+  for (const flag of ['hover', 'pressed', 'focused', 'dragging', 'disabled', 'checked', 'mixed']) {
+    values[flag] = signals?.[flag] === true;
+  }
+  return values;
+}
+
 function evaluateState(state, signals) {
   if (!state || state.enabled === false) return false;
+  // Optional compound condition over channels/flags (`level > 0.5 && mode == 'A'`),
+  // evaluated with the same language links and hit zones use. ANDed with `when`
+  // so flag toggles and a rule can be combined.
+  const rule = String(state.rule ?? '').trim();
+  if (rule && !customConditionMatches(rule, stateRuleValues(signals))) return false;
   const when = state.when ?? {};
   return Object.entries(when).every(([key, expected]) => {
     const actual = stateSignalValue(key, signals);
@@ -475,7 +492,7 @@ function resolveSliderInteractionContext(control, previewSession = {}) {
 function normalizeCustomChannelValue(channel = null, rawValue = 0) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   if (type === 'bool' || type === 'boolean') return rawValue === true ? 1 : 0;
-  if (type === 'enum' || type === 'text' || type === 'note') return 0;
+  if (type === 'enum' || type === 'text' || type === 'note' || type === 'array') return 0;
 
   const min = numberOr(channel?.min, 0);
   const max = Math.max(min, numberOr(channel?.max, min + 1));
@@ -488,7 +505,7 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
   const channels = getValueChannels(control);
   const constrainedCustomValues = constrainCustomValues(control, previewSession?.customValues ?? {});
   const mainChannel = channels.mainValue
-    ?? Object.values(channels).find((channel) => String(channel?.type ?? '').trim().toLowerCase() !== 'enum')
+    ?? Object.values(channels).find((channel) => ! ['enum', 'array'].includes(String(channel?.type ?? '').trim().toLowerCase()))
     ?? Object.values(channels)[0]
     ?? null;
   const modeChannel = channels.mode ?? null;
@@ -507,6 +524,26 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
     channelSignals[`channel.${name}.display`] = String(channelRaw ?? '');
+    // Array channels (§12.3) additionally expose their items — whole and
+    // per-index — so generators and bindings can target item i directly
+    // (`channel.<name>.items`, `channel.<name>.<i>.raw|.normalized`).
+    // Object-item channels (itemFields) get `.items`, `.count`, and per-index
+    // raw objects; per-index normalization only applies to scalar items.
+    if (String(channel?.type ?? '').trim().toLowerCase() === 'array') {
+      const items = Array.isArray(channelRaw) ? channelRaw : (Array.isArray(channel?.items) ? channel.items : []);
+      channelSignals[`channel.${name}.items`] = items;
+      channelSignals[`channel.${name}.count`] = items.length;
+      const objectItems = !!channel?.itemFields;
+      const itemMin = numberOr(channel?.min, 0);
+      const itemMax = Math.max(itemMin, numberOr(channel?.max, itemMin + 1));
+      const span = Math.max(0.000001, itemMax - itemMin);
+      items.forEach((item, index) => {
+        channelSignals[`channel.${name}.${index}.raw`] = item;
+        if (!objectItems) {
+          channelSignals[`channel.${name}.${index}.normalized`] = clamp((numberOr(item, itemMin) - itemMin) / span, 0, 1);
+        }
+      });
+    }
   }
 
   return {
@@ -755,6 +792,12 @@ export function resolveInteractiveControl(control, previewSession = {}) {
   for (const [, state] of activeStates) {
     applyStatePatches(resolved, state);
   }
+
+  // Resize policy: with Transform.contentScaleMode === 'scaleInternals',
+  // px-unit internals (parts, zones) scale to the instance size relative to
+  // the stamped design size. Applied last so materialization, bindings, and
+  // state patches all keep authoring in design space.
+  if (isCustomComponent) applyCustomInternalScale (resolved);
 
   const transitions = buildTransitionCatalog(resolved, effectivePreviewSession);
 

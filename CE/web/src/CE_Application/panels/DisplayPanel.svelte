@@ -407,15 +407,15 @@
   }
 
   const tabs = [
-    { id: 'colors',   label: 'Colors',   icon: Palette,     short: 'Col' },
-    { id: 'gradient', label: 'Gradient', icon: SwatchBook,  short: 'Grd' },
-    { id: 'effects',  label: 'Effects',  icon: Sparkles,    short: 'Fx' },
-    { id: 'notepad',  label: 'Notepad',  icon: StickyNote,  short: 'Nte' },
-    { id: 'viewer',   label: 'Viewer',   icon: Image,       short: 'Img' },
-    { id: 'align',    label: 'Align',    icon: AlignCenter, short: 'Aln' },
-    { id: 'device',   label: 'Device',   icon: Cable,       short: 'Dev' },
-    { id: 'preview',  label: 'Preview',  icon: Play,        short: 'Prv' },
-    { id: 'console',  label: 'Console',  icon: Terminal,    short: 'Con' },
+    { id: 'colors',   label: 'Colors',   icon: Palette },
+    { id: 'gradient', label: 'Gradient', icon: SwatchBook },
+    { id: 'effects',  label: 'Effects',  icon: Sparkles },
+    { id: 'notepad',  label: 'Notepad',  icon: StickyNote },
+    { id: 'viewer',   label: 'Viewer',   icon: Image },
+    { id: 'align',    label: 'Align',    icon: AlignCenter },
+    { id: 'device',   label: 'Device',   icon: Cable },
+    { id: 'preview',  label: 'Preview',  icon: Play },
+    { id: 'console',  label: 'Console',  icon: Terminal },
   ];
 </script>
 
@@ -430,7 +430,7 @@
         onclick={() => handleTabClick(tab.id)}
       >
         <tab.icon size={15} strokeWidth={1.6} />
-        <span>{tab.short}</span>
+        <span>{tab.label}</span>
       </button>
     {/each}
   </div>
@@ -562,48 +562,51 @@
 <style>
   .display-panel {
     display: flex;
-    flex-direction: row;
+    flex-direction: column;
     height: 100%;
     background: #1E1E1E;
   }
 
+  /* Horizontal tab strip along the top (was a vertical rail on the left). */
   .studio-rail {
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    flex-direction: row;
+    align-items: stretch;
     gap: 3px;
-    width: 42px;
-    padding: 5px 4px;
+    width: 100%;
+    padding: 4px 5px;
     background: #1A1A1A;
     flex-shrink: 0;
-    border-right: 1px solid #333;
+    border-bottom: 1px solid #333;
     box-sizing: border-box;
-    overflow-y: auto;
-    overflow-x: hidden;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .studio-tab {
-    width: 32px;
-    min-height: 32px;
+    min-width: 40px;
+    height: 32px;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 1px;
+    gap: 4px;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 4px;
     color: #888;
-    font-size: 8px;
+    font-size: 11px;
     line-height: 1;
-    padding: 3px 0;
+    padding: 0 10px;
     cursor: pointer;
     font-family: inherit;
     transition: all 0.1s;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .studio-tab span {
-    max-width: 30px;
+    max-width: 72px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -32,6 +32,18 @@ function __deliver(target, event, payload) {
 }
 function set(path, value, opts) { return __api.set(path, value, opts || null); }
 function get(path, form) { return __api.get(path, form || "value"); }
+
+// `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is injected per
+// script (boot string below). Plain object literal (not an ES class) so it works in QuickJS configs
+// without class support. Empty/"self"/"*" owner => no prefix.
+function __ownerPrefix(p) {
+  var o = (typeof __owner !== 'undefined' && __owner) ? __owner : "";
+  return (!o || o === "self" || o === "*") ? p : (o + "." + p);
+}
+var self = {
+  set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
+  get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
+};
 function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
@@ -77,7 +89,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
 {
     using Args = juce::var::NativeFunctionArgs;
     auto api = new juce::DynamicObject();
-    juce::ignoreUnused (owner); // owner-relative resolution is applied via `self` in the prelude (future)
+    juce::ignoreUnused (owner); // owner-relative resolution is applied via `self`/__owner in the prelude
 
     auto arg = [] (const Args& a, int i) -> juce::var { return i < a.numArguments ? a.arguments[i] : juce::var(); };
 
@@ -113,15 +125,30 @@ public:
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
+        // TypeScript runs as the JS the editor already transpiled (compiledSource). Raw TS — type
+        // annotations, interfaces — won't parse in QuickJS, so a TS script with no compiledSource
+        // is an editor/build error: report and skip rather than feed unparseable source in.
+        const bool isTs = def.language.equalsIgnoreCase ("typescript");
+        if (isTs && def.compiledSource.isEmpty())
+        {
+            onError (def.id, "typescript script has no compiled JS (transpile failed) — skipping");
+            return false;
+        }
+        const juce::String code = def.compiledSource.isNotEmpty() ? def.compiledSource : def.source;
+
         auto eng = std::make_unique<juce::JavascriptEngine>();
+        // Anti-flood / loop guard (scripting-redesign §7 keep-list): QuickJS's
+        // interrupt handler aborts any evaluate/callFunction that runs longer
+        // than this, so `while (true) {}` in a handler can't freeze the DAW.
+        eng->maximumExecutionTime = juce::RelativeTime::seconds (2.0);
         eng->registerNativeObject ("__api", makeApi (host, def.owner).get());
 
-        // Inject owner + prelude + the user source.
+        // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
         juce::String boot = "var __owner = " + def.owner.quoted() + ";\n";
         auto r1 = eng->execute (boot + juce::String (kJsPrelude));
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
-        auto r2 = eng->execute (def.source);
+        auto r2 = eng->execute (code);
         if (r2.failed()) { onError (def.id, "load error: " + r2.getErrorMessage()); return false; }
 
         engines[def.id] = std::move (eng);

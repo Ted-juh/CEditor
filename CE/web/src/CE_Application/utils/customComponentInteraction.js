@@ -4,15 +4,7 @@ import {
   syncCustomArpeggiatorValues,
 } from './customComponentArpeggiator.js';
 import { resolvePartPixelRect } from './customComponentLayout.js';
-
-function numberOr(value, fallback = 0) {
-  const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric : fallback;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+import { numberOr, clamp } from './primitives.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -39,8 +31,78 @@ export function getCustomLinks(control) {
   return sectionChildren(control, 'Links');
 }
 
+// --- Array channels (PointSet primitive, §12.3) --------------------------
+// A channel with type 'array' holds N scalar items sharing one min/max/step.
+// Its runtime value in customValues is a plain array; generators can render
+// one part per item (step bars) and generated zones write items back by
+// index (action 'setItemValue' + payload.index).
+
+export function isArrayValueChannel(channel) {
+  return String(channel?.type ?? '').trim().toLowerCase() === 'array';
+}
+
+/** Object-item array channel: items are objects clamped per `itemFields`. */
+export function isObjectArrayChannel(channel) {
+  return isArrayValueChannel(channel) && !!channel?.itemFields && typeof channel.itemFields === 'object';
+}
+
+function clampArrayItem(channel, itemValue) {
+  const min = numberOr(channel?.min, 0);
+  const max = Math.max(min, numberOr(channel?.max, min + 1));
+  return clamp(numberOr(itemValue, numberOr(channel?.defaultValue, min)), min, max);
+}
+
+function clampObjectArrayItem(channel, item) {
+  const clamped = {};
+  for (const [field, spec] of Object.entries(channel?.itemFields ?? {})) {
+    const min = numberOr(spec?.min, 0);
+    const max = Math.max(min, numberOr(spec?.max, min + 1));
+    const fieldStep = Math.abs(numberOr(spec?.step, 0));
+    let value = clamp(numberOr(item?.[field], numberOr(spec?.default, min)), min, max);
+    if (fieldStep > 0) value = clamp(min + (Math.round((value - min) / fieldStep) * fieldStep), min, max);
+    clamped[field] = value;
+  }
+  // Non-schema fields (like a block id) pass through untouched.
+  for (const [key, value] of Object.entries(item ?? {})) {
+    if (!(key in clamped)) clamped[key] = value;
+  }
+  return clamped;
+}
+
+/** The channel's items as a fresh, clamped array. Scalar channels are
+    fixed-size (padded from the default); object-item channels keep the
+    source length, capped at `size`. `rawValue` (the live customValues entry)
+    wins over the authored `items` defaults. */
+export function arrayChannelItems(channel, rawValue = undefined) {
+  const authored = Array.isArray(channel?.items) ? channel.items : [];
+  const source = Array.isArray(rawValue) ? rawValue : authored;
+  if (isObjectArrayChannel(channel)) {
+    const cap = Math.max(1, Math.round(numberOr(channel?.size, source.length || 1)));
+    return source.slice(0, cap).map((item) => clampObjectArrayItem(channel, item));
+  }
+  const size = Math.max(1, Math.round(numberOr(channel?.size, authored.length || 16)));
+  return Array.from({ length: size }, (_, index) => clampArrayItem(channel, source[index]));
+}
+
+export function normalizeArrayChannelItem(channel, itemValue) {
+  const min = numberOr(channel?.min, 0);
+  const max = Math.max(min, numberOr(channel?.max, min + 1));
+  const span = max - min;
+  if (Math.abs(span) < 0.000001) return 0;
+  return clamp((clampArrayItem(channel, itemValue) - min) / span, 0, 1);
+}
+
+export function denormalizeArrayChannelItem(channel, normalized) {
+  const min = numberOr(channel?.min, 0);
+  const max = Math.max(min, numberOr(channel?.max, min + 1));
+  const raw = min + ((max - min) * clamp(numberOr(normalized, 0), 0, 1));
+  const step = numberOr(channel?.step, 0);
+  return step > 0 ? clamp(Math.round((raw - min) / step) * step + min, min, max) : raw;
+}
+
 export function customChannelDefaultValue(channel) {
   if (!channel) return 0;
+  if (isArrayValueChannel(channel)) return arrayChannelItems(channel, channel.currentValue);
   return channel.currentValue ?? channel.defaultValue ?? (String(channel.type ?? '') === 'bool' ? false : 0);
 }
 
@@ -78,6 +140,7 @@ export function seedCustomValues(control) {
 
 export function normalizeCustomChannelValue(channel, rawValue) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'array') return 0; // arrays have per-item normalization, no single scalar
   if (type === 'bool') return rawValue === true ? 1 : 0;
   if (type === 'enum') {
     const values = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
@@ -162,7 +225,9 @@ export function constrainCustomValues(control, values = {}, options = {}) {
   if (primaryChannelName && channels?.[primaryChannelName]) {
     const channel = channels[primaryChannelName];
     const type = String(channel?.type ?? 'float').trim().toLowerCase();
-    if (!['enum', 'bool', 'boolean'].includes(type)) {
+    if (type === 'array') {
+      nextValues = { ...nextValues, [primaryChannelName]: arrayChannelItems(channel, nextValues[primaryChannelName]) };
+    } else if (!['enum', 'bool', 'boolean'].includes(type)) {
       const bounds = customChannelNormalizedBounds(primaryChannelName, channel, nextValues, channels);
       const raw = nextValues[primaryChannelName] ?? customChannelDefaultValue(channel);
       const normalized = normalizeCustomChannelValue(channel, raw);
@@ -179,6 +244,18 @@ export function constrainCustomValues(control, values = {}, options = {}) {
       if (name === primaryChannelName) continue;
       const type = String(channel?.type ?? 'float').trim().toLowerCase();
       if (type === 'enum' || type === 'bool' || type === 'boolean') continue;
+      if (type === 'array') {
+        const clampedItems = arrayChannelItems(channel, nextValues[name]);
+        const current = nextValues[name];
+        const identical = Array.isArray(current)
+          && current.length === clampedItems.length
+          && clampedItems.every((item, index) => item === current[index]);
+        if (!identical) {
+          nextValues = { ...nextValues, [name]: clampedItems };
+          changed = true;
+        }
+        continue;
+      }
       const bounds = customChannelNormalizedBounds(name, channel, nextValues, channels);
       const raw = nextValues[name] ?? customChannelDefaultValue(channel);
       const normalized = normalizeCustomChannelValue(channel, raw);
@@ -256,6 +333,7 @@ function angleInCircularSweep(angle, definition = null) {
 
 export function snapCustomChannelValue(channel, rawValue) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'array') return arrayChannelItems(channel, rawValue);
   if (type === 'bool') return rawValue === true || rawValue === 'true' || Number(rawValue) >= 0.5;
   if (type === 'enum') return String(rawValue ?? customChannelDefaultValue(channel) ?? '');
 
@@ -375,6 +453,16 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
     nextValues[channelName] = nextCustomEnumValue(channel, currentValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
+  } else if (action === 'setitemvalue' && isArrayValueChannel(channel) && !isObjectArrayChannel(channel)) {
+    const index = Math.round(numberOr(hitZone?.payload?.index, -1));
+    const items = arrayChannelItems(channel, currentValue);
+    if (index >= 0 && index < items.length) {
+      items[index] = denormalizeArrayChannelItem(
+        channel,
+        payloadNormalized(hitZone?.payload) ?? hitZone?.probeNormalized ?? 0.75
+      );
+      nextValues[channelName] = items;
+    }
   } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
     applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
   } else if (['dragvalue', 'setvalue', 'slider', 'dial', 'ring'].includes(action) || ['slider', 'dial', 'ring', 'xy-pad'].includes(String(behaviorModule?.type ?? '').trim().toLowerCase())) {
@@ -434,6 +522,10 @@ function conditionMatches(condition, values) {
     })
   );
 }
+
+// Shared with state rules (interactionRuntime) so links, hit zones, and
+// visual states all evaluate the same condition language.
+export { conditionMatches as customConditionMatches };
 
 function resolveSwitchLinkValue(link, values) {
   const sourceName = String(link?.source ?? '').trim();
@@ -777,6 +869,20 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
     normalized = nextValue ? 1 : 0;
+  } else if (action === 'setitemvalue' && isArrayValueChannel(channel) && !isObjectArrayChannel(channel)) {
+    // Indexed repeats (§12.4): the zone edits ONE item of a scalar array
+    // channel. Vertical position inside the zone is the item value (top =
+    // max). Object-item channels have their own editors (e.g. the arp grid).
+    const index = Math.round(numberOr(hitZone?.payload?.index, -1));
+    const items = arrayChannelItems(channel, previousValues[channelName]);
+    if (index >= 0 && index < items.length) {
+      const itemNormalized = point?.rect
+        ? clamp(1 - ((point.clientY - point.rect.top) / Math.max(1, point.rect.height)), 0, 1)
+        : (payloadNormalized(hitZone?.payload) ?? 1);
+      items[index] = denormalizeArrayChannelItem(channel, itemNormalized);
+      nextValue = items;
+      normalized = itemNormalized;
+    }
   } else if (['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action) && hitZone?.payload) {
     const result = applyHitZonePayloadValues(nextValues, channels, hitZone, channelName, action);
     nextValue = result?.value ?? nextValue;

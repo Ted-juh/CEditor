@@ -1,0 +1,12 @@
+# Provisioned toolchain binaries are downloaded by provision.mjs (and bundled/downloaded by the
+# installer) — never committed. Keep only the manifest + scripts + cmake toolchain files.
+*
+!.gitignore
+!manifest.json
+!provision.mjs
+!provision.cmd
+!provision.sh
+!languages.mjs
+!resolveToolchain.mjs
+!*.cmake
+!README.md

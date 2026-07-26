@@ -38,21 +38,66 @@ export const SCRIPT_LANGUAGES = [
     comment: '//',
   },
   {
+    id: 'typescript',
+    label: 'TypeScript',
+    version: '5.x',
+    host: 'transpiled to JS (QuickJS)',
+    live: true, // transpiles to JS, which runs everywhere JS does
+    block: '(${e}) => {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
+  {
     id: 'python',
     label: 'Python',
     version: '3.x',
     host: 'Pyodide (WASM)',
-    live: false, // Tier 2 — WebView only (editor preview + open plugin window); not in the C++ runtime
+    live: false, // Tier 2 — live in the WebView (editor preview + plugin window); in the native C++ runtime only when CPython is embedded at export (embedPython auto/on), not in the always-on Lua+JS core
     block: 'def ${e}:\n  $0',
     method: '.',
     comment: '#',
   },
+  {
+    id: 'cpp',
+    label: 'C++',
+    version: '17',
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
+    live: true,    // runs live in the editor via the interpreted handler subset (cppPreview.js)
+    subset: true,  // …a subset; does NOT yet run in the shipped plugin (see native-handlers-design.md)
+    block: '[](CeContext& ctx, const CeEvent& event) {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
+  {
+    id: 'csharp',
+    label: 'C#',
+    version: '12',
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
+    live: true,
+    subset: true,
+    block: '(${e}) => {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
+  {
+    id: 'java',
+    label: 'Java',
+    version: '21',
+    host: 'CeScript interpreter — preview only (compile-at-export planned)',
+    live: true,
+    subset: true,
+    block: '(${e}) -> {\n  $0\n}',
+    method: '.',
+    comment: '//',
+  },
 ];
 
-// Tier-1 = always available everywhere (incl. the C++ window-closed runtime). Python is Tier-2
-// (WebView only). RUNNABLE_LANGUAGES is every language the WebView runtime can execute.
-export const TIER1_LANGUAGES = ['lua', 'javascript'];
-export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'python'];
+// Tier-1 = always built into every export incl. the C++ window-closed runtime (Lua + JS). Python is
+// Tier-2: live in the WebView, and in the native runtime only when CPython is embedded at export (the
+// embedPython auto/on setting). RUNNABLE_LANGUAGES is every language the WebView runtime can execute
+// (C++ via the interpreted preview subset).
+export const TIER1_LANGUAGES = ['lua', 'javascript', 'typescript'];
+export const RUNNABLE_LANGUAGES = ['lua', 'javascript', 'typescript', 'python', 'cpp', 'csharp', 'java'];
 
 /* ----------------------------------------------------------- scopes / context */
 // Where a member is valid. 'any' = all scopes. Scope-relative resolution (Q7):

@@ -239,7 +239,7 @@ Resolved:
 
 No blocking QA problems remain from this pass.
 
-Future polish:
-1. Add richer visual state-rule authoring for non-enum compound conditions.
-2. Add optional color/shape presets for the new waveform and envelope renderers.
-3. Add keyboard shortcuts for the arpeggiator tool modes.
+Future polish — **all three shipped (2026-07-05)**:
+1. ~~Add richer visual state-rule authoring for non-enum compound conditions.~~ Done — states carry an optional `rule` (compound channel/flag condition, same language as links/hit zones) with a ConditionBuilder in the States inspector tab; the filmstrip badge shows rule triggers.
+2. ~~Add optional color/shape presets for the new waveform and envelope renderers.~~ Done — preset strips (6 color presets; 4 waveform shapes; 5 ADSR silhouettes) appear when a waveformIcon/envelopePath part is selected.
+3. ~~Add keyboard shortcuts for the arpeggiator tool modes.~~ Done — keys 1–5 switch Select/Draw/Move/Resize/Velocity; shown on the toolbar buttons and the `?` cheatsheet.

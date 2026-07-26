@@ -22,6 +22,10 @@ import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionP
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
 import { isSourceScript } from './scriptModel.js';
+import { compileCpp, invokeCpp } from './cppPreview.js';
+import { compileCsharp, invokeCsharp } from './csharpPreview.js';
+import { compileJava, invokeJava } from './javaPreview.js';
+import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
 import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
@@ -29,6 +33,7 @@ import { phraseScriptPatch } from '../utils/phraseLayout.js';
 import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
 import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
+import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -149,6 +154,11 @@ function getValue(path) {
   return valueAtPath(control, modelPath);
 }
 
+/** Read a control value at a path, for the debugger's watch panel. Never throws. */
+export function readWatch(path) {
+  try { return getValue(path); } catch { return undefined; }
+}
+
 /* ------------------------------------------------------------------ helpers (pure) */
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -169,7 +179,7 @@ const helpers = {
 // host (e.g. a plain browser tab) the call is a no-op and we trace what *would* have gone out.
 // Origin/transmit gating for shipped panels is owned by the C++ runtime (Model 2).
 
-const DEFAULT_ROLE = 'mainSynth';
+const DEFAULT_ROLE = DEFAULT_DEVICE_ROLE;
 
 function midiInt(v, lo, hi) { v = Math.round(Number(v) || 0); return v < lo ? lo : v > hi ? hi : v; }
 function toByteArray(input) {
@@ -448,18 +458,34 @@ function ownerOf(script) {
 
 /* -------------------------------------------------------------- JavaScript executor */
 
-/** Execute a JS script's source and return its declared handlers (sync). */
-function loadHandlersJs(script) {
-  const api = buildApi(ownerOf(script));
+/** Run JS source with the panel API bound and collect its declared handlers (sync). */
+function runJsSource(source, scriptId, api) {
   const probe = HANDLER_NAMES.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
-  const body = `${script.source}\n;return {${probe}};`;
+  const body = `${source}\n;return {${probe}};`;
   try {
     const factory = new Function(...Object.keys(api), body);
     return factory(...Object.values(api)) || {};
   } catch (e) {
-    addScriptTrace('error', script.id, `load error: ${e?.message ?? e}`);
+    addScriptTrace('error', scriptId, `load error: ${e?.message ?? e}`);
     return null;
   }
+}
+
+/** Execute a JS script's source and return its declared handlers (sync). */
+function loadHandlersJs(script) {
+  return runJsSource(script.source, script.id, buildApi(ownerOf(script)));
+}
+
+/** TypeScript: prefer the JS the editor already transpiled (what the C++ host ships), else
+    transpile on the fly via the lazy compiler. Both run through the JS path. */
+async function loadHandlersTs(script) {
+  if (typeof script.compiledJs === 'string' && script.compiledJs.length)
+    return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script)));
+  const ts = await ensureTs();
+  if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
+  const js = transpileTs(script.source);
+  if (js == null) { addScriptTrace('error', script.id, 'TypeScript transpile failed'); return null; }
+  return runJsSource(js, script.id, buildApi(ownerOf(script)));
 }
 
 /* --------------------------------------------------------------------- Lua executor */
@@ -504,8 +530,10 @@ async function loadHandlersLua(script) {
 
 /* ------------------------------------------------------------------ Python executor */
 // Python via Pyodide (CPython in WASM), loaded lazily from the jsDelivr CDN on the first Python
-// script. Tier-2 language: runs in the WebView (editor preview + the OPEN plugin window). Offline /
-// window-closed Python is a follow-up (bundle Pyodide's assets; the C++ Model-2 runtime is Lua+JS).
+// script. Tier-2 language: in the WebView (editor preview + the OPEN plugin window) it runs via
+// Pyodide. Window-closed / offline native execution is delivered by embedding REAL CPython at export
+// (Scripting Runtime -> Python; CMake CEDITOR_PYTHON -> PythonScriptEngine.cpp), NOT Pyodide. The
+// always-on native core is Lua+JS; embedded CPython is the optional third window-closed engine.
 
 let pyodidePromise = null;
 async function getPyodideEngine() {
@@ -555,17 +583,105 @@ async function loadHandlersPython(script) {
   }
 }
 
+/* ----------------------------------------------------------------------- C++ executor */
+// Interpreted preview of the C++ behavior-handler subset (cppPreview.js). The real C++ is
+// compiled into the exported plugin; this lets a C++ script move live controls in the editor.
+// `ctx.*` maps onto the same panel API as Lua/JS; `event` is the handler payload.
+function loadHandlersCpp(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
+  const { handlers: parsed, diagnostics } = compileCpp(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `C++ preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    out[name] = (payload) => {
+      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      try { return invokeCpp(fnNode, [ctx, event], { print }); }
+      catch (e) { addScriptTrace('error', script.id, `C++ preview runtime error: ${e?.message ?? e}`); }
+    };
+  }
+  return out;
+}
+
+/* ----------------------------------------------------------------------- C# executor */
+// Interpreted preview of the C# behavior-handler subset (csharpPreview.js). `ctx` exposes the
+// panel API in both C# (PascalCase) and lower-case spellings; handler names match camelCase
+// (the skeleton) or PascalCase (idiomatic C#).
+function loadHandlersCsharp(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = {
+    ...api, setValue: api.set, getValue: api.get,
+    SetValue: api.set, GetValue: api.get, Log: api.log,
+    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex, Clamp: api.clamp, Scale: api.scale,
+  };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
+  const { handlers: parsed, diagnostics } = compileCsharp(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `C# preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    const fire = (payload) => {
+      const event = payload && typeof payload === 'object'
+        ? { ...payload, Value: payload.value, FirstTime: payload.firstTime }
+        : { value: payload, Value: payload };
+      try { return invokeCsharp(fnNode, [ctx, event], { print }); }
+      catch (e) { addScriptTrace('error', script.id, `C# preview runtime error: ${e?.message ?? e}`); }
+    };
+    out[name] = fire;
+    const lower = name.charAt(0).toLowerCase() + name.slice(1); // OnValueChanged → onValueChanged
+    if (lower !== name && !out[lower]) out[lower] = fire;
+  }
+  return out;
+}
+
+/* ----------------------------------------------------------------------- Java executor */
+// Interpreted preview of the Java behavior-handler subset (javaPreview.js).
+function loadHandlersJava(script) {
+  const api = buildApi(ownerOf(script));
+  const ctx = { ...api, setValue: api.set, getValue: api.get };
+  const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
+  const { handlers: parsed, diagnostics } = compileJava(script.source);
+  for (const d of diagnostics) addScriptTrace('error', script.id, `Java preview: ${d}`);
+  const out = {};
+  for (const [name, fnNode] of parsed) {
+    out[name] = (payload) => {
+      const event = payload && typeof payload === 'object' ? payload : { value: payload };
+      try { return invokeJava(fnNode, [ctx, event], { print }); }
+      catch (e) { addScriptTrace('error', script.id, `Java preview runtime error: ${e?.message ?? e}`); }
+    };
+  }
+  return out;
+}
+
 /* ---------------------------------------------------------------- unified run / load */
 
-/** Execute a script's source and return its declared handlers (JS sync; Lua/Python async). */
+/** Execute a script's source and return its declared handlers (JS/C++/C#/Java sync; Lua/Python async). */
 async function getHandlers(script) {
   const lang = script?.language ?? 'lua';
   if (lang === 'javascript' || lang === 'js') return loadHandlersJs(script);
+  if (lang === 'typescript' || lang === 'ts') return loadHandlersTs(script);
   if (lang === 'lua') return loadHandlersLua(script);
   if (lang === 'python' || lang === 'py') return loadHandlersPython(script);
+  if (lang === 'cpp' || lang === 'c++') return loadHandlersCpp(script);
+  if (lang === 'csharp' || lang === 'cs' || lang === 'c#') return loadHandlersCsharp(script);
+  if (lang === 'java') return loadHandlersJava(script);
   addScriptTrace('error', script?.id ?? '',
-    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, and Python run here).`);
+    `Language "${lang}" isn't supported in the web runtime (Lua, JavaScript, TypeScript, Python, C++, C#, and Java run here).`);
   return null;
+}
+
+// Report a thrown error as an error line plus a few call-stack frames (when available),
+// so the console shows the exception AND where it came from.
+function reportScriptError(scriptId, e) {
+  const msg = e?.message ?? String(e);
+  addScriptTrace('error', scriptId, msg);
+  const stack = e && typeof e.stack === 'string' ? e.stack : '';
+  if (stack) {
+    const frames = stack.split('\n').map((s) => s.trim())
+      .filter((l) => /^at\s|:\d+:\d+\)?$|^\[string/.test(l)) // JS "at …" frames / Lua "[string ...]:n"
+      .slice(0, 5);
+    for (const f of frames) addScriptTrace('trace', scriptId, `  ${f}`);
+  }
 }
 
 /** Run a script now — execute it and call its declared handler (or a named hook). */
@@ -583,7 +699,7 @@ export async function runScript(script, hook = null, payload = undefined) {
     if (result && typeof result.then === 'function') await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
   } catch (e) {
-    addScriptTrace('error', script.id, `${e?.message ?? e}`);
+    reportScriptError(script.id, e);
   }
 }
 

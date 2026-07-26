@@ -30,6 +30,13 @@ export function resolveWorkspaceChrome({
   // column (between the full-height palette and inspector), so the App-level
   // shared DisplayPanel is hidden here just like for other chrome-owning
   // workspaces — it stays available only in the panel editor.
+  //
+  // The properties panel is the exception (restructure Stage A): while the
+  // component workspace is open it hosts the AUTHOR tab set (Interact / React
+  // / Assets / Publish / Test Bench), so it must stay visible — it is the
+  // author inspector, not panel-editor chrome. Forced on (not merely allowed)
+  // because the icon-panel toggle that could re-show it is itself hidden in
+  // owned-chrome workspaces.
   return {
     workspaceKind,
     ownsChrome,
@@ -37,7 +44,9 @@ export function resolveWorkspaceChrome({
     chromeWorkspaceActive: ownsChrome,
     showTreePanel: !ownsChrome && !compactPanel && showTreePanel,
     showDisplayPanel: !ownsChrome && !compactPanel && showDisplayPanel,
-    showPropertiesPanel: !ownsChrome && !compactPanel && showPropertiesPanel,
+    showPropertiesPanel: workspaceKind === 'component'
+      ? true
+      : (!ownsChrome && !compactPanel && showPropertiesPanel),
     iconWidth: ownsChrome || compactPanel ? 0 : 48,
   };
 }
