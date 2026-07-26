@@ -520,6 +520,16 @@ export function onMidiInputMessage(callback) {
   return () => window.__JUCE__.backend.removeEventListener(token);
 }
 
+// The DAW playhead, pushed by the exported plugin's editor timer at 30Hz and
+// only when it changes (see PlayerHost::pushHostTransport). Fields the host
+// didn't report are ABSENT rather than zero — see utils/transportLayout.js's
+// parseHostPosition, which has to tell "no tempo yet" from "0 bpm".
+export function onHostTransport(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('hostTransport', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function onSysexInputMessage(callback) {
   if (!isJuceAvailable()) return () => {};
   const token = window.__JUCE__.backend.addEventListener('sysexInputMessage', callback);

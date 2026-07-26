@@ -56,6 +56,10 @@ export function createPanel(name = null) {
     width: 600,
     height: 400,
     resizable: false,
+    // The panel-wide emergency-stop key (see docs/panic.md). Lives on the panel
+    // rather than in app settings so it travels with an exported Player. Empty
+    // string switches it off — some rigs already have Escape bound.
+    panicShortcut: 'Escape',
     minWidth: 0,
     minHeight: 0,
     maxWidth: 0,

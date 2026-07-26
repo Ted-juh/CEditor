@@ -94,6 +94,13 @@ function buildValueRows(rows = []) {
     selectedByDefault: row.selectedByDefault === true,
     enabled: row.enabled !== false,
     visualOverrides: row.visualOverrides ?? {},
+    // Rich-row extras (Listbox): all optional.
+    icon: row.icon ?? '',          // data URL or icon name (left of the label)
+    subtitle: row.subtitle ?? '',  // secondary line under the label
+    badge: row.badge ?? '',        // trailing tag (bank letter, FAV, MIDI #)
+    swatch: row.swatch ?? '',      // AARRGGBB category accent (left stripe/dot)
+    isHeader: row.isHeader === true, // renders as a non-selectable section header
+    parentValue: row.parentValue ?? '', // cascading: parent value this row belongs to ('' = all)
   }));
 }
 
@@ -318,6 +325,93 @@ export const COMPONENT_TYPES = {
     },
   },
 
+  Listbox: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'Listbox', 'DeviceBindings', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Listbox'),
+    defaultOverrides: {
+      // Tall enough for ~5 rows; no dropdown arrow gutter.
+      Transform: { width: 160, height: 200 },
+      Text: { content: 'Option 1' },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF2F2F2F' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'center',
+        gap: 8,
+        paddingLeft: 10,
+        paddingRight: 10,
+        paddingTop: 6,
+        paddingBottom: 6,
+      },
+      Behavior: {
+        buttonType: 'listbox',
+        subtype: 'scrollable',
+        family: 'select',
+        role: 'listbox',
+        valueType: 'enum',
+        defaultValue: 'option_1',
+        selectionMode: 'single',
+        keyboardEnabled: true,
+        focusable: true,
+        emitClick: true,
+        emitValueChange: true,
+        emitStateChange: true,
+      },
+      States: createComboboxStates(),
+      Value: {
+        showMapping: true,
+        rows: buildValueRows([
+          { id: 'option_1', displayText: 'Option 1', internalValue: 'option_1', sendValue: 0, selectedByDefault: true },
+          { id: 'option_2', displayText: 'Option 2', internalValue: 'option_2', sendValue: 1 },
+          { id: 'option_3', displayText: 'Option 3', internalValue: 'option_3', sendValue: 2 },
+        ]),
+        segmentStyle: { shared: {}, rows: {} },
+      },
+    },
+  },
+
+  TextInput: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'DeviceBindings'],
+    ports: getComponentPorts('TextInput'),
+    defaultOverrides: {
+      Transform: { width: 160, height: 32 },
+      Text: { content: 'Enter text…' }, // placeholder (NOT the live value)
+      Background: {
+        _children: {
+          Fill: { colour: 'FF2F2F2F' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'center',
+        paddingLeft: 8,
+        paddingRight: 8,
+        paddingTop: 4,
+        paddingBottom: 4,
+      },
+      Behavior: {
+        buttonType: 'textInput',
+        family: 'text',
+        role: 'textInput',
+        valueType: 'text',
+        defaultValue: '', // the live text lives here
+        keyboardEnabled: true,
+        focusable: true,
+        emitValueChange: true,
+      },
+      States: createComboboxStates(),
+    },
+  },
+
   TimedButton: createButtonType({
     label: 'Hold',
     width: 148,
@@ -352,9 +446,19 @@ export const COMPONENT_TYPES = {
     sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
     ports: getComponentPorts('Range'),
     defaultOverrides: {
-      Transform: { width: 180, height: 40 },
+      Transform: { width: 200, height: 40 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
       ...createDefaultInteractiveSections('Range'),
+    },
+  },
+
+  Number: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Number'),
+    defaultOverrides: {
+      Transform: { width: 132, height: 38 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Number'),
     },
   },
 
@@ -365,6 +469,16 @@ export const COMPONENT_TYPES = {
       Transform: { width: 220, height: 48 },
       Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
       ...createDefaultInteractiveSections('Slider'),
+    },
+  },
+
+  Knob: {
+    sections: ['Mouse', 'Behavior', 'Parts', 'Bindings', 'DeviceBindings', 'States', 'Animations', 'Scripts'],
+    ports: getComponentPorts('Knob'),
+    defaultOverrides: {
+      Transform: { width: 100, height: 100 },
+      Mouse: { cursor: 'pointer', interceptClicks: true, focusable: true, tabIndex: 0, draggable: true },
+      ...createDefaultInteractiveSections('Knob'),
     },
   },
 
@@ -425,6 +539,506 @@ export const COMPONENT_TYPES = {
     defaultOverrides: {
       Transform: { width: 300, height: 200 },
       Grid: { enabled: true, snap: true, size: 10 },
+    },
+  },
+
+  Group: {
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Grid', 'Children'],
+    defaultOverrides: {
+      Transform: { width: 260, height: 180 },
+      Background: {
+        _children: {
+          Fill: { colour: '11FFFFFF' },
+          Border: { enabled: true, thickness: 1, colour: '66FFFFFF' },
+          Corners: { radius: 6 },
+        },
+      },
+      Text: { content: 'Group' },
+      ContentLayout: {
+        mode: 'text_only',
+        horizontalAlign: 'left',
+        verticalAlign: 'top',
+        paddingLeft: 10,
+        paddingRight: 10,
+        paddingTop: 4,
+        paddingBottom: 4,
+      },
+      Grid: { enabled: true, snap: true, size: 10 },
+    },
+  },
+
+  Image: {
+    sections: ['Background', 'Effects'],
+    defaultOverrides: {
+      Transform: { width: 160, height: 120 },
+      Background: {
+        _children: {
+          Fill: { solidEnabled: false, imageEnabled: true, imageFit: 'contain', colour: '00000000' },
+          Border: { enabled: false },
+        },
+      },
+    },
+  },
+
+  LcdDisplay: {
+    sections: ['Background', 'Display', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('LcdDisplay'),
+    defaultOverrides: {
+      // A 16x2 character LCD in a dark bezel by default.
+      Transform: { width: 260, height: 96 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF161616' },
+          Border: { enabled: true, thickness: 2, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  PixelDisplay: {
+    sections: ['Background', 'Pixel', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('PixelDisplay'),
+    defaultOverrides: {
+      // A 128x64 OLED-style pixel surface in a dark bezel by default.
+      Transform: { width: 260, height: 140 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101010' },
+          Border: { enabled: true, thickness: 2, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Macro: {
+    sections: ['Background', 'Macro', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Macro'),
+    defaultOverrides: {
+      // A macro knob + assignment lanes in a dark panel by default.
+      Transform: { width: 320, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF15151A' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  Constellation: {
+    sections: ['Background', 'Constellation', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Constellation'),
+    defaultOverrides: {
+      // A wide preset-map field on a dark panel by default.
+      Transform: { width: 260, height: 220 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0C0C12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
+  Timbre: {
+    sections: ['Background', 'Timbre', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Timbre'),
+    defaultOverrides: {
+      // A square perceptual sound-map on a dark panel by default.
+      Transform: { width: 220, height: 220 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0C0C12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
+  Router: {
+    sections: ['Background', 'Router', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Router'),
+    defaultOverrides: {
+      // A transfer-curve panel with a source chip + destination lanes by default.
+      Transform: { width: 320, height: 190 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  Turing: {
+    sections: ['Background', 'Turing', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Turing'),
+    defaultOverrides: {
+      // A wide step-sequence field on a dark panel by default.
+      Transform: { width: 260, height: 120 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  Looper: {
+    sections: ['Background', 'Looper', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Looper'),
+    defaultOverrides: {
+      // A wide multi-lane gesture recorder on a dark panel by default.
+      Transform: { width: 300, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  ChordPad: {
+    // Note-playing control: it emits MIDI notes rather than driving a device
+    // parameter, so it carries no DeviceBindings section.
+    sections: ['Background', 'ChordPad', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('ChordPad'),
+    defaultOverrides: {
+      // A square chord wheel on a dark panel by default.
+      Transform: { width: 260, height: 280 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
+  Arp: {
+    // Like the ChordPad it plays notes rather than driving a parameter, so it
+    // carries no DeviceBindings section either.
+    sections: ['Background', 'Arp', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Arp'),
+    defaultOverrides: {
+      // A wide, short step lane.
+      Transform: { width: 320, height: 96 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  NoteRibbon: {
+    // Plays notes rather than driving a parameter — no DeviceBindings, same as
+    // the ChordPad and the Arp.
+    sections: ['Background', 'NoteRibbon', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('NoteRibbon'),
+    defaultOverrides: {
+      // A wide playing strip.
+      Transform: { width: 360, height: 104 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  DrumPads: {
+    // Emits notes rather than driving a parameter — no DeviceBindings, same as
+    // the ChordPad, the Arp and the NoteRibbon.
+    sections: ['Background', 'DrumPads', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('DrumPads'),
+    defaultOverrides: {
+      // A square 4x4 grid.
+      Transform: { width: 260, height: 280 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
+  Phrase: {
+    // Sequences PITCH — the gap between the Turing (values) and the Arp (notes
+    // you're already holding). Emits MIDI, so no DeviceBindings.
+    sections: ['Background', 'Phrase', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Phrase'),
+    defaultOverrides: {
+      Transform: { width: 460, height: 170 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Setlist: {
+    // An ordered list of panel states you advance with a footswitch. Sends
+    // program change and writes panel values, so no DeviceBindings of its own.
+    sections: ['Background', 'Setlist', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Setlist'),
+    defaultOverrides: {
+      Transform: { width: 260, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Harmoniser: {
+    // One finger in, a chord out. Reads the MIDI input and emits notes, so no
+    // DeviceBindings.
+    sections: ['Background', 'Harmoniser', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Harmoniser'),
+    defaultOverrides: {
+      Transform: { width: 340, height: 110 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Recorder: {
+    // The note twin of the Gesture Looper: records what you play (on the panel
+    // or on the MIDI input) and loops it. Emits MIDI, so no DeviceBindings.
+    sections: ['Background', 'Recorder', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Recorder'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  SplitZone: {
+    // A routing table: notes in on the hardware input, notes out on the raw MIDI
+    // path. Like the other note controls it emits MIDI rather than parameter
+    // values, so there is no DeviceBindings section.
+    sections: ['Background', 'SplitZone', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('SplitZone'),
+    defaultOverrides: {
+      Transform: { width: 420, height: 110 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Panic: {
+    // Emits MIDI directly, like the note-playing controls — no DeviceBindings.
+    sections: ['Background', 'Panic', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Panic'),
+    defaultOverrides: {
+      Transform: { width: 132, height: 48 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Transport: {
+    // Emits MIDI clock directly rather than driving a parameter.
+    sections: ['Background', 'Transport', 'Text', 'Effects', 'Scripts'],
+    ports: getComponentPorts('Transport'),
+    defaultOverrides: {
+      Transform: { width: 230, height: 58 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Constraint: {
+    sections: ['Background', 'Constraint', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Constraint'),
+    defaultOverrides: {
+      // A row of linked value bars on a dark panel by default.
+      Transform: { width: 200, height: 140 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF101017' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  Kinetic: {
+    sections: ['Background', 'Kinetic', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Kinetic'),
+    defaultOverrides: {
+      // A square physics box on a dark panel by default.
+      Transform: { width: 180, height: 180 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0D0D12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 10 },
+        },
+      },
+    },
+  },
+
+  Orbit: {
+    sections: ['Background', 'Orbit', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Orbit'),
+    defaultOverrides: {
+      // A square circular modulation field on a dark panel by default.
+      Transform: { width: 200, height: 200 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF0D0D12' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 12 },
+        },
+      },
+    },
+  },
+
+  Ribbon: {
+    sections: ['Background', 'Ribbon', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Ribbon'),
+    defaultOverrides: {
+      // A tall vertical touch strip / wheel by default.
+      Transform: { width: 44, height: 150 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Crossfader: {
+    sections: ['Background', 'Crossfader', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Crossfader'),
+    defaultOverrides: {
+      // A wide horizontal A/B fader by default.
+      Transform: { width: 200, height: 44 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  VectorJoystick: {
+    sections: ['Background', 'Joystick', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('VectorJoystick'),
+    defaultOverrides: {
+      // A square XY pad in a dark panel by default.
+      Transform: { width: 160, height: 160 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Matrix: {
+    sections: ['Background', 'Matrix', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Matrix'),
+    defaultOverrides: {
+      // A 4×4 routing grid in a dark panel by default.
+      Transform: { width: 260, height: 170 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Envelope: {
+    sections: ['Background', 'Envelope', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Envelope'),
+    defaultOverrides: {
+      // A wide ADSR editing area in a dark panel by default.
+      Transform: { width: 280, height: 160 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF141414' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 8 },
+        },
+      },
+    },
+  },
+
+  Meter: {
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    ports: getComponentPorts('Meter'),
+    defaultOverrides: {
+      // A horizontal level meter in a dark inset by default.
+      Transform: { width: 220, height: 34 },
+      Background: {
+        _children: {
+          Fill: { colour: 'FF121212' },
+          Border: { enabled: true, thickness: 1, colour: 'FF000000' },
+          Corners: { radius: 6 },
+        },
+      },
     },
   },
 

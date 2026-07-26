@@ -1,6 +1,17 @@
 import { deepClone } from './deepClone.js';
 import { getEnumNormalizedValue, normalizeEnumValues, resolveEnumDefaultValue } from './enumBehavior.js';
-import { getCurrentRangeValue, getRangeMax, getRangeMin, resolveRangeDisplayValue, snapRangeValue } from './rangeBehavior.js';
+import {
+  formatRangeValue,
+  getCurrentRangeValue,
+  getRangeActiveHandle,
+  getRangeEndValue,
+  getRangeMax,
+  getRangeMin,
+  getRangeStartValue,
+  isTwoValueRange,
+  resolveRangeDisplayValue,
+  snapRangeValue,
+} from './rangeBehavior.js';
 import {
   formatSliderNumericValue,
   formatSliderReadout,
@@ -19,6 +30,7 @@ import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
+import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
 
 function getNodeChild(node, key) {
   return node?._children?.[key];
@@ -162,6 +174,10 @@ function evaluateBindingSource(binding, signals) {
       return signals.endValueNormalized;
     case 'value.display':
       return signals.valueDisplay;
+    case 'value.start.display':
+      return signals.startValueDisplay;
+    case 'value.end.display':
+      return signals.endValueDisplay;
     case 'value.bool':
       return signals.checked;
     case 'value.enum':
@@ -564,7 +580,9 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
 export function resolveInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const behavior = getNodeChild(control, 'Behavior');
-  const valueRows = getValueRows(control);
+  // Cascading selectors: reduce the choices to those visible under the parent
+  // selector's current value (a no-op for independent controls).
+  const valueRows = visibleChoiceRows(getValueRows(control), previewSession?.dependsParentValue, dependsOnId(control));
   const defaultRow = findDefaultRow(valueRows);
   const buttonType = String(behavior?.buttonType ?? '');
   const valueType = String(behavior?.valueType ?? 'none');
@@ -615,7 +633,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     };
   }
 
-  if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox') {
+  if (buttonType === 'radio' || buttonType === 'cyclic' || buttonType === 'combobox' || buttonType === 'listbox') {
     const resolvedRow = findRowByInternalValue(valueRows, valueRaw)
       ?? findDefaultRow(valueRows);
     const selectionActive = resolvedRow != null;
@@ -660,6 +678,25 @@ export function resolveInteractionContext(control, previewSession = {}) {
     ? resolveRangeDisplayValue(behavior, previewSession)
     : (valueType === 'enum' ? String(valueRaw ?? '') : String(valueRaw ?? '')));
 
+  // Two-value (min/max) range spinner carries a low (start) and high (end)
+  // value plus which one is active. These extra signals feed the low/high text
+  // bindings and the active-field highlight state; single-value ranges (Number)
+  // leave them undefined and are unaffected.
+  let twoValueSignals = {};
+  if (isTwoValueRange(behavior)) {
+    const startValue = getRangeStartValue(behavior, previewSession);
+    const endValue = getRangeEndValue(behavior, previewSession);
+    twoValueSignals = {
+      startValueRaw: startValue,
+      endValueRaw: endValue,
+      startValueDisplay: formatRangeValue(behavior, startValue),
+      endValueDisplay: formatRangeValue(behavior, endValue),
+      startValueNormalized: clamp(normalizeRange(startValue, min, max), 0, 1),
+      endValueNormalized: clamp(normalizeRange(endValue, min, max), 0, 1),
+      activeHandle: getRangeActiveHandle(previewSession),
+    };
+  }
+
   return {
     family: String(behavior?.family ?? 'trigger'),
     role: String(behavior?.role ?? core?.controlType ?? 'custom'),
@@ -668,6 +705,7 @@ export function resolveInteractionContext(control, previewSession = {}) {
     valueDisplay,
     valueEnum: valueType === 'enum' ? String(valueRaw ?? '') : '',
     valueNormalized,
+    ...twoValueSignals,
     hover: previewSession?.hover === true,
     pressed: previewSession?.pressed === true,
     focused: previewSession?.focused === true,

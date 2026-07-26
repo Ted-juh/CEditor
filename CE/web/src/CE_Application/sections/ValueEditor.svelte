@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { panels, resolvedActivePanelId } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -12,6 +13,21 @@
   let valueSection = $derived(getSection(control, 'Value'));
   let buttonType = $derived(String(behavior?.buttonType ?? 'momentary'));
   let rows = $derived(Array.isArray(valueSection?.rows) ? valueSection.rows : []);
+
+  // Cascading selectors: other selector controls on this panel that can drive
+  // this one, plus the chosen parent's rows (to populate the per-row picker).
+  let isSelector = $derived(['radio', 'combobox', 'listbox', 'cyclic'].includes(buttonType));
+  let panelControls = $derived($panels.find((p) => p.id === $resolvedActivePanelId)?.controls ?? []);
+  let parentOptions = $derived(panelControls.filter((c) => {
+    const id = c?._children?.Core?.id;
+    const bt = String(c?._children?.Behavior?.buttonType ?? '').toLowerCase();
+    return id && id !== core?.id && ['radio', 'combobox', 'listbox', 'cyclic'].includes(bt);
+  }));
+  let dependsOn = $derived(String(valueSection?.dependsOn ?? ''));
+  let parentControl = $derived(panelControls.find((c) => c?._children?.Core?.id === dependsOn) ?? null);
+  let parentRows = $derived((parentControl?._children?.Value?.rows ?? []).filter((r) => r?.isHeader !== true));
+  function parentRowValue(row) { return String(row?.internalValue ?? row?.id ?? ''); }
+  function parentRowLabel(row) { return String(row?.displayText || row?.internalValue || row?.id || ''); }
 
   function set(path, value) {
     if (!core?.id) return;
@@ -62,7 +78,41 @@
     <PropertyCell label="Rows" span={2} hint="Add or remove rows for cyclic values, radio groups, toggles, and mapped payloads.">
       <button type="button" class="action-btn" onclick={addRow}>Add Row</button>
     </PropertyCell>
+    {#if isSelector}
+      <PropertyCell label="Store by name" span={4} hint="Export/save this choice by its stable name instead of a row index, so the value round-trips even when the visible rows change (cascading lists).">
+        <PropertyToggle
+          value={valueSection.storeByValue === true}
+          onchange={() => set('Value.storeByValue', !(valueSection.storeByValue === true))}
+        />
+      </PropertyCell>
+    {/if}
   </PropertySection>
+
+  {#if isSelector}
+    <PropertySection title="Depends on (cascading)">
+      <PropertyCell label="Parent list" span={dependsOn ? 3 : 4} hint="Show only the rows that match another selector's current choice (bank → preset).">
+        <select class="val" value={dependsOn} onchange={(event) => set('Value.dependsOn', event.target.value)}>
+          <option value="">— None (independent) —</option>
+          {#each parentOptions as parent (parent._children.Core.id)}
+            <option value={parent._children.Core.id}>{parent._children?.Core?.name || parent._children.Core.id}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      {#if dependsOn}
+        <PropertyCell label="Reset pick" span={1} hint="When the parent changes, jump this list to the first matching row.">
+          <PropertyToggle
+            value={valueSection.dependsResetOnChange !== false}
+            onchange={() => set('Value.dependsResetOnChange', !(valueSection.dependsResetOnChange !== false))}
+          />
+        </PropertyCell>
+        {#if parentControl && parentRows.length === 0}
+          <PropertyCell label="" span={4}>
+            <div class="empty">The parent list has no rows yet — add rows there first, then tag each row below with the parent value it belongs to.</div>
+          </PropertyCell>
+        {/if}
+      {/if}
+    </PropertySection>
+  {/if}
 
   {#if buttonType === 'momentary' && valueSection.showMapping !== true}
     <PropertySection title="Momentary">
@@ -116,7 +166,7 @@
                 />
               </div>
               <div class="row-actions">
-                {#if buttonType === 'radio' || buttonType === 'combobox'}
+                {#if buttonType === 'radio' || buttonType === 'combobox' || buttonType === 'listbox'}
                   <label class="flag">
                     <input
                       type="checkbox"
@@ -136,6 +186,35 @@
                 </label>
                 <button type="button" class="action-btn danger" onclick={() => removeRow(index)}>Remove</button>
               </div>
+              {#if isSelector && dependsOn && row.isHeader !== true}
+                <label class="show-for">
+                  <span>Show for</span>
+                  <select
+                    class="val"
+                    value={String(row.parentValue ?? '')}
+                    onchange={(event) => updateRow(index, 'parentValue', event.target.value)}
+                  >
+                    <option value="">All ({parentControl?._children?.Core?.name || 'parent'})</option>
+                    {#each parentRows as prow (prow.id ?? prow.internalValue)}
+                      <option value={parentRowValue(prow)}>{parentRowLabel(prow)}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+              {#if buttonType === 'listbox'}
+                <div class="row-rich">
+                  <label class="flag">
+                    <input type="checkbox" checked={row.isHeader === true} onchange={(event) => updateRow(index, 'isHeader', event.currentTarget.checked)} />
+                    <span>Header</span>
+                  </label>
+                  {#if row.isHeader !== true}
+                    <input class="rich-in" type="text" placeholder="icon (glyph or URL)" value={row.icon ?? ''} onchange={(event) => updateRow(index, 'icon', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="subtitle" value={row.subtitle ?? ''} onchange={(event) => updateRow(index, 'subtitle', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="badge" value={row.badge ?? ''} onchange={(event) => updateRow(index, 'badge', event.target.value)} />
+                    <input class="rich-in" type="text" placeholder="swatch AARRGGBB" value={row.swatch ?? ''} onchange={(event) => updateRow(index, 'swatch', event.target.value.trim())} />
+                  {/if}
+                </div>
+              {/if}
             </div>
           {/each}
         </div>
@@ -192,6 +271,25 @@
     justify-content: flex-end;
   }
 
+  .row-rich {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .row-rich .rich-in {
+    flex: 1 1 90px;
+    min-width: 70px;
+    background: #1A1A1A;
+    border: 1px solid #333;
+    color: #DDD;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 11px;
+  }
+  .row-rich .rich-in:focus-visible { outline: 2px solid #5B9BD5; outline-offset: 1px; }
+
   .flag {
     display: inline-flex;
     align-items: center;
@@ -199,6 +297,16 @@
     color: #B9B9B9;
     font-size: 11px;
   }
+
+  .show-for {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #B9B9B9;
+    font-size: 11px;
+  }
+  .show-for span { flex: 0 0 auto; }
+  .show-for .val { flex: 1 1 auto; }
 
   .empty {
     border: 1px dashed #3A3A3A;

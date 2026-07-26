@@ -1,0 +1,722 @@
+<script>
+  // PixelDisplay — a free-pixel dot-matrix surface (OLED/GLCD style). Unlike the
+  // LCD's character/segment grids, everything here is pixel-addressed: elements
+  // live at (x, y, w, h) on a pixelsW × pixelsH grid. Text elements rasterise at
+  // their position with a per-element font height; widget elements (bars,
+  // sliders, needle) fill their rect; an animation layer plays behind.
+  import { onDestroy, untrack } from 'svelte';
+  import LcdGraphicCanvas from './LcdGraphicCanvas.svelte';
+  import { resolveZoneContent, infoFraction, WIDGET_ZONE_KINDS, resolveActiveLayoutId, findLayout, zoneScrollWindow } from '../utils/lcdZones.js';
+  import { FONT_H, FONT_ADVANCE, ICON_GLYPHS } from '../utils/pixelFont.js';
+  import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { updateControlProperty } from '../stores/controls.js';
+
+  let { control = null, allControls = [], width = 0, height = 0, editable = false, scale = 1 } = $props();
+
+  // Pixel-only widget kinds: the LCD's zone widgets plus the synthesized
+  // waveform and the scope trace (which have no character fallback).
+  const PIXEL_WIDGET_KINDS = new Set([...WIDGET_ZONE_KINDS, 'wave', 'scope', 'adsr']);
+
+  let pixel = $derived(control?._children?.Pixel ?? null);
+  let coreId = $derived(String(control?._children?.Core?.id ?? ''));
+
+  function numberOr(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  // Current wall-clock time, formatted for a 'clock' element.
+  function formatClock(fmt) {
+    const two = (n) => String(n).padStart(2, '0');
+    const d = new Date();
+    const h24 = d.getHours(); const m = d.getMinutes(); const s = d.getSeconds();
+    const h12 = ((h24 + 11) % 12) + 1;
+    switch (String(fmt ?? 'hm')) {
+      case 'hms': return `${two(h24)}:${two(m)}:${two(s)}`;
+      case 'hm12': return `${h12}:${two(m)}`;
+      case 'hms12': return `${h12}:${two(m)}:${two(s)}`;
+      case 'date': return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`;
+      case 'hm':
+      default: return `${two(h24)}:${two(m)}`;
+    }
+  }
+
+  // Word-wrap a string to at most `maxChars` per line, honouring explicit
+  // newlines and hard-breaking any single word longer than the line.
+  function wrapText(str, maxChars) {
+    const out = [];
+    for (const rawLine of String(str ?? '').split('\n')) {
+      if (maxChars <= 0) { out.push(rawLine); continue; }
+      let cur = '';
+      for (const word of rawLine.split(' ')) {
+        if (cur === '') cur = word;
+        else if ((cur + ' ' + word).length <= maxChars) cur += ' ' + word;
+        else { out.push(cur); cur = word; }
+        while (cur.length > maxChars) { out.push(cur.slice(0, maxChars)); cur = cur.slice(maxChars); }
+      }
+      out.push(cur);
+    }
+    return out.length ? out : [''];
+  }
+
+  // AARRGGBB / RRGGBB hex → css rgba().
+  function cssColour(value, fallback = 'transparent') {
+    const raw = String(value ?? '').trim();
+    if (/^[0-9a-f]{8}$/i.test(raw)) {
+      const a = parseInt(raw.slice(0, 2), 16) / 255;
+      const r = parseInt(raw.slice(2, 4), 16);
+      const g = parseInt(raw.slice(4, 6), 16);
+      const b = parseInt(raw.slice(6, 8), 16);
+      return `rgba(${r}, ${g}, ${b}, ${a.toFixed(3)})`;
+    }
+    if (/^[0-9a-f]{6}$/i.test(raw)) return `#${raw}`;
+    return raw || fallback;
+  }
+
+  let pixW = $derived(Math.max(8, Math.round(numberOr(pixel?.pixelsW, 128))));
+  let pixH = $derived(Math.max(8, Math.round(numberOr(pixel?.pixelsH, 64))));
+  let padding = $derived(Math.max(0, numberOr(pixel?.padding, 8)));
+  let brightness = $derived(clamp(numberOr(pixel?.brightness, 100), 0, 100) / 100);
+  let contrast = $derived(clamp(numberOr(pixel?.contrast, 55), 0, 100) / 100);
+
+  let litCss = $derived(cssColour(pixel?.litColour ?? 'FFF2F2F2', '#F2F2F2'));
+  let unlitCss = $derived(cssColour(pixel?.unlitColour ?? '14FFFFFF', 'rgba(255,255,255,0.08)'));
+  let screenCss = $derived(cssColour(pixel?.screenColour ?? 'FF000000', '#000'));
+  let backlightCss = $derived(cssColour(pixel?.backlightColour ?? '00000000', 'transparent'));
+  let glassTintCss = $derived(cssColour(pixel?.glassTint ?? '14FFFFFF', 'rgba(255,255,255,0.08)'));
+
+  let screenW = $derived(Math.max(1, numberOr(width, 0) - padding * 2));
+  let screenH = $derived(Math.max(1, numberOr(height, 0) - padding * 2));
+
+  let backlightOn = $derived(pixel?.backlightOn !== false);
+  let showGhost = $derived(pixel?.showGhost !== false);
+  let showScanlines = $derived(pixel?.showScanlines === true);
+  let showGlass = $derived(pixel?.showGlass !== false);
+  let dotShape = $derived(String(pixel?.dotShape ?? 'round').trim().toLowerCase());
+
+  // Live info about a source: preview-injected (__live), else static defaults.
+  function controlInfo(sourceId) {
+    const id = String(sourceId ?? '');
+    if (!id) return null;
+    // '@edit' resolves to this screen's own editable buffer (Pixel.editText).
+    if (id === '@edit') {
+      return { present: true, name: '', value: 0, min: 0, max: 0, text: String(pixel?.editText ?? ''), on: false };
+    }
+    const live = pixel?.__live?.[id];
+    const ctrl = (Array.isArray(allControls) ? allControls : [])
+      .find((c) => String(c?._children?.Core?.id ?? '') === id);
+    if (!live && !ctrl) return null;
+    const behavior = ctrl?._children?.Behavior ?? null;
+    const min = live?.min ?? numberOr(behavior?.min, 0);
+    const max = live?.max ?? numberOr(behavior?.max, 127);
+    const fallbackValue = numberOr(behavior?.defaultValue ?? behavior?.defaultStartValue, min);
+    return {
+      present: true,
+      name: String(live?.name ?? ctrl?._children?.Core?.name ?? id),
+      value: numberOr(live?.value, fallbackValue),
+      min,
+      max,
+      text: String(live?.text ?? ctrl?._children?.Text?.content ?? ''),
+      on: live?.on === true,
+    };
+  }
+
+  // Layouts/pages: when layouts exist, the active layout's elements replace the
+  // flat list. Active = preview-injected (__page), else the inspector's design
+  // selection (transient store), else the Pages default.
+  let layouts = $derived(Array.isArray(pixel?.layouts) ? pixel.layouts : []);
+  let hasLayouts = $derived(layouts.length > 0);
+  let activeLayoutId = $derived.by(() => {
+    if (!hasLayouts) return '';
+    const injected = pixel?.__page?.activeLayoutId;
+    if (injected) return String(injected);
+    const design = String($lcdDesignLayoutIds[coreId] ?? '');
+    if (design && findLayout(layouts, design)) return design;
+    return resolveActiveLayoutId(pixel?.pages ?? {}, layouts, {});
+  });
+  let elements = $derived.by(() => {
+    if (hasLayouts) {
+      const layout = findLayout(layouts, activeLayoutId);
+      return Array.isArray(layout?.elements) ? layout.elements : [];
+    }
+    return Array.isArray(pixel?.elements) ? pixel.elements : [];
+  });
+
+  // Text elements → pixel-positioned strings for the canvas. Widget elements
+  // with a label get a small caption drawn under the widget (above it when the
+  // widget sits at the bottom edge).
+  const WIDGET_LABEL_H = 7;
+  let texts = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      const kind = String(el?.kind ?? '');
+      if (el?.visible === false || !kind) continue;
+      if (el?.blink === true && !blinkPhase) continue; // blink: hidden on the off half
+      if (PIXEL_WIDGET_KINDS.has(kind)) {
+        const label = String(el?.label ?? '').trim();
+        if (!label) continue;
+        const x = Math.round(numberOr(el?.x, 0));
+        const y = Math.round(numberOr(el?.y, 0));
+        const w = Math.max(1, Math.round(numberOr(el?.w, 10)));
+        const h = Math.max(1, Math.round(numberOr(el?.h, 10)));
+        const below = y + h + 1;
+        out.push({
+          x,
+          y: below + WIDGET_LABEL_H <= pixH ? below : Math.max(0, y - WIDGET_LABEL_H - 1),
+          w,
+          h: WIDGET_LABEL_H,
+          align: 'center',
+          content: label,
+          colour: el?.colour ? cssColour(el.colour) : '',
+        });
+        continue;
+      }
+      // Icon element: content is the picked glyph char (no source).
+      // Clock element: current wall-clock time (ticks via the rAF clock).
+      let content;
+      if (kind === 'icon') {
+        content = ICON_GLYPHS[String(el?.icon ?? 'play')] ?? '';
+      } else if (kind === 'clock') {
+        void frameTime; // re-derive each frame so the time advances
+        content = formatClock(el?.clockFormat);
+      } else {
+        const info = controlInfo(String(el?.sourceId ?? ''));
+        // Reuse the zone content engine (element kinds mirror zone show kinds).
+        content = resolveZoneContent({ ...el, show: kind }, info, 16);
+      }
+      if (content === '') continue;
+      const elX = Math.round(numberOr(el?.x, 0));
+      const elY = Math.round(numberOr(el?.y, 0));
+      const boxW = Math.max(0, Math.round(numberOr(el?.w, 0)));
+      const elH = Math.max(3, Math.round(numberOr(el?.h, 8)));
+      const colour = el?.colour ? cssColour(el.colour) : '';
+      const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+      const align = String(el?.align ?? 'left');
+
+      // Word-wrap into stacked lines (honours explicit \n too). Takes precedence
+      // over marquee; each wrapped line is its own text entry.
+      if (el?.wrap === true && boxW > 0) {
+        const charsPerLine = Math.max(1, Math.floor(boxW / (FONT_ADVANCE * s)));
+        const lineH = FONT_H * s + 1;
+        wrapText(content, charsPerLine).forEach((ln, li) => {
+          const ly = elY + li * lineH;
+          if (ly < pixH) out.push({ x: elX, y: ly, w: boxW, h: elH, align, content: ln, colour, font: String(el?.font ?? '') });
+        });
+        continue;
+      }
+
+      // Marquee: when the text overflows its W box, scroll a window across it
+      // rather than clipping. Reads the rAF clock only when scroll is on, so
+      // static text elements don't recompute every frame.
+      if (el?.scroll === true && boxW > 0) {
+        const fit = Math.floor(boxW / (FONT_ADVANCE * s));
+        if (fit > 0 && content.length > fit) {
+          const elapsed = Math.floor((frameTime / 1000) * 3); // ~3 chars/sec
+          content = zoneScrollWindow(content, fit, elapsed);
+        }
+      }
+      out.push({ x: elX, y: elY, w: boxW, h: elH, align, content, colour, font: String(el?.font ?? '') });
+    }
+    return out;
+  });
+
+  // Freehand pixel-art (kind 'bitmap') → bitmap descriptors for the canvas.
+  let bitmaps = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      if (el?.visible === false || String(el?.kind ?? '') !== 'bitmap') continue;
+      if (el?.blink === true && !blinkPhase) continue;
+      out.push({
+        x: Math.round(numberOr(el?.x, 0)),
+        y: Math.round(numberOr(el?.y, 0)),
+        w: Math.max(1, Math.round(numberOr(el?.w, 8))),
+        h: Math.max(1, Math.round(numberOr(el?.h, 8))),
+        bits: String(el?.bits ?? ''),
+        colour: el?.colour ? cssColour(el.colour) : '',
+      });
+    }
+    return out;
+  });
+
+  // Widget elements → pixel-rect widgets for the canvas.
+  let pixelWidgets = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      const kind = String(el?.kind ?? '');
+      if (el?.visible === false || !PIXEL_WIDGET_KINDS.has(kind)) continue;
+      const info = controlInfo(String(el?.sourceId ?? ''));
+      const cutInfo = kind === 'wave' ? controlInfo(String(el?.cutoffSourceId ?? '')) : null;
+      const resInfo = kind === 'wave' ? controlInfo(String(el?.resoSourceId ?? '')) : null;
+      const lfoInfo = kind === 'wave' ? controlInfo(String(el?.lfoSourceId ?? '')) : null;
+      const freqInfo = kind === 'wave' ? controlInfo(String(el?.freqSourceId ?? '')) : null;
+      const attInfo = kind === 'adsr' ? controlInfo(String(el?.attackSourceId ?? '')) : null;
+      const decInfo = kind === 'adsr' ? controlInfo(String(el?.decaySourceId ?? '')) : null;
+      const susInfo = kind === 'adsr' ? controlInfo(String(el?.sustainSourceId ?? '')) : null;
+      const relInfo = kind === 'adsr' ? controlInfo(String(el?.releaseSourceId ?? '')) : null;
+      out.push({
+        id: String(el?.id ?? ''),
+        kind,
+        px: true,
+        x: Math.round(numberOr(el?.x, 0)),
+        y: Math.round(numberOr(el?.y, 0)),
+        w: Math.max(1, Math.round(numberOr(el?.w, 10))),
+        h: Math.max(1, Math.round(numberOr(el?.h, 10))),
+        frac: info ? infoFraction(info) : 0,
+        frame: el?.frame === true,
+        ticks: el?.ticks === true,
+        peakHold: el?.peakHold === true,
+        smooth: el?.smooth === true,
+        colour: el?.colour ? cssColour(el.colour) : '',
+        meterColours: el?.meterColours === true,
+        gradient: el?.gradient === true,
+        // wave: synthesized waveform driven by MIDI values (no audio needed)
+        shape: String(el?.waveShape ?? 'saw'),
+        cycles: Math.max(0.25, numberOr(el?.waveCycles, 2)),
+        speed: numberOr(el?.waveSpeed, 1),
+        lfoDepth: Math.max(0, Math.min(1, numberOr(el?.waveDepth, 0.5))),
+        // Bound → the source drives amplitude; unbound → a steady idle amplitude
+        // (not full-scale, so "no source" reads differently from "source at max").
+        amp: kind === 'wave' ? (info ? infoFraction(info) : 0.7) : undefined,
+        cutoff: cutInfo ? infoFraction(cutInfo) : null,
+        reso: resInfo ? infoFraction(resInfo) : 0,
+        lfoRate: lfoInfo ? 0.3 + infoFraction(lfoInfo) * 7 : 0,
+        freqMul: freqInfo ? 0.5 + infoFraction(freqInfo) * 1.5 : 1,
+        // scope: rolling history window
+        secs: Math.max(0.25, numberOr(el?.scopeSecs, 3)),
+        fill: el?.scopeFill === true,
+        // adsr: envelope curve from four sources
+        att: attInfo ? infoFraction(attInfo) : null,
+        dec: decInfo ? infoFraction(decInfo) : null,
+        sus: susInfo ? infoFraction(susInfo) : null,
+        rel: relInfo ? infoFraction(relInfo) : null,
+      });
+    }
+    return out;
+  });
+
+  // --- Design-mode element dragging ---
+  // Handles overlay each element on the screen (when the control is selected in
+  // design mode) and drag writes the element's x/y back in grid pixels.
+  let dragEl = $state(null); // { i, cx, cy, x, y }
+  let resizeEl = $state(null); // { i, cx, cy, w, h }
+
+  function elementPathPrefix(i) {
+    if (hasLayouts) {
+      const li = layouts.findIndex((l) => String(l?.id ?? '') === String(activeLayoutId));
+      if (li < 0) return '';
+      return `Pixel.layouts.${li}.elements.${i}`;
+    }
+    return `Pixel.elements.${i}`;
+  }
+
+  let overlayBoxes = $derived.by(() => {
+    if (!editable) return [];
+    const sx = screenW / pixW;
+    const sy = screenH / pixH;
+    const out = [];
+    elements.forEach((el, i) => {
+      if (el?.visible === false) return;
+      const kind = String(el?.kind ?? '');
+      // anim defaults to its rendered 32×16 rect so the grab handle matches the
+      // element instead of collapsing to the 6px minimum.
+      const h = Math.max(3, Math.round(numberOr(el?.h, kind === 'anim' ? 16 : 8)));
+      let w = Math.max(0, Math.round(numberOr(el?.w, kind === 'anim' ? 32 : 0)));
+      // Text without an alignment box: estimate the grab area from the content.
+      if (!PIXEL_WIDGET_KINDS.has(kind) && kind !== 'anim' && w <= 0) {
+        const len = Math.max(2, String(el?.text ?? el?.kind ?? '').length);
+        w = Math.ceil(h * 0.6 * len);
+      }
+      out.push({
+        i,
+        left: numberOr(el?.x, 0) * sx,
+        top: numberOr(el?.y, 0) * sy,
+        width: Math.max(6, w * sx),
+        height: Math.max(6, h * sy),
+      });
+    });
+    return out;
+  });
+
+  function startElementDrag(box, event) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const el = elements[box.i];
+    if (!el) return;
+    // Grouped elements move together: capture every member's start position.
+    const group = String(el.group ?? '').trim();
+    const members = elements
+      .map((e, idx) => ({ idx, e }))
+      .filter(({ e, idx }) => idx === box.i || (group && String(e?.group ?? '').trim() === group))
+      .map(({ idx, e }) => ({ idx, x: numberOr(e.x, 0), y: numberOr(e.y, 0) }));
+    dragEl = { i: box.i, cx: event.clientX, cy: event.clientY, x: numberOr(el.x, 0), y: numberOr(el.y, 0), members };
+    window.addEventListener('mousemove', onElementDragMove);
+    window.addEventListener('mouseup', endElementDrag);
+  }
+
+  function onElementDragMove(event) {
+    if (!dragEl) return;
+    const s = Math.max(0.01, Number(scale) || 1);
+    const gx = (event.clientX - dragEl.cx) / s / (screenW / pixW);
+    const gy = (event.clientY - dragEl.cy) / s / (screenH / pixH);
+    if (!coreId) return;
+    // Optional snap-to-grid (Pixel.snapGrid, in grid pixels; 0 = free).
+    const step = Math.max(0, Math.round(numberOr(pixel?.snapGrid, 0)));
+    const snap = (v) => (step > 1 ? Math.round(v / step) * step : Math.round(v));
+    for (const m of (dragEl.members ?? [{ idx: dragEl.i, x: dragEl.x, y: dragEl.y }])) {
+      const el = elements[m.idx];
+      const prefix = elementPathPrefix(m.idx);
+      if (!el || !prefix) continue;
+      const w = Math.min(pixW, Math.max(1, Math.round(numberOr(el.w, 1))));
+      const h = Math.min(pixH, Math.max(1, Math.round(numberOr(el.h, 8))));
+      const nx = snap(clamp(m.x + gx, 0, Math.max(0, pixW - w)));
+      const ny = snap(clamp(m.y + gy, 0, Math.max(0, pixH - h)));
+      if (nx !== numberOr(el.x, 0)) updateControlProperty(coreId, `${prefix}.x`, nx);
+      if (ny !== numberOr(el.y, 0)) updateControlProperty(coreId, `${prefix}.y`, ny);
+    }
+  }
+
+  function endElementDrag() {
+    dragEl = null;
+    window.removeEventListener('mousemove', onElementDragMove);
+    window.removeEventListener('mouseup', endElementDrag);
+  }
+
+  // SE-corner resize: drags the element's width/height (grid px), snapped to the
+  // same step as moves and clamped so the element stays on screen.
+  function startElementResize(box, event) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    event.preventDefault();
+    const el = elements[box.i];
+    if (!el) return;
+    const defW = String(el?.kind) === 'anim' ? 32 : Math.max(4, Math.round(numberOr(el?.w, 10)));
+    const defH = String(el?.kind) === 'anim' ? 16 : Math.max(3, Math.round(numberOr(el?.h, 8)));
+    resizeEl = { i: box.i, cx: event.clientX, cy: event.clientY, w: numberOr(el.w, defW), h: numberOr(el.h, defH) };
+    window.addEventListener('mousemove', onElementResizeMove);
+    window.addEventListener('mouseup', endElementResize);
+  }
+
+  function onElementResizeMove(event) {
+    if (!resizeEl) return;
+    const s = Math.max(0.01, Number(scale) || 1);
+    const dw = (event.clientX - resizeEl.cx) / s / (screenW / pixW);
+    const dh = (event.clientY - resizeEl.cy) / s / (screenH / pixH);
+    const el = elements[resizeEl.i];
+    const prefix = elementPathPrefix(resizeEl.i);
+    if (!el || !prefix || !coreId) return;
+    const x = Math.round(numberOr(el.x, 0));
+    const y = Math.round(numberOr(el.y, 0));
+    const step = Math.max(0, Math.round(numberOr(pixel?.snapGrid, 0)));
+    const snap = (v) => (step > 1 ? Math.round(v / step) * step : Math.round(v));
+    const nw = Math.max(1, snap(clamp(resizeEl.w + dw, 1, pixW - x)));
+    const nh = Math.max(1, snap(clamp(resizeEl.h + dh, 1, pixH - y)));
+    if (nw !== numberOr(el.w, -1)) updateControlProperty(coreId, `${prefix}.w`, nw);
+    if (nh !== numberOr(el.h, -1)) updateControlProperty(coreId, `${prefix}.h`, nh);
+  }
+
+  function endElementResize() {
+    resizeEl = null;
+    window.removeEventListener('mousemove', onElementResizeMove);
+    window.removeEventListener('mouseup', endElementResize);
+  }
+
+  onDestroy(() => { endElementDrag(); endElementResize(); });
+
+  // Placeable animation elements (kind 'anim'): their own rect + source, part
+  // of the layout — so switching layouts switches animations.
+  let animElements = $derived.by(() => {
+    const out = [];
+    for (const el of elements) {
+      if (el?.visible === false || String(el?.kind ?? '') !== 'anim') continue;
+      out.push({
+        id: String(el?.id ?? ''),
+        x: Math.round(numberOr(el?.x, 0)),
+        y: Math.round(numberOr(el?.y, 0)),
+        w: Math.max(4, Math.round(numberOr(el?.w, 32))),
+        h: Math.max(4, Math.round(numberOr(el?.h, 16))),
+        mode: String(el?.animMode ?? (el?.animSrc ? 'file' : 'preset')),
+        src: String(el?.animSrc ?? ''),
+        frames: Math.max(0, Math.round(numberOr(el?.animFrames, 0))),
+        spriteCols: Math.max(0, Math.round(numberOr(el?.animSpriteCols, 0))),
+        fps: Math.max(1, numberOr(el?.animFps, 12)),
+        loop: el?.animLoop !== false,
+        preset: String(el?.animPreset ?? 'wave'),
+        speed: Math.max(0.05, numberOr(el?.animSpeed, 1)),
+        colour: el?.colour ? cssColour(el.colour) : '',
+        colourful: el?.animColour === true,
+      });
+    }
+    return out;
+  });
+
+  // Layout transition: when the active layout changes, fade/slide the new
+  // content in via a CSS transition on the screen wrapper (browser-timed, so it
+  // works even when the render loop is otherwise idle).
+  let screenWrap = $state(null);
+  let lastTransLayout = '';
+  $effect(() => {
+    const id = activeLayoutId;
+    const kind = String(pixel?.layoutTransition ?? 'none');
+    const ms = Math.max(0, Math.round(numberOr(pixel?.transitionMs, 250)));
+    const el = screenWrap;
+    if (!el) { lastTransLayout = id; return; }
+    if (id === lastTransLayout) return;
+    const first = lastTransLayout === '';
+    lastTransLayout = id;
+    if (first || kind === 'none' || ms === 0) return;
+    untrack(() => {
+      el.style.transition = 'none';
+      el.style.opacity = '0';
+      if (kind === 'slide') el.style.transform = 'translateX(10%)';
+      // Force reflow so the from-state applies before the transition.
+      void el.offsetWidth;
+      el.style.transition = `opacity ${ms}ms ease, transform ${ms}ms ease`;
+      el.style.opacity = '1';
+      el.style.transform = 'translateX(0)';
+    });
+  });
+
+  // rAF clock for animations and widget ballistics.
+  let frameTime = $state(0);
+  let animMode = $derived(String(pixel?.animMode ?? 'off').trim().toLowerCase());
+  let animActive = $derived(animMode !== 'off' || animElements.length > 0);
+  let widgetMotion = $derived(pixelWidgets.some((w) => w.smooth || w.peakHold || w.kind === 'wave' || w.kind === 'scope'));
+  let editActive = $derived(pixel?.__edit?.active === true);
+  let clockActive = $derived(elements.some((e) => String(e?.kind ?? '') === 'clock' && e?.visible !== false));
+  let blinkActive = $derived(elements.some((e) => e?.blink === true && e?.visible !== false));
+  // Blink phase (~530ms, matches the LCD cursor): elements flagged blink are
+  // dropped from the frame on the "off" half.
+  let blinkPhase = $derived(Math.floor(frameTime / 530) % 2 === 0);
+  let motionActive = $derived(animActive || widgetMotion || editActive || clockActive || blinkActive);
+
+  // On-screen edit caret: the preview injects pixel.__edit = { active, elementId,
+  // caret, kind }. Compute a blinking I-beam at the insertion point, mirroring
+  // the text layout (font scale + alignment) so it lands between characters.
+  let editBlink = $derived(Math.floor(frameTime / 530) % 2 === 0);
+  let caretRect = $derived.by(() => {
+    const es = pixel?.__edit;
+    if (!es || es.active !== true) return null;
+    const el = elements.find((e) => String(e?.id ?? '') === String(es.elementId ?? ''));
+    if (!el) return null;
+    const elX = Math.round(numberOr(el.x, 0));
+    const elY = Math.round(numberOr(el.y, 0));
+    const elH = Math.max(3, Math.round(numberOr(el.h, 8)));
+    const boxW = Math.max(0, Math.round(numberOr(el.w, 0)));
+    const s = Math.max(1, Math.floor(elH / (FONT_H + 1)));
+    const advance = FONT_ADVANCE * s;
+    const info = controlInfo(String(el.sourceId ?? ''));
+    // The rendered string is prefix + editText + suffix; the caret index is into
+    // editText, so it sits past the prefix. Alignment uses the full rendered
+    // width, so center/right-aligned edit fields track correctly too.
+    const content = resolveZoneContent({ ...el, show: String(el.kind ?? 'edit') }, info, 16);
+    const len = content.length;
+    const prefixLen = String(el.prefix ?? '').length;
+    const suffixLen = String(el.suffix ?? '').length;
+    const rawLen = Math.max(0, len - prefixLen - suffixLen);
+    const textW = len > 0 ? len * advance - s : 0;
+    let startX = elX;
+    if (boxW > 0) {
+      const align = String(el.align ?? 'left');
+      if (align === 'center') startX = elX + Math.round((boxW - textW) / 2);
+      else if (align === 'right') startX = elX + boxW - textW;
+    }
+    const caret = String(es.kind ?? 'text') === 'choice'
+      ? 0 : Math.max(0, Math.min(rawLen, Math.round(numberOr(es.caret, 0))));
+    return { x: startX + (prefixLen + caret) * advance, y: elY, w: Math.max(1, s), h: FONT_H * s, on: editBlink };
+  });
+
+  function prefersReducedMotion() {
+    return typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  }
+
+  $effect(() => {
+    // Respect the OS reduced-motion setting: render a representative static
+    // frame instead of running the animation loop.
+    if (!motionActive || prefersReducedMotion()) {
+      frameTime = 0;
+      return;
+    }
+    let raf = 0;
+    let origin = -1;
+    const loop = (t) => {
+      if (origin < 0) origin = t;
+      frameTime = t - origin;
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  });
+
+  // Surface layers (bezel inset, backlight wash, scanlines, glass) — same look
+  // and feel as the LCD so the two displays sit together visually.
+  let surfaceStyle = $derived(`inset:${padding}px; background:${screenCss}; border-radius:5px;`);
+  let backlightStyle = $derived(
+    `background: radial-gradient(120% 140% at 50% 42%, ${backlightCss}, transparent 78%); opacity:${(0.35 + contrast * 0.5).toFixed(3)};`
+  );
+  let scanlineStyle = $derived(
+    `background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 1px, transparent 3px);`
+  );
+  // Design-time grid overlay (editor aid). Cell = snap step (or 8) grid pixels,
+  // scaled into screen pixels. Never shown outside the editor / at runtime.
+  let gridStep = $derived(Math.max(2, Math.round(numberOr(pixel?.snapGrid, 0)) || 8));
+  let gridStyle = $derived.by(() => {
+    const cx = ((screenW / pixW) * gridStep).toFixed(2);
+    const cy = ((screenH / pixH) * gridStep).toFixed(2);
+    return `background-image:`
+      + `repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px ${cy}px),`
+      + `repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 1px, transparent 1px ${cx}px);`;
+  });
+</script>
+
+{#if pixel}
+  <div class="pixel-surface" style={surfaceStyle}>
+    {#if backlightOn}
+      <div class="pixel-layer" style={backlightStyle}></div>
+    {/if}
+
+    <div class="screen-fx" bind:this={screenWrap}>
+    <LcdGraphicCanvas
+      lines={[]}
+      cols={1}
+      rows={1}
+      {litCss}
+      {unlitCss}
+      {brightness}
+      {contrast}
+      gamma={numberOr(pixel?.gamma, 1)}
+      glow={numberOr(pixel?.glow, 0)}
+      {showGhost}
+      blinkOn={true}
+      dotShape={dotShape}
+      imageSrc={pixel?.imageSrc ?? ''}
+      dither={pixel?.imageDither !== false}
+      imageColour={pixel?.imageColour === true}
+      animColour={pixel?.animColour === true}
+      pixelWidth={pixW}
+      pixelHeight={pixH}
+      widgets={pixelWidgets}
+      {texts}
+      {bitmaps}
+      customFontSrc={pixel?.customFont?.src ?? ''}
+      cfGlyphW={numberOr(pixel?.customFont?.glyphW, 6)}
+      cfGlyphH={numberOr(pixel?.customFont?.glyphH, 8)}
+      cfCols={numberOr(pixel?.customFont?.cols, 16)}
+      cfFirst={numberOr(pixel?.customFont?.first, 32)}
+      caret={caretRect}
+      anims={animElements}
+      animMode={animMode}
+      animSrc={pixel?.animSrc ?? ''}
+      animFrames={numberOr(pixel?.animFrames, 0)}
+      animSpriteCols={numberOr(pixel?.animSpriteCols, 0)}
+      animFps={numberOr(pixel?.animFps, 12)}
+      animLoop={pixel?.animLoop !== false}
+      animPreset={pixel?.animPreset ?? 'wave'}
+      animSpeed={numberOr(pixel?.animSpeed, 1)}
+      animTick={frameTime}
+      width={screenW}
+      height={screenH}
+    />
+    </div>
+
+    {#if showScanlines}
+      <div class="pixel-layer" style={scanlineStyle}></div>
+    {/if}
+    {#if showGlass}
+      <div class="pixel-layer pixel-glass" style={`background:linear-gradient(155deg, ${glassTintCss}, transparent 55%);`}></div>
+    {/if}
+
+    {#if editable && pixel?.showGrid}
+      <div class="pixel-layer pixel-grid" style={gridStyle}></div>
+    {/if}
+
+    {#if editable}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      {#each overlayBoxes as box (box.i)}
+        <div
+          class="el-handle"
+          class:dragging={dragEl?.i === box.i}
+          style={`left:${box.left}px; top:${box.top}px; width:${box.width}px; height:${box.height}px;`}
+          onmousedown={(event) => startElementDrag(box, event)}
+          title="Drag to move element"
+        >
+          <div
+            class="el-resize"
+            class:resizing={resizeEl?.i === box.i}
+            onmousedown={(event) => startElementResize(box, event)}
+            title="Drag to resize (W×H)"
+          ></div>
+        </div>
+      {/each}
+    {/if}
+  </div>
+{/if}
+
+<style>
+  .pixel-surface {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    box-sizing: border-box;
+    pointer-events: none;
+  }
+
+  .pixel-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .screen-fx {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .pixel-glass {
+    mix-blend-mode: screen;
+  }
+
+  .el-handle {
+    position: absolute;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: move;
+    border: 1px dashed transparent;
+    border-radius: 2px;
+    z-index: 5;
+  }
+
+  .el-handle:hover,
+  .el-handle.dragging {
+    border-color: rgba(91, 155, 213, 0.9);
+    background: rgba(91, 155, 213, 0.12);
+  }
+
+  .el-resize {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 10px;
+    height: 10px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    cursor: nwse-resize;
+    border: 1px solid rgba(91, 155, 213, 0.95);
+    background: rgba(20, 24, 21, 0.85);
+    border-radius: 2px;
+    opacity: 0;
+    z-index: 6;
+  }
+
+  .el-handle:hover .el-resize,
+  .el-handle.dragging .el-resize,
+  .el-resize.resizing {
+    opacity: 1;
+  }
+</style>

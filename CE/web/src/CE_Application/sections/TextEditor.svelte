@@ -9,6 +9,7 @@
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { stateEditScope } from '../stores/stateEditScope.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -733,6 +734,11 @@
           <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
         </div>
       </PropertyCell>
+      {#if String(core?.controlType ?? '') === 'Label'}
+        <PropertyCell label="Editable" span={2} hint="Whether this label's text can be edited by the user at runtime. Must be On before an LCD 'edit' zone can rewrite it from the screen.">
+          <PropertyToggle value={text?.editable === true} onchange={(next) => set('Text.editable', next)} />
+        </PropertyCell>
+      {/if}
     </PropertySection>
 
     {#key fontEditorRenderKey}

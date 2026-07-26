@@ -1,6 +1,6 @@
 <script>
   import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
-  import { addControl, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
+  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -174,7 +174,6 @@
 
   let scaledPanelWidth = $derived(canvasPanel ? canvasPanel.width * scale : 0);
   let scaledPanelHeight = $derived(canvasPanel ? canvasPanel.height * scale : 0);
-  let panelHasNoControls = $derived(canvasPanel && (canvasPanel.controls?.length ?? 0) === 0);
   let stageMarginLeft = $derived(Math.max(40, (metrics.width - scaledPanelWidth) / 2));
   let stageMarginTop = $derived(Math.max(40, (metrics.height - scaledPanelHeight) / 2));
   let previewBadge = $derived(
@@ -430,9 +429,6 @@
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
-  function addStarterControl(type) {
-    addControl(type);
-  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->

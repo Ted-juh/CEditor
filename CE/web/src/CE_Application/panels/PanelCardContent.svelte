@@ -1,6 +1,7 @@
 <script>
   import { panels, activePanel, updatePanel, buildActivePanelVst3 } from '../stores/panels.js';
   import { makeGuid } from '../stores/panelModel.js';
+  import { shortcutFromEvent, panicShortcutWarnings } from '../utils/panicLayout.js';
   import { deriveIdentity } from '../utils/exportIdentity.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { browseImage, onImageBrowsed, requestFileInfo, onFileInfo } from '../bridge/bridge.js';
@@ -162,6 +163,30 @@
     return false;
   }
 
+  // --- Panic shortcut capture ---------------------------------------------------
+  // Typing "Ctrl+Shift+P" by hand is easy to get wrong, so the field records the
+  // keys you actually press.
+  let capturingShortcut = $state(false);
+  // Advice, never a block — the author knows their rig. The point is that a bad
+  // choice is a choice rather than a surprise.
+  let shortcutNotes = $derived(panel ? panicShortcutWarnings(panel.panicShortcut) : []);
+  function shortcutKeyDown(event) {
+    if (!capturingShortcut || !panel) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.key === 'Backspace' || event.key === 'Delete') {
+      updatePanel(panel.id, { panicShortcut: '' });     // clear = switched off
+      capturingShortcut = false;
+      event.currentTarget?.blur?.();
+      return;
+    }
+    const next = shortcutFromEvent(event);
+    if (!next) return;                                  // a bare modifier: keep waiting
+    updatePanel(panel.id, { panicShortcut: next });
+    capturingShortcut = false;
+    event.currentTarget?.blur?.();
+  }
+
   function handleToggle(prop) {
     if (!panel) return;
     const updates = { [prop]: !panel[prop] };
@@ -290,6 +315,23 @@
         <PropertyToggle value={panel.resizable}
                         onchange={() => handleToggle('resizable')} />
       </PropertyCell>
+      <PropertyCell label="Panic key" span={2} hint="The panel-wide emergency stop: silences every note this panel is holding and sends all-sound-off to the synth. Click and press the keys you want; Backspace clears it (switching the shortcut off). A bare key like Escape is ignored while you are typing in a field; a combo with a modifier still works there.">
+        <button class="shortcut" class:capturing={capturingShortcut} type="button"
+                onclick={() => { capturingShortcut = true; }}
+                onblur={() => { capturingShortcut = false; }}
+                onkeydown={shortcutKeyDown}>
+          {capturingShortcut ? 'Press keys…' : (panel.panicShortcut || 'Off')}
+        </button>
+      </PropertyCell>
+      {#if shortcutNotes.length}
+        <PropertyCell label="" span={4} hint="Nothing else on a panel binds a key, so this is not a clash with another control — it is about keys the host may take first, and keys that fire too easily.">
+          <ul class="shortcut-notes">
+            {#each shortcutNotes as note, i (i)}
+              <li class={note.level}>{note.message}</li>
+            {/each}
+          </ul>
+        </PropertyCell>
+      {/if}
       <PropertyCell label="Min W" span={2} hint="Minimum width when resizable" disabled={!panel.resizable}>
         <NumberInput value={panel.resizable ? panel.minWidth : panel.width} step={1} min={0}
                      onchange={(v) => updatePanel(panel.id, { minWidth: v })} />
@@ -603,6 +645,17 @@
 {/if}
 
 <style>
+  .shortcut {
+    width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333;
+    color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; cursor: pointer;
+    text-align: left; font-family: inherit;
+  }
+  .shortcut:hover { border-color: #5B9BD5; }
+  .shortcut.capturing { border-color: #F2C94C; color: #F2C94C; background: #241f10; }
+  .shortcut-notes { margin: 0; padding-left: 14px; display: flex; flex-direction: column; gap: 3px; }
+  .shortcut-notes li { font-size: 11px; line-height: 1.45; }
+  .shortcut-notes li.warn { color: #E0A05C; }
+  .shortcut-notes li.info { color: #8a8a94; }
   .val {
     color: #DDD;
     font-size: 11px;

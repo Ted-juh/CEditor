@@ -10,6 +10,7 @@
   import { createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
+  import { choiceIndexOf, choiceValueAt } from './CE_Application/utils/exportParameters.js';
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState } from './CE_Application/stores/deviceProfiles.js';
   import { getDeviceSessionState } from './CE_Application/bridge/bridge.js';
@@ -47,6 +48,7 @@
   const INBOUND_CC = Object.fromEntries(Object.entries(deviceRuntime.ccIn ?? {}).map(([cc, rid]) => [Number(cc), flatId(rid)]));
   const INBOUND_SYSEX = Object.fromEntries(Object.entries(deviceRuntime.sysexIn ?? {}).map(([addr, rid]) => [addr, flatId(rid)]));
   let paramControlMap = {};  // parameterId -> controlId, rebuilt from the loaded panel's bindings
+  let paramPortMap = {};     // parameterId -> binding port (value | brightness | backlight | text | …)
   let paramRows = {};        // parameterId -> Value.rows (choice controls), for numeric -> id mapping
 
   // Coalesce high-rate incoming CC to ONE DOM update per animation frame. The GAIA streams
@@ -59,6 +61,7 @@
   function rebuildParamControlMap(controls) {
     const map = {};
     const rows = {};
+    const ports = {};
     for (const c of controls ?? []) {
       const id = c?._children?.Core?.id;
       if (!id) continue;
@@ -66,10 +69,12 @@
       for (const b of c?._children?.DeviceBindings?.bindings ?? [])
         if (b?.kind === 'deviceParameter' && b?.parameterId) {
           map[b.parameterId] = id;
+          ports[b.parameterId] = String(b.port ?? 'value');
           if (Array.isArray(valueRows) && valueRows.length) rows[b.parameterId] = valueRows;
         }
     }
     paramControlMap = map;
+    paramPortMap = ports;
     paramRows = rows;
     lastAppliedValue = {};
   }
@@ -98,12 +103,15 @@
       const leaf = String(param.path ?? '').split('.').slice(1).join('.') || 'value';
       const bindings = (controlsById[controlId]?._children?.DeviceBindings?.bindings ?? [])
         .filter((b) => b?.kind === 'deviceParameter' && b?.parameterId);
-      controlByParam[param.id] = { controlId, leaf, bindings };
+      // Store-by-name selectors carry a fixed choice list; keep the param so the
+      // choice name ↔ host index mapping stays stable across cascading changes.
+      const choiceParam = String(param?.choiceMode ?? '') === 'value' ? param : null;
+      controlByParam[param.id] = { controlId, leaf, bindings, choiceParam };
     }
   }
 
   // The numeric value a control currently holds in its preview session (matches the param's range).
-  function controlParamValue(session, leaf) {
+  function controlParamValue(session, leaf, choiceParam = null) {
     if (!session) return undefined;
     if (leaf && leaf !== 'value') {
       const n = Number(session.customValues?.[leaf]);
@@ -113,8 +121,13 @@
     if (session.currentValueOverrideEnabled) v = session.currentValueOverride;
     else if (session.valueOverrideEnabled) v = session.valueOverride;
     else if (typeof session.checked === 'boolean') v = session.checked ? 1 : 0;
+    // Store-by-name selector: the live value is a choice name → its fixed host index.
+    if (choiceParam) {
+      const idx = choiceIndexOf(choiceParam, v);
+      return idx == null ? undefined : idx;
+    }
     const n = Number(v);
-    return Number.isFinite(n) ? n : undefined;  // non-numeric (e.g. select ids) -> skip for now
+    return Number.isFinite(n) ? n : undefined;  // non-numeric (e.g. select ids) -> skip
   }
 
   // DAW automation moved a parameter -> move the on-screen control AND drive the synth. We route
@@ -126,10 +139,12 @@
     const v = Number(value);
     if (!m || !Number.isFinite(v) || lastParamValue[parameterId] === v) return;
     lastParamValue[parameterId] = v;
+    // Store-by-name selector: the host index maps back to a choice name to write.
+    const writeValue = m.choiceParam ? choiceValueAt(m.choiceParam, v) : v;
     // 1. Move the on-screen control (silent — no echo back into the recorded value).
     updatePanelPreviewSession(m.controlId, (m.leaf && m.leaf !== 'value')
       ? { customValues: { [m.leaf]: v } }
-      : { valueOverrideEnabled: true, valueOverride: v });
+      : { valueOverrideEnabled: true, valueOverride: writeValue });
     // 2. Send the bound device parameter(s) to the synth — the same call a user drag makes, so
     //    automation playback drives the hardware. 'continuous' = rate-limited stream.
     for (const b of m.bindings ?? []) {
@@ -137,7 +152,7 @@
         requestId: `automation_${parameterId}_${Date.now()}`,
         deviceRole: b.deviceRole || DEFAULT_DEVICE_ROLE,
         parameterId: b.parameterId,
-        value: v,
+        value: writeValue,
         interactionPhase: 'continuous',
         dryRun: false,
       });
@@ -147,8 +162,8 @@
   // The user moved a control -> tell C++ to drive the matching host parameter (records automation).
   function emitChangedParams(sessions, backend) {
     for (const parameterId in controlByParam) {
-      const { controlId, leaf } = controlByParam[parameterId];
-      const v = controlParamValue(sessions?.[controlId], leaf);
+      const { controlId, leaf, choiceParam } = controlByParam[parameterId];
+      const v = controlParamValue(sessions?.[controlId], leaf, choiceParam);
       if (v === undefined || lastParamValue[parameterId] === v) continue;
       lastParamValue[parameterId] = v;
       if (paramSyncReady) backend.emitEvent('paramChanged', { id: parameterId, value: v });
@@ -162,12 +177,19 @@
     pendingIncoming = null;
     if (!pend) return;
     for (const controlId in pend) {
-      const value = pend[controlId];
+      const { v: value, port } = pend[controlId];
       if (lastAppliedValue[controlId] === value) continue;  // no change -> no render
       lastAppliedValue[controlId] = value;
       // Move the on-screen control WITHOUT re-emitting a send (updatePanelPreviewSession
       // directly, not patchControlSession) so we don't fight the synth / create a loop.
-      updatePanelPreviewSession(controlId, { valueOverrideEnabled: true, valueOverride: value });
+      // Display ports drive the panel's lighting/text, not a value override, so a
+      // display bound directly to a device parameter responds live in the player.
+      let patch;
+      if (port === 'brightness') patch = { brightnessOverride: Math.max(0, Math.min(100, Math.round((Number(value) / 127) * 100))) };
+      else if (port === 'backlight') patch = { backlightOverride: Number(value) >= 64 };
+      else if (port === 'text') patch = { textOverride: String(value) };
+      else patch = { valueOverrideEnabled: true, valueOverride: value };
+      updatePanelPreviewSession(controlId, patch);
     }
   }
 
@@ -188,7 +210,7 @@
       if (!Number.isFinite(value)) return;    // sliders: numeric only
       v = value;
     }
-    (pendingIncoming ??= {})[controlId] = v;
+    (pendingIncoming ??= {})[controlId] = { v, port: paramPortMap[parameterId] ?? 'value' };
     if (!incomingRaf) incomingRaf = requestAnimationFrame(flushIncoming);
   }
 

@@ -108,6 +108,11 @@ public:
 
     // Debug (Q11).
     virtual void log (const juce::String& message, const juce::var& value) = 0;
+
+    // Timers. startTimer(id, ms) starts a repeating timer that fires `onTimer` ({ id }) every ms
+    // until stopTimer(id). Default no-op so alternative hosts need not implement them.
+    virtual void startTimer (const juce::String& id, int intervalMs) { juce::ignoreUnused (id, intervalMs); }
+    virtual void stopTimer  (const juce::String& id) { juce::ignoreUnused (id); }
 };
 
 // ----------------------------------------------------------------------------------------------

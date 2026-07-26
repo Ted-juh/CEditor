@@ -3,6 +3,35 @@
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
+  import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
+  import MeterRenderer from './MeterRenderer.svelte';
+  import EnvelopeRenderer from './EnvelopeRenderer.svelte';
+  import MatrixRenderer from './MatrixRenderer.svelte';
+  import JoystickRenderer from './JoystickRenderer.svelte';
+  import CrossfaderRenderer from './CrossfaderRenderer.svelte';
+  import RibbonRenderer from './RibbonRenderer.svelte';
+  import MacroRenderer from './MacroRenderer.svelte';
+  import OrbitRenderer from './OrbitRenderer.svelte';
+  import LooperRenderer from './LooperRenderer.svelte';
+  import RouterRenderer from './RouterRenderer.svelte';
+  import TimbreRenderer from './TimbreRenderer.svelte';
+  import TuringRenderer from './TuringRenderer.svelte';
+  import KineticRenderer from './KineticRenderer.svelte';
+  import ConstellationRenderer from './ConstellationRenderer.svelte';
+  import ConstraintRenderer from './ConstraintRenderer.svelte';
+  import ChordPadRenderer from './ChordPadRenderer.svelte';
+  import ArpRenderer from './ArpRenderer.svelte';
+  import NoteRibbonRenderer from './NoteRibbonRenderer.svelte';
+  import DrumPadsRenderer from './DrumPadsRenderer.svelte';
+  import PanicRenderer from './PanicRenderer.svelte';
+  import SplitZoneRenderer from './SplitZoneRenderer.svelte';
+  import PhraseRenderer from './PhraseRenderer.svelte';
+  import RecorderRenderer from './RecorderRenderer.svelte';
+  import HarmoniserRenderer from './HarmoniserRenderer.svelte';
+  import SetlistRenderer from './SetlistRenderer.svelte';
+  import TransportRenderer from './TransportRenderer.svelte';
+  import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
@@ -16,6 +45,7 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
+  import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
   import { measurePerfDebug } from '../utils/perfDebug.js';
   import { resolveRadioGroupLayout } from '../utils/radioGroupLayout.js';
   import { segmentEditScope } from '../stores/segmentEditScope.js';
@@ -90,6 +120,7 @@
     previewAriaValueMax = undefined,
     previewAriaValueText = undefined,
     previewValueField = null,
+    previewEditableFields = null,
     previewKeyboardFocus = false,
     previewHighlighted = false,
     onpreviewpointerenter = null,
@@ -105,12 +136,113 @@
     onpreviewvaluefieldkeydown = null,
     onpreviewvaluefieldfocus = null,
     onpreviewvaluefieldblur = null,
+    onpreviewfieldinput = null,
+    onpreviewfieldkeydown = null,
+    onpreviewfieldfocus = null,
+    onpreviewfieldblur = null,
+    previewTextField = null,
+    onpreviewtextinput = null,
+    onpreviewtextkeydown = null,
+    onpreviewtextfocus = null,
+    onpreviewtextblur = null,
+    previewListboxFilter = null,
+    onpreviewlistboxfilter = null,
   } = $props();
+
+  // Editable value fields resolve per part role. `previewEditableFields` is a
+  // role→descriptor map (used by the two-value Range spinner for lowField /
+  // highField); the older single `previewValueField` still serves the
+  // `valueField` role (Number, InteractiveTestSurface).
+  function editableInputForPart(part) {
+    if (!previewInteractive) return null;
+    const role = part?.role;
+    if (previewEditableFields && previewEditableFields[role]) return previewEditableFields[role];
+    if (role === 'valueField') return previewValueField;
+    return null;
+  }
+
+  function editableHandlerForPart(part, kind) {
+    if (!previewInteractive) return null;
+    const role = part?.role;
+    if (previewEditableFields && previewEditableFields[role]) {
+      const roleAware = {
+        input: onpreviewfieldinput,
+        keydown: onpreviewfieldkeydown,
+        focus: onpreviewfieldfocus,
+        blur: onpreviewfieldblur,
+      }[kind];
+      return roleAware ? (event) => roleAware(role, event) : null;
+    }
+    if (role === 'valueField') {
+      return {
+        input: onpreviewvaluefieldinput,
+        keydown: onpreviewvaluefieldkeydown,
+        focus: onpreviewvaluefieldfocus,
+        blur: onpreviewvaluefieldblur,
+      }[kind];
+    }
+    return null;
+  }
 
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
+  let isLcdDisplay = $derived(String(core?.controlType ?? '') === 'LcdDisplay');
+  let isPixelDisplay = $derived(String(core?.controlType ?? '') === 'PixelDisplay');
+  let isMeter = $derived(String(core?.controlType ?? '') === 'Meter');
+  let isEnvelope = $derived(String(core?.controlType ?? '') === 'Envelope');
+  let isMatrix = $derived(String(core?.controlType ?? '') === 'Matrix');
+  let isJoystick = $derived(String(core?.controlType ?? '') === 'VectorJoystick');
+  let isCrossfader = $derived(String(core?.controlType ?? '') === 'Crossfader');
+  let isRibbon = $derived(String(core?.controlType ?? '') === 'Ribbon');
+  let isMacro = $derived(String(core?.controlType ?? '') === 'Macro');
+  let isOrbit = $derived(String(core?.controlType ?? '') === 'Orbit');
+  let isLooper = $derived(String(core?.controlType ?? '') === 'Looper');
+  let isRouter = $derived(String(core?.controlType ?? '') === 'Router');
+  let isTimbre = $derived(String(core?.controlType ?? '') === 'Timbre');
+  let isTuring = $derived(String(core?.controlType ?? '') === 'Turing');
+  let isKinetic = $derived(String(core?.controlType ?? '') === 'Kinetic');
+  let isConstellation = $derived(String(core?.controlType ?? '') === 'Constellation');
+  let isConstraint = $derived(String(core?.controlType ?? '') === 'Constraint');
+  let isChordPad = $derived(String(core?.controlType ?? '') === 'ChordPad');
+  let isArp = $derived(String(core?.controlType ?? '') === 'Arp');
+  let isNoteRibbon = $derived(String(core?.controlType ?? '') === 'NoteRibbon');
+  let isDrumPads = $derived(String(core?.controlType ?? '') === 'DrumPads');
+  let isPanic = $derived(String(core?.controlType ?? '') === 'Panic');
+  let isSplitZone = $derived(String(core?.controlType ?? '') === 'SplitZone');
+  let isPhrase = $derived(String(core?.controlType ?? '') === 'Phrase');
+  let isRecorder = $derived(String(core?.controlType ?? '') === 'Recorder');
+  let isHarmoniser = $derived(String(core?.controlType ?? '') === 'Harmoniser');
+  let isSetlist = $derived(String(core?.controlType ?? '') === 'Setlist');
+  let isTransport = $derived(String(core?.controlType ?? '') === 'Transport');
+  let isTextInput = $derived(String(core?.controlType ?? '') === 'TextInput');
+  // TextInput: an editable <input> styled from the Text/Font/ContentLayout
+  // sections. Value + placeholder come from the preview surface.
+  function argbCss(hex, fallback) {
+    const s = String(hex ?? '').replace(/^#/, '').trim();
+    if (/^[0-9a-fA-F]{8}$/.test(s)) {
+      return `rgba(${parseInt(s.slice(2, 4), 16)},${parseInt(s.slice(4, 6), 16)},${parseInt(s.slice(6, 8), 16)},${parseInt(s.slice(0, 2), 16) / 255})`;
+    }
+    if (/^[0-9a-fA-F]{6}$/.test(s)) {
+      return `rgba(${parseInt(s.slice(0, 2), 16)},${parseInt(s.slice(2, 4), 16)},${parseInt(s.slice(4, 6), 16)},1)`;
+    }
+    return fallback;
+  }
+  let tiValue = $derived(String(previewTextField?.value ?? ''));
+  let tiPlaceholder = $derived(String(previewTextField?.placeholder ?? control?._children?.Text?.content ?? ''));
+  let tiStyle = $derived.by(() => {
+    const font = control?._children?.Text?._children?.Font ?? null;
+    const cl = control?._children?.ContentLayout ?? null;
+    const colour = argbCss(control?._children?.Text?._children?.Fill?.colour, 'rgba(224,224,224,1)');
+    const align = String(cl?.horizontalAlign ?? 'left');
+    return `color:${colour};`
+      + `font-family:${String(font?.family ?? 'Arial')};`
+      + `font-size:${Math.max(6, Number(font?.size) || 12)}px;`
+      + `font-weight:${Number(font?.weightValue) || 400};`
+      + `text-align:${align};`
+      + `padding:${Math.max(0, Number(cl?.paddingTop) || 4)}px ${Math.max(0, Number(cl?.paddingRight) || 8)}px ${Math.max(0, Number(cl?.paddingBottom) || 4)}px ${Math.max(0, Number(cl?.paddingLeft) || 8)}px;`;
+  });
   let previewSession = $derived(previewSessionOverride ?? null);
   let appliedPreviewSession = $derived(previewSession?.enabled === false ? {} : previewSession);
   let interactiveRenderingEnabled = $derived(isCustomComponent || previewSessionOverride !== null || editorInteractionEnabled === false);
@@ -144,9 +276,31 @@
   let sourceValueSection = $derived(getSection(sourceControl, 'Value') ?? valueSection);
   let sourceStatesSection = $derived(getSection(sourceControl, 'States') ?? statesSection);
   let buttonType = $derived(String(sourceBehavior?.buttonType ?? behavior?.buttonType ?? '').trim().toLowerCase());
-  let valueRows = $derived(getEnabledValueRows(sourceValueSection ?? valueSection));
+  // Cascading selectors: rows visible under the parent selector's current value
+  // (a no-op unless this control has Value.dependsOn set).
+  let valueRows = $derived(visibleChoiceRows(
+    getEnabledValueRows(sourceValueSection ?? valueSection),
+    previewSession?.dependsParentValue,
+    dependsOnId(renderControl),
+  ));
   let isRadioGroupControl = $derived(buttonType === 'radio');
   let isComboboxControl = $derived(buttonType === 'combobox');
+  let isListboxControl = $derived(buttonType === 'listbox');
+  // The control the listbox renderer draws — with its rows reduced to the
+  // parent value so render + hit-test stay aligned.
+  let listboxRenderControl = $derived(dependentControl(renderControl, previewSession?.dependsParentValue));
+  // Multi-select set for the listbox renderer (null unless multiSelect is on).
+  let listboxMultiSet = $derived.by(() => {
+    if (!isListboxControl || (renderControl?._children?.Listbox?.multiSelect !== true)) return null;
+    const arr = previewSession?.listboxSelected;
+    return new Set((Array.isArray(arr) ? arr : []).map((v) => String(v)));
+  });
+  // Now-playing (recalled) row for the ▶ marker (only when nowPlaying is on).
+  let listboxNowPlaying = $derived.by(() => {
+    if (!isListboxControl || renderControl?._children?.Listbox?.nowPlaying !== true) return undefined;
+    const np = previewSession?.listboxNowPlaying;
+    return (np !== undefined && np !== '') ? np : undefined;
+  });
   let renderParts = $derived(getSection(renderControl, 'Parts'));
   let designer = $derived(getSection(renderControl, 'Designer'));
   let hitZones = $derived(getSection(renderControl, 'HitZones'));
@@ -1192,7 +1346,7 @@
   });
   let textParagraphMeasureWidth = $derived(textMeasureMaxWidth);
   let textForceLineBoxWidth = $derived(!usesCustomTextFlow);
-  let hasText = $derived(!isRadioGroupControl && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
+  let hasText = $derived(!isRadioGroupControl && !isListboxControl && !isTextInput && !isMeter && !isEnvelope && !isMatrix && !isJoystick && !isCrossfader && !isRibbon && !isMacro && !isOrbit && !isLooper && !isRouter && !isTimbre && !isTuring && !isKinetic && !isConstellation && !isConstraint && !isChordPad && !isArp && !isNoteRibbon && !isDrumPads && !isPanic && !isTransport && !isSplitZone && !isPhrase && !isRecorder && !isHarmoniser && !isSetlist && !!text && renderedTextContent.length > 0 && contentLayoutMode !== 'icon_only');
   let textOutlineThickness = $derived(Math.max(1, numberOr(textEffects?.outlineThickness ?? textEffects?.outlineWidth, textEffects?.knockout === true ? 1 : 1)));
   let textOutlineDistance = $derived(Math.max(0, numberOr(textEffects?.outlineDistance, 0)));
   let textOutlineEnabled = $derived(textEffects?.outlineEnabled === true || textEffects?.knockout === true);
@@ -2430,6 +2584,167 @@
       <BackgroundRenderer {background} width={displayW} height={displayH} />
     {/if}
 
+    {#if isLcdDisplay}
+      <LcdDisplayRenderer control={renderControl} allControls={allControls} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isMeter}
+      <MeterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isEnvelope}
+      <EnvelopeRenderer control={renderControl} width={displayW} height={displayH} activeIndex={previewSession?.envActiveIndex ?? -1} />
+    {/if}
+
+    {#if isMatrix}
+      <MatrixRenderer control={renderControl} width={displayW} height={displayH} activeCell={previewSession?.matrixActiveCell ?? null} />
+    {/if}
+
+    {#if isJoystick}
+      <JoystickRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isCrossfader}
+      <CrossfaderRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isRibbon}
+      <RibbonRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isMacro}
+      <MacroRenderer control={renderControl} width={displayW} height={displayH} dragging={previewSession?.dragging === true} />
+    {/if}
+
+    {#if isOrbit}
+      <OrbitRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isLooper}
+      <LooperRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isRouter}
+      <RouterRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTimbre}
+      <TimbreRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTuring}
+      <TuringRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isKinetic}
+      <KineticRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isConstellation}
+      <ConstellationRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isConstraint}
+      <ConstraintRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isChordPad}
+      <ChordPadRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isArp}
+      <ArpRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isNoteRibbon}
+      <NoteRibbonRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isDrumPads}
+      <DrumPadsRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isPanic}
+      <PanicRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isSplitZone}
+      <SplitZoneRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isPhrase}
+      <PhraseRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+    {#if isRecorder}
+      <RecorderRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+    {#if isHarmoniser}
+      <HarmoniserRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+    {#if isSetlist}
+      <SetlistRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isTransport}
+      <TransportRenderer control={renderControl} width={displayW} height={displayH} />
+    {/if}
+
+    {#if isPixelDisplay}
+      <PixelDisplayRenderer
+        control={renderControl}
+        allControls={allControls}
+        width={displayW}
+        height={displayH}
+        editable={editorInteractionEnabled && isSelected && !isEditorLocked}
+        {scale}
+      />
+    {/if}
+
+    {#if isListboxControl}
+      <ListboxRenderer
+        control={listboxRenderControl}
+        width={displayW}
+        height={displayH}
+        selectedValue={interactionRuntime?.signals?.valueRaw}
+        selectedValues={listboxMultiSet}
+        pendingValue={previewSession?.listboxPending ?? ''}
+        nowPlayingValue={listboxNowPlaying}
+        focused={previewSession?.focused === true && previewInteractive}
+        scrollTop={previewSession?.listboxScrollTop ?? 0}
+        hoveredIndex={previewSession?.listboxHoverIndex ?? -1}
+        filterText={previewListboxFilter?.value ?? ''}
+      />
+      {#if previewListboxFilter?.visible && previewInteractive}
+        <input
+          class="canvas-listbox-filter"
+          type="text"
+          placeholder="Search…"
+          value={previewListboxFilter?.value ?? ''}
+          style={`height:${previewListboxFilter?.height ?? 24}px;`}
+          oninput={onpreviewlistboxfilter}
+          onpointerdown={(event) => event.stopPropagation()}
+        />
+      {/if}
+    {/if}
+
+    {#if isTextInput}
+      <input
+        class="canvas-text-input"
+        type="text"
+        style={tiStyle}
+        value={tiValue}
+        placeholder={tiPlaceholder}
+        disabled={previewTextField?.disabled === true}
+        readonly={!previewInteractive}
+        tabindex={previewInteractive ? 0 : -1}
+        oninput={previewInteractive ? onpreviewtextinput : undefined}
+        onkeydown={previewInteractive ? onpreviewtextkeydown : undefined}
+        onfocus={previewInteractive ? onpreviewtextfocus : undefined}
+        onblur={previewInteractive ? onpreviewtextblur : undefined}
+        onpointerdown={previewInteractive ? (event) => event.stopPropagation() : undefined}
+      />
+    {/if}
+
     {#if isSliderControl}
       <SliderFamilyRenderer
         control={renderControl}
@@ -2449,11 +2764,11 @@
           parentHeight={displayH}
           transitionBucket={interactionRuntime?.transitions?.partTransitions?.get?.(partName) ?? null}
           debug={interactionDebugEnabled}
-          editableInput={previewInteractive && previewValueField && part?.role === 'valueField' ? previewValueField : null}
-          oneditableinput={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldinput : null}
-          oneditablekeydown={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldkeydown : null}
-          oneditablefocus={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldfocus : null}
-          oneditableblur={previewInteractive && part?.role === 'valueField' ? onpreviewvaluefieldblur : null}
+          editableInput={editableInputForPart(part)}
+          oneditableinput={editableHandlerForPart(part, 'input')}
+          oneditablekeydown={editableHandlerForPart(part, 'keydown')}
+          oneditablefocus={editableHandlerForPart(part, 'focus')}
+          oneditableblur={editableHandlerForPart(part, 'blur')}
         />
       {/each}
     {/if}
@@ -3744,6 +4059,38 @@
     box-sizing: border-box;
     cursor: default;
   }
+
+  /* TextInput editable field: fills the control, styled via inline tiStyle. */
+  .canvas-text-input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: transparent;
+    border: none;
+    outline: none;
+    margin: 0;
+  }
+  .canvas-text-input:read-only {
+    cursor: default;
+  }
+
+  /* Listbox filter-box input, pinned to the top of the control. */
+  .canvas-listbox-filter {
+    position: absolute;
+    top: 2px; left: 4px; right: 4px;
+    box-sizing: border-box;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+    color: inherit;
+    font: inherit;
+    padding: 0 6px;
+    outline: none;
+    z-index: 4;
+  }
+  .canvas-listbox-filter:focus-visible { border-color: #5B9BD5; }
 
   .control-content {
     position: absolute;

@@ -1,6 +1,7 @@
 <script>
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
+  import { createDefaultInteractiveSections } from '../models/interactionDefaults.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -25,6 +26,29 @@
   let showSubtypeSelector = $derived(buttonType !== 'radio' && buttonType !== 'combobox');
   let momentarySubtype = $derived(String(behavior?.subtype ?? 'action'));
   let radioVisualStyle = $derived(String(behavior?.visualStyle ?? behavior?.subtype ?? 'radio'));
+  let isRangeSpinbox = $derived(
+    String(behavior?.family ?? '').trim().toLowerCase() === 'range'
+    && String(behavior?.role ?? '').trim().toLowerCase() === 'spinbox'
+  );
+  // Range = two-value min/max control (spinner OR slider variant); Number = the
+  // single-value stepper. isTwoValueRange holds across both Range variants so the
+  // Value inspector (and the variant selector) stays reachable after switching.
+  let isRangeFamily = $derived(String(behavior?.family ?? '').trim().toLowerCase() === 'range');
+  let isTwoValueRange = $derived(
+    isRangeFamily && String(behavior?.valueMode ?? 'single').trim().toLowerCase() === 'range'
+  );
+  let rangeVariant = $derived(
+    String(behavior?.variant ?? (String(behavior?.role ?? '').trim().toLowerCase() === 'slider' ? 'slider' : 'spinner'))
+  );
+  let showValueSection = $derived(isRangeSpinbox || isTwoValueRange);
+  let parts = $derived(getSection(control, 'Parts'));
+  // The value glyph size lives on whichever value part the control uses
+  // (valueField for Number, lowField for the two-value Range).
+  let valueFontSize = $derived(numberOr(
+    parts?._children?.valueField?._children?.Text?._children?.Font?.size
+    ?? parts?._children?.lowField?._children?.Text?._children?.Font?.size,
+    12
+  ));
 
   function inferButtonType(controlType = '') {
     switch (String(controlType ?? '')) {
@@ -38,6 +62,11 @@
     }
   }
 
+  function numberOr(value, fallback = 0) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : fallback;
+  }
+
   function set(prop, value) {
     if (!core?.id) return;
     const path = `Behavior.${prop}`;
@@ -46,6 +75,72 @@
     } else {
       updateControlProperty(core.id, path, value);
     }
+  }
+
+  // The spinbox glyphs live in separate parts (valueField/decrement/increment
+  // for Number; lowField/highField/decrement/increment for Range). Keeping them
+  // a single uniform size is the sensible default; drive whichever exist from
+  // one cell.
+  function setValueFontSize(value) {
+    if (!core?.id) return;
+    const size = Math.max(4, numberOr(value, 12));
+    const present = parts?._children ?? {};
+    for (const partName of ['decrement', 'valueField', 'increment', 'lowField', 'highField']) {
+      if (present[partName]) {
+        updateControlProperty(core.id, `Parts.${partName}.Text.Font.size`, size);
+      }
+    }
+  }
+
+  // Editing a two-value default also refreshes the static field text so the
+  // editor (design view, where live bindings don't run) shows the new value.
+  function setStartValue(value) {
+    if (!core?.id) return;
+    const next = numberOr(value, 0);
+    set('defaultStartValue', next);
+    if (parts?._children?.lowField) {
+      updateControlProperty(core.id, 'Parts.lowField.Text.content', String(next));
+    }
+  }
+
+  function setEndValue(value) {
+    if (!core?.id) return;
+    const next = numberOr(value, 0);
+    set('defaultEndValue', next);
+    if (parts?._children?.highField) {
+      updateControlProperty(core.id, 'Parts.highField.Text.content', String(next));
+    }
+  }
+
+  // Switch a two-value Range between the boxed spinner and the dual-handle
+  // slider. Both share the range engine, so we regenerate the interactive
+  // sections for the target rendering (spinbox parts vs slider parts) while
+  // carrying the value config (bounds, step, low/high, int) across.
+  function setVariant(variant) {
+    if (!core?.id) return;
+    const target = variant === 'slider' ? 'slider' : 'spinner';
+    if (rangeVariant === target) return;
+
+    const b = behavior ?? {};
+    const preserved = {
+      variant: target,
+      valueMode: 'range',
+      valueType: b.valueType ?? 'int',
+      min: numberOr(b.min, 0),
+      max: numberOr(b.max, 100),
+      step: numberOr(b.step, 1),
+      defaultStartValue: numberOr(b.defaultStartValue, numberOr(b.min, 0)),
+      defaultEndValue: numberOr(b.defaultEndValue, numberOr(b.max, 100)),
+    };
+
+    // 'Slider' gives role:'slider' + slider parts; 'Range' gives the spinbox
+    // spinner. Merge the preserved value config on top of the generated behavior.
+    const sections = createDefaultInteractiveSections(target === 'slider' ? 'Slider' : 'Range');
+    updateControlProperty(core.id, 'Behavior', { ...sections.Behavior, ...preserved });
+    updateControlProperty(core.id, 'Parts', sections.Parts);
+    updateControlProperty(core.id, 'Bindings', sections.Bindings);
+    updateControlProperty(core.id, 'States', sections.States);
+    updateControlProperty(core.id, 'Animations', sections.Animations);
   }
 
   function handleToggle(prop) {
@@ -81,7 +176,7 @@
     <PropertyCell label="Type" span={showSubtypeSelector ? 2 : 4} hint="Behavior is defined by the inserted button type.">
       <input class="val" type="text" value={buttonType} readonly />
     </PropertyCell>
-    {#if showSubtypeSelector}
+    {#if showSubtypeSelector && String(behavior.valueType ?? '') !== 'text'}
       <PropertyCell label="Subtype" span={2} hint="Choose the exact behavior variant for this button type.">
         <select class="val" value={behavior.subtype ?? subtypeOptions[0]} onchange={(event) => handleSubtypeChange(event.target.value)}>
           {#each subtypeOptions as option}
@@ -90,7 +185,56 @@
         </select>
       </PropertyCell>
     {/if}
+    {#if String(behavior.valueType ?? '') === 'text'}
+      <PropertyCell label="Initial text" span={4} hint="The field's starting value (Text section holds the empty-state placeholder).">
+        <input class="val" type="text" value={behavior.defaultValue ?? ''} oninput={(event) => set('defaultValue', event.target.value)} />
+      </PropertyCell>
+      <PropertyCell label="Editable" span={2} hint="Allow keyboard text entry in preview / player.">
+        <input type="checkbox" checked={behavior.keyboardEnabled !== false} onchange={(event) => set('keyboardEnabled', event.target.checked)} />
+      </PropertyCell>
+      <PropertyCell label="Focusable" span={2} hint="Can receive keyboard focus (Tab).">
+        <input type="checkbox" checked={behavior.focusable !== false} onchange={(event) => set('focusable', event.target.checked)} />
+      </PropertyCell>
+    {/if}
   </PropertySection>
+
+  {#if showValueSection}
+    <PropertySection title="Value">
+      {#if isTwoValueRange}
+        <PropertyCell label="Variant" span={4} hint="Spinner = boxed [low] [− +] [high]; Slider = dual-handle min/max track.">
+          <select class="val" value={rangeVariant} onchange={(event) => setVariant(event.target.value)}>
+            <option value="spinner">Spinner (boxed)</option>
+            <option value="slider">Slider (dual handle)</option>
+          </select>
+        </PropertyCell>
+      {/if}
+      <PropertyCell label="Min" span={2} hint="Lower bound the values are clamped to.">
+        <NumberInput value={behavior.min ?? 0} step={1} onchange={(value) => set('min', value)} />
+      </PropertyCell>
+      <PropertyCell label="Max" span={2} hint="Upper bound the values are clamped to.">
+        <NumberInput value={behavior.max ?? 100} step={1} onchange={(value) => set('max', value)} />
+      </PropertyCell>
+      <PropertyCell label="Step" span={2} hint="Increment per step / stepper click.">
+        <NumberInput value={behavior.step ?? 1} step={1} min={0} onchange={(value) => set('step', value)} />
+      </PropertyCell>
+      <PropertyCell label="Integer" span={2} hint="Round values to whole numbers.">
+        <PropertyToggle value={String(behavior.valueType ?? '') === 'int'} onchange={() => set('valueType', String(behavior.valueType ?? '') === 'int' ? 'float' : 'int')} />
+      </PropertyCell>
+      {#if isTwoValueRange}
+        <PropertyCell label="Low" span={2} hint="Default low (min) value of the range.">
+          <NumberInput value={behavior.defaultStartValue ?? behavior.min ?? 0} step={1} onchange={(value) => setStartValue(value)} />
+        </PropertyCell>
+        <PropertyCell label="High" span={2} hint="Default high (max) value of the range.">
+          <NumberInput value={behavior.defaultEndValue ?? behavior.max ?? 100} step={1} onchange={(value) => setEndValue(value)} />
+        </PropertyCell>
+      {/if}
+      {#if isRangeSpinbox}
+        <PropertyCell label="Font Size" span={2} hint="Height (px) of the value and ± glyphs.">
+          <NumberInput value={valueFontSize} step={1} min={4} onchange={(value) => setValueFontSize(value)} />
+        </PropertyCell>
+      {/if}
+    </PropertySection>
+  {/if}
 
   {#if buttonType === 'momentary'}
     <PropertySection title="Momentary">

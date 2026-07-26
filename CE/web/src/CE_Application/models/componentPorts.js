@@ -1,3 +1,12 @@
+import { matrixPorts } from '../utils/matrixLayout.js';
+import { macroPorts } from '../utils/macroLayout.js';
+import { orbitPorts } from '../utils/orbitLayout.js';
+import { looperPorts } from '../utils/looperLayout.js';
+import { routerPorts } from '../utils/routerLayout.js';
+import { timbrePorts } from '../utils/timbreLayout.js';
+import { constellationPorts } from '../utils/constellationLayout.js';
+import { constraintPorts } from '../utils/constraintLayout.js';
+
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
   FLOAT: 'float',
@@ -84,7 +93,31 @@ export const DEFAULT_COMPONENT_PORTS = {
       defaultBindingMode: 'onCommit',
     },
   ],
+  Listbox: [
+    {
+      id: 'selectedChoice',
+      label: 'Selected Choice',
+      accepts: [PARAMETER_TYPES.CHOICE, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
+  TextInput: [
+    {
+      id: 'text',
+      label: 'Text',
+      accepts: [PARAMETER_TYPES.TEXT, PARAMETER_TYPES.PATCH_NAME],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
   Range: [
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+  ],
+  Number: [
     {
       id: 'value',
       label: 'Value',
@@ -99,6 +132,113 @@ export const DEFAULT_COMPONENT_PORTS = {
       accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
       defaultBindingMode: 'continuous',
     },
+  ],
+  Knob: [
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+  ],
+  LcdDisplay: [
+    {
+      id: 'text',
+      label: 'Text',
+      accepts: [PARAMETER_TYPES.TEXT, PARAMETER_TYPES.PATCH_NAME, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'brightness',
+      label: 'Brightness',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'backlight',
+      label: 'Backlight',
+      accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
+  PixelDisplay: [
+    {
+      id: 'value',
+      label: 'Value',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'text',
+      label: 'Text',
+      accepts: [PARAMETER_TYPES.TEXT, PARAMETER_TYPES.PATCH_NAME, PARAMETER_TYPES.ENUM],
+      defaultBindingMode: 'onCommit',
+    },
+    {
+      id: 'brightness',
+      label: 'Brightness',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+    {
+      id: 'backlight',
+      label: 'Backlight',
+      accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'onCommit',
+    },
+  ],
+  Meter: [
+    {
+      id: 'level',
+      label: 'Level',
+      accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED],
+      defaultBindingMode: 'continuous',
+    },
+  ],
+  Ribbon: [
+    { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'touch', label: 'Touch gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
+  Crossfader: [
+    { id: 'a', label: 'Gain A', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'b', label: 'Gain B', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'mix', label: 'Mix', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
+  Turing: [
+    // A stepped generative modulator: the current step value, a gate, its inverse.
+    { id: 'value', label: 'Value', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'gate', label: 'Gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'inverse', label: 'Inverse', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+  ],
+  Kinetic: [
+    // A physics ball: its position axes, its speed, and a bounce pulse.
+    { id: 'x', label: 'X position', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'y', label: 'Y position', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED, PARAMETER_TYPES.BIPOLAR], defaultBindingMode: 'continuous' },
+    { id: 'speed', label: 'Speed', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'bounce', label: 'Bounce gate', accepts: [PARAMETER_TYPES.BOOLEAN, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
+  VectorJoystick: [
+    // Two axes + four bilinear corner blends — bind any subset (fan-out).
+    { id: 'x', label: 'X axis', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'y', label: 'Y axis', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.BIPOLAR, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'cornerTL', label: 'Corner ↖', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'cornerTR', label: 'Corner ↗', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'cornerBL', label: 'Corner ↙', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'cornerBR', label: 'Corner ↘', accepts: [PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+  ],
+  Envelope: [
+    // Common stage parameters — the typical ADSR/DAHDSR device bindings. (Full
+    // per-node fan-out binding is a later capability; these cover the usual case.)
+    { id: 'attack', label: 'Attack', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'decay', label: 'Decay', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'sustain', label: 'Sustain', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
+    { id: 'release', label: 'Release', accepts: [PARAMETER_TYPES.INTEGER, PARAMETER_TYPES.FLOAT, PARAMETER_TYPES.NORMALIZED], defaultBindingMode: 'continuous' },
   ],
   CustomComponent: [
     {
@@ -190,6 +330,39 @@ export function getComponentPorts(componentOrType) {
   if (componentType === 'CustomComponent' && typeof componentOrType === 'object') {
     const dynamicPorts = publishedPorts(componentOrType);
     return dynamicPorts.length ? dynamicPorts : DEFAULT_COMPONENT_PORTS.CustomComponent;
+  }
+  // Mod Matrix: one bindable port per grid cell ("Source → Destination"),
+  // generated from the control's rows × cols (dynamic, like custom components).
+  if (componentType === 'Matrix' && typeof componentOrType === 'object') {
+    return matrixPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Macro: one bindable port per assignment ("Destination"), from the slots.
+  if (componentType === 'Macro' && typeof componentOrType === 'object') {
+    return macroPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Orbit: one bindable port per satellite ("Node N"), from the nodes.
+  if (componentType === 'Orbit' && typeof componentOrType === 'object') {
+    return orbitPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Looper: one bindable port per recorded lane ("Lane N").
+  if (componentType === 'Looper' && typeof componentOrType === 'object') {
+    return looperPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Router: one bindable port per destination ("Destination N").
+  if (componentType === 'Router' && typeof componentOrType === 'object') {
+    return routerPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Timbre Space: one bindable port per morph target ("Target N").
+  if (componentType === 'Timbre' && typeof componentOrType === 'object') {
+    return timbrePorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Preset Constellation: one bindable port per morph target ("Target N").
+  if (componentType === 'Constellation' && typeof componentOrType === 'object') {
+    return constellationPorts(componentOrType, PARAMETER_TYPES);
+  }
+  // Constraint Cell: one bindable port per linked member ("Member N").
+  if (componentType === 'Constraint' && typeof componentOrType === 'object') {
+    return constraintPorts(componentOrType, PARAMETER_TYPES);
   }
   return DEFAULT_COMPONENT_PORTS[componentType] ?? [];
 }

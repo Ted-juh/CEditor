@@ -2,7 +2,8 @@ import { writable, derived, get } from 'svelte/store';
 import { selectedControl } from './controls.js';
 import { panels, resolvedActivePanelId, selectedComponentId } from './panels.js';
 import { setDebugDock } from './debugDock.js';
-import { resolveInteractiveControl, serializeInteractionRuntime } from '../utils/interactionRuntime.js';
+import { resolveInteractiveControl, serializeInteractionRuntime, resolveInteractionContext } from '../utils/interactionRuntime.js';
+import { dependsOnId, dependsResetOnChange, visibleChoiceRows, firstDependentValue } from '../utils/dependentChoices.js';
 import { getNextEnumValue } from '../utils/enumBehavior.js';
 import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../utils/selectGroupUtils.js';
 import { normalizeCustomChannelValue, seedCustomValues } from '../utils/customComponentInteraction.js';
@@ -71,6 +72,13 @@ export function createInteractionPreviewSession(control = null) {
     next.activeHandle = String(behavior?.valueMode ?? 'single') === 'range' ? 'start' : 'current';
     next.valueInputRole = next.activeHandle;
   }
+  // Two-value range spinner starts with the low (start) field active.
+  if (String(behavior?.family ?? '') === 'range'
+    && String(behavior?.role ?? '') === 'spinbox'
+    && String(behavior?.valueMode ?? 'single') === 'range') {
+    next.activeHandle = 'start';
+    next.valueInputRole = 'start';
+  }
   return next;
 }
 
@@ -87,6 +95,60 @@ function shallowEqualSession(left, right) {
 
 function getControlId(control) {
   return String(control?._children?.Core?.id ?? '');
+}
+
+// Cascading selectors: after any session change, keep every dependent list in
+// sync with its parent selector. Each child stores the parent's current value
+// in `dependsParentValue`; when that changes, the child's selection is reset to
+// the first row visible under the new parent value (unless it opted out via
+// dependsResetOnChange, in which case a still-visible pick is kept). This runs
+// alongside applyPanelCustomLinkRoutes on every panel-preview session update.
+export function applyPanelDependentChoices(controls = [], sessions = {}) {
+  const controlList = Array.isArray(controls) ? controls : [];
+  const byId = new Map(controlList.map((control) => [getControlId(control), control]));
+  let nextSessions = sessions ?? {};
+  let changed = false;
+
+  for (const child of controlList) {
+    const parentId = dependsOnId(child);
+    if (!parentId) continue;
+    const childId = getControlId(child);
+    if (!childId || parentId === childId) continue;
+    const parent = byId.get(parentId);
+    if (!parent) continue;
+
+    const parentValue = String(resolveInteractionContext(parent, nextSessions?.[parentId] ?? {})?.valueRaw ?? '');
+    const childSession = nextSessions?.[childId] ?? {};
+    const storedParentValue = childSession.dependsParentValue;
+    if (storedParentValue !== undefined && String(storedParentValue) === parentValue) continue; // unchanged
+
+    const rows = child?._children?.Value?.rows ?? [];
+    const patch = { dependsParentValue: parentValue };
+    // Is the child's current pick still visible under the new parent value?
+    const currentValue = String(resolveInteractionContext(child, childSession)?.valueRaw ?? '');
+    const stillVisible = visibleChoiceRows(rows, parentValue, parentId)
+      .some((row) => row?.isHeader !== true && row?.enabled !== false
+        && String(row.internalValue ?? row.id ?? '') === currentValue);
+
+    if (dependsResetOnChange(child) || !stillVisible) {
+      patch.valueOverrideEnabled = true;
+      patch.valueOverride = firstDependentValue(rows, parentValue, parentId);
+      patch.listboxSelected = [];
+      patch.listboxPending = '';
+      patch.listboxScrollTop = 0;
+      patch.listboxNowPlaying = '';
+    }
+
+    nextSessions = { ...nextSessions, [childId]: { ...childSession, ...patch } };
+    changed = true;
+  }
+
+  return changed ? nextSessions : sessions;
+}
+
+// Route custom-component links, then reconcile dependent (cascading) selectors.
+function applyPanelSessionEffects(controls, sessions) {
+  return applyPanelDependentChoices(controls, applyPanelCustomLinkRoutes(controls, sessions));
 }
 
 function getActivePanel() {
@@ -122,7 +184,7 @@ function createPreviewSessionsMap(controls = []) {
     nextSessions[controlId] = createInteractionPreviewSession(control);
     return nextSessions;
   }, {});
-  return applyPanelCustomLinkRoutes(controlList, sessions);
+  return applyPanelSessionEffects(controlList, sessions);
 }
 
 export function updateInteractionPreviewSession(controlId, patch = {}) {
@@ -145,7 +207,7 @@ export function updateInteractionPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions);
+    return applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions);
   });
 }
 
@@ -210,7 +272,7 @@ export function syncPanelPreviewSessions(controls = []) {
 
     const currentKeys = Object.keys(current ?? {});
     if (currentKeys.length !== Object.keys(next).length) changed = true;
-    const routed = applyPanelCustomLinkRoutes(controlList, next);
+    const routed = applyPanelSessionEffects(controlList, next);
     if (!changed && routed === next) return current;
     return routed;
   });
@@ -247,7 +309,7 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions);
+    return applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions);
   });
 }
 
@@ -294,7 +356,7 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       };
     }
 
-    panelPreviewSessions.set(applyPanelCustomLinkRoutes(getActivePanel()?.controls ?? [], nextSessions));
+    panelPreviewSessions.set(applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions));
     return {
       checked: true,
       mixed: false,

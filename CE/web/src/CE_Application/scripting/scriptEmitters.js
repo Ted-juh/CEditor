@@ -1,4 +1,5 @@
 import { SCRIPT_TARGETS, commandDescriptor, portabilityForScript } from './scriptCommandRegistry.js';
+import { panicCcMessages } from '../utils/panicLayout.js';
 import { expressionToText } from './scriptExpressions.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
@@ -85,6 +86,12 @@ function emitLuaStep(step, lines) {
   else if (command === 'startTimer') lines.push(`  startTimer(${quoted(args.id)}, ${Number(args.ms) || 0})`);
   else if (command === 'stopTimer') lines.push(`  stopTimer(${quoted(args.id)})`);
   else if (command === 'emitEvent') lines.push(`  emitEvent(${quoted(args.event)}, ${quoted(args.target ?? '')}, ${luaExpression(args.value ?? { ref: 'event.value' })})`);
+  else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC(${m.channel}, ${m.cc}, 0)`); }
+  else if (command === 'split') lines.push(`  ${splitCall(args, 'lua')}`);
+  else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'lua')}`);
+  else if (command === 'recorder') lines.push(`  ${recorderCall(args, 'lua')}`);
+  else if (command === 'harmony') lines.push(`  ${harmonyCall(args, 'lua')}`);
+  else if (command === 'setlist') lines.push(`  ${setlistCall(args, 'lua')}`);
   else if (command === 'sendCC') lines.push(`  sendCC(${args.channel}, ${args.cc}, ${luaExpression(args.value)})`);
   else if (command === 'sendNRPN') lines.push(`  sendNRPN(${args.channel}, ${args.parameterMsb}, ${args.parameterLsb}, ${luaExpression(args.value)})`);
   else if (command === 'sendSysex') lines.push(`  sendSysex(${luaBytes(args.bytes)})`);
@@ -103,6 +110,113 @@ function emitLuaStep(step, lines) {
   else lines.push(`  -- ${ceStep(step)}`);
 }
 
+// One builder for every dialect, so lua/js/text can't drift about what a split
+// step actually does. The argument set is deliberately narrow: whichever fields
+// the chosen action uses, and nothing else on the line to read past.
+function splitCall(args, dialect) {
+  const t = String(args.target ?? '');
+  const zone = args.zone === '' || args.zone == null ? '' : args.zone;
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const z = () => (typeof zone === 'number' || /^\d+$/.test(String(zone)) ? Number(zone) : q(zone));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest) => (dialect === 'ce'
+    ? `${name} ${[q(t), ...rest].join(sep)}`
+    : `${name}(${[q(t), ...rest].join(sep)})`);
+  switch (String(args.action ?? 'preset')) {
+    case 'mute': return call('splitMute', [z(), String(args.enabled !== false)]);
+    case 'channel': return call('splitChannel', [z(), Number(args.channel) || 1]);
+    case 'transpose': return call('splitTranspose', [z(), Number(args.transpose) || 0]);
+    case 'splitPoint': return call('splitPoint', [z(), Number(args.note) || 60]);
+    case 'preset':
+    default: return call('splitPreset', [q(args.preset ?? 'classic')]);
+  }
+}
+
+// The Phrase Sequencer's equivalent. Same rule: only the arguments the chosen
+// action actually uses reach the line.
+function phraseCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'seed')) {
+    case 'clear': return call('phraseClear');
+    case 'key': return call('phraseKey', [Number(args.key) || 0]);
+    case 'scale': return call('phraseScale', [q(args.scale ?? 'minor')]);
+    case 'transpose': return call('phraseTranspose', [Number(args.transpose) || 0]);
+    case 'direction': return call('phraseDirection', [q(args.direction ?? 'forward')]);
+    case 'run': return call('phraseRun', [String(args.running !== false)]);
+    case 'cell': return call('phraseCell', [Number(args.step) || 0, Number(args.row) || 0]);
+    case 'seed':
+    default: return call('phraseSeed', [q(args.seed ?? 'riff')]);
+  }
+}
+
+// The three newest components. Same rule as splitCall/phraseCall: only the
+// arguments the chosen action actually uses reach the line.
+function recorderCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'record')) {
+    case 'stop': return call('recorderStop');
+    case 'play': return call('recorderPlay', [String(args.on !== false)]);
+    case 'clear': return call('recorderClear');
+    case 'undo': return call('recorderUndo');
+    case 'quantize': return call('recorderQuantize', [Number(args.grid) || 16, Number(args.strength) || 0]);
+    case 'transpose': return call('recorderTranspose', [Number(args.transpose) || 0]);
+    case 'bars': return call('recorderBars', [Number(args.bars) || 2]);
+    case 'source': return call('recorderSource', [q(args.source ?? 'both')]);
+    case 'record':
+    default: return call('recorderRecord', [String(args.on !== false)]);
+  }
+}
+function harmonyCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'key')) {
+    case 'mode': return call('harmonyMode', [q(args.mode ?? 'diatonic')]);
+    case 'scale': return call('harmonyScale', [q(args.scale ?? 'major')]);
+    case 'size': return call('harmonySize', [Number(args.size) || 3]);
+    case 'shape': return call('harmonyShape', [q(args.shape ?? 'major')]);
+    case 'voicing': return call('harmonyVoicing', [q(args.voicing ?? 'close')]);
+    case 'inversion': return call('harmonyInversion', [Number(args.inversion) || 0]);
+    case 'octave': return call('harmonyOctave', [Number(args.octave) || 0]);
+    case 'outOfKey': return call('harmonyOutOfKey', [q(args.outOfKey ?? 'pass')]);
+    case 'keepPlayed': return call('harmonyKeepPlayed', [String(args.on !== false)]);
+    case 'channel': return call('harmonyChannel', [Number(args.channel) || 1]);
+    case 'key':
+    default: return call('harmonyKey', [Number(args.key) || 0]);
+  }
+}
+function setlistCall(args, dialect) {
+  const q = (v) => (dialect === 'ce' ? String(v) : JSON.stringify(String(v)));
+  const t = q(String(args.target ?? ''));
+  const scene = args.scene === '' || args.scene == null ? '' : args.scene;
+  const sc = () => (typeof scene === 'number' || /^\d+$/.test(String(scene)) ? Number(scene) : q(scene));
+  const sep = dialect === 'ce' ? ' ' : ', ';
+  const call = (name, rest = []) => (dialect === 'ce'
+    ? `${name} ${[t, ...rest].join(sep)}`
+    : `${name}(${[t, ...rest].join(sep)})`);
+  switch (String(args.action ?? 'next')) {
+    case 'prev': return call('setlistPrev');
+    case 'goto': return call('setlistGoto', [sc()]);
+    case 'enable': return call('setlistEnable', [sc(), String(args.enabled !== false)]);
+    case 'wrap': return call('setlistWrap', [String(args.wrap !== false)]);
+    case 'next':
+    default: return call('setlistNext');
+  }
+}
+
 function ceStep(step) {
   const command = step.command ?? step.cmd;
   const args = step.args ?? {};
@@ -118,6 +232,12 @@ function ceStep(step) {
   if (command === 'startTimer') return `startTimer ${args.id} ${args.ms}ms`;
   if (command === 'stopTimer') return `stopTimer ${args.id}`;
   if (command === 'emitEvent') return `emitEvent ${args.event} target=${args.target ?? ''} value=${valueText(args.value ?? { ref: 'event.value' }, 'ce')}`;
+  if (command === 'panic') return panicStepMessages(args).map((m) => `sendCC channel=${m.channel} cc=${m.cc} value=0`).join('\n  ');
+  if (command === 'split') return splitCall(args, 'ce');
+  if (command === 'phrase') return phraseCall(args, 'ce');
+  if (command === 'recorder') return recorderCall(args, 'ce');
+  if (command === 'harmony') return harmonyCall(args, 'ce');
+  if (command === 'setlist') return setlistCall(args, 'ce');
   if (command === 'sendCC') return `sendCC channel=${args.channel} cc=${args.cc} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendNRPN') return `sendNRPN channel=${args.channel} param=${args.parameterMsb}/${args.parameterLsb} value=${valueText(args.value, 'ce')}`;
   if (command === 'sendSysex') return `sendSysex bytes=[${(args.bytes ?? []).join(', ')}]`;
@@ -157,6 +277,12 @@ function emitJsLike(script, target) {
     else if (command === 'startTimer') lines.push(`  startTimer("${args.id}", ${Number(args.ms) || 0});`);
     else if (command === 'stopTimer') lines.push(`  stopTimer("${args.id}");`);
     else if (command === 'emitEvent') lines.push(`  emitEvent("${args.event}", { target: "${args.target ?? ''}", value: ${valueText(args.value ?? { ref: 'event.value' }, target)} });`);
+    else if (command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  sendCC({ channel: ${m.channel}, cc: ${m.cc}, value: 0 });`); }
+    else if (command === 'split') lines.push(`  ${splitCall(args, 'js')};`);
+    else if (command === 'phrase') lines.push(`  ${phraseCall(args, 'js')};`);
+    else if (command === 'recorder') lines.push(`  ${recorderCall(args, 'js')};`);
+    else if (command === 'harmony') lines.push(`  ${harmonyCall(args, 'js')};`);
+    else if (command === 'setlist') lines.push(`  ${setlistCall(args, 'js')};`);
     else if (command === 'sendCC') lines.push(`  sendCC({ channel: ${args.channel}, cc: ${args.cc}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendNRPN') lines.push(`  sendNRPN({ channel: ${args.channel}, parameterMsb: ${args.parameterMsb}, parameterLsb: ${args.parameterLsb}, value: ${valueText(args.value, target)} });`);
     else if (command === 'sendSysex') lines.push(`  sendSysex([${(args.bytes ?? []).join(', ')}]);`);
@@ -191,6 +317,7 @@ function emitPython(script) {
     else if (step.command === 'showGroup') lines.push(`    show_group("${args.group}")`);
     else if (step.command === 'hideGroup') lines.push(`    hide_group("${args.group}")`);
     else if (step.command === 'setPanelState') lines.push(`    set_panel_state("${args.state}")`);
+    else if (step.command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`    send_cc(channel=${m.channel}, cc=${m.cc}, value=0)`); }
     else if (step.command === 'sendCC') lines.push(`    send_cc(channel=${args.channel}, cc=${args.cc}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendNRPN') lines.push(`    send_nrpn(channel=${args.channel}, parameter_msb=${args.parameterMsb}, parameter_lsb=${args.parameterLsb}, value=${valueText(args.value, 'python')})`);
     else if (step.command === 'sendSysex') lines.push(`    send_sysex([${(args.bytes ?? []).join(', ')}])`);
@@ -470,6 +597,7 @@ function emitNative(script, target) {
     else if (step.command === 'startTimer') lines.push(`  ${cfg.startTimer}(${cfg.string(args.id)}, ${Number(args.ms) || 0})${cfg.lineEnd}`);
     else if (step.command === 'stopTimer') lines.push(`  ${cfg.stopTimer}(${cfg.string(args.id)})${cfg.lineEnd}`);
     else if (step.command === 'emitEvent') lines.push(`  ${cfg.emitEvent}(${cfg.string(args.event)}, ${cfg.string(args.target ?? '')}, ${nativeExpression(args.value ?? { ref: 'event.value' }, cfg, target)})${cfg.lineEnd}`);
+    else if (step.command === 'panic') { for (const m of panicStepMessages(args)) lines.push(`  ${cfg.sendCC}(${m.channel}, ${m.cc}, 0)${cfg.lineEnd}`); }
     else if (step.command === 'sendCC') lines.push(`  ${cfg.sendCC}(${Number(args.channel) || 1}, ${Number(args.cc) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendNRPN') lines.push(`  ${cfg.sendNRPN}(${Number(args.channel) || 1}, ${Number(args.parameterMsb) || 0}, ${Number(args.parameterLsb) || 0}, ${nativeExpression(args.value, cfg, target)})${cfg.lineEnd}`);
     else if (step.command === 'sendSysex') lines.push(`  ${cfg.sendSysex}(${cfg.bytes(args.bytes ?? [])})${cfg.lineEnd}`);
@@ -491,6 +619,15 @@ function emitHtml(script) {
 
 function emitCss(script) {
   return `.ce-script-${script.id} {\n  --script-event: "${script.event}";\n  --script-target: "${script.target}";\n}`;
+}
+
+// Every code target knows sendCC and nothing else, so `panic` is emitted as the
+// CC sequence it stands for rather than as a call no host would define. Keeps
+// the command export-safe on all of them.
+function panicStepMessages(args) {
+  return panicCcMessages({
+    scope: args?.scope, channel: args?.channel, resetControllers: args?.resetControllers !== false,
+  });
 }
 
 export function exportWarningsForScript(script) {

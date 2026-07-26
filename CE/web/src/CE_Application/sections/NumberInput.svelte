@@ -46,7 +46,7 @@
     class="num-field"
     type="number"
     {value}
-    {step}
+    step="any"
     {min}
     {max}
     {disabled}

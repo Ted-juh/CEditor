@@ -9,6 +9,19 @@
     <title>CEditor</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
+      /* Dark UA theme for native form controls (select/input/etc.) app-wide, so
+         they never fall back to a white background in the dark UI. */
+      :root { color-scheme: dark; }
+      /* Durable dark styling for the LCD Display inspector's fields. Kept in this
+         static global stylesheet (not the component) so Svelte HMR can't drop it
+         on a hot update, which was flipping these fields back to a light look. */
+      .lcd-inspector .val {
+        background: #1A1A1A !important;
+        color: #DDD !important;
+        border: 1px solid #333 !important;
+        border-radius: 4px;
+      }
+      .lcd-inspector .val option { background: #1A1A1A; color: #DDD; }
       /* Kill native number spinners globally — WebView2/Chromium */
       input[type="number"]::-webkit-inner-spin-button,
       input[type="number"]::-webkit-outer-spin-button {

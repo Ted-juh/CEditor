@@ -51,6 +51,8 @@ function requestDump(kind) { return __api.requestDump(kind); }
 function applyDump(bytes) { return __api.applyDump(bytes); }
 function sendDump(kind) { return __api.sendDump(kind); }
 function buildDump(kind) { return __api.buildDump(kind); }
+function startTimer(id, ms) { return __api.startTimer(id, ms || 0); }
+function stopTimer(id) { return __api.stopTimer(id); }
 function run(target, args) { return __api.run(target, args || null); }
 function emit(name, data) { return __api.emit(name, data || null); }
 function log(msg, v) { return __api.log(String(msg), v === undefined ? null : v); }
@@ -104,6 +106,8 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("applyDump", [host, arg] (const Args& a) -> juce::var { host->applyDump (arg (a, 0)); return {}; });
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
+    api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
+    api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
     api->setMethod ("run", [host, arg] (const Args& a) -> juce::var { return host->runAction (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("emit", [host, arg] (const Args& a) -> juce::var { host->emitEvent (arg (a, 0).toString(), arg (a, 1)); return {}; });
     api->setMethod ("log", [host, arg] (const Args& a) -> juce::var { host->log (arg (a, 0).toString(), arg (a, 1)); return {}; });

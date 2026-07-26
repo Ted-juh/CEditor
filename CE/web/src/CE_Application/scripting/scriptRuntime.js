@@ -1,4 +1,5 @@
 import { commandDescriptor } from './scriptCommandRegistry.js';
+import { panicCcMessages } from '../utils/panicLayout.js';
 import { evaluateExpression, readPath } from './scriptExpressions.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
@@ -228,6 +229,66 @@ function runStep(step, context, output, index) {
     };
     output.events.push(event);
     output.trace.push({ time: nowStamp(index), type: 'EVENT', message: `emit ${event.name} ${event.target} value=${formatValue(event.value)}` });
+    return { continue: true };
+  }
+
+  if (command === 'panic') {
+    // Expanded through the same pure function the Panic button uses, so the
+    // order guarantee (sound-off BEFORE notes-off) holds for scripts too.
+    const messages = panicCcMessages({
+      scope: args.scope, channel: args.channel, resetControllers: args.resetControllers !== false,
+    });
+    for (const m of messages) {
+      output.deviceMessages.push({ type: 'cc', channel: m.channel, cc: m.cc, value: 0, phase, queued: !shouldEmit });
+    }
+    const where = String(args.scope ?? 'all') === 'channel' ? `ch${Number(args.channel) || 1}` : 'all channels';
+    output.trace.push({ time: nowStamp(index), type: 'MIDI', message: `panic ${where} (${messages.length} messages)${shouldEmit ? '' : ' queued until commit'}` });
+    return { continue: true };
+  }
+
+  if (command === 'split') {
+    // The simulator has no panel to read the current zones from, so it reports
+    // the intent rather than pretending to compute the resulting array. A patch
+    // with a null value would be worse than none: it would look applied.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? 'preset');
+    const detail = action === 'preset' ? `preset=${args.preset ?? 'classic'}`
+      : action === 'mute' ? `zone=${args.zone} enabled=${args.enabled !== false}`
+      : action === 'channel' ? `zone=${args.zone} channel=${Number(args.channel) || 1}`
+      : action === 'transpose' ? `zone=${args.zone} transpose=${Number(args.transpose) || 0}`
+      : `zone=${args.zone} note=${Number(args.note) || 60}`;
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `split ${target}: ${action} ${detail}` });
+    return { continue: true };
+  }
+
+  if (command === 'phrase') {
+    // Same as `split`: no panel here to read the pattern from, so the trace
+    // reports the intent rather than inventing a resulting grid.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? 'seed');
+    const detail = action === 'seed' ? `seed=${args.seed ?? 'riff'}`
+      : action === 'clear' ? ''
+      : action === 'key' ? `key=${Number(args.key) || 0}`
+      : action === 'scale' ? `scale=${args.scale ?? 'minor'}`
+      : action === 'transpose' ? `transpose=${Number(args.transpose) || 0}`
+      : action === 'direction' ? `direction=${args.direction ?? 'forward'}`
+      : action === 'run' ? `running=${args.running !== false}`
+      : `step=${Number(args.step) || 0} row=${Number(args.row) || 0}`;
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `phrase ${target}: ${action}${detail ? ` ${detail}` : ''}` });
+    return { continue: true };
+  }
+
+  if (command === 'recorder' || command === 'harmony' || command === 'setlist') {
+    // Same as split/phrase: there is no panel here to read the current state
+    // from, so the trace reports the intent rather than inventing a result.
+    const target = String(args.target ?? '');
+    const action = String(args.action ?? (command === 'setlist' ? 'next' : command === 'harmony' ? 'key' : 'record'));
+    const shown = ['on', 'grid', 'strength', 'scale', 'key', 'transpose', 'bars', 'source',
+      'mode', 'size', 'shape', 'voicing', 'inversion', 'octave', 'channel', 'scene', 'enabled', 'wrap']
+      .filter((k) => args[k] !== undefined && args[k] !== '')
+      .map((k) => `${k}=${args[k]}`)
+      .join(' ');
+    output.trace.push({ time: nowStamp(index), type: 'PATCH', message: `${command} ${target}: ${action}${shown ? ` ${shown}` : ''}` });
     return { continue: true };
   }
 

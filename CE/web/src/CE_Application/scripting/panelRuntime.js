@@ -28,6 +28,11 @@ import { compileJava, invokeJava } from './javaPreview.js';
 import { ensureTs, transpileTs } from './tsService.js';
 // The wasm binary URL — resolved by Vite so wasmoon finds its runtime in dev and in the bundle.
 import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+import { applySplitScriptAction } from '../utils/splitZoneLayout.js';
+import { phraseScriptPatch } from '../utils/phraseLayout.js';
+import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
+import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
+import { setlistScriptPatch } from '../utils/setlistLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /* --------------------------------------------------------------- path resolution */
@@ -268,6 +273,137 @@ const midiApi = {
 
 /* ------------------------------------------------------------------ API + executor */
 
+// --- Zone Splitter -----------------------------------------------------------
+// `set()` can already reach SplitZone.zones, but nobody is going to hand-write a
+// zone array in a script. This reads the current zones, hands them to the same
+// pure reducer the editor's own buttons use, and writes the result back — so a
+// footswitch changing the split mid-set is one line.
+function splitAction(path, action, args) {
+  const target = String(path ?? '');
+  const zonesPath = `${target}.SplitZone.zones`;
+  const current = getValue(zonesPath);
+  if (!Array.isArray(current)) {
+    addScriptTrace('error', '', `split: "${target}" is not a Zone Splitter (no SplitZone.zones)`);
+    return;
+  }
+  const next = applySplitScriptAction(current, action, args ?? {});
+  setValue(zonesPath, next);
+  addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
+}
+const splitApi = {
+  splitPreset: (target, preset, lowNote, highNote) =>
+    splitAction(target, 'preset', { preset, lowNote, highNote }),
+  splitMute: (target, zone, enabled) => splitAction(target, 'mute', { zone, enabled: enabled !== false }),
+  splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
+  splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
+  splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+};
+
+// --- Phrase Sequencer --------------------------------------------------------
+// Same idea, one level up: the reducer patches the whole config rather than one
+// array, because a seed needs to know the grid size and a key change needs to
+// leave the pattern alone. Only the changed fields are written, so an undo step
+// says "direction" rather than "the sequencer".
+function phraseAction(path, action, args) {
+  const target = String(path ?? '');
+  const cfg = getValue(`${target}.Phrase`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `phrase: "${target}" is not a Phrase Sequencer (no Phrase section)`);
+    return;
+  }
+  const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    // Not an error — an unknown seed or an out-of-grid cell is a no-op by
+    // design. But silence would look like the footswitch was dead.
+    addScriptTrace('log', '', `phrase ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
+    return;
+  }
+  for (const key of keys) setValue(`${target}.Phrase.${key}`, patch[key]);
+  addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
+}
+const phraseApi = {
+  phraseSeed: (target, seed) => phraseAction(target, 'seed', { seed }),
+  phraseClear: (target) => phraseAction(target, 'clear', {}),
+  phraseKey: (target, key) => phraseAction(target, 'key', { key }),
+  phraseScale: (target, scale) => phraseAction(target, 'scale', { scale }),
+  phraseTranspose: (target, semitones) => phraseAction(target, 'transpose', { transpose: semitones }),
+  phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
+  phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
+  phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+};
+
+// --- Recorder / Harmoniser / Setlist -----------------------------------------
+// All three follow the Phrase Sequencer's shape exactly: read the section, hand
+// it to a pure reducer, write back only the fields that changed. One helper,
+// because three near-identical copies is how they drift apart.
+function sectionAction(path, section, reducer, action, args) {
+  const target = String(path ?? '');
+  const cfg = getValue(`${target}.${section}`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `${section.toLowerCase()}: "${target}" is not a ${section} (no ${section} section)`);
+    return;
+  }
+  const patch = reducer(cfg, action, args ?? {});
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    // Not an error: an unknown argument or a move that changes nothing is a
+    // no-op by design. Silence would look like a dead footswitch, though.
+    addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
+    return;
+  }
+  for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
+  addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} → ${keys.join(', ')}`);
+}
+const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
+const recorderApi = {
+  recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
+  recorderStop: (target) => recAction(target, 'stop', {}),
+  recorderPlay: (target, playing) => recAction(target, 'play', playing === undefined ? {} : { playing: playing !== false }),
+  recorderClear: (target) => recAction(target, 'clear', {}),
+  recorderUndo: (target) => recAction(target, 'undo', {}),
+  recorderQuantize: (target, grid, strength, scale, key) =>
+    recAction(target, 'quantize', { grid, strength, scale, key }),
+  recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
+  recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
+  recorderSource: (target, source) => recAction(target, 'source', { source }),
+  recorderNudge: (target, by) => recAction(target, 'nudge', { by }),
+  recorderShift: (target, semitones) => recAction(target, 'shift', { semitones }),
+  recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
+  recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
+  recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
+};
+
+const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
+const harmoniserApi = {
+  harmonyMode: (target, mode) => harmAction(target, 'mode', { mode }),
+  harmonyKey: (target, key) => harmAction(target, 'key', { key }),
+  harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
+  harmonySize: (target, size) => harmAction(target, 'size', { size }),
+  harmonyShape: (target, shape) => harmAction(target, 'shape', { shape, preset: shape }),
+  harmonyVoicing: (target, voicing) => harmAction(target, 'voicing', { voicing }),
+  harmonyInversion: (target, inversion) => harmAction(target, 'inversion', { inversion }),
+  harmonyOctave: (target, octave) => harmAction(target, 'octave', { octave }),
+  harmonyOutOfKey: (target, mode) => harmAction(target, 'outOfKey', { outOfKey: mode }),
+  harmonyKeepPlayed: (target, keep) => harmAction(target, 'keepPlayed', keep === undefined ? {} : { keepPlayed: keep !== false }),
+  harmonyChannel: (target, channel) => harmAction(target, 'channel', { channel }),
+  harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
+  harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
+  harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
+};
+
+const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
+const setlistApi = {
+  // These move the INDEX. The recall follows from the index changing, so a
+  // scripted step and a footswitch step are the same event downstream.
+  setlistNext: (target) => setAction(target, 'next', {}),
+  setlistPrev: (target) => setAction(target, 'prev', {}),
+  setlistGoto: (target, scene) => setAction(target, 'goto', { scene }),
+  setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
+  setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
+  setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
+};
+
 function buildApi(ownerName) {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
@@ -279,6 +415,16 @@ function buildApi(ownerName) {
     log: (msg, val) => addScriptTrace('log', '', val !== undefined ? `${msg} ${JSON.stringify(val)}` : String(msg)),
     // MIDI/device — real raw send via the device bridge; bulk codec is a fast-follow.
     ...midiApi,
+    // Zone Splitter — change the split from a footswitch.
+    ...splitApi,
+    // Phrase Sequencer — swap the riff, transpose it, run it backwards.
+    ...phraseApi,
+    // Phrase Recorder — arm it, undo a pass, quantise the take.
+    ...recorderApi,
+    // Harmoniser — re-key it mid-song.
+    ...harmoniserApi,
+    // Setlist — next song, from a button or a script.
+    ...setlistApi,
     // flow — minimal for M1
     emit: () => {},
     run: () => {},

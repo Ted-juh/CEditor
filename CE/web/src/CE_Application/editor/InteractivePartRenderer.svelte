@@ -194,6 +194,12 @@
       `justify-content:${justifyContentFor(textPosition?.justification)}`,
       'align-items:center',
       'display:flex',
+      // The part Background renders as position:absolute fill layers, which are
+      // positioned descendants. A non-positioned text block would be painted
+      // *under* them (CSS paint order), hiding the glyphs. Promote the text to
+      // its own positioned level so it always draws above the fill.
+      'position:relative',
+      'z-index:2',
       'height:100%',
       'line-height:1',
       'padding:0 8px',
@@ -551,6 +557,8 @@
         onkeydown={oneditablekeydown}
         onfocus={oneditablefocus}
         onblur={oneditableblur}
+        onpointerdown={(event) => event.stopPropagation()}
+        onmousedown={(event) => event.stopPropagation()}
       />
     {/if}
 
@@ -569,6 +577,21 @@
     position: absolute;
     box-sizing: border-box;
     pointer-events: none;
+  }
+
+  /* Editable value field — make editing visually obvious (caret + focus highlight). */
+  .interactive-part-input {
+    caret-color: currentColor;
+  }
+
+  .interactive-part-input:focus {
+    outline: 1px solid rgba(120, 180, 255, 0.9);
+    outline-offset: -1px;
+    background: rgba(120, 180, 255, 0.14) !important;
+  }
+
+  .interactive-part-input::selection {
+    background: rgba(120, 180, 255, 0.45);
   }
 
   .interactive-value-arc {
