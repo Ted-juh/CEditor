@@ -1,4 +1,5 @@
 import { deepClone } from '../utils/deepClone.js';
+import { mapControlsTree } from '../utils/containment.js';
 
 export function updatePanelInList(list, panelId, updater) {
   let changed = false;
@@ -20,7 +21,10 @@ export function mutatePanelControlsInList(list, panelId, matcher, mutator) {
   return updatePanelInList(list, panelId, (panel) => {
     let changed = false;
 
-    const nextControls = panel.controls.map((control) => {
+    // Tree-aware: a control may sit at top level or nested inside a container's
+    // Children map. mapControlsTree walks the whole tree (a flat list is just a
+    // tree with no children, so this is identical for un-nested panels).
+    const nextControls = mapControlsTree(panel.controls, (control) => {
       if (!matcher(control)) return control;
 
       const draft = deepClone(control);

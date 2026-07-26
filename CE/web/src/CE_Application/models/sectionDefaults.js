@@ -521,12 +521,14 @@ export const SECTION_DEFAULTS = {
     },
   },
 
-  /** Children — contains nested Controls. */
+  /** Children — contains nested Controls (keyed by Core.id in _children). */
   Children: {
     _type: 'Children',
     layout: 'none',
     gap: 0,
     padding: 0,
+    clip: false,
+    _children: {},
   },
 
   /**
