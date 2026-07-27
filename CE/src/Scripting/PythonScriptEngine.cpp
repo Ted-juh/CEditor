@@ -477,6 +477,35 @@ def __webviewOnly(name):
     return stub
 for __n in __WEBVIEW_ONLY:
     globals()[__n] = __webviewOnly(__n)
+
+# BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
+# on top. ce.core is global: its members are never namespaced, so they appear here only for
+# discoverability (ce.core.set is the same function as set).
+import types as __ce_types
+__CE_MODULES = {
+    "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendCC": "sendCC", "sendNRPN": "sendNRPN", "sendSysex": "sendSysex", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
+    "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
+    "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
+    "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+    "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
+    "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
+    "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
+    "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
+    "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
+}
+ce = __ce_types.SimpleNamespace()
+for __ce_path, __ce_members in __CE_MODULES.items():
+    __ce_node = ce
+    for __ce_seg in __ce_path.split(".")[1:]:
+        if not hasattr(__ce_node, __ce_seg):
+            setattr(__ce_node, __ce_seg, __ce_types.SimpleNamespace())
+        __ce_node = getattr(__ce_node, __ce_seg)
+    for __ce_short, __ce_global in __ce_members.items():
+        setattr(__ce_node, __ce_short, globals()[__ce_global])
+# END GENERATED module namespace
 )PY";
 
 } // namespace

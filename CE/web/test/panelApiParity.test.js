@@ -29,8 +29,10 @@ import {
   membersForRuntime, memberNames, memberRuntime,
   WEBVIEW_ONLY_MEMBERS, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
   handlerNamesForRuntime, PANEL_TARGET, PANEL_READONLY_PROPERTIES,
+  MODULES, MODULE_BY_ID, MEMBER_MODULE, moduleMemberMap, memberPath,
+  MODULE_EXT_ROOT, isExtensionModule, modulesForRuntime,
 } from '../src/CE_Application/scripting/panelApi.js';
-import { apiSurfaceNames } from '../src/CE_Application/scripting/panelRuntime.js';
+import { apiSurfaceNames, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
@@ -39,7 +41,10 @@ const readEngine = (file) => readFileSync(join(scriptingDir, file), 'utf8');
 // Names the runtimes bind for their own plumbing. They are not part of the script-facing contract,
 // so the "implemented but undeclared" direction ignores them rather than forcing panelApi.js to
 // document internals.
-const INTERNAL = new Set(['self', '__api', '__deliver', '__ownerPrefix', '__owner', '__global']);
+// `ce` is the namespace root, not a member: tier 1 (ce.version, ce.has) plus every module hanging
+// off it. Its CONTENTS are checked against the manifest below, which is stricter than treating it
+// as a declared member would be.
+const INTERNAL = new Set(['self', 'ce', '__api', '__deliver', '__ownerPrefix', '__owner', '__global']);
 
 /* ------------------------------------------------------------------ the WebView runtime */
 
@@ -243,4 +248,81 @@ test('`self` in a panel script resolves to the panel in every runtime', () => {
   for (const file of ['LuaScriptEngine.cpp', 'JsScriptEngine.cpp', 'PythonScriptEngine.cpp']) {
     assert.match(readEngine(file), /resolveSelfOwner \(def\)/, `${file} should resolve self through the shared rule`);
   }
+});
+
+/* ---------------------------------------------------------------------------------- modules */
+
+test('every member belongs to exactly one module', () => {
+  const members = ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle').map((m) => m.id);
+  const assigned = Object.keys(MEMBER_MODULE);
+  assert.deepEqual(members.filter((id) => !assigned.includes(id)), [], 'members with no module');
+  assert.deepEqual(assigned.filter((id) => !members.includes(id)), [], 'assigned but not a member');
+  assert.equal(assigned.length, members.length);
+});
+
+test('every module a member claims actually exists, and declares its dependencies', () => {
+  for (const [memberId, at] of Object.entries(MEMBER_MODULE)) {
+    assert.ok(MODULE_BY_ID[at.module], `${memberId} claims unknown module ${at.module}`);
+  }
+  for (const m of MODULES) {
+    for (const dep of m.requires ?? []) {
+      assert.ok(MODULE_BY_ID[dep], `${m.id} requires ${dep}, which does not exist`);
+    }
+    assert.match(m.version, /^\d+\.\d+$/, `${m.id} needs a version`);
+  }
+});
+
+test('a member is reachable at its module path, and keeps its flat name as an alias', () => {
+  const api = scriptApiForTesting();
+  for (const [memberId, at] of Object.entries(MEMBER_MODULE)) {
+    // Panel-verb stubs and host-dependent members are still bound; only their behaviour differs.
+    // memberPath already carries the `ce.` root for a namespaced member, and is a bare name for a
+    // ce.core one, so both forms walk from the api object itself.
+    const path = memberPath(memberId);
+    const viaPath = path.split('.').reduce((node, seg) => (node == null ? node : node[seg]), api);
+    assert.equal(typeof viaPath, 'function', `${memberId} is not reachable at ${path}`);
+    assert.equal(typeof api[memberId], 'function', `${memberId} lost its flat alias`);
+    assert.equal(viaPath, api[memberId], `${path} and ${memberId} should be the same function`);
+  }
+});
+
+test('ce.core is global and nothing else is', () => {
+  const global = MODULES.filter((m) => m.global).map((m) => m.id);
+  assert.deepEqual(global, ['ce.core'],
+    'only the verbs used on every line stay unprefixed; anything else earns its namespace');
+});
+
+test('the generated namespace blocks in the C++ engines are up to date', async () => {
+  // The engines embed their preludes as string literals and cannot import the contract, so their
+  // namespace block is generated. Adding a module and forgetting to regenerate would ship a plugin
+  // whose scripts cannot see it — this turns that into a build failure.
+  const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
+  const blocks = { 'LuaScriptEngine.cpp': gen.luaBlock(), 'JsScriptEngine.cpp': gen.jsBlock(), 'PythonScriptEngine.cpp': gen.pythonBlock() };
+  for (const [file, block] of Object.entries(blocks)) {
+    assert.ok(readEngine(file).includes(block), `${file} has a stale generated block — run: node tools/scripts/gen-script-modules.mjs --write`);
+  }
+});
+
+test('no module member name is a keyword in any language we generate for', async () => {
+  // `goto` was the one that caught this: legal in JS and Python, a Lua keyword, so both the
+  // generated table and the call site ce.components.setlist.goto(...) failed to parse there only.
+  const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
+  assert.doesNotThrow(() => gen.checkReservedNames());
+});
+
+test('third-party modules are namespaced away from ours', () => {
+  assert.equal(MODULE_EXT_ROOT, 'ce.ext');
+  assert.ok(isExtensionModule('ce.ext.roland_sysex'));
+  assert.ok(!isExtensionModule('ce.midi'), 'a first-party module is not an extension');
+  for (const m of MODULES) {
+    assert.ok(!isExtensionModule(m.id), `${m.id} is built in and must not sit under ${MODULE_EXT_ROOT}`);
+  }
+});
+
+test('a runtime is only asked for the modules it can actually carry', () => {
+  const webview = modulesForRuntime(RUNTIME_WEBVIEW).map((m) => m.id);
+  const player = modulesForRuntime(RUNTIME_PLAYER).map((m) => m.id);
+  assert.ok(webview.includes('ce.components.setlist'), 'the panel view carries the component modules');
+  assert.ok(!player.includes('ce.components.setlist'), 'the window-closed runtime does not');
+  assert.ok(player.includes('ce.midi') && player.includes('ce.math'), 'and does carry the cross-runtime ones');
 });

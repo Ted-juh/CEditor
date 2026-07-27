@@ -30,6 +30,7 @@ import {
 import {
   handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
+  MODULES, MODULE_BY_ID, moduleMemberMap,
 } from './panelApi.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
@@ -835,12 +836,16 @@ function stopAllTimers() {
   timers.clear();
 }
 
+// The API version a panel is written against. Bumped when a module's members change incompatibly;
+// panels record it so the runtime can tell "written for an older API" from "broken".
+const CE_API_VERSION = '1.0';
+
 function buildApi(ownerName, scriptId = '') {
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form),
   };
-  return {
+  const api = {
     // The third argument is the value form for the second-argument spelling. `set` also takes an
     // opts object in that position in the contract; only a string is read as a form, so
     // set(path, v, { transmit: false }) is unaffected.
@@ -880,6 +885,43 @@ function buildApi(ownerName, scriptId = '') {
     self,
     ...helpers,
   };
+
+  // ce.<module>.<name> on top of the flat names, which stay as aliases. Built here from the
+  // contract rather than from a copy of it, so the WebView's namespace cannot drift from
+  // panelApi.js — the C++ engines get the same layout from a generated block, since a prelude
+  // embedded as a string literal cannot import anything.
+  api.ce = buildModuleNamespace(api);
+  return api;
+}
+
+/**
+ * Assemble `ce` from the module manifest: ce.midi.sendCC, ce.components.setlist.next, and so on.
+ * ce.core is `global: true` — its members are never namespaced — but they are mirrored under
+ * ce.core anyway so the namespace is a complete picture of what a script can reach.
+ */
+function buildModuleNamespace(flat) {
+  const ce = {};
+  for (const module of MODULES) {
+    const segments = module.id.split('.').slice(1);   // drop the "ce" root
+    let node = ce;
+    for (const segment of segments) {
+      node[segment] ??= {};
+      node = node[segment];
+    }
+    for (const [shortName, memberId] of Object.entries(moduleMemberMap(module.id))) {
+      const bound = flat[memberId];
+      if (typeof bound === 'function' || bound !== undefined) node[shortName] = bound;
+    }
+  }
+  // Tier 1: the system namespace. Not a module — it describes the runtime rather than extending it.
+  ce.version = CE_API_VERSION;
+  ce.runtime = RUNTIME_WEBVIEW;
+  ce.modules = MODULES.map((m) => ({ id: m.id, version: m.version, runtime: m.runtime }));
+  ce.has = (moduleId) => {
+    const module = MODULE_BY_ID[moduleId];
+    return module != null && (module.runtime === 'any' || module.runtime === RUNTIME_WEBVIEW);
+  };
+  return ce;
 }
 
 // Driven from panelApi.js, never from a local copy. This list is what the executors probe for, so

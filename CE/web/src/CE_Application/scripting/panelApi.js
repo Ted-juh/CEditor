@@ -673,6 +673,133 @@ export const HELPERS = [
   { id: 'fromSigned', category: 'MIDI encoding', signature: 'fromSigned(b, bits)', summary: "Two's-complement in N bits → value." },
 ];
 
+/* ------------------------------------------------------------------- modules */
+// See docs/scripting-modules-design.md. Three tiers: `ce` is the system (version, runtime,
+// capabilities), `ce.panel`/`ce.device`/`ce.host` are the objects a script acts on, and the modules
+// below are the verbs. Modules are opt-in per panel: the exporter bundles only the ones a panel
+// enables, and the picker shows only those.
+//
+// This is a SHAPE change, not a rename. Every member keeps the name it always had; it simply also
+// lives at ce.<module>.<name>, and the flat spelling stays as an alias. The one place a short name
+// earns its keep is ce.components.*, where `setlistNext` becomes `ce.components.setlist.next`.
+//
+// `ce.core` is `global: true` — its members are never namespaced. Those are the verbs used on every
+// line of every script, and prefixing them would cost more than it buys. This is `using namespace
+// juce;`: JUCE does not make you write juce::String either.
+//
+// THIRD-PARTY modules install into the app and live under `ce.ext.*` — `ce.ext.roland_sysex` — so
+// provenance is visible and `ce.<module>` stays first-party. The manifest carries id/version/
+// requires/integrity from day one so an installed module fits the same shape as a built-in one.
+
+export const MODULE_ROOT = 'ce';
+export const MODULE_EXT_ROOT = 'ce.ext';   // reserved for installed third-party modules
+
+export const MODULES = [
+  { id: 'ce.core', version: '1.0', requires: [], runtime: RUNTIME_ANY, global: true,
+    summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
+  { id: 'ce.midi', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Raw MIDI out, panic, checksums, and the 7-bit/nibble/ASCII encoders.' },
+  { id: 'ce.device', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Bulk dumps through the device profile. Needs the device host.' },
+  { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
+    summary: 'Value and range arithmetic. Pure — no host involved.' },
+  { id: 'ce.music', version: '1.0', requires: [], runtime: RUNTIME_ANY,
+    summary: 'Note names and numbers.' },
+  { id: 'ce.time', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Host timers. Musical time (tempo, beats) lands here next.' },
+  { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
+  { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Phrase Sequencer. Panel view only.' },
+  { id: 'ce.components.recorder', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Phrase Recorder. Panel view only.' },
+  { id: 'ce.components.harmony', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Harmoniser. Panel view only.' },
+  { id: 'ce.components.setlist', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Setlist. Panel view only.' },
+];
+
+// module id -> the members it owns. A plain array means "keep the member's own name"; an object
+// maps shortName -> memberId, which is how ce.components.setlist.next reaches `setlistNext`.
+// Every non-lifecycle member must appear exactly once — panelApiParity.test.js checks it.
+const MODULE_MEMBERS = {
+  'ce.core': ['set', 'get', 'log', 'on', 'off', 'emit', 'run', 'noTransmit', 'transmit'],
+  'ce.midi': [
+    'sendCC', 'sendNRPN', 'sendSysex', 'checksum', 'panic',
+    'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
+    'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
+  ],
+  'ce.device': ['requestDump', 'applyDump', 'sendDump', 'buildDump'],
+  'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
+  'ce.music': ['noteName', 'noteNumber'],
+  'ce.time': ['startTimer', 'stopTimer'],
+  'ce.components.split': {
+    preset: 'splitPreset', mute: 'splitMute', channel: 'splitChannel',
+    transpose: 'splitTranspose', point: 'splitPoint',
+  },
+  'ce.components.phrase': {
+    seed: 'phraseSeed', clear: 'phraseClear', key: 'phraseKey', scale: 'phraseScale',
+    transpose: 'phraseTranspose', direction: 'phraseDirection', run: 'phraseRun', cell: 'phraseCell',
+  },
+  'ce.components.recorder': {
+    record: 'recorderRecord', stop: 'recorderStop', play: 'recorderPlay', clear: 'recorderClear',
+    undo: 'recorderUndo', quantize: 'recorderQuantize', transpose: 'recorderTranspose',
+    bars: 'recorderBars', source: 'recorderSource', nudge: 'recorderNudge', shift: 'recorderShift',
+    store: 'recorderStore', load: 'recorderLoad', countIn: 'recorderCountIn',
+  },
+  'ce.components.harmony': {
+    mode: 'harmonyMode', key: 'harmonyKey', scale: 'harmonyScale', size: 'harmonySize',
+    shape: 'harmonyShape', voicing: 'harmonyVoicing', inversion: 'harmonyInversion',
+    octave: 'harmonyOctave', outOfKey: 'harmonyOutOfKey', keepPlayed: 'harmonyKeepPlayed',
+    channel: 'harmonyChannel', voiceLeading: 'harmonyVoiceLeading', strum: 'harmonyStrum',
+    degree: 'harmonyDegree',
+  },
+  'ce.components.setlist': {
+    // `jump`, not `goto`: goto is a Lua 5.4 keyword, so both the generated table and the call site
+    // ce.components.setlist.goto(...) would fail to parse. The generator refuses reserved words in
+    // any of the three languages so this cannot be reintroduced by accident.
+    next: 'setlistNext', prev: 'setlistPrev', jump: 'setlistGoto',
+    enable: 'setlistEnable', wrap: 'setlistWrap', crossfade: 'setlistCrossfade',
+  },
+};
+
+export const MODULE_BY_ID = Object.fromEntries(MODULES.map((m) => [m.id, m]));
+
+/** { shortName: memberId } for a module, whichever form its entry was written in. */
+export function moduleMemberMap(moduleId) {
+  const entry = MODULE_MEMBERS[moduleId] ?? {};
+  return Array.isArray(entry) ? Object.fromEntries(entry.map((id) => [id, id])) : { ...entry };
+}
+
+/** The module a member belongs to, and the name it answers to inside it. */
+export const MEMBER_MODULE = (() => {
+  const out = {};
+  for (const moduleId of Object.keys(MODULE_MEMBERS)) {
+    for (const [shortName, memberId] of Object.entries(moduleMemberMap(moduleId))) {
+      out[memberId] = { module: moduleId, name: shortName };
+    }
+  }
+  return out;
+})();
+
+/** Where a member lives: "set" for ce.core (global), "ce.midi.sendCC" otherwise. */
+export function memberPath(memberId) {
+  const at = MEMBER_MODULE[memberId];
+  if (!at) return memberId;
+  return MODULE_BY_ID[at.module]?.global ? at.name : `${at.module}.${at.name}`;
+}
+
+/** Modules whose members a runtime must bind. */
+export function modulesForRuntime(runtime) {
+  return MODULES.filter((m) => m.runtime === RUNTIME_ANY || m.runtime === runtime);
+}
+
+/** Is `id` a well-formed third-party module id? Installed modules live under ce.ext.* so that
+    provenance is visible and the first-party namespace stays ours. */
+export function isExtensionModule(id) {
+  return String(id ?? '').startsWith(`${MODULE_EXT_ROOT}.`);
+}
+
 /* ----------------------------------------------------------- derived indexes */
 // Convenience lookups for the picker, validation, and docs.
 

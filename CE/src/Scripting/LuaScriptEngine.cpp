@@ -196,6 +196,34 @@ for _, name in ipairs(WEBVIEW_ONLY) do
     log("[panel] " .. name .. "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.")
   end
 end
+
+-- BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
+-- on top. ce.core is global: its members are never namespaced, so they appear here only for
+-- discoverability (ce.core.set is the same function as set).
+local __CE_MODULES = {
+  ["ce.core"] = { emit = "emit", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendCC = "sendCC", sendNRPN = "sendNRPN", sendSysex = "sendSysex", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", requestDump = "requestDump", sendDump = "sendDump" },
+  ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
+  ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
+  ["ce.time"] = { startTimer = "startTimer", stopTimer = "stopTimer" },
+  ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
+  ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
+  ["ce.components.recorder"] = { bars = "recorderBars", clear = "recorderClear", countIn = "recorderCountIn", load = "recorderLoad", nudge = "recorderNudge", play = "recorderPlay", quantize = "recorderQuantize", record = "recorderRecord", shift = "recorderShift", source = "recorderSource", stop = "recorderStop", store = "recorderStore", transpose = "recorderTranspose", undo = "recorderUndo" },
+  ["ce.components.harmony"] = { channel = "harmonyChannel", degree = "harmonyDegree", inversion = "harmonyInversion", keepPlayed = "harmonyKeepPlayed", key = "harmonyKey", mode = "harmonyMode", octave = "harmonyOctave", outOfKey = "harmonyOutOfKey", scale = "harmonyScale", shape = "harmonyShape", size = "harmonySize", strum = "harmonyStrum", voiceLeading = "harmonyVoiceLeading", voicing = "harmonyVoicing" },
+  ["ce.components.setlist"] = { crossfade = "setlistCrossfade", enable = "setlistEnable", jump = "setlistGoto", next = "setlistNext", prev = "setlistPrev", wrap = "setlistWrap" },
+}
+ce = ce or {}
+for __path, __members in pairs(__CE_MODULES) do
+  local __node = ce
+  for __seg in string.gmatch(string.sub(__path, 4), "[^.]+") do
+    __node[__seg] = __node[__seg] or {}
+    __node = __node[__seg]
+  end
+  for __short, __global in pairs(__members) do __node[__short] = _G[__global] end
+end
+-- END GENERATED module namespace
 )LUA";
 
 // --------------------------------------------------------------------------------------------

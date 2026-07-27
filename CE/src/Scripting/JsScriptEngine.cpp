@@ -12,6 +12,7 @@
 #include "ScriptRuntime.h"
 #include <juce_javascript/juce_javascript.h>
 
+#include <cmath>
 #include <map>
 #include <memory>
 
@@ -148,6 +149,43 @@ for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
     };
   })(__WEBVIEW_ONLY[__i]);
 }
+
+// BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
+// on top. ce.core is global: its members are never namespaced, so they appear here only for
+// discoverability (ce.core.set is the same function as set).
+var __CE_MODULES = {
+  "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendCC": "sendCC", "sendNRPN": "sendNRPN", "sendSysex": "sendSysex", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
+  "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
+  "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
+  "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+  "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
+  "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
+  "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
+  "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
+  "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
+};
+var ce = {};
+(function () {
+  var __g = (typeof globalThis !== 'undefined') ? globalThis : this;
+  for (var __path in __CE_MODULES) {
+    if (!Object.prototype.hasOwnProperty.call(__CE_MODULES, __path)) continue;
+    var __segs = __path.split('.').slice(1);
+    var __node = ce;
+    for (var __i = 0; __i < __segs.length; __i++) {
+      if (!__node[__segs[__i]]) __node[__segs[__i]] = {};
+      __node = __node[__segs[__i]];
+    }
+    var __members = __CE_MODULES[__path];
+    for (var __short in __members) {
+      if (!Object.prototype.hasOwnProperty.call(__members, __short)) continue;
+      __node[__short] = __g[__members[__short]];
+    }
+  }
+})();
+// END GENERATED module namespace
 )JS";
 
 // Build the native "__api" object the prelude wraps.
@@ -157,7 +195,22 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     auto api = new juce::DynamicObject();
     juce::ignoreUnused (owner); // owner-relative resolution is applied via `self`/__owner in the prelude
 
-    auto arg = [] (const Args& a, int i) -> juce::var { return i < a.numArguments ? a.arguments[i] : juce::var(); };
+    // Every JS number is a double, so `sendCC(1, 74, 100)` handed the host 100.0 where Lua and
+    // Python hand it 100 — the same integer/float asymmetry solToVar/varToSol already fold for Lua.
+    // Numerically it never mattered (the host casts to int), but anything that STRINGIFIES a script
+    // value — log(), JSON state — printed "100.0" from JS and "100" from the other two. Fold it
+    // here, at the one point every JS argument crosses.
+    auto arg = [] (const Args& a, int i) -> juce::var
+    {
+        if (i >= a.numArguments) return {};
+        const auto& v = a.arguments[i];
+        if (v.isDouble())
+        {
+            const double d = (double) v;
+            if (d == std::floor (d) && std::abs (d) < 9.0e15) return juce::var ((juce::int64) d);
+        }
+        return v;
+    };
 
     api->setMethod ("set", [host, arg] (const Args& a) -> juce::var
         { host->setValue (arg (a, 0).toString(), arg (a, 1), arg (a, 2)); return {}; });

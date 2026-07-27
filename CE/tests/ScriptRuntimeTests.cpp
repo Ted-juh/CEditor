@@ -276,6 +276,46 @@ int main()
     runtime.dispatchEvent ("shared", "panel", juce::var());
     check (host.logs.contains ("keeper heard"), "off(): only removes the calling script's listeners");
 
+    // 11) the ce.* module namespace ------------------------------------------------------------
+    // Generated into each prelude from panelApi.js by tools/scripts/gen-script-modules.mjs. Every
+    // member keeps its flat name as an alias, so both spellings must reach the same function.
+    juce::Array<juce::var> moduleScripts;
+    moduleScripts.add (makeScript ("modlua", "lua", "panel", "onModules", "*",
+        "function onModules()\n"
+        "  log(\"same \" .. tostring(ce.midi.sendCC == sendCC))\n"
+        "  log(\"clamp \" .. tostring(ce.math.clamp(5, 0, 3)))\n"
+        "  log(\"sum \" .. tostring(ce.midi.checksum(\"roland\", {1, 2, 3})))\n"
+        "  log(\"core \" .. type(ce.core.set))\n"
+        "  log(\"verb \" .. type(ce.components.setlist.next))\n"
+        "  ce.midi.sendCC(2, 11, 64)\n"
+        "end\n"));
+    moduleScripts.add (makeScript ("modjs", "javascript", "panel", "onModulesJs", "*",
+        "function onModulesJs() {\n"
+        "  log('js same ' + (ce.midi.sendCC === sendCC));\n"
+        "  log('js clamp ' + ce.math.clamp(5, 0, 3));\n"
+        "  ce.midi.sendCC(3, 12, 100);\n"
+        "}"));
+    runtime.loadScripts (juce::var (moduleScripts));
+
+    host.logs.clear();
+    host.ccSends.clear();
+    errors.clear();
+    runtime.dispatchEvent ("onModules", "panel", juce::var());
+    check (host.logs.contains ("same true"), "ce.midi.sendCC is the same function as sendCC (Lua)");
+    check (host.logs.contains ("clamp 3"),   "ce.math.clamp works through the namespace");
+    check (host.logs.contains ("sum 122"),   "ce.midi.checksum works through the namespace");
+    check (host.logs.contains ("core function"), "ce.core mirrors the global verbs");
+    check (host.logs.contains ("verb function"), "ce.components.setlist.next is the panel-verb stub");
+    check (host.ccSends.contains ("2:11:64"), "a namespaced call reaches the host (Lua)");
+
+    host.logs.clear();
+    host.ccSends.clear();
+    runtime.dispatchEvent ("onModulesJs", "panel", juce::var());
+    check (host.logs.contains ("js same true"), "ce.midi.sendCC is the same function as sendCC (JS)");
+    check (host.logs.contains ("js clamp 3"),   "ce.math.clamp works through the namespace (JS)");
+    check (host.ccSends.contains ("3:12:100"),  "a namespaced call reaches the host (JS)");
+    check (errors.isEmpty(), "the generated namespace block loaded without error");
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

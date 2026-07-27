@@ -243,3 +243,58 @@ function canonical(v) {
   const keys = Object.keys(v).sort();
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
 }
+
+/* -------------------------------------------------------------- the generated ce.* namespace */
+
+test('the generated namespace block runs in the JS prelude and reaches the same functions', () => {
+  const prelude = extractRawString('JsScriptEngine.cpp', 'JS');
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }) };
+  vm.createContext(sandbox);
+  vm.runInContext(prelude, sandbox);
+
+  assert.equal(typeof sandbox.ce, 'object', 'ce should exist after the prelude runs');
+  assert.equal(sandbox.ce.midi.sendCC, sandbox.sendCC, 'ce.midi.sendCC is the flat sendCC');
+  assert.equal(sandbox.ce.math.clamp(5, 0, 3), 3);
+  assert.equal(sandbox.ce.midi.checksum('roland', [1, 2, 3]), web.checksum('roland', [1, 2, 3]));
+  assert.equal(typeof sandbox.ce.components.setlist.next, 'function', 'the panel-verb stub is namespaced too');
+  assert.equal(sandbox.ce.components.setlist.next, sandbox.setlistNext);
+  assert.equal(typeof sandbox.ce.core.set, 'function', 'ce.core mirrors the globals for discoverability');
+});
+
+test('the generated namespace block runs in the Lua prelude and reaches the same functions', async () => {
+  const { LuaFactory } = await import('wasmoon');
+  const lua = await new LuaFactory().createEngine();
+  try {
+    // The real engine's installApi() binds the ce.core verbs as host functions BEFORE the prelude
+    // runs, so the generated namespace block finds them in _G. Mirror that, or ce.core comes out
+    // empty here for a reason that has nothing to do with the block being tested.
+    for (const hostBinding of ['set', 'get', 'log', 'on', 'off', 'emit', 'run', 'noTransmit', 'transmit', 'sendCC']) {
+      lua.global.set(hostBinding, () => {});
+    }
+    await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+
+    // One crossing, as everywhere else in this file — wasmoon's heap does not survive many.
+    // Separator is "|" rather than a newline: escaping a newline through JS template literal ->
+    // Lua string literal is one layer of quoting too many, and gets it wrong silently.
+    const got = String(await lua.doString(`
+      return table.concat({
+        tostring(ce ~= nil),
+        tostring(ce.midi.sendCC == sendCC),
+        tostring(ce.math.clamp(5, 0, 3)),
+        tostring(ce.midi.checksum("roland", {1, 2, 3})),
+        tostring(type(ce.components.setlist.next)),
+        tostring(ce.components.setlist.next == setlistNext),
+        tostring(type(ce.core.set)),
+      }, "|")`)).split('|');
+
+    assert.equal(got[0], 'true', 'ce should exist after the prelude runs');
+    assert.equal(got[1], 'true', 'ce.midi.sendCC is the flat sendCC');
+    assert.equal(got[2], '3');
+    assert.equal(got[3], String(web.checksum('roland', [1, 2, 3])));
+    assert.equal(got[4], 'function', 'the panel-verb stub is namespaced too');
+    assert.equal(got[5], 'true');
+    assert.equal(got[6], 'function', 'ce.core mirrors the globals for discoverability');
+  } finally {
+    lua.global.close();
+  }
+});
