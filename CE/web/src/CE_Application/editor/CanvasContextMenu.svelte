@@ -1,6 +1,7 @@
 <script>
   import { selectedComponentIds } from '../stores/panels.js';
-  import { removeControl, duplicateControl, updateControlProperty, selectedControl, getSection } from '../stores/controls.js';
+  import { removeControl, duplicateControl, updateControlProperty, selectedControl, getSection, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
+  import { findControlById, flatControls, isContainerControl } from '../utils/containment.js';
   import { setFacet } from '../stores/editorFacet.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
@@ -29,7 +30,7 @@
 
   function toggleLock() {
     for (const id of $selectedComponentIds) {
-      const ctrl = panel?.controls.find(c => c._children?.Core?.id === id);
+      const ctrl = findControlById(panel?.controls ?? [], id);
       const locked = ctrl?._children?.Core?.locked ?? false;
       updateControlProperty(id, 'Core.locked', !locked);
     }
@@ -38,10 +39,22 @@
 
   let allLocked = $derived.by(() => {
     if ($selectedComponentIds.size === 0 || !panel) return false;
-    return panel.controls
+    return flatControls(panel.controls)
       .filter(c => $selectedComponentIds.has(c._children?.Core?.id))
       .every(c => c._children?.Core?.locked === true);
   });
+
+  // --- Group / Ungroup ---
+  let singleContainerSelected = $derived(
+    $selectedComponentIds.size === 1 && isContainerControl($selectedControl)
+  );
+
+  function group()   { groupSelectionIntoContainer(); close(); }
+  function ungroup() {
+    const id = $selectedControl?._children?.Core?.id;
+    if (id) ungroupContainer(id);
+    close();
+  }
 
   // --- Single-selection contextual edit jumps (into the Look bar facets / Colors / Properties) ---
   let single = $derived($selectedComponentIds.size === 1);
@@ -114,6 +127,11 @@
       <div class="ctx-separator"></div>
       <button class="ctx-item" onclick={dupe}>Duplicate<span class="ctx-shortcut">Ctrl+D</span></button>
       <button class="ctx-item ctx-danger" onclick={del}>Delete<span class="ctx-shortcut">Del</span></button>
+      <div class="ctx-separator"></div>
+      <button class="ctx-item" onclick={group}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>
+      {#if singleContainerSelected}
+        <button class="ctx-item" onclick={ungroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
+      {/if}
       <div class="ctx-separator"></div>
       <button class="ctx-item" onclick={align}>Align &amp; Layout...</button>
       <!-- svelte-ignore a11y_no_static_element_interactions -->

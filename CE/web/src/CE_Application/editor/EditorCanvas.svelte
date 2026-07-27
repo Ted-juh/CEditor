@@ -1,6 +1,6 @@
 <script>
   import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, addPanel, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel } from '../stores/panels.js';
-  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl } from '../stores/controls.js';
+  import { getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { enumerateLeafPaths } from '../stores/controlTreeUtils.js';
   import { cutSelection, copySelection, pasteSelection, selectAll } from '../stores/clipboard.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from '../utils/backgroundCSS.js';
@@ -330,6 +330,7 @@
       zoomToSelection: zoomCtrl.zoomToSelection,
       selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
       removeControl, updateControlProperty, deleteSelectedGuide,
+      groupSelectionIntoContainer, ungroupContainer,
     });
   }
 

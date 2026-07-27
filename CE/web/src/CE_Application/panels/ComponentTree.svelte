@@ -1,13 +1,50 @@
 <script>
-  import { Eye, EyeOff, Lock, LockOpen } from 'lucide-svelte';
+  import { Eye, EyeOff, Lock, LockOpen, ChevronDown, ChevronRight } from 'lucide-svelte';
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
-  import { updateControlProperty } from '../stores/controls.js';
-  import { updatePanel } from '../stores/panels.js';
+  import { applyControlPatchesById, updateControlProperty, reparentControls } from '../stores/controls.js';
   import { getSection } from '../models/componentTypes.js';
   import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
+  import {
+    controlPanelRect,
+    findControlById,
+    findParentOfControl,
+    flatControls,
+    getChildControls,
+    isContainerControl,
+    isDescendantOfControl,
+    panelToLocalPoint,
+  } from '../utils/containment.js';
 
-  // Controls in reverse order (top of list = front/highest z)
-  let controls = $derived($activePanel ? [...sortControlsForRender($activePanel.controls)].reverse() : []);
+  // Collapsed container ids (expanded by default)
+  let collapsedIds = $state(new Set());
+
+  function toggleCollapsed(id) {
+    const next = new Set(collapsedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    collapsedIds = next;
+  }
+
+  // Flattened display rows: depth-first, siblings front-to-back (top of list =
+  // front/highest z), respecting collapsed containers.
+  let rows = $derived.by(() => {
+    if (!$activePanel) return [];
+    const out = [];
+    const visit = (controls, depth) => {
+      for (const ctrl of [...sortControlsForRender(controls)].reverse()) {
+        const id = getControlId(ctrl);
+        const container = isContainerControl(ctrl);
+        out.push({ ctrl, id, depth, container });
+        if (container && !collapsedIds.has(id)) {
+          visit(getChildControls(ctrl), depth + 1);
+        }
+      }
+    };
+    visit($activePanel.controls, 0);
+    return out;
+  });
+
+  let totalCount = $derived($activePanel ? flatControls($activePanel.controls).length : 0);
 
   // --- Rename ---
   let renamingId = $state(null);
@@ -48,10 +85,16 @@
     updateControlProperty(id, 'Core.locked', !current);
   }
 
-  // --- Drag to reorder z-order ---
+  // --- Drag: reorder z-order (above/below) or nest into a container (onto) ---
   let dragOverId = $state(null);
-  let dragOverPos = $state(null); // 'above' | 'below'
+  let dragOverPos = $state(null); // 'above' | 'below' | 'inside'
   let dragSourceId = $state(null);
+
+  function resetDragState() {
+    dragOverId = null;
+    dragOverPos = null;
+    dragSourceId = null;
+  }
 
   function handleDragStart(id, e) {
     dragSourceId = id;
@@ -59,15 +102,25 @@
     e.dataTransfer.setData('text/plain', id);
   }
 
-  function handleDragOver(id, e) {
+  function handleDragOver(id, container, e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     if (id === dragSourceId) { dragOverId = null; return; }
+    // Never allow dropping a container into its own subtree
+    if (dragSourceId && $activePanel && isDescendantOfControl($activePanel.controls, dragSourceId, id)) {
+      dragOverId = null;
+      return;
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
+    const relY = (e.clientY - rect.top) / rect.height;
     dragOverId = id;
-    dragOverPos = e.clientY < midY ? 'above' : 'below';
+    if (container && relY > 0.3 && relY < 0.7) {
+      // Middle band of a container row → nest inside
+      dragOverPos = 'inside';
+    } else {
+      dragOverPos = relY < 0.5 ? 'above' : 'below';
+    }
   }
 
   function handleDragLeave() {
@@ -78,83 +131,90 @@
   function handleDrop(e) {
     e.preventDefault();
     if (!$activePanel || !dragSourceId || !dragOverId || dragSourceId === dragOverId) {
-      dragOverId = null; dragOverPos = null; dragSourceId = null;
+      resetDragState();
       return;
     }
 
-    const source = $activePanel.controls.find(c => getControlId(c) === dragSourceId);
-    const target = $activePanel.controls.find(c => getControlId(c) === dragOverId);
+    const controls = $activePanel.controls;
+    const source = findControlById(controls, dragSourceId);
+    const target = findControlById(controls, dragOverId);
+    if (!source || !target) { resetDragState(); return; }
 
-    if (!source || !target || getControlLayer(source) !== getControlLayer(target)) {
-      dragOverId = null;
-      dragOverPos = null;
-      dragSourceId = null;
+    if (dragOverPos === 'inside') {
+      // Nest into the target container, keeping the visual position
+      const rect = controlPanelRect(controls, dragSourceId);
+      if (rect && isContainerControl(target)) {
+        const local = panelToLocalPoint(controls, dragOverId, rect.x, rect.y);
+        reparentControls([{ id: dragSourceId, x: local.x, y: local.y }], dragOverId);
+      }
+      resetDragState();
       return;
     }
 
-    const layer = getControlLayer(source);
-    const displayLayer = controls.filter(c => getControlLayer(c) === layer);
+    // Above/below → z-reorder among the TARGET's siblings. If source lives in
+    // a different parent, reparent first (keeping visual position).
+    const sourceParent = findParentOfControl(controls, dragSourceId);
+    const targetParent = findParentOfControl(controls, dragOverId);
+    const sourceParentId = sourceParent ? getControlId(sourceParent) : null;
+    const targetParentId = targetParent ? getControlId(targetParent) : null;
+
+    if (sourceParentId !== targetParentId) {
+      const rect = controlPanelRect(controls, dragSourceId);
+      if (!rect) { resetDragState(); return; }
+      const local = panelToLocalPoint(controls, targetParentId, rect.x, rect.y);
+      reparentControls([{ id: dragSourceId, x: local.x, y: local.y }], targetParentId);
+    }
+
+    // Re-read the (possibly reparented) tree for the sibling reorder
+    const nextControls = $activePanel.controls;
+    const freshSource = findControlById(nextControls, dragSourceId);
+    const freshTarget = findControlById(nextControls, dragOverId);
+    if (!freshSource || !freshTarget || getControlLayer(freshSource) !== getControlLayer(freshTarget)) {
+      resetDragState();
+      return;
+    }
+
+    const parent = findParentOfControl(nextControls, dragOverId);
+    const siblings = parent ? getChildControls(parent) : nextControls;
+    const layer = getControlLayer(freshSource);
+    const displayLayer = [...sortControlsForRender(siblings)].reverse().filter(c => getControlLayer(c) === layer);
     const item = displayLayer.find(c => getControlId(c) === dragSourceId);
 
-    if (!item) {
-      dragOverId = null;
-      dragOverPos = null;
-      dragSourceId = null;
-      return;
-    }
+    if (!item) { resetDragState(); return; }
 
     const reorderedDisplayLayer = displayLayer.filter(c => getControlId(c) !== dragSourceId);
     let targetIndex = reorderedDisplayLayer.findIndex(c => getControlId(c) === dragOverId);
-    if (targetIndex < 0) {
-      dragOverId = null;
-      dragOverPos = null;
-      dragSourceId = null;
-      return;
-    }
+    if (targetIndex < 0) { resetDragState(); return; }
 
     if (dragOverPos === 'below') targetIndex += 1;
     reorderedDisplayLayer.splice(targetIndex, 0, item);
 
-    const zIndexById = new Map(
-      [...reorderedDisplayLayer].reverse().map((control, index) => [getControlId(control), index])
+    const patches = new Map(
+      [...reorderedDisplayLayer].reverse().map((control, index) => [getControlId(control), { 'Core.zIndex': index }])
     );
+    applyControlPatchesById(patches);
 
-    const updatedControls = $activePanel.controls.map(control => {
-      const id = getControlId(control);
-      if (getControlLayer(control) !== layer || id == null || !zIndexById.has(id)) return control;
-
-      const clone = JSON.parse(JSON.stringify(control));
-      clone._children.Core.zIndex = zIndexById.get(id);
-      return clone;
-    });
-
-    updatePanel($activePanel.id, { controls: updatedControls });
-
-    dragOverId = null;
-    dragOverPos = null;
-    dragSourceId = null;
+    resetDragState();
   }
 
   function handleDragEnd() {
-    dragOverId = null;
-    dragOverPos = null;
-    dragSourceId = null;
+    resetDragState();
   }
 </script>
 
 <div class="tree-panel">
   <div class="tree-header">
     <span class="tree-title">Components</span>
-    <span class="tree-count">{controls.length}</span>
+    <span class="tree-count">{totalCount}</span>
   </div>
 
   <div class="tree-list">
-    {#if controls.length === 0}
+    {#if rows.length === 0}
       <div class="tree-empty">No components</div>
     {:else}
-      {#each controls as ctrl (ctrl._children?.Core?.id)}
-        {@const core = getSection(ctrl, 'Core')}
-        {@const id = core?.id}
+      {#each rows as row (row.id)}
+        {@const core = getSection(row.ctrl, 'Core')}
+        {@const id = row.id}
         {@const isSelected = $selectedComponentIds.has(id)}
         {@const isKey = $keyObjectId === id && $selectedComponentIds.size > 1}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -166,15 +226,33 @@
           class:hidden-item={core?.visible === false}
           class:drag-above={dragOverId === id && dragOverPos === 'above'}
           class:drag-below={dragOverId === id && dragOverPos === 'below'}
+          class:drag-inside={dragOverId === id && dragOverPos === 'inside'}
+          style="padding-left: {10 + row.depth * 14}px"
           onclick={(e) => handleItemClick(id, e)}
           ondblclick={() => startRename(id, core?.name ?? '')}
           draggable="true"
           ondragstart={(e) => handleDragStart(id, e)}
-          ondragover={(e) => handleDragOver(id, e)}
+          ondragover={(e) => handleDragOver(id, row.container, e)}
           ondragleave={handleDragLeave}
           ondrop={handleDrop}
           ondragend={handleDragEnd}
         >
+          {#if row.container}
+            <button
+              class="collapse-toggle"
+              title={collapsedIds.has(id) ? 'Expand' : 'Collapse'}
+              onclick={(e) => { e.stopPropagation(); toggleCollapsed(id); }}
+            >
+              {#if collapsedIds.has(id)}
+                <ChevronRight size={11} strokeWidth={1.5} />
+              {:else}
+                <ChevronDown size={11} strokeWidth={1.5} />
+              {/if}
+            </button>
+          {:else}
+            <span class="collapse-spacer"></span>
+          {/if}
+
           <span class="item-type">{core?.controlType ?? '?'}</span>
 
           {#if renamingId === id}
@@ -310,6 +388,33 @@
 
   .tree-item.drag-below {
     border-bottom-color: #5B9BD5;
+  }
+
+  .tree-item.drag-inside {
+    outline: 1px solid #5B9BD5;
+    outline-offset: -1px;
+    background: rgba(91, 155, 213, 0.12);
+  }
+
+  .collapse-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    background: none;
+    border: none;
+    color: #777;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .collapse-toggle:hover { color: #CCC; }
+
+  .collapse-spacer {
+    width: 14px;
+    flex-shrink: 0;
   }
 
   .item-type {
