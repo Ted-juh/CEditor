@@ -306,10 +306,14 @@ public:
         sol::environment env (lua, sol::create, lua.globals());
 
         // `self` — convenience proxy bound to the script's owner (Q7). Methods prefix the owner.
-        const juce::String owner = def.owner;
+        // `self` is the element the script is attached to: the control for a component script, and
+        // THE PANEL for a panel script. The panel half was documented from the start but never
+        // resolved — self.set("width", 800) landed on a control called "width" and reported it
+        // missing, because there was no way to address the panel at all.
+        const juce::String owner = resolveSelfOwner (def);
         auto prefix = [owner] (const std::string& p) -> juce::String
         {
-            if (owner.isEmpty() || owner == "self" || owner == "*") return juce::String (p);
+            if (owner.isEmpty()) return juce::String (p);
             return owner + "." + juce::String (p);
         };
         sol::table self = lua.create_table();

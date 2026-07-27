@@ -43,10 +43,12 @@ const char* kPanel = R"JSON({
 // component-scope script that reaches for a device-scope command.
 const char* kAccessorPanel = R"JSON({
   "name": "Accessors",
+  "width": 600,
+  "height": 400,
   "scripting": { "enabled": true, "runOnExport": true },
   "scripts": [
     { "id": "acc", "name": "acc", "language": "lua", "scope": "panel", "event": "onReadBack", "target": "*", "enabled": true,
-      "source": "function onReadBack()\n  set(\"cutoff.value\", 50)\n  log(\"norm \" .. tostring(get(\"cutoff.normalizedValue\")))\n  log(\"arg \" .. tostring(get(\"cutoff\", \"normalizedValue\")))\n  set(\"cutoff.normalizedValue\", 0.5)\n  log(\"after \" .. tostring(get(\"cutoff.value\")))\n  log(\"bare \" .. tostring(get(\"cutoff\")))\nend\nfunction onMidiForm()\n  local m = get(\"cutoff.midiValue\")\n  log(\"midi \" .. tostring(m))\nend\n" }
+      "source": "function onReadBack()\n  set(\"cutoff.value\", 50)\n  log(\"norm \" .. tostring(get(\"cutoff.normalizedValue\")))\n  log(\"arg \" .. tostring(get(\"cutoff\", \"normalizedValue\")))\n  set(\"cutoff.normalizedValue\", 0.5)\n  log(\"after \" .. tostring(get(\"cutoff.value\")))\n  log(\"bare \" .. tostring(get(\"cutoff\")))\nend\nfunction onMidiForm()\n  local m = get(\"cutoff.midiValue\")\n  log(\"midi \" .. tostring(m))\nend\nfunction onPanelProps()\n  log(\"w \" .. tostring(get(\"panel.width\")))\n  log(\"n \" .. tostring(get(\"panel.name\")))\n  set(\"panel.width\", 900)\n  log(\"w2 \" .. tostring(get(\"panel.width\")))\n  set(\"panel.height\", 480)\n  log(\"self \" .. tostring(self.get(\"height\")))\n  log(\"count \" .. tostring(get(\"panel.controlCount\")))\n  set(\"panel.id\", 999)\nend\n" }
   ],
   "controls": [
     { "_type": "Control", "_children": {
@@ -136,6 +138,19 @@ int main()
         // Writing 0.5 as a position lands at 100 of 0..200.
         check (accLogs.contains ("after 100"), "set(.normalizedValue) maps the position onto the range");
         check (accLogs.contains ("bare 100"),  "get(\"cutoff\") means the control's value");
+
+        // The panel itself is addressable: `panel` is a reserved first segment, and `self` in a
+        // panel-scope script means the panel. Before this, the first segment was always a control
+        // name, so the panel's own size and name were invisible to every script.
+        accLogs.clear();
+        accRuntime.runAction ("onPanelProps", juce::var());
+        check (accLogs.contains ("w 600"),    "get(\"panel.width\") reads the document");
+        check (accLogs.contains ("n Accessors"), "get(\"panel.name\") reads the document");
+        check (accLogs.contains ("w2 900"),   "set(\"panel.width\", …) writes the document");
+        check (accLogs.contains ("self 480"), "self.get(\"height\") in a panel script means the panel");
+        check (accLogs.contains ("count 1"),  "panel.controlCount counts the controls");
+        check (accLogs.joinIntoString ("\n").contains ("read-only"),
+               "writing panel.id is refused with a reason");
 
         accLogs.clear();
         accRuntime.runAction ("onMidiForm", juce::var());

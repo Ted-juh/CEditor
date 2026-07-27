@@ -48,6 +48,7 @@ public:
     juce::var getValue (const juce::String& scriptPath, const juce::String& form = "value") const
     {
         const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return getPanelValue (split.second);
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return {};
         const auto raw = valueAtPath (control, resolveModelPath (control, split.second));
@@ -66,6 +67,7 @@ public:
     bool setValue (const juce::String& scriptPath, const juce::var& value, const juce::String& form = "value")
     {
         const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return setPanelValue (split.second, value);
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return false;
 
@@ -132,8 +134,90 @@ public:
         return current;
     }
 
+    /** `panel` is a RESERVED first path segment addressing the panel DOCUMENT rather than a control,
+        so a script can read and write the thing it lives inside — size, name, background, the panic
+        key. Mirrors the same rule in panelRuntime.js. A control genuinely named "panel" loses to the
+        document: behaviour that depends on whether somebody named a knob "panel" would be worse than
+        a reserved word. */
+    static bool isPanelTarget (const juce::String& name) { return name.equalsIgnoreCase ("panel"); }
+
+    /** Identity and structure. Writing these would corrupt the document or detach it from its file,
+        so they read but do not write. Everything else on the panel is writable, exactly as every
+        control property is. Mirrors PANEL_READONLY_PROPERTIES in panelApi.js. */
+    static bool isPanelReadOnly (const juce::String& property)
+    {
+        return property.equalsIgnoreCase ("id") || property.equalsIgnoreCase ("panelGuid")
+            || property.equalsIgnoreCase ("scriptId") || property.equalsIgnoreCase ("filePath")
+            || property.equalsIgnoreCase ("controls") || property.equalsIgnoreCase ("scripts");
+    }
+
 private:
     juce::var doc;
+
+    // Case-insensitive walk over the panel document, which is flat (no _children sections).
+    static juce::var panelValueAt (const juce::var& node, const juce::StringArray& segs, int from = 0)
+    {
+        juce::var current = node;
+        for (int i = from; i < segs.size(); ++i)
+        {
+            auto* obj = current.getDynamicObject();
+            if (obj == nullptr) return {};
+            juce::var next;
+            bool found = false;
+            for (const auto& p : obj->getProperties())
+                if (p.name.toString().equalsIgnoreCase (segs[i])) { next = p.value; found = true; break; }
+            if (! found) return {};
+            current = next;
+        }
+        return current;
+    }
+
+    juce::var getPanelValue (const juce::StringArray& segs) const
+    {
+        auto* obj = doc.getDynamicObject();
+        if (obj == nullptr) return {};
+
+        if (segs.isEmpty())
+        {
+            // A bare `panel` gives the summary a script usually wants, not the whole document.
+            auto* out = new juce::DynamicObject();
+            out->setProperty ("id", obj->getProperty ("id"));
+            out->setProperty ("name", obj->getProperty ("name"));
+            out->setProperty ("width", obj->getProperty ("width"));
+            out->setProperty ("height", obj->getProperty ("height"));
+            auto controls = obj->getProperty ("controls");
+            out->setProperty ("controlCount", controls.getArray() != nullptr ? controls.getArray()->size() : 0);
+            return juce::var (out);
+        }
+        if (segs.size() == 1 && segs[0].equalsIgnoreCase ("controlCount"))
+        {
+            auto controls = obj->getProperty ("controls");
+            return controls.getArray() != nullptr ? juce::var (controls.getArray()->size()) : juce::var (0);
+        }
+        return panelValueAt (doc, segs);
+    }
+
+    bool setPanelValue (const juce::StringArray& segs, const juce::var& value)
+    {
+        if (segs.isEmpty() || isPanelReadOnly (segs[0])) return false;
+
+        // Walk to the leaf's parent, then assign with the document's real-case key.
+        juce::var node = segs.size() > 1 ? panelValueAt (doc, segs, 0) : doc;
+        if (segs.size() > 1)
+        {
+            juce::StringArray parent = segs;
+            parent.remove (parent.size() - 1);
+            node = panelValueAt (doc, parent);
+        }
+        auto* obj = node.getDynamicObject();
+        if (obj == nullptr) return false;
+
+        const auto& leaf = segs[segs.size() - 1];
+        for (const auto& p : obj->getProperties())
+            if (p.name.toString().equalsIgnoreCase (leaf)) { obj->setProperty (p.name, value); return true; }
+        obj->setProperty (juce::Identifier (leaf), value);
+        return true;
+    }
 
     // "cutoff.background.fill.colour" -> { "cutoff", ["background","fill","colour"] }
     static std::pair<juce::String, juce::StringArray> splitScriptPath (const juce::String& path)

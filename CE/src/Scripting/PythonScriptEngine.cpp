@@ -354,7 +354,7 @@ def transmit(fn):
 class _Self:
     def _p(self, p):
         o = globals().get("__owner", "")
-        return p if (not o or o in ("self", "*")) else (o + "." + p)
+        return p if not o else (o + "." + p)
     def set(self, p, value, opts=None): return __api.set(self._p(p), value, opts)
     def get(self, p, form="value"):     return __api.get(self._p(p), form)
 self = _Self()
@@ -507,7 +507,8 @@ public:
         if (ns == nullptr) { onError (def.id, fetchPyError()); return false; }
         PyDict_SetItemString (ns, "__builtins__", PyEval_GetBuiltins());
         {
-            PyObject* owner = PyUnicode_FromString (def.owner.toRawUTF8());
+            // resolveSelfOwner: a panel script's `self` is the panel (see ScriptRuntime.h).
+            PyObject* owner = PyUnicode_FromString (resolveSelfOwner (def).toRawUTF8());
             PyDict_SetItemString (ns, "__owner", owner);
             Py_XDECREF (owner);
         }

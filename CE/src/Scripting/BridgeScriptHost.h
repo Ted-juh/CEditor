@@ -70,6 +70,18 @@ public:
         return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
     }
 
+    /** Does this path write a read-only property of the panel document? Mirrors
+        PANEL_READONLY_PROPERTIES in panelApi.js — panelApiParity.test.js checks the two agree. */
+    static bool isPanelReadOnlyPath (const juce::String& path)
+    {
+        if (! path.upToFirstOccurrenceOf (".", false, false).equalsIgnoreCase ("panel")) return false;
+        const auto property = path.fromFirstOccurrenceOf (".", false, false)
+                                  .upToFirstOccurrenceOf (".", false, false);
+        static const char* readOnly[] = { "id", "panelGuid", "scriptId", "filePath", "controls", "scripts" };
+        for (auto* r : readOnly) if (property.equalsIgnoreCase (r)) return true;
+        return false;
+    }
+
     // -- ScriptHostApi --
     void enterScript (const ScriptContext& c) override { context = c; }
     void exitScript() override { context = {}; }
@@ -95,6 +107,19 @@ public:
             reportNeedsDeviceHost ("set(.midiValue)", addressed.first);
             return;
         }
+        // `panel` is a reserved first segment addressing the document; a few of its properties are
+        // its identity or its structure and writing them would detach the document from itself.
+        // The refusal is REPORTED here rather than swallowed by the value model, because the web
+        // runtime explains it and a script must get the same answer from both.
+        if (isPanelReadOnlyPath (addressed.first))
+        {
+            const auto property = addressed.first.fromFirstOccurrenceOf (".", false, false);
+            if (callbacks.log)
+                callbacks.log ("set(\"panel." + property + "\", …) is read-only — it is the panel's identity or its "
+                               "structure, and writing it would detach the document from itself.", juce::var());
+            return;
+        }
+
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");

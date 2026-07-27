@@ -28,7 +28,7 @@ import {
   ALL_MEMBERS, ALL_EVENTS, ALL_HANDLER_NAMES, LIFECYCLE_HOOKS,
   membersForRuntime, memberNames, memberRuntime,
   WEBVIEW_ONLY_MEMBERS, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
-  handlerNamesForRuntime, COMMANDS,
+  handlerNamesForRuntime, PANEL_TARGET, PANEL_READONLY_PROPERTIES,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames } from '../src/CE_Application/scripting/panelRuntime.js';
 
@@ -203,4 +203,44 @@ test('the only scope-limited members are the ones that genuinely need a componen
   const categories = [...new Set(limited.map((m) => m.category))];
   assert.deepEqual(categories, ['Panel components'],
     `scope-limited members outside the panel verbs: ${limited.filter((m) => m.category !== 'Panel components').map((m) => m.id).join(', ')}`);
+});
+
+/* ------------------------------------------------------------------------ the panel itself */
+
+test('both runtimes reserve the same word for the panel document', () => {
+  const runtime = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+  assert.match(runtime, /function isPanelTarget\(name\)/, 'the WebView runtime should reserve it');
+  assert.match(readEngine('../Player/PanelValueModel.h'), /isPanelTarget \(const juce::String& name\)/,
+    'the value model should reserve it too, or a script addresses the panel window-open only');
+  assert.equal(PANEL_TARGET, 'panel');
+});
+
+test('the read-only panel properties agree across the contract and both C++ copies', () => {
+  // The list appears three times: the contract, the value model's own invariant, and
+  // BridgeScriptHost, which owns the message because the WebView explains the refusal and a script
+  // must get the same answer from both runtimes. Three copies is two too many to leave unchecked.
+  const declared = [...PANEL_READONLY_PROPERTIES].sort();
+
+  const bridge = readEngine('BridgeScriptHost.h');
+  const bridgeList = /readOnly\[\] = \{([^}]*)\}/.exec(bridge);
+  assert.ok(bridgeList, 'could not find the read-only list in BridgeScriptHost.h');
+  assert.deepEqual([...bridgeList[1].matchAll(/"(\w+)"/g)].map((m) => m[1]).sort(), declared,
+    'BridgeScriptHost.h disagrees with panelApi.js');
+
+  const model = readEngine('../Player/PanelValueModel.h');
+  const modelBlock = /isPanelReadOnly \(const juce::String& property\)[\s\S]*?\n    \}/.exec(model);
+  assert.ok(modelBlock, 'could not find the read-only guard in PanelValueModel.h');
+  assert.deepEqual([...modelBlock[0].matchAll(/equalsIgnoreCase \("(\w+)"\)/g)].map((m) => m[1]).sort(), declared,
+    'PanelValueModel.h disagrees with panelApi.js');
+});
+
+test('`self` in a panel script resolves to the panel in every runtime', () => {
+  // SELF has always been documented as "control, panel, or custom-component instance". The panel
+  // half never resolved, in any runtime, because the panel was unaddressable.
+  const runtime = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+  assert.match(runtime, /script\?\.scope === 'panel' \? PANEL_TARGET : ''/);
+  assert.match(readEngine('ScriptRuntime.h'), /resolveSelfOwner \(const ScriptDefinition& def\)/);
+  for (const file of ['LuaScriptEngine.cpp', 'JsScriptEngine.cpp', 'PythonScriptEngine.cpp']) {
+    assert.match(readEngine(file), /resolveSelfOwner \(def\)/, `${file} should resolve self through the shared rule`);
+  }
 });

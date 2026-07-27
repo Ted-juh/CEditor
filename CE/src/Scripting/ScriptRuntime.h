@@ -55,6 +55,21 @@ struct ScriptDefinition
     static ScriptDefinition fromVar (const juce::var& v);
 };
 
+/** What `self` resolves against, for any engine building a script's `self` proxy.
+
+    `self` is the element the script is attached to: the CONTROL for a component script, and THE
+    PANEL for a panel script. The panel half was documented from the start ("control, panel, or
+    custom-component instance") but never worked — there was no way to address the panel at all,
+    so self.set("width", 800) landed on a control named "width" and reported it missing.
+
+    Returns an empty string when `self` should add no prefix (a project-scope script, or one whose
+    owner is the wildcard), in which case a relative path is just a global path. */
+inline juce::String resolveSelfOwner (const ScriptDefinition& def)
+{
+    if (def.owner.isNotEmpty() && def.owner != "self" && def.owner != "*") return def.owner;
+    return def.scope == "panel" ? juce::String ("panel") : juce::String();
+}
+
 /** Reported when a script throws or a guard trips. Never crashes the panel (Q11). */
 using ScriptErrorSink = std::function<void (const juce::String& scriptId, const juce::String& message)>;
 

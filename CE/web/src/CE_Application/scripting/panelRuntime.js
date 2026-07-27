@@ -27,7 +27,10 @@ import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
 } from '../stores/deviceProfiles.js';
-import { handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS } from './panelApi.js';
+import {
+  handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
+  PANEL_TARGET, PANEL_READONLY_PROPERTIES,
+} from './panelApi.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -149,6 +152,91 @@ function splitScriptPath(path) {
   return { name: parts[0], segs: parts.slice(1) };
 }
 
+/* ------------------------------------------------------------------ the panel itself */
+// `panel` is a reserved first segment addressing the panel DOCUMENT rather than a control, so a
+// script can read and write the thing it lives inside: size, name, background, the panic key.
+// Until this existed the first segment was always a control name, so asking for the panel's width
+// searched for a control called "panel" and reported it missing — a misleading answer.
+
+function isPanelTarget(name) {
+  return String(name ?? '').toLowerCase() === PANEL_TARGET;
+}
+
+// A control genuinely named "panel" loses to the document. Behaviour that depends on whether
+// somebody happened to name a knob "panel" would be worse than a reserved word — but the author
+// needs to know that control is no longer reachable by name, so it is reported once.
+let warnedPanelNameClash = false;
+function warnIfControlNamedPanel() {
+  if (warnedPanelNameClash) return;
+  const clash = activePanel()?.controls?.some((c) => isPanelTarget(c?._children?.Core?.name));
+  if (!clash) return;
+  warnedPanelNameClash = true;
+  addScriptTrace('error', '',
+    'A control on this panel is named "panel", which is a reserved word addressing the panel document. '
+    + 'That control cannot be reached by name — rename it.');
+}
+
+/** Walk a plain dotted path on the panel object (no _children sections; it is a flat document). */
+function panelValueAt(panel, segs) {
+  let node = panel;
+  for (const seg of segs) {
+    if (node == null || typeof node !== 'object') return undefined;
+    const key = Object.keys(node).find((k) => k.toLowerCase() === String(seg).toLowerCase());
+    if (key == null) return undefined;
+    node = node[key];
+  }
+  return node;
+}
+
+function getPanelValue(segs) {
+  const panel = activePanel();
+  if (!panel) return undefined;
+  warnIfControlNamedPanel();
+  if (segs.length === 0) {
+    // A bare `panel` gives the summary a script usually wants, rather than the whole document.
+    return {
+      id: panel.id, name: panel.name, width: panel.width, height: panel.height,
+      controlCount: Array.isArray(panel.controls) ? panel.controls.length : 0,
+    };
+  }
+  if (segs.length === 1 && String(segs[0]).toLowerCase() === 'controlcount') {
+    return Array.isArray(panel.controls) ? panel.controls.length : 0;
+  }
+  return panelValueAt(panel, segs);
+}
+
+function setPanelValue(segs, value) {
+  const panel = activePanel();
+  if (!panel) return;
+  warnIfControlNamedPanel();
+  if (segs.length === 0) { addScriptTrace('error', '', 'set("panel", …): name a property, e.g. set("panel.width", 800)'); return; }
+
+  const root = String(segs[0]);
+  if (PANEL_READONLY_PROPERTIES.some((p) => p.toLowerCase() === root.toLowerCase())) {
+    addScriptTrace('error', '',
+      `set("panel.${root}", …) is read-only — it is the panel's identity or its structure, and writing it `
+      + 'would detach the document from itself. Use the panel/structure verbs for controls.');
+    return;
+  }
+
+  // Walk to the leaf's parent, then assign with the document's real-case key.
+  let node = panel;
+  for (let i = 0; i < segs.length - 1; i++) {
+    if (node == null || typeof node !== 'object') return;
+    const key = Object.keys(node).find((k) => k.toLowerCase() === String(segs[i]).toLowerCase());
+    if (key == null) { addScriptTrace('error', '', `set("panel.${segs.join('.')}", …): no such property`); return; }
+    node = node[key];
+  }
+  if (node == null || typeof node !== 'object') return;
+  const last = Object.keys(node).find((k) => k.toLowerCase() === String(segs[segs.length - 1]).toLowerCase())
+    ?? segs[segs.length - 1];
+  node[last] = value;
+
+  // The editor holds panels in a store; the player holds one object. Poke the store so the canvas
+  // repaints, exactly as a control write does.
+  if (!host) panels.update((list) => list.map((p) => (p.id === panel.id ? { ...p, [last]: node === panel ? value : p[last] } : p)));
+}
+
 /* ---------------------------------------------------------------- value representations (Q8) */
 // A control value can be asked for three ways: the real value, the 0–1 position, or what the DPD
 // would put on the wire. The accessor is a path SUFFIX — get("cutoff.normalizedValue") — or a
@@ -230,6 +318,7 @@ function setValue(path, value, formOrOpts = '') {
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
+  if (isPanelTarget(name)) { setPanelValue(segs, value); return; }
   const control = findControlByName(name);
   if (!control) { addScriptTrace('error', '', `set: control "${name}" not found on the active panel`); return; }
 
@@ -271,6 +360,7 @@ function setValue(path, value, formOrOpts = '') {
 function getValue(path, form = '') {
   const addressed = splitAccessor(path, form);
   const { name, segs } = splitScriptPath(addressed.path);
+  if (isPanelTarget(name)) return getPanelValue(segs);
   const control = findControlByName(name);
   if (!control) return undefined;
 
@@ -851,9 +941,16 @@ function samplePayload(event) {
   return undefined;
 }
 
-/** The owner name a script's `self`/relative paths resolve against (a concrete control name, or none). */
+/**
+ * The owner a script's `self`/relative paths resolve against: a concrete control name, or — for a
+ * panel-scope script — the panel itself. SELF has always been documented as "the element this
+ * script is attached to (control, panel, …)"; the panel half of that never resolved, because there
+ * was no way to address the panel at all. self.set("width", 800) landed on a control called
+ * "width" and reported it missing.
+ */
 function ownerOf(script) {
-  return script?.target && script.target !== '*' && script.target !== 'self' ? script.target : '';
+  if (script?.target && script.target !== '*' && script.target !== 'self') return script.target;
+  return script?.scope === 'panel' ? PANEL_TARGET : '';
 }
 
 /* -------------------------------------------------------------- JavaScript executor */

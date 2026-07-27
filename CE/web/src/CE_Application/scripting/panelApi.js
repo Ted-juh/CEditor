@@ -117,9 +117,46 @@ export const SCRIPT_SCOPES = ['component', 'panel', 'device', 'project'];
 export const SELF = {
   id: 'self',
   label: 'self',
-  summary: 'The element this script is attached to (control, panel, or custom-component instance). Use instead of a fixed name so one script works on every copy of a reusable component.',
+  summary: 'The element this script is attached to: the control for a component script, THE PANEL for a panel script. Use instead of a fixed name so one script works on every copy of a reusable component.',
   scopes: ['component', 'panel'],
 };
+
+/* ------------------------------------------------------------- the panel itself */
+// `panel` is a RESERVED first path segment: it addresses the panel document rather than a control,
+// so get("panel.width") and set("panel.bgColour", …) reach the thing the script lives inside.
+//
+// Before this existed the first segment was always a control name, so the panel — its size, its
+// name, its background, its panic key — was invisible to scripts, and asking for it produced
+// "control 'panel' not found", which is a misleading answer to a reasonable question.
+//
+// A control actually NAMED "panel" loses to the document and is reported, because behaviour that
+// depends on whether someone happened to name a knob "panel" is worse than a reserved word.
+
+export const PANEL_TARGET = 'panel';
+
+// Identity and structure. Writing these would corrupt the document or silently detach it from its
+// file, so they read but do not write. Everything else on the panel is writable, exactly as every
+// control property is.
+export const PANEL_READONLY_PROPERTIES = ['id', 'panelGuid', 'scriptId', 'filePath', 'controls', 'scripts'];
+
+// The properties worth surfacing in the picker. Not a whitelist — any panel property resolves —
+// just the ones a script is likely to want, with a description.
+export const PANEL_PROPERTIES = [
+  { id: 'name', type: 'string', summary: 'The panel\'s name.' },
+  { id: 'width', type: 'number', summary: 'Panel width in pixels.' },
+  { id: 'height', type: 'number', summary: 'Panel height in pixels.' },
+  { id: 'author', type: 'string', summary: 'Author metadata.' },
+  { id: 'version', type: 'string', summary: 'Panel version metadata.' },
+  { id: 'description', type: 'string', summary: 'Panel description metadata.' },
+  { id: 'locked', type: 'boolean', summary: 'Whether editing is locked.' },
+  { id: 'resizable', type: 'boolean', summary: 'Whether the panel window can be resized.' },
+  { id: 'panicShortcut', type: 'string', summary: 'The panel-wide emergency-stop key. Empty string switches it off.' },
+  { id: 'bgColour', type: 'string', summary: 'Background colour, AARRGGBB hex.' },
+  { id: 'bgSolid', type: 'boolean', summary: 'Whether the solid background layer is drawn.' },
+  { id: 'bgGradientEnabled', type: 'boolean', summary: 'Whether the gradient background layer is drawn.' },
+  { id: 'bgImageEnabled', type: 'boolean', summary: 'Whether the image background layer is drawn.' },
+  { id: 'controlCount', type: 'number', readOnly: true, summary: 'How many controls the panel holds.' },
+];
 
 /* --------------------------------------------------------------- value access */
 // A control value has three representations (Q8). The DPD converts between them.

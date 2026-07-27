@@ -48,7 +48,7 @@ function get(path, form) { return __api.get(path, form || "value"); }
 // without class support. Empty/"self"/"*" owner => no prefix.
 function __ownerPrefix(p) {
   var o = (typeof __owner !== 'undefined' && __owner) ? __owner : "";
-  return (!o || o === "self" || o === "*") ? p : (o + "." + p);
+  return !o ? p : (o + "." + p);
 }
 var self = {
   set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
@@ -210,7 +210,8 @@ public:
         eng->registerNativeObject ("__api", makeApi (host, def.owner).get());
 
         // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
-        juce::String boot = "var __owner = " + def.owner.quoted() + ";\n";
+        // resolveSelfOwner: a panel script's `self` is the panel, a component script's is its control.
+        juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n";
         auto r1 = eng->execute (boot + juce::String (kJsPrelude));
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
