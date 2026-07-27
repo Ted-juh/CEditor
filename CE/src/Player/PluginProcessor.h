@@ -646,6 +646,15 @@ private:
         installScriptDeviceCallback();   // receive window-closed device events (PlayerHost owns it open)
        #endif
 
+        // The panel's declared modules, BEFORE loadScripts — a script's top-level code runs during
+        // the load, so the gate has to already be in place. The exporter resolves `auto` and bakes
+        // an explicit list into the panel, so what arrives here is either a real list or nothing
+        // (nothing = every module on, which is what an unmigrated panel gets).
+        const auto declaredModules = ceditor::scripting::ScriptRuntime::modulesFromPanel (scriptValues.panel());
+        scriptRuntime->setEnabledModules (declaredModules);
+        if (! declaredModules.isEmpty())
+            scriptLogLine ("scripting modules: " + declaredModules.joinIntoString (", "));
+
         const auto loaded = ceditor::gatherPanelScripts (scriptValues.panel());
         scriptRuntime->loadScripts (loaded);
         for (const auto& f : scriptRuntime->failedScripts())

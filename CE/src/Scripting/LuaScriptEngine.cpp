@@ -94,6 +94,7 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 }
 
 const char* kPrelude = R"LUA(
+-- @module ce.math
 -- Pure-math helpers (no host). Keep in sync with the JS prelude + panelApi.js.
 function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi else return v end end
 function round(v) return math.floor(v + 0.5) end
@@ -110,6 +111,7 @@ function curve(v, shape)
   elseif shape == "s" then return v * v * (3 - 2 * v)
   else return v end
 end
+-- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 function noteName(n) n = math.floor(n) return NOTE_NAMES[(n % 12) + 1] .. tostring(math.floor(n / 12) - 1) end
 function noteNumber(name)
@@ -118,6 +120,7 @@ function noteNumber(name)
   for i, nm in ipairs(NOTE_NAMES) do if nm == note then return (tonumber(oct) + 1) * 12 + (i - 1) end end
   return 0
 end
+-- @module ce.midi
 function to14bit(v) v = math.floor(v) return { msb = math.floor(v / 128) % 128, lsb = v % 128 } end
 function from14bit(msb, lsb) return msb * 128 + lsb end
 function to7bit(v, count, order)
@@ -176,6 +179,7 @@ function panic(opts)
   end
 end
 
+-- @module ce.components
 -- Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
 -- Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
 -- counterpart to drive with the window closed. Defining them here as explaining stubs means a
@@ -197,6 +201,7 @@ for _, name in ipairs(WEBVIEW_ONLY) do
   end
 end
 
+-- @module ce.midi
 -- MIDI channel messages. All of them are arithmetic over sendMidi, the way panic() is over sendCC,
 -- which is what makes them work identically in every runtime and every exported language.
 -- `note` accepts a MIDI number or a name ("C3"), because a script that reads musically should be
@@ -230,6 +235,7 @@ function sendTransport(action)
   else sendMidi({0xFA}) end
 end
 
+-- @module ce.storage
 -- ce.storage. `state` is a plain table: each script runs in its own sol::environment, which lives
 -- as long as the script is loaded, so it persists between handler calls without any host help.
 -- Settings go through the host, because they outlive the session.
@@ -240,6 +246,7 @@ function loadSetting(key, fallback)
   return v
 end
 
+-- @module -
 -- BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
@@ -258,15 +265,77 @@ local __CE_MODULES = {
   ["ce.components.harmony"] = { channel = "harmonyChannel", degree = "harmonyDegree", inversion = "harmonyInversion", keepPlayed = "harmonyKeepPlayed", key = "harmonyKey", mode = "harmonyMode", octave = "harmonyOctave", outOfKey = "harmonyOutOfKey", scale = "harmonyScale", shape = "harmonyShape", size = "harmonySize", strum = "harmonyStrum", voiceLeading = "harmonyVoiceLeading", voicing = "harmonyVoicing" },
   ["ce.components.setlist"] = { crossfade = "setlistCrossfade", enable = "setlistEnable", jump = "setlistGoto", next = "setlistNext", prev = "setlistPrev", wrap = "setlistWrap" },
 }
-ce = ce or {}
-for __path, __members in pairs(__CE_MODULES) do
-  local __node = ce
-  for __seg in string.gmatch(string.sub(__path, 4), "[^.]+") do
-    __node[__seg] = __node[__seg] or {}
-    __node = __node[__seg]
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist" }
+local __CE_META = {
+  { id = "ce.core", version = "1.0", runtime = "any" },
+  { id = "ce.midi", version = "1.1", runtime = "any" },
+  { id = "ce.device", version = "1.0", runtime = "any" },
+  { id = "ce.math", version = "1.0", runtime = "any" },
+  { id = "ce.music", version = "1.0", runtime = "any" },
+  { id = "ce.time", version = "1.0", runtime = "any" },
+  { id = "ce.storage", version = "1.0", runtime = "any" },
+  { id = "ce.components.split", version = "1.0", runtime = "webview" },
+  { id = "ce.components.phrase", version = "1.0", runtime = "webview" },
+  { id = "ce.components.recorder", version = "1.0", runtime = "webview" },
+  { id = "ce.components.harmony", version = "1.0", runtime = "webview" },
+  { id = "ce.components.setlist", version = "1.0", runtime = "webview" },
+}
+local __CE_VALUES = { ["state"] = true }
+local __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically."
+-- The real implementation of every member, captured before anything is gated, so turning a module
+-- back on restores the function rather than leaving the stub in place.
+local __CE_REAL = {}
+
+local function __ce_gate(__member, __module)
+  return function()
+    local __m = string.gsub(__CE_GATE_MSG, "{member}", __member)
+    __m = string.gsub(__m, "{module}", __module)
+    log(__m)
   end
-  for __short, __global in pairs(__members) do __node[__short] = _G[__global] end
 end
+
+-- __ce_apply_modules(enabled) — enabled is an array of module ids, or nil for "everything on".
+-- The host calls this with the panel's resolved list; a member of a module that is not on becomes
+-- a stub that names the module instead of a call that quietly works.
+function __ce_apply_modules(enabled)
+  local __on = nil
+  if enabled ~= nil then
+    __on = { ["ce.core"] = true }
+    for _, __id in ipairs(enabled) do __on[__id] = true end
+  end
+  ce = {}
+  for _, __path in ipairs(__CE_ORDER) do
+    local __live = (__on == nil) or (__on[__path] == true)
+    local __node = ce
+    for __seg in string.gmatch(string.sub(__path, 4), "[^.]+") do
+      __node[__seg] = __node[__seg] or {}
+      __node = __node[__seg]
+    end
+    for __short, __global in pairs(__CE_MODULES[__path]) do
+      if __CE_REAL[__global] == nil then __CE_REAL[__global] = _G[__global] end
+      local __v = __CE_REAL[__global]
+      if (not __live) and (not __CE_VALUES[__global]) then __v = __ce_gate(__global, __path) end
+      _G[__global] = __v
+      __node[__short] = __v
+    end
+  end
+  ce.version = "1.0"
+  ce.runtime = "player"
+  ce.language = "lua"
+  ce.modules = {}
+  for _, __m in ipairs(__CE_META) do
+    if (__on == nil) or (__on[__m.id] == true) then
+      ce.modules[#ce.modules + 1] = { id = __m.id, version = __m.version, runtime = __m.runtime }
+    end
+  end
+  ce.has = function(__id)
+    for _, __m in ipairs(ce.modules) do
+      if __m.id == __id then return __m.runtime == "any" or __m.runtime == ce.runtime end
+    end
+    return false
+  end
+end
+__ce_apply_modules(nil)
 -- END GENERATED module namespace
 )LUA";
 
@@ -376,7 +445,16 @@ public:
         });
 
         lua.script (kPrelude);
+        applyModuleGates();
         return true;
+    }
+
+    // One sol::state is shared by every Lua script, so the gate is applied once here rather than
+    // per script the way the JS/Python engines have to.
+    void setEnabledModules (const juce::StringArray& moduleIds) override
+    {
+        enabledModules = moduleIds;
+        applyModuleGates();
     }
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
@@ -460,6 +538,26 @@ private:
         sol::error e = r; juce::Logger::writeToLog (juce::String ("[lua block] ") + e.what());
     }
 
+    /** Hand the prelude the panel's module list — or nil, meaning "declared nothing, all on". */
+    void applyModuleGates()
+    {
+        sol::protected_function apply = lua["__ce_apply_modules"];
+        if (! apply.valid()) return;   // prelude not installed yet
+
+        sol::protected_function_result r;
+        if (enabledModules.isEmpty())
+        {
+            r = apply (sol::nil);
+        }
+        else
+        {
+            sol::table t = lua.create_table();
+            for (int i = 0; i < enabledModules.size(); ++i) t[i + 1] = enabledModules[i].toStdString();
+            r = apply (t);
+        }
+        if (! r.valid()) reportPF (r);
+    }
+
     sol::state lua;
     std::map<juce::String, sol::environment> envs;
     std::vector<Listener> listeners;
@@ -468,6 +566,7 @@ private:
     // Which script is executing, so on()/off() can tag and match listeners. Set around
     // both load (top-level on() calls) and dispatch (a handler subscribing later).
     juce::String currentScriptId;
+    juce::StringArray enabledModules;   // empty = the panel declared nothing = every module on
 };
 
 } // namespace

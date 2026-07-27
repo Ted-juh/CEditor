@@ -414,6 +414,86 @@ int main()
     runtime.dispatchEvent ("onStore", "panel", juce::var());
     check (host.logs.contains ("count 1"), "state is cleared when the script reloads");
 
+    // 14) module opt-in (slice 3) -----------------------------------------------------------------
+    // A panel declares the modules it uses. Members of a module it did not declare are STUBS that
+    // name the module — not missing globals. Both spellings are gated together: the namespaced
+    // ce.midi.sendCC and the flat alias sendCC are the same function object either way.
+    {
+        const char* gateSource =
+            "function onGated()\n"
+            "  sendCC(1, 74, 100)\n"                       // ce.midi — gated below
+            "  ce.midi.sendNote(1, 60, 100)\n"             // same module, namespaced spelling
+            "  log(\"clamped \" .. tostring(clamp(5, 0, 3)))\n"   // ce.math — declared, must work
+            "  set(\"cutoff\", 10)\n"                      // ce.core — never gated
+            "  log(\"has-midi \" .. tostring(ce.has(\"ce.midi\")))\n"
+            "  log(\"has-math \" .. tostring(ce.has(\"ce.math\")))\n"
+            "  log(\"modules \" .. tostring(#ce.modules))\n"
+            "end\n";
+        juce::Array<juce::var> gateScripts;
+        gateScripts.add (makeScript ("gate", "lua", "panel", "onGated", "*", gateSource));
+
+        // Declared: ce.math only. ce.core comes along because it is never gated.
+        runtime.setEnabledModules ({ "ce.math" });
+        runtime.loadScripts (juce::var (gateScripts));
+
+        host.logs.clear(); host.ccSends.clear(); host.rawSends.clear();
+        runtime.runAction ("onGated", juce::var());
+
+        check (host.ccSends.isEmpty(), "a gated verb does not reach the host");
+        check (host.rawSends.isEmpty(), "the namespaced spelling is gated with the flat one");
+        const auto joined = host.logs.joinIntoString ("\n");
+        check (joined.contains ("sendCC() needs the ce.midi module"),
+               "the gated call explains itself and names the module");
+        check (joined.contains ("Scripting Modules"), "…and says where to turn it on");
+        check (host.logs.contains ("clamped 3"), "a declared module still works");
+        check (host.logs.contains ("has-midi false"), "ce.has() reports a module the panel left off");
+        check (host.logs.contains ("has-math true"), "ce.has() reports a module the panel declared");
+        check (host.logs.contains ("modules 2"), "ce.modules lists only what is enabled (ce.core + ce.math)");
+
+        // Turning the module back on restores the REAL function, not a second stub.
+        runtime.setEnabledModules ({ "ce.math", "ce.midi" });
+        host.logs.clear(); host.ccSends.clear();
+        runtime.runAction ("onGated", juce::var());
+        check (host.ccSends.size() == 1 && host.ccSends[0] == "1:74:100",
+               "enabling the module restores the real implementation");
+        check (host.logs.contains ("has-midi true"), "…and ce.has() agrees");
+
+        // Declaring nothing is NOT declaring none: a panel written before modules existed, or one
+        // whose list was never filled in, keeps the whole surface.
+        runtime.setEnabledModules ({});
+        host.logs.clear(); host.ccSends.clear();
+        runtime.runAction ("onGated", juce::var());
+        check (host.ccSends.size() == 1, "an empty declaration leaves every module on");
+
+        // The same gate, in the other engine. JS gets one QuickJS engine per script, so this proves
+        // the per-script application path rather than Lua's shared-state one.
+        juce::Array<juce::var> jsGate;
+        jsGate.add (makeScript ("gatejs", "javascript", "panel", "onGatedJs", "*",
+            "function onGatedJs(){ sendCC(1, 74, 100); log('has-midi ' + ce.has('ce.midi')); }"));
+        runtime.setEnabledModules ({ "ce.math" });
+        runtime.loadScripts (juce::var (jsGate));
+        host.logs.clear(); host.ccSends.clear();
+        runtime.runAction ("onGatedJs", juce::var());
+        check (host.ccSends.isEmpty(), "the JS engine gates an undeclared module too");
+        check (host.logs.joinIntoString ("\n").contains ("needs the ce.midi module"),
+               "…with the same sentence the Lua engine uses");
+        check (host.logs.contains ("has-midi false"), "…and the same ce.has() answer");
+
+        runtime.setEnabledModules ({});   // leave the runtime ungated for anything after this
+    }
+
+    // modulesFromPanel: the panel document is where the list comes from.
+    {
+        auto panel = juce::JSON::parse (R"({ "scripting": { "modules": ["ce.midi", "ce.time"] } })");
+        const auto ids = ScriptRuntime::modulesFromPanel (panel);
+        check (ids.size() == 2 && ids[0] == "ce.midi" && ids[1] == "ce.time",
+               "modulesFromPanel reads scripting.modules");
+        check (ScriptRuntime::modulesFromPanel (juce::JSON::parse (R"({ "scripting": {} })")).isEmpty(),
+               "a panel with no module list reads as ungated, not as none");
+        check (ScriptRuntime::modulesFromPanel (juce::var()).isEmpty(),
+               "so does a panel that isn't an object at all");
+    }
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

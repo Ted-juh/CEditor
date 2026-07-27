@@ -170,6 +170,19 @@ public:
                                const juce::var& payload, const ScriptErrorSink& onError)
     { juce::ignoreUnused (target, event, payload, onError); }
 
+    /** Gate the API down to the modules this panel declared (design doc §5, "Opt-in and cost").
+        The list is module ids — "ce.midi", "ce.storage". An EMPTY list means "not declared":
+        every module stays on, so a panel written before modules existed is unaffected.
+        `ce.core` is always on regardless.
+
+        Members of a module that is off are replaced by a stub that names the module rather than
+        removed. `attempt to call a nil value` is the failure mode this whole layer exists to
+        avoid; a call that explains itself is the point.
+
+        Default no-op: an engine that has no prelude (the native-handler engine) has nothing to
+        gate — a compiled module's calls go through the vtable, which the host already checks. */
+    virtual void setEnabledModules (const juce::StringArray& moduleIds) { juce::ignoreUnused (moduleIds); }
+
     /** Drop all loaded scripts/environments. */
     virtual void reset() = 0;
 };
@@ -193,6 +206,19 @@ public:
     /** Replace the loaded scripts from a JSON array of ScriptDefinitions (from the panel's Scripts
         sections). Re-installs the API and reloads every enabled script. */
     void loadScripts (const juce::var& scriptArray);
+
+    /** The modules the panel declared, from `scripting.modules`. Empty = not declared = all on.
+        Call BEFORE loadScripts: the gate has to be in place before a script's top-level code runs,
+        or a module-gated call at load time would slip through. */
+    void setEnabledModules (const juce::StringArray& moduleIds);
+
+    /** What the gate is currently set to. Empty means ungated. */
+    const juce::StringArray& enabledModules() const { return enabledModuleIds; }
+
+    /** Read `scripting.modules` off a panel document. Absent or not an array -> empty (ungated):
+        the editor resolves `auto` and BAKES the result into the exported panel, so by the time a
+        document reaches this runtime the list is either explicit or deliberately absent. */
+    static juce::StringArray modulesFromPanel (const juce::var& panel);
 
     /** Scripts that were enabled but did NOT load (compile error, missing engine in this build).
         They receive no events; surface these to the user rather than failing silently. */
@@ -251,6 +277,7 @@ private:
     ScriptEngine* engineFor (const juce::String& language);
     void dispatchTo (const ScriptDefinition& def, const juce::String& fn, const juce::var& payload);
     void reportError (const juce::String& scriptId, const juce::String& message);
+    void applyModuleGates();
 
     ScriptHostApi& host;
     std::unique_ptr<ScriptEngine> lua;
@@ -260,6 +287,7 @@ private:
     std::vector<ScriptDefinition> scripts;
     std::vector<FailedScript> failed;
     std::function<void (const juce::String&)> errorLogger;
+    juce::StringArray enabledModuleIds;   // empty = the panel declared nothing = every module on
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)

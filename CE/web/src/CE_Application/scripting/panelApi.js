@@ -1,5 +1,9 @@
 // panelApi.js — single source of truth for the CEditor panel scripting API.
 //
+// The ONE thing it does not hold itself: what a module costs. That is measured from the preludes
+// by tools/scripts/gen-script-modules.mjs and imported below — asserting a size here would just be
+// a number nobody recomputes.
+//
 // This module DESCRIBES the API surface that scripts call. It drives, from one place:
 //   • the tree-picker ("This panel" + "Commands"),
 //   • edit-time validation (unknown paths, wrong scope, bad args),
@@ -20,6 +24,10 @@
 // Snippet templates use ${name} placeholders the picker fills, and $0 for the final
 // cursor / $1.. for tab stops. Each member that differs by language carries a per-language
 // snippet; otherwise the call looks identical in Lua and JS.
+
+import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
+
+export { MODULE_COST, MODULE_COST_LANGUAGES };
 
 /* ------------------------------------------------------------------ languages */
 
@@ -813,10 +821,19 @@ export const HELPERS = [
 export const MODULE_ROOT = 'ce';
 export const MODULE_EXT_ROOT = 'ce.ext';   // reserved for installed third-party modules
 
+// The API version a panel is written against. Bumped when a module's members change incompatibly;
+// panels record it so a runtime can tell "written for an older API" from "broken". Lives here
+// rather than in a runtime so every runtime reports the same number.
+export const CE_API_VERSION = '1.0';
+
 export const MODULES = [
   { id: 'ce.core', version: '1.0', requires: [], runtime: RUNTIME_ANY, global: true,
     summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
-  { id: 'ce.midi', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
+  // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
+  // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
+  // cross-module call that `requires` does not cover, so this cannot be forgotten again.
+  { id: 'ce.midi', version: '1.1', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
     summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   { id: 'ce.device', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Bulk dumps through the device profile. Needs the device host.' },
@@ -923,6 +940,193 @@ export function modulesForRuntime(runtime) {
 export function isExtensionModule(id) {
   return String(id ?? '').startsWith(`${MODULE_EXT_ROOT}.`);
 }
+
+/* --------------------------------------------------------------- module opt-in (slice 3) */
+// A panel declares the modules it uses. Everything not declared is gated: the member is still
+// bound, but as a stub that names the module and says how to turn it on. Gating by REMOVAL was
+// the obvious alternative and is the wrong one — `attempt to call a nil value` is precisely the
+// class of unexplained failure the previous two rounds were spent deleting.
+//
+// Absent declaration means AUTO, not "none": every panel written before this existed keeps
+// working, and a beginner never has to know the concept. Narrowing is opt-in on top.
+
+export const MODULE_CORE = 'ce.core';        // never gated — the verbs used on every line
+export const MODULE_MODE_AUTO = 'auto';      // derive the set from what the scripts actually touch
+
+/** ce.core plus anything that is not addressable through the namespace, so gating can't strand it. */
+const ALWAYS_ENABLED = [MODULE_CORE];
+
+/**
+ * Close a declared list over `requires` and pin the always-on modules.
+ * Returns { enabled, added, unknown } — `added` is what `requires` pulled in (so the UI can say
+ * why a module the user did not tick is on), `unknown` is ids we have never heard of, reported
+ * rather than dropped: silently ignoring one is how a typo becomes a mystery.
+ */
+export function resolveModules(declared) {
+  const enabled = new Set(ALWAYS_ENABLED);
+  const added = new Set();
+  const unknown = [];
+  const queue = [];
+
+  for (const raw of Array.isArray(declared) ? declared : []) {
+    const id = String(raw ?? '').trim();
+    if (!id) continue;
+    if (!MODULE_BY_ID[id]) { unknown.push(id); continue; }
+    queue.push(id);
+  }
+
+  while (queue.length) {
+    const id = queue.shift();
+    if (enabled.has(id)) continue;
+    enabled.add(id);
+    for (const need of MODULE_BY_ID[id]?.requires ?? []) {
+      if (!enabled.has(need) && MODULE_BY_ID[need]) { added.add(need); queue.push(need); }
+    }
+  }
+
+  // Keep manifest order rather than insertion order, so two panels with the same set produce the
+  // same list and a diff of the panel document stays readable.
+  return {
+    enabled: MODULES.map((m) => m.id).filter((id) => enabled.has(id)),
+    added: [...added].filter((id) => !ALWAYS_ENABLED.includes(id)),
+    unknown,
+  };
+}
+
+// What a reference to a member looks like in the languages a panel can be written in. Both
+// spellings count: the flat alias (`sendCC(`) and the namespaced path (`ce.midi.sendCC`).
+// Value members have no call parens, so they are matched as bare words.
+function memberReferenceRe(memberId, shortName) {
+  const flat = escapeForRe(memberId);
+  const short = escapeForRe(shortName);
+  return new RegExp(`\\b${flat}\\b|\\.\\s*${short}\\b`);
+}
+
+function escapeForRe(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Which modules a piece of script source actually reaches for. A scan, not a parse — same
+ * standing caveat as scriptValidate.js: it can over-report from a comment or a string, and
+ * over-reporting is the safe direction here (a module gets enabled that did not need to be).
+ */
+export function modulesUsedBy(source) {
+  const src = typeof source === 'string' ? source : '';
+  if (!src) return [];
+  const hit = new Set();
+  for (const [memberId, at] of Object.entries(MEMBER_MODULE)) {
+    if (hit.has(at.module)) continue;
+    if (MODULE_BY_ID[at.module]?.global) continue;      // ce.core is never gated, never scanned for
+    if (memberReferenceRe(memberId, at.name).test(src)) hit.add(at.module);
+  }
+  // A script may also address a module wholesale — `local midi = ce.midi`, `ce.has("ce.time")`.
+  for (const module of MODULES) {
+    if (hit.has(module.id) || module.global) continue;
+    const path = escapeForRe(module.id);
+    if (new RegExp(`\\b${path}\\b`).test(src)) hit.add(module.id);
+  }
+  return MODULES.map((m) => m.id).filter((id) => hit.has(id));
+}
+
+/** The scripts a panel ships, flattened — panel-level plus per-control. Sources only. */
+function panelScriptSources(panel) {
+  const out = [];
+  for (const s of panel?.scripts ?? []) if (typeof s?.source === 'string') out.push(s.source);
+  for (const control of panel?.controls ?? []) {
+    for (const s of control?._children?.Scripts?.scripts ?? []) {
+      if (typeof s?.source === 'string') out.push(s.source);
+    }
+  }
+  return out;
+}
+
+/**
+ * What this panel's scripting surface resolves to.
+ *
+ *   scripting.modules absent, or "auto"  -> derived from the sources (the default)
+ *   scripting.modules: [...]             -> exactly that, closed over `requires`
+ *
+ * `mode` is reported back so the Export tab can say which of the two it is showing.
+ */
+export function panelModules(panel) {
+  const declared = panel?.scripting?.modules;
+  const isExplicit = Array.isArray(declared);
+  const source = isExplicit
+    ? declared
+    : [...new Set(panelScriptSources(panel).flatMap((src) => modulesUsedBy(src)))];
+  return { mode: isExplicit ? 'manual' : MODULE_MODE_AUTO, declared: [...source], ...resolveModules(source) };
+}
+
+// The notice a gated member reports instead of acting. Kept as a TEMPLATE because the C++ preludes
+// need the same sentence and cannot import this file — gen-script-modules.mjs copies the template
+// into each one, so all five runtimes explain a gated call in exactly the same words.
+export const MODULE_GATE_MESSAGE =
+  '{member}() needs the {module} module, which this panel has not enabled. '
+  + 'Add "{module}" to the panel\'s Scripting Modules (Export tab) — or clear the list to let it '
+  + 'follow the scripts automatically.';
+
+/** The notice a gated member reports instead of acting. Names the module, and what to do. */
+export function moduleGateMessage(memberId, moduleId = MEMBER_MODULE[memberId]?.module ?? '?') {
+  return MODULE_GATE_MESSAGE.split('{member}').join(memberId).split('{module}').join(moduleId);
+}
+
+/* -------------------------------------------------------------------- what a module costs */
+// MODULE_COST is MEASURED from the preludes by tools/scripts/gen-script-modules.mjs, not asserted
+// here — design doc §3. A cost key is a module id, the shared bucket "-", or a GROUP: the five
+// component families share one indivisible stub block in the C++ preludes, so `ce.components`
+// is billed once rather than split five ways.
+
+/** The cost key a module is billed under — itself, or the group that owns its bytes. */
+export function costKeyFor(moduleId) {
+  if (MODULE_COST[moduleId]) return moduleId;
+  const parts = String(moduleId ?? '').split('.');
+  for (let i = parts.length - 1; i >= 2; i--) {
+    const group = parts.slice(0, i).join('.');
+    if (MODULE_COST[group]) return group;
+  }
+  return null;
+}
+
+/**
+ * What this panel's scripting surface weighs, per module and in total.
+ *
+ * These are SOURCE bytes across the runtimes that carry a prelude, not a binary delta: Lua and
+ * JavaScript are compiled into the player whether a panel uses them or not. The number is honest
+ * about what the surface costs and is the figure the Export tab shows — beside the Python runtime,
+ * which is the one that moves megabytes.
+ */
+export function panelModuleCost(panel, languages = MODULE_COST_LANGUAGES) {
+  const { enabled } = panelModules(panel);
+  const sum = (key) => languages.reduce((n, l) => n + (MODULE_COST[key]?.[l] ?? 0), 0);
+
+  const billed = new Map();          // cost key -> the modules charged to it
+  for (const id of enabled) {
+    const key = costKeyFor(id);
+    if (!key) continue;
+    if (!billed.has(key)) billed.set(key, []);
+    billed.get(key).push(id);
+  }
+
+  const modules = [...billed.entries()]
+    .map(([key, ids]) => ({ key, ids, bytes: sum(key) }))
+    .sort((a, b) => b.bytes - a.bytes);
+
+  return {
+    languages: [...languages],
+    modules,
+    total: modules.reduce((n, m) => n + m.bytes, 0),
+    shared: sum(COST_SHARED_KEY),
+    // What declaring fewer modules would save: everything not enabled, billed the same way.
+    unused: MODULES
+      .map((m) => m.id)
+      .filter((id) => !enabled.includes(id))
+      .reduce((keys, id) => { const k = costKeyFor(id); if (k && !billed.has(k)) keys.add(k); return keys; }, new Set()),
+  };
+}
+
+/** The shared baseline every panel pays: host bindings, the event registry, the namespace block. */
+export const COST_SHARED_KEY = '-';
 
 /* ----------------------------------------------------------- derived indexes */
 // Convenience lookups for the picker, validation, and docs.

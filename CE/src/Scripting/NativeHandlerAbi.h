@@ -134,7 +134,15 @@ typedef struct CeHostVtable {
     /* Settings that outlive the session. Where they land is the host's business. */
     void (CE_CALL *save_setting)  (void* host_ctx, const CeStr* key, const CeValue* value);
     int  (CE_CALL *load_setting)  (void* host_ctx, const CeStr* key, CeValue* out /*host-owned, free_value*/);
-    /* New fields append HERE only; bump struct_size; handlers gate on struct_size before reading. */
+    /* NOTE on module opt-in (design doc §5): a panel declares the modules its scripts may use, and
+     * the scripted engines enforce it by swapping the prelude's members for explaining stubs. A
+     * native handler has no prelude — it calls these function pointers directly — so there is
+     * nothing to swap. That is deliberate, not an oversight: the module gate is an authoring aid
+     * for source scripts, while a compiled handler was written against this vtable and the host
+     * already checks every call it makes. If the gate ever needs to reach here it becomes an
+     * appended `is_module_enabled` query, not a change to any existing slot.
+     *
+     * New fields append HERE only; bump struct_size; handlers gate on struct_size before reading. */
 } CeHostVtable;
 
 /* Does the vtable the host handed us carry the field `member`? Handlers built against a newer ABI

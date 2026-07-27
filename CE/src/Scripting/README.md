@@ -131,6 +131,44 @@ scratch that survives between handler calls in one session and is cleared when t
 `ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
 the same two verbs either way.
 
+### Modules, and what a panel opts into
+
+Every member above belongs to a module (`ce.midi`, `ce.math`, …) and is reachable both flat and
+namespaced — `sendCC(…)` and `ce.midi.sendCC(…)` are the same function. A panel declares which
+modules it uses in `scripting.modules`:
+
+```jsonc
+"scripting": { "modules": ["ce.core", "ce.midi", "ce.music"], "apiVersion": "1.0" }
+```
+
+`ScriptRuntime::setEnabledModules()` pushes that list into every engine, which calls the generated
+`__ce_apply_modules(enabled)` in its prelude. Call it **before** `loadScripts` — a script's
+top-level code runs during the load, so a late gate lets that first pass through ungated.
+
+Three rules worth knowing:
+
+- **An empty list means "the panel declared nothing", not "the panel wants nothing."** Every module
+  stays on. That is what keeps a panel written before modules existed working unchanged. A panel
+  that genuinely wants nothing but `ce.core` says so in the editor, and the exporter bakes the
+  resolved list in — so what reaches the player is always explicit or deliberately absent.
+- **A gated member is a stub, never a missing name.** It logs a sentence naming the module and where
+  to switch it on. `attempt to call a nil value` tells a user nothing, and the same sentence is
+  compiled into all three preludes from one template in `panelApi.js`.
+- **`ce.core` is never gated**, and value members (`state`) are never replaced — a function stub in
+  place of a table turns `state.count = 1` into a type error, which explains less than nothing.
+
+Tier 1 comes from the same generated block: `ce.version`, `ce.runtime`, `ce.language`, `ce.modules`
+and `ce.has("ce.midi")`. `ce.has` answers for *this* runtime and *this* panel's list, so it is the
+honest way to ask "can I call this here" before calling it.
+
+A native handler has no prelude and is not gated — it calls the vtable directly, and the host
+already checks every call. See the note in `NativeHandlerAbi.h`.
+
+Module sizes are **measured**, not declared: `@module <id>` markers delimit regions in each prelude
+and `tools/scripts/gen-script-modules.mjs` sums them into `moduleCost.generated.js`, which a test
+regenerates and diffs. Those are source bytes for the Export tab, not a binary delta — Lua and JS
+are compiled in either way.
+
 ### Value representations (Q8)
 `get`/`set` take the accessor either as a path **suffix** or as a second **argument** — both work
 everywhere, because the suffix is what the picker inserts and the argument is what the engines'

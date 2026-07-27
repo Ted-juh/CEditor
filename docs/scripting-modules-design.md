@@ -188,17 +188,27 @@ alias above — the same trade JUCE made, and the same escape hatch.
 
 ## 5. Cost, opt-in and export
 
-A panel declares the modules it uses. The exporter bundles only those preludes, in only the
-languages that panel actually scripts in.
+A panel declares the modules it uses. The exporter resolves the declaration and bakes it in; the
+shipped runtime gates everything else.
 
 ```json
-"scripting": { "modules": ["ce.midi", "ce.time", "ce.draw"], "apiVersion": "2.0" }
+"scripting": { "modules": ["ce.core", "ce.midi", "ce.music"], "apiVersion": "1.0" }
 ```
 
-That gives the Export tab a real number — *"scripting: 4 modules, 11 KB"* — beside the existing
-CPython and native-handler costs, satisfying the same requirement `CMakeLists.txt:295` records for
-those. Edit-time gating (the picker hides members from disabled modules) is optional and is the
-thing that makes the surface feel small to a beginner; it is a UI decision, not an architectural one.
+That gives the Export tab a real number — *"3 modules, 27.7 KB"* — beside the existing CPython and
+native-handler costs, satisfying the same requirement `CMakeLists.txt:295` records for those.
+
+**What the number is, and is not.** It is measured source bytes of the scripting surface, summed
+across the runtimes that carry a prelude. It is **not** a binary delta: Lua and JavaScript are
+compiled into the player either way, so a shorter module list does not currently produce a smaller
+`.vst3`. Saying "11 KB saved" when nothing shrinks would be worse than saying nothing. What the
+declaration buys today is a smaller *surface* — fewer names in scope, a picker that can be filtered
+(slice 4), and a machine-checkable statement of what a panel actually depends on. Compile-time
+stripping stays available later: the fragments are delimited data and the exporter already passes
+per-panel cache variables to CMake, so it is a build change and not an architecture change.
+
+Edit-time gating (the picker hides members from disabled modules) is what makes the surface feel
+small to a beginner; it is a UI decision, not an architectural one, and it is slice 4.
 
 ---
 
@@ -282,7 +292,7 @@ A registry stays possible and stays deferred; the manifest already carries `id`,
 2. **Phase-1 capability** — `ce.midi` note/PC/bend/aftertouch/clock, `ce.storage` state + settings.
    ✅ *done*
 3. **Opt-in + cost** — a panel declares its modules, the exporter bundles only those, the Export tab
-   reports the size.
+   reports the size. ✅ *done*
 4. **Picker filtering** — the editor hides members from modules a panel has not enabled.
 
 Then `ce.ext.*` install/resolve, and only after that does `ce.draw` or `ce.panel` structure add a
@@ -329,3 +339,64 @@ returns `"C3"`, while all four implementations return `"C4"` — scientific pitc
 middle C is C4. The runtimes agreed with each other and disagreed with the doc, so **the doc was
 wrong and was fixed.** Changing the code instead would have shifted every existing script's notes by
 an octave to satisfy a sentence nobody had implemented.
+
+### How slice 3 landed
+
+Three parts: a panel declares, the runtimes enforce, and the number on the Export tab is measured.
+
+**Declaring.** `scripting.modules` on the panel. Absent means **auto** — derived by scanning the
+panel's scripts for both spellings of every member — and auto is the default because the
+alternative silently breaks every panel written before modules existed. An explicit array is the
+panel's decision and is obeyed even where it contradicts the scan. `resolveModules()` closes the
+list over `requires` and always keeps `ce.core`. An id we have never heard of is *reported*, not
+dropped: silently ignoring one is how a typo becomes a mystery.
+
+**Enforcing.** A member of a module the panel did not declare becomes a stub that names the module
+and says where to switch it on — in all five runtimes, from one template string in `panelApi.js`
+that the generator copies into each C++ prelude. Gating by *removal* was the obvious alternative and
+is the wrong one: `attempt to call a nil value` is exactly the class of unexplained failure the
+previous two rounds were spent deleting. Both spellings are gated together, because
+`ce.midi.sendCC` and the flat `sendCC` are literally the same function object. Values are the one
+exception — swapping `state` for a function would turn `state.count = 1` into a type error, so
+value members are left alone and only the module's `ce.has()` answer changes.
+
+The mechanism is one generated function, `__ce_apply_modules(enabled)`, plus
+`ScriptRuntime::setEnabledModules()`. Lua applies it once (one shared `sol::state`); QuickJS and
+CPython apply it per script, because each script gets its own engine or namespace. Calling it again
+with a wider list restores the real implementations — it re-reads a captured table rather than
+stacking stubs — so toggling a module in the editor takes effect without a reload. A native handler
+has no prelude and is not gated; that is recorded in the ABI header rather than left to be noticed.
+
+**Measuring.** `@module <id>` marker lines delimit regions in every prelude, and
+`gen-script-modules.mjs` sums the bytes between them into a committed `moduleCost.generated.js`. A
+test regenerates and fails on drift — it caught a stale table during this slice, which is the whole
+argument for generating it. `ce.components` is billed as a **group**: the five families share one
+indivisible stub block in the C++ preludes and splitting it five ways would be invented precision.
+
+| | measured |
+|---|---|
+| `ce.midi` | 26.2 KB |
+| `ce.components` (all five) | 12.3 KB |
+| `ce.storage` / `ce.math` / `ce.music` / `ce.time` / `ce.device` | 2.9 / 2.8 / 1.5 / 0.9 / 0.5 KB |
+| shared baseline every panel pays | 86.4 KB |
+
+**Be clear about what that number is.** It is source bytes across the four runtimes that carry a
+prelude — not a binary delta. Lua and JavaScript are compiled into the player whether a panel uses
+them or not, so declaring fewer modules does not shrink the `.vst3` today. The Export tab says so
+in as many words, next to the Python runtime figure, which is the one that actually moves megabytes
+(~56 MB). Compile-time stripping is now *possible* — the fragments exist as data and the exporter
+already passes per-panel cache variables to CMake — but ~40 KB off a multi-megabyte plugin does not
+pay for the build fragility, so it was not done. The measurement is what makes that a decision
+instead of a guess.
+
+Two things the work turned up:
+
+- **`ce.midi` depended on `ce.music` and nobody had said so.** `sendNote(1, "C4", 100)` resolves the
+  name with `noteNumber()`, which belongs to `ce.music`. Gate `ce.music` away and `sendNote` reads a
+  stub and sends note 0 — silently, in the one runtime nobody is watching. Fixed in the manifest,
+  and a new parity test now walks the marked prelude regions and fails on *any* call that reaches
+  outside its module's declared closure, so the next one is caught at commit rather than on a synth.
+- **`ce.has()` did not exist in the C++ engines at all.** It is tier-1, not a module member, so
+  parity never checked it — the generated block built `ce.midi` and friends and stopped there. Slice
+  3 gives it a real answer to return, so `ce.version`, `ce.runtime`, `ce.language`, `ce.modules` and
+  `ce.has` are now generated into all three preludes alongside the module tables.

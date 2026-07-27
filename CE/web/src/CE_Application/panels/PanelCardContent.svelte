@@ -21,6 +21,7 @@
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
+  import { MODULES, panelModules, panelModuleCost } from '../scripting/panelApi.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
 
@@ -79,6 +80,38 @@
   let panelHasPython = $derived(
     collectPanelExportScripts(panel).some((s) => s?.language === 'python')
   );
+  // --- Scripting modules (Export tab) ---
+  // A panel declares the modules its scripts use; the exporter bakes the resolved list into the
+  // export and the shipped runtime gates everything else. Absent declaration = Auto = derived from
+  // the sources, which is what keeps every panel written before this existed working unchanged.
+  let moduleState = $derived(panelModules(panel));
+  let moduleCost = $derived(panelModuleCost(panel));
+  let gatedModules = $derived(
+    MODULES.filter((m) => !m.global).map((m) => ({
+      ...m,
+      on: moduleState.enabled.includes(m.id),
+      required: moduleState.added.includes(m.id),
+    }))
+  );
+  // Auto is the absence of a list, so switching to Manual has to write the currently-resolved set
+  // — anything else would silently change what the panel can do the moment the mode flips.
+  function setModuleMode(mode) {
+    if (!panel) return;
+    const scripting = { ...(panel.scripting ?? {}) };
+    if (mode === 'auto') delete scripting.modules;
+    else scripting.modules = moduleState.enabled.filter((id) => id !== 'ce.core');
+    updatePanel(panel.id, { scripting });
+  }
+
+  function toggleModule(id, on) {
+    if (!panel) return;
+    const current = new Set(moduleState.declared.filter((m) => m !== 'ce.core'));
+    if (on) current.add(id); else current.delete(id);
+    updatePanel(panel.id, { scripting: { ...(panel.scripting ?? {}), modules: [...current] } });
+  }
+
+  const formatKb = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
+
   let embedPythonMode = $derived(exportSettings.embedPython ?? 'auto');
   // What 'auto' / 'on' / 'off' actually resolves to for this panel right now.
   let pythonWillEmbed = $derived(
@@ -605,6 +638,57 @@
       </PropertyCell>
     </PropertySection>
 
+    <PropertySection title="Scripting Modules">
+      <PropertyCell label="Modules" span={4}
+                    hint="Which parts of the scripting API this panel's scripts can reach. Auto follows the scripts — it is the right answer almost always. Manual pins an explicit list; anything left off logs a notice naming the module instead of acting. ce.core (set/get/log/on/run) is always on.">
+        <div class="export-row">
+          <div class="seg">
+            {#each [['auto', 'Auto'], ['manual', 'Manual']] as [mode, label] (mode)}
+              <button class={['seg-btn', moduleState.mode === mode && 'seg-active']}
+                      onclick={() => setModuleMode(mode)}>{label}</button>
+            {/each}
+          </div>
+          <span class="export-cost cost-on">
+            {moduleCost.modules.length} module{moduleCost.modules.length === 1 ? '' : 's'},
+            {formatKb(moduleCost.total)}
+          </span>
+        </div>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <div class="module-list">
+          {#each gatedModules as m (m.id)}
+            <label class="module-row" class:module-off={!m.on}>
+              <input type="checkbox" checked={m.on}
+                     disabled={moduleState.mode === 'auto' || m.required}
+                     onchange={(e) => toggleModule(m.id, e.target.checked)} />
+              <span class="module-id">{m.id}</span>
+              <span class="module-summary">{m.summary}</span>
+              {#if m.required}<span class="module-tag">required by another module</span>{/if}
+              {#if m.runtime !== 'any'}<span class="module-tag">{m.runtime} only</span>{/if}
+            </label>
+          {/each}
+        </div>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          {#if moduleState.unknown.length}
+            ⚠ Unknown module{moduleState.unknown.length === 1 ? '' : 's'}: {moduleState.unknown.join(', ')} — ignored at export.
+          {:else if moduleState.mode === 'auto'}
+            Following the scripts: {moduleState.enabled.join(', ')}. The exporter bakes this list into the export.
+          {:else}
+            Pinned: {moduleState.enabled.join(', ')}. A call into any other module logs a notice instead of acting.
+          {/if}
+        </span>
+      </PropertyCell>
+      <PropertyCell label="" span={4}>
+        <span class="export-build-note">
+          Source size across {moduleCost.languages.join(', ')}, plus a {formatKb(moduleCost.shared)}
+          baseline every panel pays. These are prelude bytes, not plugin megabytes — Lua and
+          JavaScript are compiled in either way. The size lever is the Python runtime below.
+        </span>
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Scripting Runtime">
       <PropertyCell label="Python" span={4}
                     hint="Embed the REAL CPython runtime (full standard library) so Python scripts run window-closed and offline. Lua + JavaScript are always built in and add almost nothing — only Python carries a meaningful size cost. Auto = include only when this panel has Python scripts.">
@@ -723,6 +807,24 @@
     font-size: 11px; color: #777; font-family: 'Consolas', monospace; white-space: nowrap;
   }
   .export-cost.cost-on { color: #E0A23C; }
+
+  /* Scripting modules — a checklist, disabled in Auto mode (the list follows the scripts there). */
+  .module-list { display: flex; flex-direction: column; gap: 2px; width: 100%; }
+  .module-row {
+    display: flex; align-items: baseline; gap: 8px; font-size: 11px; color: #CCC;
+    padding: 2px 4px; border-radius: 3px; cursor: pointer;
+  }
+  .module-row:hover { background: #222; }
+  .module-row.module-off { color: #666; }
+  .module-row input { margin: 0; flex: none; }
+  .module-row input:disabled { cursor: default; }
+  .module-id { font-family: 'Consolas', monospace; min-width: 148px; flex: none; }
+  .module-summary { color: #888; flex: 1 1 auto; }
+  .module-off .module-summary { color: #555; }
+  .module-tag {
+    flex: none; font-size: 10px; color: #8A7A4A; border: 1px solid #4A4230;
+    border-radius: 3px; padding: 0 4px;
+  }
 
   .validation-row {
     grid-column: span 4;

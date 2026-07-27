@@ -341,19 +341,24 @@ PyObject* PyInit_ceditor() { return PyModule_Create (&apiModuleDef); }
 
 // --- Python prelude: globals wrapping `ceditor` + helpers (parity with Lua/JS) -----------------
 const char* kPrelude = R"PY(
+# @module -
 import ceditor as __api
 
 def set(path, value, opts=None): return __api.set(path, value, opts)
 def get(path, form="value"):      return __api.get(path, form)
+# @module ce.midi
 def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
 def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
 def sendSysex(b):                 return __api.sendSysex(b)
+# @module ce.device
 def requestDump(kind):            return __api.requestDump(kind)
 def applyDump(b):                 return __api.applyDump(b)
 def sendDump(kind):               return __api.sendDump(kind)
 def buildDump(kind):              return __api.buildDump(kind)
+# @module ce.time
 def startTimer(id, ms=0):         return __api.startTimer(id, ms)
 def stopTimer(id):                return __api.stopTimer(id)
+# @module -
 def run(target, args=None):       return __api.run(target, args)
 def emit(name, data=None):        return __api.emit(name, data)
 def log(msg, v=None):             return __api.log(str(msg), v)
@@ -379,6 +384,7 @@ class _Self:
     def get(self, p, form="value"):     return __api.get(self._p(p), form)
 self = _Self()
 
+# @module ce.math
 # Pure-math + MIDI helpers — keep in sync with the Lua/JS preludes + panelApi.js.
 def clamp(v, lo, hi): return lo if v < lo else (hi if v > hi else v)
 __builtin_round = round  # capture the builtin before shadowing it below
@@ -400,6 +406,7 @@ def curve(v, shape="linear"):
     if shape == "log": return math.sqrt(max(0, v))
     if shape == "s":   return v * v * (3 - 2 * v)
     return v
+# @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def noteName(n):
     import math; n = math.floor(n)
@@ -410,6 +417,7 @@ def noteNumber(name):
     if not m: return 0
     i = __NOTES.index(m.group(1)) if m.group(1) in __NOTES else -1
     return 0 if i < 0 else (int(m.group(2)) + 1) * 12 + i
+# @module ce.midi
 def to14bit(v):
     import math; v = math.floor(v); return { "msb": math.floor(v / 128) % 128, "lsb": v % 128 }
 def from14bit(msb, lsb): return msb * 128 + lsb
@@ -475,6 +483,7 @@ def panic(opts=None):
         sendCC(c, 123, 0)
         if reset: sendCC(c, 121, 0)
 
+# @module ce.components
 # Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
 # Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
 # counterpart to drive with the window closed. Defining them here as explaining stubs means a
@@ -498,6 +507,7 @@ def __webviewOnly(name):
 for __n in __WEBVIEW_ONLY:
     globals()[__n] = __webviewOnly(__n)
 
+# @module ce.midi
 # MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
 # makes them work identically in every runtime and every exported language. `note` accepts a MIDI
 # number or a name ("C3"), because a script that reads musically should be allowed to say so.
@@ -537,6 +547,7 @@ def sendTransport(action="start"):
     elif action == "continue": sendMidi([0xFB])
     else: sendMidi([0xFA])
 
+# @module ce.storage
 # ce.storage. `state` is a plain dict-like namespace: each script is exec'd into its OWN module
 # namespace, which lives as long as the script is loaded, so it persists between handler calls with
 # no host help. Settings go through the host, because they outlive the session.
@@ -549,6 +560,7 @@ def loadSetting(key, fallback=None):
     v = __api.loadSetting(str(key))
     return fallback if v is None else v
 
+# @module -
 # BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 # on top. ce.core is global: its members are never namespaced, so they appear here only for
@@ -568,15 +580,73 @@ __CE_MODULES = {
     "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
     "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 }
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"]
+__CE_META = [
+    { "id": "ce.core", "version": "1.0", "runtime": "any" },
+    { "id": "ce.midi", "version": "1.1", "runtime": "any" },
+    { "id": "ce.device", "version": "1.0", "runtime": "any" },
+    { "id": "ce.math", "version": "1.0", "runtime": "any" },
+    { "id": "ce.music", "version": "1.0", "runtime": "any" },
+    { "id": "ce.time", "version": "1.0", "runtime": "any" },
+    { "id": "ce.storage", "version": "1.0", "runtime": "any" },
+    { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.components.recorder", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.components.harmony", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.components.setlist", "version": "1.0", "runtime": "webview" },
+]
+__CE_VALUES = { "state": True }
+__CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically."
+# The real implementation of every member, captured before anything is gated, so turning a module
+# back on restores the function rather than leaving the stub in place.
+__CE_REAL = {}
 ce = __ce_types.SimpleNamespace()
-for __ce_path, __ce_members in __CE_MODULES.items():
-    __ce_node = ce
-    for __ce_seg in __ce_path.split(".")[1:]:
-        if not hasattr(__ce_node, __ce_seg):
-            setattr(__ce_node, __ce_seg, __ce_types.SimpleNamespace())
-        __ce_node = getattr(__ce_node, __ce_seg)
-    for __ce_short, __ce_global in __ce_members.items():
-        setattr(__ce_node, __ce_short, globals()[__ce_global])
+
+def __ce_gate(__member, __module):
+    def __stub(*args, **kwargs):
+        log(__CE_GATE_MSG.replace("{member}", __member).replace("{module}", __module))
+    return __stub
+
+# __ce_apply_modules(enabled) — enabled is a list of module ids, or None for "everything on".
+# The host calls this with the panel's resolved list; a member of a module that is not on becomes
+# a stub that names the module instead of a call that quietly works.
+def __ce_apply_modules(enabled):
+    global ce
+    __g = globals()
+    __on = None
+    if enabled is not None:
+        __on = { "ce.core": True }
+        for __id in enabled:
+            __on[__id] = True
+    ce = __ce_types.SimpleNamespace()
+    for __path in __CE_ORDER:
+        __live = (__on is None) or (__on.get(__path) is True)
+        __node = ce
+        for __seg in __path.split(".")[1:]:
+            if not hasattr(__node, __seg):
+                setattr(__node, __seg, __ce_types.SimpleNamespace())
+            __node = getattr(__node, __seg)
+        for __short, __global in __CE_MODULES[__path].items():
+            if __global not in __CE_REAL:
+                __CE_REAL[__global] = __g.get(__global)
+            __v = __CE_REAL[__global]
+            if (not __live) and (__CE_VALUES.get(__global) is not True):
+                __v = __ce_gate(__global, __path)
+            __g[__global] = __v
+            setattr(__node, __short, __v)
+    ce.version = "1.0"
+    ce.runtime = "player"
+    ce.language = "python"
+    ce.modules = [__m for __m in __CE_META if __on is None or __on.get(__m["id"]) is True]
+    def __ce_has(__id):
+        for __m in ce.modules:
+            if __m["id"] == __id:
+                return __m["runtime"] == "any" or __m["runtime"] == ce.runtime
+        return False
+    ce.has = __ce_has
+    __g["ce"] = ce
+
+__ce_apply_modules(None)
 # END GENERATED module namespace
 )PY";
 
@@ -598,6 +668,20 @@ public:
 
     bool installApi (ScriptHostApi& h) override { host = &h; g_host = &h; return interpreterOk; }
 
+    // Stored, then re-applied to every namespace that already exists, so toggling a module in the
+    // editor takes effect without reloading the scripts.
+    void setEnabledModules (const juce::StringArray& moduleIds) override
+    {
+        enabledModules = moduleIds;
+        if (! interpreterOk) return;
+        const auto call = moduleGateCall();
+        for (auto& [id, ns] : namespaces)
+        {
+            juce::ignoreUnused (id);
+            if (! exec (call.toRawUTF8(), ns)) PyErr_Clear();
+        }
+    }
+
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
         if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
@@ -616,7 +700,10 @@ public:
 
         const WatchdogScope guard (*this); // module-level statements obey the execution budget too
         currentScriptId = def.id;          // so a module-level on() tags its listener correctly
-        const bool preludeOk = exec (kPrelude, ns);
+        // Prelude, then the module gate, then the user source — the gate has to be in place before
+        // any top-level statement runs. Each script gets its own namespace dict, so the gate is
+        // applied per script here rather than once for the language (as Lua can).
+        const bool preludeOk = exec (kPrelude, ns) && exec (moduleGateCall().toRawUTF8(), ns);
         const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
         currentScriptId = {};
         if (! preludeOk) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
@@ -716,6 +803,7 @@ private:
     // interpreter serves every Python script, so without it off() could not tell whose
     // listener it was removing.
     juce::String currentScriptId;
+    juce::StringArray enabledModules;   // empty = the panel declared nothing = every module on
 
     // Wall-clock execution budget per outermost entry into Python (matches the
     // JS engine's 2s maximumExecutionTime).
@@ -785,6 +873,15 @@ private:
 
         PythonScriptEngine& engine;
     };
+
+    /** `__ce_apply_modules([...])`, or `(None)` for "the panel declared nothing — everything on". */
+    juce::String moduleGateCall() const
+    {
+        if (enabledModules.isEmpty()) return "__ce_apply_modules(None)\n";
+        juce::StringArray quoted;
+        for (const auto& id : enabledModules) quoted.add (id.quoted());
+        return "__ce_apply_modules([" + quoted.joinIntoString (",") + "])\n";
+    }
 
     bool exec (const char* code, PyObject* ns)
     {

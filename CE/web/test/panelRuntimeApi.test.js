@@ -15,7 +15,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { get } from 'svelte/store';
+import { scriptApiForTesting, setRuntimeHost } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
+import { CE_API_VERSION, RUNTIME_WEBVIEW } from '../src/CE_Application/scripting/panelApi.js';
 
 const api = scriptApiForTesting();
 const runtimeSource = readFileSync(
@@ -276,4 +279,91 @@ test('state is per script and survives between calls', () => {
 test('loadSetting returns the fallback for a key never written', () => {
   assert.equal(api.loadSetting('never-written', 'fallback'), 'fallback');
   assert.equal(typeof api.saveSetting, 'function');
+});
+
+/* ------------------------------------------------------------------- module opt-in (slice 3) */
+// The runtime resolves the panel's declared modules and gates everything else. These install a
+// panel through setRuntimeHost — the same door the exported player comes in by — so the gate is
+// exercised the way it actually runs rather than through a private hook.
+
+function withPanel(panel, fn) {
+  setRuntimeHost({ panel });
+  try { return fn(); } finally { setRuntimeHost(null); }
+}
+
+const gateNotices = () => get(scriptTrace)
+  .filter((t) => String(t.message ?? '').includes('has not enabled'))
+  .map((t) => t.message);
+
+test('a member of an undeclared module is a stub that names the module', () => {
+  const panel = { id: 'p', scripting: { modules: ['ce.math'] }, controls: [] };
+  withPanel(panel, () => {
+    clearScriptTrace();
+    const gated = scriptApiForTesting('', 'gate-1');
+
+    assert.equal(typeof gated.sendCC, 'function', 'gated, not deleted — the name still resolves');
+    gated.sendCC(1, 74, 100);
+    const notices = gateNotices();
+    assert.equal(notices.length, 1, 'the call reported exactly once');
+    assert.match(notices[0], /sendCC\(\) needs the ce\.midi module/);
+    assert.match(notices[0], /Scripting Modules/, 'and says where to turn it on');
+
+    // The namespaced spelling is the SAME function object, so it cannot be a way around the gate.
+    assert.equal(gated.ce.midi.sendCC, gated.sendCC);
+    // A declared module is untouched.
+    assert.equal(gated.clamp(5, 0, 3), 3);
+    // ce.core is never gated, whatever the list says.
+    assert.equal(typeof gated.set, 'function');
+    assert.equal(typeof gated.log, 'function');
+  });
+});
+
+test('ce.has and ce.modules report the panel\'s list, not the whole manifest', () => {
+  withPanel({ id: 'p', scripting: { modules: ['ce.math'] }, controls: [] }, () => {
+    const { ce } = scriptApiForTesting('', 'gate-2');
+    assert.equal(ce.has('ce.math'), true);
+    assert.equal(ce.has('ce.midi'), false, 'a module the panel left off');
+    assert.equal(ce.has('ce.nonexistent'), false);
+    assert.deepEqual(ce.modules.map((m) => m.id), ['ce.core', 'ce.math']);
+    assert.equal(ce.version, CE_API_VERSION);
+    assert.equal(ce.runtime, RUNTIME_WEBVIEW);
+  });
+});
+
+test('a panel with no declaration follows its scripts', () => {
+  const panel = {
+    id: 'p', controls: [],
+    scripts: [{ id: 's', source: 'function onX(){ sendCC(1, 74, 100) }' }],
+  };
+  withPanel(panel, () => {
+    clearScriptTrace();
+    const auto = scriptApiForTesting('', 'gate-3');
+    auto.sendCC(1, 74, 100);
+    assert.deepEqual(gateNotices(), [], 'auto-detection enabled ce.midi, so nothing is gated');
+    assert.equal(auto.ce.has('ce.midi'), true);
+    // …and what the scripts never mention stays off, which is the point of measuring cost.
+    assert.equal(auto.ce.has('ce.components.setlist'), false);
+  });
+});
+
+test('`state` is not replaced by a stub even when its module is off', () => {
+  // A gate stub is a function. Swapping a table for one turns `state.count = 1` into a type
+  // error, which explains nothing — the exact failure mode gating exists to remove.
+  withPanel({ id: 'p', scripting: { modules: [] }, controls: [] }, () => {
+    const gated = scriptApiForTesting('', 'gate-4');
+    assert.equal(typeof gated.state, 'object');
+    gated.state.count = 1;
+    assert.equal(gated.state.count, 1);
+    assert.equal(gated.ce.has('ce.storage'), false, 'the module still reports as off');
+  });
+});
+
+test('with no panel at all, nothing is gated', () => {
+  // Gating an API that has no document to protect would just make the runtime unusable outside
+  // one. An empty set is a panel decision; the absence of a panel is not.
+  clearScriptTrace();
+  const ungated = scriptApiForTesting('', 'gate-5');
+  ungated.sendCC(1, 74, 100);
+  assert.deepEqual(gateNotices(), []);
+  assert.equal(ungated.ce.has('ce.midi'), true);
 });

@@ -61,6 +61,35 @@ ScriptEngine* ScriptRuntime::engineFor (const juce::String& language)
     return lua.get(); // default + "lua"
 }
 
+juce::StringArray ScriptRuntime::modulesFromPanel (const juce::var& panel)
+{
+    juce::StringArray out;
+    auto* obj = panel.getDynamicObject();
+    if (obj == nullptr) return out;
+    auto scripting = obj->getProperty ("scripting");
+    auto* s = scripting.getDynamicObject();
+    if (s == nullptr) return out;
+    if (auto* arr = s->getProperty ("modules").getArray())
+        for (const auto& id : *arr)
+            if (id.toString().isNotEmpty()) out.addIfNotAlreadyThere (id.toString());
+    return out;
+}
+
+void ScriptRuntime::setEnabledModules (const juce::StringArray& moduleIds)
+{
+    assertMessageThread();
+    enabledModuleIds = moduleIds;
+    applyModuleGates();
+}
+
+void ScriptRuntime::applyModuleGates()
+{
+    if (lua)    lua->setEnabledModules (enabledModuleIds);
+    if (js)     js->setEnabledModules (enabledModuleIds);
+    if (python) python->setEnabledModules (enabledModuleIds);
+    if (native) native->setEnabledModules (enabledModuleIds);
+}
+
 void ScriptRuntime::reportError (const juce::String& scriptId, const juce::String& message)
 {
     auto line = "[script " + scriptId + "] " + message;
@@ -82,6 +111,10 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     if (js)     js->installApi (host);
     if (python) python->installApi (host);
     if (native) native->installApi (host);
+
+    // …and gate it down to the panel's declared modules BEFORE any script's top-level code runs.
+    // installApi is what (re)builds the prelude, so the gate has to be re-applied after it.
+    applyModuleGates();
 
     failed.clear();
 

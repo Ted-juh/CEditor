@@ -30,7 +30,8 @@ import {
 import {
   handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
-  MODULES, MODULE_BY_ID, moduleMemberMap,
+  MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
+  CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage,
 } from './panelApi.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
@@ -388,7 +389,9 @@ export function readWatch(path) {
 
 /* ------------------------------------------------------------------ helpers (pure) */
 
+// @module ce.music
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+// @module ce.math
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -396,9 +399,11 @@ const helpers = {
   snap: (v, step) => (step === 0 ? v : Math.round(v / step) * step),
   lerp: (a, b, t) => a + (b - a) * t,
   curve: (v, shape) => (shape === 'exp' ? v * v : shape === 'log' ? Math.sqrt(Math.max(0, v)) : shape === 's' ? v * v * (3 - 2 * v) : v),
+  // @module ce.music
   noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
   noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
 
+// @module ce.midi
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
   // doesn't model. Ported byte-for-byte from the Lua/JS/Python preludes in CE/src/Scripting so a
   // script packs a value identically whether it runs here or in the shipped plugin.
@@ -444,6 +449,7 @@ const helpers = {
 // it as an alias of to14bit, so panels written against it keep working.
 helpers.to14Bit = helpers.to14bit;
 
+// @module ce.midi
 /* ------------------------------------------------------------------- MIDI out (real) */
 // Scripts emit MIDI through the same device bridge the player/DPD use: raw bytes go via
 // triggerRawMidiAction (needs a hardware output selected on the 'mainSynth' role). With no JUCE
@@ -632,6 +638,7 @@ const midiApi = {
 // zone array in a script. This reads the current zones, hands them to the same
 // pure reducer the editor's own buttons use, and writes the result back — so a
 // footswitch changing the split mid-set is one line.
+// @module ce.components
 function splitAction(path, action, args) {
   const target = String(path ?? '');
   const zonesPath = `${target}.SplitZone.zones`;
@@ -766,6 +773,7 @@ const setlistApi = {
 // `on` listeners belong to the script that registered them, so re-running a script (an edit in the
 // designer, a source change) replaces its listeners instead of stacking a second copy.
 
+// @module -
 const listeners = [];   // { scriptId, target, event, fn }
 
 function clearListeners(scriptId) {
@@ -846,6 +854,7 @@ function runAction(ref, args) {
 // handler calls and QuickJS has no setTimeout, so both need the host to keep time. Starting an id
 // that is already running re-times it rather than stacking a second interval.
 
+// @module ce.time
 const timers = new Map();   // id -> interval handle
 
 function startTimer(id, ms) {
@@ -871,10 +880,7 @@ function stopAllTimers() {
   timers.clear();
 }
 
-// The API version a panel is written against. Bumped when a module's members change incompatibly;
-// panels record it so the runtime can tell "written for an older API" from "broken".
-const CE_API_VERSION = '1.0';
-
+// @module ce.storage
 /* ------------------------------------------------------------------------------ ce.storage */
 // Two lifetimes, deliberately kept apart. `state` lives as long as the script is loaded — in the
 // C++ engines that falls out of the per-script environment for free, and here it falls out of the
@@ -910,6 +916,7 @@ function loadSetting(key, fallback) {
   return v === undefined ? fallback : v;
 }
 
+// @module -
 function buildApi(ownerName, scriptId = '') {
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
@@ -960,12 +967,55 @@ function buildApi(ownerName, scriptId = '') {
     ...helpers,
   };
 
+  // Modules the panel has not enabled become explaining stubs, before `ce` is assembled from the
+  // flat surface — so the namespaced spelling and the flat alias are gated identically.
+  const enabled = enabledModules();
+  applyModuleGates(api, enabled);
+
   // ce.<module>.<name> on top of the flat names, which stay as aliases. Built here from the
   // contract rather than from a copy of it, so the WebView's namespace cannot drift from
   // panelApi.js — the C++ engines get the same layout from a generated block, since a prelude
   // embedded as a string literal cannot import anything.
-  api.ce = buildModuleNamespace(api);
+  api.ce = buildModuleNamespace(api, enabled);
   return api;
+}
+
+/**
+ * The modules this panel has turned on, or null for "do not gate".
+ *
+ * Absent declaration means AUTO — derived from what the scripts actually reference — so a panel
+ * written before modules existed keeps every verb it used. With no panel at all there is nothing
+ * to derive from and nothing to protect, so gating is off: an empty set there would mean the API
+ * disappears whenever a script runs outside a document, which is a worse answer than not gating.
+ */
+function enabledModules() {
+  const panel = activePanel();
+  if (!panel) return null;
+  return new Set(panelModules(panel).enabled);
+}
+
+/**
+ * Replace the members of disabled modules with a stub that names the module. Not deletion:
+ * `sendCC is not a function` says nothing about why, which is the whole failure mode this
+ * codebase spent two rounds removing. Value members (`state`) are left alone — swapping a table
+ * for a function would break `state.x = 1` with a type error instead of an explanation.
+ */
+function applyModuleGates(flat, enabled) {
+  if (enabled == null) return;
+  for (const module of MODULES) {
+    if (module.global || enabled.has(module.id)) continue;
+    for (const memberId of Object.values(moduleMemberMap(module.id))) {
+      if (isValueMember(MEMBER_BY_ID[memberId])) continue;
+      const message = moduleGateMessage(memberId, module.id);
+      flat[memberId] = () => addScriptTrace('log', '', message);
+    }
+  }
+  // Declared aliases follow their member: to14Bit is to14bit, gated or not.
+  for (const member of Object.values(MEMBER_BY_ID)) {
+    for (const alias of member.aliases ?? []) {
+      if (flat[member.id] !== undefined) flat[alias] = flat[member.id];
+    }
+  }
 }
 
 /**
@@ -973,7 +1023,7 @@ function buildApi(ownerName, scriptId = '') {
  * ce.core is `global: true` — its members are never namespaced — but they are mirrored under
  * ce.core anyway so the namespace is a complete picture of what a script can reach.
  */
-function buildModuleNamespace(flat) {
+function buildModuleNamespace(flat, enabled = null) {
   const ce = {};
   for (const module of MODULES) {
     const segments = module.id.split('.').slice(1);   // drop the "ce" root
@@ -990,10 +1040,17 @@ function buildModuleNamespace(flat) {
   // Tier 1: the system namespace. Not a module — it describes the runtime rather than extending it.
   ce.version = CE_API_VERSION;
   ce.runtime = RUNTIME_WEBVIEW;
-  ce.modules = MODULES.map((m) => ({ id: m.id, version: m.version, runtime: m.runtime }));
+  ce.language = 'javascript';
+  ce.modules = MODULES
+    .filter((m) => enabled == null || enabled.has(m.id))
+    .map((m) => ({ id: m.id, version: m.version, runtime: m.runtime }));
+  // Enabled AND reachable from here. A module the panel turned on that only runs in the player
+  // still answers false, because the question ce.has() is asked to settle is "can I call this".
   ce.has = (moduleId) => {
     const module = MODULE_BY_ID[moduleId];
-    return module != null && (module.runtime === 'any' || module.runtime === RUNTIME_WEBVIEW);
+    if (module == null) return false;
+    if (enabled != null && !enabled.has(moduleId)) return false;
+    return module.runtime === RUNTIME_ANY || module.runtime === RUNTIME_WEBVIEW;
   };
   return ce;
 }

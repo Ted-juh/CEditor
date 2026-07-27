@@ -22,6 +22,7 @@ namespace
 {
 
 const char* kJsPrelude = R"JS(
+// @module -
 // Wrap the native bridge as globals + pure-math helpers + event registry + self.
 var __listeners = [];
 function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
@@ -55,30 +56,37 @@ var self = {
   set: function (p, value, opts) { return __api.set(__ownerPrefix(p), value, opts || null); },
   get: function (p, form) { return __api.get(__ownerPrefix(p), form || "value"); }
 };
+// @module ce.midi
 function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
+// @module ce.device
 function requestDump(kind) { return __api.requestDump(kind); }
 function applyDump(bytes) { return __api.applyDump(bytes); }
 function sendDump(kind) { return __api.sendDump(kind); }
 function buildDump(kind) { return __api.buildDump(kind); }
+// @module ce.time
 function startTimer(id, ms) { return __api.startTimer(id, ms || 0); }
 function stopTimer(id) { return __api.stopTimer(id); }
+// @module -
 function run(target, args) { return __api.run(target, args || null); }
 function emit(name, data) { return __api.emit(name, data || null); }
 function log(msg, v) { return __api.log(String(msg), v === undefined ? null : v); }
 function noTransmit(fn) { __api.beginTransmit(false); try { fn(); } finally { __api.endTransmit(); } }
 function transmit(fn) { __api.beginTransmit(true); try { fn(); } finally { __api.endTransmit(); } }
 
+// @module ce.math
 function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
 function round(v) { return Math.round(v); }
 function scale(v, inLo, inHi, outLo, outHi) { return inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo); }
 function snap(v, step) { return step === 0 ? v : Math.round(v / step) * step; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function curve(v, shape) { shape = shape || "linear"; if (shape === "exp") return v * v; if (shape === "log") return Math.sqrt(Math.max(0, v)); if (shape === "s") return v * v * (3 - 2 * v); return v; }
+// @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function noteName(n) { n = Math.floor(n); return __NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); }
 function noteNumber(name) { var m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; var i = __NOTES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; }
+// @module ce.midi
 function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
 function from14bit(msb, lsb) { return msb * 128 + lsb; }
 function to7bit(v, count, order) { count = count || 2; order = order || "msb"; v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
@@ -126,6 +134,7 @@ function panic(opts) {
   }
 }
 
+// @module ce.components
 // Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
 // Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
 // counterpart to drive with the window closed. Defining them here as explaining stubs means a
@@ -150,6 +159,7 @@ for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
   })(__WEBVIEW_ONLY[__i]);
 }
 
+// @module ce.midi
 // MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
 // makes them work identically in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
@@ -183,6 +193,7 @@ function sendTransport(action) {
   else sendMidi([0xFA]);
 }
 
+// @module ce.storage
 // ce.storage. `state` is a plain object: QuickJS gives each script its own engine, whose globals
 // live as long as the script is loaded, so it persists between handler calls with no host help.
 // Settings go through the host, because they outlive the session.
@@ -193,6 +204,7 @@ function loadSetting(key, fallback) {
   return (v === undefined || v === null) ? fallback : v;
 }
 
+// @module -
 // BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
@@ -211,24 +223,71 @@ var __CE_MODULES = {
   "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 };
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.0","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.0","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_VALUES = {"state":true};
+var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
+// The real implementation of every member, captured before anything is gated, so turning a module
+// back on restores the function rather than leaving the stub in place.
+var __CE_REAL = {};
 var ce = {};
-(function () {
+
+function __ce_gate(member, module) {
+  return function () {
+    log(__CE_GATE_MSG.split("{member}").join(member).split("{module}").join(module));
+  };
+}
+
+// __ce_apply_modules(enabled) — enabled is an array of module ids, or null for "everything on".
+// The host calls this with the panel's resolved list; a member of a module that is not on becomes
+// a stub that names the module instead of a call that quietly works.
+function __ce_apply_modules(enabled) {
   var __g = (typeof globalThis !== 'undefined') ? globalThis : this;
-  for (var __path in __CE_MODULES) {
-    if (!Object.prototype.hasOwnProperty.call(__CE_MODULES, __path)) continue;
-    var __segs = __path.split('.').slice(1);
-    var __node = ce;
-    for (var __i = 0; __i < __segs.length; __i++) {
-      if (!__node[__segs[__i]]) __node[__segs[__i]] = {};
-      __node = __node[__segs[__i]];
+  var on = null;
+  if (enabled !== undefined && enabled !== null) {
+    on = {};
+    on["ce.core"] = true;
+    for (var i = 0; i < enabled.length; i++) on[enabled[i]] = true;
+  }
+  ce = {};
+  for (var p = 0; p < __CE_ORDER.length; p++) {
+    var path = __CE_ORDER[p];
+    var live = (on === null) || (on[path] === true);
+    var segs = path.split('.').slice(1);
+    var node = ce;
+    for (var s = 0; s < segs.length; s++) {
+      if (!node[segs[s]]) node[segs[s]] = {};
+      node = node[segs[s]];
     }
-    var __members = __CE_MODULES[__path];
-    for (var __short in __members) {
-      if (!Object.prototype.hasOwnProperty.call(__members, __short)) continue;
-      __node[__short] = __g[__members[__short]];
+    var members = __CE_MODULES[path];
+    for (var short in members) {
+      if (!Object.prototype.hasOwnProperty.call(members, short)) continue;
+      var global = members[short];
+      if (!Object.prototype.hasOwnProperty.call(__CE_REAL, global)) __CE_REAL[global] = __g[global];
+      var v = __CE_REAL[global];
+      if (!live && __CE_VALUES[global] !== true) v = __ce_gate(global, path);
+      __g[global] = v;
+      node[short] = v;
     }
   }
-})();
+  ce.version = "1.0";
+  ce.runtime = "player";
+  ce.language = "javascript";
+  ce.modules = [];
+  for (var m = 0; m < __CE_META.length; m++) {
+    if (on === null || on[__CE_META[m].id] === true) ce.modules.push(__CE_META[m]);
+  }
+  ce.has = function (id) {
+    for (var k = 0; k < ce.modules.length; k++) {
+      if (ce.modules[k].id === id) {
+        return ce.modules[k].runtime === "any" || ce.modules[k].runtime === ce.runtime;
+      }
+    }
+    return false;
+  };
+  __g.ce = ce;
+}
+__ce_apply_modules(null);
 // END GENERATED module namespace
 )JS";
 
@@ -289,6 +348,19 @@ public:
 
     bool installApi (ScriptHostApi& h) override { host = &h; return true; }
 
+    // Stored, not applied: every script gets its own QuickJS engine, so the gate goes on at load.
+    // Changing the set after scripts are loaded re-gates the engines that already exist, which is
+    // what makes toggling a module in the editor take effect without a reload.
+    void setEnabledModules (const juce::StringArray& moduleIds) override
+    {
+        enabledModules = moduleIds;
+        for (auto& [id, eng] : engines)
+        {
+            juce::ignoreUnused (id);
+            eng->execute (moduleGateCall());
+        }
+    }
+
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
         // TypeScript runs as the JS the editor already transpiled (compiledSource). Raw TS — type
@@ -312,7 +384,9 @@ public:
         // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
         // resolveSelfOwner: a panel script's `self` is the panel, a component script's is its control.
         juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n";
-        auto r1 = eng->execute (boot + juce::String (kJsPrelude));
+        // …then gate the API down to the panel's declared modules. QuickJS gives every script its
+        // own engine, so the gate is applied per script here rather than once for the language.
+        auto r1 = eng->execute (boot + juce::String (kJsPrelude) + "\n" + moduleGateCall());
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
         auto r2 = eng->execute (code);
@@ -360,8 +434,18 @@ public:
     void reset() override { engines.clear(); }
 
 private:
+    /** `__ce_apply_modules([...])`, or `(null)` for "the panel declared nothing — everything on". */
+    juce::String moduleGateCall() const
+    {
+        if (enabledModules.isEmpty()) return "__ce_apply_modules(null);";
+        juce::StringArray quoted;
+        for (const auto& id : enabledModules) quoted.add (id.quoted());
+        return "__ce_apply_modules([" + quoted.joinIntoString (",") + "]);";
+    }
+
     std::map<juce::String, std::unique_ptr<juce::JavascriptEngine>> engines;
     ScriptHostApi* host = nullptr;
+    juce::StringArray enabledModules;
 };
 
 } // namespace

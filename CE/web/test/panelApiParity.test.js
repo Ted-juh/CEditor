@@ -31,6 +31,8 @@ import {
   handlerNamesForRuntime, PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, MEMBER_MODULE, moduleMemberMap, memberPath,
   MODULE_EXT_ROOT, isExtensionModule, modulesForRuntime, isValueMember,
+  MODULE_COST, MODULE_COST_LANGUAGES, resolveModules, modulesUsedBy, panelModules,
+  panelModuleCost, costKeyFor, moduleGateMessage, MODULE_CORE, COST_SHARED_KEY,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
@@ -328,4 +330,176 @@ test('a runtime is only asked for the modules it can actually carry', () => {
   assert.ok(webview.includes('ce.components.setlist'), 'the panel view carries the component modules');
   assert.ok(!player.includes('ce.components.setlist'), 'the window-closed runtime does not');
   assert.ok(player.includes('ce.midi') && player.includes('ce.math'), 'and does carry the cross-runtime ones');
+});
+
+/* ------------------------------------------------------- module opt-in, and what it costs */
+
+// Every prelude carries `@module <id>` marker lines. This reads them back so the tests below can
+// ask "which module owns this line", which is what makes the cross-module dependency check
+// possible at all.
+const PRELUDE_SOURCES = [
+  { language: 'lua', file: 'LuaScriptEngine.cpp', open: 'R"LUA(', close: ')LUA";' },
+  { language: 'javascript', file: 'JsScriptEngine.cpp', open: 'R"JS(', close: ')JS";' },
+  { language: 'python', file: 'PythonScriptEngine.cpp', open: 'R"PY(', close: ')PY";' },
+];
+const MARKER = /^\s*(?:--|\/\/|#)\s*@module\s+(\S+)\s*$/;
+
+function preludeRegions({ file, open, close }) {
+  const text = readEngine(file);
+  const from = text.indexOf(open);
+  const to = text.indexOf(close, from);
+  assert.ok(from !== -1 && to !== -1, `could not bound the prelude in ${file}`);
+
+  const regions = new Map();   // marker id -> its source
+  let current = '-';
+  for (const line of text.slice(from + open.length, to).split('\n')) {
+    const m = MARKER.exec(line);
+    if (m) { current = m[1]; continue; }
+    regions.set(current, (regions.get(current) ?? '') + line + '\n');
+  }
+  return regions;
+}
+
+test('a prelude region only calls members its module declares a dependency on', () => {
+  // The bug this exists for: ce.midi's sendNote(1, "C4", …) resolves the name with noteNumber(),
+  // which belongs to ce.music. Gate ce.music away and sendNote reads a stub and sends note 0 —
+  // silently. `requires` is the place that has to know, so this walks the actual prelude source
+  // and fails if a region reaches outside its module's declared closure.
+  const owner = {};   // global name -> owning module id
+  for (const [memberId, at] of Object.entries(MEMBER_MODULE)) owner[memberId] = at.module;
+
+  const problems = [];
+  for (const source of PRELUDE_SOURCES) {
+    for (const [regionId, code] of preludeRegions(source)) {
+      if (regionId === '-') continue;                 // shared region owes nothing to anyone
+      // A region marked with a GROUP (ce.components) covers several modules; take the closure of
+      // all of them, which is the weakest claim the manifest makes about that block.
+      const covered = MODULES.map((m) => m.id).filter((id) => id === regionId || id.startsWith(`${regionId}.`));
+      if (!covered.length) continue;
+      const allowed = new Set(resolveModules(covered).enabled);
+
+      for (const [name, ownerModule] of Object.entries(owner)) {
+        if (allowed.has(ownerModule)) continue;
+        if (!new RegExp(`\\b${escapeRe(name)}\\s*\\(`).test(code)) continue;
+        problems.push(`${source.language} @module ${regionId} calls ${name}() from ${ownerModule}`
+          + ` — add "${ownerModule}" to ${regionId}'s requires`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], problems.join('\n'));
+});
+
+test('every prelude marker names a module we know about, and every module with a prelude is marked', async () => {
+  const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
+  assert.doesNotThrow(() => gen.checkCostKeys(gen.measureAll()));
+
+  // A module that carries members in a prelude but has no marker would silently bill its bytes to
+  // the shared bucket, which is how a cost table stops being true.
+  const marked = new Set();
+  for (const source of PRELUDE_SOURCES) for (const id of preludeRegions(source).keys()) marked.add(id);
+  for (const m of MODULES) {
+    if (m.global) continue;                                       // ce.core lives in host bindings
+    const key = costKeyFor(m.id);
+    assert.ok(key && marked.has(key), `${m.id} has no @module marker in any prelude (billed to "${COST_SHARED_KEY}")`);
+  }
+});
+
+test('the measured cost table matches what the preludes actually weigh', async () => {
+  // MODULE_COST is generated. If a prelude grew and nobody regenerated, the Export tab would show
+  // a number that used to be true — which is worse than showing none.
+  const gen = await import('../../../tools/scripts/gen-script-modules.mjs');
+  const fresh = gen.costFile();
+  const committed = readFileSync(
+    join(here, '..', 'src', 'CE_Application', 'scripting', 'moduleCost.generated.js'), 'utf8');
+  assert.equal(committed, fresh,
+    'moduleCost.generated.js is stale — run: node tools/scripts/gen-script-modules.mjs --write');
+
+  for (const m of MODULES) {
+    if (m.global) continue;
+    const key = costKeyFor(m.id);
+    const bytes = MODULE_COST_LANGUAGES.reduce((n, l) => n + (MODULE_COST[key]?.[l] ?? 0), 0);
+    assert.ok(bytes > 0, `${m.id} measures as free, which no module is`);
+  }
+});
+
+test('resolveModules closes over requires and always keeps ce.core', () => {
+  const bare = resolveModules([]);
+  assert.deepEqual(bare.enabled, [MODULE_CORE], 'declaring nothing still leaves the always-on module');
+
+  const midi = resolveModules(['ce.midi']);
+  assert.ok(midi.enabled.includes('ce.music'),
+    'ce.midi pulls in ce.music, because sendNote resolves note names with noteNumber');
+  assert.ok(midi.added.includes('ce.music'), 'and reports it as pulled in, so the UI can say why');
+
+  const typo = resolveModules(['ce.middi']);
+  assert.deepEqual(typo.unknown, ['ce.middi'], 'an unknown id is reported, not silently dropped');
+  assert.ok(!typo.enabled.includes('ce.middi'));
+
+  // Manifest order, not declaration order — two panels with the same set produce the same list.
+  const a = resolveModules(['ce.storage', 'ce.midi']).enabled;
+  const b = resolveModules(['ce.midi', 'ce.storage']).enabled;
+  assert.deepEqual(a, b);
+});
+
+test('auto-detection reads both spellings of a member', () => {
+  assert.deepEqual(modulesUsedBy('function f(){ sendCC(1,74,100); }'), ['ce.midi']);
+  assert.deepEqual(modulesUsedBy('function f(){ ce.midi.sendCC(1,74,100); }'), ['ce.midi']);
+  assert.deepEqual(modulesUsedBy('local midi = ce.midi'), ['ce.midi'], 'a module taken wholesale counts');
+  assert.deepEqual(modulesUsedBy('function f(){ setlistNext("s") }'), ['ce.components.setlist']);
+  assert.deepEqual(modulesUsedBy('function f(){ set("a", 1) }'), [],
+    'ce.core is never gated, so it is never scanned for');
+  assert.deepEqual(modulesUsedBy(''), []);
+});
+
+test('a panel with no declaration follows its scripts, and an explicit list is obeyed', () => {
+  const scripts = [{ source: 'function onX(){ sendCC(1, 74, 100) }' }];
+
+  const auto = panelModules({ scripts });
+  assert.equal(auto.mode, 'auto');
+  assert.deepEqual(auto.enabled, ['ce.core', 'ce.midi', 'ce.music']);
+
+  const manual = panelModules({ scripts, scripting: { modules: ['ce.math'] } });
+  assert.equal(manual.mode, 'manual');
+  assert.deepEqual(manual.enabled, ['ce.core', 'ce.math'],
+    'an explicit list is the panel\'s decision, even where it contradicts the scan');
+
+  // An EMPTY explicit list is still explicit — "I want nothing but ce.core" is expressible.
+  assert.deepEqual(panelModules({ scripts, scripting: { modules: [] } }).enabled, ['ce.core']);
+
+  // Per-control scripts count too, or a panel that keeps its logic on the controls auto-detects
+  // as empty and loses its whole API.
+  const onControl = panelModules({
+    controls: [{ _children: { Scripts: { scripts: [{ source: 'function onX(){ splitMute(1, true) }' }] } } }],
+  });
+  assert.ok(onControl.enabled.includes('ce.components.split'));
+});
+
+test('the cost of a panel is the sum of what it turned on', () => {
+  const cost = panelModuleCost({ scripting: { modules: ['ce.math'] } });
+  assert.equal(cost.modules.length, 1, 'ce.core has no prelude of its own — its bytes are shared');
+  assert.equal(cost.modules[0].key, 'ce.math');
+  assert.ok(cost.total > 0 && cost.total === cost.modules[0].bytes);
+  assert.ok(cost.shared > 0, 'the shared baseline is real and is reported separately');
+  assert.ok(cost.unused.has('ce.midi'), 'and what declaring less would save is reported too');
+
+  // The five component families share one stub block, billed once rather than five times.
+  const one = panelModuleCost({ scripting: { modules: ['ce.components.split'] } });
+  const all = panelModuleCost({
+    scripting: { modules: MODULES.filter((m) => m.id.startsWith('ce.components.')).map((m) => m.id) },
+  });
+  assert.equal(one.total, all.total, 'ce.components is billed as one indivisible block');
+  assert.equal(all.modules.length, 1);
+  assert.equal(all.modules[0].ids.length, 5, '…and says which five modules it covers');
+});
+
+test('a gated member explains itself in the same words everywhere', () => {
+  const msg = moduleGateMessage('sendCC');
+  assert.ok(msg.includes('sendCC()'), 'names the member');
+  assert.ok(msg.includes('ce.midi'), 'names the module');
+  assert.ok(msg.includes('Scripting Modules'), 'says where to turn it on');
+  // The same sentence is compiled into the three C++ preludes, via the generator.
+  for (const source of PRELUDE_SOURCES) {
+    assert.ok(readEngine(source.file).includes('{member}() needs the {module} module'),
+      `${source.file} carries the shared gate template`);
+  }
 });

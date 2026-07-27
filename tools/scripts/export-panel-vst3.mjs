@@ -257,6 +257,23 @@ mkdirSync(outDir, { recursive: true });
   if (fixed) console.log(`TypeScript: transpiled ${fixed} handler(s) to compiledJs for the shipped runtime`);
 }
 
+// Resolve the panel's scripting modules and BAKE the result in. `auto` (no declaration) is derived
+// from what the scripts actually reference; an explicit list is closed over `requires`. Either way
+// the shipped plugin reads a plain list — it has no scanner and should not need one, and resolving
+// once here means the editor and the player can never disagree about which modules are on.
+{
+  const api = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/scripting/panelApi.js')).href);
+  const resolved = api.panelModules(panelDoc);
+  if (resolved.unknown.length) {
+    console.warn(`  WARNING: unknown scripting module(s) ignored: ${resolved.unknown.join(', ')}`);
+  }
+  panelDoc.scripting = { ...(panelDoc.scripting ?? {}), modules: resolved.enabled, apiVersion: api.CE_API_VERSION };
+  const cost = api.panelModuleCost(panelDoc);
+  console.log(`Scripting: ${resolved.enabled.length} module(s) [${resolved.mode}] — ${resolved.enabled.join(', ')}`);
+  console.log(`  surface ${(cost.total / 1024).toFixed(1)} KB across ${cost.languages.join(', ')}`
+    + ` (+${(cost.shared / 1024).toFixed(1)} KB shared baseline)`);
+}
+
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);
 panelDoc.exportParameters = ep.deriveExportParameters(panelDoc);
 const bakedPanel = path.join(outDir, `${productName}.cepanel`);

@@ -9,7 +9,10 @@
 // This is a lightweight scan, not a parser — it may miss matches inside comments/strings.
 // Native syntax checking comes from the code editor / the runtime later.
 
-import { ALL_MEMBERS, EVENT_BY_ID, ALL_EVENTS, isValidInScope, WEBVIEW_ONLY_MEMBERS } from './panelApi.js';
+import {
+  ALL_MEMBERS, EVENT_BY_ID, ALL_EVENTS, isValidInScope, WEBVIEW_ONLY_MEMBERS,
+  MEMBER_MODULE, MODULE_BY_ID, modulesUsedBy, panelModules, memberPath,
+} from './panelApi.js';
 
 const EVENT_FNS = new Set(ALL_EVENTS.map((e) => e.fn));
 const EVENT_IDS = new Set(ALL_EVENTS.map((e) => e.id));
@@ -29,12 +32,40 @@ function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/** Validate one source-based script → array of { severity, message }. */
-export function validateScript(script) {
+/** Validate one source-based script → array of { severity, message }.
+ *
+ * `panel` is optional. Pass it and the script is also checked against the panel's declared
+ * scripting modules, which is the only way to catch a gated call before it runs. Omit it and
+ * every other check behaves exactly as before. */
+export function validateScript(script, panel = null) {
   if (!script || typeof script.source !== 'string') return [];
   const problems = [];
   const src = script.source;
   const scope = script.scope || 'component';
+
+  // 0) Modules the script reaches for that the panel has not declared. Only ever reported for a
+  //    MANUAL list: on `auto` the declaration follows the source by construction, so there is
+  //    nothing a user could act on.
+  if (panel) {
+    const { mode, enabled } = panelModules(panel);
+    if (mode === 'manual') {
+      const missing = modulesUsedBy(src).filter((id) => !enabled.includes(id));
+      for (const moduleId of missing) {
+        const used = Object.entries(MEMBER_MODULE)
+          .filter(([, at]) => at.module === moduleId)
+          .map(([memberId]) => memberId)
+          .filter((memberId) => new RegExp(`\\b${escapeRe(memberId)}\\b`).test(src))
+          .slice(0, 3);
+        const examples = used.length ? ` (${used.map((id) => memberPath(id)).join(', ')})` : '';
+        problems.push({
+          severity: 'error',
+          message: `Uses ${moduleId}${examples}, which this panel has not enabled. `
+            + `Add "${moduleId}" under Scripting Modules on the Export tab, or clear the list to `
+            + 'let it follow the scripts. Until then those calls log a notice instead of acting.',
+        });
+      }
+    }
+  }
 
   // 1) Handler presence — the script should define a function for the event it runs on.
   //    Matches Lua/JS (`function name(`), Python (`def name(`), and C++ (`void name(`).
@@ -103,11 +134,11 @@ export function validateScript(script) {
 }
 
 /** Rollup for a list of scripts — counts by severity. */
-export function validationSummary(scripts) {
+export function validationSummary(scripts, panel = null) {
   let errors = 0;
   let warnings = 0;
   for (const s of scripts || []) {
-    for (const p of validateScript(s)) {
+    for (const p of validateScript(s, panel)) {
       if (p.severity === 'error') errors += 1;
       else warnings += 1;
     }
