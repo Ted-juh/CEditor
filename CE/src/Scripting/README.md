@@ -109,7 +109,9 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Values | `set` `get` | everywhere |
 | Transmit | `noTransmit` `transmit` | everywhere — they gate `set()`, **not** the explicit senders. `sendCC` inside `noTransmit` still sends. |
 | Events & flow | `on` `off` `emit` `run` `startTimer` `stopTimer` | everywhere |
-| Device / MIDI | `sendCC` `sendNRPN` `sendSysex` `requestDump` `applyDump` `sendDump` `buildDump` `checksum` `panic` | everywhere |
+| Device / MIDI | `sendCC` `sendNRPN` `sendSysex` `sendMidi` `requestDump` `applyDump` `sendDump` `buildDump` `checksum` `panic` | everywhere |
+| Channel messages | `sendNote` `sendNoteOff` `sendProgramChange` `sendPitchBend` `sendAftertouch` `sendClock` `sendTransport` | everywhere — arithmetic over `sendMidi`, defined in each prelude |
+| Storage | `state` `saveSetting` `loadSetting` | everywhere |
 | Debug | `log` | everywhere |
 | Helpers | `scale` `clamp` `round` `snap` `curve` `lerp` `noteName` `noteNumber` + 14 MIDI-encoding helpers | everywhere (pure, defined in each prelude) |
 | Panel components | 47 verbs: `split*` `phrase*` `recorder*` `harmony*` `setlist*` | **panel view only** — see below |
@@ -117,6 +119,17 @@ index had to be floored first. `solToVar` already folded the other direction; th
 `checksum(type, bytes)` takes `"roland"`/`"yamaha"` (the same two's-complement 7-bit sum, both
 spellings accepted), `"sum"`, or `"xor"`. `panic([opts])` expands to All Sound Off → All Notes Off →
 Reset All Controllers, which is why it is portable to every runtime: it is three `sendCC` calls.
+
+The channel-message row is the same trick one level down. `sendMidi(bytes)` is the only new host
+primitive; `sendNote(1, "C4", 100)` is `sendMidi({0x90, 60, 100})` computed in the prelude, so no
+engine can disagree about a byte. Note arguments take a number or a name — `noteName(60)` is `"C4"`
+(scientific pitch notation, middle C = C4), and `sendNote` accepts either spelling.
+
+`state` is a plain table (Lua/JS) or namespace (Python) that lives in the script's own environment:
+scratch that survives between handler calls in one session and is cleared when the script reloads.
+`saveSetting`/`loadSetting` are the durable pair — the player stores them in the DAW session as a
+`ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
+the same two verbs either way.
 
 ### Value representations (Q8)
 `get`/`set` take the accessor either as a path **suffix** or as a second **argument** — both work

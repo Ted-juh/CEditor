@@ -34,6 +34,22 @@ public:
     { ccSends.add (juce::String (ch) + ":" + juce::String (cc) + ":" + v.toString()); }
 
     void sendNRPN (int, int, int, const juce::var&) override {}
+
+    // Raw byte sends, recorded as hex so a test can assert the exact wire bytes — which is where a
+    // status nibble or an lsb/msb swap actually hides.
+    juce::StringArray rawSends;
+    void sendMidi (const juce::var& bytes) override
+    {
+        juce::StringArray hex;
+        if (auto* arr = bytes.getArray())
+            for (const auto& b : *arr) hex.add (juce::String::toHexString ((int) b).paddedLeft ('0', 2).toUpperCase());
+        rawSends.add (hex.joinIntoString (" "));
+    }
+
+    std::map<juce::String, juce::var> settings;
+    void saveSetting (const juce::String& key, const juce::var& value) override { settings[key] = value; }
+    juce::var loadSetting (const juce::String& key) override
+    { auto it = settings.find (key); return it != settings.end() ? it->second : juce::var(); }
     void sendSysex (const juce::var&) override {}
     void requestDump (const juce::String&) override {}
     void applyDump (const juce::var&) override {}
@@ -315,6 +331,88 @@ int main()
     check (host.logs.contains ("js clamp 3"),   "ce.math.clamp works through the namespace (JS)");
     check (host.ccSends.contains ("3:12:100"),  "a namespaced call reaches the host (JS)");
     check (errors.isEmpty(), "the generated namespace block loaded without error");
+
+    // 12) ce.midi channel messages ---------------------------------------------------------------
+    // A script could turn a knob but not make a sound until these landed. Assert the exact bytes:
+    // a swapped pitch-bend lsb/msb or a wrong status nibble is silent until a synth misbehaves.
+    juce::Array<juce::var> noteScripts;
+    noteScripts.add (makeScript ("notes", "lua", "panel", "onNotes", "*",
+        "function onNotes()\n"
+        "  sendNote(1, 60, 100)\n"
+        "  sendNote(2, \"C4\", 64)\n"        // a note NAME, not a number (middle C is C4)
+        "  sendNoteOff(1, 60)\n"
+        "  sendProgramChange(3, 5)\n"
+        "  sendPitchBend(1, 8192)\n"
+        "  sendPitchBend(1, 0)\n"
+        "  sendAftertouch(1, 90)\n"
+        "  sendAftertouch(1, 90, 64)\n"
+        "  sendClock()\n"
+        "  sendTransport(\"stop\")\n"
+        "end\n"
+        "function onBankChange()\n  sendProgramChange(1, 7, 2, 3)\nend\n"));
+    noteScripts.add (makeScript ("notesjs", "javascript", "panel", "onNotesJs", "*",
+        "function onNotesJs() { ce.midi.sendNote(1, 60, 100); ce.midi.sendPitchBend(1, 0); }"));
+    runtime.loadScripts (juce::var (noteScripts));
+
+    host.rawSends.clear();
+    host.ccSends.clear();
+    errors.clear();
+    runtime.dispatchEvent ("onNotes", "panel", juce::var());
+    check (host.rawSends[0] == "90 3C 64", "sendNote: note on, channel 1 (got " + host.rawSends[0] + ")");
+    check (host.rawSends[1] == "91 3C 40", "sendNote: a note NAME resolves, channel 2 (got " + host.rawSends[1] + ")");
+    check (host.rawSends[2] == "80 3C 00", "sendNoteOff: release velocity defaults to 0");
+    check (host.rawSends[3] == "C2 05",    "sendProgramChange: status C2 for channel 3");
+    check (host.rawSends[4] == "E0 00 40", "sendPitchBend: centre 8192 is lsb 0, msb 64");
+    check (host.rawSends[5] == "E0 00 00", "sendPitchBend: 0 is fully down");
+    check (host.rawSends[6] == "D0 5A",    "sendAftertouch: channel pressure");
+    check (host.rawSends[7] == "A0 40 5A", "sendAftertouch: poly pressure when a note is given");
+    check (host.rawSends[8] == "F8",       "sendClock");
+    check (host.rawSends[9] == "FC",       "sendTransport(stop)");
+
+    // Bank select must precede the program change — a device applies the bank in force when the PC
+    // lands, so the other order selects from the previous bank.
+    host.rawSends.clear();
+    host.ccSends.clear();
+    runtime.runAction ("onBankChange", juce::var());
+    check (host.ccSends.size() == 2 && host.ccSends[0] == "1:0:2" && host.ccSends[1] == "1:32:3",
+           "sendProgramChange: bank MSB then LSB, both before the program change");
+    check (host.rawSends.size() == 1 && host.rawSends[0] == "C0 07", "…then the program change itself");
+
+    host.rawSends.clear();
+    runtime.dispatchEvent ("onNotesJs", "panel", juce::var());
+    check (host.rawSends[0] == "90 3C 64", "ce.midi.sendNote assembles the same bytes in JS");
+    check (host.rawSends[1] == "E0 00 00", "ce.midi.sendPitchBend agrees across engines");
+    check (errors.isEmpty(), "no errors from the message verbs");
+
+    // 13) ce.storage ------------------------------------------------------------------------------
+    juce::Array<juce::var> storeScripts;
+    storeScripts.add (makeScript ("store", "lua", "panel", "onStore", "*",
+        "function onStore()\n"
+        "  state.count = (state.count or 0) + 1\n"
+        "  log(\"count \" .. tostring(state.count))\n"
+        "  saveSetting(\"lastPatch\", 42)\n"
+        "  log(\"read \" .. tostring(loadSetting(\"lastPatch\")))\n"
+        "  log(\"fallback \" .. tostring(loadSetting(\"never\", \"none\")))\n"
+        "end\n"));
+    runtime.loadScripts (juce::var (storeScripts));
+
+    host.logs.clear();
+    host.settings.clear();
+    runtime.dispatchEvent ("onStore", "panel", juce::var());
+    check (host.logs.contains ("count 1"), "state starts empty");
+    check (host.logs.contains ("read 42"), "saveSetting/loadSetting round-trip through the host");
+    check (host.logs.contains ("fallback none"), "loadSetting returns the fallback for an unknown key");
+
+    // state must SURVIVE the next dispatch — that is the whole point of it.
+    host.logs.clear();
+    runtime.dispatchEvent ("onStore", "panel", juce::var());
+    check (host.logs.contains ("count 2"), "state persists between handler calls");
+
+    // …and must NOT survive a reload, or a re-edited script inherits stale state.
+    runtime.loadScripts (juce::var (storeScripts));
+    host.logs.clear();
+    runtime.dispatchEvent ("onStore", "panel", juce::var());
+    check (host.logs.contains ("count 1"), "state is cleared when the script reloads");
 
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";

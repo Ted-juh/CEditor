@@ -58,6 +58,32 @@ const char* kAccessorPanel = R"JSON({
     } }
   ]
 })JSON";
+
+// Slice 2, window-closed: the ce.midi channel-message verbs and the ce.storage pair. The script
+// reaches for them through the MODULE namespace (ce.midi.sendNote, ce.storage.saveSetting) rather
+// than the bare globals, so this also proves the generated `ce.*` block survives the export path.
+const char* kModulePanel = R"JSON({
+  "name": "Modules",
+  "scripting": { "enabled": true, "runOnExport": true },
+  "scripts": [
+    { "id": "mod", "name": "mod", "language": "lua", "scope": "panel", "event": "onReadBack", "target": "*", "enabled": true,
+      "source": "function onNotes()\n  ce.midi.sendNote(1, \"C4\", 100)\n  ce.midi.sendProgramChange(2, 5)\n  ce.midi.sendPitchBend(1, 8192)\n  ce.midi.sendClock()\nend\nfunction onSettings()\n  local n = ce.storage.loadSetting(\"count\", 0)\n  ce.storage.saveSetting(\"count\", n + 1)\n  log(\"count \" .. tostring(ce.storage.loadSetting(\"count\", 0)))\n  log(\"missing \" .. tostring(ce.storage.loadSetting(\"nope\", \"fallback\")))\n  ce.storage.state.seen = (ce.storage.state.seen or 0) + 1\n  log(\"seen \" .. tostring(state.seen))\nend\n" }
+  ],
+  "controls": [
+    { "_type": "Control", "_children": {
+      "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+      "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 127 },
+      "Value": { "_type": "Value", "value": 0 }
+    } }
+  ]
+})JSON";
+
+juce::String hex (const juce::Array<int>& bytes)
+{
+    juce::StringArray out;
+    for (auto b : bytes) out.add (juce::String::toHexString (b).paddedLeft ('0', 2).toUpperCase());
+    return out.joinIntoString (" ");
+}
 } // namespace
 
 int main()
@@ -156,6 +182,72 @@ int main()
         accRuntime.runAction ("onMidiForm", juce::var());
         check (accLogs.joinIntoString ("\n").contains ("needs the device host"),
                ".midiValue explains itself rather than returning a quiet nothing");
+    }
+
+    // --- slice 2: ce.midi channel messages + ce.storage, window-closed -----------------------
+    {
+        PanelValueModel modModel;
+        check (modModel.loadFromJson (kModulePanel), "loaded the module panel");
+
+        juce::StringArray modLogs, midiOut;
+        // Stand in for PluginProcessor's `scriptSettings` NamedValueSet, which it now writes into
+        // the DAW session as a ScriptSettings child. Same shape, same lifetime within a session.
+        juce::NamedValueSet settings;
+
+        BridgeScriptHost::Callbacks mcb;
+        mcb.getValue = [&] (const juce::String& p, const juce::String& f) { return modModel.getValue (p, f); };
+        mcb.setValue = [&] (const juce::String& p, const juce::var& v, bool, const juce::String& f) { modModel.setValue (p, v, f); };
+        mcb.log      = [&] (const juce::String& m, const juce::var&) { modLogs.add (m); };
+        mcb.sendCC   = [] (int, int, const juce::var&) {};
+        mcb.sendNRPN = [] (int, int, int, const juce::var&) {};
+        mcb.sendSysex = [] (const juce::var&) {};
+        mcb.requestDump = [] (const juce::String&) {};
+        mcb.applyDump = [] (const juce::var&) {};
+        mcb.sendDump = [] (const juce::String&) {};
+        mcb.buildDump = [] (const juce::String&) { return juce::var(); };
+        // Byte-for-byte what PluginProcessor's cb.sendMidi clamps and forwards to the MIDI port.
+        mcb.sendMidi = [&] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
+            if (! b.isEmpty()) midiOut.add (hex (b));
+        };
+        mcb.saveSetting = [&] (const juce::String& k, const juce::var& v) { settings.set (k, v); };
+        mcb.loadSetting = [&] (const juce::String& k) { return settings.getWithDefault (k, juce::var()); };
+
+        BridgeScriptHost modHost (std::move (mcb));
+        ScriptRuntime modRuntime (modHost);
+        modHost.attachRuntime (&modRuntime);
+        modRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        modRuntime.loadScripts (gatherPanelScripts (modModel.panel()));
+
+        modRuntime.runAction ("onNotes", juce::var());
+        check (midiOut.size() == 4, "four channel messages reached the host (got " + juce::String (midiOut.size()) + ")");
+        check (midiOut[0] == "90 3C 64", "sendNote(1, \"C4\", 100) -> 90 3C 64 (got " + midiOut[0] + ")");
+        check (midiOut[1] == "C1 05",    "sendProgramChange(2, 5) -> C1 05 (got " + midiOut[1] + ")");
+        check (midiOut[2] == "E0 00 40", "sendPitchBend centre -> E0 00 40 (got " + midiOut[2] + ")");
+        check (midiOut[3] == "F8",       "sendClock -> F8 (got " + midiOut[3] + ")");
+
+        modRuntime.runAction ("onSettings", juce::var());
+        check (modLogs.contains ("count 1"), "saveSetting/loadSetting round-trip through the host store");
+        check (modLogs.contains ("missing fallback"), "loadSetting returns the fallback for an unset key");
+        check (modLogs.contains ("seen 1"), "state is per-script scratch, reachable bare and via ce.storage");
+        check ((int) settings.getWithDefault ("count", juce::var (0)) == 1,
+               "the setting landed in the host's own store, not just the script's");
+
+        // Second dispatch: the setting persists across calls, and so does `state` until reload.
+        modLogs.clear();
+        modRuntime.runAction ("onSettings", juce::var());
+        check (modLogs.contains ("count 2"), "the saved setting survives the next dispatch");
+        check (modLogs.contains ("seen 2"), "state survives the next dispatch");
+
+        // Reloading the scripts is what clears `state` — the settings store is untouched.
+        modLogs.clear();
+        modRuntime.loadScripts (gatherPanelScripts (modModel.panel()));
+        modRuntime.runAction ("onSettings", juce::var());
+        check (modLogs.contains ("seen 1"), "reloading the scripts clears state");
+        check (modLogs.contains ("count 3"), "reloading the scripts does NOT clear saved settings");
     }
 
     std::cout << "--------------------------------------------\n"

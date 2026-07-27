@@ -280,6 +280,7 @@ A registry stays possible and stays deferred; the manifest already carries `id`,
    aliases. No new functionality; the parity and prelude-agreement suites stay green throughout,
    which is the proof the conversion is faithful. ✅ *done*
 2. **Phase-1 capability** — `ce.midi` note/PC/bend/aftertouch/clock, `ce.storage` state + settings.
+   ✅ *done*
 3. **Opt-in + cost** — a panel declares its modules, the exporter bundles only those, the Export tab
    reports the size.
 4. **Picker filtering** — the editor hides members from modules a panel has not enabled.
@@ -304,3 +305,27 @@ Two things the work turned up:
   Python hand over `100` — the same asymmetry `varToSol` already folded for Lua. Numerically
   harmless, but anything stringifying a script value printed differently per language. Folded at the
   single point every JS argument crosses.
+
+### How slice 2 landed
+
+Eleven members, all cross-runtime: `sendMidi`, `sendNote`, `sendNoteOff`, `sendProgramChange`,
+`sendPitchBend`, `sendAftertouch`, `sendClock`, `sendTransport` in `ce.midi`, and `state`,
+`saveSetting`, `loadSetting` in `ce.storage`.
+
+Only **three** of them are host primitives — `sendMidi`, `saveSetting`, `loadSetting`. They are new
+virtuals on `ScriptHostApi`, new `BridgeScriptHost` callbacks, and three appended slots on the native
+handler vtable (`CE_ABI_VERSION` still 1: the append is compatible by construction, a bump would
+disown every module already built). Everything else — every note, program change, bend, aftertouch,
+clock and transport message — is arithmetic over `sendMidi` inside the shared prelude, so the five
+runtimes cannot disagree about a byte. `state` is a plain per-script table living in the script's own
+environment, which is what makes reloading a script clear it.
+
+Where the settings land is the host's business, and each host answers differently: the player writes
+them into the DAW session as a `ScriptSettings` child of its state, the editor keeps them under
+`panel.scripting.settings`. The script sees one pair of verbs either way.
+
+One documentation bug surfaced while testing the byte output: `panelApi.js` said `noteName(60)`
+returns `"C3"`, while all four implementations return `"C4"` — scientific pitch notation, where
+middle C is C4. The runtimes agreed with each other and disagreed with the doc, so **the doc was
+wrong and was fixed.** Changing the code instead would have shifted every existing script's notes by
+an octave to satisfy a sentence nobody had implemented.

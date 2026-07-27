@@ -33,6 +33,7 @@ public:
         std::function<void (int ch, int cc, const juce::var& value)> sendCC;
         std::function<void (int ch, int msb, int lsb, const juce::var& value)> sendNRPN;
         std::function<void (const juce::var& bytes)> sendSysex;
+        std::function<void (const juce::var& bytes)> sendMidi;   // raw bytes, no wrapping
         std::function<void (const juce::String& kind)> requestDump;
         std::function<void (const juce::var& bytes)> applyDump;   // host should run inside an InboundScope
         std::function<void (const juce::String& kind)> sendDump;
@@ -47,6 +48,10 @@ public:
         // Timers.
         std::function<void (const juce::String& id, int intervalMs)> startTimer;
         std::function<void (const juce::String& id)> stopTimer;
+        // Settings that outlive the session (ce.storage). Optional: unset means the panel simply
+        // has nowhere to persist, and loadSetting always returns the fallback.
+        std::function<void (const juce::String& key, const juce::var& value)> saveSetting;
+        std::function<juce::var (const juce::String& key)> loadSetting;
     };
 
     explicit BridgeScriptHost (Callbacks cb) : callbacks (std::move (cb)) {}
@@ -132,6 +137,7 @@ public:
     void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
     void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
     void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (bytes); }
+    void sendMidi (const juce::var& bytes) override                  { if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (bytes); }
     void requestDump (const juce::String& kind) override             { if (callbacks.requestDump) callbacks.requestDump (kind); }
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
@@ -152,6 +158,10 @@ public:
     void log (const juce::String& message, const juce::var& value) override { if (callbacks.log) callbacks.log (message, value); }
     void startTimer (const juce::String& id, int intervalMs) override { if (callbacks.startTimer) callbacks.startTimer (id, intervalMs); }
     void stopTimer  (const juce::String& id) override { if (callbacks.stopTimer) callbacks.stopTimer (id); }
+    void saveSetting (const juce::String& key, const juce::var& value) override
+    { if (callbacks.saveSetting) callbacks.saveSetting (key, value); }
+    juce::var loadSetting (const juce::String& key) override
+    { return callbacks.loadSetting ? callbacks.loadSetting (key) : juce::var(); }
 
 private:
     // Scope (Q7) is NOT enforced here, and that is a decision rather than an omission. The

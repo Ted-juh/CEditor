@@ -493,7 +493,42 @@ function sendRawMidi(bytes, actionId) {
   }
 }
 
+// MIDI channel messages — arithmetic over one raw-byte send, the way panic() is over sendCC, which
+// is what makes them identical in every runtime and every exported language. `note` accepts a MIDI
+// number or a name ("C3"), because a script that reads musically should be allowed to say so.
+const midiCh = (c) => midiInt(c, 1, 16) - 1;
+const midiNote = (n) => (typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
+
 const midiApi = {
+  sendMidi: (bytes) => {
+    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    if (!b.length) { addScriptTrace('error', '', 'sendMidi: no bytes given'); return; }
+    sendRawMidi(b, 'raw');
+  },
+  sendNote: (ch, note, velocity) =>
+    sendRawMidi([0x90 | midiCh(ch), midiNote(note), midiInt(velocity, 0, 127)], `note_${midiNote(note)}`),
+  sendNoteOff: (ch, note, velocity) =>
+    sendRawMidi([0x80 | midiCh(ch), midiNote(note), midiInt(velocity ?? 0, 0, 127)], `noteoff_${midiNote(note)}`),
+  sendProgramChange: (ch, program, bankMsb, bankLsb) => {
+    // Bank select first: a device applies the bank that was in force when the program change lands.
+    const s = 0xB0 | midiCh(ch);
+    if (bankMsb !== undefined && bankMsb !== null) sendRawMidi([s, 0, midiInt(bankMsb, 0, 127)], 'cc_0');
+    if (bankLsb !== undefined && bankLsb !== null) sendRawMidi([s, 32, midiInt(bankLsb, 0, 127)], 'cc_32');
+    sendRawMidi([0xC0 | midiCh(ch), midiInt(program, 0, 127)], `pc_${midiInt(program, 0, 127)}`);
+  },
+  sendPitchBend: (ch, value) => {
+    const v = midiInt(value ?? 8192, 0, 16383);
+    sendRawMidi([0xE0 | midiCh(ch), v % 128, Math.floor(v / 128) % 128], 'bend');
+  },
+  sendAftertouch: (ch, pressure, note) => (note === undefined || note === null
+    ? sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch')
+    : sendRawMidi([0xA0 | midiCh(ch), midiNote(note), midiInt(pressure, 0, 127)], 'polyaftertouch')),
+  sendClock: () => sendRawMidi([0xF8], 'clock'),
+  sendTransport: (action) => {
+    const a = String(action ?? 'start').toLowerCase();
+    sendRawMidi([a === 'stop' ? 0xFC : a === 'continue' ? 0xFB : 0xFA], `transport_${a}`);
+  },
+
   sendCC: (ch, cc, v) =>
     sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
   sendNRPN: (ch, msb, lsb, v) => {
@@ -840,6 +875,41 @@ function stopAllTimers() {
 // panels record it so the runtime can tell "written for an older API" from "broken".
 const CE_API_VERSION = '1.0';
 
+/* ------------------------------------------------------------------------------ ce.storage */
+// Two lifetimes, deliberately kept apart. `state` lives as long as the script is loaded — in the
+// C++ engines that falls out of the per-script environment for free, and here it falls out of the
+// handler cache, so both behave the same. Settings outlive the session: they go into the panel
+// document under scripting.settings, which is what makes them travel with the panel and survive an
+// export. In the player the document is in memory, so they last the session and ride along in the
+// DAW state the plugin already saves.
+
+const scriptState = new Map();   // scriptId -> the script's own scratch table
+
+function stateFor(scriptId) {
+  if (!scriptState.has(scriptId)) scriptState.set(scriptId, {});
+  return scriptState.get(scriptId);
+}
+
+function settingsStore() {
+  const panel = activePanel();
+  if (!panel) return null;
+  panel.scripting ??= {};
+  panel.scripting.settings ??= {};
+  return panel.scripting.settings;
+}
+
+function saveSetting(key, value) {
+  const store = settingsStore();
+  if (!store) { addScriptTrace('error', '', `saveSetting("${key}"): no active panel to store it on`); return; }
+  store[String(key)] = value;
+}
+
+function loadSetting(key, fallback) {
+  const store = settingsStore();
+  const v = store?.[String(key)];
+  return v === undefined ? fallback : v;
+}
+
 function buildApi(ownerName, scriptId = '') {
   const self = {
     set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
@@ -871,6 +941,10 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.storage
+    state: stateFor(scriptId),
+    saveSetting: (key, value) => saveSetting(key, value),
+    loadSetting: (key, fallback) => loadSetting(key, fallback),
     // The blocks gate set()'s transmission, not the explicit senders — same rule as the C++ host.
     // finally, not catch-and-continue: an exception inside the block must not leave the override
     // stuck on, or every later write in the panel inherits it.
@@ -1266,6 +1340,7 @@ function resetScriptState() {
   handlerCache.clear();
   listeners.length = 0;
   stopAllTimers();
+  scriptState.clear();   // `state` lives exactly as long as the loaded script does
 }
 
 /** Call a loaded script's handler. Used by dispatch — reuses the cached load. */

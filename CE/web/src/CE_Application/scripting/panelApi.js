@@ -471,6 +471,89 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0', javascript: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0' },
   },
+  // --- notes and channel messages -----------------------------------------------------------
+  // Until these landed a script could turn a knob but not make a sound: sendCC/sendNRPN/sendSysex
+  // were the entire MIDI vocabulary, which in a hardware editor ruled out auditioning a patch,
+  // testing a split, or triggering a chord — the things the ChordPad and DrumPads exist for.
+  //
+  // All of them are arithmetic over one host primitive, `sendMidi`, exactly as `panic` is over
+  // sendCC. That is what makes them portable to every runtime and every exported language.
+  {
+    id: 'sendMidi', category: 'Device / MIDI', signature: 'sendMidi(bytes)',
+    summary: 'Send raw MIDI bytes exactly as given — no wrapping, no channel maths. The primitive the other message verbs are built on; reach for one of those first.',
+    params: [{ name: 'bytes', type: 'bytes', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
+  },
+  {
+    id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity)',
+    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it — call sendNoteOff to be explicit.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'note', type: 'value', required: true },
+      { name: 'velocity', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendNote(${1:1}, ${2:60}, ${3:100})$0', javascript: 'sendNote(${1:1}, ${2:60}, ${3:100})$0' },
+  },
+  {
+    id: 'sendNoteOff', category: 'Device / MIDI', signature: 'sendNoteOff(channel, note [, velocity])',
+    summary: 'Note off. Release velocity defaults to 0. Nothing schedules this for you — a note you start is a note you stop.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'note', type: 'value', required: true },
+      { name: 'velocity', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendNoteOff(${1:1}, ${2:60})$0', javascript: 'sendNoteOff(${1:1}, ${2:60})$0' },
+  },
+  {
+    id: 'sendProgramChange', category: 'Device / MIDI', signature: 'sendProgramChange(channel, program [, bankMsb, bankLsb])',
+    summary: 'Program change, with an optional bank select (CC 0 / CC 32) sent first, which is the order devices expect.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'program', type: 'number', required: true },
+      { name: 'bankMsb', type: 'number', required: false },
+      { name: 'bankLsb', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendProgramChange(${1:1}, ${2:0})$0', javascript: 'sendProgramChange(${1:1}, ${2:0})$0' },
+  },
+  {
+    id: 'sendPitchBend', category: 'Device / MIDI', signature: 'sendPitchBend(channel, value)',
+    summary: 'Pitch bend, 0–16383 with 8192 at centre — the raw 14-bit value, because how many semitones that is depends on the synth\'s bend range, not on us.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'value', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendPitchBend(${1:1}, ${2:8192})$0', javascript: 'sendPitchBend(${1:1}, ${2:8192})$0' },
+  },
+  {
+    id: 'sendAftertouch', category: 'Device / MIDI', signature: 'sendAftertouch(channel, pressure [, note])',
+    summary: 'Channel pressure, or polyphonic pressure for one note when `note` is given.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'pressure', type: 'number', required: true },
+      { name: 'note', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendAftertouch(${1:1}, ${2:64})$0', javascript: 'sendAftertouch(${1:1}, ${2:64})$0' },
+  },
+  {
+    id: 'sendClock', category: 'Device / MIDI', signature: 'sendClock()',
+    summary: 'One MIDI clock tick (0xF8). Twenty-four per quarter note — drive it from a timer.',
+    params: [],
+    scopes: 'any',
+    snippet: { lua: 'sendClock()$0', javascript: 'sendClock()$0' },
+  },
+  {
+    id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
+    summary: 'MIDI transport: "start" (0xFA), "continue" (0xFB) or "stop" (0xFC).',
+    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'] }],
+    scopes: 'any',
+    snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
+  },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
     summary: 'Send a raw SysEx message (device-scope, power use).',
@@ -494,6 +577,38 @@ export const COMMANDS = [
     params: [{ name: 'opts', type: 'object', required: false, fields: ['channel', 'resetControllers'] }],
     scopes: 'any',
     snippet: { lua: 'panic()$0', javascript: 'panic()$0' },
+  },
+
+  /* --- Storage --- */
+  // Two different lifetimes, deliberately named apart. `state` is a scratchpad that lives as long
+  // as the script is loaded; settings outlive the session. Language globals happened to give you
+  // the first one already, but nothing said so, which made it undefined behaviour people relied on.
+  {
+    id: 'state', category: 'Storage', signature: 'state',
+    summary: 'A table of your own that survives between handler calls, private to this script. Cleared when the script reloads — for anything that must outlive the session use saveSetting.',
+    params: [],
+    scopes: 'any',
+    snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
+  },
+  {
+    id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value)',
+    summary: 'Persist a value beyond the session. In the editor it is stored with the panel and travels with it; in the exported plugin it goes into the DAW project state.',
+    params: [
+      { name: 'key', type: 'string', required: true },
+      { name: 'value', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'saveSetting("${1:key}", ${2:value})$0', javascript: 'saveSetting("${1:key}", ${2:value})$0' },
+  },
+  {
+    id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback])',
+    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written.',
+    params: [
+      { name: 'key', type: 'string', required: true },
+      { name: 'fallback', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
   },
 
   /* --- Debug --- */
@@ -651,8 +766,12 @@ export const HELPERS = [
   { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)', summary: 'Apply a named response curve ("log","exp","s"…).' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
   // music
-  { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C3".' },
-  { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C3" → 60.' },
+  // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
+  // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
+  // disagreed by an octave: a script written from the manual transposed everything twelve
+  // semitones. The code is right and stays; the wording is what was wrong.
+  { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C).' },
+  { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4.' },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
   { id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)', summary: 'Pack v into `count` 7-bit bytes; order = "msb"/"lsb" first (14/21/28-bit).' },
   { id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)', summary: 'Unpack 7-bit bytes back to a value.' },
@@ -697,8 +816,8 @@ export const MODULE_EXT_ROOT = 'ce.ext';   // reserved for installed third-party
 export const MODULES = [
   { id: 'ce.core', version: '1.0', requires: [], runtime: RUNTIME_ANY, global: true,
     summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
-  { id: 'ce.midi', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Raw MIDI out, panic, checksums, and the 7-bit/nibble/ASCII encoders.' },
+  { id: 'ce.midi', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   { id: 'ce.device', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Bulk dumps through the device profile. Needs the device host.' },
   { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
@@ -707,6 +826,8 @@ export const MODULES = [
     summary: 'Note names and numbers.' },
   { id: 'ce.time', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Host timers. Musical time (tempo, beats) lands here next.' },
+  { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -726,12 +847,15 @@ const MODULE_MEMBERS = {
   'ce.core': ['set', 'get', 'log', 'on', 'off', 'emit', 'run', 'noTransmit', 'transmit'],
   'ce.midi': [
     'sendCC', 'sendNRPN', 'sendSysex', 'checksum', 'panic',
+    'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',
+    'sendAftertouch', 'sendClock', 'sendTransport',
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
     'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
   ],
   'ce.device': ['requestDump', 'applyDump', 'sendDump', 'buildDump'],
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
+  'ce.storage': ['state', 'saveSetting', 'loadSetting'],
   'ce.time': ['startTimer', 'stopTimer'],
   'ce.components.split': {
     preset: 'splitPreset', mute: 'splitMute', channel: 'splitChannel',
@@ -844,6 +968,13 @@ export function handlerNamesForRuntime(runtime) {
 export const WEBVIEW_ONLY_MEMBERS = ALL_MEMBERS
   .filter((m) => memberRuntime(m) === RUNTIME_WEBVIEW)
   .map((m) => m.id);
+
+/** Is this member a VALUE rather than a callable? `state` is a table you read and write, not a
+    function you call, and the signature already says so — it carries no parentheses. Tests and the
+    picker both need to tell the two apart. */
+export function isValueMember(member) {
+  return typeof member?.signature === 'string' && !member.signature.includes('(');
+}
 
 /** Every name a member answers to — its id plus any back-compat aliases. */
 export function memberNames(member) {

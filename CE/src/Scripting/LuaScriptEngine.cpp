@@ -197,17 +197,61 @@ for _, name in ipairs(WEBVIEW_ONLY) do
   end
 end
 
+-- MIDI channel messages. All of them are arithmetic over sendMidi, the way panic() is over sendCC,
+-- which is what makes them work identically in every runtime and every exported language.
+-- `note` accepts a MIDI number or a name ("C3"), because a script that reads musically should be
+-- allowed to say so.
+local function __ch(c) c = math.floor(tonumber(c) or 1); if c < 1 then c = 1 elseif c > 16 then c = 16 end return c - 1 end
+local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 elseif v > 127 then v = 127 end return v end
+local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
+
+function sendNote(channel, note, velocity) sendMidi({0x90 | __ch(channel), __note(note), __7(velocity)}) end
+function sendNoteOff(channel, note, velocity) sendMidi({0x80 | __ch(channel), __note(note), __7(velocity or 0)}) end
+function sendProgramChange(channel, program, bankMsb, bankLsb)
+  -- Bank select first: a device applies the bank that was in force when the program change lands.
+  if bankMsb ~= nil then sendCC(channel, 0, __7(bankMsb)) end
+  if bankLsb ~= nil then sendCC(channel, 32, __7(bankLsb)) end
+  sendMidi({0xC0 | __ch(channel), __7(program)})
+end
+function sendPitchBend(channel, value)
+  local v = math.floor(tonumber(value) or 8192)
+  if v < 0 then v = 0 elseif v > 16383 then v = 16383 end
+  sendMidi({0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128})
+end
+function sendAftertouch(channel, pressure, note)
+  if note ~= nil then sendMidi({0xA0 | __ch(channel), __note(note), __7(pressure)})
+  else sendMidi({0xD0 | __ch(channel), __7(pressure)}) end
+end
+function sendClock() sendMidi({0xF8}) end
+function sendTransport(action)
+  action = string.lower(tostring(action or "start"))
+  if action == "stop" then sendMidi({0xFC})
+  elseif action == "continue" then sendMidi({0xFB})
+  else sendMidi({0xFA}) end
+end
+
+-- ce.storage. `state` is a plain table: each script runs in its own sol::environment, which lives
+-- as long as the script is loaded, so it persists between handler calls without any host help.
+-- Settings go through the host, because they outlive the session.
+state = {}
+function loadSetting(key, fallback)
+  local v = __loadSetting(key)
+  if v == nil then return fallback end
+  return v
+end
+
 -- BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
   ["ce.core"] = { emit = "emit", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit" },
-  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendCC = "sendCC", sendNRPN = "sendNRPN", sendSysex = "sendSysex", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", requestDump = "requestDump", sendDump = "sendDump" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
   ["ce.time"] = { startTimer = "startTimer", stopTimer = "stopTimer" },
+  ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
   ["ce.components.recorder"] = { bars = "recorderBars", clear = "recorderClear", countIn = "recorderCountIn", load = "recorderLoad", nudge = "recorderNudge", play = "recorderPlay", quantize = "recorderQuantize", record = "recorderRecord", shift = "recorderShift", source = "recorderSource", stop = "recorderStop", store = "recorderStore", transpose = "recorderTranspose", undo = "recorderUndo" },
@@ -287,6 +331,7 @@ public:
         g.set_function ("sendCC",   [this] (int ch, int cc, sol::object v) { host->sendCC (ch, cc, solToVar (v)); });
         g.set_function ("sendNRPN", [this] (int ch, int msb, int lsb, sol::object v) { host->sendNRPN (ch, msb, lsb, solToVar (v)); });
         g.set_function ("sendSysex", [this] (sol::object bytes) { host->sendSysex (solToVar (bytes)); });
+        g.set_function ("sendMidi",  [this] (sol::object bytes) { host->sendMidi (solToVar (bytes)); });
         g.set_function ("requestDump", [this] (std::string kind) { host->requestDump (juce::String (kind)); });
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
@@ -294,6 +339,11 @@ public:
 
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });
+
+        g.set_function ("saveSetting", [this] (std::string key, sol::object v)
+            { host->saveSetting (juce::String (key), solToVar (v)); });
+        g.set_function ("__loadSetting", [this] (std::string key)
+            { return varToSol (lua, host->loadSetting (juce::String (key))); });
 
         g.set_function ("run",  [this] (std::string target, sol::optional<sol::object> args)
             { return varToSol (lua, host->runAction (juce::String (target), args ? solToVar (*args) : juce::var())); });

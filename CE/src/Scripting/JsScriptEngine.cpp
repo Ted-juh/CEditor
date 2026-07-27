@@ -150,17 +150,61 @@ for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
   })(__WEBVIEW_ONLY[__i]);
 }
 
+// MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
+// makes them work identically in every runtime and every exported language. `note` accepts a MIDI
+// number or a name ("C3"), because a script that reads musically should be allowed to say so.
+function sendMidi(bytes) { return __api.sendMidi(bytes); }
+function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
+function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
+function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
+
+function sendNote(channel, note, velocity) { sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)]); }
+function sendNoteOff(channel, note, velocity) { sendMidi([0x80 | __ch(channel), __note(note), __7(velocity || 0)]); }
+function sendProgramChange(channel, program, bankMsb, bankLsb) {
+  // Bank select first: a device applies the bank that was in force when the program change lands.
+  if (bankMsb !== undefined && bankMsb !== null) sendCC(channel, 0, __7(bankMsb));
+  if (bankLsb !== undefined && bankLsb !== null) sendCC(channel, 32, __7(bankLsb));
+  sendMidi([0xC0 | __ch(channel), __7(program)]);
+}
+function sendPitchBend(channel, value) {
+  var v = Math.floor(Number(value)); if (!isFinite(v)) v = 8192;
+  if (v < 0) v = 0; else if (v > 16383) v = 16383;
+  sendMidi([0xE0 | __ch(channel), v % 128, Math.floor(v / 128) % 128]);
+}
+function sendAftertouch(channel, pressure, note) {
+  if (note !== undefined && note !== null) sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)]);
+  else sendMidi([0xD0 | __ch(channel), __7(pressure)]);
+}
+function sendClock() { sendMidi([0xF8]); }
+function sendTransport(action) {
+  action = String(action === undefined || action === null ? "start" : action).toLowerCase();
+  if (action === "stop") sendMidi([0xFC]);
+  else if (action === "continue") sendMidi([0xFB]);
+  else sendMidi([0xFA]);
+}
+
+// ce.storage. `state` is a plain object: QuickJS gives each script its own engine, whose globals
+// live as long as the script is loaded, so it persists between handler calls with no host help.
+// Settings go through the host, because they outlive the session.
+var state = {};
+function saveSetting(key, value) { return __api.saveSetting(String(key), value); }
+function loadSetting(key, fallback) {
+  var v = __api.loadSetting(String(key));
+  return (v === undefined || v === null) ? fallback : v;
+}
+
 // BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
   "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
-  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendCC": "sendCC", "sendNRPN": "sendNRPN", "sendSysex": "sendSysex", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
   "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
   "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+  "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
   "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
   "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
   "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
@@ -221,12 +265,15 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("sendNRPN", [host, arg] (const Args& a) -> juce::var
         { host->sendNRPN ((int) arg (a, 0), (int) arg (a, 1), (int) arg (a, 2), arg (a, 3)); return {}; });
     api->setMethod ("sendSysex", [host, arg] (const Args& a) -> juce::var { host->sendSysex (arg (a, 0)); return {}; });
+    api->setMethod ("sendMidi", [host, arg] (const Args& a) -> juce::var { host->sendMidi (arg (a, 0)); return {}; });
     api->setMethod ("requestDump", [host, arg] (const Args& a) -> juce::var { host->requestDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("applyDump", [host, arg] (const Args& a) -> juce::var { host->applyDump (arg (a, 0)); return {}; });
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
     api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
+    api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var { host->saveSetting (arg (a, 0).toString(), arg (a, 1)); return {}; });
+    api->setMethod ("loadSetting", [host, arg] (const Args& a) -> juce::var { return host->loadSetting (arg (a, 0).toString()); });
     api->setMethod ("run", [host, arg] (const Args& a) -> juce::var { return host->runAction (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("emit", [host, arg] (const Args& a) -> juce::var { host->emitEvent (arg (a, 0).toString(), arg (a, 1)); return {}; });
     api->setMethod ("log", [host, arg] (const Args& a) -> juce::var { host->log (arg (a, 0).toString(), arg (a, 1)); return {}; });

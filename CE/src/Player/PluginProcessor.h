@@ -227,6 +227,12 @@ public:
             juce::var store (new juce::DynamicObject());   // scripts write their persisted state here
             scriptRuntime->onDawSaveState (store);
             root.createNewChildElement ("ScriptState")->addTextElement (juce::JSON::toString (store));
+            // ce.storage settings ride along separately: they are the runtime's, not any one
+            // script's, so merging them into `store` would let a script overwrite another's key.
+            auto* settings = new juce::DynamicObject();
+            for (int i = 0; i < scriptSettings.size(); ++i)
+                settings->setProperty (scriptSettings.getName (i), scriptSettings.getValueAt (i));
+            root.createNewChildElement ("ScriptSettings")->addTextElement (juce::JSON::toString (juce::var (settings)));
         }
        #endif
         copyXmlToBinary (root, destData);
@@ -247,6 +253,13 @@ public:
             if (auto* dev = xml->getChildByName ("DeviceMappings"))
                 deviceService.importRoleMappings (juce::JSON::parse (dev->getAllSubText()));
            #if CEDITOR_SCRIPTING
+            // Settings first: a script's onDawRestoreState may well read one back.
+            if (auto* sset = xml->getChildByName ("ScriptSettings"))
+            {
+                scriptSettings.clear();
+                if (auto* obj = juce::JSON::parse (sset->getAllSubText()).getDynamicObject())
+                    for (const auto& p : obj->getProperties()) scriptSettings.set (p.name, p.value);
+            }
             if (scriptRuntime != nullptr)
                 if (auto* sx = xml->getChildByName ("ScriptState"))
                     scriptRuntime->onDawRestoreState (juce::JSON::parse (sx->getAllSubText()));
@@ -543,6 +556,16 @@ private:
             if (b.getLast()  != 0xF7) b.add (0xF7);
             scriptSendRawMidi ("sysex", b);
         };
+        // Raw bytes straight out — notes, program change, bend, aftertouch, clock all arrive here
+        // already assembled by the prelude, so the host does no interpretation.
+        cb.sendMidi = [this] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
+            if (b.isEmpty()) return;
+            scriptSendRawMidi ("raw", b);
+        };
         cb.requestDump = [this] (const juce::String& kind)
         {
             auto* p = new juce::DynamicObject();
@@ -590,6 +613,10 @@ private:
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));
         };
+        // ce.storage settings. The plugin has no .cepanel to write, so they live in memory and ride
+        // along in the DAW project state the processor already saves (see getStateInformation).
+        cb.saveSetting = [this] (const juce::String& key, const juce::var& value) { scriptSettings.set (key, value); };
+        cb.loadSetting = [this] (const juce::String& key) { return scriptSettings.getWithDefault (key, juce::var()); };
         cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };
         cb.stopTimer  = [this] (const juce::String& id) { scriptTimers.stop (id); };
 
@@ -637,6 +664,9 @@ private:
     // Declared after scriptRuntime so it is destroyed FIRST (stops its juce::Timer before the
     // runtime the fire callback references goes away).
     ceditor::scripting::TimerManager scriptTimers;
+    // ce.storage settings. The plugin cannot write the .cepanel, so these live here and are saved
+    // with the DAW project alongside the scripts' own onDawSaveState data.
+    juce::NamedValueSet scriptSettings;
     std::map<juce::String, juce::String> scriptBoundParamByPath;  // control path -> APVTS param id (bound)
     std::map<juce::String, juce::String> scriptDumpParamPaths;    // deviceParameterId -> control path (dump fill)
     std::map<juce::String, float> lastScriptValue;                // change-detect for window-closed onValueChanged

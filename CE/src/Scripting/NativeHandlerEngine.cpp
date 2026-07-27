@@ -197,6 +197,23 @@ void CE_CALL host_stop_timer  (void* ctx, const CeStr* id) { static_cast<HostCtx
 void CE_CALL host_begin_transmit (void* ctx, int32_t transmit) { static_cast<HostCtx*> (ctx)->host->beginTransmitOverride (transmit != 0); }
 void CE_CALL host_end_transmit   (void* ctx) { static_cast<HostCtx*> (ctx)->host->endTransmitOverride(); }
 
+void CE_CALL host_send_midi (void* ctx, const CeBytes* bytes)
+{
+    juce::Array<juce::var> a; if (bytes) for (int64_t i = 0; i < bytes->len; ++i) a.add ((int) bytes->ptr[i]);
+    static_cast<HostCtx*> (ctx)->host->sendMidi (juce::var (a));
+}
+void CE_CALL host_save_setting (void* ctx, const CeStr* key, const CeValue* value)
+{
+    static_cast<HostCtx*> (ctx)->host->saveSetting (key ? fromCeStr (*key) : juce::String(),
+                                                    value ? ceToVar (value) : juce::var());
+}
+int CE_CALL host_load_setting (void* ctx, const CeStr* key, CeValue* out)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    if (out != nullptr) *out = buildCeValue (h->loadSetting (key ? fromCeStr (*key) : juce::String()));
+    return 0;
+}
+
 void CE_CALL host_free_value (void* /*ctx*/, CeValue* v) { freeCeValueDeep (v); }
 void* CE_CALL host_alloc   (void* /*ctx*/, size_t n) { return std::malloc (n); }
 void  CE_CALL host_dealloc (void* /*ctx*/, void* p, size_t /*n*/) { std::free (p); }
@@ -417,6 +434,8 @@ private:
         m.vtable.run_action = host_run_action;
         m.vtable.start_timer = host_start_timer; m.vtable.stop_timer = host_stop_timer;
         m.vtable.begin_transmit = host_begin_transmit; m.vtable.end_transmit = host_end_transmit;
+        m.vtable.send_midi = host_send_midi;
+        m.vtable.save_setting = host_save_setting; m.vtable.load_setting = host_load_setting;
 
         if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
         {

@@ -127,6 +127,13 @@ typedef struct CeHostVtable {
      * the host keeps the stack, so these nest. */
     void (CE_CALL *begin_transmit)(void* host_ctx, int32_t transmit);
     void (CE_CALL *end_transmit)  (void* host_ctx);
+    /* Raw MIDI bytes, exactly as given — no F0/F7 wrapping, no channel maths. Notes, program
+     * changes, pitch bend, aftertouch and clock are all arithmetic over this one call in the
+     * scripted engines; a native handler builds them the same way. */
+    void (CE_CALL *send_midi)     (void* host_ctx, const CeBytes* bytes);
+    /* Settings that outlive the session. Where they land is the host's business. */
+    void (CE_CALL *save_setting)  (void* host_ctx, const CeStr* key, const CeValue* value);
+    int  (CE_CALL *load_setting)  (void* host_ctx, const CeStr* key, CeValue* out /*host-owned, free_value*/);
     /* New fields append HERE only; bump struct_size; handlers gate on struct_size before reading. */
 } CeHostVtable;
 

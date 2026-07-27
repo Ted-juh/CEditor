@@ -268,6 +268,23 @@ PyObject* api_log (PyObject*, PyObject* args)
     g_host->log (juce::String::fromUTF8 (msg), (v && v != Py_None) ? pyToVar (v) : juce::var());
     Py_RETURN_NONE;
 }
+PyObject* api_sendMidi (PyObject*, PyObject* args)
+{
+    PyObject* bytes = nullptr;
+    if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
+    g_host->sendMidi (pyToVar (bytes)); Py_RETURN_NONE;
+}
+PyObject* api_saveSetting (PyObject*, PyObject* args)
+{
+    const char* key = nullptr; PyObject* v = nullptr;
+    if (! PyArg_ParseTuple (args, "sO", &key, &v)) return nullptr;
+    g_host->saveSetting (juce::String::fromUTF8 (key), pyToVar (v)); Py_RETURN_NONE;
+}
+PyObject* api_loadSetting (PyObject*, PyObject* args)
+{
+    const char* key = nullptr; if (! PyArg_ParseTuple (args, "s", &key)) return nullptr;
+    return varToPy (g_host->loadSetting (juce::String::fromUTF8 (key)));
+}
 PyObject* api_startTimer (PyObject*, PyObject* args)
 {
     const char* id = nullptr; int ms = 0;
@@ -296,6 +313,9 @@ PyMethodDef apiMethods[] = {
     { "sendCC",        api_sendCC,        METH_VARARGS, nullptr },
     { "sendNRPN",      api_sendNRPN,      METH_VARARGS, nullptr },
     { "sendSysex",     api_sendSysex,     METH_VARARGS, nullptr },
+    { "sendMidi",      api_sendMidi,      METH_VARARGS, nullptr },
+    { "saveSetting",   api_saveSetting,   METH_VARARGS, nullptr },
+    { "loadSetting",   api_loadSetting,   METH_VARARGS, nullptr },
     { "requestDump",   api_requestDump,   METH_VARARGS, nullptr },
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
@@ -478,6 +498,57 @@ def __webviewOnly(name):
 for __n in __WEBVIEW_ONLY:
     globals()[__n] = __webviewOnly(__n)
 
+# MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
+# makes them work identically in every runtime and every exported language. `note` accepts a MIDI
+# number or a name ("C3"), because a script that reads musically should be allowed to say so.
+def sendMidi(b):                  return __api.sendMidi(b)
+def __ch(c):
+    import math
+    c = math.floor(c or 1)
+    return (1 if c < 1 else (16 if c > 16 else c)) - 1
+def __7(v):
+    import math
+    v = math.floor(v or 0)
+    return 0 if v < 0 else (127 if v > 127 else v)
+def __note(n):
+    return noteNumber(n) if isinstance(n, str) else __7(n)
+
+def sendNote(channel, note, velocity):
+    sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)])
+def sendNoteOff(channel, note, velocity=0):
+    sendMidi([0x80 | __ch(channel), __note(note), __7(velocity)])
+def sendProgramChange(channel, program, bankMsb=None, bankLsb=None):
+    # Bank select first: a device applies the bank that was in force when the program change lands.
+    if bankMsb is not None: sendCC(channel, 0, __7(bankMsb))
+    if bankLsb is not None: sendCC(channel, 32, __7(bankLsb))
+    sendMidi([0xC0 | __ch(channel), __7(program)])
+def sendPitchBend(channel, value):
+    import math
+    v = math.floor(value if value is not None else 8192)
+    v = 0 if v < 0 else (16383 if v > 16383 else v)
+    sendMidi([0xE0 | __ch(channel), v % 128, math.floor(v / 128) % 128])
+def sendAftertouch(channel, pressure, note=None):
+    if note is not None: sendMidi([0xA0 | __ch(channel), __note(note), __7(pressure)])
+    else: sendMidi([0xD0 | __ch(channel), __7(pressure)])
+def sendClock(): sendMidi([0xF8])
+def sendTransport(action="start"):
+    action = str(action).lower()
+    if action == "stop": sendMidi([0xFC])
+    elif action == "continue": sendMidi([0xFB])
+    else: sendMidi([0xFA])
+
+# ce.storage. `state` is a plain dict-like namespace: each script is exec'd into its OWN module
+# namespace, which lives as long as the script is loaded, so it persists between handler calls with
+# no host help. Settings go through the host, because they outlive the session.
+# SimpleNamespace, not a dict: `state.count = 1` has to work the same way `state.count` does in a
+# Lua table and a JS object, and a dict only offers state["count"].
+import types as __ce_state_types
+state = __ce_state_types.SimpleNamespace()
+def saveSetting(key, value):      return __api.saveSetting(str(key), value)
+def loadSetting(key, fallback=None):
+    v = __api.loadSetting(str(key))
+    return fallback if v is None else v
+
 # BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # Every member keeps its flat global name as an alias; this adds the ce.<module>.<name> spelling
 # on top. ce.core is global: its members are never namespaced, so they appear here only for
@@ -485,11 +556,12 @@ for __n in __WEBVIEW_ONLY:
 import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
-    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendCC": "sendCC", "sendNRPN": "sendNRPN", "sendSysex": "sendSysex", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
     "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+    "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
     "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },

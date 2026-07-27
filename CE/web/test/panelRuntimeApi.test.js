@@ -217,3 +217,63 @@ test('startTimer replaces a timer with the same id rather than stacking a second
   assert.doesNotThrow(() => api.stopTimer('t'), 'stopping an unknown id is harmless');
   assert.doesNotThrow(() => api.stopTimer('never-started'));
 });
+
+/* ------------------------------------------------------------- ce.midi channel messages */
+
+test('the message verbs are bound and assemble without throwing', () => {
+  for (const name of ['sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange',
+    'sendPitchBend', 'sendAftertouch', 'sendClock', 'sendTransport']) {
+    assert.equal(typeof api[name], 'function', `${name} should be bound`);
+  }
+  // No JUCE host in a test run, so sends are traced rather than transmitted.
+  assert.doesNotThrow(() => api.sendNote(1, 60, 100));
+  assert.doesNotThrow(() => api.sendNote(1, 'C4', 100), 'a note name should resolve');
+  assert.doesNotThrow(() => api.sendProgramChange(1, 7, 2, 3));
+  assert.doesNotThrow(() => api.sendPitchBend(1, 8192));
+  assert.doesNotThrow(() => api.sendAftertouch(1, 90, 64));
+  assert.doesNotThrow(() => api.sendTransport('stop'));
+});
+
+test('middle C is C4, and the docs now say so', () => {
+  // The contract claimed 60 -> "C3" (the Yamaha convention) while every runtime computed "C4"
+  // (scientific pitch notation). A script written from the manual transposed by an octave.
+  assert.equal(api.noteName(60), 'C4');
+  assert.equal(api.noteNumber('C4'), 60);
+  assert.equal(api.noteNumber(api.noteName(60)), 60, 'the pair must round-trip');
+});
+
+test('the note verbs build the bytes the MIDI spec calls for', () => {
+  // Asserted against the runtime source rather than a captured send, since without a JUCE host the
+  // bytes only reach the trace console. The C++ suite asserts the actual wire bytes.
+  assert.match(runtimeSource, /0x90 \| midiCh\(ch\), midiNote\(note\)/, 'note on is 0x90');
+  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), midiNote\(note\)/, 'note off is 0x80');
+  assert.match(runtimeSource, /0xC0 \| midiCh\(ch\)/, 'program change is 0xC0');
+  assert.match(runtimeSource, /0xE0 \| midiCh\(ch\), v % 128, Math\.floor\(v \/ 128\)/, 'pitch bend is lsb then msb');
+  assert.match(runtimeSource, /0xD0 \| midiCh\(ch\)/, 'channel pressure is 0xD0');
+  assert.match(runtimeSource, /0xA0 \| midiCh\(ch\)/, 'poly pressure is 0xA0');
+  assert.match(runtimeSource, /\[0xF8\]/, 'clock is 0xF8');
+});
+
+test('bank select is sent before the program change', () => {
+  // A device applies the bank in force when the PC lands, so the other order selects from the
+  // previous bank — a bug that only shows on a synth, never in the editor.
+  const fn = runtimeSource.slice(runtimeSource.indexOf('sendProgramChange: (ch, program'));
+  const bankAt = fn.indexOf('bankMsb');
+  const pcAt = fn.indexOf('0xC0');
+  assert.ok(bankAt !== -1 && pcAt !== -1 && bankAt < pcAt, 'bank select must precede the program change');
+});
+
+/* ---------------------------------------------------------------------------- ce.storage */
+
+test('state is per script and survives between calls', () => {
+  const a = scriptApiForTesting('', 'script-a');
+  const b = scriptApiForTesting('', 'script-b');
+  a.state.count = 1;
+  assert.equal(scriptApiForTesting('', 'script-a').state.count, 1, 'the same script sees its own state');
+  assert.equal(b.state.count, undefined, 'another script does not');
+});
+
+test('loadSetting returns the fallback for a key never written', () => {
+  assert.equal(api.loadSetting('never-written', 'fallback'), 'fallback');
+  assert.equal(typeof api.saveSetting, 'function');
+});

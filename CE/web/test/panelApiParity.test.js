@@ -30,7 +30,7 @@ import {
   WEBVIEW_ONLY_MEMBERS, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
   handlerNamesForRuntime, PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, MEMBER_MODULE, moduleMemberMap, memberPath,
-  MODULE_EXT_ROOT, isExtensionModule, modulesForRuntime,
+  MODULE_EXT_ROOT, isExtensionModule, modulesForRuntime, isValueMember,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames, scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 
@@ -79,8 +79,11 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 // or a host binding. Deliberately not "the name appears somewhere" — every one of these names is
 // also written in a comment nearby, and a matcher that accepts a comment would have passed the
 // whole drift this file exists to catch.
-function definesName(source, name) {
+function definesName(source, name, { value = false } = {}) {
   const n = escapeRe(name);
+  // A VALUE member (`state`) is assigned, not declared — `state = {}` in Lua/Python, `var state = {}`
+  // in JS. Matching only function shapes would report it missing from all three engines.
+  if (value) return new RegExp(`(?:^|\\n)\\s*(?:var |let |const )?${n}\\s*=`).test(source);
   return new RegExp(
     `function\\s+${n}\\s*\\(`            // Lua / JS prelude
     + `|def\\s+${n}\\s*\\(`              // Python prelude
@@ -106,7 +109,7 @@ for (const [label, file] of [
   test(`the ${label} engine implements every cross-runtime member`, () => {
     const source = readEngine(file);
     const missing = membersForRuntime(RUNTIME_ANY)
-      .filter((m) => !definesName(source, m.id))
+      .filter((m) => !definesName(source, m.id, { value: isValueMember(m) }))
       .map((m) => m.id);
     assert.deepEqual(missing, [], `declared in panelApi.js but absent from ${file}: ${missing.join(', ')}`);
   });
@@ -280,9 +283,9 @@ test('a member is reachable at its module path, and keeps its flat name as an al
     // ce.core one, so both forms walk from the api object itself.
     const path = memberPath(memberId);
     const viaPath = path.split('.').reduce((node, seg) => (node == null ? node : node[seg]), api);
-    assert.equal(typeof viaPath, 'function', `${memberId} is not reachable at ${path}`);
-    assert.equal(typeof api[memberId], 'function', `${memberId} lost its flat alias`);
-    assert.equal(viaPath, api[memberId], `${path} and ${memberId} should be the same function`);
+    assert.notEqual(viaPath, undefined, `${memberId} is not reachable at ${path}`);
+    assert.notEqual(api[memberId], undefined, `${memberId} lost its flat alias`);
+    assert.equal(viaPath, api[memberId], `${path} and ${memberId} should be the same thing`);
   }
 });
 

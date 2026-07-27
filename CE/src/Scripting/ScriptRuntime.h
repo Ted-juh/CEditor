@@ -112,6 +112,10 @@ public:
     virtual void sendCC   (int channel, int cc, const juce::var& value) = 0;
     virtual void sendNRPN (int channel, int msb, int lsb, const juce::var& value) = 0;
     virtual void sendSysex (const juce::var& bytes) = 0;
+    /** Raw MIDI bytes, exactly as given — no F0/F7 wrapping, no channel maths. Notes, program
+        changes, pitch bend, aftertouch and clock are all prelude arithmetic over this one call, the
+        way panic() is over sendCC, which is what keeps them portable to every runtime. */
+    virtual void sendMidi (const juce::var& bytes) { juce::ignoreUnused (bytes); }
     virtual void requestDump (const juce::String& kind) = 0;
     virtual void applyDump  (const juce::var& bytes) = 0;   // fills the panel; runs in inbound origin (silent)
     virtual void sendDump   (const juce::String& kind) = 0;
@@ -128,6 +132,13 @@ public:
     // until stopTimer(id). Default no-op so alternative hosts need not implement them.
     virtual void startTimer (const juce::String& id, int intervalMs) { juce::ignoreUnused (id, intervalMs); }
     virtual void stopTimer  (const juce::String& id) { juce::ignoreUnused (id); }
+
+    /** Settings that outlive the session. Where they land is the host's business: the editor keeps
+        them with the panel so they travel with it, the exported plugin puts them in the DAW project
+        state. `state` (a per-script scratchpad) needs no host at all — the script's own environment
+        already persists for as long as it is loaded. */
+    virtual void saveSetting (const juce::String& key, const juce::var& value) { juce::ignoreUnused (key, value); }
+    virtual juce::var loadSetting (const juce::String& key) { juce::ignoreUnused (key); return {}; }
 };
 
 // ----------------------------------------------------------------------------------------------
