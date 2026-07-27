@@ -5,6 +5,7 @@ import {
 } from './customComponentInteraction.js';
 import { syncCustomArpeggiatorValues } from './customComponentArpeggiator.js';
 import { numberOr } from './primitives.js';
+import { flatControls } from './containment.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -45,7 +46,9 @@ function publishedEntries(control, direction) {
 }
 
 export function listPanelCustomApiEndpoints(controls = []) {
-  return (Array.isArray(controls) ? controls : [])
+  // Walk the whole control tree so custom components nested inside containers
+  // expose their published API to panel-level linking, not just top-level ones.
+  return flatControls(Array.isArray(controls) ? controls : [])
     .filter(isCustomComponent)
     .flatMap((control) => [
       ...publishedEntries(control, 'input'),
@@ -261,8 +264,8 @@ function endpointFor(endpoints, controlId, channel, direction = '') {
 }
 
 export function listPanelCustomRouteLinks(controls = []) {
-  const controlList = Array.isArray(controls) ? controls : [];
-  const endpoints = listPanelCustomApiEndpoints(controlList);
+  const controlList = flatControls(Array.isArray(controls) ? controls : []);
+  const endpoints = listPanelCustomApiEndpoints(controls);
   const controlMap = new Map(controlList.map((control) => [controlId(control), control]));
   const routes = [];
 
@@ -345,9 +348,9 @@ function targetInputChannel(control, port) {
 }
 
 export function applyPanelCustomLinkRoutes(controls = [], sessions = {}) {
-  const controlList = Array.isArray(controls) ? controls : [];
+  const controlList = flatControls(Array.isArray(controls) ? controls : []);
   const controlMap = new Map(controlList.map((control) => [controlId(control), control]));
-  const endpoints = listPanelCustomApiEndpoints(controlList);
+  const endpoints = listPanelCustomApiEndpoints(controls);
   let nextSessions = sessions ?? {};
   let changed = false;
 
