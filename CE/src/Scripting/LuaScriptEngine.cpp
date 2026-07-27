@@ -12,6 +12,7 @@
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <vector>
@@ -279,9 +280,22 @@ public:
         g.set_function ("transmit", [this] (sol::protected_function fn)
             { host->beginTransmitOverride (true); auto r = fn(); host->endTransmitOverride(); if (! r.valid()) reportPF (r); });
 
-        // on(target, event, fn) — register a listener.
+        // on(target, event, fn) — register a listener, tagged with the script registering it.
+        // One sol::state is shared by every Lua script, so without the tag off() could not tell
+        // whose listener it was removing (QuickJS gets an engine per script, so its prelude can
+        // filter locally instead).
         g.set_function ("on", [this] (std::string target, std::string event, sol::protected_function fn)
-            { listeners.push_back ({ juce::String (target), juce::String (event), std::move (fn) }); });
+            { listeners.push_back ({ currentScriptId, juce::String (target), juce::String (event), std::move (fn) }); });
+
+        // off(target, event) — drop THIS script's listeners for that pair. Unknown pairs are a no-op.
+        g.set_function ("off", [this] (std::string target, std::string event)
+        {
+            const juce::String t (target), e (event);
+            listeners.erase (std::remove_if (listeners.begin(), listeners.end(),
+                [this, &t, &e] (const Listener& l)
+                { return l.scriptId == currentScriptId && l.target == t && l.event == e; }),
+                listeners.end());
+        });
 
         lua.script (kPrelude);
         return true;
@@ -305,7 +319,9 @@ public:
         env["self"] = self;
 
         const Watchdog guard (*this); // top-level statements obey the instruction budget too
+        currentScriptId = def.id;
         auto result = lua.safe_script (def.source.toStdString(), env, sol::script_pass_on_error);
+        currentScriptId = {};
         if (! result.valid())
         {
             sol::error err = result;
@@ -332,7 +348,9 @@ public:
         sol::protected_function f = it->second[fn.toStdString()];
         if (! f.valid()) return {};
         const Watchdog guard (*this);
+        currentScriptId = scriptId;
         auto r = f (varToSol (lua, payload));
+        currentScriptId = {};
         if (! r.valid()) { sol::error e = r; onError (scriptId, juce::String (e.what())); return {}; }
         return r.return_count() > 0 ? solToVar (r) : juce::var();
     }
@@ -353,7 +371,7 @@ public:
     void reset() override { envs.clear(); listeners.clear(); }
 
 private:
-    struct Listener { juce::String target, event; sol::protected_function fn; };
+    struct Listener { juce::String scriptId, target, event; sol::protected_function fn; };
 
     void reportPF (const sol::protected_function_result& r)
     {
@@ -365,6 +383,9 @@ private:
     std::vector<Listener> listeners;
     ScriptHostApi* host = nullptr;
     int watchdogDepth = 0;
+    // Which script is executing, so on()/off() can tag and match listeners. Set around
+    // both load (top-level on() calls) and dispatch (a handler subscribing later).
+    juce::String currentScriptId;
 };
 
 } // namespace

@@ -72,7 +72,20 @@ export function validateScript(script) {
     }
   }
 
-  // 4) on(target, "event", …) — flag unknown event names.
+  // 4) Async handlers. The WebView runtime awaits a promise a handler returns; the C++ engines
+  //    dispatch synchronously and discard it. So `await` runs to completion in preview and gets
+  //    cut off at the first suspension point in the shipped plugin — the worst kind of difference,
+  //    because the editor says it works.
+  if (/\basync\s+(?:function\b|\()/.test(src) || /\bawait\s/.test(src)) {
+    problems.push({
+      severity: 'warn',
+      message: 'async / await runs to completion only in the editor preview. The exported plugin '
+        + 'dispatches handlers synchronously and drops the promise, so anything after the first '
+        + 'await never happens there. Use onTimer for work that has to wait.',
+    });
+  }
+
+  // 5) on(target, "event", …) — flag unknown event names.
   const onRe = /\bon\s*\(\s*[^,]+,\s*["']([^"']+)["']/g;
   let mtch;
   while ((mtch = onRe.exec(src)) !== null) {

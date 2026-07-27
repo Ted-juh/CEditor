@@ -24,6 +24,16 @@ const char* kJsPrelude = R"JS(
 // Wrap the native bridge as globals + pure-math helpers + event registry + self.
 var __listeners = [];
 function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
+// off(target, event) — this engine instance holds one script's listeners (QuickJS gives each script
+// its own engine), so filtering here is already scoped to the calling script.
+function off(target, event) {
+  var kept = [];
+  for (var i = 0; i < __listeners.length; i++) {
+    var l = __listeners[i];
+    if (!(l.t === target && l.e === event)) kept.push(l);
+  }
+  __listeners = kept;
+}
 function __deliver(target, event, payload) {
   for (var i = 0; i < __listeners.length; i++) {
     var l = __listeners[i];

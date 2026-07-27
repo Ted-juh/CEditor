@@ -27,7 +27,8 @@ import { dirname, join } from 'node:path';
 import {
   ALL_MEMBERS, ALL_EVENTS, ALL_HANDLER_NAMES, LIFECYCLE_HOOKS,
   membersForRuntime, memberNames, memberRuntime,
-  WEBVIEW_ONLY_MEMBERS, RUNTIME_ANY, RUNTIME_WEBVIEW,
+  WEBVIEW_ONLY_MEMBERS, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER,
+  handlerNamesForRuntime, COMMANDS,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames } from '../src/CE_Application/scripting/panelRuntime.js';
 
@@ -60,7 +61,7 @@ test('the WebView runtime probes for every handler name the contract declares', 
   // The executors collect handlers by probing this list; a name missing from it is an event that
   // can never fire, which is how onTimer and the raw-MIDI events went dark.
   const source = readFileSync(join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
-  assert.match(source, /const HANDLER_NAMES = ALL_HANDLER_NAMES;/,
+  assert.match(source, /const HANDLER_NAMES = handlerNamesForRuntime\(RUNTIME_WEBVIEW\);/,
     'HANDLER_NAMES must come from panelApi.js, never from a local copy');
   assert.equal(new Set(ALL_HANDLER_NAMES).size, ALL_HANDLER_NAMES.length, 'handler names must be unique');
 });
@@ -157,13 +158,49 @@ test('member ids are unique across the whole contract', () => {
 });
 
 test('every member declares a runtime the parity checks understand', () => {
-  const bad = ALL_MEMBERS.filter((m) => ![RUNTIME_ANY, RUNTIME_WEBVIEW].includes(memberRuntime(m)));
+  const bad = ALL_MEMBERS.filter((m) => ![RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER].includes(memberRuntime(m)));
   assert.deepEqual(bad.map((m) => m.id), []);
 });
 
-test('panel verbs are the only webview-only members, and there are no webview-only helpers', () => {
-  // A helper is pure maths; if one ever needs the panel view it has been put in the wrong list.
-  const helpers = ALL_MEMBERS.filter((m) => m.kind === 'helper' && memberRuntime(m) === RUNTIME_WEBVIEW);
-  assert.deepEqual(helpers.map((m) => m.id), []);
-  assert.ok(WEBVIEW_ONLY_MEMBERS.length > 0, 'the panel verbs should be declared webview-only');
+/* ------------------------------------------------------- event sources, not just event names */
+
+test('the WebView runtime raises every event it is expected to raise', () => {
+  // Name parity got the handlers PROBED for; this checks they can actually FIRE. A declared event
+  // with no source is the same defect one step earlier — the probe list is right and nothing ever
+  // pushes the event. onDaw* are excluded by their runtime:'player' marker: the editor has no DAW.
+  //
+  // Two places can raise one: panelRuntime itself, and the preview surface, which calls
+  // dispatchInteraction for the transient pointer events (onWheel/onDoubleClick/onPointerMove)
+  // that cannot be recovered from a session diff. Both count.
+  const sources = [
+    join(here, '..', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'),
+    join(here, '..', 'src', 'CE_Application', 'editor', 'PanelPreviewSurface.svelte'),
+  ].map((f) => readFileSync(f, 'utf8')).join('\n');
+
+  const missing = handlerNamesForRuntime(RUNTIME_WEBVIEW)
+    .filter((name) => !new RegExp(`['\`"]${name}['\`"]`).test(sources));
+  assert.deepEqual(missing, [], `declared but nothing raises them: ${missing.join(', ')}`);
+});
+
+test('the onDaw hooks are declared player-only rather than pretending to fire everywhere', () => {
+  const daw = ALL_MEMBERS.filter((m) => m.id.startsWith('onDaw'));
+  assert.ok(daw.length > 0);
+  for (const hook of daw) {
+    assert.equal(memberRuntime(hook), RUNTIME_PLAYER, `${hook.id} should be runtime:'player'`);
+  }
+  assert.ok(!handlerNamesForRuntime(RUNTIME_WEBVIEW).includes('onDawSaveState'));
+  assert.ok(handlerNamesForRuntime(RUNTIME_PLAYER).includes('onDawSaveState'));
+});
+
+/* ------------------------------------------------------------------------------- scope */
+
+test('the only scope-limited members are the ones that genuinely need a component', () => {
+  // The Device/MIDI verbs used to declare device/panel/project scope. Enforcing that denied a
+  // per-control script the ability to send a CC — the ordinary thing a panel control does — so the
+  // list was withdrawn rather than enforced as written. What is left is the panel-component verbs,
+  // which need a component to exist: a device script runs at onPanelLoad, before the GUI is there.
+  const limited = ALL_MEMBERS.filter((m) => Array.isArray(m.scopes));
+  const categories = [...new Set(limited.map((m) => m.category))];
+  assert.deepEqual(categories, ['Panel components'],
+    `scope-limited members outside the panel verbs: ${limited.filter((m) => m.category !== 'Panel components').map((m) => m.id).join(', ')}`);
 });

@@ -233,8 +233,12 @@ juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& ar
     ++dispatchDepth;
     struct DepthScope { int& d; ~DepthScope() { --d; } } depthScope { dispatchDepth };
 
-    const juce::String owner  = ref.upToLastOccurrenceOf (".", false, false);
-    const juce::String action = ref.fromLastOccurrenceOf (".", false, false);
+    // Split on the LAST dot, testing for one first: upToLastOccurrenceOf returns the WHOLE string
+    // when the separator is absent, so a bare "action" would come back as owner "action" and match
+    // no script — silently breaking the documented bare form while "owner.action" kept working.
+    const int dot = ref.lastIndexOfChar ('.');
+    const juce::String owner  = dot > 0 ? ref.substring (0, dot) : juce::String();
+    const juce::String action = dot >= 0 ? ref.substring (dot + 1) : ref;
     if (action.isEmpty()) return {};
 
     for (auto& s : scripts)

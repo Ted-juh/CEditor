@@ -40,22 +40,57 @@ public:
 
     const juce::var& panel() const noexcept { return doc; }
 
-    /** Read a script path ("control.section.prop" or a shorthand like "control.value"). */
-    juce::var getValue (const juce::String& scriptPath) const
+    /** Read a script path ("control.section.prop" or a shorthand like "control.value").
+        `form` selects the representation (Q8): "value" (default) or "normalizedValue". Both are
+        arithmetic over the control's own Behavior.min/max, so they need nothing but the panel
+        document. "midiValue" is the DPD's encoding and cannot be answered here — the caller
+        (BridgeScriptHost) rejects it before we get this far. */
+    juce::var getValue (const juce::String& scriptPath, const juce::String& form = "value") const
     {
         const auto split = splitScriptPath (scriptPath);
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return {};
-        return valueAtPath (control, resolveModelPath (control, split.second));
+        const auto raw = valueAtPath (control, resolveModelPath (control, split.second));
+        if (form != "normalizedValue") return raw;
+
+        double lo = 0.0, hi = 0.0;
+        if (! rangeOf (control, lo, hi)) return {};
+        const double n = (double) raw;
+        return juce::var (juce::jlimit (0.0, 1.0, (n - lo) / (hi - lo)));
     }
 
-    /** Write a script path. Returns true if the control + path resolved and the write landed. */
-    bool setValue (const juce::String& scriptPath, const juce::var& value)
+    /** Write a script path. Returns true if the control + path resolved and the write landed.
+        With form == "normalizedValue" the incoming 0–1 position is mapped onto the control's range
+        first — clamped, because a position outside 0–1 is a bug in the caller's maths and letting
+        it through would drive the control past its own limits. */
+    bool setValue (const juce::String& scriptPath, const juce::var& value, const juce::String& form = "value")
     {
         const auto split = splitScriptPath (scriptPath);
         const auto control = findControlByName (split.first);
         if (! control.isObject()) return false;
-        return setAtPath (control, resolveModelPath (control, split.second), value);
+
+        juce::var toWrite = value;
+        if (form == "normalizedValue")
+        {
+            double lo = 0.0, hi = 0.0;
+            if (! rangeOf (control, lo, hi)) return false;
+            toWrite = juce::var (lo + juce::jlimit (0.0, 1.0, (double) value) * (hi - lo));
+        }
+        return setAtPath (control, resolveModelPath (control, split.second), toWrite);
+    }
+
+    /** A control's numeric range from its Behavior section. False when it hasn't got one. */
+    static bool rangeOf (const juce::var& control, double& lo, double& hi)
+    {
+        const auto behavior = readChildValue (control, "Behavior");
+        auto* obj = behavior.getDynamicObject();
+        if (obj == nullptr) return false;
+        const auto minVar = obj->getProperty ("min");
+        const auto maxVar = obj->getProperty ("max");
+        if (minVar.isVoid() || maxVar.isVoid()) return false;
+        lo = (double) minVar;
+        hi = (double) maxVar;
+        return lo != hi;
     }
 
     /** Find a control's live var by friendly name (case-insensitive) or id — for event dispatch. */
@@ -199,7 +234,11 @@ private:
     // Mirror of resolveModelPath(): shorthand → explicit-section walk → per-section search → channelize.
     static juce::String resolveModelPath (const juce::var& control, const juce::StringArray& segments)
     {
-        if (segments.isEmpty()) return {};
+        // A bare control name means its value — `.value` is the documented default representation,
+        // so get("cutoff") and get("cutoff.value") ask the same question. Mirrors the same rule in
+        // panelRuntime.js, and is what lets get("cutoff", "normalizedValue") find a value to
+        // normalise once the accessor suffix has been stripped off the path.
+        if (segments.isEmpty()) return channelizePath (control, "Value.value");
         const auto first = segments[0].toLowerCase();
         juce::String path;
 

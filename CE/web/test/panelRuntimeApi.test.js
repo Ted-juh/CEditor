@@ -155,6 +155,61 @@ test('a decoded dump announces each parameter once, not twice', () => {
     'onDumpParsed should seed runtimeParams for the values it announced');
 });
 
+/* ------------------------------------------------------------------- value representations */
+
+test('both spellings of the value accessor are accepted', () => {
+  // The suffix was documented and the second argument was implemented, and for a while neither
+  // was wired through. Both now resolve to the same request.
+  assert.match(runtimeSource, /function splitAccessor\(path, explicitForm\)/);
+  assert.match(runtimeSource, /DERIVED_ACCESSORS\.has\(tail\)/,
+    'a trailing .normalizedValue / .midiValue should be recognised as an accessor');
+  assert.match(runtimeSource, /get: \(path, form\) => getValue\(path, form\)/,
+    'get should pass a form argument through');
+});
+
+test('normalizedValue is arithmetic over the control\'s own range, and is clamped', () => {
+  assert.match(runtimeSource, /function rangeOf\(control\)/);
+  assert.match(runtimeSource, /behavior\?\.min/, 'the range comes from Behavior.min/max');
+  assert.match(runtimeSource, /Math\.max\(0, Math\.min\(1,/,
+    'a position outside 0–1 must be clamped, not driven past the control limits');
+});
+
+test('midiValue reports that it needs the device host instead of returning undefined', () => {
+  assert.match(runtimeSource, /function reportNeedsDeviceHost\(member, path\)/);
+  assert.match(runtimeSource, /addScriptTrace\('error'/,
+    'the report must be at error level — info level reads as ordinary chatter');
+});
+
+test('buildDump says why it produced nothing rather than returning a quiet null', () => {
+  const build = runtimeSource.slice(runtimeSource.indexOf('buildDump: (kind)'));
+  assert.match(build.slice(0, 600), /addScriptTrace\(\s*'error'/,
+    'buildDump should report at error level when the device host is absent');
+});
+
+/* --------------------------------------------------------------------- set()\'s opts.transmit */
+
+test('set honours opts.transmit, which used to be accepted and dropped', () => {
+  assert.match(runtimeSource, /const transmit = opts && 'transmit' in opts \? opts\.transmit !== false : defaultTransmit\(\);/,
+    'an explicit opts.transmit must beat the origin rule, as it does in the C++ host');
+  // A string in that position is the value form, an object is opts — the contract puts both there.
+  assert.match(runtimeSource, /const form = typeof formOrOpts === 'string' \? formOrOpts : '';/);
+});
+
+/* ---------------------------------------------------------------------------------- off() */
+
+test('off is bound and takes its arguments', () => {
+  assert.equal(typeof api.off, 'function');
+  assert.ok(api.off.length >= 2, 'off(target, event) should take both');
+  assert.doesNotThrow(() => api.off('*', 'never-registered'), 'an unknown pair is a no-op');
+});
+
+test('off only removes the calling script\'s listeners', () => {
+  // Scoped by script id, so one script cannot silently unsubscribe another's handlers — a failure
+  // that would be near-impossible to debug from the script that stopped working.
+  assert.match(runtimeSource, /function removeListener\(scriptId, target, event\)/);
+  assert.match(runtimeSource, /l\.scriptId === scriptId && l\.target === t && l\.event === e/);
+});
+
 test('startTimer replaces a timer with the same id rather than stacking a second one', () => {
   api.startTimer('t', 10_000);
   api.startTimer('t', 10_000);

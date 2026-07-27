@@ -27,7 +27,7 @@ import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
 } from '../stores/deviceProfiles.js';
-import { ALL_HANDLER_NAMES } from './panelApi.js';
+import { handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS } from './panelApi.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -117,7 +117,10 @@ function channelizePath(control, path) {
 
 /** Map a script path's segments to the model's real-case section path. */
 function resolveModelPath(control, segments) {
-  if (segments.length === 0) return '';
+  // A bare control name means its value — `.value` is documented as the default representation, so
+  // get("cutoff") and get("cutoff.value") are the same question. This is also what lets the
+  // second-argument form, get("cutoff", "normalizedValue"), find something to normalise.
+  if (segments.length === 0) return channelizePath(control, SHORTHANDS.value);
   const first = String(segments[0]).toLowerCase();
   let path;
   // Single-segment shorthand (e.g. "visible", "x", "value") — canonical, wins over any stray key.
@@ -144,6 +147,46 @@ function resolveModelPath(control, segments) {
 function splitScriptPath(path) {
   const parts = String(path).split('.');
   return { name: parts[0], segs: parts.slice(1) };
+}
+
+/* ---------------------------------------------------------------- value representations (Q8) */
+// A control value can be asked for three ways: the real value, the 0–1 position, or what the DPD
+// would put on the wire. The accessor is a path SUFFIX — get("cutoff.normalizedValue") — or a
+// second ARGUMENT — get("cutoff", "normalizedValue"). Both spellings work; the suffix is what the
+// picker inserts, the argument is what the engines' host bindings pass. An explicit argument wins.
+//
+// `.value` is left in the path: it is the shorthand that already resolves to Value.value. The other
+// two are stripped, because underneath them the thing being read or written is still the real value
+// — the representation is arithmetic applied on the way past.
+
+const DERIVED_ACCESSORS = new Set(VALUE_ACCESSOR_IDS.filter((id) => id !== 'value'));
+
+function splitAccessor(path, explicitForm) {
+  const text = String(path ?? '');
+  const form = VALUE_ACCESSOR_IDS.includes(explicitForm) ? explicitForm : '';
+  const dot = text.lastIndexOf('.');
+  if (dot > 0) {
+    const tail = text.slice(dot + 1);
+    if (DERIVED_ACCESSORS.has(tail)) return { path: text.slice(0, dot), form: form || tail };
+  }
+  return { path: text, form: form || 'value' };
+}
+
+/** The control's own 0–1 range, from Behavior.min/max. null when it has no numeric range. */
+function rangeOf(control) {
+  const behavior = control?._children?.Behavior;
+  const min = Number(behavior?.min);
+  const max = Number(behavior?.max);
+  return Number.isFinite(min) && Number.isFinite(max) && max !== min ? { min, max } : null;
+}
+
+// `.midiValue` is what the DPD codec would encode, and the codec lives in the device host — there
+// is no way to answer it from the panel document alone. Say so once, clearly, rather than returning
+// undefined and leaving the author to work out which of several things went wrong.
+function reportNeedsDeviceHost(member, path) {
+  addScriptTrace('error', '',
+    `${member} on "${path}" needs the device host — the MIDI encoding is the device profile's, not the panel's. `
+    + 'Use .value or .normalizedValue, or run this where the device host is attached.');
 }
 
 /* ------------------------------------------------------------- transmit origin (Q2) */
@@ -179,18 +222,40 @@ function valueBindingFor(control) {
     && String(b.port ?? 'value') === 'value') ?? null;
 }
 
-function setValue(path, value) {
-  const { name, segs } = splitScriptPath(path);
+// The third argument carries two different things, as the contract's own signature does:
+// set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
+// A string is a form, an object is opts.
+function setValue(path, value, formOrOpts = '') {
+  const form = typeof formOrOpts === 'string' ? formOrOpts : '';
+  const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
+  const addressed = splitAccessor(path, form);
+  const { name, segs } = splitScriptPath(addressed.path);
   const control = findControlByName(name);
   if (!control) { addScriptTrace('error', '', `set: control "${name}" not found on the active panel`); return; }
+
+  if (addressed.form === 'midiValue') { reportNeedsDeviceHost('set(.midiValue)', addressed.path); return; }
+  if (addressed.form === 'normalizedValue') {
+    const range = rangeOf(control);
+    if (!range) {
+      addScriptTrace('error', '', `set: "${name}" has no numeric range (Behavior.min/max), so .normalizedValue means nothing here`);
+      return;
+    }
+    // Clamp: a 0–1 position outside 0–1 is a bug in the caller's maths, and letting it through
+    // would drive the control past its own limits.
+    const t = Math.max(0, Math.min(1, Number(value)));
+    value = range.min + t * (range.max - range.min);
+  }
+
   const modelPath = resolveModelPath(control, segs);
   if (host) host.writeValue(control, modelPath, value);
   else updateControlProperty(control?._children?.Core?.id, modelPath, value);
 
   // Transmit-by-default: a bound control's value write also goes to the synth, which is what the
   // C++ runtime does. Without this the same script moved the knob window-closed and only moved
-  // the picture window-open.
-  if (!defaultTransmit()) return;
+  // the picture window-open. An explicit opts.transmit beats the origin rule, as it does there —
+  // this runtime used to accept the option and drop it.
+  const transmit = opts && 'transmit' in opts ? opts.transmit !== false : defaultTransmit();
+  if (!transmit) return;
   if (String(modelPath).toLowerCase() !== 'value' && !String(modelPath).toLowerCase().endsWith('.value')) return;
   const binding = valueBindingFor(control);
   if (!binding) return;
@@ -203,13 +268,26 @@ function setValue(path, value) {
   });
 }
 
-function getValue(path) {
-  const { name, segs } = splitScriptPath(path);
+function getValue(path, form = '') {
+  const addressed = splitAccessor(path, form);
+  const { name, segs } = splitScriptPath(addressed.path);
   const control = findControlByName(name);
   if (!control) return undefined;
+
+  if (addressed.form === 'midiValue') { reportNeedsDeviceHost('get(.midiValue)', addressed.path); return undefined; }
+
   const modelPath = resolveModelPath(control, segs);
-  if (host) return host.readValue(control, modelPath);
-  return valueAtPath(control, modelPath);
+  const raw = host ? host.readValue(control, modelPath) : valueAtPath(control, modelPath);
+  if (addressed.form !== 'normalizedValue') return raw;
+
+  const range = rangeOf(control);
+  if (!range) {
+    addScriptTrace('error', '', `get: "${name}" has no numeric range (Behavior.min/max), so .normalizedValue means nothing here`);
+    return undefined;
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(0, Math.min(1, (n - range.min) / (range.max - range.min)));
 }
 
 /** Read a control value at a path, for the debugger's watch panel. Never throws. */
@@ -341,12 +419,13 @@ const midiApi = {
     sendRawMidi(b, 'sysex');
   },
   // Read the synth: routes through the app's device-sync path (resolves the profile on the role).
-  requestDump: (request) => {
+  // The parameter is `kind`, the name the contract and every other runtime use for it.
+  requestDump: (kind) => {
     if (isJuceAvailable()) {
-      startDeviceSync({ deviceRole: DEFAULT_ROLE, request: String(request ?? '') });
-      addScriptTrace('midi', '', `requestDump(${JSON.stringify(request ?? '')}) → device sync requested`);
+      startDeviceSync({ deviceRole: DEFAULT_ROLE, request: String(kind ?? '') });
+      addScriptTrace('midi', '', `requestDump(${JSON.stringify(kind ?? '')}) → device sync requested`);
     } else {
-      addScriptTrace('midi', '', `requestDump(${JSON.stringify(request ?? '')}) — no JUCE host`);
+      addScriptTrace('midi', '', `requestDump(${JSON.stringify(kind ?? '')}) — no device host`);
     }
   },
   checksum: (type, bytes) =>
@@ -376,7 +455,14 @@ const midiApi = {
   // applyDump fills the panel from a dump: pass a DECODED { parameterId: value } map and it lands
   // on the bound controls right away (no host needed); pass raw bytes and the device host (C++ DPD
   // codec) decodes them, then onDumpMessageParsed fills the panel + fires onDumpReceived.
-  applyDump: (data, role = DEFAULT_ROLE) => {
+  // applyDump(bytes) — the contract's signature. It also accepts an already-decoded
+  // { parameter: value } map, which is how a panel fills with no device host attached; that is
+  // documented on the member rather than left as a surprise. There is no role parameter: every
+  // runtime addresses the main synth, and an undocumented extra argument here is exactly the kind
+  // of divergence that put the five runtimes out of step in the first place.
+  applyDump: (bytes) => {
+    const data = bytes;
+    const role = DEFAULT_ROLE;
     if (data && typeof data === 'object' && !Array.isArray(data)) {
       const n = syncDeviceRuntimeStateToPanelPreview({ [role]: data });
       addScriptTrace('midi', '', `applyDump: filled ${n} control(s) from ${Object.keys(data).length} value(s)`);
@@ -391,7 +477,8 @@ const midiApi = {
     return 0;
   },
   // sendDump builds the dump from the device profile and sends it (host-side bulk send).
-  sendDump: (kind, role = DEFAULT_ROLE) => {
+  sendDump: (kind) => {
+    const role = DEFAULT_ROLE;
     if (isJuceAvailable()) {
       startBulkDumpSend({ deviceRole: role, expectedDumpId: String(kind ?? ''), dryRun: false });
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) → bulk send requested`);
@@ -399,9 +486,15 @@ const midiApi = {
       addScriptTrace('midi', '', `sendDump(${JSON.stringify(kind ?? '')}) — no device host`);
     }
   },
-  // buildDump (panel → bytes) is encoded by the device profile's codec, which lives in the C++ host.
-  buildDump: () => {
-    addScriptTrace('midi', '', 'buildDump(...) — panel→bytes encoding runs in the device host (export/native); use sendDump to transmit');
+  // buildDump (panel → bytes) is encoded by the device profile's codec, which lives in the device
+  // host. This runtime cannot produce the bytes, so it reports at ERROR level and returns null —
+  // it used to report at 'midi' level, which reads as ordinary chatter, so a script that built a
+  // dump here got a quiet null and no indication that anything was wrong. Declared
+  // requiresDeviceHost in panelApi.js so the docs and the picker say it too.
+  buildDump: (kind) => {
+    addScriptTrace('error', '',
+      `buildDump(${JSON.stringify(kind ?? '')}) needs the device host — panel→bytes encoding is the device profile's codec, `
+      + 'which runs in the host, not the panel view. It returns bytes in the exported plugin; use sendDump to transmit from here.');
     return null;
   },
 };
@@ -558,6 +651,17 @@ function addListener(scriptId, target, event, fn) {
   listeners.push({ scriptId, target: String(target ?? '*'), event: String(event ?? ''), fn });
 }
 
+/** off(target, event) — drop THIS script's listeners for that pair. Scoped to the caller so one
+    script cannot silently unsubscribe another's handlers. An unknown pair is a no-op. */
+function removeListener(scriptId, target, event) {
+  const t = String(target ?? '*');
+  const e = String(event ?? '');
+  for (let i = listeners.length - 1; i >= 0; i--) {
+    const l = listeners[i];
+    if (l.scriptId === scriptId && l.target === t && l.event === e) listeners.splice(i, 1);
+  }
+}
+
 // Same backstop as ScriptRuntime::dispatchEvent: emit → handler → emit → … is cut off at a fixed
 // depth and reported, rather than recursing until the tab dies.
 const MAX_EMIT_DEPTH = 16;
@@ -643,12 +747,15 @@ function stopAllTimers() {
 
 function buildApi(ownerName, scriptId = '') {
   const self = {
-    set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
-    get: (p) => getValue(ownerName ? `${ownerName}.${p}` : p),
+    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v, typeof form === 'string' ? form : ''),
+    get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form),
   };
   return {
-    set: (path, value) => setValue(path, value),
-    get: (path) => getValue(path),
+    // The third argument is the value form for the second-argument spelling. `set` also takes an
+    // opts object in that position in the contract; only a string is read as a form, so
+    // set(path, v, { transmit: false }) is unaffected.
+    set: (path, value, form) => setValue(path, value, typeof form === 'string' ? form : ''),
+    get: (path, form) => getValue(path, form),
     log: (msg, val) => addScriptTrace('log', '', val !== undefined ? `${msg} ${JSON.stringify(val)}` : String(msg)),
     // MIDI/device — real raw send via the device bridge; bulk codec is a fast-follow.
     ...midiApi,
@@ -666,6 +773,7 @@ function buildApi(ownerName, scriptId = '') {
     emit: (name, data) => deliverEmit(String(name ?? ''), null, data),
     run: (ref, args) => runAction(ref, args),
     on: (target, event, fn) => addListener(scriptId, target, event, fn),
+    off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
     // The blocks gate set()'s transmission, not the explicit senders — same rule as the C++ host.
@@ -688,7 +796,9 @@ function buildApi(ownerName, scriptId = '') {
 // a name missing from it is a handler that can never fire — which is exactly what happened to
 // onControlChanged, onTimer, onMidiIn, onCcIn, onSysexIn and the two device-connection events
 // while this was hand-maintained.
-const HANDLER_NAMES = ALL_HANDLER_NAMES;
+// The onDaw* hooks are declared runtime:'player' — there is no DAW behind the editor to save a
+// project, so they are not in this runtime's list and never probed for here.
+const HANDLER_NAMES = handlerNamesForRuntime(RUNTIME_WEBVIEW);
 
 /**
  * Every global this runtime binds into a script, as the runtime itself builds it — `self` and the

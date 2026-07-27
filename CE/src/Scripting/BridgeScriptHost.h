@@ -13,6 +13,7 @@
 // THREADING: all calls happen on the message thread, inside a dispatch.
 
 #include "ScriptRuntime.h"
+#include <map>
 
 namespace ceditor::scripting
 {
@@ -24,7 +25,10 @@ public:
     {
         // Values (path = "control.value" style; form = value|normalizedValue|midiValue).
         std::function<juce::var (const juce::String& path, const juce::String& form)> getValue;
-        std::function<void (const juce::String& path, const juce::var& value, bool transmit)> setValue;
+        // `form` is the value representation the script asked for: "value" (default) or
+        // "normalizedValue". The app maps it, because only the app knows the control's range.
+        std::function<void (const juce::String& path, const juce::var& value, bool transmit,
+                            const juce::String& form)> setValue;
         // Device / MIDI.
         std::function<void (int ch, int cc, const juce::var& value)> sendCC;
         std::function<void (int ch, int msb, int lsb, const juce::var& value)> sendNRPN;
@@ -52,6 +56,20 @@ public:
     // The script currently running — exposed so callbacks can resolve scope-relative paths if needed.
     const ScriptContext& currentScript() const { return context; }
 
+    /** Split a trailing value accessor off a path. The accessor may be a SUFFIX
+        ("cutoff.normalizedValue") or an explicit `form` ARGUMENT — both spellings are documented,
+        and an explicit argument wins. `.value` is left on the path: it is the shorthand that
+        already resolves to the value, so stripping it would leave nothing to resolve. */
+    static std::pair<juce::String, juce::String> splitAccessor (const juce::String& path,
+                                                                const juce::String& explicitForm)
+    {
+        const bool explicitIsDerived = explicitForm == "normalizedValue" || explicitForm == "midiValue";
+        const auto tail = path.fromLastOccurrenceOf (".", false, false);
+        if (tail == "normalizedValue" || tail == "midiValue")
+            return { path.upToLastOccurrenceOf (".", false, false), explicitIsDerived ? explicitForm : tail };
+        return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
+    }
+
     // -- ScriptHostApi --
     void enterScript (const ScriptContext& c) override { context = c; }
     void exitScript() override { context = {}; }
@@ -59,17 +77,31 @@ public:
     void endTransmitOverride() override { if (runtime) runtime->popTransmit(); }
 
     juce::var getValue (const juce::String& path, const juce::String& form) override
-    { return callbacks.getValue ? callbacks.getValue (path, form) : juce::var(); }
+    {
+        const auto addressed = splitAccessor (path, form);
+        if (addressed.second == "midiValue")
+        {
+            reportNeedsDeviceHost ("get(.midiValue)", addressed.first);
+            return {};
+        }
+        return callbacks.getValue ? callbacks.getValue (addressed.first, addressed.second) : juce::var();
+    }
 
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override
     {
+        const auto addressed = splitAccessor (path, {});
+        if (addressed.second == "midiValue")
+        {
+            reportNeedsDeviceHost ("set(.midiValue)", addressed.first);
+            return;
+        }
         bool transmit = runtime ? runtime->defaultTransmit() : true;
         if (auto* o = options.getDynamicObject())
             if (o->hasProperty ("transmit")) transmit = (bool) o->getProperty ("transmit");
         // Under a MIDI flood the value still applies locally — only the synth send is dropped.
         if (transmit && ! midiSendAllowed())
             transmit = false;
-        if (callbacks.setValue) callbacks.setValue (path, value, transmit);
+        if (callbacks.setValue) callbacks.setValue (addressed.first, value, transmit, addressed.second);
     }
 
     void sendCC (int ch, int cc, const juce::var& v) override        { if (callbacks.sendCC && midiSendAllowed()) callbacks.sendCC (ch, cc, v); }
@@ -97,6 +129,24 @@ public:
     void stopTimer  (const juce::String& id) override { if (callbacks.stopTimer) callbacks.stopTimer (id); }
 
 private:
+    // Scope (Q7) is NOT enforced here, and that is a decision rather than an omission. The
+    // Device/MIDI verbs used to declare device/panel/project scope; enforcing that list denied a
+    // COMPONENT script — a per-control script — the ability to send a CC, which is the ordinary
+    // thing a panel control does. The list was aspirational, so panelApi.js now declares those
+    // verbs 'any' and the only genuinely scoped members left are the panel-component verbs, which
+    // need a component to exist. Those are webview-only: the C++ engines define them as stubs that
+    // explain themselves, which is the enforcement. scriptValidate flags the misuse at edit time.
+
+    // `.midiValue` is what the DPD codec would put on the wire, and the codec is the device host's,
+    // not the panel's. Say so once and clearly rather than returning a quiet nothing and leaving the
+    // author to work out which of several things went wrong.
+    void reportNeedsDeviceHost (const juce::String& member, const juce::String& path)
+    {
+        if (callbacks.log)
+            callbacks.log (member + " on '" + path + "' needs the device host — the MIDI encoding belongs to the "
+                           "device profile, not the panel. Use .value or .normalizedValue.", juce::var());
+    }
+
     // Anti-flood backstop (scripting-redesign §7 keep-list): scripts may not push
     // more than this many MIDI messages (CC/NRPN/sysex + transmitting setValues)
     // per rolling second. Excess sends are dropped — local value writes still

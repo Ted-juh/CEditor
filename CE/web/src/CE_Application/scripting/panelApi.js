@@ -125,11 +125,23 @@ export const SELF = {
 // A control value has three representations (Q8). The DPD converts between them.
 // Addressed as a suffix on a control path: "cutoff.value", "cutoff.normalizedValue", …
 
+// TWO SPELLINGS, ONE MEANING. The accessor may be a path suffix — get("cutoff.normalizedValue") —
+// or a second argument — get("cutoff", "normalizedValue"). Both work in every runtime; the suffix
+// is what the picker inserts and what the manual shows. An explicit second argument wins if you
+// somehow give both. (The suffix was documented and the argument was implemented, for a while, and
+// neither was wired all the way through — see VALUE_ACCESSOR_IDS' use in the runtimes.)
+//
+// `.value` and `.normalizedValue` are pure arithmetic over the control's own Behavior.min/max, so
+// they work anywhere. `.midiValue` is what the DPD would put on the wire, which only the device
+// host can answer — it is marked accordingly and reports rather than returning a quiet nothing.
+
 export const VALUE_ACCESSORS = [
   { id: 'value', label: '.value', summary: 'The real, human value — e.g. 8000 (Hz) or "LP" (enum name). The default. Setting it lets the DPD convert to MIDI on send.' },
-  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The 0–1 position. For uniform math, curves, and linking controls of different ranges.' },
-  { id: 'midiValue', label: '.midiValue', summary: 'The value as MIDI (e.g. 101). Only for device-bound controls; empty for decorative ones. For hand-built MIDI.' },
+  { id: 'normalizedValue', label: '.normalizedValue', summary: 'The 0–1 position, from the control\'s own min/max. For uniform math, curves, and linking controls of different ranges.' },
+  { id: 'midiValue', label: '.midiValue', requiresDeviceHost: true, summary: 'The value as MIDI (e.g. 101), as the DPD would encode it. Device-bound controls only, and only with the device host attached — the encoding lives there, not in the panel.' },
 ];
+
+export const VALUE_ACCESSOR_IDS = VALUE_ACCESSORS.map((a) => a.id);
 
 /* ------------------------------------------------------------------- runtimes */
 // Where a member actually runs. Most of the API is 'any' — implemented identically by the
@@ -142,6 +154,13 @@ export const VALUE_ACCESSORS = [
 
 export const RUNTIME_ANY = 'any';         // WebView + every C++ engine
 export const RUNTIME_WEBVIEW = 'webview'; // panel view only; C++ engines stub it with a notice
+export const RUNTIME_PLAYER = 'player';   // the exported plugin only; the editor has no DAW to raise it
+
+// Some members need the DEVICE HOST — the C++ side that owns the DPD codec and the MIDI ports.
+// They are cross-runtime (every engine binds them) but they cannot produce an answer in a plain
+// browser tab with no host attached. Marked so the docs say it, and so the runtimes report it
+// instead of returning undefined and letting the author guess.
+export const REQUIRES_DEVICE_HOST = 'requiresDeviceHost';
 
 /* ------------------------------------------------------------- lifecycle hooks */
 // Named entry points the host calls (Q5). `onDaw*` = host-triggered.
@@ -171,17 +190,28 @@ export const LIFECYCLE_HOOKS = [
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
   },
+  // RETURN what you want saved — do not mutate `store`. `store` arrives as a copy: each engine
+  // marshals it into the script's own language (a fresh Lua table, a QuickJS object, a Python
+  // dict), so writing into it changes something the host will never read, and the state vanishes
+  // when the DAW reopens the project. Returning an object is the contract every engine honours:
+  // ScriptRuntime::onDawSaveState merges the returned keys into the shared store.
+  //
+  // Player-only. The editor has no DAW to save a project, so these never fire in preview — test
+  // them in the exported plugin.
   {
-    id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle',
-    signature: 'onDawSaveState(store)',
-    summary: 'The DAW is saving the project — write values into `store`.',
+    id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
+    signature: 'onDawSaveState(store) -> object',
+    summary: 'The DAW is saving the project — RETURN an object of what to save. `store` is what other scripts have saved so far, for reading. Mutating it does nothing.',
     params: [{ name: 'store', type: 'object' }],
-    snippet: { lua: 'function onDawSaveState(store)\n  $0\nend', javascript: 'function onDawSaveState(store) {\n  $0\n}' },
+    snippet: {
+      lua: 'function onDawSaveState(store)\n  return { ${1:key} = ${2:value} }$0\nend',
+      javascript: 'function onDawSaveState(store) {\n  return { ${1:key}: ${2:value} };$0\n}',
+    },
   },
   {
-    id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle',
+    id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawRestoreState(store)',
-    summary: 'The DAW reopened the project — read values back from `store`.',
+    summary: 'The DAW reopened the project — read your values back out of `store` (the object your onDawSaveState returned, merged with every other script\'s).',
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawRestoreState(store)\n  $0\nend', javascript: 'function onDawRestoreState(store) {\n  $0\n}' },
   },
@@ -231,12 +261,21 @@ export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, device: DE
 
 /* ------------------------------------------------------------------ commands */
 // The action verbs (Q1, Q2, Q6, Q9). Picker category "Commands". param.type drives validation.
+//
+// SCOPE, and what it is actually for. `scopes` limits where a member may be used. The Device/MIDI
+// verbs used to declare device/panel/project — design intent from the spec, never enforced. When
+// enforcement was added the rule turned out to be wrong: a COMPONENT script is a per-control
+// script, and a control that sends a CC or a sysex message on press is the ordinary case, not an
+// abuse. Enforcing the list as written would have broken every panel whose buttons talk to the
+// synth. So the MIDI verbs are 'any', and the only genuinely scoped members left are the
+// panel-component verbs, which need a component to exist — a device script runs at onPanelLoad,
+// before the GUI is there. That restriction is real, so it is the one that is enforced.
 
 export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Write a value at a path. Transmits to the synth by default (Q2); silence is auto-inferred when reacting to inbound MIDI.',
+    summary: 'Write a value at a path. Suffix the path with .normalizedValue to write a 0–1 position instead of the real value. Transmits to the synth by default (Q2); silence is auto-inferred when reacting to inbound MIDI.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'value', type: 'value', required: true },
@@ -246,9 +285,12 @@ export const COMMANDS = [
     snippet: { lua: 'set("${1:path}", ${2:value})$0', javascript: 'set("${1:path}", ${2:value})$0' },
   },
   {
-    id: 'get', category: 'Values', signature: 'get(path)',
-    summary: 'Read a value at a path. Suffix with .value (default), .normalizedValue, or .midiValue.',
-    params: [{ name: 'path', type: 'path', required: true }],
+    id: 'get', category: 'Values', signature: 'get(path [, form])',
+    summary: 'Read a value at a path. Choose the representation by suffixing the path (.value — the default — .normalizedValue, or .midiValue) or by passing it as `form`.',
+    params: [
+      { name: 'path', type: 'path', required: true },
+      { name: 'form', type: 'string', required: false, values: VALUE_ACCESSOR_IDS },
+    ],
     scopes: 'any',
     snippet: { lua: 'get("${1:path}")$0', javascript: 'get("${1:path}")$0' },
   },
@@ -283,6 +325,16 @@ export const COMMANDS = [
       lua: 'on("${1:target}", "${2:event}", function(${3:e})\n  $0\nend)',
       javascript: 'on("${1:target}", "${2:event}", (${3:e}) => {\n  $0\n})',
     },
+  },
+  {
+    id: 'off', category: 'Events & Flow', signature: 'off(target, event)',
+    summary: 'Stop reacting to an event you subscribed to with on(). Removes this script\'s listeners for that target and event; unknown pairs are ignored.',
+    params: [
+      { name: 'target', type: 'targetRef', required: true },
+      { name: 'event', type: 'eventName', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'off("${1:target}", "${2:event}")$0', javascript: 'off("${1:target}", "${2:event}")$0' },
   },
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
@@ -332,28 +384,29 @@ export const COMMANDS = [
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind)',
     summary: 'Ask the synth to send a dump. kind ("patch"/"tone"/"global"…) is defined by the DPD.',
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
-    scopes: ['device', 'panel', 'project'],
+    scopes: 'any',
     snippet: { lua: 'requestDump("${1:patch}")$0', javascript: 'requestDump("${1:patch}")$0' },
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context.',
+    summary: 'Fill the whole panel from a received dump (walks the DPD map). Silent automatically — inbound context. Also accepts an already-decoded { parameter: value } map, which is how a panel can be filled with no device host attached.',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
-    scopes: ['device', 'panel', 'project'],
+    scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
   },
   {
     id: 'sendDump', category: 'Device / MIDI', signature: 'sendDump(kind)',
     summary: 'Build a dump from the panel values and send it to the synth.',
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
-    scopes: ['device', 'panel', 'project'],
+    scopes: 'any',
     snippet: { lua: 'sendDump("${1:patch}")$0', javascript: 'sendDump("${1:patch}")$0' },
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build the dump bytes from the panel values without sending.',
+    summary: 'Build the dump bytes from the panel values without sending. Needs the device host: the panel→bytes encoding is the DPD codec, which lives there, so this returns nothing in a plain browser tab and says so.',
+    requiresDeviceHost: true,
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
-    scopes: ['device', 'panel', 'project'],
+    scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
 
@@ -366,7 +419,7 @@ export const COMMANDS = [
       { name: 'cc', type: 'number', required: true },
       { name: 'value', type: 'value', required: true },
     ],
-    scopes: ['device', 'panel'],
+    scopes: 'any',
     snippet: { lua: 'sendCC(${1:channel}, ${2:cc}, ${3:value})$0', javascript: 'sendCC(${1:channel}, ${2:cc}, ${3:value})$0' },
   },
   {
@@ -378,14 +431,14 @@ export const COMMANDS = [
       { name: 'lsb', type: 'number', required: true },
       { name: 'value', type: 'value', required: true },
     ],
-    scopes: ['device', 'panel'],
+    scopes: 'any',
     snippet: { lua: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0', javascript: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0' },
   },
   {
     id: 'sendSysex', category: 'Device / MIDI', signature: 'sendSysex(bytes)',
     summary: 'Send a raw SysEx message (device-scope, power use).',
     params: [{ name: 'bytes', type: 'bytes', required: true }],
-    scopes: ['device'],
+    scopes: 'any',
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
@@ -395,14 +448,14 @@ export const COMMANDS = [
       { name: 'type', type: 'string', required: true, values: ['roland', 'yamaha', 'sum', 'xor'] },
       { name: 'bytes', type: 'bytes', required: true },
     ],
-    scopes: ['device'],
+    scopes: 'any',
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },
   },
   {
     id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
     summary: 'Silence the rig: All Sound Off (120), then All Notes Off (123), then Reset All Controllers (121). Defaults to all 16 channels; pass { channel } for one, { resetControllers: false } to skip 121.',
     params: [{ name: 'opts', type: 'object', required: false, fields: ['channel', 'resetControllers'] }],
-    scopes: ['device', 'panel'],
+    scopes: 'any',
     snippet: { lua: 'panic()$0', javascript: 'panic()$0' },
   },
 
@@ -606,6 +659,21 @@ export function membersForRuntime(runtime) {
   return runtime === RUNTIME_WEBVIEW
     ? ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle')
     : ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle' && memberRuntime(m) === RUNTIME_ANY);
+}
+
+/** Does this member need the device host to produce an answer? Cross-runtime either way — the
+    runtimes all bind it — but in a plain browser tab it must report, not return a quiet nothing. */
+export function requiresDeviceHost(member) {
+  return member?.requiresDeviceHost === true;
+}
+
+/** Handler names an event source in `runtime` is expected to raise. Lifecycle hooks marked
+    RUNTIME_PLAYER (onDaw*) are excluded from the WebView's list: the editor has no DAW. */
+export function handlerNamesForRuntime(runtime) {
+  const hooks = LIFECYCLE_HOOKS
+    .filter((h) => memberRuntime(h) === RUNTIME_ANY || memberRuntime(h) === runtime)
+    .map((h) => h.id);
+  return [...hooks, ...ALL_EVENTS.map((e) => e.fn)];
 }
 
 /** The names the C++ engines define as "needs the panel window" stubs. */

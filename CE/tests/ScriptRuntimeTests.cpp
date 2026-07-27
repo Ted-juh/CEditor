@@ -235,6 +235,47 @@ int main()
            && host.ccSends[1] == "3:123:0" && host.ccSends[2] == "3:121:0",
            "panic(): all-sound-off, then all-notes-off, then reset-all-controllers");
 
+    // 10) off() — on() with no counterpart meant a listener lived until a full reload ------------
+    juce::Array<juce::var> offScripts;
+    offScripts.add (makeScript ("offlua", "lua", "panel", "onArmListener", "*",
+        "function onArmListener()\n  on(\"*\", \"ping\", function(v) log(\"lua heard \" .. tostring(v)) end)\nend\n"
+        "function onDropListener()\n  off(\"*\", \"ping\")\nend\n"));
+    offScripts.add (makeScript ("offjs", "javascript", "panel", "onArmJs", "*",
+        "function onArmJs() { on(\"*\", \"ping\", function (v) { log(\"js heard \" + v); }); }\n"
+        "function onDropJs() { off(\"*\", \"ping\"); }"));
+    runtime.loadScripts (juce::var (offScripts));
+
+    runtime.dispatchEvent ("onArmListener", "panel", juce::var());
+    runtime.dispatchEvent ("onArmJs", "panel", juce::var());
+    host.logs.clear();
+    runtime.dispatchEvent ("ping", "panel", juce::var (1));
+    check (host.logs.contains ("lua heard 1"), "on(): the Lua listener fired");
+    check (host.logs.contains ("js heard 1"), "on(): the JS listener fired");
+
+    // runAction, not dispatchEvent: a script only receives the event it DECLARES, and these two
+    // declare the arming event. run() calls a function by name, which is what a real script would
+    // do to reach a helper that is not itself a handler.
+    runtime.runAction ("onDropListener", juce::var());
+    runtime.runAction ("onDropJs", juce::var());
+    host.logs.clear();
+    runtime.dispatchEvent ("ping", "panel", juce::var (2));
+    check (! host.logs.contains ("lua heard 2"), "off(): the Lua listener stopped");
+    check (! host.logs.contains ("js heard 2"), "off(): the JS listener stopped");
+
+    // off() must only drop the CALLER's listeners — one script silently unsubscribing another's
+    // handlers would be impossible to debug from the script that stopped working.
+    juce::Array<juce::var> shareScripts;
+    shareScripts.add (makeScript ("keeper", "lua", "panel", "onArmKeeper", "*",
+        "function onArmKeeper()\n  on(\"*\", \"shared\", function() log(\"keeper heard\") end)\nend\n"));
+    shareScripts.add (makeScript ("dropper", "lua", "panel", "onDropOther", "*",
+        "function onDropOther()\n  off(\"*\", \"shared\")\nend\n"));
+    runtime.loadScripts (juce::var (shareScripts));
+    runtime.dispatchEvent ("onArmKeeper", "panel", juce::var());
+    runtime.dispatchEvent ("onDropOther", "panel", juce::var());
+    host.logs.clear();
+    runtime.dispatchEvent ("shared", "panel", juce::var());
+    check (host.logs.contains ("keeper heard"), "off(): only removes the calling script's listeners");
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

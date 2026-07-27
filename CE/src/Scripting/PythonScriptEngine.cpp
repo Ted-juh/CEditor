@@ -287,7 +287,8 @@ PyObject* api_beginTransmit (PyObject*, PyObject* args)
 PyObject* api_endTransmit (PyObject*, PyObject*) { g_host->endTransmitOverride(); Py_RETURN_NONE; }
 
 // on(target, event, fn) — defined here so it can capture the engine's listener registry.
-PyObject* api_on (PyObject*, PyObject* args);   // fwd (needs the engine class)
+PyObject* api_on  (PyObject*, PyObject* args);  // fwd (needs the engine class)
+PyObject* api_off (PyObject*, PyObject* args);  // fwd (needs the engine class)
 
 PyMethodDef apiMethods[] = {
     { "set",           api_set,           METH_VARARGS, nullptr },
@@ -307,6 +308,7 @@ PyMethodDef apiMethods[] = {
     { "beginTransmit", api_beginTransmit, METH_VARARGS, nullptr },
     { "endTransmit",   api_endTransmit,   METH_NOARGS,  nullptr },
     { "on",            api_on,            METH_VARARGS, nullptr },
+    { "off",           api_off,           METH_VARARGS, nullptr },
     { nullptr, nullptr, 0, nullptr }
 };
 
@@ -336,6 +338,7 @@ def run(target, args=None):       return __api.run(target, args)
 def emit(name, data=None):        return __api.emit(name, data)
 def log(msg, v=None):             return __api.log(str(msg), v)
 def on(target, event, fn):        return __api.on(target, event, fn)
+def off(target, event):           return __api.off(target, event)
 
 def noTransmit(fn):
     __api.beginTransmit(False)
@@ -510,8 +513,12 @@ public:
         }
 
         const WatchdogScope guard (*this); // module-level statements obey the execution budget too
-        if (! exec (kPrelude, ns)) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
-        if (! exec (def.source.toRawUTF8(), ns)) { onError (def.id, "load error: " + fetchPyError()); Py_DECREF (ns); return false; }
+        currentScriptId = def.id;          // so a module-level on() tags its listener correctly
+        const bool preludeOk = exec (kPrelude, ns);
+        const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
+        currentScriptId = {};
+        if (! preludeOk) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
+        if (! sourceOk)  { onError (def.id, "load error: " + fetchPyError()); Py_DECREF (ns); return false; }
 
         if (auto it = namespaces.find (def.id); it != namespaces.end()) Py_DECREF (it->second);
         namespaces[def.id] = ns; // keep the ref
@@ -543,7 +550,9 @@ public:
         PyObject* arg = varToPy (payload);
         if (arg == nullptr) { onError (scriptId, "failed to convert payload: " + fetchPyError()); return {}; }
         const WatchdogScope guard (*this);
+        currentScriptId = scriptId;        // a handler may call on()/off() while running
         PyObject* result = PyObject_CallFunctionObjArgs (f, arg, nullptr);
+        currentScriptId = {};
         Py_DECREF (arg);
 
         if (result == nullptr) { onError (scriptId, fetchPyError()); return {}; }
@@ -579,12 +588,32 @@ public:
         listeners.clear();
     }
 
-    // Called by the native on() bridge.
+    // Called by the native on() bridge. Tagged with the script registering it, so off() removes
+    // only the caller's listeners — one interpreter is shared by every Python script here.
     void addListener (const juce::String& target, const juce::String& event, PyObject* fn)
-    { listeners.push_back ({ target, event, fn }); } // fn already INCREF'd by caller
+    { listeners.push_back ({ currentScriptId, target, event, fn }); } // fn already INCREF'd by caller
+
+    /** off(target, event) — drop THIS script's listeners for that pair. Unknown pairs are a no-op. */
+    void removeListener (const juce::String& target, const juce::String& event)
+    {
+        for (auto it = listeners.begin(); it != listeners.end();)
+        {
+            if (it->scriptId == currentScriptId && it->target == target && it->event == event)
+            {
+                Py_XDECREF (it->fn);          // we own the ref api_on took
+                it = listeners.erase (it);
+            }
+            else ++it;
+        }
+    }
 
 private:
-    struct Listener { juce::String target, event; PyObject* fn; };
+    struct Listener { juce::String scriptId, target, event; PyObject* fn; };
+
+    // Which script is executing, so on()/off() can tag and match listeners. One
+    // interpreter serves every Python script, so without it off() could not tell whose
+    // listener it was removing.
+    juce::String currentScriptId;
 
     // Wall-clock execution budget per outermost entry into Python (matches the
     // JS engine's 2s maximumExecutionTime).
@@ -778,6 +807,14 @@ PyObject* api_on (PyObject*, PyObject* args)
     Py_INCREF (fn);
     if (g_engine != nullptr) g_engine->addListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event), fn);
     else Py_DECREF (fn);
+    Py_RETURN_NONE;
+}
+
+PyObject* api_off (PyObject*, PyObject* args)
+{
+    const char* target = nullptr; const char* event = nullptr;
+    if (! PyArg_ParseTuple (args, "ss", &target, &event)) return nullptr;
+    if (g_engine != nullptr) g_engine->removeListener (juce::String::fromUTF8 (target), juce::String::fromUTF8 (event));
     Py_RETURN_NONE;
 }
 } // namespace

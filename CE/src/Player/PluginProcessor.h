@@ -499,8 +499,11 @@ private:
 
         using namespace ceditor::scripting;
         BridgeScriptHost::Callbacks cb;
-        cb.getValue = [this] (const juce::String& path, const juce::String&) { return scriptValues.getValue (path); };
-        cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit)
+        // `form` is honoured, not dropped: PanelValueModel maps "normalizedValue" against the
+        // control's own Behavior.min/max, so get("cutoff.normalizedValue") answers window-closed
+        // exactly as it does in the panel view.
+        cb.getValue = [this] (const juce::String& path, const juce::String& form) { return scriptValues.getValue (path, form); };
+        cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
             // A bound control: drive the host parameter so the DAW records automation AND the M2 timer
@@ -510,7 +513,7 @@ private:
            #else
             juce::ignoreUnused (transmit);
            #endif
-            scriptValues.setValue (path, value);   // mirror always (immediate read-back, drives unbound)
+            scriptValues.setValue (path, value, form);   // mirror always (immediate read-back, drives unbound)
         };
        #if CEDITOR_VALUE_LAYER
         // Raw CC/NRPN/Sysex mirror the byte construction in panelRuntime.js so a script transmits
