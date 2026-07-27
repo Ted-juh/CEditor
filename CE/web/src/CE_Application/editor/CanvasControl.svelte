@@ -2,7 +2,8 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import CanvasControlNested from './CanvasControl.svelte';
-  import { getChildControls, computeFlowLayout } from '../utils/containment.js';
+  import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds } from '../utils/containment.js';
+  import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
@@ -36,7 +37,7 @@
   import TransportRenderer from './TransportRenderer.svelte';
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
-  import { applyControlPatchesById, getSection, updateControlProperty } from '../stores/controls.js';
+  import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
@@ -392,6 +393,7 @@
   let isDragging = $state(false);
   let dragStartMouse = $state({ x: 0, y: 0 });
   let dragStartPos = $state({ x: 0, y: 0 });
+  let rootElement = $state(null);
 
   // --- Resize state ---
   let isResizing = $state(false);
@@ -447,6 +449,8 @@
   });
   let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
   let myGridSection = $derived(getSection(control, 'Grid') ?? null);
+  // This container is highlighted as the live drop target during a canvas drag.
+  let isDropTargetHighlighted = $derived(editorInteractionEnabled && core?.id != null && $containerDropTargetId === core.id);
 
   const MIN_SIZE = 10;
 
@@ -707,6 +711,45 @@
     }
   }
 
+  // Map a mouse client point to panel-surface coordinates (accounts for scale).
+  function surfacePointFromClient(clientX, clientY) {
+    const surface = rootElement?.closest?.('.panel-surface');
+    if (!surface) return null;
+    const rect = surface.getBoundingClientRect();
+    return { x: (clientX - rect.left) / scale, y: (clientY - rect.top) / scale };
+  }
+
+  // The container currently under the pointer that this drag could drop into —
+  // deepest container whose panel-space AABB contains the point, excluding the
+  // dragged subtree(s) and any locked/hidden container (or one under one).
+  function dropCandidateAt(panelX, panelY) {
+    const ids = get(selectedComponentIds);
+    const movingRoots = ids.size > 1 && ids.has(core?.id) ? selectionRoots(panelControls, ids) : [core?.id];
+    const excluded = new Set();
+    for (const rootId of movingRoots) {
+      const rootControl = findControlById(panelControls, rootId);
+      if (rootControl) for (const subId of collectSubtreeIds(rootControl)) excluded.add(subId);
+    }
+    const index = buildControlIndex(panelControls);
+    let best = null;
+    for (const entry of allControls) {
+      const entryCore = entry._children?.Core;
+      const entryTransform = entry._children?.Transform;
+      if (!entryCore?.id || !entryTransform || !entry._children?.Children) continue;
+      if (excluded.has(entryCore.id)) continue;
+      if (entryCore.locked === true || entryCore.visible === false) continue;
+      if (getAncestorIds(panelControls, entryCore.id).some((ancestorId) => {
+        const ancestorCore = index.get(ancestorId)?.control?._children?.Core;
+        return ancestorCore?.locked === true || ancestorCore?.visible === false;
+      })) continue;
+      if (panelX < entryTransform.x || panelX > entryTransform.x + entryTransform.width) continue;
+      if (panelY < entryTransform.y || panelY > entryTransform.y + entryTransform.height) continue;
+      const depth = index.get(entryCore.id)?.depth ?? 0;
+      if (!best || depth >= best.depth) best = { id: entryCore.id, depth };
+    }
+    return best?.id ?? null;
+  }
+
   function handleDragMove(e) {
     if (!isDragging) return;
     const dx = (e.clientX - dragStartMouse.x) / scale;
@@ -733,20 +776,58 @@
     if (ids.size > 1) {
       multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
     }
+
+    // Highlight the container under the pointer as the drop target (Alt suppresses).
+    const currentParentId = parentChainIds[0] ?? null;
+    const surfacePoint = surfacePointFromClient(e.clientX, e.clientY);
+    const target = (!e.altKey && surfacePoint) ? dropCandidateAt(surfacePoint.x, surfacePoint.y) : currentParentId;
+    containerDropTargetId.set(target !== currentParentId ? target : null);
   }
 
-  function handleDragEnd() {
+  function handleDragEnd(e) {
     if (!isDragging) return;
     window.removeEventListener('mousemove', handleDragMove);
     window.removeEventListener('mouseup', handleDragEnd);
+    containerDropTargetId.set(null);
 
     const dx = transientX - dragStartPos.x;
     const dy = transientY - dragStartPos.y;
+    const moved = dx !== 0 || dy !== 0;
+    const ids = get(selectedComponentIds);
+    const isMultiDrag = ids.size > 1 && ids.has(core?.id);
 
-    if (dx !== 0 || dy !== 0) {
+    // Where did the drag end — over which container (or top level)?
+    const currentParentId = parentChainIds[0] ?? null;
+    let targetParentId = currentParentId;
+    if (moved && e?.altKey !== true) {
+      const surfacePoint = surfacePointFromClient(e?.clientX, e?.clientY);
+      if (surfacePoint) targetParentId = dropCandidateAt(surfacePoint.x, surfacePoint.y);
+    }
+
+    if (moved && targetParentId !== currentParentId) {
+      // Structural move: reparent the selection roots into the target container
+      // (or to top level when null), converting positions so nothing visually jumps.
+      const roots = isMultiDrag ? selectionRoots(panelControls, ids) : [core?.id];
+      const entries = [];
+      for (const rootId of roots) {
+        if (rootId == null) continue;
+        let panelX, panelY;
+        if (rootId === core?.id) {
+          panelX = transientX + parentOffset.x;
+          panelY = transientY + parentOffset.y;
+        } else {
+          const rect = controlPanelRect(panelControls, rootId);
+          if (!rect) continue;
+          panelX = rect.x + dx;
+          panelY = rect.y + dy;
+        }
+        const local = panelToLocalPoint(panelControls, targetParentId, panelX, panelY);
+        entries.push({ id: rootId, x: local.x, y: local.y });
+      }
+      if (entries.length) reparentControls(entries, targetParentId);
+    } else if (moved) {
       const patches = new Map();
-      const ids = get(selectedComponentIds);
-      if (ids.size > 1 && ids.has(core?.id)) {
+      if (isMultiDrag) {
         // Multi-drag: apply delta to all selected components
         for (const other of allControls) {
           const otherId = getSection(other, 'Core')?.id;
@@ -2571,6 +2652,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 <div
+  bind:this={rootElement}
   class="canvas-control"
   class:selected={editorInteractionEnabled && isSelected && !panelLocked}
   class:key-object={editorInteractionEnabled && isKeyObject && !panelLocked}
@@ -2578,6 +2660,7 @@
   class:locked={editorInteractionEnabled && isEditorLocked}
   class:custom-component-hint={editorInteractionEnabled && isCustomComponent && !panelLocked}
   class:preview-surface={!editorInteractionEnabled}
+  class:drop-target={isDropTargetHighlighted}
   class:preview-interactive={previewInteractive}
   class:preview-disabled={previewInteractive && previewAriaDisabled === true}
   class:preview-keyboard-focus={previewInteractive && previewKeyboardFocus}
@@ -4141,6 +4224,13 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+  }
+
+  /* Container highlighted as the live drop target during a canvas drag. */
+  .canvas-control.drop-target {
+    outline: 2px dashed #5B9BD5;
+    outline-offset: 1px;
+    background: rgba(91, 155, 213, 0.10);
   }
 
   /* TextInput editable field: fills the control, styled via inline tiStyle. */
