@@ -2,7 +2,7 @@
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
   import CanvasControlNested from './CanvasControl.svelte';
-  import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds } from '../utils/containment.js';
+  import { getChildControls, computeFlowLayout, controlPanelRect, panelToLocalPoint, selectionRoots, collectSubtreeIds, findControlById, buildControlIndex, getAncestorIds, flatControlsWithPanelRects } from '../utils/containment.js';
   import { containerDropTargetId } from '../stores/containerDrag.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
@@ -732,7 +732,9 @@
     }
     const index = buildControlIndex(panelControls);
     let best = null;
-    for (const entry of allControls) {
+    // Consider every container in the tree (panel-space rects), so a component
+    // can be dropped into a nested container, not just a top-level one.
+    for (const entry of flatControlsWithPanelRects(panelControls)) {
       const entryCore = entry._children?.Core;
       const entryTransform = entry._children?.Transform;
       if (!entryCore?.id || !entryTransform || !entry._children?.Children) continue;
