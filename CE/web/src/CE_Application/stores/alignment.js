@@ -4,20 +4,40 @@ import { applyControlPatchesById, getSection } from './controls.js';
 import { updatePanel } from './panels.js';
 import { guides } from './guides.js';
 import { getControlId, getControlLayer, sortControlsForRender } from '../utils/controlOrder.js';
+import { controlPanelOffset, flatControls, getChildControls, isContainerControl } from '../utils/containment.js';
 
 // --- Helpers ---
 
+// Transforms are reported in PANEL space (nested controls included); the
+// offsetX/offsetY fields convert results back to each control's local frame
+// before writing.
 function getSelectedTransforms() {
   const panel = get(activePanel);
   if (!panel) return [];
   const ids = get(selectedComponentIds);
-  return panel.controls
+  return flatControls(panel.controls)
     .filter(c => ids.has(c._children?.Core?.id))
     .map(c => {
       const t = getSection(c, 'Transform');
       const id = c._children.Core.id;
-      return { id, x: t.x, y: t.y, width: t.width, height: t.height };
+      const offset = controlPanelOffset(panel.controls, id);
+      return {
+        id,
+        x: t.x + offset.x,
+        y: t.y + offset.y,
+        width: t.width,
+        height: t.height,
+        offsetX: offset.x,
+        offsetY: offset.y,
+      };
     });
+}
+
+function toLocalTransformPatch(transform, patch) {
+  const out = { ...patch };
+  if ('Transform.x' in out) out['Transform.x'] = Math.round(out['Transform.x'] - (transform.offsetX ?? 0));
+  if ('Transform.y' in out) out['Transform.y'] = Math.round(out['Transform.y'] - (transform.offsetY ?? 0));
+  return out;
 }
 
 function getReferenceBounds(mode, transforms, regionRef = null) {
@@ -86,7 +106,7 @@ function commitTransformUpdates(transforms, buildPatch) {
   transforms.forEach((transform, index) => {
     const patch = buildPatch(transform, index);
     if (!patch || Object.keys(patch).length === 0) return;
-    patches.set(transform.id, patch);
+    patches.set(transform.id, toLocalTransformPatch(transform, patch));
   });
 
   if (patches.size > 0) {
@@ -246,7 +266,7 @@ export function distributeHSpacing(fixedGap = null, alignOpposite = false) {
     let currentX = sorted[0].x + sorted[0].width + fixedGap;
     const patches = new Map();
     for (let i = 1; i < sorted.length; i++) {
-      patches.set(sorted[i].id, { 'Transform.x': Math.round(currentX) });
+      patches.set(sorted[i].id, toLocalTransformPatch(sorted[i], { 'Transform.x': currentX }));
       currentX += sorted[i].width + fixedGap;
     }
     applyControlPatchesById(patches);
@@ -260,7 +280,7 @@ export function distributeHSpacing(fixedGap = null, alignOpposite = false) {
     let currentX = sorted[0].x + sorted[0].width + gap;
     const patches = new Map();
     for (let i = 1; i < sorted.length - 1; i++) {
-      patches.set(sorted[i].id, { 'Transform.x': Math.round(currentX) });
+      patches.set(sorted[i].id, toLocalTransformPatch(sorted[i], { 'Transform.x': currentX }));
       currentX += sorted[i].width + gap;
     }
     applyControlPatchesById(patches);
@@ -283,7 +303,7 @@ export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
     let currentY = sorted[0].y + sorted[0].height + fixedGap;
     const patches = new Map();
     for (let i = 1; i < sorted.length; i++) {
-      patches.set(sorted[i].id, { 'Transform.y': Math.round(currentY) });
+      patches.set(sorted[i].id, toLocalTransformPatch(sorted[i], { 'Transform.y': currentY }));
       currentY += sorted[i].height + fixedGap;
     }
     applyControlPatchesById(patches);
@@ -297,7 +317,7 @@ export function distributeVSpacing(fixedGap = null, alignOpposite = false) {
     let currentY = sorted[0].y + sorted[0].height + gap;
     const patches = new Map();
     for (let i = 1; i < sorted.length - 1; i++) {
-      patches.set(sorted[i].id, { 'Transform.y': Math.round(currentY) });
+      patches.set(sorted[i].id, toLocalTransformPatch(sorted[i], { 'Transform.y': currentY }));
       currentY += sorted[i].height + gap;
     }
     applyControlPatchesById(patches);
@@ -314,42 +334,45 @@ function reorderControls(reorderFn) {
   if (ids.size === 0) return;
 
   const zIndexById = new Map();
-  const layers = new Map();
 
-  for (const control of sortControlsForRender(panel.controls)) {
-    const layer = getControlLayer(control);
-    if (!layers.has(layer)) layers.set(layer, []);
-    layers.get(layer).push(control);
+  // Z-order is scoped per sibling group (panel top level, or one container's
+  // children), then per layer within that group.
+  const siblingGroups = [panel.controls];
+  for (const control of flatControls(panel.controls)) {
+    if (isContainerControl(control)) siblingGroups.push(getChildControls(control));
   }
 
-  for (const layerControls of layers.values()) {
-    const selectedInLayer = new Set(
-      layerControls
-        .map(control => getControlId(control))
-        .filter(id => id != null && ids.has(id))
-    );
+  for (const siblings of siblingGroups) {
+    const layers = new Map();
+    for (const control of sortControlsForRender(siblings)) {
+      const layer = getControlLayer(control);
+      if (!layers.has(layer)) layers.set(layer, []);
+      layers.get(layer).push(control);
+    }
 
-    if (selectedInLayer.size === 0) continue;
+    for (const layerControls of layers.values()) {
+      const selectedInLayer = new Set(
+        layerControls
+          .map(control => getControlId(control))
+          .filter(id => id != null && ids.has(id))
+      );
 
-    const reorderedLayer = reorderFn([...layerControls], selectedInLayer);
-    reorderedLayer.forEach((control, index) => {
-      const id = getControlId(control);
-      if (id != null) zIndexById.set(id, index);
-    });
+      if (selectedInLayer.size === 0) continue;
+
+      const reorderedLayer = reorderFn([...layerControls], selectedInLayer);
+      reorderedLayer.forEach((control, index) => {
+        const id = getControlId(control);
+        if (id != null) zIndexById.set(id, index);
+      });
+    }
   }
 
   if (zIndexById.size === 0) return;
 
-  const newControls = panel.controls.map(control => {
-    const id = getControlId(control);
-    if (id == null || !zIndexById.has(id)) return control;
-
-    const clone = JSON.parse(JSON.stringify(control));
-    clone._children.Core.zIndex = zIndexById.get(id);
-    return clone;
-  });
-
-  updatePanel(panel.id, { controls: newControls });
+  const patches = new Map(
+    [...zIndexById].map(([id, zIndex]) => [id, { 'Core.zIndex': zIndex }])
+  );
+  applyControlPatchesById(patches);
 }
 
 export function bringToFront() {
@@ -451,8 +474,8 @@ export function snapSelectionToGrid() {
   for (const t of transforms) {
     const snappedX = Math.round((t.x - ox) / gridSize) * gridSize + ox;
     const snappedY = Math.round((t.y - oy) / gridSize) * gridSize + oy;
-    updateControlProperty(t.id, 'Transform.x', snappedX);
-    updateControlProperty(t.id, 'Transform.y', snappedY);
+    updateControlProperty(t.id, 'Transform.x', Math.round(snappedX - (t.offsetX ?? 0)));
+    updateControlProperty(t.id, 'Transform.y', Math.round(snappedY - (t.offsetY ?? 0)));
   }
 }
 
@@ -476,7 +499,7 @@ export function snapSelectionToGuides() {
           if (d < bestDist) { bestDist = d; bestX = gx - (edge - t.x); }
         }
       }
-      updateControlProperty(t.id, 'Transform.x', Math.round(bestX));
+      updateControlProperty(t.id, 'Transform.x', Math.round(bestX - (t.offsetX ?? 0)));
     }
     // Snap Y to nearest horizontal guide
     if (hg.length > 0) {
@@ -487,7 +510,7 @@ export function snapSelectionToGuides() {
           if (d < bestDist) { bestDist = d; bestY = gy - (edge - t.y); }
         }
       }
-      updateControlProperty(t.id, 'Transform.y', Math.round(bestY));
+      updateControlProperty(t.id, 'Transform.y', Math.round(bestY - (t.offsetY ?? 0)));
     }
   }
 }
@@ -503,7 +526,7 @@ export function flipHorizontal() {
   const center = (minX + maxX) / 2;
   for (const t of transforms) {
     const mirroredX = center - (t.x + t.width - center);
-    updateControlProperty(t.id, 'Transform.x', Math.round(mirroredX));
+    updateControlProperty(t.id, 'Transform.x', Math.round(mirroredX - (t.offsetX ?? 0)));
   }
 }
 
@@ -515,7 +538,7 @@ export function flipVertical() {
   const center = (minY + maxY) / 2;
   for (const t of transforms) {
     const mirroredY = center - (t.y + t.height - center);
-    updateControlProperty(t.id, 'Transform.y', Math.round(mirroredY));
+    updateControlProperty(t.id, 'Transform.y', Math.round(mirroredY - (t.offsetY ?? 0)));
   }
 }
 
@@ -547,8 +570,8 @@ export function tidyGrid(columns = 3, gapX = 10, gapY = 10) {
     const row = Math.floor(i / columns);
     const x = originX + col * (cellW + gapX);
     const y = originY + row * (cellH + gapY);
-    updateControlProperty(sorted[i].id, 'Transform.x', Math.round(x));
-    updateControlProperty(sorted[i].id, 'Transform.y', Math.round(y));
+    updateControlProperty(sorted[i].id, 'Transform.x', Math.round(x - (sorted[i].offsetX ?? 0)));
+    updateControlProperty(sorted[i].id, 'Transform.y', Math.round(y - (sorted[i].offsetY ?? 0)));
   }
 }
 
@@ -574,7 +597,7 @@ export function arrangeCircular(radius = 100, startAngle = 0) {
     const angle = startRad + step * i;
     const x = cx + radius * Math.cos(angle) - transforms[i].width / 2;
     const y = cy + radius * Math.sin(angle) - transforms[i].height / 2;
-    updateControlProperty(transforms[i].id, 'Transform.x', Math.round(x));
-    updateControlProperty(transforms[i].id, 'Transform.y', Math.round(y));
+    updateControlProperty(transforms[i].id, 'Transform.x', Math.round(x - (transforms[i].offsetX ?? 0)));
+    updateControlProperty(transforms[i].id, 'Transform.y', Math.round(y - (transforms[i].offsetY ?? 0)));
   }
 }

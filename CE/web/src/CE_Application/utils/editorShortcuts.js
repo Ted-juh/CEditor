@@ -1,5 +1,6 @@
 import { get } from 'svelte/store';
 import { keyboardNudgeSmall, keyboardNudgeLarge } from '../stores/runtimePreferences.js';
+import { flatControls, isContainerControl } from './containment.js';
 
 /**
  * Editor canvas keyboard shortcuts.
@@ -15,6 +16,7 @@ export function handleEditorShortcut(e, ctx) {
     fitToWindow, zoomToSelection,
     selectAll, pasteSelection, copySelection, cutSelection, duplicateControl,
     removeControl, updateControlProperty, deleteSelectedGuide,
+    groupSelectionIntoContainer, ungroupContainer,
   } = ctx;
 
   if (!panel) return;
@@ -55,7 +57,7 @@ export function handleEditorShortcut(e, ctx) {
   const ids = selectedComponentIds;
   if (ids.size === 0) return;
 
-  const selectedCtrls = panel.controls.filter(c => ids.has(c._children?.Core?.id));
+  const selectedCtrls = flatControls(panel.controls).filter(c => ids.has(c._children?.Core?.id));
   if (selectedCtrls.length === 0) return;
 
   // --- Clipboard / destructive ops ---
@@ -67,6 +69,19 @@ export function handleEditorShortcut(e, ctx) {
     return;
   }
   if (mod && e.key === 'd') { e.preventDefault(); duplicateControl(ids); return; }
+
+  // --- Group / Ungroup ---
+  if (mod && e.shiftKey && (e.key === 'G' || e.key === 'g')) {
+    e.preventDefault();
+    const container = selectedCtrls.find(c => isContainerControl(c));
+    if (container && selectedCtrls.length === 1) ungroupContainer?.(container._children.Core.id);
+    return;
+  }
+  if (mod && e.key === 'g') {
+    e.preventDefault();
+    groupSelectionIntoContainer?.();
+    return;
+  }
 
   // --- Arrow nudge (skip if panel locked or any selected is component-locked) ---
   if (panelLocked) return;

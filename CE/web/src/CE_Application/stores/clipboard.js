@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentIds, selectComponent, clearSelection } from './panels.js';
 import { removeControl } from './controls.js';
+import { controlPanelRect, findControlById, flatControls, remintControlIds, selectionRoots } from '../utils/containment.js';
 
 /**
  * Internal clipboard buffer — array of serialised control objects.
@@ -18,9 +19,22 @@ export function copySelection() {
   const panel = get(panels).find(p => p.id === get(resolvedActivePanelId));
   if (!panel) return;
 
-  buffer = panel.controls
-    .filter(c => ids.has(c._children?.Core?.id))
-    .map(c => JSON.parse(JSON.stringify(c)));
+  // Copy selection roots only (a selected child inside a selected container
+  // rides along in the subtree). Positions are captured in panel space so a
+  // nested child pastes where it visually was.
+  buffer = selectionRoots(panel.controls, ids)
+    .map(id => {
+      const source = findControlById(panel.controls, id);
+      if (!source) return null;
+      const clone = JSON.parse(JSON.stringify(source));
+      const rect = controlPanelRect(panel.controls, id);
+      if (clone._children?.Transform && rect) {
+        clone._children.Transform.x = rect.x;
+        clone._children.Transform.y = rect.y;
+      }
+      return clone;
+    })
+    .filter(Boolean);
 }
 
 /**
@@ -71,9 +85,8 @@ export function pasteSelection(position = null) {
       }
 
       const clones = buffer.map(src => {
-        const clone = JSON.parse(JSON.stringify(src));
-        const newId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-        clone._children.Core.id = newId;
+        // Fresh ids for the control and its whole subtree
+        const clone = remintControlIds(src);
         clone._children.Core.name = clone._children.Core.name.replace(/_copy$/, '') + '_copy';
 
         if (clone._children.Transform) {
@@ -81,7 +94,7 @@ export function pasteSelection(position = null) {
           clone._children.Transform.y += offsetY;
         }
 
-        newIds.push(newId);
+        newIds.push(clone._children.Core.id);
         return clone;
       });
 
@@ -111,7 +124,7 @@ export function selectAll() {
   if (!panel) return;
 
   const ids = new Set();
-  for (const ctrl of panel.controls) {
+  for (const ctrl of flatControls(panel.controls)) {
     const id = ctrl._children?.Core?.id;
     if (id) ids.add(id);
   }

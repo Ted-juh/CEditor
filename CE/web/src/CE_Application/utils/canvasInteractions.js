@@ -6,6 +6,8 @@
  * the consumer. The controller itself has no Svelte dependency.
  */
 
+import { flatControlsWithPanelRects } from './containment.js';
+
 // -----------------------------------------------------------------------------
 // Pan controller
 // -----------------------------------------------------------------------------
@@ -177,12 +179,13 @@ export function computeFitZoom(panel, viewportEl, padding = 80) {
 
 /**
  * Compute AABB of the selected controls in panel coordinates, or null if
- * nothing selected / no transform data.
+ * nothing selected / no transform data. Tree-aware: nested controls count
+ * at their panel-space position.
  */
 export function computeSelectionBounds(panel, ids) {
   if (!panel || !ids || ids.size === 0) return null;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const ctrl of panel.controls) {
+  for (const ctrl of flatControlsWithPanelRects(panel.controls)) {
     if (!ids.has(ctrl._children?.Core?.id)) continue;
     const t = ctrl._children?.Transform;
     if (!t) continue;

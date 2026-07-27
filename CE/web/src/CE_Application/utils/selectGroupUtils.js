@@ -1,4 +1,5 @@
 import { deepClone } from './deepClone.js';
+import { flatControls, mapControlsTree } from './containment.js';
 
 function normalizeKey(value) {
   return String(value ?? '').trim().toLowerCase();
@@ -33,11 +34,12 @@ export function getExclusiveSelectGroupId(control) {
 export function findExclusiveSelectGroupControls(controls = [], targetControlId = '') {
   if (!Array.isArray(controls) || !targetControlId) return [];
 
-  const target = controls.find((control) => getControlId(control) === targetControlId) ?? null;
+  const all = flatControls(controls);
+  const target = all.find((control) => getControlId(control) === targetControlId) ?? null;
   const groupId = getExclusiveSelectGroupId(target);
   if (!groupId) return [];
 
-  return controls.filter((control) => getExclusiveSelectGroupId(control) === groupId);
+  return all.filter((control) => getExclusiveSelectGroupId(control) === groupId);
 }
 
 export function normalizeExclusiveSelectDefaults(controls = [], preferredControlIds = []) {
@@ -45,36 +47,38 @@ export function normalizeExclusiveSelectDefaults(controls = [], preferredControl
     return Array.isArray(controls) ? controls : [];
   }
 
+  // Group membership spans the whole tree — a radio group can live inside a container.
+  const all = flatControls(controls);
   const groups = new Map();
-  for (let index = 0; index < controls.length; index += 1) {
-    const groupId = getExclusiveSelectGroupId(controls[index]);
+  for (const control of all) {
+    const groupId = getExclusiveSelectGroupId(control);
     if (!groupId) continue;
     const bucket = groups.get(groupId) ?? [];
-    bucket.push(index);
+    bucket.push(control);
     groups.set(groupId, bucket);
   }
 
-  let nextControls = null;
   const preferredIds = new Set(preferredControlIds.filter(Boolean));
+  const loserIds = new Set();
 
-  for (const indexes of groups.values()) {
-    const checkedIndexes = indexes.filter((index) => getBehavior(controls[index])?.defaultValue === true);
-    if (checkedIndexes.length <= 1) continue;
+  for (const members of groups.values()) {
+    const checked = members.filter((control) => getBehavior(control)?.defaultValue === true);
+    if (checked.length <= 1) continue;
 
-    const winnerIndex = checkedIndexes.find((index) => preferredIds.has(getControlId(controls[index])))
-      ?? checkedIndexes[0];
-
-    for (const index of checkedIndexes) {
-      if (index === winnerIndex) continue;
-
-      if (!nextControls) nextControls = [...controls];
-      const clone = deepClone(nextControls[index]);
-      if (clone?._children?.Behavior) {
-        clone._children.Behavior.defaultValue = false;
-      }
-      nextControls[index] = clone;
+    const winner = checked.find((control) => preferredIds.has(getControlId(control))) ?? checked[0];
+    for (const control of checked) {
+      if (control !== winner) loserIds.add(getControlId(control));
     }
   }
 
-  return nextControls ?? controls;
+  if (loserIds.size === 0) return controls;
+
+  return mapControlsTree(controls, (control) => {
+    if (!loserIds.has(getControlId(control))) return control;
+    const clone = deepClone(control);
+    if (clone?._children?.Behavior) {
+      clone._children.Behavior.defaultValue = false;
+    }
+    return clone;
+  });
 }
