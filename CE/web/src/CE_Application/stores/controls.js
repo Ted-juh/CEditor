@@ -4,6 +4,19 @@ import { createControl as createControlFromType, getSection, hasSection } from '
 import { insertOffset, duplicateOffset } from './runtimePreferences.js';
 import { stateEditScope } from './stateEditScope.js';
 import { deepClone } from '../utils/deepClone.js';
+import {
+  collectSubtreeIds,
+  controlPanelRect,
+  findControlById,
+  findParentOfControl,
+  flatControls,
+  insertControlIntoTree,
+  isContainerControl,
+  panelToLocalPoint,
+  remintControlIds,
+  removeControlFromTree,
+  selectionRoots,
+} from '../utils/containment.js';
 import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
@@ -26,7 +39,7 @@ export const selectedControl = derived(
     if (targetId == null) return null;
     const panel = $panels.find(p => p.id === $resolvedActivePanelId);
     if (!panel) return null;
-    return panel.controls.find(c => c._children?.Core?.id === targetId) ?? null;
+    return findControlById(panel.controls, targetId);
   }
 );
 
@@ -39,7 +52,7 @@ export const selectedControls = derived(
     if ($ids.size === 0) return [];
     const panel = $panels.find(p => p.id === $resolvedActivePanelId);
     if (!panel) return [];
-    return panel.controls.filter(c => $ids.has(c._children?.Core?.id));
+    return flatControls(panel.controls).filter(c => $ids.has(c._children?.Core?.id));
   }
 );
 
@@ -208,27 +221,28 @@ export function removeControl(id) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return;
 
+  let removedIds = [id];
+
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      return {
-        ...p,
-        controls: p.controls.filter(c => c._children?.Core?.id !== id),
-        modified: true,
-      };
+      const { controls, removed } = removeControlFromTree(p.controls, id);
+      if (!removed) return p;
+      removedIds = collectSubtreeIds(removed);
+      return { ...p, controls, modified: true };
     })
   );
 
-  // Remove from selection if it was selected
+  // Remove the whole deleted subtree from the selection
   selectedComponentIds.update(ids => {
-    if (!ids.has(id)) return ids;
+    if (!removedIds.some(removedId => ids.has(removedId))) return ids;
     const next = new Set(ids);
-    next.delete(id);
+    for (const removedId of removedIds) next.delete(removedId);
     return next;
   });
 
-  // Clear key object if it was the deleted control
-  if (get(keyObjectId) === id) {
+  // Clear key object if it was inside the deleted subtree
+  if (removedIds.includes(get(keyObjectId))) {
     keyObjectId.set(null);
   }
 }
@@ -254,14 +268,17 @@ export function duplicateControl(ids) {
   const panel = get(panels).find(p => p.id === panelId);
   if (!panel) return null;
 
+  // When a container and its descendant are both selected, duplicate only the
+  // container — the descendant rides along in the subtree copy.
+  const rootIds = selectionRoots(panel.controls, idList);
+
   const clones = [];
-  for (const id of idList) {
-    const source = panel.controls.find(c => c._children?.Core?.id === id);
+  for (const id of rootIds) {
+    const source = findControlById(panel.controls, id);
     if (!source) continue;
 
-    const clone = JSON.parse(JSON.stringify(source));
-    const newId = `ctrl_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
-    clone._children.Core.id = newId;
+    // Fresh ids for the control and every descendant
+    const clone = remintControlIds(source);
     clone._children.Core.name = `${clone._children.Core.name}_copy`;
 
     if (clone._children.Transform) {
@@ -274,7 +291,8 @@ export function duplicateControl(ids) {
       clone._children.Behavior.defaultValue = false;
     }
 
-    clones.push(clone);
+    const parent = findParentOfControl(panel.controls, id);
+    clones.push({ clone, parentId: parent?._children?.Core?.id ?? null });
   }
 
   if (clones.length === 0) return null;
@@ -282,15 +300,19 @@ export function duplicateControl(ids) {
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      return { ...p, controls: [...p.controls, ...clones], modified: true };
+      let controls = p.controls;
+      for (const { clone, parentId } of clones) {
+        controls = insertControlIntoTree(controls, parentId, clone);
+      }
+      return { ...p, controls, modified: true };
     })
   );
 
   // Select all duplicated controls
-  const newIds = new Set(clones.map(c => c._children.Core.id));
+  const newIds = new Set(clones.map(({ clone }) => clone._children.Core.id));
   selectedComponentIds.set(newIds);
 
-  return clones;
+  return clones.map(({ clone }) => clone);
 }
 
 /**
@@ -503,4 +525,163 @@ export function removeSection(controlId, sectionName) {
       }
     )
   );
+}
+
+/**
+ * Move one or more controls into a container (or to the top level when
+ * newParentId is null), placing each at panel-local coords {x, y}. Rejects
+ * moving a control into its own subtree. One panels.update = one undo step.
+ * @param {{id:string, x:number, y:number}[]} entries
+ * @param {string|null} newParentId - Container Core.id, or null for top level
+ */
+export function reparentControls(entries, newParentId) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null || !entries?.length) return;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      let controls = p.controls;
+      let changed = false;
+
+      for (const { id, x, y } of entries) {
+        if (id == null || id === newParentId) continue;
+        // Reject moves into a non-container or into the control's own subtree
+        if (newParentId != null) {
+          const target = findControlById(controls, newParentId);
+          const source = findControlById(controls, id);
+          if (!target || !isContainerControl(target) || !source) continue;
+          if (collectSubtreeIds(source).includes(newParentId)) continue;
+        }
+
+        const { controls: without, removed } = removeControlFromTree(controls, id);
+        if (!removed) continue;
+
+        const moved = deepClone(removed);
+        if (moved._children.Transform) {
+          moved._children.Transform.x = Math.round(x);
+          moved._children.Transform.y = Math.round(y);
+        }
+
+        controls = insertControlIntoTree(without, newParentId, moved);
+        changed = true;
+      }
+
+      if (!changed) return p;
+      return { ...p, controls, modified: true };
+    })
+  );
+}
+
+/**
+ * Wrap the current selection in a new Container sized to its bounding box.
+ * Children keep their visual positions (coords converted to container-local).
+ */
+export function groupSelectionIntoContainer(padding = 12) {
+  const panelId = get(resolvedActivePanelId);
+  const ids = [...get(selectedComponentIds)];
+  if (panelId == null || ids.length === 0) return null;
+
+  const panel = get(panels).find(p => p.id === panelId);
+  if (!panel) return null;
+
+  const rootIds = selectionRoots(panel.controls, ids);
+  const rects = rootIds
+    .map(id => ({ id, rect: controlPanelRect(panel.controls, id) }))
+    .filter(entry => entry.rect);
+  if (rects.length === 0) return null;
+
+  const minX = Math.min(...rects.map(({ rect }) => rect.x)) - padding;
+  const minY = Math.min(...rects.map(({ rect }) => rect.y)) - padding;
+  const maxX = Math.max(...rects.map(({ rect }) => rect.x + rect.w)) + padding;
+  const maxY = Math.max(...rects.map(({ rect }) => rect.y + rect.h)) + padding;
+
+  const container = createControlFromType('Container', {
+    Transform: { x: Math.round(minX), y: Math.round(minY), width: Math.round(maxX - minX), height: Math.round(maxY - minY) },
+  });
+  const containerId = container._children.Core.id;
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      let controls = p.controls;
+      const members = [];
+
+      for (const { id, rect } of rects) {
+        const { controls: without, removed } = removeControlFromTree(controls, id);
+        if (!removed) continue;
+        const member = deepClone(removed);
+        if (member._children.Transform) {
+          member._children.Transform.x = Math.round(rect.x - minX);
+          member._children.Transform.y = Math.round(rect.y - minY);
+        }
+        members.push(member);
+        controls = without;
+      }
+
+      if (!container._children.Children._children) container._children.Children._children = {};
+      for (const member of members) {
+        container._children.Children._children[member._children.Core.id] = member;
+      }
+
+      return { ...p, controls: [...controls, container], modified: true };
+    })
+  );
+
+  selectComponent(containerId);
+  return container;
+}
+
+/**
+ * Dissolve a container: promote its children to the container's parent at
+ * their panel-space positions, then delete the empty shell.
+ */
+export function ungroupContainer(id) {
+  const panelId = get(resolvedActivePanelId);
+  if (panelId == null || id == null) return;
+
+  const promotedIds = [];
+
+  panels.update(list =>
+    list.map(p => {
+      if (p.id !== panelId) return p;
+
+      const container = findControlById(p.controls, id);
+      if (!container || !isContainerControl(container)) return p;
+
+      const parent = findParentOfControl(p.controls, id);
+      const parentId = parent?._children?.Core?.id ?? null;
+
+      const childRects = Object.values(container._children.Children._children ?? {})
+        .filter(child => child?._children?.Core)
+        .map(child => ({
+          child,
+          rect: controlPanelRect(p.controls, child._children.Core.id),
+        }));
+
+      const { controls: without, removed } = removeControlFromTree(p.controls, id);
+      if (!removed) return p;
+
+      let controls = without;
+      for (const { child, rect } of childRects) {
+        const promoted = deepClone(child);
+        if (promoted._children.Transform && rect) {
+          const local = panelToLocalPoint(controls, parentId, rect.x, rect.y);
+          promoted._children.Transform.x = Math.round(local.x);
+          promoted._children.Transform.y = Math.round(local.y);
+        }
+        controls = insertControlIntoTree(controls, parentId, promoted);
+        promotedIds.push(promoted._children.Core.id);
+      }
+
+      return { ...p, controls, modified: true };
+    })
+  );
+
+  if (promotedIds.length > 0) {
+    selectedComponentIds.set(new Set(promotedIds));
+    keyObjectId.set(null);
+  }
 }
