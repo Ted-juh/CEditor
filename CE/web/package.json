@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test",
+    "test": "node --import ./test/support/register-svelte.mjs --test",
     "test:script-exports": "node scripts/validate-script-exports.mjs",
     "test:all": "npm test && npm run test:script-exports"
   },

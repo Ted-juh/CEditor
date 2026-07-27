@@ -204,16 +204,6 @@ export function addScriptToDocument(documentId, script = {}) {
   return nextScript;
 }
 
-export function duplicateScriptInDocument(documentId, scriptId) {
-  const document = get(scriptDocuments).find((entry) => entry.id === documentId);
-  const source = document?.scripts?.find((script) => script.id === scriptId);
-  if (!source) return null;
-  const copy = JSON.parse(JSON.stringify(source));
-  copy.id = `${source.id}_copy_${Date.now().toString(36)}`;
-  copy.name = `${source.name ?? source.id} Copy`;
-  return addScriptToDocument(documentId, copy);
-}
-
 export function removeScriptFromDocument(documentId, scriptId) {
   updateScriptDocument(documentId, (document) => {
     const scripts = (document.scripts ?? []).filter((script) => script.id !== scriptId);

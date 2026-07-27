@@ -47,6 +47,7 @@
   import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
   import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
+  import { readinessAutoFix } from '../utils/customComponentReadinessFixes.js';
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
@@ -202,13 +203,21 @@
   // '?'-toggled overlay listing shortcuts plus a plain-language glossary.
   let helpOverlayOpen = $state(false);
   let surfaceShellEl = $state(null);
-  // Inline readiness nudge: open required/recommended steps, dismissible.
+  // Inline readiness nudge: open required/recommended steps, dismissible. Steps that can be
+  // scaffolded mechanically carry their fix inline, so the nudge is actionable rather than
+  // just a scolding — readinessAutoFix returns null for anything needing a human decision.
   let readinessNudgeDismissed = $state(false);
   let readinessNudgeSteps = $derived.by(() => {
     if (!control) return [];
     return analyzeCustomComponentReadiness(control).steps
-      .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity));
+      .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity))
+      .map((step) => ({ ...step, fix: readinessAutoFix(control, step.id) }));
   });
+
+  function applyReadinessFix(step) {
+    if (!core?.id || !step?.fix?.patch) return;
+    applyControlPatch(core.id, step.fix.patch);
+  }
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
@@ -3834,7 +3843,12 @@
           <div class="readiness-nudge" role="status">
             <strong>Not reusable yet:</strong>
             {#each readinessNudgeSteps as step (step.id)}
-              <span class={`nudge-step ${step.severity}`}>{step.label} — {step.detail}</span>
+              <span class={`nudge-step ${step.severity}`}>
+                {step.label} — {step.detail}
+                {#if step.fix}
+                  <button type="button" class="nudge-fix" title={step.fix.label} onclick={() => applyReadinessFix(step)}>Fix</button>
+                {/if}
+              </span>
             {/each}
             <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
           </div>
@@ -6859,6 +6873,9 @@
   }
 
   .readiness-nudge .nudge-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     padding: 2px 6px;
     border-radius: 4px;
     border: 1px solid rgba(106, 87, 57, 0.6);
@@ -6870,6 +6887,25 @@
     border-color: rgba(106, 57, 57, 0.7);
     background: rgba(37, 23, 23, 0.9);
     color: #E8A0A0;
+  }
+
+  /* Overrides the dismiss-button sizing below — this one carries a word, not a glyph. */
+  .readiness-nudge .nudge-step .nudge-fix {
+    width: auto;
+    height: auto;
+    padding: 1px 7px;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    background: transparent;
+    color: inherit;
+    font-size: 10px;
+    opacity: 0.85;
+  }
+
+  .readiness-nudge .nudge-step .nudge-fix:hover {
+    background: currentColor;
+    color: #191919;
+    opacity: 1;
   }
 
   .readiness-nudge button {
