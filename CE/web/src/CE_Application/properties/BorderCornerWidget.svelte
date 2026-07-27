@@ -6,7 +6,8 @@
   import { sideStyleOptions } from './lineTypeSvgs.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activateGradientTarget } from '../stores/gradientTarget.js';
-  import { Image, Layers } from 'lucide-svelte';
+  import Image from 'lucide-svelte/icons/image';
+  import Layers from 'lucide-svelte/icons/layers';
   import {
     SIDES, CORNERS,
     BORDER_UNLINK_PROPS, CORNER_UNLINK_PROPS, cascadeUnlink,

@@ -1,5 +1,6 @@
 <script>
-  import { Plus, X } from 'lucide-svelte';
+  import Plus from 'lucide-svelte/icons/plus';
+  import X from 'lucide-svelte/icons/x';
 
   let { notes = $bindable([]), activeNoteIndex = $bindable(0), onchange } = $props();
 

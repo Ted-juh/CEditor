@@ -1,5 +1,8 @@
 <script>
-  import { Cog, Image, Type, Code2 } from 'lucide-svelte';
+  import Cog from 'lucide-svelte/icons/cog';
+  import Image from 'lucide-svelte/icons/image';
+  import Type from 'lucide-svelte/icons/type';
+  import Code2 from 'lucide-svelte/icons/code-2';
   import GeneralSettings from '../settings/GeneralSettings.svelte';
   import FontsSettings from '../settings/FontsSettings.svelte';
   import IconsSettings from '../settings/IconsSettings.svelte';

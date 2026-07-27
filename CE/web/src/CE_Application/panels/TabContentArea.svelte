@@ -24,7 +24,8 @@
    *                      collide with the component half's ids)
    *   ontogglecollapse — (id) => void — parent mutates the collapsedCards map
    */
-  import { ChevronDown, ChevronRight } from 'lucide-svelte';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import SectionRenderer from './SectionRenderer.svelte';
   import FooterRenderer from './FooterRenderer.svelte';
   import { isStateScopableTabId } from '../utils/stateTargets.js';

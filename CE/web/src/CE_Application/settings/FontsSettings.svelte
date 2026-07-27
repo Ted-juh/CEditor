@@ -1,5 +1,9 @@
 <script>
-  import { Download, Globe, Power, PowerOff, Trash2 } from 'lucide-svelte';
+  import Download from 'lucide-svelte/icons/download';
+  import Globe from 'lucide-svelte/icons/globe';
+  import Power from 'lucide-svelte/icons/power';
+  import PowerOff from 'lucide-svelte/icons/power-off';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import { storedFonts, fontRuntimeStatus, importLocalFontFiles, addGoogleFont, toggleFontEnabled, removeStoredFont, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
 

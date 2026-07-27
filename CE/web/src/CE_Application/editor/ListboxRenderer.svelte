@@ -122,6 +122,7 @@
   role="listbox"
   aria-multiselectable={cfg.multiSelect === true}
   aria-activedescendant={activeIndex >= 0 ? optionId(activeIndex) : undefined}
+  tabindex="0"
   style={`width:${width}px; height:${height}px; color:${textCss}; font-family:${fontFamily}; font-size:${fontSize}px; font-weight:${fontWeight}; padding-top:${padTop}px; padding-bottom:${padBottom}px; --lb-accent:${accentCss};`}
 >
   {#if thumb}

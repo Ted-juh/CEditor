@@ -11,7 +11,12 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import PropertyColor from '../properties/PropertyColor.svelte';
   import LayerEffectsSection from './LayerEffectsSection.svelte';
-  import { PaintBucket, Blend, Image, BrickWall, ChevronUp, ChevronDown } from 'lucide-svelte';
+  import PaintBucket from 'lucide-svelte/icons/paint-bucket';
+  import Blend from 'lucide-svelte/icons/blend';
+  import Image from 'lucide-svelte/icons/image';
+  import BrickWall from 'lucide-svelte/icons/brick-wall';
+  import ChevronUp from 'lucide-svelte/icons/chevron-up';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';

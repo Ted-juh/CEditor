@@ -1,5 +1,8 @@
 <script>
-  import { Maximize, Ruler, Columns3, MoveHorizontal } from 'lucide-svelte';
+  import Maximize from 'lucide-svelte/icons/maximize';
+  import Ruler from 'lucide-svelte/icons/ruler';
+  import Columns3 from 'lucide-svelte/icons/columns-3';
+  import MoveHorizontal from 'lucide-svelte/icons/move-horizontal';
   import { editorZoom, editorZoomIncrement, activePanel } from '../stores/panels.js';
   import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
 

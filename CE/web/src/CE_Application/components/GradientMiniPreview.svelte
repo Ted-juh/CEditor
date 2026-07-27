@@ -5,7 +5,7 @@
    */
   import { onMount } from 'svelte';
   import { gradientToCSS, gradientFilterCSS, gradientBlendCSS, squareRampToDataURL } from '../utils/gradientCSS.js';
-  import { ArrowLeft } from 'lucide-svelte';
+  import ArrowLeft from 'lucide-svelte/icons/arrow-left';
 
   let props = $props();
   let gradient = $derived(props.gradient);

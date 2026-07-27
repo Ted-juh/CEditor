@@ -1,5 +1,7 @@
 <script>
-  import { Copy, Check, Trash2 } from 'lucide-svelte';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Check from 'lucide-svelte/icons/check';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import { debugDockState, clearDebugDock } from '../stores/debugDock.js';
 
   let copied = $state(false);

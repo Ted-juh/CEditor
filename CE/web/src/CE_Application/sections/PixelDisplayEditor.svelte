@@ -1078,12 +1078,6 @@
     min-width: 60px;
   }
 
-  .el-extra .etext {
-    flex: 1 1 70px;
-    min-width: 50px;
-    max-width: 180px;
-  }
-
   .el-head .erm,
   .el-row .erm,
   .el-extra .erm {

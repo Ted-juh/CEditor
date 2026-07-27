@@ -3,7 +3,13 @@
    * ColorSettings — Format display, Harmony swatches, Tint/Shade variations,
    * Quick actions, Opacity presets, and Bit Depth for the Colors tab sidebar.
    */
-  import { Copy, Check, Sun, Moon, Droplets, Thermometer, RotateCcw } from 'lucide-svelte';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Check from 'lucide-svelte/icons/check';
+  import Sun from 'lucide-svelte/icons/sun';
+  import Moon from 'lucide-svelte/icons/moon';
+  import Droplets from 'lucide-svelte/icons/droplets';
+  import Thermometer from 'lucide-svelte/icons/thermometer';
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
   import { hexToRgb, rgbToHex, rgbToHsl, alphaToHex, quantizeColor } from '../utils/colorMath.js';
   import { computeHarmony } from '../utils/colorHarmony.js';
   import { invertColor, grayscaleColor, shiftLightness, shiftSaturation } from '../utils/colorActions.js';

@@ -201,7 +201,7 @@
               {#if behavior}
                 <div class="field-row">
                   <span class="field-name">{behaviorName}</span>
-                  <label><em>Type</em><span class="readout">{behavior.type ?? 'behavior'}</span></label>
+                  <div class="ro-field"><em>Type</em><span class="readout">{behavior.type ?? 'behavior'}</span></div>
                   <label><em>Geometry</em>
                     <select value={behavior.geometry ?? 'linear'} onchange={(event) => setBehaviorField(behaviorName, 'geometry', event.currentTarget.value)}>
                       {#each GEOMETRY_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
@@ -468,14 +468,16 @@
     text-decoration: underline;
   }
 
-  .field-row label {
+  .field-row label,
+  .field-row .ro-field {
     display: flex;
     align-items: center;
     gap: 4px;
     min-width: 0;
   }
 
-  .field-row label em {
+  .field-row label em,
+  .field-row .ro-field em {
     color: #6E7B87;
     font-size: 9px;
     font-style: normal;

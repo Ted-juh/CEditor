@@ -1,5 +1,7 @@
 <script>
-  import { ImagePlus, Power, Trash2 } from 'lucide-svelte';
+  import ImagePlus from 'lucide-svelte/icons/image-plus';
+  import Power from 'lucide-svelte/icons/power';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
   import {
     storedIcons,
     importLocalIconFiles,

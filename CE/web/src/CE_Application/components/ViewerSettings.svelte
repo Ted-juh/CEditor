@@ -1,5 +1,10 @@
 <script>
-  import { ZoomIn, ZoomOut, Maximize, RotateCcw, ImagePlus, Pipette } from 'lucide-svelte';
+  import ZoomIn from 'lucide-svelte/icons/zoom-in';
+  import ZoomOut from 'lucide-svelte/icons/zoom-out';
+  import Maximize from 'lucide-svelte/icons/maximize';
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+  import ImagePlus from 'lucide-svelte/icons/image-plus';
+  import Pipette from 'lucide-svelte/icons/pipette';
 
   let { getViewerRef, statusMessage = '', hoverColor = null } = $props();
 

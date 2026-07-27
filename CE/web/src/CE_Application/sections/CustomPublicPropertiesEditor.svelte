@@ -1,5 +1,8 @@
 <script>
-  import { Cable, LayoutDashboard, RotateCcw, X } from 'lucide-svelte';
+  import Cable from 'lucide-svelte/icons/cable';
+  import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
+  import RotateCcw from 'lucide-svelte/icons/rotate-ccw';
+  import X from 'lucide-svelte/icons/x';
   import { getSection, applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
   import { fingerprintCustomComponent } from '../utils/customComponentPackage.js';

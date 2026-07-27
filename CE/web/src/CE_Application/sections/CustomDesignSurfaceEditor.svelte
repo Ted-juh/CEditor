@@ -1,22 +1,20 @@
 <script>
   import { onDestroy } from 'svelte';
-  import {
-    ArrowDown,
-    ArrowUp,
-    Copy,
-    Eye,
-    EyeOff,
-    Lock,
-    Maximize,
-    PanelBottom,
-    PanelLeft,
-    PanelRight,
-    Ruler,
-    Scissors,
-    Trash2,
-    Unlock,
-    Zap,
-  } from 'lucide-svelte';
+  import ArrowDown from 'lucide-svelte/icons/arrow-down';
+  import ArrowUp from 'lucide-svelte/icons/arrow-up';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Eye from 'lucide-svelte/icons/eye';
+  import EyeOff from 'lucide-svelte/icons/eye-off';
+  import Lock from 'lucide-svelte/icons/lock';
+  import Maximize from 'lucide-svelte/icons/maximize';
+  import PanelBottom from 'lucide-svelte/icons/panel-bottom';
+  import PanelLeft from 'lucide-svelte/icons/panel-left';
+  import PanelRight from 'lucide-svelte/icons/panel-right';
+  import Ruler from 'lucide-svelte/icons/ruler';
+  import Scissors from 'lucide-svelte/icons/scissors';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import Unlock from 'lucide-svelte/icons/unlock';
+  import Zap from 'lucide-svelte/icons/zap';
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';

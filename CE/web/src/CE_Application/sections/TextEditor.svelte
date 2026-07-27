@@ -1,5 +1,8 @@
 <script>
-  import { Bold, Italic, Underline, Strikethrough } from 'lucide-svelte';
+  import Bold from 'lucide-svelte/icons/bold';
+  import Italic from 'lucide-svelte/icons/italic';
+  import Underline from 'lucide-svelte/icons/underline';
+  import Strikethrough from 'lucide-svelte/icons/strikethrough';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';

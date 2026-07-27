@@ -1,5 +1,10 @@
 <script>
-  import { Eye, EyeOff, Lock, LockOpen, ChevronDown, ChevronRight } from 'lucide-svelte';
+  import Eye from 'lucide-svelte/icons/eye';
+  import EyeOff from 'lucide-svelte/icons/eye-off';
+  import Lock from 'lucide-svelte/icons/lock';
+  import LockOpen from 'lucide-svelte/icons/lock-open';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, updateControlProperty, reparentControls } from '../stores/controls.js';
   import { getSection } from '../models/componentTypes.js';

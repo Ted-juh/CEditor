@@ -1,4 +1,10 @@
-import { ArrowLeft, ArrowRight, Blend, FlipHorizontal, Image as ImageIcon, Layers, PaintBucket } from 'lucide-svelte';
+import ArrowLeft from 'lucide-svelte/icons/arrow-left';
+import ArrowRight from 'lucide-svelte/icons/arrow-right';
+import Blend from 'lucide-svelte/icons/blend';
+import FlipHorizontal from 'lucide-svelte/icons/flip-horizontal';
+import ImageIcon from 'lucide-svelte/icons/image';
+import Layers from 'lucide-svelte/icons/layers';
+import PaintBucket from 'lucide-svelte/icons/paint-bucket';
 
 export const DEFAULT_TEXT_FILL_GRADIENT = {
   type: 'linear',

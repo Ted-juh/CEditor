@@ -31,7 +31,8 @@
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
   import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
-  import { Undo2, Redo2 } from 'lucide-svelte';
+  import Undo2 from 'lucide-svelte/icons/undo-2';
+  import Redo2 from 'lucide-svelte/icons/redo-2';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { isSourceScript } from '../scripting/scriptModel.js';

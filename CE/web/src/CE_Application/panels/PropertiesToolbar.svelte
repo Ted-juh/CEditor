@@ -6,10 +6,19 @@
    * The parent still owns the `pinPanelProps` and `viewMode` state since
    * both are consumed elsewhere in PropertiesPanel.
    */
-  import {
-    Undo2, Redo2, Save, Lock, LockOpen,
-    Grid3x3 as GridIcon, Magnet, Pin, PinOff, Layers, SquareStack, Play, Square,
-  } from 'lucide-svelte';
+  import Undo2 from 'lucide-svelte/icons/undo-2';
+  import Redo2 from 'lucide-svelte/icons/redo-2';
+  import Save from 'lucide-svelte/icons/save';
+  import Lock from 'lucide-svelte/icons/lock';
+  import LockOpen from 'lucide-svelte/icons/lock-open';
+  import GridIcon from 'lucide-svelte/icons/grid-3x3';
+  import Magnet from 'lucide-svelte/icons/magnet';
+  import Pin from 'lucide-svelte/icons/pin';
+  import PinOff from 'lucide-svelte/icons/pin-off';
+  import Layers from 'lucide-svelte/icons/layers';
+  import SquareStack from 'lucide-svelte/icons/square-stack';
+  import Play from 'lucide-svelte/icons/play';
+  import Square from 'lucide-svelte/icons/square';
   import { undo, redo, undoAvailable, redoAvailable } from '../stores/history.js';
   import { updatePanel, saveActivePanel } from '../stores/panels.js';
 

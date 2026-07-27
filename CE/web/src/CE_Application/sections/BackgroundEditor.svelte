@@ -1,6 +1,11 @@
 <script>
   import { onDestroy } from 'svelte';
-  import { PaintBucket, Blend, Image, Layers, ChevronUp, ChevronDown } from 'lucide-svelte';
+  import PaintBucket from 'lucide-svelte/icons/paint-bucket';
+  import Blend from 'lucide-svelte/icons/blend';
+  import Image from 'lucide-svelte/icons/image';
+  import Layers from 'lucide-svelte/icons/layers';
+  import ChevronUp from 'lucide-svelte/icons/chevron-up';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import { getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateColorTarget } from '../stores/colorTarget.js';

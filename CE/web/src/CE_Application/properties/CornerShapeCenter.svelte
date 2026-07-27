@@ -5,7 +5,8 @@
    *
    * Owns the `.center-group`, `.center-btn`, and `.link-btn` CSS.
    */
-  import { Link, Unlink } from 'lucide-svelte';
+  import Link from 'lucide-svelte/icons/link';
+  import Unlink from 'lucide-svelte/icons/unlink';
 
   let {
     cornerCombo,            // 'straight' | 'notch' | 'chamfer' | 'round-out' | 'round-in'

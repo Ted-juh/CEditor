@@ -3,7 +3,9 @@
   // the API contract, the variant definitions (the consumer-facing preset
   // surface), and the package/library identity. One tab replaces the former
   // API, Variants, and Designer-tab Library homes.
-  import { BookMarked, Cable, Rows3 } from 'lucide-svelte';
+  import BookMarked from 'lucide-svelte/icons/book-marked';
+  import Cable from 'lucide-svelte/icons/cable';
+  import Rows3 from 'lucide-svelte/icons/rows-3';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import CustomPublishedPropertiesEditor from './CustomPublishedPropertiesEditor.svelte';
   import CustomVariantsEditor from './CustomVariantsEditor.svelte';

@@ -1,5 +1,9 @@
 <script>
-  import { Trash2, ArrowDownToLine, Filter, Copy, Check } from 'lucide-svelte';
+  import Trash2 from 'lucide-svelte/icons/trash-2';
+  import ArrowDownToLine from 'lucide-svelte/icons/arrow-down-to-line';
+  import Filter from 'lucide-svelte/icons/filter';
+  import Copy from 'lucide-svelte/icons/copy';
+  import Check from 'lucide-svelte/icons/check';
   import { consoleEntries, clearConsole } from '../stores/console.js';
   import { isPerfDebugEnabled, setPerfDebugEnabled } from '../utils/perfDebug.js';
 

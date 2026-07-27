@@ -3,7 +3,14 @@
    * GradientSettings — Sidebar for gradient type, angle/position,
    * shape, edge mode, and stops list.
    */
-  import { X, Plus, Circle, Square, RectangleHorizontal, Triangle, ChevronUp, ChevronDown } from 'lucide-svelte';
+  import X from 'lucide-svelte/icons/x';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Circle from 'lucide-svelte/icons/circle';
+  import Square from 'lucide-svelte/icons/square';
+  import RectangleHorizontal from 'lucide-svelte/icons/rectangle-horizontal';
+  import Triangle from 'lucide-svelte/icons/triangle';
+  import ChevronUp from 'lucide-svelte/icons/chevron-up';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { addStopInLargestGap, updateStopAt, deleteStopAt } from '../utils/gradientStops.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';

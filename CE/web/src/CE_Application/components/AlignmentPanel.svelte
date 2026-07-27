@@ -1,36 +1,34 @@
 <script>
-  import {
-    AlignHorizontalJustifyStart,
-    AlignHorizontalJustifyCenter,
-    AlignHorizontalJustifyEnd,
-    AlignVerticalJustifyStart,
-    AlignVerticalJustifyCenter,
-    AlignVerticalJustifyEnd,
-    AlignHorizontalDistributeStart,
-    AlignHorizontalDistributeCenter,
-    AlignHorizontalDistributeEnd,
-    AlignVerticalDistributeStart,
-    AlignVerticalDistributeCenter,
-    AlignVerticalDistributeEnd,
-    AlignHorizontalSpaceBetween,
-    AlignVerticalSpaceBetween,
-    Group,
-    Frame,
-    MousePointerClick,
-    BringToFront,
-    SendToBack,
-    MoveUp,
-    MoveDown,
-    StretchHorizontal,
-    StretchVertical,
-    Scaling,
-    Magnet,
-    FlipHorizontal2,
-    FlipVertical2,
-    LayoutGrid,
-    Circle,
-    Ruler,
-  } from 'lucide-svelte';
+  import AlignHorizontalJustifyStart from 'lucide-svelte/icons/align-horizontal-justify-start';
+  import AlignHorizontalJustifyCenter from 'lucide-svelte/icons/align-horizontal-justify-center';
+  import AlignHorizontalJustifyEnd from 'lucide-svelte/icons/align-horizontal-justify-end';
+  import AlignVerticalJustifyStart from 'lucide-svelte/icons/align-vertical-justify-start';
+  import AlignVerticalJustifyCenter from 'lucide-svelte/icons/align-vertical-justify-center';
+  import AlignVerticalJustifyEnd from 'lucide-svelte/icons/align-vertical-justify-end';
+  import AlignHorizontalDistributeStart from 'lucide-svelte/icons/align-horizontal-distribute-start';
+  import AlignHorizontalDistributeCenter from 'lucide-svelte/icons/align-horizontal-distribute-center';
+  import AlignHorizontalDistributeEnd from 'lucide-svelte/icons/align-horizontal-distribute-end';
+  import AlignVerticalDistributeStart from 'lucide-svelte/icons/align-vertical-distribute-start';
+  import AlignVerticalDistributeCenter from 'lucide-svelte/icons/align-vertical-distribute-center';
+  import AlignVerticalDistributeEnd from 'lucide-svelte/icons/align-vertical-distribute-end';
+  import AlignHorizontalSpaceBetween from 'lucide-svelte/icons/align-horizontal-space-between';
+  import AlignVerticalSpaceBetween from 'lucide-svelte/icons/align-vertical-space-between';
+  import Group from 'lucide-svelte/icons/group';
+  import Frame from 'lucide-svelte/icons/frame';
+  import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
+  import BringToFront from 'lucide-svelte/icons/bring-to-front';
+  import SendToBack from 'lucide-svelte/icons/send-to-back';
+  import MoveUp from 'lucide-svelte/icons/move-up';
+  import MoveDown from 'lucide-svelte/icons/move-down';
+  import StretchHorizontal from 'lucide-svelte/icons/stretch-horizontal';
+  import StretchVertical from 'lucide-svelte/icons/stretch-vertical';
+  import Scaling from 'lucide-svelte/icons/scaling';
+  import Magnet from 'lucide-svelte/icons/magnet';
+  import FlipHorizontal2 from 'lucide-svelte/icons/flip-horizontal-2';
+  import FlipVertical2 from 'lucide-svelte/icons/flip-vertical-2';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import Circle from 'lucide-svelte/icons/circle';
+  import Ruler from 'lucide-svelte/icons/ruler';
 
   import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds, keyObjectId } from '../stores/panels.js';

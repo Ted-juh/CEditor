@@ -1,5 +1,5 @@
 <script>
-  import { Link } from 'lucide-svelte';
+  import Link from 'lucide-svelte/icons/link';
 
   let {
     mode = 'radial',         // 'radial' | 'tangential' | 'inherit'

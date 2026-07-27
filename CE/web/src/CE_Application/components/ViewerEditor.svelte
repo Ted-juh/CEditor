@@ -1,5 +1,6 @@
 <script>
-  import { Plus, X } from 'lucide-svelte';
+  import Plus from 'lucide-svelte/icons/plus';
+  import X from 'lucide-svelte/icons/x';
 
   let { images = $bindable([]), activeImageIndex = $bindable(0), onchange, onColorPicked, onColorHover } = $props();
 

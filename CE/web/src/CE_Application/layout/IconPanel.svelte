@@ -1,54 +1,52 @@
 <script>
-  import {
-    BadgeCheck,
-    CircleDot,
-    Container,
-    ArrowLeftRight,
-    CircleDashed,
-    Orbit,
-    AudioWaveform,
-    Waypoints,
-    Palette,
-    BarChart3,
-    Circle,
-    Sparkle,
-    Link2,
-    Music,
-    ListMusic,
-    Piano,
-    LayoutGrid,
-    OctagonAlert,
-    SplitSquareHorizontal,
-    Grid2x2Check,
-    Disc3,
-    Layers,
-    ListOrdered,
-    Timer,
-    Gauge,
-    Spline,
-    Grid2x2,
-    Crosshair,
-    Grid3x3,
-    Library,
-    Monitor,
-    Pin,
-    Plus,
-    Search,
-    RectangleHorizontal,
-    RefreshCw,
-    SlidersHorizontal,
-    SlidersVertical,
-    Square,
-    ListCollapse,
-    List,
-    TextCursorInput,
-    TimerReset,
-    ToggleLeft,
-    Type,
-    PanelBottom,
-    PanelRight,
-    PanelLeftClose,
-  } from 'lucide-svelte';
+  import BadgeCheck from 'lucide-svelte/icons/badge-check';
+  import CircleDot from 'lucide-svelte/icons/circle-dot';
+  import Container from 'lucide-svelte/icons/container';
+  import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
+  import CircleDashed from 'lucide-svelte/icons/circle-dashed';
+  import Orbit from 'lucide-svelte/icons/orbit';
+  import AudioWaveform from 'lucide-svelte/icons/audio-waveform';
+  import Waypoints from 'lucide-svelte/icons/waypoints';
+  import Palette from 'lucide-svelte/icons/palette';
+  import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
+  import Circle from 'lucide-svelte/icons/circle';
+  import Sparkle from 'lucide-svelte/icons/sparkle';
+  import Link2 from 'lucide-svelte/icons/link-2';
+  import Music from 'lucide-svelte/icons/music';
+  import ListMusic from 'lucide-svelte/icons/list-music';
+  import Piano from 'lucide-svelte/icons/piano';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import OctagonAlert from 'lucide-svelte/icons/octagon-alert';
+  import SplitSquareHorizontal from 'lucide-svelte/icons/split-square-horizontal';
+  import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
+  import Disc3 from 'lucide-svelte/icons/disc-3';
+  import Layers from 'lucide-svelte/icons/layers';
+  import ListOrdered from 'lucide-svelte/icons/list-ordered';
+  import Timer from 'lucide-svelte/icons/timer';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import Spline from 'lucide-svelte/icons/spline';
+  import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import Library from 'lucide-svelte/icons/library';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Pin from 'lucide-svelte/icons/pin';
+  import Plus from 'lucide-svelte/icons/plus';
+  import Search from 'lucide-svelte/icons/search';
+  import RectangleHorizontal from 'lucide-svelte/icons/rectangle-horizontal';
+  import RefreshCw from 'lucide-svelte/icons/refresh-cw';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
+  import Square from 'lucide-svelte/icons/square';
+  import ListCollapse from 'lucide-svelte/icons/list-collapse';
+  import List from 'lucide-svelte/icons/list';
+  import TextCursorInput from 'lucide-svelte/icons/text-cursor-input';
+  import TimerReset from 'lucide-svelte/icons/timer-reset';
+  import ToggleLeft from 'lucide-svelte/icons/toggle-left';
+  import Type from 'lucide-svelte/icons/type';
+  import PanelBottom from 'lucide-svelte/icons/panel-bottom';
+  import PanelRight from 'lucide-svelte/icons/panel-right';
+  import PanelLeftClose from 'lucide-svelte/icons/panel-left-close';
   import { addControl, addCustomComponentPackage } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';

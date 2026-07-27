@@ -3,17 +3,15 @@
    * Display Panel — bottom dock with mini displays/tools.
    * Tabs for: Colors, Gradient, Notepad, Viewer, Tools, Console.
    */
-  import {
-    AlignCenter,
-    Cable,
-    Image,
-    Palette,
-    Play,
-    Sparkles,
-    StickyNote,
-    SwatchBook,
-    Terminal,
-  } from 'lucide-svelte';
+  import AlignCenter from 'lucide-svelte/icons/align-center';
+  import Cable from 'lucide-svelte/icons/cable';
+  import Image from 'lucide-svelte/icons/image';
+  import Palette from 'lucide-svelte/icons/palette';
+  import Play from 'lucide-svelte/icons/play';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import StickyNote from 'lucide-svelte/icons/sticky-note';
+  import SwatchBook from 'lucide-svelte/icons/swatch-book';
+  import Terminal from 'lucide-svelte/icons/terminal';
   import ColorChooser from '../components/ColorChooser.svelte';
   import ColorSettings from '../components/ColorSettings.svelte';
   import GradientMiniPreview from '../components/GradientMiniPreview.svelte';

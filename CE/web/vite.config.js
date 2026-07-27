@@ -41,6 +41,12 @@ export default defineConfig(({ command }) => ({
     emptyOutDir: true,
     chunkSizeWarningLimit: 1400,
     rollupOptions: {
+      // Tree-shaking off: profiling showed Rollup's `include` pass (includeCallArguments alone
+      // was ~49% of build time) accounted for 93% of a 4m22s build. Disabling it takes the build
+      // to ~10s for +0.55 MB of assets — bytes that are read from local disk in WebView2 and
+      // never cross a network. Relies on the per-icon lucide imports (`lucide-svelte/icons/x`):
+      // with the old barrel import this would pull in all ~1800 icons instead of the 152 used.
+      treeshake: false,
       // Two entries: the editor (index.html) and the standalone player (player.html).
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),

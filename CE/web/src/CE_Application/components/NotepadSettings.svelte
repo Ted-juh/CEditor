@@ -1,5 +1,15 @@
 <script>
-  import { Bold, Italic, Underline, Strikethrough, AlignLeft, AlignCenter, AlignRight, List, ListOrdered, RemoveFormatting, Pipette } from 'lucide-svelte';
+  import Bold from 'lucide-svelte/icons/bold';
+  import Italic from 'lucide-svelte/icons/italic';
+  import Underline from 'lucide-svelte/icons/underline';
+  import Strikethrough from 'lucide-svelte/icons/strikethrough';
+  import AlignLeft from 'lucide-svelte/icons/align-left';
+  import AlignCenter from 'lucide-svelte/icons/align-center';
+  import AlignRight from 'lucide-svelte/icons/align-right';
+  import List from 'lucide-svelte/icons/list';
+  import ListOrdered from 'lucide-svelte/icons/list-ordered';
+  import RemoveFormatting from 'lucide-svelte/icons/remove-formatting';
+  import Pipette from 'lucide-svelte/icons/pipette';
   import { availableFonts, ensureStoredFontLoaded } from '../stores/appSettings.js';
 
   let { getEditorElement, onPickColor } = $props();

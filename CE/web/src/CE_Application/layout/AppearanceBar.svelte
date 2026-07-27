@@ -10,7 +10,18 @@
    * Every control writes the same dot-paths the PropertiesPanel uses, so this
    * is a faster door into the same model, not a separate one.
    */
-  import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Type, PaintBucket, Frame, Square, Sparkles, Image } from 'lucide-svelte';
+  import Bold from 'lucide-svelte/icons/bold';
+  import Italic from 'lucide-svelte/icons/italic';
+  import Underline from 'lucide-svelte/icons/underline';
+  import AlignLeft from 'lucide-svelte/icons/align-left';
+  import AlignCenter from 'lucide-svelte/icons/align-center';
+  import AlignRight from 'lucide-svelte/icons/align-right';
+  import Type from 'lucide-svelte/icons/type';
+  import PaintBucket from 'lucide-svelte/icons/paint-bucket';
+  import Frame from 'lucide-svelte/icons/frame';
+  import Square from 'lucide-svelte/icons/square';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Image from 'lucide-svelte/icons/image';
   import { selectedControl, getSection, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { availableFonts, availableIcons } from '../stores/appSettings.js';

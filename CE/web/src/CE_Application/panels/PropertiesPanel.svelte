@@ -1,8 +1,49 @@
 <script>
-  import {
-    Paintbrush, Type, Image, Sparkles, Zap, Link, Settings2, Workflow, Play, Cable,
-    LayoutDashboard, Grid3x3, Monitor, Box, Move, Frame, MousePointer, Rows3, SlidersHorizontal, Gauge, Spline, Grid2x2, Crosshair, ArrowLeftRight, SlidersVertical, CircleDashed, Orbit, AudioWaveform, Waypoints, Palette, BarChart3, Circle, Sparkle, Link2, Music, ListMusic, Piano, LayoutGrid, OctagonAlert, Timer, SplitSquareHorizontal, Grid2x2Check, Disc3, Layers, ListOrdered,
-  } from 'lucide-svelte';
+  import Paintbrush from 'lucide-svelte/icons/paintbrush';
+  import Type from 'lucide-svelte/icons/type';
+  import Image from 'lucide-svelte/icons/image';
+  import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Zap from 'lucide-svelte/icons/zap';
+  import Link from 'lucide-svelte/icons/link';
+  import Settings2 from 'lucide-svelte/icons/settings-2';
+  import Workflow from 'lucide-svelte/icons/workflow';
+  import Play from 'lucide-svelte/icons/play';
+  import Cable from 'lucide-svelte/icons/cable';
+  import LayoutDashboard from 'lucide-svelte/icons/layout-dashboard';
+  import Grid3x3 from 'lucide-svelte/icons/grid-3x3';
+  import Monitor from 'lucide-svelte/icons/monitor';
+  import Box from 'lucide-svelte/icons/box';
+  import Move from 'lucide-svelte/icons/move';
+  import Frame from 'lucide-svelte/icons/frame';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Rows3 from 'lucide-svelte/icons/rows-3';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import Gauge from 'lucide-svelte/icons/gauge';
+  import Spline from 'lucide-svelte/icons/spline';
+  import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
+  import Crosshair from 'lucide-svelte/icons/crosshair';
+  import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
+  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
+  import CircleDashed from 'lucide-svelte/icons/circle-dashed';
+  import Orbit from 'lucide-svelte/icons/orbit';
+  import AudioWaveform from 'lucide-svelte/icons/audio-waveform';
+  import Waypoints from 'lucide-svelte/icons/waypoints';
+  import Palette from 'lucide-svelte/icons/palette';
+  import BarChart3 from 'lucide-svelte/icons/bar-chart-3';
+  import Circle from 'lucide-svelte/icons/circle';
+  import Sparkle from 'lucide-svelte/icons/sparkle';
+  import Link2 from 'lucide-svelte/icons/link-2';
+  import Music from 'lucide-svelte/icons/music';
+  import ListMusic from 'lucide-svelte/icons/list-music';
+  import Piano from 'lucide-svelte/icons/piano';
+  import LayoutGrid from 'lucide-svelte/icons/layout-grid';
+  import OctagonAlert from 'lucide-svelte/icons/octagon-alert';
+  import Timer from 'lucide-svelte/icons/timer';
+  import SplitSquareHorizontal from 'lucide-svelte/icons/split-square-horizontal';
+  import Grid2x2Check from 'lucide-svelte/icons/grid-2x2-check';
+  import Disc3 from 'lucide-svelte/icons/disc-3';
+  import Layers from 'lucide-svelte/icons/layers';
+  import ListOrdered from 'lucide-svelte/icons/list-ordered';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { propertyFilter, clearPropertyFilter } from '../stores/propertyFilter.js';
