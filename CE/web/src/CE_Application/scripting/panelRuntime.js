@@ -1296,7 +1296,7 @@ function onDumpParsed(payload) {
       // Record what we just announced. The decoded values also land in deviceRuntimeState, whose
       // subscriber raises onParameterReceived for anything that CHANGED — so without this the whole
       // dump would be announced a second time, one event per parameter.
-      runtimeParams.set(`${role} ${parameter}`, value);
+      runtimeParams.set(`${role}\u0000${parameter}`, value);
     }
   }
   // Inbound origin: set()s inside these handlers are silent by default, or filling the panel from a
