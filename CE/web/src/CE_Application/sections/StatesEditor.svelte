@@ -110,7 +110,7 @@
     }
 
     updateControlProperty(core.id, `States.${nextName}`, {
-      ...JSON.parse(JSON.stringify(selectedState)),
+      ...$state.snapshot(selectedState),
       name: nextName,
     });
     selectedStateName = nextName;

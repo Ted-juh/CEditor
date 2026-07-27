@@ -613,7 +613,8 @@ function loadHandlersCsharp(script) {
   const ctx = {
     ...api, setValue: api.set, getValue: api.get,
     SetValue: api.set, GetValue: api.get, Log: api.log,
-    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex, Clamp: api.clamp, Scale: api.scale,
+    SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
+    Clamp: api.clamp, Scale: api.scale, Round: api.round, Snap: api.snap, Lerp: api.lerp, Curve: api.curve,
   };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCsharp(script.source);

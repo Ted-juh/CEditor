@@ -128,9 +128,9 @@
   function genId(prefix) {
     return `${prefix}${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
   }
-  function cloneLayouts() { return JSON.parse(JSON.stringify(layouts)); }
+  function cloneLayouts() { return $state.snapshot(layouts); }
   function commitLayouts(next) { set('layouts', next); }
-  function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
+  function clonePages() { return $state.snapshot(pages ?? {}); }
   function commitPages(next) { set('pages', next); }
   function setPageProp(prop, value) { const p = clonePages(); p[prop] = value; commitPages(p); }
 
@@ -142,7 +142,7 @@
     const next = cloneLayouts();
     const id = genId('lay_');
     // The first layout adopts the current flat elements so nothing is lost.
-    next.push({ id, name: `Layout ${next.length + 1}`, elements: next.length === 0 ? JSON.parse(JSON.stringify(flatElements)) : [] });
+    next.push({ id, name: `Layout ${next.length + 1}`, elements: next.length === 0 ? $state.snapshot(flatElements) : [] });
     commitLayouts(next);
     editLayoutId = id;
     setLcdDesignLayout(core?.id, id);
@@ -159,7 +159,7 @@
     const next = cloneLayouts();
     const src = next.find((x) => String(x.id) === String(id));
     if (!src) return;
-    const copy = JSON.parse(JSON.stringify(src));
+    const copy = $state.snapshot(src);
     copy.id = genId('lay_');
     copy.name = `${src.name ?? 'Layout'} copy`;
     for (const el of (Array.isArray(copy.elements) ? copy.elements : [])) el.id = genId('el_');
@@ -225,7 +225,7 @@
   let flatElements = $derived(Array.isArray(pixel?.elements) ? pixel.elements : []);
   let elements = $derived(layouts.length ? (Array.isArray(editLayout?.elements) ? editLayout.elements : []) : flatElements);
 
-  function cloneElements() { return JSON.parse(JSON.stringify(elements)); }
+  function cloneElements() { return $state.snapshot(elements); }
   function commitElements(next) {
     if (!layouts.length) { set('elements', next); return; }
     const all = cloneLayouts();
@@ -254,7 +254,7 @@
     const next = cloneElements();
     const src = next[i];
     if (!src) return;
-    const copy = JSON.parse(JSON.stringify(src));
+    const copy = $state.snapshot(src);
     copy.id = genId('el_');
     // Nudge the copy so it doesn't sit exactly on the original.
     copy.x = Math.min(pixelsW - 1, (Number(copy.x) || 0) + 2);

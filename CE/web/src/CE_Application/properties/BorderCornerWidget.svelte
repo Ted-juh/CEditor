@@ -284,7 +284,7 @@
     const rootPath = ctxRootPath();
     // Seed default gradient if none exists yet so the renderer has data
     if (!currentGrad) {
-      currentGrad = JSON.parse(JSON.stringify(DEFAULT_GRADIENT));
+      currentGrad = structuredClone(DEFAULT_GRADIENT);
       set(`${rootPath}.gradient`, currentGrad);
     }
     const target = typeof buildGradientTarget === 'function'

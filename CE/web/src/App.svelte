@@ -4,6 +4,7 @@
   import IconPanel from './CE_Application/layout/IconPanel.svelte';
   import EditorCanvas from './CE_Application/editor/EditorCanvas.svelte';
   import PropertiesPanel from './CE_Application/panels/PropertiesPanel.svelte';
+  import ErrorBoundary from './CE_Application/components/ErrorBoundary.svelte';
   import DisplayPanel from './CE_Application/panels/DisplayPanel.svelte';
   import StatusBar from './CE_Application/layout/StatusBar.svelte';
   import ComponentTree from './CE_Application/panels/ComponentTree.svelte';
@@ -315,7 +316,9 @@
             </div>
           {/if}
           <div class="editor-canvas-area">
-            <EditorCanvas />
+            <ErrorBoundary label="The canvas">
+              <EditorCanvas />
+            </ErrorBoundary>
           </div>
           {#if !isSettingsTab && !chromeWorkspaceActive}
             <div class="common-bar-area">
@@ -337,7 +340,9 @@
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div class="display-resize-handle" class:active={isResizingDisplay} onmousedown={startDisplayResize} style="display: {effectiveShowDisplayPanel ? 'block' : 'none'}"></div>
       <div class="display-panel-area" style="flex: 0 0 {displayPanelBasis}; display: {effectiveShowDisplayPanel ? 'block' : 'none'}">
-        <DisplayPanel onTabChange={handleDisplayTabChange} />
+        <ErrorBoundary label="The display panel">
+          <DisplayPanel onTabChange={handleDisplayTabChange} />
+        </ErrorBoundary>
       </div>
     </div>
 
@@ -346,7 +351,9 @@
       <div class="resize-handle" class:active={isResizingProps} onmousedown={startPropsResize}></div>
 
       <div class="properties-area">
-        <PropertiesPanel width={propertiesPanelWidth} />
+        <ErrorBoundary label="The properties panel">
+          <PropertiesPanel width={propertiesPanelWidth} />
+        </ErrorBoundary>
       </div>
     {/if}
 

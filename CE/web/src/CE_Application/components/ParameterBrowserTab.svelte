@@ -3,6 +3,7 @@
   import { get } from 'svelte/store';
   import { activePanel, openDeviceProfileTab, syncOpenDeviceProfileDesigner, updatePanel } from '../stores/panels.js';
   import { selectedControl, updateControlProperty } from '../stores/controls.js';
+  import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import {
     deviceProfiles,
     deviceDiagnostics,
@@ -52,6 +53,13 @@
   let selectedDestinationId = $derived($selectedMidiDestinationId);
   let selectedInputId = $derived($selectedMidiInputId);
   let selectedDirection = $derived($selectedSyncDirection);
+
+  // Which way values move between the panel and the synth.
+  const SYNC_DIRECTIONS = [
+    { id: 'pull', label: 'Pull', hint: 'Read values from the synth into the panel' },
+    { id: 'push', label: 'Push', hint: 'Send panel values out to the synth' },
+    { id: 'live', label: 'Live', hint: 'Keep both in step as either side changes' },
+  ];
   let roleSession = $derived($deviceSessionState?.mainSynth ?? {});
   let identityMismatch = $derived(getCurrentIdentityMismatch($latestDeviceIdentityMismatch, roleSession, selectedProfileId));
   let bulkStatus = $derived(getRelevantBulkSend($latestBulkDumpSend, selectedProfileId));
@@ -946,85 +954,38 @@
     });
   }
 
-  function adoptParameterMetadata(controlId, controlType, parameter) {
-    const shortLabel = parameter?.display?.shortLabel || parameter?.name || parameter?.id;
-    if (shortLabel && ['Button', 'MomentaryButton', 'TimedButton', 'OneShotButton', 'ToggleButton', 'RadioButtonGroup', 'CyclicButton', 'Combobox', 'Label'].includes(controlType)) {
-      updateControlProperty(controlId, 'Text.content', shortLabel);
-    }
-
-    if (parameter?.type === 'integer' || parameter?.type === 'float' || parameter?.type === 'bipolar') {
-      const min = Number(parameter?.range?.min ?? 0);
-      const max = Number(parameter?.range?.max ?? 127);
-      const value = Number(parameter?.default ?? min);
-      updateControlProperty(controlId, 'Behavior.min', min);
-      updateControlProperty(controlId, 'Behavior.max', max);
-      updateControlProperty(controlId, 'Behavior.defaultCurrentValue', value);
-      updateControlProperty(controlId, 'Behavior.valueType', parameter.type === 'float' ? 'float' : 'int');
-    }
-
-    if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {
-      updateControlProperty(controlId, 'Value.rows', parameter.choices.map((choice, index) => ({
-        id: choice.id ?? `choice_${index + 1}`,
-        displayText: choice.label ?? choice.id ?? String(choice.value ?? index),
-        internalValue: choice.id ?? String(choice.value ?? index),
-        sendValue: choice.value ?? index,
-        receiveValue: choice.value ?? index,
-        selectedByDefault: (choice.id ?? String(choice.value)) === parameter.default,
-        enabled: true,
-        visualOverrides: {},
-      })));
-      updateControlProperty(controlId, 'Behavior.valueType', 'enum');
-      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default ?? parameter.choices[0]?.id ?? '');
-    }
-
-    if (parameter?.type === 'boolean') {
-      updateControlProperty(controlId, 'Behavior.family', 'select');
-      updateControlProperty(controlId, 'Behavior.role', 'toggle');
-      updateControlProperty(controlId, 'Behavior.valueType', 'bool');
-      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default === true);
-      updateControlProperty(controlId, 'Behavior.allowMixed', false);
-    }
-
-    if (parameter?.type === 'action' || parameter?.type === 'momentary') {
-      updateControlProperty(controlId, 'Behavior.family', 'trigger');
-      updateControlProperty(controlId, 'Behavior.role', 'button');
-      updateControlProperty(controlId, 'Behavior.valueType', 'none');
-      if (controlType === 'TimedButton') {
-        updateControlProperty(controlId, 'Behavior.buttonType', 'timed');
-        updateControlProperty(controlId, 'Behavior.subtype', 'hold_to_confirm');
-      } else if (controlType === 'OneShotButton') {
-        updateControlProperty(controlId, 'Behavior.buttonType', 'one_shot');
-        updateControlProperty(controlId, 'Behavior.subtype', 'single_use');
-      } else {
-        updateControlProperty(controlId, 'Behavior.buttonType', parameter.type === 'momentary' ? 'momentary' : 'one_shot');
-        updateControlProperty(controlId, 'Behavior.subtype', parameter.type === 'momentary' ? 'momentary' : 'action');
-      }
-    }
-  }
 </script>
 
 <div class="parameter-browser">
   <div class="toolbar">
     <select value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
-      {#each $deviceProfiles as profile}
+      {#each $deviceProfiles as profile (profile.id)}
         <option value={profile.id}>{profile.name || profile.id}</option>
       {/each}
     </select>
     <select value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
-      {#each $midiDestinations as destination}
+      {#each $midiDestinations as destination (destination.id)}
         <option value={destination.id}>{destination.name || destination.id}</option>
       {/each}
     </select>
     <select value={selectedInputId} onchange={(e) => handleInputChange(e.target.value)}>
-      {#each $midiInputs as input}
+      {#each $midiInputs as input (input.id)}
         <option value={input.id}>{input.name || input.id}</option>
       {/each}
     </select>
-    <select value={selectedDirection} onchange={(e) => handleSyncDirectionChange(e.target.value)}>
-      <option value="pull">Pull</option>
-      <option value="push">Push</option>
-      <option value="live">Live</option>
-    </select>
+    <!-- Three mutually exclusive modes: a segmented toggle, not a dropdown (house rule). -->
+    <div class="direction-toggle" role="group" aria-label="Sync direction">
+      {#each SYNC_DIRECTIONS as direction (direction.id)}
+        <button
+          type="button"
+          class="direction-option"
+          class:active={selectedDirection === direction.id}
+          aria-pressed={selectedDirection === direction.id}
+          title={direction.hint}
+          onclick={() => handleSyncDirectionChange(direction.id)}
+        >{direction.label}</button>
+      {/each}
+    </div>
     <input value={query} placeholder="Search parameters" oninput={(e) => query = e.target.value} />
     <button onclick={handleOpenDesigner}>Designer</button>
     <button onclick={handlePullFromSynth}>Sync</button>
@@ -1146,7 +1107,7 @@
   {/if}
 
   <div class="list">
-    {#each filteredParameters as parameter}
+    {#each filteredParameters as parameter (parameter.id)}
       {@const compatibility = getBindingCompatibility($selectedControl, parameter)}
       <button
         class={['parameter-row', compatibility.status, parameter.snapshotOnly ? 'snapshot' : '']}
@@ -1326,6 +1287,40 @@
     color: #DDD;
     font: inherit;
     padding: 4px 6px;
+  }
+
+  /* Segmented toggle: one bordered box, hairline dividers, accent on the active segment. */
+  .direction-toggle {
+    display: grid;
+    grid-auto-columns: 1fr;
+    grid-auto-flow: column;
+    min-width: 0;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .direction-option {
+    border: none;
+    border-left: 1px solid #3A3A3A;
+    border-radius: 0;
+    background: #252525;
+    color: #888;
+    padding: 4px 2px;
+    cursor: pointer;
+  }
+
+  .direction-option:first-child {
+    border-left: none;
+  }
+
+  .direction-option:hover {
+    color: #DDD;
+  }
+
+  .direction-option.active {
+    background: #2F6FEB;
+    color: #FFF;
   }
 
   .target {

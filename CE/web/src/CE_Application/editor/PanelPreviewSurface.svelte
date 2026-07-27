@@ -2750,6 +2750,12 @@
   const setlistIndexSeen = {};    // id -> the index we last recalled for
   const setlistBackDown = {};     // id -> is the BACK pedal held
   const setlistFadeTimers = {};   // id -> [intervalId…] for a value crossfade
+  // A fade in flight writes through updateControlProperty, which reaches the ValueTree and
+  // the undo stack. Left running past teardown it would keep editing the document — and
+  // stack undo entries — for a surface that no longer exists.
+  onDestroy(() => {
+    for (const timers of Object.values(setlistFadeTimers)) timers.forEach(clearInterval);
+  });
   function isSetlistControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'Setlist';
   }

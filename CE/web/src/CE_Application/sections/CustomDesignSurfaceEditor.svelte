@@ -180,7 +180,7 @@
   // Object-relative smart guides: snap moves to other parts' edges/centers
   // and the artboard edges/center; Alt bypasses, grid snap is the fallback.
   let smartSnapEnabled = $state(true);
-  let activeSmartGuides = $state([]);
+  let activeSmartGuides = $state.raw([]);
   // Split active guides per ruler axis, tagging the artboard-center guide so
   // both the ruler and the on-canvas line can draw it distinctly.
   let smartGuideCenterEps = 0.75;
@@ -304,7 +304,7 @@
   let selectedFrame = $derived(selectedPart ? partFrame(selectedPart) : null);
   let selectedZoneFrame = $derived(selectedZone ? displayZoneFrame(selectedZone) : null);
   let activeFrame = $state(null);
-  let activeLayerFrames = $state({});
+  let activeLayerFrames = $state.raw({});
   let activeZoneFrame = $state(null);
   let interaction = $state(null);
   let activeTool = $state('select');

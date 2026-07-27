@@ -419,7 +419,7 @@
 
 <div class="display-panel">
   <div class="studio-rail" aria-label="Display studios">
-    {#each tabs as tab}
+    {#each tabs as tab (tab.id)}
       <button
         class="studio-tab"
         class:active={activeTab === tab.id}

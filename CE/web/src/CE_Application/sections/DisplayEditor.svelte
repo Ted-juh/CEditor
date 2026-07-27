@@ -159,9 +159,9 @@
     return `${prefix}${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-3)}`;
   }
   function commitLayouts(next) { set('layouts', next); }
-  function cloneLayouts() { return JSON.parse(JSON.stringify(layouts)); }
+  function cloneLayouts() { return $state.snapshot(layouts); }
   function commitPages(next) { set('pages', next); }
-  function clonePages() { return JSON.parse(JSON.stringify(pages ?? {})); }
+  function clonePages() { return $state.snapshot(pages ?? {}); }
 
   // Select which layout the zone table edits, and preview it on the canvas via
   // the transient design-layout store (view state only — never saved).
@@ -189,7 +189,7 @@
     const next = cloneLayouts();
     const src = next.find((x) => String(x.id) === String(id));
     if (!src) return;
-    const copy = JSON.parse(JSON.stringify(src));
+    const copy = $state.snapshot(src);
     copy.id = genId('lay_');
     copy.name = `${src.name ?? 'Layout'} copy`;
     for (const z of (Array.isArray(copy.zones) ? copy.zones : [])) z.id = genId('z_');
@@ -223,7 +223,7 @@
     withEditLayout((l) => {
       const src = l.zones[i];
       if (!src) return;
-      const copy = JSON.parse(JSON.stringify(src));
+      const copy = $state.snapshot(src);
       copy.id = genId('z_');
       l.zones.splice(i + 1, 0, copy);
     });

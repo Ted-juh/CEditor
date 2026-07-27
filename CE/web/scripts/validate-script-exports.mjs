@@ -1,3 +1,21 @@
+// validate-script-exports.mjs — prove that a script an author writes in CEditor is valid,
+// runnable source in its own language.
+//
+// CEditor stores and runs scripts AS-IS: no transpilation, no projection through an
+// intermediate model (CLAUDE.md, tools/docs/panel-api-spec.md). So this harness takes the
+// canonical script source for each language (script-export-corpus.mjs), hands it to that
+// language's REAL toolchain, and asserts it produces the canonical effects against a stubbed
+// panel API. If a language's toolchain is absent the target is skipped, never silently passed.
+//
+// Coverage is exactly RUNNABLE_LANGUAGES from panelApi.js — the set the product claims to run.
+//
+// Two extra passes beyond "does it compile":
+//   • TypeScript is additionally transpiled with the SAME tsService the editor uses, and the
+//     emitted JS is executed — that JS is what ships in `compiledJs` and what QuickJS runs.
+//   • C++/C#/Java also run through the CeScript interpreters (cppPreview/csharpPreview/
+//     javaPreview) that drive the live editor preview, and must agree with the real compiler.
+//     That cross-check needs no toolchain, so it always runs.
+
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
@@ -5,12 +23,15 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { emitScript } from '../src/CE_Application/scripting/scriptEmitters.js';
-import { createMacroRoutingScript } from '../src/CE_Application/scripting/scriptSamples.js';
+import { compileCpp, invokeCpp } from '../src/CE_Application/scripting/cppPreview.js';
+import { compileCsharp, invokeCsharp } from '../src/CE_Application/scripting/csharpPreview.js';
+import { compileJava, invokeJava } from '../src/CE_Application/scripting/javaPreview.js';
+import { RUNNABLE_LANGUAGES } from '../src/CE_Application/scripting/panelApi.js';
+import { ensureTs, transpileTs } from '../src/CE_Application/scripting/tsService.js';
+import { EXPECTED, SOURCES, checkEffects, createRecordingApi } from './script-export-corpus.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webRoot = path.resolve(here, '..');
-const repoRoot = path.resolve(webRoot, '..', '..');
 const workspaceRoot = path.resolve(os.tmpdir(), 'ceditor-script-export-validation');
 
 function quote(value) {
@@ -97,58 +118,69 @@ async function writeTargetFile(target, filename, contents) {
   return { directory, filePath };
 }
 
-function generated(target) {
-  return emitScript(createMacroRoutingScript(), target);
-}
+/* ------------------------------------------------------------------ harnesses */
+// Each harness = stub panel API + the author's source verbatim + the canonical assertions.
+// EXPECTED is interpolated so the fixture and the assertions can never drift apart.
 
-function javascriptHarness() {
+const { patches: EXP_PATCHES, cc: EXP_CC, eventValue: EV } = EXPECTED;
+
+function javascriptHarness(source = SOURCES.javascript) {
   return `
 const patches = [];
 const midi = [];
-function scale(value, fromMin, fromMax, toMin, toMax) {
-  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin);
-}
-function round(value) { return Math.round(value); }
-function setValue(target, value) { patches.push({ target, value }); }
-function sendCC(message) { midi.push(message); }
-${generated('javascript')}
-onControlChanged('macroControl', { value: 0.5, phase: 'commit' });
-if (patches.length !== 2) throw new Error('expected two value patches');
-if (midi.length !== 1 || midi[0].value !== 64) throw new Error('expected one CC value');
+function set(path, value) { patches.push({ path, value }); }
+function get(path) { return 0; }
+function sendCC(channel, cc, value) { midi.push({ channel, cc, value }); }
+function scale(v, inLo, inHi, outLo, outHi) { return inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo); }
+function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+function round(v) { return Math.round(v); }
+
+${source}
+onValueChanged(${EV});
+
+if (patches.length !== ${EXP_PATCHES.length}) throw new Error('expected ${EXP_PATCHES.length} set() calls, got ' + patches.length);
+${EXP_PATCHES.map((p, i) => `if (patches[${i}].path !== ${JSON.stringify(p.path)}) throw new Error('set()[${i}] wrong path');
+if (Math.abs(patches[${i}].value - ${p.value}) > 1e-9) throw new Error('set()[${i}] expected ${p.value}, got ' + patches[${i}].value);`).join('\n')}
+if (midi.length !== 1) throw new Error('expected one CC, got ' + midi.length);
+if (midi[0].channel !== ${EXP_CC.channel} || midi[0].cc !== ${EXP_CC.cc} || midi[0].value !== ${EXP_CC.value}) throw new Error('wrong CC: ' + JSON.stringify(midi[0]));
 `.trimStart();
 }
 
+// Type-check file: the ambient declarations are the panel API's contract for TS authors.
 function typescriptHarness() {
   return `
-const patches: Array<{ target: string; value: number }> = [];
-const midi: Array<{ channel: number; cc: number; value: number }> = [];
-function scale(value: number, fromMin: number, fromMax: number, toMin: number, toMax: number): number {
-  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin);
-}
-function round(value: number): number { return Math.round(value); }
-function setValue(target: string, value: number): void { patches.push({ target, value }); }
-function sendCC(message: { channel: number; cc: number; value: number }): void { midi.push(message); }
-${generated('typescript')}
-onControlChanged('macroControl', { value: 0.5, phase: 'commit' });
-if (patches.length !== 2) throw new Error('expected two value patches');
-if (midi.length !== 1 || midi[0].value !== 64) throw new Error('expected one CC value');
-`.trimStart();
+declare function set(path: string, value: number): void;
+declare function get(path: string): number;
+declare function sendCC(channel: number, cc: number, value: number): void;
+declare function scale(v: number, inLo: number, inHi: number, outLo: number, outHi: number): number;
+declare function clamp(v: number, lo: number, hi: number): number;
+declare function round(v: number): number;
+
+${SOURCES.typescript}`.trimStart();
 }
 
 function luaHarness() {
   return `
 local patches = {}
 local midi = {}
-function scale(value, fromMin, fromMax, toMin, toMax)
-  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin)
-end
-function round(value) return math.floor(value + 0.5) end
-function setValue(target, value) table.insert(patches, { target = target, value = value }) end
+function set(path, value) table.insert(patches, { path = path, value = value }) end
+function get(path) return 0 end
 function sendCC(channel, cc, value) table.insert(midi, { channel = channel, cc = cc, value = value }) end
-${generated('lua')}
-onControlChanged({ value = 0.5, phase = 'commit' })
-assert(#patches == 2, 'expected two value patches')
-assert(#midi == 1 and midi[1].value == 64, 'expected one CC value')
+function scale(v, inLo, inHi, outLo, outHi)
+  if inHi == inLo then return outLo end
+  return outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)
+end
+function clamp(v, lo, hi) if v < lo then return lo elseif v > hi then return hi else return v end end
+function round(v) return math.floor(v + 0.5) end
+
+${SOURCES.lua}
+onValueChanged(${EV})
+
+assert(#patches == ${EXP_PATCHES.length}, 'expected ${EXP_PATCHES.length} set() calls, got ' .. #patches)
+${EXP_PATCHES.map((p, i) => `assert(patches[${i + 1}].path == ${JSON.stringify(p.path)}, 'set()[${i}] wrong path')
+assert(math.abs(patches[${i + 1}].value - ${p.value}) < 1e-9, 'set()[${i}] expected ${p.value}, got ' .. patches[${i + 1}].value)`).join('\n')}
+assert(#midi == 1, 'expected one CC, got ' .. #midi)
+assert(midi[1].channel == ${EXP_CC.channel} and midi[1].cc == ${EXP_CC.cc} and midi[1].value == ${EXP_CC.value}, 'wrong CC')
 `.trimStart();
 }
 
@@ -156,77 +188,69 @@ function pythonHarness() {
   return `
 patches = []
 midi = []
-class Event:
-    value = 0.5
-    phase = "commit"
-def scale(value, from_min, from_max, to_min, to_max):
-    return to_min + ((value - from_min) / (from_max - from_min)) * (to_max - to_min)
-def set_value(target, value):
-    patches.append({"target": target, "value": value})
-def send_cc(channel, cc, value):
+def set(path, value):
+    patches.append({"path": path, "value": value})
+def get(path):
+    return 0
+def sendCC(channel, cc, value):
     midi.append({"channel": channel, "cc": cc, "value": value})
-${generated('python')}
-onControlChanged(Event())
-assert len(patches) == 2, 'expected two value patches'
-assert len(midi) == 1 and midi[0]["value"] == 64, 'expected one CC value'
+def scale(v, inLo, inHi, outLo, outHi):
+    if inHi == inLo:
+        return outLo
+    return outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)
+def clamp(v, lo, hi):
+    return lo if v < lo else (hi if v > hi else v)
+def round(v):
+    import math
+    return int(math.floor(v + 0.5))
+
+${SOURCES.python}
+onValueChanged(${EV})
+
+assert len(patches) == ${EXP_PATCHES.length}, "expected ${EXP_PATCHES.length} set() calls, got %d" % len(patches)
+${EXP_PATCHES.map((p, i) => `assert patches[${i}]["path"] == ${JSON.stringify(p.path)}, "set()[${i}] wrong path"
+assert abs(patches[${i}]["value"] - ${p.value}) < 1e-9, "set()[${i}] expected ${p.value}, got %r" % patches[${i}]["value"]`).join('\n')}
+assert len(midi) == 1, "expected one CC, got %d" % len(midi)
+assert midi[0]["channel"] == ${EXP_CC.channel} and midi[0]["cc"] == ${EXP_CC.cc} and midi[0]["value"] == ${EXP_CC.value}, "wrong CC: %r" % midi[0]
 `.trimStart();
 }
 
 function cppHarness() {
   return `
 #include <cmath>
-#include <initializer_list>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
-namespace ce {
-double scale(double value, double fromMin, double fromMax, double toMin, double toMax) {
-  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin);
-}
-double clamp(double value, double min, double max) { return value < min ? min : value > max ? max : value; }
-double curve(double value, double from, double to, const char*) { return scale(value, 0.0, 1.0, from, to); }
-}
-
 struct CeEvent { double value = 0.0; };
-
-struct MidiOut {
-  int ccCount = 0;
-  long lastCcValue = -1;
-  void sendCC(int, int, long value) { ++ccCount; lastCcValue = value; }
-  void sendNRPN(int, int, int, long) {}
-  void sendSysex(std::initializer_list<int>) {}
-  std::vector<int> buildSysex(std::initializer_list<int> bytes) { return std::vector<int>(bytes); }
-  int checksum(const char*, std::initializer_list<int>) { return 0; }
-  int to14Bit(double value) { return static_cast<int>(std::lround(value)); }
-};
 
 struct CeContext {
   std::vector<std::pair<std::string, double>> patches;
-  MidiOut midiOut;
-  double getValue(const char*) const { return 0.0; }
-  void setValue(const char* target, double value) { patches.emplace_back(target, value); }
-  void setVisible(const char*, bool) {}
-  void showGroup(const char*) {}
-  void hideGroup(const char*) {}
-  void setPanelState(const char*) {}
-  void setPartColor(const char*, const char*) {}
-  void setAnimation(const char*, const char*, bool) {}
-  void startTimer(const char*, int) {}
-  void stopTimer(const char*) {}
-  void emitEvent(const char*, const char*, double) {}
-  void trace(const char*, double) {}
-  MidiOut& midi() { return midiOut; }
+  int ccCount = 0, ccChannel = -1, ccNumber = -1;
+  long ccValue = -1;
+  void set(const char* path, double value) { patches.emplace_back(path, value); }
+  double get(const char*) const { return 0.0; }
+  void sendCC(int channel, int cc, long value) { ++ccCount; ccChannel = channel; ccNumber = cc; ccValue = value; }
+  double scale(double v, double inLo, double inHi, double outLo, double outHi) const {
+    return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
+  }
+  double clamp(double v, double lo, double hi) const { return v < lo ? lo : v > hi ? hi : v; }
+  double round(double v) const { return std::floor(v + 0.5); }
 };
 
-${generated('cpp')}
-
+${SOURCES.cpp}
 int main() {
   CeContext ctx;
-  onControlChanged(ctx, CeEvent{0.5});
-  if (ctx.patches.size() != 2) throw std::runtime_error("expected two value patches");
-  if (ctx.midi().ccCount != 1 || ctx.midi().lastCcValue != 64) throw std::runtime_error("expected one CC value");
+  CeEvent event; event.value = ${EV};
+  onValueChanged(ctx, event);
+
+  if (ctx.patches.size() != ${EXP_PATCHES.length}) throw std::runtime_error("expected ${EXP_PATCHES.length} set() calls");
+${EXP_PATCHES.map((p, i) => `  if (ctx.patches[${i}].first != ${JSON.stringify(p.path)}) throw std::runtime_error("set()[${i}] wrong path");
+  if (std::fabs(ctx.patches[${i}].second - ${p.value}) > 1e-9) throw std::runtime_error("set()[${i}] wrong value");`).join('\n')}
+  if (ctx.ccCount != 1) throw std::runtime_error("expected one CC");
+  if (ctx.ccChannel != ${EXP_CC.channel} || ctx.ccNumber != ${EXP_CC.cc} || ctx.ccValue != ${EXP_CC.value}) throw std::runtime_error("wrong CC");
   return 0;
 }
 `.trimStart();
@@ -239,262 +263,76 @@ using System.Collections.Generic;
 
 public sealed class CeEvent { public double Value { get; set; } }
 
+public sealed class CeContext {
+  public List<KeyValuePair<string, double>> Patches = new List<KeyValuePair<string, double>>();
+  public int CcCount = 0, CcChannel = -1, CcNumber = -1, CcValue = -1;
+  public void SetValue(string path, double value) { Patches.Add(new KeyValuePair<string, double>(path, value)); }
+  public double GetValue(string path) { return 0; }
+  public void SendCC(int channel, int cc, int value) { CcCount++; CcChannel = channel; CcNumber = cc; CcValue = value; }
+  public double Scale(double v, double inLo, double inHi, double outLo, double outHi) {
+    return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
+  }
+  public double Clamp(double v, double lo, double hi) { return Math.Min(hi, Math.Max(lo, v)); }
+  public double Round(double v) { return Math.Floor(v + 0.5); }
+}
+
 public sealed class ScriptHarness {
-  private readonly List<(string Target, double Value)> patches = new();
-  private int ccCount;
-  private int lastCcValue;
-
-  private static double Scale(double value, double fromMin, double fromMax, double toMin, double toMax) =>
-    toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin);
-  private static double Clamp(double value, double min, double max) => Math.Min(max, Math.Max(min, value));
-  private static double Curve(double value, double from, double to, string shape) => Scale(value, 0, 1, from, to);
-  private double GetValue(string target) => 0;
-  private void SetValue(string target, double value) => patches.Add((target, value));
-  private void SetVisible(string target, bool visible) {}
-  private void ShowGroup(string group) {}
-  private void HideGroup(string group) {}
-  private void SetPanelState(string state) {}
-  private void SetPartColor(string part, string color) {}
-  private void SetAnimation(string target, string animation, bool enabled) {}
-  private void StartTimer(string id, int ms) {}
-  private void StopTimer(string id) {}
-  private void EmitEvent(string eventName, string target, double value) {}
-  private void SendCC(int channel, int cc, int value) { ccCount++; lastCcValue = value; }
-  private void SendNRPN(int channel, int parameterMsb, int parameterLsb, int value) {}
-  private void SendSysex(byte[] bytes) {}
-  private byte[] BuildSysex(byte[] bytes) => bytes;
-  private int Checksum(string type, byte[] bytes) => 0;
-  private int To14Bit(double value) => (int)Math.Round(value);
-  private void Trace(string message, double value) {}
-
-${generated('csharp').split('\n').map((line) => `  ${line}`).join('\n')}
-
+${SOURCES.csharp.split('\n').map((line) => (line ? `  ${line}` : line)).join('\n')}
   public static void Main() {
-    var harness = new ScriptHarness();
-    harness.OnControlChanged(new CeEvent { Value = 0.5 });
-    if (harness.patches.Count != 2) throw new Exception("expected two value patches");
-    if (harness.ccCount != 1 || harness.lastCcValue != 64) throw new Exception("expected one CC value");
+    var ctx = new CeContext();
+    new ScriptHarness().OnValueChanged(ctx, new CeEvent { Value = ${EV} });
+
+    if (ctx.Patches.Count != ${EXP_PATCHES.length}) throw new Exception("expected ${EXP_PATCHES.length} set() calls");
+${EXP_PATCHES.map((p, i) => `    if (ctx.Patches[${i}].Key != ${JSON.stringify(p.path)}) throw new Exception("set()[${i}] wrong path");
+    if (Math.Abs(ctx.Patches[${i}].Value - ${p.value}) > 1e-9) throw new Exception("set()[${i}] wrong value");`).join('\n')}
+    if (ctx.CcCount != 1) throw new Exception("expected one CC");
+    if (ctx.CcChannel != ${EXP_CC.channel} || ctx.CcNumber != ${EXP_CC.cc} || ctx.CcValue != ${EXP_CC.value}) throw new Exception("wrong CC");
   }
 }
 `.trimStart();
 }
 
-function goMain() {
+function javaHarness() {
   return `
-package main
+import java.util.ArrayList;
+import java.util.List;
 
-import (
-  "math"
-  "ceditor-validator/ce"
-  "ceditor-validator/midi"
-)
-
-${generated('go')}
-
-func main() {
-  OnControlChanged(ce.Event{Value: 0.5})
-  if len(ce.Patches) != 2 {
-    panic("expected two value patches")
+public class MacroRouting {
+  static class CeEvent {
+    double value;
+    CeEvent(double v) { value = v; }
   }
-  if midi.CCCount != 1 || midi.LastCCValue != 64 {
-    panic("expected one CC value")
+
+  static class CeContext {
+    List<String> paths = new ArrayList<String>();
+    List<Double> values = new ArrayList<Double>();
+    int ccCount = 0, ccChannel = -1, ccNumber = -1, ccValue = -1;
+    void set(String path, double value) { paths.add(path); values.add(value); }
+    double get(String path) { return 0; }
+    void sendCC(int channel, int cc, int value) { ccCount++; ccChannel = channel; ccNumber = cc; ccValue = value; }
+    double scale(double v, double inLo, double inHi, double outLo, double outHi) {
+      return inHi == inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo);
+    }
+    double clamp(double v, double lo, double hi) { return Math.min(hi, Math.max(lo, v)); }
+    double round(double v) { return Math.floor(v + 0.5); }
+  }
+
+${SOURCES.java.split('\n').map((line) => (line ? `  ${line}` : line)).join('\n')}
+  public static void main(String[] args) {
+    CeContext ctx = new CeContext();
+    new MacroRouting().onValueChanged(ctx, new CeEvent(${EV}));
+
+    if (ctx.paths.size() != ${EXP_PATCHES.length}) throw new RuntimeException("expected ${EXP_PATCHES.length} set() calls");
+${EXP_PATCHES.map((p, i) => `    if (!ctx.paths.get(${i}).equals(${JSON.stringify(p.path)})) throw new RuntimeException("set()[${i}] wrong path");
+    if (Math.abs(ctx.values.get(${i}) - ${p.value}) > 1e-9) throw new RuntimeException("set()[${i}] wrong value");`).join('\n')}
+    if (ctx.ccCount != 1) throw new RuntimeException("expected one CC");
+    if (ctx.ccChannel != ${EXP_CC.channel} || ctx.ccNumber != ${EXP_CC.cc} || ctx.ccValue != ${EXP_CC.value}) throw new RuntimeException("wrong CC");
   }
 }
 `.trimStart();
 }
 
-const goCePackage = `
-package ce
-
-type Event struct { Value float64 }
-type Patch struct { Target string; Value float64 }
-var Patches []Patch
-func SetValue(target string, value float64) { Patches = append(Patches, Patch{target, value}) }
-func GetValue(target string) float64 { return 0 }
-func SetVisible(target string, visible bool) {}
-func ShowGroup(group string) {}
-func HideGroup(group string) {}
-func SetPanelState(state string) {}
-func SetPartColor(part string, color string) {}
-func SetAnimation(target string, animation string, enabled bool) {}
-func StartTimer(id string, ms int) {}
-func StopTimer(id string) {}
-func EmitEvent(event string, target string, value float64) {}
-func Trace(message string, value float64) {}
-func Scale(value float64, fromMin float64, fromMax float64, toMin float64, toMax float64) float64 {
-  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin)
-}
-func Clamp(value float64, min float64, max float64) float64 {
-  if value < min { return min }
-  if value > max { return max }
-  return value
-}
-func Curve(value float64, from float64, to float64, shape string) float64 { return Scale(value, 0, 1, from, to) }
-`.trimStart();
-
-const goMidiPackage = `
-package midi
-
-var CCCount int
-var LastCCValue int
-func SendCC(channel int, cc int, value int) { CCCount++; LastCCValue = value }
-func SendNRPN(channel int, parameterMsb int, parameterLsb int, value int) {}
-func SendSysex(bytes []byte) {}
-func BuildSysex(bytes []byte) []byte { return bytes }
-func Checksum(kind string, bytes []byte) int { return 0 }
-func To14Bit(value float64) int { return int(value) }
-`.trimStart();
-
-function rustHarness() {
-  return `
-mod ce {
-    pub struct Event { pub value: f64 }
-    pub struct Patch { pub target: String, pub value: f64 }
-    pub struct Midi { pub cc_count: usize, pub last_cc_value: i32 }
-    pub struct Context { pub patches: Vec<Patch>, pub midi_out: Midi }
-    impl Context {
-        pub fn new() -> Self { Self { patches: Vec::new(), midi_out: Midi { cc_count: 0, last_cc_value: -1 } } }
-        pub fn value(&self, _target: &str) -> f64 { 0.0 }
-        pub fn set_value(&mut self, target: &str, value: f64) { self.patches.push(Patch { target: target.to_string(), value }); }
-        pub fn set_visible(&mut self, _target: &str, _visible: bool) {}
-        pub fn show_group(&mut self, _group: &str) {}
-        pub fn hide_group(&mut self, _group: &str) {}
-        pub fn set_panel_state(&mut self, _state: &str) {}
-        pub fn set_part_color(&mut self, _part: &str, _color: &str) {}
-        pub fn set_animation(&mut self, _target: &str, _animation: &str, _enabled: bool) {}
-        pub fn start_timer(&mut self, _id: &str, _ms: i32) {}
-        pub fn stop_timer(&mut self, _id: &str) {}
-        pub fn emit_event(&mut self, _event: &str, _target: &str, _value: f64) {}
-        pub fn trace(&mut self, _message: &str, _value: f64) {}
-        pub fn midi(&mut self) -> &mut Midi { &mut self.midi_out }
-    }
-    impl Midi {
-        pub fn send_cc(&mut self, _channel: i32, _cc: i32, value: i32) { self.cc_count += 1; self.last_cc_value = value; }
-        pub fn send_nrpn(&mut self, _channel: i32, _msb: i32, _lsb: i32, _value: i32) {}
-        pub fn send_sysex(&mut self, _bytes: &[u8]) {}
-        pub fn build_sysex(&mut self, bytes: &[u8]) -> Vec<u8> { bytes.to_vec() }
-        pub fn checksum(&mut self, _kind: &str, _bytes: &[u8]) -> i32 { 0 }
-        pub fn to_14_bit(&mut self, value: f64) -> i32 { value.round() as i32 }
-    }
-    pub fn scale(value: f64, from_min: f64, from_max: f64, to_min: f64, to_max: f64) -> f64 {
-        to_min + ((value - from_min) / (from_max - from_min)) * (to_max - to_min)
-    }
-    pub fn clamp(value: f64, min: f64, max: f64) -> f64 { value.max(min).min(max) }
-    pub fn curve(value: f64, from: f64, to: f64, _shape: &str) -> f64 { scale(value, 0.0, 1.0, from, to) }
-}
-
-${generated('rust')}
-
-fn main() {
-    let mut ctx = ce::Context::new();
-    on_control_changed(&mut ctx, ce::Event { value: 0.5 });
-    assert_eq!(ctx.patches.len(), 2, "expected two value patches");
-    assert_eq!(ctx.midi_out.cc_count, 1, "expected one CC message");
-    assert_eq!(ctx.midi_out.last_cc_value, 64, "expected one CC value");
-}
-`.trimStart();
-}
-
-function kotlinHarness() {
-  return `
-import kotlin.math.round
-
-data class CeEvent(val value: Double)
-data class Patch(val target: String, val value: Double)
-val patches = mutableListOf<Patch>()
-var ccCount = 0
-var lastCcValue = -1
-fun scale(value: Double, fromMin: Double, fromMax: Double, toMin: Double, toMax: Double): Double =
-  toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin)
-fun clamp(value: Double, min: Double, max: Double): Double = value.coerceIn(min, max)
-fun curve(value: Double, from: Double, to: Double, shape: String): Double = scale(value, 0.0, 1.0, from, to)
-fun getValue(target: String): Double = 0.0
-fun setValue(target: String, value: Double) { patches.add(Patch(target, value)) }
-fun setVisible(target: String, visible: Boolean) {}
-fun showGroup(group: String) {}
-fun hideGroup(group: String) {}
-fun setPanelState(state: String) {}
-fun setPartColor(part: String, color: String) {}
-fun setAnimation(target: String, animation: String, enabled: Boolean) {}
-fun startTimer(id: String, ms: Int) {}
-fun stopTimer(id: String) {}
-fun emitEvent(event: String, target: String, value: Double) {}
-fun sendCC(channel: Int, cc: Int, value: Int) { ccCount++; lastCcValue = value }
-fun sendNRPN(channel: Int, parameterMsb: Int, parameterLsb: Int, value: Int) {}
-fun sendSysex(bytes: ByteArray) {}
-fun buildSysex(bytes: ByteArray): ByteArray = bytes
-fun checksum(type: String, bytes: ByteArray): Int = 0
-fun to14Bit(value: Double): Int = round(value).toInt()
-fun trace(message: String, value: Double) {}
-
-${generated('kotlin')}
-
-fun main() {
-  onControlChanged(CeEvent(0.5))
-  check(patches.size == 2) { "expected two value patches" }
-  check(ccCount == 1 && lastCcValue == 64) { "expected one CC value" }
-}
-`.trimStart();
-}
-
-function swiftHarness() {
-  return `
-import Foundation
-
-struct CeEvent { let value: Double }
-struct Patch { let target: String; let value: Double }
-var patches: [Patch] = []
-var ccCount = 0
-var lastCcValue = -1
-func scale(_ value: Double, _ fromMin: Double, _ fromMax: Double, _ toMin: Double, _ toMax: Double) -> Double {
-  toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin)
-}
-func clamp(_ value: Double, _ min: Double, _ max: Double) -> Double { Swift.min(max, Swift.max(min, value)) }
-func curve(_ value: Double, _ from: Double, _ to: Double, _ shape: String) -> Double { scale(value, 0.0, 1.0, from, to) }
-func getValue(_ target: String) -> Double { 0.0 }
-func setValue(_ target: String, _ value: Double) { patches.append(Patch(target: target, value: value)) }
-func setVisible(_ target: String, _ visible: Bool) {}
-func showGroup(_ group: String) {}
-func hideGroup(_ group: String) {}
-func setPanelState(_ state: String) {}
-func setPartColor(_ part: String, _ color: String) {}
-func setAnimation(_ target: String, _ animation: String, _ enabled: Bool) {}
-func startTimer(_ id: String, _ ms: Int) {}
-func stopTimer(_ id: String) {}
-func emitEvent(_ event: String, _ target: String, _ value: Double) {}
-func sendCC(_ channel: Int, _ cc: Int, _ value: Int) { ccCount += 1; lastCcValue = value }
-func sendNRPN(_ channel: Int, _ parameterMsb: Int, _ parameterLsb: Int, _ value: Int) {}
-func sendSysex(_ bytes: [UInt8]) {}
-func buildSysex(_ bytes: [UInt8]) -> [UInt8] { bytes }
-func checksum(_ type: String, _ bytes: [UInt8]) -> Int { 0 }
-func to14Bit(_ value: Double) -> Int { Int(round(value)) }
-func trace(_ message: String, _ value: Double) {}
-
-${generated('swift')}
-
-onControlChanged(CeEvent(value: 0.5))
-precondition(patches.count == 2, "expected two value patches")
-precondition(ccCount == 1 && lastCcValue == 64, "expected one CC value")
-`.trimStart();
-}
-
-function validateMarkup(target, code) {
-  if (target === 'html') {
-    if (!/^<section data-ce-script="[^"]+">[\s\S]*<\/section>$/.test(code.trim())) {
-      return result(target, 'fail', 'HTML projection is not wrapped in a script metadata section.');
-    }
-    return result(target, 'pass', 'Structural HTML projection check passed.');
-  }
-  if (target === 'css') {
-    const opens = (code.match(/{/g) ?? []).length;
-    const closes = (code.match(/}/g) ?? []).length;
-    if (opens !== closes || !/--script-event:\s*"[^"]+";/.test(code) || !/--script-target:\s*"[^"]+";/.test(code)) {
-      return result(target, 'fail', 'CSS projection has unbalanced braces or missing script metadata variables.');
-    }
-    return result(target, 'pass', 'Structural CSS projection check passed.');
-  }
-  return result(target, 'fail', `No markup validator registered for ${target}.`);
-}
+/* ----------------------------------------------------------------- validators */
 
 async function validateJavascript() {
   const node = resolveCommand(['node']);
@@ -504,10 +342,12 @@ async function validateJavascript() {
   if (check.status !== 0) return result('javascript', 'fail', combineOutput(check), { tool: node });
   const exec = runExecutable(node, [filePath], directory);
   return exec.status === 0
-    ? result('javascript', 'pass', 'node --check and runtime harness passed.', { tool: node })
+    ? result('javascript', 'pass', 'node --check and panel-API harness passed.', { tool: node })
     : result('javascript', 'fail', combineOutput(exec), { tool: node });
 }
 
+// Two passes: tsc --strict against the ambient panel API, then transpile through the editor's
+// own tsService and RUN the emitted JS — that emitted JS is what ships as `compiledJs`.
 async function validateTypescript() {
   const node = resolveCommand(['node']);
   const localTsc = path.join(webRoot, 'node_modules', 'typescript', 'bin', 'tsc');
@@ -516,13 +356,22 @@ async function validateTypescript() {
   if (!hasLocalTsc && !globalTsc) return result('typescript', 'skip', 'TypeScript compiler not found. Install the local dev dependency or put tsc on PATH.');
   const { directory, filePath } = await writeTargetFile('typescript', 'macroRouting.ts', typescriptHarness());
   const args = ['--noEmit', '--strict', '--target', 'ES2022', '--lib', 'ES2022', filePath];
-  const exec = hasLocalTsc
+  const typeCheck = hasLocalTsc
     ? runExecutable(node, [localTsc, ...args], directory)
     : runExecutable(globalTsc, args, directory);
   const tool = hasLocalTsc ? `${node} ${localTsc}` : globalTsc;
+  if (typeCheck.status !== 0) return result('typescript', 'fail', combineOutput(typeCheck), { tool });
+
+  if (!node) return result('typescript', 'pass', 'tsc --strict --noEmit passed (node absent, transpile pass skipped).', { tool });
+  await ensureTs();
+  const emitted = transpileTs(SOURCES.typescript);
+  if (!emitted) return result('typescript', 'fail', 'tsService.transpileTs returned null — the compiler chunk failed to load.', { tool });
+  const { directory: runDir, filePath: runPath } =
+    await writeTargetFile('typescript', 'macroRouting.compiled.js', javascriptHarness(emitted));
+  const exec = runExecutable(node, [runPath], runDir);
   return exec.status === 0
-    ? result('typescript', 'pass', 'tsc --strict --noEmit passed.', { tool })
-    : result('typescript', 'fail', combineOutput(exec), { tool });
+    ? result('typescript', 'pass', 'tsc --strict passed; tsService-emitted JS ran green.', { tool })
+    : result('typescript', 'fail', `emitted JS failed: ${combineOutput(exec)}`, { tool });
 }
 
 async function validateLua() {
@@ -537,7 +386,7 @@ async function validateLua() {
   if (!lua) return result('lua', 'pass', 'luac -p syntax check passed.', { tool: luac });
   const exec = runExecutable(lua, [filePath], directory);
   return exec.status === 0
-    ? result('lua', 'pass', `${luac ? 'luac -p and ' : ''}lua runtime harness passed.`, { tool: lua })
+    ? result('lua', 'pass', `${luac ? 'luac -p and ' : ''}panel-API harness passed.`, { tool: lua })
     : result('lua', 'fail', combineOutput(exec), { tool: lua });
 }
 
@@ -549,7 +398,7 @@ async function validatePython() {
   if (compile.status !== 0) return result('python', 'fail', combineOutput(compile), { tool: python });
   const exec = runExecutable(python, [filePath], directory);
   return exec.status === 0
-    ? result('python', 'pass', 'py_compile and runtime harness passed.', { tool: python })
+    ? result('python', 'pass', 'py_compile and panel-API harness passed.', { tool: python })
     : result('python', 'fail', combineOutput(exec), { tool: python });
 }
 
@@ -560,12 +409,12 @@ async function validateCpp() {
   const outPath = path.join(directory, process.platform === 'win32' ? 'macroRouting.exe' : 'macroRouting');
   const isMsvc = /(^|[\\/])cl(\.exe)?$/i.test(compiler);
   const compile = isMsvc
-    ? runExecutable(compiler, ['/nologo', '/std:c++20', filePath, `/Fe:${outPath}`], directory)
+    ? runExecutable(compiler, ['/nologo', '/EHsc', '/std:c++20', filePath, `/Fe:${outPath}`], directory)
     : runExecutable(compiler, ['-std=c++20', filePath, '-o', outPath], directory);
   if (compile.status !== 0) return result('cpp', 'fail', combineOutput(compile), { tool: compiler });
   const exec = runExecutable(outPath, [], directory);
   return exec.status === 0
-    ? result('cpp', 'pass', 'C++ harness compiled and ran.', { tool: compiler })
+    ? result('cpp', 'pass', 'compiled and panel-API harness passed.', { tool: compiler })
     : result('cpp', 'fail', combineOutput(exec), { tool: compiler });
 }
 
@@ -584,7 +433,7 @@ async function validateCsharp() {
     '    <OutputType>Exe</OutputType>',
     '    <TargetFramework>net8.0</TargetFramework>',
     '    <ImplicitUsings>disable</ImplicitUsings>',
-    '    <Nullable>enable</Nullable>',
+    '    <Nullable>disable</Nullable>',
     '  </PropertyGroup>',
     '</Project>',
     '',
@@ -592,82 +441,93 @@ async function validateCsharp() {
   await writeFile(path.join(directory, 'Program.cs'), csharpHarness(), 'utf8');
   const exec = runExecutable(dotnet, ['run', '--nologo', '--project', path.join(directory, 'ScriptHarness.csproj')], directory);
   return exec.status === 0
-    ? result('csharp', 'pass', 'dotnet run harness passed.', { tool: dotnet })
+    ? result('csharp', 'pass', 'dotnet run panel-API harness passed.', { tool: dotnet })
     : result('csharp', 'fail', combineOutput(exec), { tool: dotnet });
 }
 
-async function validateGo() {
-  const go = resolveCommand(['go']);
-  if (!go) return result('go', 'skip', 'Go toolchain not found.');
-  const directory = path.join(workspaceRoot, 'go');
-  await mkdir(path.join(directory, 'ce'), { recursive: true });
-  await mkdir(path.join(directory, 'midi'), { recursive: true });
-  await writeFile(path.join(directory, 'go.mod'), 'module ceditor-validator\n\ngo 1.22\n', 'utf8');
-  await writeFile(path.join(directory, 'main.go'), goMain(), 'utf8');
-  await writeFile(path.join(directory, 'ce', 'ce.go'), goCePackage, 'utf8');
-  await writeFile(path.join(directory, 'midi', 'midi.go'), goMidiPackage, 'utf8');
-  const exec = runExecutable(go, ['run', '.'], directory);
-  return exec.status === 0
-    ? result('go', 'pass', 'go run harness passed.', { tool: go })
-    : result('go', 'fail', combineOutput(exec), { tool: go });
-}
-
-async function validateRust() {
-  const rustc = resolveCommand(['rustc']);
-  if (!rustc) return result('rust', 'skip', 'rustc not found.');
-  const { directory, filePath } = await writeTargetFile('rust', 'macroRouting.rs', rustHarness());
-  const outPath = path.join(directory, process.platform === 'win32' ? 'macroRouting.exe' : 'macroRouting');
-  const compile = runExecutable(rustc, ['--edition=2021', filePath, '-o', outPath], directory);
-  if (compile.status !== 0) return result('rust', 'fail', combineOutput(compile), { tool: rustc });
-  const exec = runExecutable(outPath, [], directory);
-  return exec.status === 0
-    ? result('rust', 'pass', 'rustc harness compiled and ran.', { tool: rustc })
-    : result('rust', 'fail', combineOutput(exec), { tool: rustc });
-}
-
-async function validateKotlin() {
-  const kotlinc = resolveCommand(['kotlinc']);
-  if (!kotlinc) return result('kotlin', 'skip', 'Kotlin compiler not found.');
-  const { directory, filePath } = await writeTargetFile('kotlin', 'MacroRouting.kt', kotlinHarness());
-  const jarPath = path.join(directory, 'macroRouting.jar');
-  const compile = runExecutable(kotlinc, [filePath, '-include-runtime', '-d', jarPath], directory);
-  if (compile.status !== 0) return result('kotlin', 'fail', combineOutput(compile), { tool: kotlinc });
+async function validateJava() {
+  const javac = resolveCommand(['javac']);
   const java = resolveCommand(['java']);
-  if (!java) return result('kotlin', 'pass', 'kotlinc compiled harness; java not found for runtime pass.', { tool: kotlinc });
-  const exec = runExecutable(java, ['-jar', jarPath], directory);
+  if (!javac) return result('java', 'skip', 'javac not found.');
+  const { directory, filePath } = await writeTargetFile('java', 'MacroRouting.java', javaHarness());
+  const compile = runExecutable(javac, [filePath], directory);
+  if (compile.status !== 0) return result('java', 'fail', combineOutput(compile), { tool: javac });
+  if (!java) return result('java', 'pass', 'javac compiled the harness; java not found for the runtime pass.', { tool: javac });
+  const exec = runExecutable(java, ['-cp', directory, 'MacroRouting'], directory);
   return exec.status === 0
-    ? result('kotlin', 'pass', 'kotlinc compiled and runtime harness passed.', { tool: kotlinc })
-    : result('kotlin', 'fail', combineOutput(exec), { tool: kotlinc });
+    ? result('java', 'pass', 'javac and panel-API harness passed.', { tool: javac })
+    : result('java', 'fail', combineOutput(exec), { tool: javac });
 }
 
-async function validateSwift() {
-  const swift = resolveCommand(['swift']);
-  if (!swift) return result('swift', 'skip', 'Swift toolchain not found.');
-  const { directory, filePath } = await writeTargetFile('swift', 'MacroRouting.swift', swiftHarness());
-  const exec = runExecutable(swift, [filePath], directory);
-  return exec.status === 0
-    ? result('swift', 'pass', 'swift script harness passed.', { tool: swift })
-    : result('swift', 'fail', combineOutput(exec), { tool: swift });
+// The interpreted-subset languages ship TWO executors: the real compiler at export, and the
+// CeScript interpreter that moves controls live in the editor. They must agree, or a script
+// behaves one way while designing and another way once exported. Pure JS — always runs.
+const INTERPRETERS = [
+  { language: 'cpp', handler: 'onValueChanged', compile: compileCpp, invoke: invokeCpp, event: () => ({ value: EV }) },
+  { language: 'csharp', handler: 'OnValueChanged', compile: compileCsharp, invoke: invokeCsharp, event: () => ({ value: EV, Value: EV }) },
+  { language: 'java', handler: 'onValueChanged', compile: compileJava, invoke: invokeJava, event: () => ({ value: EV }) },
+];
+
+async function validateInterpreters() {
+  const failures = [];
+  for (const spec of INTERPRETERS) {
+    const { patches, midi, api } = createRecordingApi();
+    const ctx = {
+      ...api,
+      setValue: api.set, getValue: api.get,
+      SetValue: api.set, GetValue: api.get, Log: api.log,
+      SendCC: api.sendCC, SendNRPN: api.sendNRPN, SendSysex: api.sendSysex,
+      Clamp: api.clamp, Scale: api.scale, Round: api.round,
+    };
+    const { handlers, diagnostics } = spec.compile(SOURCES[spec.language]);
+    if (diagnostics.length) {
+      failures.push(`${spec.language}: ${diagnostics.join('; ')}`);
+      continue;
+    }
+    const fn = handlers.get(spec.handler);
+    if (!fn) {
+      failures.push(`${spec.language}: interpreter did not expose ${spec.handler}`);
+      continue;
+    }
+    try {
+      spec.invoke(fn, [ctx, spec.event()]);
+    } catch (e) {
+      failures.push(`${spec.language}: ${e?.message ?? e}`);
+      continue;
+    }
+    const mismatch = checkEffects(patches, midi);
+    if (mismatch) failures.push(`${spec.language}: ${mismatch}`);
+  }
+  return failures.length
+    ? result('interpreters', 'fail', failures.join('\n'))
+    : result('interpreters', 'pass', `CeScript preview matches the compiled result for ${INTERPRETERS.map((i) => i.language).join(', ')}.`);
 }
 
-async function validateStructural(target) {
-  await writeTargetFile(target, `macroRouting.${target}`, generated(target));
-  return validateMarkup(target, generated(target));
+// Guard against the corpus silently falling behind the languages the product advertises.
+async function validateCoverage() {
+  const covered = Object.keys(SOURCES).sort();
+  const claimed = [...RUNNABLE_LANGUAGES].sort();
+  const missing = claimed.filter((l) => !covered.includes(l));
+  const extra = covered.filter((l) => !claimed.includes(l));
+  if (missing.length || extra.length) {
+    const parts = [];
+    if (missing.length) parts.push(`no source for RUNNABLE_LANGUAGES: ${missing.join(', ')}`);
+    if (extra.length) parts.push(`source for non-runnable languages: ${extra.join(', ')}`);
+    return result('coverage', 'fail', parts.join('; '));
+  }
+  return result('coverage', 'pass', `corpus covers every runnable language (${claimed.join(', ')}).`);
 }
 
 const validators = [
+  validateCoverage,
   validateJavascript,
   validateTypescript,
   validateLua,
   validatePython,
   validateCpp,
   validateCsharp,
-  validateGo,
-  validateRust,
-  validateKotlin,
-  validateSwift,
-  () => validateStructural('html'),
-  () => validateStructural('css'),
+  validateJava,
+  validateInterpreters,
 ];
 
 export async function validateScriptExportToolchains() {
@@ -689,7 +549,7 @@ function printSummary(summary) {
   for (const item of summary.results) {
     const label = item.status.toUpperCase().padEnd(4);
     const tool = item.tool ? ` (${item.tool})` : '';
-    console.log(`${label} ${item.target.padEnd(10)} ${item.detail}${tool}`);
+    console.log(`${label} ${item.target.padEnd(12)} ${item.detail}${tool}`);
   }
   console.log('');
   console.log(`Export validation workspace: ${summary.workspaceRoot}`);

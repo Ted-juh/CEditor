@@ -38,6 +38,7 @@
   import ListboxRenderer from './ListboxRenderer.svelte';
   import { activePanel, selectedComponentIds, selectComponent, multiDragDelta, keyObjectId, updatePanel } from '../stores/panels.js';
   import { applyControlPatchesById, getSection, updateControlProperty, reparentControls } from '../stores/controls.js';
+  import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
@@ -459,8 +460,8 @@
   const snapToGridY = (val) => snapToGrid ? snapToGridAxis(val, gridSize, gridOriginY) : val;
 
   // --- Snap guides & distance labels ---
-  let snapGuides = $state([]);
-  let distanceLabels = $state([]); // { axis, dist, x, y, length }
+  let snapGuides = $state.raw([]);
+  let distanceLabels = $state.raw([]); // { axis, dist, x, y, length }
 
   // Thin wrappers around the pure snap utils so the drag/resize handlers
   // stay readable. findAlignmentSnap uses allControls + ruler guides;
@@ -608,7 +609,7 @@
       });
     }
 
-    adoptDroppedParameterMetadata(core.id, core.controlType, parameter);
+    adoptParameterMetadata(core.id, core.controlType, parameter);
     persistDroppedPanelDeviceReference(payload);
   }
 
@@ -653,62 +654,6 @@
       requiredProfiles,
       parameterSnapshots,
     });
-  }
-
-  function adoptDroppedParameterMetadata(controlId, controlType, parameter) {
-    const shortLabel = parameter?.display?.shortLabel || parameter?.name || parameter?.id;
-    if (shortLabel && ['Button', 'MomentaryButton', 'TimedButton', 'OneShotButton', 'ToggleButton', 'RadioButtonGroup', 'CyclicButton', 'Combobox', 'Label'].includes(controlType)) {
-      updateControlProperty(controlId, 'Text.content', shortLabel);
-    }
-
-    if (parameter?.type === 'integer' || parameter?.type === 'float' || parameter?.type === 'bipolar') {
-      const min = Number(parameter?.range?.min ?? 0);
-      const max = Number(parameter?.range?.max ?? 127);
-      const value = Number(parameter?.default ?? min);
-      updateControlProperty(controlId, 'Behavior.min', min);
-      updateControlProperty(controlId, 'Behavior.max', max);
-      updateControlProperty(controlId, 'Behavior.defaultCurrentValue', value);
-      updateControlProperty(controlId, 'Behavior.valueType', parameter.type === 'float' ? 'float' : 'int');
-    }
-
-    if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {
-      updateControlProperty(controlId, 'Value.rows', parameter.choices.map((choice, index) => ({
-        id: choice.id ?? `choice_${index + 1}`,
-        displayText: choice.label ?? choice.id ?? String(choice.value ?? index),
-        internalValue: choice.id ?? String(choice.value ?? index),
-        sendValue: choice.value ?? index,
-        receiveValue: choice.value ?? index,
-        selectedByDefault: (choice.id ?? String(choice.value)) === parameter.default,
-        enabled: true,
-        visualOverrides: {},
-      })));
-      updateControlProperty(controlId, 'Behavior.valueType', 'enum');
-      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default ?? parameter.choices[0]?.id ?? '');
-    }
-
-    if (parameter?.type === 'boolean') {
-      updateControlProperty(controlId, 'Behavior.family', 'select');
-      updateControlProperty(controlId, 'Behavior.role', 'toggle');
-      updateControlProperty(controlId, 'Behavior.valueType', 'bool');
-      updateControlProperty(controlId, 'Behavior.defaultValue', parameter.default === true);
-      updateControlProperty(controlId, 'Behavior.allowMixed', false);
-    }
-
-    if (parameter?.type === 'action' || parameter?.type === 'momentary') {
-      updateControlProperty(controlId, 'Behavior.family', 'trigger');
-      updateControlProperty(controlId, 'Behavior.role', 'button');
-      updateControlProperty(controlId, 'Behavior.valueType', 'none');
-      if (controlType === 'TimedButton') {
-        updateControlProperty(controlId, 'Behavior.buttonType', 'timed');
-        updateControlProperty(controlId, 'Behavior.subtype', 'hold_to_confirm');
-      } else if (controlType === 'OneShotButton') {
-        updateControlProperty(controlId, 'Behavior.buttonType', 'one_shot');
-        updateControlProperty(controlId, 'Behavior.subtype', 'single_use');
-      } else {
-        updateControlProperty(controlId, 'Behavior.buttonType', parameter.type === 'momentary' ? 'momentary' : 'one_shot');
-        updateControlProperty(controlId, 'Behavior.subtype', parameter.type === 'momentary' ? 'momentary' : 'action');
-      }
-    }
   }
 
   // Map a mouse client point to panel-surface coordinates (accounts for scale).
@@ -1655,7 +1600,7 @@
   let controlContentElement = $state(null);
   let textGlyphElement = $state(null);
   let domTextGlyphSize = $state({ width: 0, height: 0 });
-  let domGlyphCharacterRects = $state([]);
+  let domGlyphCharacterRects = $state.raw([]);
   let lineCanvasBackElement = $state(null);
   let lineCanvasFrontElement = $state(null);
   let fontSectionForCanvas = $derived(textFont ?? null);
@@ -2950,112 +2895,247 @@
     {/if}
 
     {#if hasText && showBlockLineDecorations}
-      <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        <defs>
-          {#if textFont?.underline === true && lineLayerFor('underline', textFont) === 'back'}
-            <mask id={lineMaskId('underline', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.underlineGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === 'back'}
-            <mask id={lineMaskId('strikethrough', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.strikethroughGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if textFont?.overline === true && lineLayerFor('overline', textFont) === 'back'}
-            <mask id={lineMaskId('overline', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.overlineGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-        </defs>
-
-        <g transform={textSvgBlockTransform}>
-          <g transform={textSvgMirrorTransform}>
-            {#if textFont?.underline === true && lineLayerFor('underline', textFont) === 'back'}
-              <rect
-                x={lineGeometryFor('underline', textFont, textFill).left}
-                y={lineGeometryFor('underline', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('underline', textFont, textFill).right - lineGeometryFor('underline', textFont, textFill).left)}
-                height={lineGeometryFor('underline', textFont, textFill).thickness}
-                fill={lineGeometryFor('underline', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('underline', 'back')})`}
-              ></rect>
-            {/if}
-            {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === 'back'}
-              <rect
-                x={lineGeometryFor('strikethrough', textFont, textFill).left}
-                y={lineGeometryFor('strikethrough', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('strikethrough', textFont, textFill).right - lineGeometryFor('strikethrough', textFont, textFill).left)}
-                height={lineGeometryFor('strikethrough', textFont, textFill).thickness}
-                fill={lineGeometryFor('strikethrough', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('strikethrough', 'back')})`}
-              ></rect>
-            {/if}
-            {#if textFont?.overline === true && lineLayerFor('overline', textFont) === 'back'}
-              <rect
-                x={lineGeometryFor('overline', textFont, textFill).left}
-                y={lineGeometryFor('overline', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('overline', textFont, textFill).right - lineGeometryFor('overline', textFont, textFill).left)}
-                height={lineGeometryFor('overline', textFont, textFill).thickness}
-                fill={lineGeometryFor('overline', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('overline', 'back')})`}
-              ></rect>
-            {/if}
-          </g>
-        </g>
-      </svg>
+      {@render blockLineDecorations('back')}
     {/if}
+
+    <!-- Under/strike/overline for block-laid-out text. Rendered twice — once behind the glyphs,
+         once in front — so each rule lands on the side its `layer` asks for. -->
+    {#snippet blockLineDecorations(layer)}
+        <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+          <defs>
+            {#if textFont?.underline === true && lineLayerFor('underline', textFont) === layer}
+              <mask id={lineMaskId('underline', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgBlockTransform}>
+                  <g transform={textSvgMirrorTransform}>
+                    {#each svgTextLines as line, index}
+                      <text
+                        x={blockSvgLineXFor(index)}
+                        y={svgTextBaseY + (index * svgTextLineHeight)}
+                        text-anchor={blockSvgLineAnchorFor(index)}
+                        dominant-baseline={svgBlockTextDominantBaseline}
+                        fill="#000"
+                        stroke="#000"
+                        stroke-width={Math.max(0, numberOr(textFont?.underlineGap, 0) * 2)}
+                        paint-order="stroke fill"
+                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
+                      >{line}</text>
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+            {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === layer}
+              <mask id={lineMaskId('strikethrough', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgBlockTransform}>
+                  <g transform={textSvgMirrorTransform}>
+                    {#each svgTextLines as line, index}
+                      <text
+                        x={blockSvgLineXFor(index)}
+                        y={svgTextBaseY + (index * svgTextLineHeight)}
+                        text-anchor={blockSvgLineAnchorFor(index)}
+                        dominant-baseline={svgBlockTextDominantBaseline}
+                        fill="#000"
+                        stroke="#000"
+                        stroke-width={Math.max(0, numberOr(textFont?.strikethroughGap, 0) * 2)}
+                        paint-order="stroke fill"
+                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
+                      >{line}</text>
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+            {#if textFont?.overline === true && lineLayerFor('overline', textFont) === layer}
+              <mask id={lineMaskId('overline', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgBlockTransform}>
+                  <g transform={textSvgMirrorTransform}>
+                    {#each svgTextLines as line, index}
+                      <text
+                        x={blockSvgLineXFor(index)}
+                        y={svgTextBaseY + (index * svgTextLineHeight)}
+                        text-anchor={blockSvgLineAnchorFor(index)}
+                        dominant-baseline={svgBlockTextDominantBaseline}
+                        fill="#000"
+                        stroke="#000"
+                        stroke-width={Math.max(0, numberOr(textFont?.overlineGap, 0) * 2)}
+                        paint-order="stroke fill"
+                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
+                      >{line}</text>
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+          </defs>
+
+          <g transform={textSvgBlockTransform}>
+            <g transform={textSvgMirrorTransform}>
+              {#if textFont?.underline === true && lineLayerFor('underline', textFont) === layer}
+                <rect
+                  x={lineGeometryFor('underline', textFont, textFill).left}
+                  y={lineGeometryFor('underline', textFont, textFill).top}
+                  width={Math.max(0, lineGeometryFor('underline', textFont, textFill).right - lineGeometryFor('underline', textFont, textFill).left)}
+                  height={lineGeometryFor('underline', textFont, textFill).thickness}
+                  fill={lineGeometryFor('underline', textFont, textFill).colour}
+                  mask={`url(#${lineMaskId('underline', layer)})`}
+                ></rect>
+              {/if}
+              {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === layer}
+                <rect
+                  x={lineGeometryFor('strikethrough', textFont, textFill).left}
+                  y={lineGeometryFor('strikethrough', textFont, textFill).top}
+                  width={Math.max(0, lineGeometryFor('strikethrough', textFont, textFill).right - lineGeometryFor('strikethrough', textFont, textFill).left)}
+                  height={lineGeometryFor('strikethrough', textFont, textFill).thickness}
+                  fill={lineGeometryFor('strikethrough', textFont, textFill).colour}
+                  mask={`url(#${lineMaskId('strikethrough', layer)})`}
+                ></rect>
+              {/if}
+              {#if textFont?.overline === true && lineLayerFor('overline', textFont) === layer}
+                <rect
+                  x={lineGeometryFor('overline', textFont, textFill).left}
+                  y={lineGeometryFor('overline', textFont, textFill).top}
+                  width={Math.max(0, lineGeometryFor('overline', textFont, textFill).right - lineGeometryFor('overline', textFont, textFill).left)}
+                  height={lineGeometryFor('overline', textFont, textFill).thickness}
+                  fill={lineGeometryFor('overline', textFont, textFill).colour}
+                  mask={`url(#${lineMaskId('overline', layer)})`}
+                ></rect>
+              {/if}
+            </g>
+          </g>
+        </svg>
+    {/snippet}
+
+    <!-- The same rules for custom-flow (path/arc) text, where each decoration is a stroked path. -->
+    {#snippet customFlowLineDecorations(layer)}
+        <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+          <defs>
+            {#if customFlowDecorations.underline?.layer === layer && customFlowDecorations.underline.gap > 0}
+              <mask id={customFlowMaskId('underline', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgMirrorTransform}>
+                  <g transform={customTextTranslateTransform}>
+                    {#each customTextLayout.glyphs as glyph}
+                      {#if glyph.render}
+                        <text
+                          x={customTextOrigin.x + glyph.x}
+                          y={customTextOrigin.y + glyph.y}
+                          text-anchor="middle"
+                          dominant-baseline="middle"
+                          fill="#000"
+                          stroke="#000"
+                          stroke-width={Math.max(0, customFlowDecorations.underline.gap * 2)}
+                          paint-order="stroke fill"
+                          style={customFlowTextMaskStyle}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                        >{glyph.char}</text>
+                      {/if}
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+            {#if customFlowDecorations.strikethrough?.layer === layer && customFlowDecorations.strikethrough.gap > 0}
+              <mask id={customFlowMaskId('strikethrough', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgMirrorTransform}>
+                  <g transform={customTextTranslateTransform}>
+                    {#each customTextLayout.glyphs as glyph}
+                      {#if glyph.render}
+                        <text
+                          x={customTextOrigin.x + glyph.x}
+                          y={customTextOrigin.y + glyph.y}
+                          text-anchor="middle"
+                          dominant-baseline="middle"
+                          fill="#000"
+                          stroke="#000"
+                          stroke-width={Math.max(0, customFlowDecorations.strikethrough.gap * 2)}
+                          paint-order="stroke fill"
+                          style={customFlowTextMaskStyle}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                        >{glyph.char}</text>
+                      {/if}
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+            {#if customFlowDecorations.overline?.layer === layer && customFlowDecorations.overline.gap > 0}
+              <mask id={customFlowMaskId('overline', layer)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
+                <g transform={textSvgMirrorTransform}>
+                  <g transform={customTextTranslateTransform}>
+                    {#each customTextLayout.glyphs as glyph}
+                      {#if glyph.render}
+                        <text
+                          x={customTextOrigin.x + glyph.x}
+                          y={customTextOrigin.y + glyph.y}
+                          text-anchor="middle"
+                          dominant-baseline="middle"
+                          fill="#000"
+                          stroke="#000"
+                          stroke-width={Math.max(0, customFlowDecorations.overline.gap * 2)}
+                          paint-order="stroke fill"
+                          style={customFlowTextMaskStyle}
+                          transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
+                        >{glyph.char}</text>
+                      {/if}
+                    {/each}
+                  </g>
+                </g>
+              </mask>
+            {/if}
+          </defs>
+          <g transform={textSvgMirrorTransform}>
+            <g transform={customTextTranslateTransform}>
+              {#if customFlowDecorations.underline?.layer === layer}
+                <g mask={customFlowDecorations.underline.gap > 0 ? `url(#${customFlowMaskId('underline', layer)})` : undefined}>
+                  {#each customFlowDecorations.underline.paths as pathData}
+                    <path
+                      d={pathData.d}
+                      fill="none"
+                      stroke={customFlowDecorations.underline.colour}
+                      stroke-width={customFlowDecorations.underline.thickness}
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    ></path>
+                  {/each}
+                </g>
+              {/if}
+              {#if customFlowDecorations.strikethrough?.layer === layer}
+                <g mask={customFlowDecorations.strikethrough.gap > 0 ? `url(#${customFlowMaskId('strikethrough', layer)})` : undefined}>
+                  {#each customFlowDecorations.strikethrough.paths as pathData}
+                    <path
+                      d={pathData.d}
+                      fill="none"
+                      stroke={customFlowDecorations.strikethrough.colour}
+                      stroke-width={customFlowDecorations.strikethrough.thickness}
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    ></path>
+                  {/each}
+                </g>
+              {/if}
+              {#if customFlowDecorations.overline?.layer === layer}
+                <g mask={customFlowDecorations.overline.gap > 0 ? `url(#${customFlowMaskId('overline', layer)})` : undefined}>
+                  {#each customFlowDecorations.overline.paths as pathData}
+                    <path
+                      d={pathData.d}
+                      fill="none"
+                      stroke={customFlowDecorations.overline.colour}
+                      stroke-width={customFlowDecorations.overline.thickness}
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    ></path>
+                  {/each}
+                </g>
+              {/if}
+            </g>
+          </g>
+        </svg>
+    {/snippet}
 
     {#if hasText && !usesCustomTextFlow && shouldUseNativeTextPreview && nativePreviewData}
       <img class="native-text-preview" style={nativePreviewStyle} src={nativePreviewData} alt="" />
@@ -3081,131 +3161,7 @@
     {/if}
 
     {#if hasText && showCustomFlowLineDecorations}
-      <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        <defs>
-          {#if customFlowDecorations.underline?.layer === 'back' && customFlowDecorations.underline.gap > 0}
-            <mask id={customFlowMaskId('underline', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.underline.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if customFlowDecorations.strikethrough?.layer === 'back' && customFlowDecorations.strikethrough.gap > 0}
-            <mask id={customFlowMaskId('strikethrough', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.strikethrough.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if customFlowDecorations.overline?.layer === 'back' && customFlowDecorations.overline.gap > 0}
-            <mask id={customFlowMaskId('overline', 'back')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.overline.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-        </defs>
-        <g transform={textSvgMirrorTransform}>
-          <g transform={customTextTranslateTransform}>
-            {#if customFlowDecorations.underline?.layer === 'back'}
-              <g mask={customFlowDecorations.underline.gap > 0 ? `url(#${customFlowMaskId('underline', 'back')})` : undefined}>
-                {#each customFlowDecorations.underline.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.underline.colour}
-                    stroke-width={customFlowDecorations.underline.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-            {#if customFlowDecorations.strikethrough?.layer === 'back'}
-              <g mask={customFlowDecorations.strikethrough.gap > 0 ? `url(#${customFlowMaskId('strikethrough', 'back')})` : undefined}>
-                {#each customFlowDecorations.strikethrough.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.strikethrough.colour}
-                    stroke-width={customFlowDecorations.strikethrough.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-            {#if customFlowDecorations.overline?.layer === 'back'}
-              <g mask={customFlowDecorations.overline.gap > 0 ? `url(#${customFlowMaskId('overline', 'back')})` : undefined}>
-                {#each customFlowDecorations.overline.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.overline.colour}
-                    stroke-width={customFlowDecorations.overline.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-          </g>
-        </g>
-      </svg>
+      {@render customFlowLineDecorations('back')}
     {/if}
 
     {#if hasText && usesCustomTextFlow}
@@ -3571,131 +3527,7 @@
     {/if}
 
     {#if hasText && showCustomFlowLineDecorations}
-      <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        <defs>
-          {#if customFlowDecorations.underline?.layer === 'front' && customFlowDecorations.underline.gap > 0}
-            <mask id={customFlowMaskId('underline', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.underline.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if customFlowDecorations.strikethrough?.layer === 'front' && customFlowDecorations.strikethrough.gap > 0}
-            <mask id={customFlowMaskId('strikethrough', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.strikethrough.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if customFlowDecorations.overline?.layer === 'front' && customFlowDecorations.overline.gap > 0}
-            <mask id={customFlowMaskId('overline', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgMirrorTransform}>
-                <g transform={customTextTranslateTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={Math.max(0, customFlowDecorations.overline.gap * 2)}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-        </defs>
-        <g transform={textSvgMirrorTransform}>
-          <g transform={customTextTranslateTransform}>
-            {#if customFlowDecorations.underline?.layer === 'front'}
-              <g mask={customFlowDecorations.underline.gap > 0 ? `url(#${customFlowMaskId('underline', 'front')})` : undefined}>
-                {#each customFlowDecorations.underline.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.underline.colour}
-                    stroke-width={customFlowDecorations.underline.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-            {#if customFlowDecorations.strikethrough?.layer === 'front'}
-              <g mask={customFlowDecorations.strikethrough.gap > 0 ? `url(#${customFlowMaskId('strikethrough', 'front')})` : undefined}>
-                {#each customFlowDecorations.strikethrough.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.strikethrough.colour}
-                    stroke-width={customFlowDecorations.strikethrough.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-            {#if customFlowDecorations.overline?.layer === 'front'}
-              <g mask={customFlowDecorations.overline.gap > 0 ? `url(#${customFlowMaskId('overline', 'front')})` : undefined}>
-                {#each customFlowDecorations.overline.paths as pathData}
-                  <path
-                    d={pathData.d}
-                    fill="none"
-                    stroke={customFlowDecorations.overline.colour}
-                    stroke-width={customFlowDecorations.overline.thickness}
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  ></path>
-                {/each}
-              </g>
-            {/if}
-          </g>
-        </g>
-      </svg>
+      {@render customFlowLineDecorations('front')}
     {/if}
 
     {#if hasText && showBlockTextVisual}
@@ -4038,111 +3870,7 @@
     {/if}
 
     {#if hasText && showBlockLineDecorations}
-      <svg class="text-decoration-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        <defs>
-          {#if textFont?.underline === true && lineLayerFor('underline', textFont) === 'front'}
-            <mask id={lineMaskId('underline', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.underlineGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === 'front'}
-            <mask id={lineMaskId('strikethrough', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.strikethroughGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-          {#if textFont?.overline === true && lineLayerFor('overline', textFont) === 'front'}
-            <mask id={lineMaskId('overline', 'front')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-              <rect x="0" y="0" width={displayW} height={displayH} fill="#fff"></rect>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="#000"
-                      stroke="#000"
-                      stroke-width={Math.max(0, numberOr(textFont?.overlineGap, 0) * 2)}
-                      paint-order="stroke fill"
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </mask>
-          {/if}
-        </defs>
-
-        <g transform={textSvgBlockTransform}>
-          <g transform={textSvgMirrorTransform}>
-            {#if textFont?.underline === true && lineLayerFor('underline', textFont) === 'front'}
-              <rect
-                x={lineGeometryFor('underline', textFont, textFill).left}
-                y={lineGeometryFor('underline', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('underline', textFont, textFill).right - lineGeometryFor('underline', textFont, textFill).left)}
-                height={lineGeometryFor('underline', textFont, textFill).thickness}
-                fill={lineGeometryFor('underline', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('underline', 'front')})`}
-              ></rect>
-            {/if}
-            {#if textFont?.strikethrough === true && lineLayerFor('strikethrough', textFont) === 'front'}
-              <rect
-                x={lineGeometryFor('strikethrough', textFont, textFill).left}
-                y={lineGeometryFor('strikethrough', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('strikethrough', textFont, textFill).right - lineGeometryFor('strikethrough', textFont, textFill).left)}
-                height={lineGeometryFor('strikethrough', textFont, textFill).thickness}
-                fill={lineGeometryFor('strikethrough', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('strikethrough', 'front')})`}
-              ></rect>
-            {/if}
-            {#if textFont?.overline === true && lineLayerFor('overline', textFont) === 'front'}
-              <rect
-                x={lineGeometryFor('overline', textFont, textFill).left}
-                y={lineGeometryFor('overline', textFont, textFill).top}
-                width={Math.max(0, lineGeometryFor('overline', textFont, textFill).right - lineGeometryFor('overline', textFont, textFill).left)}
-                height={lineGeometryFor('overline', textFont, textFill).thickness}
-                fill={lineGeometryFor('overline', textFont, textFill).colour}
-                mask={`url(#${lineMaskId('overline', 'front')})`}
-              ></rect>
-            {/if}
-          </g>
-        </g>
-      </svg>
+      {@render blockLineDecorations('front')}
     {/if}
   </div>
 

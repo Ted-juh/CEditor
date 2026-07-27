@@ -290,7 +290,7 @@
           </div>
         </div>
         <div class="stops-list">
-          {#each sortedStops as stop}
+          {#each sortedStops as stop (stop.origIdx)}
             <div class="stop-row" class:selected={stop.origIdx === selectedStop}>
               <button
                 class="stop-color"
