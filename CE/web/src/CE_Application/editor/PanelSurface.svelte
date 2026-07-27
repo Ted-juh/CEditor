@@ -86,6 +86,7 @@
       gridOriginY={gridOrigin.y}
       {panelLocked}
       allControls={orderedControls}
+      panelControls={panel.controls}
       panelWidth={panel.width}
       panelHeight={panel.height}
     />

@@ -6281,6 +6281,73 @@
     const role = previewRoleFor(control);
     return ['button', 'checkbox', 'radio', 'combobox', 'slider', 'spinbutton'].includes(role) ? 0 : undefined;
   }
+
+  // All per-control preview props as one object, so the same set can be spread
+  // onto top-level controls AND threaded to nested children (childPreviewPropsFor).
+  // Called inside the template, so it stays reactive to the stores/state it reads.
+  function previewPropsFor(control) {
+    const resolvedPreview = resolvedPreviewFor(control);
+    const behavior = getBehavior(control);
+    const session = sessionFor(control);
+    const coreName = control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control';
+    return {
+      resolvedControlOverride: resolvedPreview?.control ?? control,
+      interactionRuntimeOverride: resolvedPreview?.runtime ?? null,
+      previewSessionOverride: session,
+      renderIdNamespace: previewRenderIdNamespace,
+      previewRole: previewRoleFor(control),
+      previewTabIndex: previewTabIndexFor(control),
+      previewAriaLabel: `${coreName} preview`,
+      previewAriaDisabled: isDisabled(control),
+      previewAriaChecked: previewAriaCheckedFor(control),
+      previewAriaExpanded: isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined,
+      previewAriaValueNow: isRangeControl(control) ? currentRangeValue(control) : undefined,
+      previewAriaValueMin: isRangeControl(control) ? getRangeMin(behavior) : undefined,
+      previewAriaValueMax: isRangeControl(control) ? getRangeMax(behavior) : undefined,
+      previewAriaValueText: isRangeControl(control) ? resolveRangeDisplayValue(behavior, session) : undefined,
+      previewValueField: previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
+        value: resolveRangeDisplayValue(behavior, session),
+        disabled: isDisabled(control),
+        inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
+        ariaLabel: `${coreName} value`,
+        tabIndex: -1,
+      } : null,
+      previewEditableFields: spinnerEditableFields(control),
+      previewKeyboardFocus: keyboardFocusControlId === getControlId(control),
+      previewHighlighted: $showPreviewSelectionRing && $previewInspectedControlId === getControlId(control),
+      onpreviewpointerenter: () => handlePointerEnter(control),
+      onpreviewpointerleave: () => handlePointerLeave(control),
+      onpreviewpointermove: (event) => handlePointerMove(control, event),
+      onpreviewpointerdown: (event) => handlePointerDown(control, event),
+      onpreviewwheel: (event) => handleRangeWheel(control, event),
+      onpreviewfocus: () => handleFocus(control),
+      onpreviewblur: () => handleBlur(control),
+      onpreviewkeydown: (event) => handleKeyDown(control, event),
+      onpreviewkeyup: (event) => handleKeyUp(control, event),
+      onpreviewvaluefieldinput: (event) => handleRangeFieldInput(control, event),
+      onpreviewvaluefieldkeydown: (event) => handleRangeFieldKeyDown(control, event),
+      onpreviewvaluefieldfocus: (event) => handleRangeFieldFocus(control, event),
+      onpreviewvaluefieldblur: (event) => handleRangeFieldBlur(control, event),
+      onpreviewfieldinput: (role, event) => handleSpinnerFieldInput(control, role, event),
+      onpreviewfieldkeydown: (role, event) => handleSpinnerFieldKeyDown(control, role, event),
+      onpreviewfieldfocus: (role, event) => handleSpinnerFieldFocus(control, role, event),
+      onpreviewfieldblur: (role, event) => handleSpinnerFieldBlur(control, role, event),
+      previewTextField: isTextInputControl(control) ? {
+        value: currentTextValue(control),
+        placeholder: String(control?._children?.Text?.content ?? ''),
+        disabled: isDisabled(control),
+      } : null,
+      onpreviewtextkeydown: (event) => handleTextFieldKeyDown(control, event),
+      onpreviewtextfocus: () => handleTextFieldFocus(control),
+      onpreviewtextblur: (event) => handleTextFieldBlur(control, event),
+      previewListboxFilter: isListboxControl(control) && listboxConfig(control).filterBox === true ? {
+        visible: true,
+        value: lbFilter(control),
+        height: listboxFilterHeight(control),
+      } : null,
+      onpreviewlistboxfilter: (event) => handleListboxFilterInput(control, event),
+    };
+  }
 </script>
 
 <!-- Esc is the emergency stop. Window-level so it works wherever focus is,
@@ -6308,70 +6375,17 @@
   {/if}
 
   {#each orderedControls as control (control._children?.Core?.id)}
-    {@const resolvedPreview = resolvedPreviewFor(control)}
     <CanvasControl
       {control}
-      resolvedControlOverride={resolvedPreview?.control ?? control}
-      interactionRuntimeOverride={resolvedPreview?.runtime ?? null}
       {scale}
       panelLocked={false}
       allControls={orderedControls}
+      panelControls={panel.controls}
       panelWidth={panel.width}
       panelHeight={panel.height}
       editorInteractionEnabled={false}
-      previewSessionOverride={sessionFor(control)}
-      renderIdNamespace={previewRenderIdNamespace}
-      previewRole={previewRoleFor(control)}
-      previewTabIndex={previewTabIndexFor(control)}
-      previewAriaLabel={`${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control'} preview`}
-      previewAriaDisabled={isDisabled(control)}
-      previewAriaChecked={previewAriaCheckedFor(control)}
-      previewAriaExpanded={isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined}
-      previewAriaValueNow={isRangeControl(control) ? currentRangeValue(control) : undefined}
-      previewAriaValueMin={isRangeControl(control) ? getRangeMin(getBehavior(control)) : undefined}
-      previewAriaValueMax={isRangeControl(control) ? getRangeMax(getBehavior(control)) : undefined}
-      previewAriaValueText={isRangeControl(control) ? resolveRangeDisplayValue(getBehavior(control), sessionFor(control)) : undefined}
-      previewValueField={previewRoleFor(control) === 'spinbutton' && !isTwoValueSpinner(control) ? {
-        value: resolveRangeDisplayValue(getBehavior(control), sessionFor(control)),
-        disabled: isDisabled(control),
-        inputMode: String(getBehavior(control)?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
-        ariaLabel: `${control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Range'} value`,
-        tabIndex: -1,
-      } : null}
-      previewEditableFields={spinnerEditableFields(control)}
-      previewKeyboardFocus={keyboardFocusControlId === getControlId(control)}
-      previewHighlighted={$showPreviewSelectionRing && $previewInspectedControlId === getControlId(control)}
-      onpreviewpointerenter={() => handlePointerEnter(control)}
-      onpreviewpointerleave={() => handlePointerLeave(control)}
-      onpreviewpointermove={(event) => handlePointerMove(control, event)}
-      onpreviewpointerdown={(event) => handlePointerDown(control, event)}
-      onpreviewwheel={(event) => handleRangeWheel(control, event)}
-      onpreviewfocus={() => handleFocus(control)}
-      onpreviewblur={() => handleBlur(control)}
-      onpreviewkeydown={(event) => handleKeyDown(control, event)}
-      onpreviewkeyup={(event) => handleKeyUp(control, event)}
-      onpreviewvaluefieldinput={(event) => handleRangeFieldInput(control, event)}
-      onpreviewvaluefieldkeydown={(event) => handleRangeFieldKeyDown(control, event)}
-      onpreviewvaluefieldfocus={(event) => handleRangeFieldFocus(control, event)}
-      onpreviewvaluefieldblur={(event) => handleRangeFieldBlur(control, event)}
-      onpreviewfieldinput={(role, event) => handleSpinnerFieldInput(control, role, event)}
-      onpreviewfieldkeydown={(role, event) => handleSpinnerFieldKeyDown(control, role, event)}
-      onpreviewfieldfocus={(role, event) => handleSpinnerFieldFocus(control, role, event)}
-      onpreviewfieldblur={(role, event) => handleSpinnerFieldBlur(control, role, event)}
-      previewTextField={isTextInputControl(control) ? {
-        value: currentTextValue(control),
-        placeholder: String(control?._children?.Text?.content ?? ''),
-        disabled: isDisabled(control),
-      } : null}
-      onpreviewtextkeydown={(event) => handleTextFieldKeyDown(control, event)}
-      onpreviewtextfocus={() => handleTextFieldFocus(control)}
-      onpreviewtextblur={(event) => handleTextFieldBlur(control, event)}
-      previewListboxFilter={isListboxControl(control) && listboxConfig(control).filterBox === true ? {
-        visible: true,
-        value: lbFilter(control),
-        height: listboxFilterHeight(control),
-      } : null}
-      onpreviewlistboxfilter={(event) => handleListboxFilterInput(control, event)}
+      childPreviewPropsFor={previewPropsFor}
+      {...previewPropsFor(control)}
     />
     {#if isComboboxControl(control) && openComboboxControlId === getControlId(control) && getValueRows(control).length}
       <div class="panel-combobox-menu" style={comboboxMenuStyle(control)} role="listbox">

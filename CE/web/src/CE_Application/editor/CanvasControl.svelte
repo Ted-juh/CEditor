@@ -1,6 +1,9 @@
 <script>
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
   import CanvasControlSelectionOverlay from './CanvasControlSelectionOverlay.svelte';
+  import CanvasControlNested from './CanvasControl.svelte';
+  import { getChildControls, computeFlowLayout } from '../utils/containment.js';
+  import { sortControlsForRender } from '../utils/controlOrder.js';
   import InteractivePartRenderer from './InteractivePartRenderer.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
@@ -147,6 +150,13 @@
     onpreviewtextblur = null,
     previewListboxFilter = null,
     onpreviewlistboxfilter = null,
+    // --- Nesting (all inert for un-nested/top-level controls) ---
+    panelControls = [],
+    parentOffset = { x: 0, y: 0 },
+    parentChainIds = [],
+    parentGrid = null,
+    layoutPosition = null,
+    childPreviewPropsFor = null,
   } = $props();
 
   // Editable value fields resolve per part role. `previewEditableFields` is a
@@ -412,10 +422,31 @@
           : 'incompatible'
   );
 
-  let displayX = $derived((transientX ?? transform?.x ?? 0) + multiDragOffsetX);
-  let displayY = $derived((transientY ?? transform?.y ?? 0) + multiDragOffsetY);
+  let displayX = $derived(layoutPosition ? layoutPosition.x : (transientX ?? transform?.x ?? 0) + multiDragOffsetX);
+  let displayY = $derived(layoutPosition ? layoutPosition.y : (transientY ?? transform?.y ?? 0) + multiDragOffsetY);
   let displayW = $derived(transientW ?? transform?.width ?? 100);
   let displayH = $derived(transientH ?? transform?.height ?? 40);
+
+  // --- Container children (nesting). All empty/false for non-containers, so a
+  // control with no Children section renders exactly as before. ---
+  let childrenSection = $derived(getSection(control, 'Children'));
+  let isContainer = $derived(!!childrenSection);
+  let childControls = $derived(isContainer ? sortControlsForRender(getChildControls(control)) : []);
+  let childrenPadding = $derived(Number(childrenSection?.padding ?? 0));
+  let childrenGap = $derived(Number(childrenSection?.gap ?? 0));
+  let childrenClip = $derived(childrenSection?.clip === true);
+  let childrenLayoutMode = $derived(String(childrenSection?.layout ?? 'none'));
+  let childFlowPositions = $derived(
+    childrenLayoutMode !== 'none' && childControls.length
+      ? computeFlowLayout(childControls, displayW, childrenGap, childrenPadding)
+      : null
+  );
+  let childParentOffset = $derived({
+    x: parentOffset.x + displayX + childrenPadding,
+    y: parentOffset.y + displayY + childrenPadding,
+  });
+  let childParentChainIds = $derived([...parentChainIds, core?.id].filter(Boolean));
+  let myGridSection = $derived(getSection(control, 'Grid') ?? null);
 
   const MIN_SIZE = 10;
 
@@ -4038,6 +4069,40 @@
     </div>
   {/if}
 
+  {#if childControls.length}
+    <!-- Nested children: DOM nesting makes their Transform.x/y parent-relative
+         for free. The clip/origin layers carry no pointer events; children
+         re-enable their own. -->
+    <div class="children-clip" class:clipped={childrenClip}>
+      <div class="children-origin" style="left:{childrenPadding}px; top:{childrenPadding}px;">
+        {#each childControls as child (child._children?.Core?.id)}
+          <CanvasControlNested
+            control={child}
+            {scale}
+            {editorInteractionEnabled}
+            {snapToGrid}
+            {gridSize}
+            {gridOriginX}
+            {gridOriginY}
+            {panelLocked}
+            {allControls}
+            {panelWidth}
+            {panelHeight}
+            {onDragStart}
+            {onDragEnd}
+            {panelControls}
+            {childPreviewPropsFor}
+            parentOffset={childParentOffset}
+            parentChainIds={childParentChainIds}
+            parentGrid={myGridSection}
+            layoutPosition={childFlowPositions?.get(child._children?.Core?.id) ?? null}
+            {...(childPreviewPropsFor?.(child) ?? {})}
+          />
+        {/each}
+      </div>
+    </div>
+  {/if}
+
   <CanvasControlSelectionOverlay
     showHandles={editorInteractionEnabled && isSelected && !isEditorLocked}
     {handles}
@@ -4048,8 +4113,8 @@
     {snapGuides}
     {distanceLabels}
     {isKeyObject}
-    overlayOffsetX={displayX}
-    overlayOffsetY={displayY}
+    overlayOffsetX={displayX + parentOffset.x}
+    overlayOffsetY={displayY + parentOffset.y}
   />
 </div>
 
@@ -4058,6 +4123,24 @@
     position: absolute;
     box-sizing: border-box;
     cursor: default;
+  }
+
+  /* Nested-children layers. Transparent to pointer events so the container's
+     own handlers and the children's handlers both work; children re-enable
+     interaction via their own .canvas-control. */
+  .children-clip {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .children-clip.clipped {
+    overflow: hidden;
+  }
+  .children-origin {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
   }
 
   /* TextInput editable field: fills the control, styled via inline tiStyle. */
