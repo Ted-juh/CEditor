@@ -2594,6 +2594,24 @@
       filters.length ? `filter:${filters.join(' ')}` : '',
     ].join('; ');
   });
+
+  // The layer stack names the style it wants; each layout mode owns the actual variable, so the
+  // shared stack does not need to know which spelling applies.
+  function customFlowTextStyleFor(key) {
+    return key === 'reflection' ? customFlowReflectionStyle
+      : key === 'softShadow' ? customFlowSoftShadowStyle
+      : key === 'text' ? customFlowTextStyle
+      : key === 'innerGlow' ? customFlowInnerGlowStyle
+      : customFlowTextMaskStyle;
+  }
+  function blockTextStyleFor(key) {
+    return key === 'reflection' ? svgTextReflectionStyle
+      : key === 'softShadow' ? svgTextSoftShadowStyle
+      : key === 'text' ? svgTextStyle
+      : key === 'innerGlow' ? svgTextInnerGlowStyle
+      : svgTextMaskStyle;
+  }
+
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -3164,709 +3182,164 @@
       {@render customFlowLineDecorations('back')}
     {/if}
 
-    {#if hasText && usesCustomTextFlow}
-      <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || useTextFillForeignObject || textReflectionFadeEnabled}
-          <defs>
-            {#if textReflectionFadeEnabled}
-              <linearGradient
-                id={textReflectionFadeGradientId('custom')}
-                gradientUnits="userSpaceOnUse"
-                x1={textReflectionFadeSpec.x1}
-                y1={textReflectionFadeSpec.y1}
-                x2={textReflectionFadeSpec.x2}
-                y2={textReflectionFadeSpec.y2}
-              >
-                {#each textReflectionFadeSpec.stops as stop}
-                  <stop offset={stop.offset} stop-color={stop.colour}></stop>
-                {/each}
-              </linearGradient>
-              <mask
-                id={textReflectionFadeMaskId('custom')}
-                maskUnits="userSpaceOnUse"
-                maskContentUnits="userSpaceOnUse"
-                x="0"
-                y="0"
-                width={displayW}
-                height={displayH}
-              >
-                <rect x="0" y="0" width={displayW} height={displayH} fill={`url(#${textReflectionFadeGradientId('custom')})`}></rect>
-              </mask>
-            {/if}
-            {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || useTextFillForeignObject}
-              <mask id={textShapeMaskId('custom')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-                <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
-                <g transform={textSvgMirrorTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#fff"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
+    <!--
+      The text effect stack: shape/outline masks, outline, second stroke, shadow and glow
+      copies, bevel, inner glow, inner shadow, reflection and fill. Both layout modes stack
+      the same layers with the same attributes and offsets; only the primitive that puts
+      glyphs on screen differs, so each mode passes its own drawing snippet in. `ns`
+      namespaces the <defs> ids so both can coexist in one document.
+    -->
+    {#snippet textVisual(ns, fillGate, drawText)}
+        <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
+          {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || fillGate || textReflectionFadeEnabled}
+            <defs>
+              {#if textReflectionFadeEnabled}
+                <linearGradient
+                  id={textReflectionFadeGradientId(ns)}
+                  gradientUnits="userSpaceOnUse"
+                  x1={textReflectionFadeSpec.x1}
+                  y1={textReflectionFadeSpec.y1}
+                  x2={textReflectionFadeSpec.x2}
+                  y2={textReflectionFadeSpec.y2}
+                >
+                  {#each textReflectionFadeSpec.stops as stop}
+                    <stop offset={stop.offset} stop-color={stop.colour}></stop>
                   {/each}
-                </g>
-              </mask>
-            {/if}
-            {#if textOutlineEnabled && !textOutlineUseStroke}
-              <mask id={textOutlineMaskId('custom')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-                <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
-                <g transform={textSvgMirrorTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#fff"
-                        stroke="#fff"
-                        stroke-width={textOutlineOuterRadius * 2}
-                        stroke-linejoin={textOutlineJoin}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={textOutlineInnerRadius * 2}
-                        stroke-linejoin={textOutlineJoin}
-                        paint-order="stroke fill"
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </mask>
-            {/if}
-          </defs>
-        {/if}
-        {#each textVisualLayers as layer}
-          {#if layer.key === 'reflection'}
-            <g opacity={textReflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId('custom')})` : undefined}>
-              <g transform={textReflectionTransform}>
-                <g transform={textSvgMirrorTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill={textReflectionColour}
-                        style={customFlowReflectionStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              </g>
-            </g>
-          {:else if layer.key === 'softShadow'}
-            <g transform={textSvgMirrorTransform}>
-              {#each customTextLayout.glyphs as glyph}
-                {#if glyph.render}
-                  <text
-                    x={customTextOrigin.x + glyph.x + numberOr(textEffects?.shadowOffsetX, 1)}
-                    y={customTextOrigin.y + glyph.y + numberOr(textEffects?.shadowOffsetY, 1)}
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    fill={textShadowColour}
-                    style={customFlowSoftShadowStyle}
-                    transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + numberOr(textEffects?.shadowOffsetX, 1)} ${customTextOrigin.y + glyph.y + numberOr(textEffects?.shadowOffsetY, 1)})` : null}
-                  >{glyph.char}</text>
-                {/if}
-              {/each}
-            </g>
-          {:else if layer.key === 'longShadow'}
-            <g transform={textSvgMirrorTransform}>
-              {#each textLongShadowCopies as shadowCopy}
-                <g opacity={shadowCopy.opacity}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x + shadowCopy.dx}
-                        y={customTextOrigin.y + glyph.y + shadowCopy.dy}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill={textShadowColour}
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + shadowCopy.dx} ${customTextOrigin.y + glyph.y + shadowCopy.dy})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              {/each}
-            </g>
-          {:else if layer.key === 'glow'}
-            <g transform={textSvgMirrorTransform}>
-              {#each textGlowLayers as glowLayer}
-                {#each customTextLayout.glyphs as glyph}
-                  {#if glyph.render}
-                    <text
-                      x={customTextOrigin.x + glyph.x}
-                      y={customTextOrigin.y + glyph.y}
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      fill={glowLayer.colour}
-                      style={`${customFlowTextMaskStyle}${glowLayer.blur > 0 ? `;filter:blur(${glowLayer.blur}px)` : ''}`}
-                      transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                    >{glyph.char}</text>
-                  {/if}
-                {/each}
-              {/each}
-            </g>
-          {:else if layer.key === 'motion'}
-            <g transform={textSvgMirrorTransform}>
-              {#each textMotionCopies as motionCopy}
-                <g opacity={motionCopy.opacity}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x + motionCopy.dx}
-                        y={customTextOrigin.y + glyph.y + motionCopy.dy}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill={textMotionColour}
-                        style={customFlowTextMaskStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + motionCopy.dx} ${customTextOrigin.y + glyph.y + motionCopy.dy})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              {/each}
-            </g>
-          {:else if layer.key === 'bevelOuter'}
-            <g transform={textSvgMirrorTransform}>
-              <g>
-                {#each customTextLayout.glyphs as glyph}
-                  {#if glyph.render}
-                    <text
-                      x={customTextOrigin.x + glyph.x - textBevelDepth}
-                      y={customTextOrigin.y + glyph.y - textBevelDepth}
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      fill={textBevelHighlightColour}
-                      opacity={textBevelHighlightOpacity}
-                      style={customFlowTextMaskStyle}
-                      transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x - textBevelDepth} ${customTextOrigin.y + glyph.y - textBevelDepth})` : null}
-                    >{glyph.char}</text>
-                  {/if}
-                {/each}
-                {#each customTextLayout.glyphs as glyph}
-                  {#if glyph.render}
-                    <text
-                      x={customTextOrigin.x + glyph.x + textBevelDepth}
-                      y={customTextOrigin.y + glyph.y + textBevelDepth}
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      fill={textBevelShadowColour}
-                      opacity={textBevelShadowOpacity}
-                      style={customFlowTextMaskStyle}
-                      transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + textBevelDepth} ${customTextOrigin.y + glyph.y + textBevelDepth})` : null}
-                    >{glyph.char}</text>
-                  {/if}
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'outline'}
-            <g style={textVisualEffectStyle}>
-              {#if textOutlineUseStroke}
-                <g mask={textOutlinePlacement === 'inner' ? `url(#${textShapeMaskId('custom')})` : undefined}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill="none"
-                        stroke={textOutlineColour}
-                        stroke-width={(textOutlinePlacement === 'center' ? Math.max(1, textOutlineThickness) : Math.max(1, textOutlineThickness * 2))}
-                        stroke-dasharray={textOutlineDashArray || undefined}
-                        stroke-linejoin={textOutlineJoin}
-                        style={customFlowTextStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
-              {:else}
-                <rect x="0" y="0" width={displayW} height={displayH} fill={textOutlineColour} mask={`url(#${textOutlineMaskId('custom')})`}></rect>
+                </linearGradient>
+                <mask
+                  id={textReflectionFadeMaskId(ns)}
+                  maskUnits="userSpaceOnUse"
+                  maskContentUnits="userSpaceOnUse"
+                  x="0"
+                  y="0"
+                  width={displayW}
+                  height={displayH}
+                >
+                  <rect x="0" y="0" width={displayW} height={displayH} fill={`url(#${textReflectionFadeGradientId(ns)})`}></rect>
+                </mask>
               {/if}
-            </g>
-          {:else if layer.key === 'stroke2'}
-            <g style={textVisualEffectStyle}>
-              <g mask={textStroke2Placement === 'inner' ? `url(#${textShapeMaskId('custom')})` : undefined}>
-                {#each customTextLayout.glyphs as glyph}
-                  {#if glyph.render}
-                    <text
-                      x={customTextOrigin.x + glyph.x}
-                      y={customTextOrigin.y + glyph.y}
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      fill="none"
-                      stroke={textStroke2Colour}
-                      stroke-width={(textStroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2))}
-                      stroke-dasharray={textStroke2DashArray || undefined}
-                      stroke-linejoin="round"
-                      style={customFlowTextStyle}
-                      transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                    >{glyph.char}</text>
-                  {/if}
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'fill'}
-            <g style={textVisualEffectStyle}>
-              {#if useTextFillForeignObject && !textKnockout}
-                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('custom')})`} style="pointer-events:none;">
-                  <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
-                </foreignObject>
-              {:else if !textKnockout}
-                <g transform={textSvgMirrorTransform}>
-                  {#each customTextLayout.glyphs as glyph}
-                    {#if glyph.render}
-                      <text
-                        x={customTextOrigin.x + glyph.x}
-                        y={customTextOrigin.y + glyph.y}
-                        text-anchor="middle"
-                        dominant-baseline="middle"
-                        fill={textMainFillColour}
-                        style={customFlowTextStyle}
-                        transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                      >{glyph.char}</text>
-                    {/if}
-                  {/each}
-                </g>
+              {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || fillGate}
+                <mask id={textShapeMaskId(ns)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                  <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
+                    {@render drawText({ 'fill': "#fff" }, 'mask', 0, 0, '', undefined)}
+                </mask>
               {/if}
-            </g>
-          {:else if layer.key === 'innerShadow'}
-            <g transform={textSvgMirrorTransform} mask={`url(#${textShapeMaskId('custom')})`}>
-              {#each customTextLayout.glyphs as glyph}
-                {#if glyph.render}
-                  <text
-                    x={customTextOrigin.x + glyph.x + numberOr(textEffects?.innerShadowOffsetX, 1)}
-                    y={customTextOrigin.y + glyph.y + numberOr(textEffects?.innerShadowOffsetY, 1)}
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    fill={textInnerShadowColour}
-                    style={`${customFlowTextMaskStyle};${textInnerShadowBlurValue ? `filter:${textInnerShadowBlurValue};` : ''}`}
-                    transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + numberOr(textEffects?.innerShadowOffsetX, 1)} ${customTextOrigin.y + glyph.y + numberOr(textEffects?.innerShadowOffsetY, 1)})` : null}
-                  >{glyph.char}</text>
-                {/if}
-              {/each}
-            </g>
-          {:else if layer.key === 'bevelInner'}
-            <g transform={textSvgMirrorTransform} mask={`url(#${textShapeMaskId('custom')})`}>
-              {#each customTextLayout.glyphs as glyph}
-                {#if glyph.render}
-                  <text
-                    x={customTextOrigin.x + glyph.x - textBevelDepth}
-                    y={customTextOrigin.y + glyph.y - textBevelDepth}
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    fill={textBevelHighlightColour}
-                    opacity={textBevelHighlightOpacity}
-                    style={customFlowTextMaskStyle}
-                    transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x - textBevelDepth} ${customTextOrigin.y + glyph.y - textBevelDepth})` : null}
-                  >{glyph.char}</text>
-                {/if}
-              {/each}
-              {#each customTextLayout.glyphs as glyph}
-                {#if glyph.render}
-                  <text
-                    x={customTextOrigin.x + glyph.x + textBevelDepth}
-                    y={customTextOrigin.y + glyph.y + textBevelDepth}
-                    text-anchor="middle"
-                    dominant-baseline="middle"
-                    fill={textBevelShadowColour}
-                    opacity={textBevelShadowOpacity}
-                    style={customFlowTextMaskStyle}
-                    transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + textBevelDepth} ${customTextOrigin.y + glyph.y + textBevelDepth})` : null}
-                  >{glyph.char}</text>
-                {/if}
-              {/each}
-            </g>
-          {:else if layer.key === 'innerGlow'}
-            <g transform={textSvgMirrorTransform}>
-              <g mask={`url(#${textShapeMaskId('custom')})`}>
-                {#each customTextLayout.glyphs as glyph}
-                  {#if glyph.render}
-                    <text
-                      x={customTextOrigin.x + glyph.x}
-                      y={customTextOrigin.y + glyph.y}
-                      text-anchor="middle"
-                      dominant-baseline="middle"
-                      fill={textInnerGlowColour}
-                      style={customFlowInnerGlowStyle}
-                      transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x} ${customTextOrigin.y + glyph.y})` : null}
-                    >{glyph.char}</text>
-                  {/if}
-                {/each}
+              {#if textOutlineEnabled && !textOutlineUseStroke}
+                <mask id={textOutlineMaskId(ns)} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
+                  <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
+                    {@render drawText({ 'fill': "#fff", 'stroke': "#fff", 'stroke-width': textOutlineOuterRadius * 2, 'stroke-linejoin': textOutlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
+                    {@render drawText({ 'fill': "#000", 'stroke': "#000", 'stroke-width': textOutlineInnerRadius * 2, 'stroke-linejoin': textOutlineJoin, 'paint-order': "stroke fill" }, 'mask', 0, 0, '', undefined)}
+                </mask>
+              {/if}
+            </defs>
+          {/if}
+          {#each textVisualLayers as layer}
+            {#if layer.key === 'reflection'}
+              <g opacity={textReflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId(ns)})` : undefined}>
+                <g transform={textReflectionTransform}>
+                    {@render drawText({ 'fill': textReflectionColour }, 'reflection', 0, 0, '', undefined)}
+                </g>
               </g>
-            </g>
+            {:else if layer.key === 'softShadow'}
+                {@render drawText({ 'fill': textShadowColour }, 'softShadow', + numberOr(textEffects?.shadowOffsetX, 1), + numberOr(textEffects?.shadowOffsetY, 1), '', undefined)}
+            {:else if layer.key === 'longShadow'}
+                {#each textLongShadowCopies as shadowCopy}
+                  <g opacity={shadowCopy.opacity}>
+                    {@render drawText({ 'fill': textShadowColour }, 'mask', + shadowCopy.dx, + shadowCopy.dy, '', undefined)}
+                  </g>
+                {/each}
+            {:else if layer.key === 'glow'}
+                {#each textGlowLayers as glowLayer}
+                  {@render drawText({ 'fill': glowLayer.colour }, 'mask', 0, 0, `${glowLayer.blur > 0 ? `;filter:blur(${glowLayer.blur}px)` : ''}`, undefined)}
+                {/each}
+            {:else if layer.key === 'motion'}
+                {#each textMotionCopies as motionCopy}
+                  <g opacity={motionCopy.opacity}>
+                    {@render drawText({ 'fill': textMotionColour }, 'mask', + motionCopy.dx, + motionCopy.dy, '', undefined)}
+                  </g>
+                {/each}
+            {:else if layer.key === 'bevelOuter'}
+                <g>
+                  {@render drawText({ 'fill': textBevelHighlightColour, 'opacity': textBevelHighlightOpacity }, 'mask', - textBevelDepth, - textBevelDepth, '', undefined)}
+                  {@render drawText({ 'fill': textBevelShadowColour, 'opacity': textBevelShadowOpacity }, 'mask', + textBevelDepth, + textBevelDepth, '', undefined)}
+                </g>
+            {:else if layer.key === 'outline'}
+              <g style={textVisualEffectStyle}>
+                {#if textOutlineUseStroke}
+                    {@render drawText({ 'fill': "none", 'stroke': textOutlineColour, 'stroke-width': (textOutlinePlacement === 'center' ? Math.max(1, textOutlineThickness) : Math.max(1, textOutlineThickness * 2)), 'stroke-dasharray': textOutlineDashArray || undefined, 'stroke-linejoin': textOutlineJoin }, 'text', 0, 0, '', textOutlinePlacement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
+                {:else}
+                  <rect x="0" y="0" width={displayW} height={displayH} fill={textOutlineColour} mask={`url(#${textOutlineMaskId(ns)})`}></rect>
+                {/if}
+              </g>
+            {:else if layer.key === 'stroke2'}
+              <g style={textVisualEffectStyle}>
+                  {@render drawText({ 'fill': "none", 'stroke': textStroke2Colour, 'stroke-width': (textStroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2)), 'stroke-dasharray': textStroke2DashArray || undefined, 'stroke-linejoin': "round" }, 'text', 0, 0, '', textStroke2Placement === 'inner' ? `url(#${textShapeMaskId(ns)})` : undefined)}
+              </g>
+            {:else if layer.key === 'fill'}
+              <g style={textVisualEffectStyle}>
+                {#if fillGate && !textKnockout}
+                  <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId(ns)})`} style="pointer-events:none;">
+                    <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
+                  </foreignObject>
+                {:else if !textKnockout}
+                    {@render drawText({ 'fill': textMainFillColour }, 'text', 0, 0, '', undefined)}
+                {/if}
+              </g>
+            {:else if layer.key === 'innerShadow'}
+                {@render drawText({ 'fill': textInnerShadowColour }, 'mask', + numberOr(textEffects?.innerShadowOffsetX, 1), + numberOr(textEffects?.innerShadowOffsetY, 1), `;${textInnerShadowBlurValue ? `filter:${textInnerShadowBlurValue};` : ''}`, `url(#${textShapeMaskId(ns)})`)}
+            {:else if layer.key === 'bevelInner'}
+                {@render drawText({ 'fill': textBevelHighlightColour, 'opacity': textBevelHighlightOpacity }, 'mask', - textBevelDepth, - textBevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
+                {@render drawText({ 'fill': textBevelShadowColour, 'opacity': textBevelShadowOpacity }, 'mask', + textBevelDepth, + textBevelDepth, '', `url(#${textShapeMaskId(ns)})`)}
+            {:else if layer.key === 'innerGlow'}
+                  {@render drawText({ 'fill': textInnerGlowColour }, 'innerGlow', 0, 0, '', `url(#${textShapeMaskId(ns)})`)}
+            {/if}
+          {/each}
+        </svg>
+    {/snippet}
+
+    <!-- Custom flow: one <text> per glyph, placed and rotated along the path. -->
+    {#snippet glyphTextRun(attrs, styleKey, dx, dy, styleSuffix, groupMask)}
+      <g transform={textSvgMirrorTransform} mask={groupMask}>
+        {#each customTextLayout.glyphs as glyph}
+          {#if glyph.render}
+            <text
+              x={customTextOrigin.x + glyph.x + dx}
+              y={customTextOrigin.y + glyph.y + dy}
+              text-anchor="middle"
+              dominant-baseline="middle"
+              {...attrs}
+              style={`${customFlowTextStyleFor(styleKey)}${styleSuffix}`}
+              transform={glyph.rotation ? `rotate(${glyph.rotation} ${customTextOrigin.x + glyph.x + dx} ${customTextOrigin.y + glyph.y + dy})` : null}
+            >{glyph.char}</text>
           {/if}
         {/each}
-      </svg>
-    {/if}
+      </g>
+    {/snippet}
 
-    {#if hasText && showCustomFlowLineDecorations}
-      {@render customFlowLineDecorations('front')}
+    <!-- Block layout: one <text> per line on the shared baseline grid. -->
+    {#snippet lineTextRun(attrs, styleKey, dx, dy, styleSuffix, groupMask)}
+      <g transform={textSvgBlockTransform}>
+        <g transform={textSvgMirrorTransform} mask={groupMask}>
+          {#each svgTextLines as line, index}
+            <text
+              x={blockSvgLineXFor(index) + dx}
+              y={svgTextBaseY + (index * svgTextLineHeight) + dy}
+              text-anchor={blockSvgLineAnchorFor(index)}
+              dominant-baseline={svgBlockTextDominantBaseline}
+              {...attrs}
+              style={blockSvgLineStyleFor(index, `${blockTextStyleFor(styleKey)}${styleSuffix}`)}
+            >{line}</text>
+          {/each}
+        </g>
+      </g>
+    {/snippet}
+
+    {#if hasText && usesCustomTextFlow}
+      {@render textVisual('custom', useTextFillForeignObject, glyphTextRun)}
     {/if}
 
     {#if hasText && showBlockTextVisual}
-      <svg class="text-visual-svg" viewBox={`0 0 ${displayW} ${displayH}`} width={displayW} height={displayH} aria-hidden="true">
-        {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textOutlineEnabled || textStroke2Enabled || needsVisualTextFill || textReflectionFadeEnabled}
-          <defs>
-            {#if textReflectionFadeEnabled}
-              <linearGradient
-                id={textReflectionFadeGradientId('block')}
-                gradientUnits="userSpaceOnUse"
-                x1={textReflectionFadeSpec.x1}
-                y1={textReflectionFadeSpec.y1}
-                x2={textReflectionFadeSpec.x2}
-                y2={textReflectionFadeSpec.y2}
-              >
-                {#each textReflectionFadeSpec.stops as stop}
-                  <stop offset={stop.offset} stop-color={stop.colour}></stop>
-                {/each}
-              </linearGradient>
-              <mask
-                id={textReflectionFadeMaskId('block')}
-                maskUnits="userSpaceOnUse"
-                maskContentUnits="userSpaceOnUse"
-                x="0"
-                y="0"
-                width={displayW}
-                height={displayH}
-              >
-                <rect x="0" y="0" width={displayW} height={displayH} fill={`url(#${textReflectionFadeGradientId('block')})`}></rect>
-              </mask>
-            {/if}
-            {#if textInnerGlowEnabled || textInnerShadowEnabled || textBevelNeedsMask || textStroke2Enabled || needsVisualTextFill}
-              <mask id={textShapeMaskId('block')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-                <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
-                <g transform={textSvgBlockTransform}>
-                  <g transform={textSvgMirrorTransform}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill="#fff"
-                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                </g>
-              </mask>
-            {/if}
-            {#if textOutlineEnabled && !textOutlineUseStroke}
-              <mask id={textOutlineMaskId('block')} maskUnits="userSpaceOnUse" x="0" y="0" width={displayW} height={displayH}>
-                <rect x="0" y="0" width={displayW} height={displayH} fill="#000"></rect>
-                <g transform={textSvgBlockTransform}>
-                  <g transform={textSvgMirrorTransform}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill="#fff"
-                        stroke="#fff"
-                        stroke-width={textOutlineOuterRadius * 2}
-                        stroke-linejoin={textOutlineJoin}
-                        paint-order="stroke fill"
-                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                      >{line}</text>
-                    {/each}
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill="#000"
-                        stroke="#000"
-                        stroke-width={textOutlineInnerRadius * 2}
-                        stroke-linejoin={textOutlineJoin}
-                        paint-order="stroke fill"
-                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                </g>
-              </mask>
-            {/if}
-          </defs>
-        {/if}
-        {#each textVisualLayers as layer}
-          {#if layer.key === 'reflection'}
-            <g opacity={textReflectionIntensity} mask={textReflectionFadeEnabled ? `url(#${textReflectionFadeMaskId('block')})` : undefined}>
-              <g transform={textReflectionTransform}>
-                <g transform={textSvgBlockTransform}>
-                  <g transform={textSvgMirrorTransform}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill={textReflectionColour}
-                        style={blockSvgLineStyleFor(index, svgTextReflectionStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                </g>
-              </g>
-            </g>
-          {:else if layer.key === 'softShadow'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                {#each svgTextLines as line, index}
-                  <text
-                    x={blockSvgLineXFor(index) + numberOr(textEffects?.shadowOffsetX, 1)}
-                    y={svgTextBaseY + (index * svgTextLineHeight) + numberOr(textEffects?.shadowOffsetY, 1)}
-                    text-anchor={blockSvgLineAnchorFor(index)}
-                    dominant-baseline={svgBlockTextDominantBaseline}
-                    fill={textShadowColour}
-                    style={blockSvgLineStyleFor(index, svgTextSoftShadowStyle)}
-                  >{line}</text>
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'longShadow'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                {#each textLongShadowCopies as shadowCopy}
-                  <g opacity={shadowCopy.opacity}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index) + shadowCopy.dx}
-                        y={svgTextBaseY + (index * svgTextLineHeight) + shadowCopy.dy}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill={textShadowColour}
-                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'glow'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                {#each textGlowLayers as glowLayer}
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill={glowLayer.colour}
-                      style={blockSvgLineStyleFor(index, `${svgTextMaskStyle}${glowLayer.blur > 0 ? `;filter:blur(${glowLayer.blur}px)` : ''}`)}
-                    >{line}</text>
-                  {/each}
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'motion'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                {#each textMotionCopies as motionCopy}
-                  <g opacity={motionCopy.opacity}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index) + motionCopy.dx}
-                        y={svgTextBaseY + (index * svgTextLineHeight) + motionCopy.dy}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill={textMotionColour}
-                        style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'bevelOuter'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                <g>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index) - textBevelDepth}
-                      y={svgTextBaseY + (index * svgTextLineHeight) - textBevelDepth}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill={textBevelHighlightColour}
-                      opacity={textBevelHighlightOpacity}
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index) + textBevelDepth}
-                      y={svgTextBaseY + (index * svgTextLineHeight) + textBevelDepth}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill={textBevelShadowColour}
-                      opacity={textBevelShadowOpacity}
-                      style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </g>
-          {:else if layer.key === 'outline'}
-            <g style={textVisualEffectStyle}>
-              {#if textOutlineUseStroke}
-                <g transform={textSvgBlockTransform}>
-                  <g transform={textSvgMirrorTransform} mask={textOutlinePlacement === 'inner' ? `url(#${textShapeMaskId('block')})` : undefined}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill="none"
-                        stroke={textOutlineColour}
-                        stroke-width={(textOutlinePlacement === 'center' ? Math.max(1, textOutlineThickness) : Math.max(1, textOutlineThickness * 2))}
-                        stroke-dasharray={textOutlineDashArray || undefined}
-                        stroke-linejoin={textOutlineJoin}
-                        style={blockSvgLineStyleFor(index, svgTextStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                </g>
-              {:else}
-                <rect x="0" y="0" width={displayW} height={displayH} fill={textOutlineColour} mask={`url(#${textOutlineMaskId('block')})`}></rect>
-              {/if}
-            </g>
-          {:else if layer.key === 'stroke2'}
-            <g style={textVisualEffectStyle}>
-              <g transform={textSvgBlockTransform}>
-                <g transform={textSvgMirrorTransform} mask={textStroke2Placement === 'inner' ? `url(#${textShapeMaskId('block')})` : undefined}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill="none"
-                      stroke={textStroke2Colour}
-                      stroke-width={(textStroke2Placement === 'center' ? Math.max(1, numberOr(textEffects?.stroke2Thickness, 1)) : Math.max(1, numberOr(textEffects?.stroke2Thickness, 1) * 2))}
-                      stroke-dasharray={textStroke2DashArray || undefined}
-                      stroke-linejoin="round"
-                      style={blockSvgLineStyleFor(index, svgTextStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </g>
-          {:else if layer.key === 'fill'}
-            <g style={textVisualEffectStyle}>
-              {#if needsVisualTextFill && !textKnockout}
-                <foreignObject x="0" y="0" width={displayW} height={displayH} mask={`url(#${textShapeMaskId('block')})`} style="pointer-events:none;">
-                  <div xmlns="http://www.w3.org/1999/xhtml" style={`${textFillLayerStyle};pointer-events:none;`}></div>
-                </foreignObject>
-              {:else if !textKnockout}
-                <g transform={textSvgBlockTransform}>
-                  <g transform={textSvgMirrorTransform}>
-                    {#each svgTextLines as line, index}
-                      <text
-                        x={blockSvgLineXFor(index)}
-                        y={svgTextBaseY + (index * svgTextLineHeight)}
-                        text-anchor={blockSvgLineAnchorFor(index)}
-                        dominant-baseline={svgBlockTextDominantBaseline}
-                        fill={textMainFillColour}
-                        style={blockSvgLineStyleFor(index, svgTextStyle)}
-                      >{line}</text>
-                    {/each}
-                  </g>
-                </g>
-              {/if}
-            </g>
-          {:else if layer.key === 'innerShadow'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform} mask={`url(#${textShapeMaskId('block')})`}>
-                {#each svgTextLines as line, index}
-                  <text
-                    x={blockSvgLineXFor(index) + numberOr(textEffects?.innerShadowOffsetX, 1)}
-                    y={svgTextBaseY + (index * svgTextLineHeight) + numberOr(textEffects?.innerShadowOffsetY, 1)}
-                    text-anchor={blockSvgLineAnchorFor(index)}
-                    dominant-baseline={svgBlockTextDominantBaseline}
-                    fill={textInnerShadowColour}
-                    style={blockSvgLineStyleFor(index, `${svgTextMaskStyle};${textInnerShadowBlurValue ? `filter:${textInnerShadowBlurValue};` : ''}`)}
-                  >{line}</text>
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'bevelInner'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform} mask={`url(#${textShapeMaskId('block')})`}>
-                {#each svgTextLines as line, index}
-                  <text
-                    x={blockSvgLineXFor(index) - textBevelDepth}
-                    y={svgTextBaseY + (index * svgTextLineHeight) - textBevelDepth}
-                    text-anchor={blockSvgLineAnchorFor(index)}
-                    dominant-baseline={svgBlockTextDominantBaseline}
-                    fill={textBevelHighlightColour}
-                    opacity={textBevelHighlightOpacity}
-                    style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                  >{line}</text>
-                {/each}
-                {#each svgTextLines as line, index}
-                  <text
-                    x={blockSvgLineXFor(index) + textBevelDepth}
-                    y={svgTextBaseY + (index * svgTextLineHeight) + textBevelDepth}
-                    text-anchor={blockSvgLineAnchorFor(index)}
-                    dominant-baseline={svgBlockTextDominantBaseline}
-                    fill={textBevelShadowColour}
-                    opacity={textBevelShadowOpacity}
-                    style={blockSvgLineStyleFor(index, svgTextMaskStyle)}
-                  >{line}</text>
-                {/each}
-              </g>
-            </g>
-          {:else if layer.key === 'innerGlow'}
-            <g transform={textSvgBlockTransform}>
-              <g transform={textSvgMirrorTransform}>
-                <g mask={`url(#${textShapeMaskId('block')})`}>
-                  {#each svgTextLines as line, index}
-                    <text
-                      x={blockSvgLineXFor(index)}
-                      y={svgTextBaseY + (index * svgTextLineHeight)}
-                      text-anchor={blockSvgLineAnchorFor(index)}
-                      dominant-baseline={svgBlockTextDominantBaseline}
-                      fill={textInnerGlowColour}
-                      style={blockSvgLineStyleFor(index, svgTextInnerGlowStyle)}
-                    >{line}</text>
-                  {/each}
-                </g>
-              </g>
-            </g>
-          {/if}
-        {/each}
-      </svg>
+      {@render textVisual('block', needsVisualTextFill, lineTextRun)}
     {/if}
 
     {#if hasText && showBlockLineDecorations}

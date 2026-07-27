@@ -89,12 +89,11 @@ for (const [mode, flowMode] of [['block', 'rotate'], ['custom-flow', 'arc']]) {
   });
 }
 
-// The two modes look like near-duplicates and repeatedly invite being merged into one
-// parametrised block. They cannot be, without changing the emitted SVG: the <g> chain wrapping
-// each drawn run differs between them, and those groups carry the transform and mask that decide
-// which coordinate space a mask resolves in. Block text nests textSvgBlockTransform above the
-// mirror; custom flow has no block transform at all and sometimes carries a styled group instead.
-// These counts pin that shape, so a future unification has to prove it preserves it.
+// Both modes now share one layer stack (the textVisual snippet) and differ only in the snippet
+// that draws the glyphs. What must NOT converge is the group chain each mode wraps its runs in:
+// block nests textSvgBlockTransform above the mirror, custom flow has no block transform at all,
+// and those groups carry the transform and mask that decide which coordinate space a mask
+// resolves in. These pin that the shared stack still lets each mode keep its own chain.
 for (const [mode, flowMode, wrapper] of [
   ['block', 'rotate', 'textSvgBlockTransform'],
   ['custom-flow', 'arc', 'textSvgMirrorTransform'],
@@ -108,9 +107,32 @@ for (const [mode, flowMode, wrapper] of [
 }
 
 test('block and custom flow do not emit the same group structure', () => {
-  // Guards the assumption above: if these ever converge, the dedupe becomes safe to do.
-  const shape = (flowMode) => (textVisualSvg(renderControl(texturedLabel(flowMode))).match(/<g\b|<\/g>/g) ?? []).join('');
+  // Compares opening <g> tags with attributes — the transforms and masks are the whole point,
+  // so a bare tag count would not notice them moving.
+  const shape = (flowMode) =>
+    (textVisualSvg(renderControl(texturedLabel(flowMode))).match(/<g\b[^>]*>/g) ?? []).join('|');
   assert.notEqual(shape('rotate'), shape('arc'));
+});
+
+// Mirrored text is the case the shared stack had to get right: every layer must sit under the
+// same mirror transform. Custom-flow inner-placement outline/stroke2 used to be drawn unmirrored
+// while masked against a mirrored mask, so its outline sat offset from the glyphs.
+test('every drawn run in mirrored custom-flow text is mirrored', () => {
+  const control = texturedLabel('arc');
+  control._children.Text._children.Position.readingOrientation = 'mirrored';
+  control._children.Text._children.Effects.outlinePlacement = 'inner';
+  control._children.Text._children.Effects.stroke2Placement = 'inner';
+  const svg = textVisualSvg(renderControl(control));
+
+  // Walk the tree and confirm no <text> is painted outside a mirroring group.
+  let depth = 0, mirrored = [], unmirrored = 0;
+  for (const m of svg.matchAll(/<g\b[^>]*>|<\/g>|<text\b/g)) {
+    const tag = m[0];
+    if (tag === '</g>') { mirrored.length = Math.max(0, --depth); continue; }
+    if (tag.startsWith('<g')) { depth++; mirrored[depth - 1] = /scale\(-1 1\)/.test(tag); continue; }
+    if (!mirrored.slice(0, depth).some(Boolean)) unmirrored += 1;
+  }
+  assert.equal(unmirrored, 0, `${unmirrored} run(s) painted outside the mirror transform`);
 });
 
 test('the two layout modes never share a defs id', () => {
