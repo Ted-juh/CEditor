@@ -12,13 +12,12 @@ import {
   updateOpenScriptWorkspaces as bridgeUpdateOpenScriptWorkspaces,
 } from '../bridge/bridge.js';
 import {
+  createScriptDocument,
   deserializeScriptWorkspaceDocument,
   sanitizeScriptDocument,
   scriptWorkspaceFilename,
   serializeScriptWorkspaceDocument,
 } from '../scripting/scriptDocumentModel.js';
-import { createScriptDocument } from '../scripting/scriptSamples.js';
-import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 const SCRIPT_WORKSPACE_STORAGE_KEY = 'ce.scriptWorkspaces.v1';
 let bridgeInitialized = false;
@@ -195,7 +194,6 @@ export function addScriptToDocument(documentId, script = {}) {
     event: String(script.event ?? 'onValueChanged'),
     target: String(script.target ?? '*'),
     enabled: script.enabled !== false,
-    steps: Array.isArray(script.steps) ? script.steps : [],
     ...script,
     id,
   };
@@ -223,66 +221,6 @@ export function removeScriptFromDocument(documentId, scriptId) {
       scripts,
       activeScriptId: document.activeScriptId === scriptId ? (scripts[0]?.id ?? '') : document.activeScriptId,
     };
-  });
-}
-
-export function updateScriptStep(documentId, scriptId, stepId, updater) {
-  updateScriptInDocument(documentId, scriptId, (script) => ({
-    steps: (script.steps ?? []).map((step) => {
-      if (step.id !== stepId) return step;
-      const patch = typeof updater === 'function' ? updater(step) : updater;
-      return { ...step, ...patch };
-    }),
-  }));
-}
-
-export function addScriptStep(documentId, scriptId, command = 'setValue') {
-  const defaultArgs = {
-    setValue: { target: 'target.value', value: { ref: 'event.value' } },
-    routeValue: { from: 'event.value', to: 'target.value', transform: { ref: 'event.value' } },
-    setVisible: { target: 'groupName', visible: true },
-    showGroup: { group: 'groupName' },
-    hideGroup: { group: 'groupName' },
-    setPanelState: { state: 'default' },
-    setAnimation: { target: 'partName', animation: 'hoverScroll', enabled: true },
-    startTimer: { id: 'timer1', ms: 250 },
-    stopTimer: { id: 'timer1' },
-    emitEvent: { event: 'onCustomEvent', target: 'target', value: { ref: 'event.value' } },
-    sendCC: { channel: 1, cc: 74, value: { op: 'round', args: [{ op: '*', args: [{ ref: 'event.value' }, 127] }] }, phase: 'commit' },
-    sendNRPN: { channel: 1, parameterMsb: 0, parameterLsb: 1, value: { op: 'round', args: [{ op: '*', args: [{ ref: 'event.value' }, 16383] }] }, phase: 'commit' },
-    buildSysex: { bytes: [0xF0, 0x41, 0x10, 0x00, 0x15, 0x12, 0x34, 0x56, 0xF7] },
-    checksum: { type: 'Roland', bytes: [0x10, 0x00, 0x15, 0x12, 0x34, 0x56] },
-    to14Bit: { value: { op: 'round', args: [{ op: '*', args: [{ ref: 'event.value' }, 16383] }] } },
-    sendSysex: { bytes: [0xF0, 0x41, 0x10, 0x00, 0x15, 0x12, 0x34, 0x56, 0xF7] },
-    requestDeviceDump: { profileId: 'roland-sh-201', deviceRole: DEFAULT_DEVICE_ROLE, request: 'requestTemporaryPatchBulk', phase: 'commit' },
-    log: { message: 'trace', value: { ref: 'event.value' } },
-  };
-  const step = {
-    id: `step_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
-    command,
-    args: defaultArgs[command] ?? { target: 'target.value', value: { ref: 'event.value' } },
-  };
-  updateScriptInDocument(documentId, scriptId, (script) => ({
-    steps: [...(script.steps ?? []), step],
-  }));
-  return step;
-}
-
-export function removeScriptStep(documentId, scriptId, stepId) {
-  updateScriptInDocument(documentId, scriptId, (script) => ({
-    steps: (script.steps ?? []).filter((step) => step.id !== stepId),
-  }));
-}
-
-export function moveScriptStep(documentId, scriptId, stepId, direction) {
-  updateScriptInDocument(documentId, scriptId, (script) => {
-    const steps = [...(script.steps ?? [])];
-    const index = steps.findIndex((step) => step.id === stepId);
-    const nextIndex = index + (direction < 0 ? -1 : 1);
-    if (index < 0 || nextIndex < 0 || nextIndex >= steps.length) return { steps };
-    const [step] = steps.splice(index, 1);
-    steps.splice(nextIndex, 0, step);
-    return { steps };
   });
 }
 

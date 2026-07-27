@@ -3,7 +3,6 @@
   import Type from 'lucide-svelte/icons/type';
   import Image from 'lucide-svelte/icons/image';
   import Sparkles from 'lucide-svelte/icons/sparkles';
-  import Zap from 'lucide-svelte/icons/zap';
   import Link from 'lucide-svelte/icons/link';
   import Settings2 from 'lucide-svelte/icons/settings-2';
   import Workflow from 'lucide-svelte/icons/workflow';
@@ -234,7 +233,9 @@
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
     { id: 'publish',    icon: Cable,         label: 'Publish',    section: 'PublishedProperties' },
     { id: 'testbench',  icon: Play,          label: 'Test Bench', section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
-    { id: 'actions',    icon: Zap,           label: 'Scripts',    section: 'Scripts' },
+    // No Scripts tab: scripts are authored in the Behavior Designer, reached from the
+    // Scripts zone on the Look bar (ScriptInsight). A tab here had no editor behind it
+    // and rendered an empty placeholder.
   ];
 
   // Only show tabs for sections that exist on the selected component.

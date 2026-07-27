@@ -6,10 +6,10 @@
    * actually has a Scripts section (interactive controls do; static Labels don't),
    * shows a glanceable summary, and offers a jump to where scripts are edited.
    *
-   * A control's scripts live in its Scripts section (command-graph scripts per
-   * event trigger), edited in the Properties → Scripts tab (id 'actions') — that
-   * is the script editor for control logic, distinct from the standalone Script
-   * Workspace (which authors separate documents).
+   * Scripts are authored in the Behavior Designer, in the script document bound to
+   * this control's panel — that is the only script editor. The Scripts section on a
+   * control is the count/enable surface this zone summarises, not a second store of
+   * scripts; the button below opens the panel's document.
    */
   import { get } from 'svelte/store';
   import { selectedControl, getSection } from '../stores/controls.js';
