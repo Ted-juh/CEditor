@@ -12,6 +12,7 @@
 #define SOL_ALL_SAFETIES_ON 1
 #include <sol/sol.hpp>
 
+#include <cmath>
 #include <map>
 #include <vector>
 
@@ -58,8 +59,22 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 {
     if (v.isVoid() || v.isUndefined()) return sol::make_object (lua, sol::nil);
     if (v.isBool())   return sol::make_object (lua, (bool) v);
-    if (v.isInt() || v.isInt64()) return sol::make_object (lua, (double) (juce::int64) v);
-    if (v.isDouble()) return sol::make_object (lua, (double) v);
+    // Lua 5.4 has a real integer subtype: hand an integer across as one. Widening to double made
+    // every whole number arrive as a float, so tostring(64) read "64.0" in Lua while the same
+    // payload printed "64" in JS and Python — and a value used as a table index had to be floored
+    // first. The subtype is what keeps the three runtimes agreeing on what a number looks like.
+    if (v.isInt() || v.isInt64()) return sol::make_object (lua, (lua_Integer) (juce::int64) v);
+    if (v.isDouble())
+    {
+        // solToVar already folds an integral Lua number back to an int64 on the way out; do the
+        // same on the way in, or a whole number that reached us through JS (where 21 is a double)
+        // arrives in Lua as 21.0 and prints that way. Symmetry here is what makes a value survive
+        // a round trip between two scripts written in different languages.
+        const double d = (double) v;
+        if (d == std::floor (d) && std::abs (d) < 9.0e15)
+            return sol::make_object (lua, (lua_Integer) (juce::int64) d);
+        return sol::make_object (lua, d);
+    }
     if (v.isString()) return sol::make_object (lua, v.toString().toStdString());
     if (auto* arr = v.getArray())
     {
@@ -127,6 +142,59 @@ function toOffset(v, center) return v + center end
 function fromOffset(b, center) return b - center end
 function toSigned(v, bits) local m = 2 ^ bits; if v < 0 then return v + m end return v end
 function fromSigned(b, bits) local m = 2 ^ bits; if b >= m / 2 then return b - m end return b end
+
+-- checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
+-- plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
+-- roland (the spelling panels shipped with before the contract was enforced).
+function checksum(kind, bytes)
+  if bytes == nil then bytes = kind; kind = "roland" end
+  kind = string.lower(tostring(kind or "roland"))
+  local sum, x = 0, 0
+  for i = 1, #bytes do
+    local b = math.floor(bytes[i]) % 256
+    sum = (sum + b) % 128
+    x = (x ~ b) & 0x7f
+  end
+  if kind == "xor" then return x end
+  if kind == "sum" then return sum end
+  return (128 - sum) % 128
+end
+
+-- panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
+-- order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
+-- out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
+function panic(opts)
+  opts = opts or {}
+  local reset = opts.resetControllers ~= false
+  local first, last = 1, 16
+  if opts.channel then first = math.floor(opts.channel); last = first end
+  for ch = first, last do
+    sendCC(ch, 120, 0)
+    sendCC(ch, 123, 0)
+    if reset then sendCC(ch, 121, 0) end
+  end
+end
+
+-- Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
+-- Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
+-- counterpart to drive with the window closed. Defining them here as explaining stubs means a
+-- script that strays across the boundary says so, instead of dying on a nil global.
+local WEBVIEW_ONLY = {
+  "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
+  "phraseSeed","phraseClear","phraseKey","phraseScale","phraseTranspose","phraseDirection","phraseRun","phraseCell",
+  "recorderRecord","recorderStop","recorderPlay","recorderClear","recorderUndo","recorderQuantize",
+  "recorderTranspose","recorderBars","recorderSource","recorderNudge","recorderShift","recorderStore",
+  "recorderLoad","recorderCountIn",
+  "harmonyMode","harmonyKey","harmonyScale","harmonySize","harmonyShape","harmonyVoicing","harmonyInversion",
+  "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
+  "harmonyDegree",
+  "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
+}
+for _, name in ipairs(WEBVIEW_ONLY) do
+  _G[name] = function()
+    log("[panel] " .. name .. "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.")
+  end
+end
 )LUA";
 
 // --------------------------------------------------------------------------------------------

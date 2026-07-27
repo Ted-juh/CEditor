@@ -580,8 +580,9 @@ private:
         cb.sendDump   = [] (const juce::String&) {};
        #endif
         cb.buildDump  = [] (const juce::String&) { return juce::var(); };
-        cb.runAction  = [] (const juce::String&, const juce::var&) { return juce::var(); };
-        cb.emitEvent  = [] (const juce::String&, const juce::var&) {};
+        // runAction / emitEvent are left unset on purpose: BridgeScriptHost routes them to the
+        // ScriptRuntime, which resolves them against the loaded scripts. Stubbing them here is
+        // what made run() and emit() silent no-ops in the shipped plugin.
         cb.log = [] (const juce::String& msg, const juce::var& value)
         {
             scriptLogLine ("[script] " + msg + (value.isVoid() ? juce::String() : " " + juce::JSON::toString (value)));

@@ -268,6 +268,17 @@ PyObject* api_log (PyObject*, PyObject* args)
     g_host->log (juce::String::fromUTF8 (msg), (v && v != Py_None) ? pyToVar (v) : juce::var());
     Py_RETURN_NONE;
 }
+PyObject* api_startTimer (PyObject*, PyObject* args)
+{
+    const char* id = nullptr; int ms = 0;
+    if (! PyArg_ParseTuple (args, "s|i", &id, &ms)) return nullptr;
+    g_host->startTimer (juce::String::fromUTF8 (id), ms); Py_RETURN_NONE;
+}
+PyObject* api_stopTimer (PyObject*, PyObject* args)
+{
+    const char* id = nullptr; if (! PyArg_ParseTuple (args, "s", &id)) return nullptr;
+    g_host->stopTimer (juce::String::fromUTF8 (id)); Py_RETURN_NONE;
+}
 PyObject* api_beginTransmit (PyObject*, PyObject* args)
 {
     int on = 0; if (! PyArg_ParseTuple (args, "p", &on)) return nullptr;
@@ -288,6 +299,8 @@ PyMethodDef apiMethods[] = {
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
+    { "startTimer",    api_startTimer,    METH_VARARGS, nullptr },
+    { "stopTimer",     api_stopTimer,     METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
     { "emit",          api_emit,          METH_VARARGS, nullptr },
     { "log",           api_log,           METH_VARARGS, nullptr },
@@ -317,6 +330,8 @@ def requestDump(kind):            return __api.requestDump(kind)
 def applyDump(b):                 return __api.applyDump(b)
 def sendDump(kind):               return __api.sendDump(kind)
 def buildDump(kind):              return __api.buildDump(kind)
+def startTimer(id, ms=0):         return __api.startTimer(id, ms)
+def stopTimer(id):                return __api.stopTimer(id)
 def run(target, args=None):       return __api.run(target, args)
 def emit(name, data=None):        return __api.emit(name, data)
 def log(msg, v=None):             return __api.log(str(msg), v)
@@ -406,6 +421,59 @@ def toSigned(v, bits):
     m = 2 ** bits; return v + m if v < 0 else v
 def fromSigned(b, bits):
     m = 2 ** bits; return b - m if b >= m / 2 else b
+
+# checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
+# plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
+# roland (the spelling panels shipped with before the contract was enforced).
+def checksum(kind, bytes=None):
+    import math
+    if bytes is None: bytes = kind; kind = "roland"
+    kind = str(kind if kind is not None else "roland").lower()
+    total = 0; x = 0
+    for v in bytes:
+        b = math.floor(v) & 0xff
+        total = (total + b) % 128
+        x = (x ^ b) & 0x7f
+    if kind == "xor": return x
+    if kind == "sum": return total
+    return (128 - total) % 128
+
+# panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
+# order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
+# out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
+def panic(opts=None):
+    import math
+    opts = opts or {}
+    reset = opts.get("resetControllers", True) is not False
+    ch = opts.get("channel")
+    channels = [math.floor(ch)] if ch is not None else range(1, 17)
+    for c in channels:
+        sendCC(c, 120, 0)
+        sendCC(c, 123, 0)
+        if reset: sendCC(c, 121, 0)
+
+# Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
+# Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
+# counterpart to drive with the window closed. Defining them here as explaining stubs means a
+# script that strays across the boundary says so, instead of raising NameError.
+__WEBVIEW_ONLY = [
+    "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
+    "phraseSeed","phraseClear","phraseKey","phraseScale","phraseTranspose","phraseDirection","phraseRun","phraseCell",
+    "recorderRecord","recorderStop","recorderPlay","recorderClear","recorderUndo","recorderQuantize",
+    "recorderTranspose","recorderBars","recorderSource","recorderNudge","recorderShift","recorderStore",
+    "recorderLoad","recorderCountIn",
+    "harmonyMode","harmonyKey","harmonyScale","harmonySize","harmonyShape","harmonyVoicing","harmonyInversion",
+    "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
+    "harmonyDegree",
+    "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
+]
+def __webviewOnly(name):
+    def stub(*args, **kwargs):
+        log("[panel] " + name + "() needs the panel window open — that component is drawn and modelled "
+            "in the panel view, so there is nothing to drive while the window is closed.")
+    return stub
+for __n in __WEBVIEW_ONLY:
+    globals()[__n] = __webviewOnly(__n)
 )PY";
 
 } // namespace

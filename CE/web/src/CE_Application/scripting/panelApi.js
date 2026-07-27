@@ -10,6 +10,13 @@
 // Spec: tools/docs/panel-api-spec.md (decisions Q1–Q11). Naming rule throughout:
 // self-evident, distinct words, established conventions.
 //
+// PARITY IS ENFORCED. Five runtimes implement this contract — the WebView runtime
+// (panelRuntime.js) and the four C++ engines (Lua/JS/Python preludes + the native-handler
+// ABI). CE/web/test/panelApiParity.test.js asserts that every member declared here is
+// implemented by each runtime that claims to support it, and that no runtime exposes a
+// member this file doesn't declare. Add the entry HERE first, then implement it — an
+// undeclared global is a test failure, not a feature.
+//
 // Snippet templates use ${name} placeholders the picker fills, and $0 for the final
 // cursor / $1.. for tab stops. Each member that differs by language carries a per-language
 // snippet; otherwise the call looks identical in Lua and JS.
@@ -124,6 +131,18 @@ export const VALUE_ACCESSORS = [
   { id: 'midiValue', label: '.midiValue', summary: 'The value as MIDI (e.g. 101). Only for device-bound controls; empty for decorative ones. For hand-built MIDI.' },
 ];
 
+/* ------------------------------------------------------------------- runtimes */
+// Where a member actually runs. Most of the API is 'any' — implemented identically by the
+// WebView runtime and by the C++ engines, so a script behaves the same window-open and
+// window-closed. A few members are 'webview': they drive panel components (Zone Splitter,
+// Phrase Sequencer, Recorder, Harmoniser, Setlist) that exist ONLY in the panel view — there
+// is no C++ implementation of those components to talk to. The C++ engines still DEFINE
+// those names, so calling one window-closed logs a clear explanation instead of dying with
+// "attempt to call a nil value"; scriptValidate warns if a window-closed script uses one.
+
+export const RUNTIME_ANY = 'any';         // WebView + every C++ engine
+export const RUNTIME_WEBVIEW = 'webview'; // panel view only; C++ engines stub it with a notice
+
 /* ------------------------------------------------------------- lifecycle hooks */
 // Named entry points the host calls (Q5). `onDaw*` = host-triggered.
 
@@ -187,9 +206,12 @@ export const CONTROL_EVENTS = [
   { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'State swapped (hover/pressed/disabled).' },
 ];
 
+// `panelStateChanged` used to be declared here. There is no panel-state feature in the model —
+// nothing in the editor, the player, or the C++ runtime ever switched one — so the event could
+// not fire in any runtime. Declaring an event no runtime raises is the same defect as declaring
+// a command no runtime implements; it comes back when panel states do.
 export const PANEL_EVENTS = [
   { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control changed. info.target, info.value.' },
-  { id: 'panelStateChanged', fn: 'onPanelStateChanged', payload: 'state', summary: 'Panel state switched.' },
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A started timer fired. info.id.' },
 ];
 
@@ -283,6 +305,28 @@ export const COMMANDS = [
     snippet: { lua: 'run("${1:target.action}")$0', javascript: 'run("${1:target.action}")$0' },
   },
 
+  /* --- Timers --- */
+  // A repeating timer owned by the host, not by the language: a Lua script can't hold a
+  // coroutine open across handler calls, and setTimeout doesn't exist in QuickJS. The id is
+  // yours — start with the same id twice and the second call re-times the existing timer.
+  {
+    id: 'startTimer', category: 'Events & Flow', signature: 'startTimer(id, ms)',
+    summary: 'Start (or re-time) a repeating timer. It fires onTimer with info.id every `ms` until stopTimer(id).',
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'ms', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'startTimer("${1:id}", ${2:250})$0', javascript: 'startTimer("${1:id}", ${2:250})$0' },
+  },
+  {
+    id: 'stopTimer', category: 'Events & Flow', signature: 'stopTimer(id)',
+    summary: 'Stop a timer started with startTimer. Stopping an unknown id is harmless.',
+    params: [{ name: 'id', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'stopTimer("${1:id}")$0', javascript: 'stopTimer("${1:id}")$0' },
+  },
+
   /* --- Device / MIDI: bulk (Q9) --- */
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind)',
@@ -346,13 +390,20 @@ export const COMMANDS = [
   },
   {
     id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes)',
-    summary: 'Compute a device checksum (e.g. "roland", "yamaha").',
+    summary: 'Compute a device checksum over the data bytes. "roland"/"yamaha" = two\'s-complement 7-bit (the same algorithm, both spellings accepted); "sum" = 7-bit sum; "xor" = XOR of the bytes.',
     params: [
-      { name: 'type', type: 'string', required: true },
+      { name: 'type', type: 'string', required: true, values: ['roland', 'yamaha', 'sum', 'xor'] },
       { name: 'bytes', type: 'bytes', required: true },
     ],
     scopes: ['device'],
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },
+  },
+  {
+    id: 'panic', category: 'Device / MIDI', signature: 'panic([opts])',
+    summary: 'Silence the rig: All Sound Off (120), then All Notes Off (123), then Reset All Controllers (121). Defaults to all 16 channels; pass { channel } for one, { resetControllers: false } to skip 121.',
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['channel', 'resetControllers'] }],
+    scopes: ['device', 'panel'],
+    snippet: { lua: 'panic()$0', javascript: 'panic()$0' },
   },
 
   /* --- Debug --- */
@@ -366,6 +417,135 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'log("${1:message}", ${2:value})$0', javascript: 'log("${1:message}", ${2:value})$0' },
   },
+];
+
+/* --------------------------------------------------------- panel-component verbs */
+// Verbs that drive a placed component's own model: the Zone Splitter's zones, the Phrase
+// Sequencer's grid, the Recorder's take, the Harmoniser's key, the Setlist's index. Each
+// reads the component's section, hands it to the SAME pure reducer the component's own
+// buttons use (utils/*Layout.js), and writes back only the changed fields — so a scripted
+// change and a button press are the same event downstream.
+//
+// Every one of these is runtime: 'webview'. The components are rendered and modelled in the
+// panel view; there is no C++ counterpart to drive with the window closed. The C++ engines
+// define the names and log a clear notice, so a script that strays across the boundary tells
+// you why instead of erroring on an undefined global.
+//
+// `target` is the component's control name. All are panel/component scope: a device script
+// runs before the GUI exists, so there is no component to talk to yet.
+
+const panelVerb = (id, signature, summary, params) => ({
+  id, signature, summary, params, category: 'Panel components',
+  runtime: RUNTIME_WEBVIEW, scopes: ['component', 'panel'],
+});
+
+const T = { name: 'target', type: 'targetRef', required: true };
+
+export const PANEL_COMMANDS = [
+  // --- Zone Splitter ---
+  panelVerb('splitPreset', 'splitPreset(target, preset [, lowNote, highNote])',
+    'Apply a split layout ("single"/"split"/"layer"/"three"…), optionally bounding the key range.',
+    [T, { name: 'preset', type: 'string', required: true },
+     { name: 'lowNote', type: 'number', required: false }, { name: 'highNote', type: 'number', required: false }]),
+  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone.',
+    [T, { name: 'zone', type: 'number', required: true }, { name: 'enabled', type: 'boolean', required: true }]),
+  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel.',
+    [T, { name: 'zone', type: 'number', required: true }, { name: 'channel', type: 'number', required: true }]),
+  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone.',
+    [T, { name: 'zone', type: 'number', required: true }, { name: 'semitones', type: 'number', required: true }]),
+  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the split point between two zones.',
+    [T, { name: 'zone', type: 'number', required: true }, { name: 'note', type: 'number', required: true }]),
+
+  // --- Phrase Sequencer ---
+  panelVerb('phraseSeed', 'phraseSeed(target, seed)', 'Fill the grid from a named seed pattern.',
+    [T, { name: 'seed', type: 'string', required: true }]),
+  panelVerb('phraseClear', 'phraseClear(target)', 'Clear every step.', [T]),
+  panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against.',
+    [T, { name: 'key', type: 'string', required: true }]),
+  panelVerb('phraseScale', 'phraseScale(target, scale)', 'Change the scale ("major"/"minor"/"dorian"…).',
+    [T, { name: 'scale', type: 'string', required: true }]),
+  panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose the phrase, leaving the pattern alone.',
+    [T, { name: 'semitones', type: 'number', required: true }]),
+  panelVerb('phraseDirection', 'phraseDirection(target, direction)', 'Play direction ("forward"/"reverse"/"pingpong"/"random").',
+    [T, { name: 'direction', type: 'string', required: true }]),
+  panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
+    [T, { name: 'running', type: 'boolean', required: true }]),
+  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off.',
+    [T, { name: 'step', type: 'number', required: true }, { name: 'row', type: 'number', required: true },
+     { name: 'on', type: 'boolean', required: true }]),
+
+  // --- Phrase Recorder ---
+  panelVerb('recorderRecord', 'recorderRecord(target [, on])', 'Arm / disarm recording (no argument toggles).',
+    [T, { name: 'on', type: 'boolean', required: false }]),
+  panelVerb('recorderStop', 'recorderStop(target)', 'Stop recording and playback.', [T]),
+  panelVerb('recorderPlay', 'recorderPlay(target [, playing])', 'Start / stop playback (no argument toggles).',
+    [T, { name: 'playing', type: 'boolean', required: false }]),
+  panelVerb('recorderClear', 'recorderClear(target)', 'Erase the take.', [T]),
+  panelVerb('recorderUndo', 'recorderUndo(target)', 'Undo the last recorded pass.', [T]),
+  panelVerb('recorderQuantize', 'recorderQuantize(target, grid [, strength, scale, key])',
+    'Quantise the take to a grid; strength 0–1, optional pitch repair to a scale/key.',
+    [T, { name: 'grid', type: 'string', required: true }, { name: 'strength', type: 'number', required: false },
+     { name: 'scale', type: 'string', required: false }, { name: 'key', type: 'string', required: false }]),
+  panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose the take.',
+    [T, { name: 'semitones', type: 'number', required: true }]),
+  panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set the loop length in bars.',
+    [T, { name: 'bars', type: 'number', required: true }]),
+  panelVerb('recorderSource', 'recorderSource(target, source)', 'Choose what gets recorded ("keys"/"harmony"/"both").',
+    [T, { name: 'source', type: 'string', required: true }]),
+  panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Shift the take in time by `by` ticks.',
+    [T, { name: 'by', type: 'number', required: true }]),
+  panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Shift the take in pitch without re-quantising.',
+    [T, { name: 'semitones', type: 'number', required: true }]),
+  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Save the take into a slot.',
+    [T, { name: 'slot', type: 'number', required: true }, { name: 'name', type: 'string', required: false }]),
+  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Load a take from a slot.',
+    [T, { name: 'slot', type: 'number', required: true }]),
+  panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set the count-in length in bars (0 = none).',
+    [T, { name: 'bars', type: 'number', required: true }]),
+
+  // --- Harmoniser ---
+  panelVerb('harmonyMode', 'harmonyMode(target, mode)', 'Harmoniser mode ("off"/"diatonic"/"fixed"/"chord").',
+    [T, { name: 'mode', type: 'string', required: true }]),
+  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song.',
+    [T, { name: 'key', type: 'string', required: true }]),
+  panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Change the scale the harmony follows.',
+    [T, { name: 'scale', type: 'string', required: true }]),
+  panelVerb('harmonySize', 'harmonySize(target, size)', 'How many voices to add.',
+    [T, { name: 'size', type: 'number', required: true }]),
+  panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
+    [T, { name: 'shape', type: 'string', required: true }]),
+  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)', 'Voicing spread ("close"/"open"/"drop2"…).',
+    [T, { name: 'voicing', type: 'string', required: true }]),
+  panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
+    [T, { name: 'inversion', type: 'number', required: true }]),
+  panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Octave offset for the added voices.',
+    [T, { name: 'octave', type: 'number', required: true }]),
+  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)', 'What to do with out-of-key notes ("skip"/"nearest"/"pass").',
+    [T, { name: 'mode', type: 'string', required: true }]),
+  panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Keep or drop the note actually played.',
+    [T, { name: 'keep', type: 'boolean', required: false }]),
+  panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'MIDI channel for the harmony voices.',
+    [T, { name: 'channel', type: 'number', required: true }]),
+  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)', 'Voice-leading strategy ("off"/"nearest"/"smooth").',
+    [T, { name: 'mode', type: 'string', required: true }]),
+  panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
+    [T, { name: 'ms', type: 'number', required: true }]),
+  panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Override the chord used for one scale degree.',
+    [T, { name: 'degree', type: 'number', required: true }, { name: 'chord', type: 'string', required: true }]),
+
+  // --- Setlist ---
+  // These move the INDEX; the recall follows from the index changing, so a scripted step and a
+  // footswitch step are indistinguishable downstream.
+  panelVerb('setlistNext', 'setlistNext(target)', 'Advance to the next enabled scene.', [T]),
+  panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the previous enabled scene.', [T]),
+  panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Jump to a scene by index or name.',
+    [T, { name: 'scene', type: 'value', required: true }]),
+  panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Include or skip a scene in the walk order.',
+    [T, { name: 'scene', type: 'value', required: true }, { name: 'enabled', type: 'boolean', required: true }]),
+  panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Wrap from the last scene back to the first.',
+    [T, { name: 'wrap', type: 'boolean', required: false }]),
+  panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
+    [T, { name: 'ms', type: 'number', required: true }]),
 ];
 
 /* ------------------------------------------------------------------- helpers */
@@ -386,7 +566,10 @@ export const HELPERS = [
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
   { id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)', summary: 'Pack v into `count` 7-bit bytes; order = "msb"/"lsb" first (14/21/28-bit).' },
   { id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)', summary: 'Unpack 7-bit bytes back to a value.' },
-  { id: 'to14bit', category: 'MIDI encoding', signature: 'to14bit(v)', summary: 'Shorthand: value → { msb, lsb }.' },
+  // `to14Bit` is the spelling the WebView runtime shipped with before the contract was
+  // enforced. Kept as an alias so panels written against it keep working; `to14bit` (matching
+  // to7bit/from7bit) is the documented name and the one the other runtimes define.
+  { id: 'to14bit', category: 'MIDI encoding', signature: 'to14bit(v)', summary: 'Shorthand: value → { msb, lsb }.', aliases: ['to14Bit'] },
   { id: 'from14bit', category: 'MIDI encoding', signature: 'from14bit(msb, lsb)', summary: 'Shorthand: msb, lsb → value.' },
   { id: 'toNibbles', category: 'MIDI encoding', signature: 'toNibbles(byte)', summary: 'Split a byte into { hi, lo } 4-bit nibbles.' },
   { id: 'fromNibbles', category: 'MIDI encoding', signature: 'fromNibbles(hi, lo)', summary: 'Combine two nibbles into a byte.' },
@@ -406,10 +589,34 @@ export const HELPERS = [
 export const ALL_MEMBERS = [
   ...LIFECYCLE_HOOKS.map((m) => ({ ...m, kind: 'lifecycle' })),
   ...COMMANDS.map((m) => ({ ...m, kind: 'command' })),
+  ...PANEL_COMMANDS.map((m) => ({ ...m, kind: 'command' })),
   ...HELPERS.map((m) => ({ ...m, kind: 'helper' })),
 ];
 
 export const MEMBER_BY_ID = Object.fromEntries(ALL_MEMBERS.map((m) => [m.id, m]));
+
+/** Where a member runs — 'any' unless it explicitly declares otherwise. */
+export function memberRuntime(member) {
+  return member?.runtime ?? RUNTIME_ANY;
+}
+
+/** Members a given runtime must implement. 'webview' gets everything; a C++ engine gets the
+    'any' members as working calls (the 'webview' ones it stubs — see WEBVIEW_ONLY_MEMBERS). */
+export function membersForRuntime(runtime) {
+  return runtime === RUNTIME_WEBVIEW
+    ? ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle')
+    : ALL_MEMBERS.filter((m) => m.kind !== 'lifecycle' && memberRuntime(m) === RUNTIME_ANY);
+}
+
+/** The names the C++ engines define as "needs the panel window" stubs. */
+export const WEBVIEW_ONLY_MEMBERS = ALL_MEMBERS
+  .filter((m) => memberRuntime(m) === RUNTIME_WEBVIEW)
+  .map((m) => m.id);
+
+/** Every name a member answers to — its id plus any back-compat aliases. */
+export function memberNames(member) {
+  return [member.id, ...(member.aliases ?? [])];
+}
 
 export const ALL_EVENTS = [
   ...CONTROL_EVENTS.map((e) => ({ ...e, group: 'control' })),
@@ -419,9 +626,17 @@ export const ALL_EVENTS = [
 
 export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));
 
+/** Every function name a script may define and have called: the lifecycle hooks plus the
+    handler name of every event. Runtimes collect handlers by probing for these, so a name
+    missing here can never fire — drive the probe list from this, never from a local copy. */
+export const ALL_HANDLER_NAMES = [
+  ...LIFECYCLE_HOOKS.map((h) => h.id),
+  ...ALL_EVENTS.map((e) => e.fn),
+];
+
 /** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
 export function membersByCategory() {
-  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
+  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Panel components', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
   const map = new Map(order.map((c) => [c, []]));
   for (const m of ALL_MEMBERS) {
     if (!map.has(m.category)) map.set(m.category, []);

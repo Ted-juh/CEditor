@@ -39,10 +39,18 @@ public:
     void applyDump (const juce::var&) override {}
     void sendDump (const juce::String&) override {}
     juce::var buildDump (const juce::String&) override { return {}; }
-    juce::var runAction (const juce::String&, const juce::var&) override { return {}; }
+    // Delegated to the runtime, the way BridgeScriptHost does when the app supplies no callback:
+    // run() resolves against the loaded script set, which is what makes it work cross-language.
+    juce::var runAction (const juce::String& ref, const juce::var& args) override
+    { return runtime != nullptr ? runtime->runAction (ref, args) : juce::var(); }
     void emitEvent (const juce::String& name, const juce::var& data) override
     { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
+
+    juce::StringArray timerOps;
+    void startTimer (const juce::String& id, int ms) override
+    { timerOps.add ("start:" + id + ":" + juce::String (ms)); }
+    void stopTimer (const juce::String& id) override { timerOps.add ("stop:" + id); }
 };
 
 static int failures = 0;
@@ -143,6 +151,89 @@ int main()
     runtime.dispatchEvent ("onPing", "panel", juce::var (1));
     check (errors.joinIntoString ("\n").contains ("dispatch depth"),
            "Guard: emit/dispatch feedback loop cut off at max depth");
+
+    // 5) run("owner.action") — cross-language, host-dispatched ------------------------------
+    // run() used to be wired per-host, and the exported player wired it to a stub, so it was a
+    // silent no-op in every shipped plugin. It belongs to the runtime, which owns the script set.
+    juce::Array<juce::var> runScripts;
+    runScripts.add (makeScript ("provider", "lua", "component", "onValueChanged", "filter",
+        "function boost(amount)\n  log(\"boost \" .. tostring(amount))\n  return amount * 2\nend\n"
+        "function onValueChanged(v) end\n"));
+    // The caller is JavaScript and the callee Lua: run() has to cross the language boundary.
+    runScripts.add (makeScript ("caller", "javascript", "panel", "onCallOut", "*",
+        "function onCallOut() { log(\"got \" + run(\"filter.boost\", 21)); }"));
+    runtime.loadScripts (juce::var (runScripts));
+
+    host.logs.clear();
+    errors.clear();
+    runtime.dispatchEvent ("onCallOut", "panel", juce::var());
+    check (host.logs.contains ("boost 21"), "run(): reached the Lua action from a JS script");
+    check (host.logs.contains ("got 42"), "run(): the return value crossed back to the caller");
+
+    // A bare action name matches any script; an unknown one reports instead of failing silently.
+    host.logs.clear();
+    errors.clear();
+    runtime.runAction ("nosuch.action", juce::var());
+    check (errors.joinIntoString ("\n").contains ("no script defining"),
+           "run(): an unresolved action is reported, not swallowed");
+
+    // 6) checksum() — declared in panelApi.js, previously implemented in no engine ------------
+    juce::Array<juce::var> csScripts;
+    csScripts.add (makeScript ("cslua", "lua", "device", "onSum", "*",
+        "function onSum()\n"
+        "  log(\"roland \" .. tostring(checksum(\"roland\", {1, 2, 3})))\n"
+        "  log(\"xor \" .. tostring(checksum(\"xor\", {1, 2, 3})))\n"
+        "  log(\"short \" .. tostring(checksum({1, 2, 3})))\n"
+        "end\n"));
+    csScripts.add (makeScript ("csjs", "javascript", "device", "onSumJs", "*",
+        "function onSumJs() { log(\"roland \" + checksum(\"roland\", [1, 2, 3])); }"));
+    runtime.loadScripts (juce::var (csScripts));
+
+    host.logs.clear();
+    runtime.dispatchEvent ("onSum", "", juce::var());
+    check (host.logs.contains ("roland 122"), "checksum(): Lua two's-complement 7-bit");
+    check (host.logs.contains ("xor 0"), "checksum(): the type argument selects the algorithm");
+    check (host.logs.contains ("short 122"), "checksum(): the one-argument form defaults to roland");
+
+    host.logs.clear();
+    runtime.dispatchEvent ("onSumJs", "", juce::var());
+    check (host.logs.contains ("roland 122"), "checksum(): JS agrees with Lua");
+
+    // 7) timers reach the host from every engine ---------------------------------------------
+    juce::Array<juce::var> timerScripts;
+    timerScripts.add (makeScript ("tlua", "lua", "panel", "onArm", "*",
+        "function onArm()\n  startTimer(\"blink\", 250)\n  stopTimer(\"blink\")\nend\n"));
+    runtime.loadScripts (juce::var (timerScripts));
+    host.timerOps.clear();
+    runtime.dispatchEvent ("onArm", "panel", juce::var());
+    check (host.timerOps.contains ("start:blink:250"), "startTimer() crossed to the host");
+    check (host.timerOps.contains ("stop:blink"), "stopTimer() crossed to the host");
+
+    // 8) panel verbs explain themselves rather than erroring ----------------------------------
+    // The Zone Splitter and friends live in the panel view. Window-closed, the name must still
+    // exist and say why it did nothing — an undefined global would abort the whole handler.
+    juce::Array<juce::var> verbScripts;
+    verbScripts.add (makeScript ("verblua", "lua", "panel", "onVerb", "*",
+        "function onVerb()\n  setlistNext(\"Songs\")\n  log(\"still running\")\nend\n"));
+    runtime.loadScripts (juce::var (verbScripts));
+    host.logs.clear();
+    errors.clear();
+    runtime.dispatchEvent ("onVerb", "panel", juce::var());
+    check (host.logs.joinIntoString ("\n").contains ("needs the panel window open"),
+           "Panel verb: logged an explanation window-closed");
+    check (host.logs.contains ("still running"), "Panel verb: the handler continued past the call");
+    check (errors.isEmpty(), "Panel verb: no error raised");
+
+    // 9) panic() expands to the CC sequence, in order -----------------------------------------
+    juce::Array<juce::var> panicScripts;
+    panicScripts.add (makeScript ("panic1", "lua", "device", "onPanic", "*",
+        "function onPanic()\n  panic({ channel = 3 })\nend\n"));
+    runtime.loadScripts (juce::var (panicScripts));
+    host.ccSends.clear();
+    runtime.dispatchEvent ("onPanic", "", juce::var());
+    check (host.ccSends.size() == 3 && host.ccSends[0] == "3:120:0"
+           && host.ccSends[1] == "3:123:0" && host.ccSends[2] == "3:121:0",
+           "panic(): all-sound-off, then all-notes-off, then reset-all-controllers");
 
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";

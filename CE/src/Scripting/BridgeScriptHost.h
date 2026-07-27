@@ -33,7 +33,10 @@ public:
         std::function<void (const juce::var& bytes)> applyDump;   // host should run inside an InboundScope
         std::function<void (const juce::String& kind)> sendDump;
         std::function<juce::var (const juce::String& kind)> buildDump;
-        // Flow / debug.
+        // Flow / debug. runAction and emitEvent are OPTIONAL: left unset, they fall through to the
+        // ScriptRuntime, which resolves them against the loaded script set. That is the right
+        // default — cross-script calls need the script set, not app state — so only override them
+        // if the app has actions of its own to expose.
         std::function<juce::var (const juce::String& target, const juce::var& args)> runAction;
         std::function<void (const juce::String& name, const juce::var& data)> emitEvent;
         std::function<void (const juce::String& message, const juce::var& value)> log;
@@ -76,8 +79,19 @@ public:
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
-    juce::var runAction (const juce::String& target, const juce::var& args) override { return callbacks.runAction ? callbacks.runAction (target, args) : juce::var(); }
-    void emitEvent (const juce::String& name, const juce::var& data) override { if (callbacks.emitEvent) callbacks.emitEvent (name, data); }
+    juce::var runAction (const juce::String& target, const juce::var& args) override
+    {
+        if (callbacks.runAction) return callbacks.runAction (target, args);
+        return runtime ? runtime->runAction (target, args) : juce::var();
+    }
+
+    void emitEvent (const juce::String& name, const juce::var& data) override
+    {
+        if (callbacks.emitEvent) { callbacks.emitEvent (name, data); return; }
+        // A custom event is just an event: it reaches on(name, …) listeners and any script whose
+        // handler is named for it. dispatchEvent carries the loop backstop.
+        if (runtime) runtime->dispatchEvent (name, juce::String(), data);
+    }
     void log (const juce::String& message, const juce::var& value) override { if (callbacks.log) callbacks.log (message, value); }
     void startTimer (const juce::String& id, int intervalMs) override { if (callbacks.startTimer) callbacks.startTimer (id, intervalMs); }
     void stopTimer  (const juce::String& id) override { if (callbacks.stopTimer) callbacks.stopTimer (id); }

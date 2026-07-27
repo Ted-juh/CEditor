@@ -4,12 +4,18 @@
 // (set/get/log/helpers/self) directly to the control stores — so `set("cutoff.value", 8000)`
 // moves the real control immediately, no C++ round-trip.
 //
-// Scope (M1): JavaScript + Lua (wasmoon) execution + control set/get + helpers + log → trace
-// console, LIVE onValueChanged dispatch (scripts fire on their own when a control's value changes,
-// with a loop guard), and REAL MIDI out (sendCC/sendNRPN/sendSysex → the device bridge; requestDump
-// → the device-sync path). Fast-follow: Python (Pyodide); bulk dump ↔ panel codec (applyDump/
-// sendDump/buildDump) lands with the value/parameter layer. The C++ runtime stays the engine for
-// MIDI/device/export and window-closed logic in shipped panels.
+// Scope: JavaScript / TypeScript / Lua (wasmoon) / Python (Pyodide) / the C++, C# and Java preview
+// interpreters, control set/get, the full helper set, log → trace console, live dispatch of every
+// event panelApi.js declares, real MIDI out (sendCC/sendNRPN/sendSysex → the device bridge;
+// requestDump → the device-sync path), cross-script flow (on/emit/run), host timers, and the
+// panel-component verbs. The C++ runtime remains the engine for window-closed logic in shipped
+// panels; this one covers everything while the window is open.
+//
+// This runtime implements the contract in panelApi.js, and CE/web/test/panelApiParity.test.js
+// fails if it drifts from it in either direction. It used to: on/emit/run were `() => {}`, eight
+// declared events were absent from the handler probe list, fourteen encoding helpers were missing
+// and a fifteenth was spelled differently, and forty-seven panel verbs existed here and nowhere
+// else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
 import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId } from '../stores/panels.js';
@@ -17,7 +23,11 @@ import { updateControlProperty } from '../stores/controls.js';
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed } from '../bridge/bridge.js';
-import { startDeviceSync, startBulkDumpSend } from '../stores/deviceProfiles.js';
+import {
+  startDeviceSync, startBulkDumpSend, commitDeviceParameter,
+  latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
+} from '../stores/deviceProfiles.js';
+import { ALL_HANDLER_NAMES } from './panelApi.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -136,13 +146,61 @@ function splitScriptPath(path) {
   return { name: parts[0], segs: parts.slice(1) };
 }
 
+/* ------------------------------------------------------------- transmit origin (Q2) */
+// Mirrors ScriptRuntime's origin tracking exactly, because the two runtimes have to agree on
+// whether a given set() reaches the synth. A write is LOUD by default, SILENT while we're
+// reacting to something the device just sent us (otherwise filling the panel from a dump echoes
+// the whole dump straight back), and an explicit noTransmit()/transmit() block wins over both.
+//
+// Scope note, deliberately matching the C++ side: these blocks gate set(), NOT the explicit
+// senders. sendCC() inside noTransmit() still sends — you asked for a CC, you get a CC.
+const origin = {
+  inboundDepth: 0,   // >0 while handling inbound MIDI / a dump
+  override: -1,      // -1 none, 0 forced silent (noTransmit), 1 forced loud (transmit)
+  stack: [],
+};
+
+function defaultTransmit() {
+  if (origin.override === 0) return false;
+  if (origin.override === 1) return true;
+  return origin.inboundDepth === 0;
+}
+
+function pushTransmit(on) { origin.stack.push(origin.override); origin.override = on ? 1 : 0; }
+function popTransmit() { origin.override = origin.stack.length ? origin.stack.pop() : -1; }
+
+// A control's device-parameter binding on its value port, if it has one. Same shape
+// deviceBindingSync reads going the other way (device → panel).
+function valueBindingFor(control) {
+  const bindings = control?._children?.DeviceBindings;
+  if (bindings?.enabled === false) return null;
+  const list = Array.isArray(bindings?.bindings) ? bindings.bindings : [];
+  return list.find((b) => b?.kind === 'deviceParameter' && b?.parameterId
+    && String(b.port ?? 'value') === 'value') ?? null;
+}
+
 function setValue(path, value) {
   const { name, segs } = splitScriptPath(path);
   const control = findControlByName(name);
   if (!control) { addScriptTrace('error', '', `set: control "${name}" not found on the active panel`); return; }
   const modelPath = resolveModelPath(control, segs);
-  if (host) { host.writeValue(control, modelPath, value); return; }
-  updateControlProperty(control?._children?.Core?.id, modelPath, value);
+  if (host) host.writeValue(control, modelPath, value);
+  else updateControlProperty(control?._children?.Core?.id, modelPath, value);
+
+  // Transmit-by-default: a bound control's value write also goes to the synth, which is what the
+  // C++ runtime does. Without this the same script moved the knob window-closed and only moved
+  // the picture window-open.
+  if (!defaultTransmit()) return;
+  if (String(modelPath).toLowerCase() !== 'value' && !String(modelPath).toLowerCase().endsWith('.value')) return;
+  const binding = valueBindingFor(control);
+  if (!binding) return;
+  commitDeviceParameter({
+    deviceRole: binding.deviceRole ?? DEFAULT_ROLE,
+    parameterId: binding.parameterId,
+    value,
+    interactionPhase: 'commit',
+    dryRun: false,
+  });
 }
 
 function getValue(path) {
@@ -171,7 +229,51 @@ const helpers = {
   curve: (v, shape) => (shape === 'exp' ? v * v : shape === 'log' ? Math.sqrt(Math.max(0, v)) : shape === 's' ? v * v * (3 - 2 * v) : v),
   noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
   noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
+
+  // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
+  // doesn't model. Ported byte-for-byte from the Lua/JS/Python preludes in CE/src/Scripting so a
+  // script packs a value identically whether it runs here or in the shipped plugin.
+  to14bit: (v) => { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; },
+  from14bit: (msb, lsb) => msb * 128 + lsb,
+  to7bit: (v, count = 2, order = 'msb') => {
+    v = Math.floor(v);
+    const out = [];
+    for (let i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); }
+    return order === 'msb' ? out.reverse() : out;
+  },
+  from7bit: (bytes, order = 'msb') => {
+    const b = order === 'msb' ? bytes : [...bytes].reverse();
+    let v = 0;
+    for (const x of b) v = v * 128 + x;
+    return v;
+  },
+  toNibbles: (b) => { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; },
+  fromNibbles: (hi, lo) => hi * 16 + lo,
+  nibblize: (bytes) => {
+    const o = [];
+    for (const x of bytes) { const n = { hi: Math.floor(x / 16) % 16, lo: x % 16 }; o.push(n.hi, n.lo); }
+    return o;
+  },
+  denibblize: (bytes) => {
+    const o = [];
+    for (let i = 0; i < bytes.length; i += 2) o.push(bytes[i] * 16 + (bytes[i + 1] ?? 0));
+    return o;
+  },
+  toAscii: (str, length) => {
+    const o = [];
+    for (let i = 0; i < String(str).length; i++) o.push(String(str).charCodeAt(i));
+    if (length) while (o.length < length) o.push(32);
+    return o;
+  },
+  fromAscii: (bytes) => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return s; },
+  toOffset: (v, center) => v + center,
+  fromOffset: (b, center) => b - center,
+  toSigned: (v, bits) => { const m = 2 ** bits; return v < 0 ? v + m : v; },
+  fromSigned: (b, bits) => { const m = 2 ** bits; return b >= m / 2 ? b - m : b; },
 };
+// The spelling this runtime shipped with before the contract was enforced. panelApi.js declares
+// it as an alias of to14bit, so panels written against it keep working.
+helpers.to14Bit = helpers.to14bit;
 
 /* ------------------------------------------------------------------- MIDI out (real) */
 // Scripts emit MIDI through the same device bridge the player/DPD use: raw bytes go via
@@ -191,11 +293,25 @@ function toByteArray(input) {
 function toHexMessage(bytes) {
   return bytes.map((v) => (midiInt(v, 0, 255) & 0xff).toString(16).padStart(2, '0').toUpperCase()).join(' ');
 }
-// 2's-complement 7-bit checksum (Roland/Yamaha bulk): sum data bytes, return (128 - sum) & 0x7F.
-function checksum7(bytes) {
+// checksum(kind, bytes). "roland"/"yamaha" are the same two's-complement 7-bit sum — Roland
+// documents it as (128 - sum) & 0x7F and Yamaha as (0 - sum) & 0x7F, which are the same number —
+// so both spellings are accepted rather than pretending to tell them apart. "sum" is the plain
+// 7-bit sum and "xor" the running XOR, for the devices that use those instead.
+//
+// The one-argument form checksum(bytes) defaults to roland: that is what this runtime accepted
+// when it ignored the type argument entirely, so panels written against it keep working.
+function checksumOf(kind, bytes) {
   let sum = 0;
-  for (const v of bytes) sum = (sum + (midiInt(v, 0, 255) & 0x7f)) & 0x7f;
-  return (128 - sum) & 0x7f;
+  let x = 0;
+  for (const v of bytes) {
+    const b = midiInt(v, 0, 255) & 0xff;
+    sum = (sum + b) % 128;
+    x = (x ^ b) & 0x7f;
+  }
+  const k = String(kind ?? 'roland').toLowerCase();
+  if (k === 'xor') return x;
+  if (k === 'sum') return sum;
+  return (128 - sum) % 128;
 }
 
 function sendRawMidi(bytes, actionId) {
@@ -233,9 +349,28 @@ const midiApi = {
       addScriptTrace('midi', '', `requestDump(${JSON.stringify(request ?? '')}) — no JUCE host`);
     }
   },
-  // 14-bit split + 7-bit checksum, for hand-built NRPN / SysEx.
-  to14Bit: (v) => { const n = midiInt(v, 0, 16383); return { msb: (n >> 7) & 0x7f, lsb: n & 0x7f }; },
-  checksum: (type, bytes) => checksum7(toByteArray(bytes ?? type)),
+  checksum: (type, bytes) =>
+    (bytes === undefined || bytes === null
+      ? checksumOf('roland', toByteArray(type))     // one-arg form: checksum(bytes)
+      : checksumOf(type, toByteArray(bytes))),
+
+  // panic([opts]) — All Sound Off (120) FIRST, then All Notes Off (123), then Reset All
+  // Controllers (121). The order matters: 120 cuts a note that is already ringing, 123 only stops
+  // one the device still thinks is held. Expands to plain CC sends, which is why it is portable
+  // to every runtime and every exported language rather than needing a host primitive.
+  panic: (opts) => {
+    const o = opts ?? {};
+    const reset = o.resetControllers !== false;
+    const channels = o.channel === undefined || o.channel === null
+      ? Array.from({ length: 16 }, (_, i) => i + 1)
+      : [midiInt(o.channel, 1, 16)];
+    for (const ch of channels) {
+      const s = 0xB0 | (ch - 1);
+      sendRawMidi([s, 120, 0], 'cc_120');
+      sendRawMidi([s, 123, 0], 'cc_123');
+      if (reset) sendRawMidi([s, 121, 0], 'cc_121');
+    }
+  },
 
   // Bulk dump ↔ panel.
   // applyDump fills the panel from a dump: pass a DECODED { parameterId: value } map and it lands
@@ -404,7 +539,109 @@ const setlistApi = {
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
 };
 
-function buildApi(ownerName) {
+/* -------------------------------------------------------------- flow: on / emit / run */
+// These three were `() => {}` until the API audit: a script could register a listener, announce an
+// event, or call another script's action, and nothing happened — silently, and only in the
+// WebView, so the same panel behaved differently with the window open and closed.
+//
+// `on` listeners belong to the script that registered them, so re-running a script (an edit in the
+// designer, a source change) replaces its listeners instead of stacking a second copy.
+
+const listeners = [];   // { scriptId, target, event, fn }
+
+function clearListeners(scriptId) {
+  for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].scriptId === scriptId) listeners.splice(i, 1);
+}
+
+function addListener(scriptId, target, event, fn) {
+  if (typeof fn !== 'function') return;
+  listeners.push({ scriptId, target: String(target ?? '*'), event: String(event ?? ''), fn });
+}
+
+// Same backstop as ScriptRuntime::dispatchEvent: emit → handler → emit → … is cut off at a fixed
+// depth and reported, rather than recursing until the tab dies.
+const MAX_EMIT_DEPTH = 16;
+let emitDepth = 0;
+
+function listenerMatches(l, target) {
+  return l.target === '*' || l.target === 'self' || target == null
+    || l.target.toLowerCase() === String(target).toLowerCase();
+}
+
+/** Deliver `event` to on(…) listeners and to any already-loaded handler named for it. Synchronous,
+    matching the C++ side — everything it calls has been loaded and cached by dispatchEvents. */
+function deliverEmit(name, target, data) {
+  if (emitDepth >= MAX_EMIT_DEPTH) {
+    addScriptTrace('error', '', `emit("${name}") dropped: nesting exceeded ${MAX_EMIT_DEPTH} (emit/dispatch feedback loop?)`);
+    return;
+  }
+  emitDepth += 1;
+  try {
+    for (const l of [...listeners]) {
+      if (l.event !== name || !listenerMatches(l, target)) continue;
+      try { l.fn(data); } catch (e) { reportScriptError(l.scriptId, e); }
+    }
+    for (const s of activeScripts()) {
+      if (s.enabled === false || s.event !== name) continue;
+      const fn = handlerCache.get(s.id)?.handlers?.[name];
+      if (typeof fn !== 'function') continue;
+      try { fn(data); } catch (e) { reportScriptError(s.id, e); }
+    }
+  } finally {
+    emitDepth -= 1;
+  }
+}
+
+/** run("owner.action" [, args]) — call a function defined by another script, in any language.
+    Resolved against the loaded handler cache, so it is synchronous and can return a value. */
+function runAction(ref, args) {
+  const text = String(ref ?? '');
+  const dot = text.lastIndexOf('.');
+  const owner = dot > 0 ? text.slice(0, dot) : '';
+  const action = dot > 0 ? text.slice(dot + 1) : text;
+  if (!action) return undefined;
+  for (const s of activeScripts()) {
+    if (s.enabled === false) continue;
+    if (owner && String(s.target ?? '').toLowerCase() !== owner.toLowerCase()) continue;
+    const fn = handlerCache.get(s.id)?.handlers?.[action];
+    if (typeof fn !== 'function') continue;
+    try { return fn(args); } catch (e) { reportScriptError(s.id, e); return undefined; }
+  }
+  addScriptTrace('error', '', `run("${text}") found no loaded script defining ${action}()`);
+  return undefined;
+}
+
+/* ------------------------------------------------------------------------- timers */
+// A repeating timer owned by the runtime, not the language: Lua can't hold a coroutine open across
+// handler calls and QuickJS has no setTimeout, so both need the host to keep time. Starting an id
+// that is already running re-times it rather than stacking a second interval.
+
+const timers = new Map();   // id -> interval handle
+
+function startTimer(id, ms) {
+  const key = String(id ?? '');
+  if (!key) return;
+  const period = Math.max(1, Math.round(Number(ms) || 0));
+  stopTimer(key);
+  timers.set(key, setInterval(() => {
+    dispatchEvents([{ event: 'onTimer', controlName: null, payload: { id: key } }]);
+  }, period));
+}
+
+function stopTimer(id) {
+  const key = String(id ?? '');
+  const handle = timers.get(key);
+  if (handle === undefined) return;
+  clearInterval(handle);
+  timers.delete(key);
+}
+
+function stopAllTimers() {
+  for (const handle of timers.values()) clearInterval(handle);
+  timers.clear();
+}
+
+function buildApi(ownerName, scriptId = '') {
   const self = {
     set: (p, v) => setValue(ownerName ? `${ownerName}.${p}` : p, v),
     get: (p) => getValue(ownerName ? `${ownerName}.${p}` : p),
@@ -425,23 +662,76 @@ function buildApi(ownerName) {
     ...harmoniserApi,
     // Setlist — next song, from a button or a script.
     ...setlistApi,
-    // flow — minimal for M1
-    emit: () => {},
-    run: () => {},
-    on: () => {},
-    noTransmit: (fn) => { try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } },
-    transmit: (fn) => { try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } },
+    // flow
+    emit: (name, data) => deliverEmit(String(name ?? ''), null, data),
+    run: (ref, args) => runAction(ref, args),
+    on: (target, event, fn) => addListener(scriptId, target, event, fn),
+    startTimer: (id, ms) => startTimer(id, ms),
+    stopTimer: (id) => stopTimer(id),
+    // The blocks gate set()'s transmission, not the explicit senders — same rule as the C++ host.
+    // finally, not catch-and-continue: an exception inside the block must not leave the override
+    // stuck on, or every later write in the panel inherits it.
+    noTransmit: (fn) => {
+      pushTransmit(false);
+      try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } finally { popTransmit(); }
+    },
+    transmit: (fn) => {
+      pushTransmit(true);
+      try { fn?.(); } catch (e) { addScriptTrace('error', '', String(e?.message ?? e)); } finally { popTransmit(); }
+    },
     self,
     ...helpers,
   };
 }
 
-const HANDLER_NAMES = [
-  'onPanelLoad', 'onPanelReady', 'onPanelClose', 'onDawSaveState', 'onDawRestoreState',
-  'onValueChange', 'onValueChanged', 'onClick', 'onDoubleClick',
-  'onPointerDown', 'onPointerMove', 'onPointerUp', 'onHoverStart', 'onHoverEnd', 'onWheel', 'onStateChanged',
-  'onDumpReceived', 'onParameterReceived',
+// Driven from panelApi.js, never from a local copy. This list is what the executors probe for, so
+// a name missing from it is a handler that can never fire — which is exactly what happened to
+// onControlChanged, onTimer, onMidiIn, onCcIn, onSysexIn and the two device-connection events
+// while this was hand-maintained.
+const HANDLER_NAMES = ALL_HANDLER_NAMES;
+
+/**
+ * Every global this runtime binds into a script, as the runtime itself builds it — `self` and the
+ * helpers included. Exported for CE/web/test/panelApiParity.test.js, which checks it against
+ * panelApi.js in both directions: nothing declared and unimplemented, nothing bound and
+ * undeclared. Reading the real object rather than scanning the source is the point — a surface
+ * that drifts from what scripts actually receive is the bug being guarded against.
+ */
+export function scriptApiForTesting(owner = '', scriptId = 'parity-probe') {
+  return buildApi(owner, scriptId);
+}
+
+/** Just the names — what the parity check compares against panelApi.js. */
+export function apiSurfaceNames() {
+  return Object.keys(scriptApiForTesting());
+}
+
+// run("owner.action") targets a function the author named themselves, so probing the handler list
+// alone can't find it. Scan the source for the shapes a top-level function takes in the languages
+// this runtime executes, and probe those too. A regex is enough: over-guessing costs one undefined
+// lookup, and anything it misses was never callable before this existed.
+const DECLARATION_RES = [
+  /\bfunction\s+([A-Za-z_]\w*)\s*\(/g,          // Lua / JS / C-family
+  /\bdef\s+([A-Za-z_]\w*)\s*\(/g,               // Python
+  /\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:function\b|\([^)]*\)\s*=>|[A-Za-z_]\w*\s*=>)/g, // JS arrow/expr
+  /^\s*([A-Za-z_]\w*)\s*=\s*function\s*\(/gm,   // Lua `foo = function(...)`
 ];
+
+function declaredNames(source) {
+  const out = new Set();
+  const text = String(source ?? '');
+  for (const re of DECLARATION_RES) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) out.add(m[1]);
+  }
+  return [...out];
+}
+
+/** Everything worth probing for in one script: the contract's handler names plus what it declares. */
+function probeNames(script) {
+  return [...new Set([...HANDLER_NAMES, ...declaredNames(script?.source)])];
+}
 
 /** A sensible sample payload for manually running a handler from the editor. */
 function samplePayload(event) {
@@ -459,8 +749,8 @@ function ownerOf(script) {
 /* -------------------------------------------------------------- JavaScript executor */
 
 /** Run JS source with the panel API bound and collect its declared handlers (sync). */
-function runJsSource(source, scriptId, api) {
-  const probe = HANDLER_NAMES.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
+function runJsSource(source, scriptId, api, names) {
+  const probe = names.map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`).join(',');
   const body = `${source}\n;return {${probe}};`;
   try {
     const factory = new Function(...Object.keys(api), body);
@@ -473,19 +763,21 @@ function runJsSource(source, scriptId, api) {
 
 /** Execute a JS script's source and return its declared handlers (sync). */
 function loadHandlersJs(script) {
-  return runJsSource(script.source, script.id, buildApi(ownerOf(script)));
+  return runJsSource(script.source, script.id, buildApi(ownerOf(script), script.id), probeNames(script));
 }
 
 /** TypeScript: prefer the JS the editor already transpiled (what the C++ host ships), else
     transpile on the fly via the lazy compiler. Both run through the JS path. */
 async function loadHandlersTs(script) {
+  const api = buildApi(ownerOf(script), script.id);
   if (typeof script.compiledJs === 'string' && script.compiledJs.length)
-    return runJsSource(script.compiledJs, script.id, buildApi(ownerOf(script)));
+    return runJsSource(script.compiledJs, script.id, api, probeNames(script));
   const ts = await ensureTs();
   if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
   const js = transpileTs(script.source);
   if (js == null) { addScriptTrace('error', script.id, 'TypeScript transpile failed'); return null; }
-  return runJsSource(js, script.id, buildApi(ownerOf(script)));
+  // Probe the transpiled JS as well: TypeScript's own declaration shapes are a superset.
+  return runJsSource(js, script.id, api, [...new Set([...probeNames(script), ...declaredNames(js)])]);
 }
 
 /* --------------------------------------------------------------------- Lua executor */
@@ -513,13 +805,14 @@ async function loadHandlersLua(script) {
     addScriptTrace('error', script.id, `Lua engine failed to start: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), script.id);
   try {
     for (const [k, v] of Object.entries(api)) lua.global.set(k, v);
     // Clear any handlers left in globals by a previous run, eval the source, then collect this
     // run's handlers into a table the JS side can call.
-    const clear = HANDLER_NAMES.map((n) => `${n}=nil`).join(';');
-    const collect = HANDLER_NAMES.map((n) => `${n}=${n}`).join(',');
+    const names = probeNames(script);
+    const clear = names.map((n) => `${n}=nil`).join(';');
+    const collect = names.map((n) => `${n}=${n}`).join(',');
     const handlers = await lua.doString(`${clear}\n${script.source}\nreturn {${collect}}`);
     return handlers || {};
   } catch (e) {
@@ -564,7 +857,7 @@ async function loadHandlersPython(script) {
     addScriptTrace('error', script.id, `Pyodide failed to load: ${e?.message ?? e}`);
     return null;
   }
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), script.id);
   try {
     // Fresh namespace per run, seeded with the panel API + helpers as Python globals, so the source
     // can call set()/get()/sendCC()/log()/clamp()/scale()/… directly. Each defined handler is read
@@ -572,7 +865,7 @@ async function loadHandlersPython(script) {
     const ns = py.toPy(api);
     py.runPython(script.source, { globals: ns });
     const handlers = {};
-    for (const name of HANDLER_NAMES) {
+    for (const name of probeNames(script)) {
       const fn = ns.get(name);
       if (fn) handlers[name] = (payload) => fn(payload);
     }
@@ -588,7 +881,7 @@ async function loadHandlersPython(script) {
 // compiled into the exported plugin; this lets a C++ script move live controls in the editor.
 // `ctx.*` maps onto the same panel API as Lua/JS; `event` is the handler payload.
 function loadHandlersCpp(script) {
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), script.id);
   const ctx = { ...api, setValue: api.set, getValue: api.get };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileCpp(script.source);
@@ -609,7 +902,7 @@ function loadHandlersCpp(script) {
 // panel API in both C# (PascalCase) and lower-case spellings; handler names match camelCase
 // (the skeleton) or PascalCase (idiomatic C#).
 function loadHandlersCsharp(script) {
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), script.id);
   const ctx = {
     ...api, setValue: api.set, getValue: api.get,
     SetValue: api.set, GetValue: api.get, Log: api.log,
@@ -638,7 +931,7 @@ function loadHandlersCsharp(script) {
 /* ----------------------------------------------------------------------- Java executor */
 // Interpreted preview of the Java behavior-handler subset (javaPreview.js).
 function loadHandlersJava(script) {
-  const api = buildApi(ownerOf(script));
+  const api = buildApi(ownerOf(script), script.id);
   const ctx = { ...api, setValue: api.set, getValue: api.get };
   const print = (s) => addScriptTrace('log', script.id, String(s).replace(/\n$/, ''));
   const { handlers: parsed, diagnostics } = compileJava(script.source);
@@ -685,9 +978,50 @@ function reportScriptError(scriptId, e) {
   }
 }
 
-/** Run a script now — execute it and call its declared handler (or a named hook). */
-export async function runScript(script, hook = null, payload = undefined) {
+/* ----------------------------------------------------------------- handler cache */
+// Scripts load ONCE and are dispatched many times, the way ScriptRuntime::loadScripts does it —
+// not re-executed from source on every event. Two reasons beyond the obvious cost:
+//   • on(…) listeners registered by top-level code have to outlive the run that registered them,
+//     or emit() can never reach them;
+//   • run("other.action") needs another script's functions to already exist.
+// The key includes the source, so editing a script in the designer invalidates its entry and the
+// next dispatch picks up the edit.
+
+const handlerCache = new Map();   // scriptId -> { key, handlers }
+
+function cacheKey(script) {
+  return [script?.language ?? '', ownerOf(script), script?.compiledJs ?? '', script?.source ?? ''].join('\u0000');
+}
+
+/** Load (or reuse) a script's handlers. Re-loading replaces the script's on(…) listeners. */
+async function handlersFor(script) {
+  const key = cacheKey(script);
+  const hit = handlerCache.get(script.id);
+  if (hit && hit.key === key) return hit.handlers;
+  clearListeners(script.id);
   const handlers = await getHandlers(script);
+  handlerCache.set(script.id, { key, handlers });
+  return handlers;
+}
+
+/** Load every active script, so listeners exist and run() can resolve before anything dispatches. */
+async function primeHandlers() {
+  for (const s of activeScripts()) {
+    if (s.enabled === false) continue;
+    try { await handlersFor(s); } catch (e) { reportScriptError(s.id, e); }
+  }
+}
+
+/** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
+function resetScriptState() {
+  handlerCache.clear();
+  listeners.length = 0;
+  stopAllTimers();
+}
+
+/** Call a loaded script's handler. Used by dispatch — reuses the cached load. */
+async function invokeHandler(script, hook = null, payload = undefined) {
+  const handlers = await handlersFor(script);
   if (!handlers) return;
   const fnName = hook || script.event;
   const fn = handlers[fnName];
@@ -702,6 +1036,16 @@ export async function runScript(script, hook = null, payload = undefined) {
   } catch (e) {
     reportScriptError(script.id, e);
   }
+}
+
+/**
+ * Run a script now — the editor's ▶ Run. Always re-executes the source rather than reusing the
+ * cached load: pressing Run is a request to run the code as written, and top-level statements are
+ * usually the thing being debugged. Event dispatch takes the cached path instead.
+ */
+export async function runScript(script, hook = null, payload = undefined) {
+  handlerCache.delete(script.id);
+  return invokeHandler(script, hook, payload);
 }
 
 /* ------------------------------------------------------------- live event dispatch */
@@ -792,18 +1136,32 @@ function scriptMatchesControl(script, controlName) {
 
 // Run a batch of { event, controlName, payload } against the matching live scripts. A null
 // controlName means panel-wide (lifecycle). Guarded so a script's own set() can't re-enter.
-async function dispatchEvents(events) {
+// `inbound: true` marks the whole batch as a reaction to something the device sent us, so set()
+// inside these handlers is silent by default. The depth has to be held across the AWAIT — an RAII
+// wrapper around the call would pop it the moment dispatchEvents returned its promise, i.e. before
+// a single handler had run, and every write would go out loud.
+async function dispatchEvents(events, { inbound = false } = {}) {
   if (!events.length) return;
   const scripts = activeScripts();
   live.dispatching = true;
+  if (inbound) origin.inboundDepth += 1;
   try {
+    // Load everything first: a script that only registers on(…) listeners has no `event` of its
+    // own, so it would never be loaded by the match loop below and its listeners would never fire.
+    await primeHandlers();
     for (const ev of events) {
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
-      for (const s of matches) await runScript(s, s.event, ev.payload);
+      for (const s of matches) await invokeHandler(s, s.event, ev.payload);
+      // …then the explicit on(target, event, fn) listeners for the same event.
+      for (const l of [...listeners]) {
+        if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
+        try { l.fn(ev.payload); } catch (e) { reportScriptError(l.scriptId, e); }
+      }
     }
   } finally {
+    if (inbound) origin.inboundDepth -= 1;
     snapshotValues();          // absorb panels writes our scripts just made
     seedSessionSnapshot();     // and any preview-overlay writes
     live.dispatching = false;
@@ -828,6 +1186,9 @@ function onPanelsChanged() {
     if (live.last.has(id) && live.last.get(id) !== sig) {
       events.push({ event: 'onValueChange', controlName: name, payload: value });
       events.push({ event: 'onValueChanged', controlName: name, payload: value });
+      // Panel-wide mirror of the same change, for a script that watches everything at once
+      // rather than attaching to each control.
+      events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value } });
     }
   }
   live.last = next;
@@ -856,7 +1217,7 @@ function seedSessionSnapshot() {
   const sessions = get(panelPreviewSessions) ?? {};
   const next = new Map();
   for (const [id, s] of Object.entries(sessions)) {
-    next.set(id, { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true });
+    next.set(id, { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true, disabled: s.disabled === true });
   }
   live.sessionLast = next;
 }
@@ -866,7 +1227,7 @@ function onPreviewSessionsChanged(sessions) {
   const events = [];
   const next = new Map();
   for (const [id, s] of Object.entries(sessions ?? {})) {
-    const cur = { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true };
+    const cur = { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true, disabled: s.disabled === true };
     next.set(id, cur);
     const prev = live.sessionLast.get(id);
     if (!prev) continue;
@@ -874,6 +1235,7 @@ function onPreviewSessionsChanged(sessions) {
     if (!Object.is(prev.value, cur.value) && cur.value !== undefined) {
       events.push({ event: 'onValueChange', controlName: name, payload: cur.value });
       if (s.dragging !== true) events.push({ event: 'onValueChanged', controlName: name, payload: cur.value });
+      events.push({ event: 'onControlChanged', controlName: null, payload: { target: name, value: cur.value } });
     }
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
@@ -882,6 +1244,13 @@ function onPreviewSessionsChanged(sessions) {
     }
     if (prev.hover !== cur.hover) {
       events.push({ event: cur.hover ? 'onHoverStart' : 'onHoverEnd', controlName: name, payload: undefined });
+    }
+    // onStateChanged — the control's interaction state, as one word. Reported after the specific
+    // pointer/hover events above, so a handler that only cares "which state now?" has one place
+    // to look instead of reconstructing it from four events.
+    if (prev.pressed !== cur.pressed || prev.hover !== cur.hover || prev.disabled !== cur.disabled) {
+      const stateName = cur.disabled ? 'disabled' : cur.pressed ? 'pressed' : cur.hover ? 'hover' : 'normal';
+      events.push({ event: 'onStateChanged', controlName: name, payload: stateName });
     }
   }
   live.sessionLast = next;
@@ -903,6 +1272,7 @@ function onPreviewModeChanged(on) {
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
     dispatchEvents([{ event: 'onPanelClose', controlName: null, payload: undefined }]);
     live.sessionLast.clear();
+    stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
   }
   live.prevPreviewOn = on;
 }
@@ -915,8 +1285,107 @@ function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
   if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
-  dispatchEvents([{ event: 'onDumpReceived', controlName: null,
-    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }]);
+
+  const events = [{ event: 'onDumpReceived', controlName: null,
+    payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }];
+  // One onParameterReceived per decoded parameter — the DPD payoff, and the same fan-out the C++
+  // player does (PluginProcessor::installScriptDeviceCallback).
+  if (values && typeof values === 'object') {
+    for (const [parameter, value] of Object.entries(values)) {
+      events.push({ event: 'onParameterReceived', controlName: null, payload: { parameter, value, role } });
+      // Record what we just announced. The decoded values also land in deviceRuntimeState, whose
+      // subscriber raises onParameterReceived for anything that CHANGED — so without this the whole
+      // dump would be announced a second time, one event per parameter.
+      runtimeParams.set(`${role} ${parameter}`, value);
+    }
+  }
+  // Inbound origin: set()s inside these handlers are silent by default, or filling the panel from a
+  // dump echoes the entire dump straight back at the synth.
+  dispatchEvents(events, { inbound: true });
+}
+
+/* --- source 5: raw MIDI in (device host) --- */
+// Payload shapes are copied from the C++ player's own dispatch so a handler reads identically
+// whether the window is open or closed. onMidiIn for every message; onCcIn/onSysexIn refine it.
+
+function hexToBytes(hex) {
+  const h = String(hex ?? '').replace(/\s+/g, '');
+  const out = [];
+  for (let i = 0; i + 1 < h.length; i += 2) out.push(parseInt(h.slice(i, i + 2), 16));
+  return out;
+}
+
+function onMidiInputMessage(payload) {
+  if (live.dispatching || !live.enabledGlobal) return;
+  if (!payload) return;
+  const bytes = hexToBytes(payload.hex);
+  if (!bytes.length) return;
+  const status = bytes[0] ?? 0;
+  const events = [{
+    event: 'onMidiIn',
+    controlName: null,
+    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0 },
+  }];
+  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3) {
+    events.push({ event: 'onCcIn', controlName: null,
+      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2] } });
+  }
+  dispatchEvents(events, { inbound: true });
+}
+
+function onSysexInputMessage(payload) {
+  if (live.dispatching || !live.enabledGlobal) return;
+  if (!payload) return;
+  const bytes = hexToBytes(payload.hex);
+  if (!bytes.length) return;
+  dispatchEvents([{ event: 'onSysexIn', controlName: null, payload: bytes }], { inbound: true });  // bare byte array
+}
+
+/* --- source 6: device connection state --- */
+// deviceSessionState carries a per-role record; 'ready' is connected and anything else is not.
+// Only the transitions raise an event, so a state refresh that says the same thing stays quiet.
+
+const deviceConnected = new Map();   // role -> boolean
+
+function onDeviceSessionStateChanged(state) {
+  if (live.dispatching || !live.enabledGlobal) return;
+  const events = [];
+  for (const [role, record] of Object.entries(state ?? {})) {
+    const now = String(record?.state ?? '') === 'ready';
+    const before = deviceConnected.get(role);
+    deviceConnected.set(role, now);
+    if (before === undefined || before === now) continue;
+    events.push({
+      event: now ? 'onDeviceConnected' : 'onDeviceDisconnected',
+      controlName: null,
+      payload: { role, profileId: record?.profileId ?? '', message: record?.message ?? '' },
+    });
+  }
+  if (events.length) dispatchEvents(events);
+}
+
+/* --- source 7: decoded parameters arriving outside a dump --- */
+// deviceRuntimeState is the decoded { role: { parameterId: value } } mirror. A dump updates it in
+// one go (already covered by onDumpParsed); a single parameter echoed back by the synth updates
+// one key, and that is what this turns into onParameterReceived.
+
+const runtimeParams = new Map();   // "role\0parameter" -> value
+
+function onDeviceRuntimeStateChanged(state) {
+  if (live.dispatching || !live.enabledGlobal) return;
+  const events = [];
+  const seeding = runtimeParams.size === 0;
+  for (const [role, params] of Object.entries(state ?? {})) {
+    if (!params || typeof params !== 'object') continue;
+    for (const [parameter, value] of Object.entries(params)) {
+      const key = `${role}\u0000${parameter}`;
+      const before = runtimeParams.get(key);
+      runtimeParams.set(key, value);
+      if (seeding || Object.is(before, value)) continue;
+      events.push({ event: 'onParameterReceived', controlName: null, payload: { parameter, value, role } });
+    }
+  }
+  if (events.length) dispatchEvents(events, { inbound: true });
 }
 
 /**
@@ -933,6 +1402,7 @@ export function initPanelRuntime() {
   seedSessionSnapshot();
   live.unsubs.push(resolvedActivePanelId.subscribe((id) => {
     live.activePanelId = id;
+    resetScriptState();        // another panel's scripts, listeners and timers are not ours
     snapshotValues();          // switching panels shouldn't fire spurious changes
     seedSessionSnapshot();
   }));
@@ -940,6 +1410,10 @@ export function initPanelRuntime() {
   live.unsubs.push(panelPreviewSessions.subscribe((s) => onPreviewSessionsChanged(s)));
   live.unsubs.push(previewModeEnabled.subscribe((on) => onPreviewModeChanged(on === true)));
   live.unsubs.push(onDumpMessageParsed((payload) => onDumpParsed(payload)));
+  live.unsubs.push(latestMidiInputMessage.subscribe((p) => onMidiInputMessage(p)));
+  live.unsubs.push(latestSysexInputMessage.subscribe((p) => onSysexInputMessage(p)));
+  live.unsubs.push(deviceSessionState.subscribe((s) => onDeviceSessionStateChanged(s)));
+  live.unsubs.push(deviceRuntimeState.subscribe((s) => onDeviceRuntimeStateChanged(s)));
 }
 
 /** Pause/resume all live dispatch (the editor's "Live" toggle). */
@@ -954,6 +1428,10 @@ export function setLiveEnabled(on) {
  */
 export function setLiveScripts(scripts, panelId = null) {
   live.editOverride = scripts == null ? null : { panelId, scripts: Array.isArray(scripts) ? scripts : [] };
+  // Swapping the script set retires the old set's listeners and timers. Edits to a script that
+  // survives the swap are caught by the cache key; a script that disappears is not, and its
+  // listeners would go on firing for a script the panel no longer has.
+  resetScriptState();
 }
 
 /**

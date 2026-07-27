@@ -105,8 +105,35 @@ typedef struct CeHostVtable {
      * allocator (never free across mismatched CRTs). */
     void* (CE_CALL *alloc)  (void* host_ctx, size_t n);
     void  (CE_CALL *dealloc)(void* host_ctx, void* p, size_t n);
+
+    /* --- appended: the rest of the panel API --------------------------------------------------
+     * Originally a C++/C#/Java handler could only set/get, send raw CC/NRPN/sysex, log and emit —
+     * a strictly weaker dialect than Lua/JS, with no way to discover that except at runtime.
+     * These close the gap. CE_ABI_VERSION deliberately does NOT change: the host refuses a
+     * version mismatch outright, so bumping it would disown every module already built, whereas
+     * an append is compatible by construction. A module compiled against the shorter struct never
+     * reads past its own end; one compiled against this header checks CE_HAS_FIELD first. */
+    void (CE_CALL *request_dump)(void* host_ctx, const CeStr* kind);
+    void (CE_CALL *apply_dump)  (void* host_ctx, const CeBytes* bytes);
+    void (CE_CALL *send_dump)   (void* host_ctx, const CeStr* kind);
+    int  (CE_CALL *build_dump)  (void* host_ctx, const CeStr* kind, CeValue* out /*host-owned, free_value*/);
+    /* run("owner.action", args) — host-dispatched, so a native handler can call into a Lua/JS
+     * script and back. out_result is optional. */
+    int  (CE_CALL *run_action)  (void* host_ctx, const CeStr* ref, const CeValue* args /*nullable*/,
+                                 CeValue* out /*nullable, host-owned, free_value*/);
+    void (CE_CALL *start_timer) (void* host_ctx, const CeStr* id, int32_t interval_ms);
+    void (CE_CALL *stop_timer)  (void* host_ctx, const CeStr* id);
+    /* noTransmit/transmit blocks. Call begin_transmit(0|1) then end_transmit around the block —
+     * the host keeps the stack, so these nest. */
+    void (CE_CALL *begin_transmit)(void* host_ctx, int32_t transmit);
+    void (CE_CALL *end_transmit)  (void* host_ctx);
     /* New fields append HERE only; bump struct_size; handlers gate on struct_size before reading. */
 } CeHostVtable;
+
+/* Does the vtable the host handed us carry the field `member`? Handlers built against a newer ABI
+ * than the host use this before calling anything appended after ABI 1. */
+#define CE_HAS_FIELD(vt, member) \
+    ((vt)->struct_size >= (uint32_t) (offsetof(CeHostVtable, member) + sizeof((vt)->member)))
 
 /* --------------------------------------------------------------------------- handler entry points */
 /* A handler module exports exactly these. The host resolves them by name (getFunction/dlsym).

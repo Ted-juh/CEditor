@@ -172,6 +172,31 @@ void CE_CALL host_send_sysex(void* ctx, const CeBytes* bytes)
 }
 void CE_CALL host_log  (void* ctx, int32_t /*level*/, const CeStr* msg) { static_cast<HostCtx*> (ctx)->host->log (msg ? fromCeStr (*msg) : juce::String(), juce::var()); }
 void CE_CALL host_emit (void* ctx, const CeStr* name, const CeValue* data) { static_cast<HostCtx*> (ctx)->host->emitEvent (name ? fromCeStr (*name) : juce::String(), data ? ceToVar (data) : juce::var()); }
+void CE_CALL host_request_dump (void* ctx, const CeStr* kind) { static_cast<HostCtx*> (ctx)->host->requestDump (kind ? fromCeStr (*kind) : juce::String()); }
+void CE_CALL host_apply_dump (void* ctx, const CeBytes* bytes)
+{
+    juce::Array<juce::var> a; if (bytes) for (int64_t i = 0; i < bytes->len; ++i) a.add ((int) bytes->ptr[i]);
+    static_cast<HostCtx*> (ctx)->host->applyDump (juce::var (a));
+}
+void CE_CALL host_send_dump (void* ctx, const CeStr* kind) { static_cast<HostCtx*> (ctx)->host->sendDump (kind ? fromCeStr (*kind) : juce::String()); }
+int  CE_CALL host_build_dump (void* ctx, const CeStr* kind, CeValue* out)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    if (out != nullptr) *out = buildCeValue (h->buildDump (kind ? fromCeStr (*kind) : juce::String()));
+    return 0;
+}
+int  CE_CALL host_run_action (void* ctx, const CeStr* ref, const CeValue* args, CeValue* out)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    auto result = h->runAction (ref ? fromCeStr (*ref) : juce::String(), args ? ceToVar (args) : juce::var());
+    if (out != nullptr) *out = buildCeValue (result);
+    return 0;
+}
+void CE_CALL host_start_timer (void* ctx, const CeStr* id, int32_t ms) { static_cast<HostCtx*> (ctx)->host->startTimer (id ? fromCeStr (*id) : juce::String(), (int) ms); }
+void CE_CALL host_stop_timer  (void* ctx, const CeStr* id) { static_cast<HostCtx*> (ctx)->host->stopTimer (id ? fromCeStr (*id) : juce::String()); }
+void CE_CALL host_begin_transmit (void* ctx, int32_t transmit) { static_cast<HostCtx*> (ctx)->host->beginTransmitOverride (transmit != 0); }
+void CE_CALL host_end_transmit   (void* ctx) { static_cast<HostCtx*> (ctx)->host->endTransmitOverride(); }
+
 void CE_CALL host_free_value (void* /*ctx*/, CeValue* v) { freeCeValueDeep (v); }
 void* CE_CALL host_alloc   (void* /*ctx*/, size_t n) { return std::malloc (n); }
 void  CE_CALL host_dealloc (void* /*ctx*/, void* p, size_t /*n*/) { std::free (p); }
@@ -387,6 +412,11 @@ private:
         m.vtable.send_cc = host_send_cc; m.vtable.send_nrpn = host_send_nrpn; m.vtable.send_sysex = host_send_sysex;
         m.vtable.log = host_log; m.vtable.emit = host_emit;
         m.vtable.free_value = host_free_value; m.vtable.alloc = host_alloc; m.vtable.dealloc = host_dealloc;
+        m.vtable.request_dump = host_request_dump; m.vtable.apply_dump = host_apply_dump;
+        m.vtable.send_dump = host_send_dump; m.vtable.build_dump = host_build_dump;
+        m.vtable.run_action = host_run_action;
+        m.vtable.start_timer = host_start_timer; m.vtable.stop_timer = host_stop_timer;
+        m.vtable.begin_transmit = host_begin_transmit; m.vtable.end_transmit = host_end_transmit;
 
         if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
         {

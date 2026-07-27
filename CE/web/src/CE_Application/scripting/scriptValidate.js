@@ -9,11 +9,21 @@
 // This is a lightweight scan, not a parser — it may miss matches inside comments/strings.
 // Native syntax checking comes from the code editor / the runtime later.
 
-import { ALL_MEMBERS, EVENT_BY_ID, ALL_EVENTS, isValidInScope } from './panelApi.js';
+import { ALL_MEMBERS, EVENT_BY_ID, ALL_EVENTS, isValidInScope, WEBVIEW_ONLY_MEMBERS } from './panelApi.js';
 
 const EVENT_FNS = new Set(ALL_EVENTS.map((e) => e.fn));
 const EVENT_IDS = new Set(ALL_EVENTS.map((e) => e.id));
 const SCOPE_LIMITED = ALL_MEMBERS.filter((m) => Array.isArray(m.scopes)); // members not valid in 'any'
+
+// Handlers that can fire with the panel window CLOSED, where the C++ runtime is the only engine
+// and the panel components don't exist. A panel verb in one of these is the one API mistake that
+// looks fine in the editor and then quietly does nothing in the shipped plugin, so it is worth
+// saying out loud at edit time.
+const WINDOW_CLOSED_HANDLERS = new Set([
+  'onPanelLoad', 'onPanelClose', 'onDawSaveState', 'onDawRestoreState',
+  'onMidiIn', 'onCcIn', 'onSysexIn', 'onParameterReceived', 'onDumpReceived',
+  'onDeviceConnected', 'onDeviceDisconnected', 'onTimer',
+]);
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -50,7 +60,19 @@ export function validateScript(script) {
     }
   }
 
-  // 3) on(target, "event", …) — flag unknown event names.
+  // 3) Panel-component verbs in a handler that also runs window-closed.
+  if (WINDOW_CLOSED_HANDLERS.has(handler)) {
+    const used = WEBVIEW_ONLY_MEMBERS.filter((id) => new RegExp(`\\b${escapeRe(id)}\\s*\\(`).test(src));
+    if (used.length) {
+      problems.push({
+        severity: 'warn',
+        message: `${used.join('(), ')}() only work while the panel window is open — "${handler}" also runs with it closed, `
+          + 'where the component being addressed does not exist. The call logs a notice there instead of acting.',
+      });
+    }
+  }
+
+  // 4) on(target, "event", …) — flag unknown event names.
   const onRe = /\bon\s*\(\s*[^,]+,\s*["']([^"']+)["']/g;
   let mtch;
   while ((mtch = onRe.exec(src)) !== null) {

@@ -218,4 +218,41 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
     if (native) native->deliverEvent (target, event, payload, onError);
 }
 
+juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& args)
+{
+    assertMessageThread();
+
+    // Same backstop as dispatchEvent: run() calling a handler that run()s back is a loop, and a
+    // loop that recurses through C++ frames takes the process down rather than reporting.
+    if (dispatchDepth >= maxDispatchDepth)
+    {
+        reportError ("runtime", "run('" + ref + "') dropped: dispatch depth exceeded "
+                     + juce::String (maxDispatchDepth) + " (run/emit feedback loop?)");
+        return {};
+    }
+    ++dispatchDepth;
+    struct DepthScope { int& d; ~DepthScope() { --d; } } depthScope { dispatchDepth };
+
+    const juce::String owner  = ref.upToLastOccurrenceOf (".", false, false);
+    const juce::String action = ref.fromLastOccurrenceOf (".", false, false);
+    if (action.isEmpty()) return {};
+
+    for (auto& s : scripts)
+    {
+        // A bare "action" matches any script; "owner.action" must match the script's owner.
+        if (owner.isNotEmpty() && s.owner != owner) continue;
+        auto* eng = engineFor (s.language);
+        if (eng == nullptr || ! eng->hasHandler (s.id, action)) continue;
+
+        const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+        host.enterScript (s.context());
+        auto result = eng->dispatch (s.id, action, args, onError);
+        host.exitScript();
+        return result;
+    }
+
+    reportError ("runtime", "run('" + ref + "') found no script defining " + action + "()");
+    return {};
+}
+
 } // namespace ceditor::scripting

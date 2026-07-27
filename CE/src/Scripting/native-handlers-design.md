@@ -73,11 +73,24 @@ ce_handler_dispatch(state, "onValueChanged", payload, &result)
 ce_handler_shutdown(state)
 ```
 
-The host calls back into the panel API (set/get/sendCC/log/emit) **only** through the `CeHostVtable`
-function pointers passed at init, so a handler module has **zero link-time dependency** on the host —
-it's a self-contained module that receives function pointers. Values cross as a tagged-union `CeValue`
+The host calls back into the panel API **only** through the `CeHostVtable` function pointers passed
+at init, so a handler module has **zero link-time dependency** on the host — it's a self-contained
+module that receives function pointers. Values cross as a tagged-union `CeValue`
 (double/int64/bool/string/bytes/list/map), UTF-8 strings as (ptr,len), allocation routed through the
 vtable so nothing is freed across mismatched CRTs.
+
+The vtable covers the whole command surface: `set`/`get`, `send_cc`/`send_nrpn`/`send_sysex`,
+`request_dump`/`apply_dump`/`send_dump`/`build_dump`, `run_action`, `start_timer`/`stop_timer`,
+`begin_transmit`/`end_transmit`, `log`, `emit`. Everything after `dealloc` was **appended** to the
+original seven — a native handler used to be a strictly weaker dialect than Lua/JS, with no way to
+discover that except at runtime. `CE_ABI_VERSION` deliberately did not change with the append: the
+host refuses a version mismatch outright, so bumping it would disown every module already built,
+whereas an append is compatible by construction. Read a newly-added slot only behind
+`CE_HAS_FIELD(vt, member)`, which checks it against the `struct_size` the host filled in.
+
+The pure helpers (`scale`, `clamp`, `to7bit`, `checksum`, `panic`, …) are **not** in the vtable.
+They are maths with no host state, so each language's generated glue defines them locally rather
+than paying a cross-boundary call per `clamp()`.
 
 ### Host side — `NativeHandlerEngine` (a new `ScriptEngine`)
 

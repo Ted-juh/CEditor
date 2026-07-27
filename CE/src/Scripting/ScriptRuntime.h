@@ -191,6 +191,17 @@ public:
         the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
 
+    /** run("target.action" [, args]) — call a named function defined by another script.
+        `ref` is "owner.action" (the action on the script attached to `owner`) or a bare "action"
+        (the first script that defines it, whatever it is attached to). Returns the handler's
+        return value, or void if nothing matched.
+
+        Host-dispatched on purpose: the caller and the callee can be written in different
+        languages, so the call goes through the runtime rather than the language's own scope.
+        Lives here, not in the app's callbacks, because the runtime is what owns the script set —
+        wiring it per-host is how the exported player ended up with run() as a silent no-op. */
+    juce::var runAction (const juce::String& ref, const juce::var& args);
+
     // --- Origin tracking for transmit-by-default (Q2) ---
     bool isInbound() const { return inboundDepth > 0; }
 

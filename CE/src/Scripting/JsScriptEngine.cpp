@@ -82,6 +82,62 @@ function toOffset(v, center) { return v + center; }
 function fromOffset(b, center) { return b - center; }
 function toSigned(v, bits) { var m = Math.pow(2, bits); return v < 0 ? v + m : v; }
 function fromSigned(b, bits) { var m = Math.pow(2, bits); return b >= m / 2 ? b - m : b; }
+
+// checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
+// plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
+// roland (the spelling panels shipped with before the contract was enforced).
+function checksum(kind, bytes) {
+  if (bytes === undefined || bytes === null) { bytes = kind; kind = "roland"; }
+  kind = String(kind === undefined || kind === null ? "roland" : kind).toLowerCase();
+  var sum = 0, x = 0;
+  for (var i = 0; i < bytes.length; i++) {
+    var b = Math.floor(bytes[i]) & 0xff;
+    sum = (sum + b) % 128;
+    x = (x ^ b) & 0x7f;
+  }
+  if (kind === "xor") return x;
+  if (kind === "sum") return sum;
+  return (128 - sum) % 128;
+}
+
+// panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
+// order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
+// out. Expands to plain sendCC calls, so it needs nothing of the host beyond CC output.
+function panic(opts) {
+  opts = opts || {};
+  var reset = opts.resetControllers !== false;
+  var first = 1, last = 16;
+  if (opts.channel !== undefined && opts.channel !== null) { first = Math.floor(opts.channel); last = first; }
+  for (var ch = first; ch <= last; ch++) {
+    sendCC(ch, 120, 0);
+    sendCC(ch, 123, 0);
+    if (reset) sendCC(ch, 121, 0);
+  }
+}
+
+// Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
+// Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
+// counterpart to drive with the window closed. Defining them here as explaining stubs means a
+// script that strays across the boundary says so, instead of dying on an undefined global.
+var __WEBVIEW_ONLY = [
+  "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
+  "phraseSeed","phraseClear","phraseKey","phraseScale","phraseTranspose","phraseDirection","phraseRun","phraseCell",
+  "recorderRecord","recorderStop","recorderPlay","recorderClear","recorderUndo","recorderQuantize",
+  "recorderTranspose","recorderBars","recorderSource","recorderNudge","recorderShift","recorderStore",
+  "recorderLoad","recorderCountIn",
+  "harmonyMode","harmonyKey","harmonyScale","harmonySize","harmonyShape","harmonyVoicing","harmonyInversion",
+  "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
+  "harmonyDegree",
+  "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade"
+];
+var __global = (typeof globalThis !== 'undefined') ? globalThis : this;
+for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
+  __global[__WEBVIEW_ONLY[__i]] = (function (name) {
+    return function () {
+      log("[panel] " + name + "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.");
+    };
+  })(__WEBVIEW_ONLY[__i]);
+}
 )JS";
 
 // Build the native "__api" object the prelude wraps.
