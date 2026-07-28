@@ -20,12 +20,18 @@ import { analyzeTs, foldTs } from './tsService.js';
 import { analyzeCsharp, foldCsharp } from './csharpPreview.js';
 import { analyzeJava, foldJava } from './javaPreview.js';
 import {
-  COMMANDS, HELPERS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
+  COMMANDS, HELPERS, PANEL_COMMANDS, VALUE_ACCESSORS, SELF, ALL_EVENTS,
 } from './panelApi.js';
+import { memberAppliesToType } from './componentSchema.js';
 
 /* ----------------------------------------------------------- static API data */
 
-const API_FUNCTIONS = [...COMMANDS, ...HELPERS].map((m) => ({
+// PANEL_COMMANDS — the per-component verbs — belong here as much as the rest. They were left out
+// while there was no way to say WHICH ones applied, which meant the largest part of the API had no
+// completion, no hover and no signature help at all. componentSchema answers that now.
+const ALL_API = [...COMMANDS, ...PANEL_COMMANDS, ...HELPERS];
+
+const API_FUNCTIONS = ALL_API.map((m) => ({
   label: m.id,
   kind: 'function',
   detail: m.signature || `${m.id}(…)`,
@@ -41,7 +47,7 @@ function paramsFromSignature(sig) {
   return m[1].split(',').map((s) => s.trim()).filter(Boolean);
 }
 const API_PARAMS = {};
-for (const m of [...COMMANDS, ...HELPERS]) {
+for (const m of ALL_API) {
   const params = Array.isArray(m.params) ? m.params.map((p) => p.name) : paramsFromSignature(m.signature);
   API_PARAMS[m.id] = { name: m.id, params, signature: m.signature || `${m.id}(…)` };
 }
@@ -262,9 +268,15 @@ function prefixBefore(source, caret) {
  * Returns { from, to, options } where [from,to) is the range the chosen label replaces.
  * After a '.', offers value accessors (.value/.normalizedValue/.midiValue); otherwise
  * merges keywords, built-ins, panel API functions, and document symbols, filtered by prefix.
+ *
+ * `options.controlType` is the component type the script is attached to. Given one, the API pool
+ * drops the verbs that control has no section for: no `arpRate` while you are writing a Slider's
+ * script. Omit it — an unattached script, a standalone editor — and nothing is dropped, because
+ * "we do not know what this is" must not read as "this can do nothing".
  */
-export function getCompletions(source, languageId, caretIndex) {
+export function getCompletions(source, languageId, caretIndex, options = {}) {
   const src = String(source ?? '');
+  const controlType = String(options?.controlType ?? '');
   const { prefix, start } = prefixBefore(src, caretIndex);
 
   // Member access: the char before the word is a dot.
@@ -278,7 +290,10 @@ export function getCompletions(source, languageId, caretIndex) {
   const probeSource = src.slice(0, start) + src.slice(caretIndex);
   const { symbols } = analyze(probeSource, languageId);
   const symItems = symbols.map((s) => ({ label: s.name, kind: s.kind, detail: s.detail, doc: '' }));
-  const pool = dedupeByLabel([...symItems, ...API_FUNCTIONS, ...keywordItems(languageId)]);
+  const api = controlType
+    ? API_FUNCTIONS.filter((f) => memberAppliesToType(f.label, controlType))
+    : API_FUNCTIONS;
+  const pool = dedupeByLabel([...symItems, ...api, ...keywordItems(languageId)]);
   return { from: start, to: caretIndex, options: filterRank(pool, prefix) };
 }
 

@@ -1416,3 +1416,81 @@ Adding `warn`/`error` gave `ce.core` a prelude of its own for the first time —
 Python, where they are prelude text; Lua binds them from the host, so Lua's share is zero. A test
 asserting "ce.core has no prelude of its own" started failing, correctly. That asymmetry is invisible
 unless the cost is measured rather than asserted, which is why it is.
+
+## 25. The missing half: what applies to *this* control
+
+The API is organised by module. `ce.midi`, `ce.draw`, `ce.components.arp` — that answers *what can
+this module do*, and it is the right shape for a contract that four runtimes have to agree on.
+
+It is the wrong shape for the person actually writing a script. They are not holding a module. They
+are holding a control called `cutoffslider`, and their question is the opposite one: **what of all
+this applies to me?**
+
+Nothing answered that. A Slider has no Arp section, so `arpRate("cutoffslider", 4)` does nothing —
+but the name was in the picker, it completed (or rather, it did not, see below), and the only way to
+learn it was meaningless was to run it and read the notice. The complaint that produced this slice
+was exact: *"it should be clear from the API that something doesn't belong to a slider without
+having to look it up with get/set or running into an error."*
+
+### Not a Slider module
+
+The obvious fix — give every component type its own module, `ce.slider.*`, `ce.button.*` — is the
+wrong one, and worth saying why. Almost everything a script does to a Slider is not slider-specific:
+you set its value, animate it, draw on it, send MIDI when it moves. Those verbs are shared by all 49
+component types. A `ce.slider` module would either duplicate them 49 times or be nearly empty, and
+either way the question "can I use `drawArc` here?" would still have no answer.
+
+The real asymmetry is narrower than it looks. Of the whole surface, only the 28 **component
+families** are type-specific, and each one is type-specific for exactly one reason: it drives a
+model *section* that only some component types carry. `ce.components.arp` writes to `Arp`. A Slider
+has no `Arp` section. That is the entire rule, and it was already expressed — twice — in data that
+existed before this slice.
+
+### Derived, not declared
+
+`componentSchema.js` restates neither list. `COMPONENT_TYPES` already says which sections each type
+carries; `COMPONENT_FAMILIES` already says which section each family drives. The map is the join:
+
+```
+moduleAppliesToType('ce.components.arp', 'Slider')
+  → FAMILY_SECTIONS['ce.components.arp']      = 'Arp'
+  → sectionsForType('Slider').includes('Arp')  = false
+```
+
+A module with no section in that map — `ce.midi`, `ce.draw`, `ce.core`, the lot — applies to
+everything, because it genuinely does. Narrowing those would be a lie in the other direction, and a
+more damaging one: they are the verbs almost every script uses.
+
+The five hand-written families predate the spec and have their section named by hand, because
+`ce.components.harmony` drives `Harmoniser` and `ce.components.split` drives `SplitZone` — inferring
+the section from the module id is a rule that works until it doesn't, and it already doesn't. A test
+asserts every `ce.components.*` module in the manifest has a section mapped, so the failure mode
+(a new family silently applying to every control) cannot survive a run.
+
+### One source, three surfaces
+
+- **The picker tree.** With a script attached to `cutoffslider`, the Commands tab drops the families
+  a Slider has not got and says so — *"Not for a Slider — 28 modules"* — rather than silently
+  thinning out. The Paths tab drops to that one control, already expanded. A `this control / all`
+  toggle sits above the search box, because narrowing hides real API and someone learning the
+  surface, or about to retarget the script, has to be able to see all of it.
+- **Autocomplete.** `getCompletions` takes the control type and filters the same way. This is also
+  the slice where the component verbs became completable *at all*: `API_FUNCTIONS` was
+  `[...COMMANDS, ...HELPERS]`, so the 182 `PANEL_COMMANDS` — by count the largest part of the API —
+  had no completion, no hover and no signature help. They were left out because there was no way to
+  say which of them applied. Now there is, so they are in.
+- **The error message**, via `describeType`. Somebody who gets there another way is told what the
+  control *does* have, not only what it hasn't.
+
+### Two things narrowing must never do
+
+**Narrow on "I don't know."** A wildcard target, an unknown control name, a control with no type,
+a type this build has never heard of — none of those narrow the cross-cutting half. "We cannot tell
+what this is" must not render as "this can do nothing".
+
+**Narrow away the user's own names.** The filter runs over the API pool only. A local called
+`arpRateOfMine` completes in a Slider's script, because it is theirs.
+
+The asymmetry is deliberate, though: an *unknown component type* does narrow the component families
+to nothing. A type the build has never heard of should show an empty component tree loudly, rather
+than quietly offer all 28 families as if any of them would work.

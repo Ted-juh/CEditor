@@ -137,3 +137,58 @@ test('search reaches a member by its module path, not just its flat name', () =>
     .filter((m) => memberPath(m.id).toLowerCase().includes(q));
   assert.deepEqual(hit.map((m) => m.id), ['sendNote', 'sendNoteOff']);
 });
+
+/* ------------------------------------------------------- narrowing to the target control */
+// The complaint this answers: the API is organised by module, so nothing ever told you which of
+// it applied to the control you were on. `arpRate` was a name you could find in the tree, insert
+// into a Slider's script, and only discover was meaningless by running it.
+
+const slider = { name: 'cutoffslider', type: 'Slider', leaves: ['value', 'min', 'max'] };
+const arp = { name: 'myarp', type: 'Arp', leaves: ['value'] };
+
+test('a script on a Slider is not offered the Arpeggiator verbs', () => {
+  const body = html({ controls: [slider, arp], target: 'cutoffslider' });
+
+  assert.ok(!body.includes('>ce.components.arp.rate<'), 'a Slider has no Arp section');
+  assert.ok(!body.includes('>ce.components.lcd.text<'), 'nor an Lcd one');
+  assert.ok(body.includes('Not for a Slider'), 'and it says so, rather than silently thinning out');
+
+  // The cross-cutting half is untouched: you can still send MIDI and draw from a Slider's script.
+  assert.ok(body.includes('>ce.midi.sendCC<'));
+  assert.ok(body.includes('>ce.draw.arc<'));
+});
+
+test('a script on an Arpeggiator IS offered them', () => {
+  const body = html({ controls: [slider, arp], target: 'myarp' });
+  assert.ok(body.includes('>ce.components.arp.rate<'), 'the family it actually has');
+  assert.ok(!body.includes('>ce.components.lcd.text<'), 'and not the ones it has not');
+});
+
+test('the wildcard target narrows nothing, because it could run on anything', () => {
+  for (const target of ['*', '', 'self']) {
+    const body = html({ controls: [slider, arp], target });
+    assert.ok(body.includes('>ce.components.arp.rate<'), `target "${target}" holds nothing back`);
+    assert.ok(!body.includes('Not for a'), `target "${target}" shows no narrowing notice`);
+  }
+});
+
+test('a target the control list does not know narrows nothing either', () => {
+  // "We cannot tell what this is" must not render as "this can do nothing".
+  const body = html({ controls: [slider], target: 'somethingElse' });
+  assert.ok(body.includes('>ce.components.arp.rate<'));
+  const untyped = html({ controls: [{ name: 'x', type: '' }], target: 'x' });
+  assert.ok(untyped.includes('>ce.components.arp.rate<'), 'and neither does a control with no type');
+});
+
+test('the narrowing is a toggle, not a wall — the whole API is one click away', () => {
+  const body = html({ controls: [slider], target: 'cutoffslider' });
+  assert.ok(body.includes('picker-narrow'), 'the target chip is shown');
+  assert.ok(body.includes('this control') && body.includes('>all<'),
+    'with both sides of the toggle offered');
+});
+
+test('narrowing the Paths tab: only the target control, and already open', () => {
+  const body = html({ controls: [slider, arp], target: 'cutoffslider', initialTab: 'paths' });
+  assert.ok(!body.includes('myarp'), 'the other controls are out of the way');
+  assert.ok(body.includes('cutoffslider.min'), 'and the target is expanded, not one dead collapsed row');
+});

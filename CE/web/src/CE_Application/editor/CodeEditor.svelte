@@ -23,6 +23,9 @@
     onbreakpoints = null,
     placeholder = '',
     minHeight = 240,
+    // The component type this script is attached to, if it is attached to one. Completion uses it
+    // to leave out the verbs the control has no section for.
+    controlType = '',
   } = $props();
 
   let bpSet = $derived(new Set(breakpoints)); // 1-based line numbers
@@ -296,7 +299,7 @@
     if (!taEl) return;
     const caret = taEl.selectionStart;
     if (caret !== taEl.selectionEnd) { acOpen = false; return; }
-    const { from, to, options } = getCompletions(value, language, caret);
+    const { from, to, options } = getCompletions(value, language, caret, { controlType });
     const prefixLen = to - from;
     // Auto-open only once there's a prefix; Ctrl+Space (force) opens regardless.
     if (!force && prefixLen === 0) { acOpen = false; return; }

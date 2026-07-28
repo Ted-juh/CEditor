@@ -174,3 +174,35 @@ test('languageKey normalizes to lua for non-js', () => {
   assert.equal(languageKey('javascript'), 'javascript');
   assert.equal(languageKey('python'), 'lua');
 });
+
+/* --------------------------------------------------- completion narrowed to the control */
+// Until now getCompletions offered COMMANDS and HELPERS only — the per-component verbs, the
+// largest part of the API, had no completion at all, because there was no way to say which of
+// them applied. componentSchema answers that, so they can come in.
+
+test('the component verbs are offered at all now', () => {
+  const { options } = getCompletions('arpR', 'lua', 4);
+  assert.ok(options.some((o) => o.label === 'arpRate'), 'arpRate completes');
+});
+
+test('and are left out when the script is attached to a control that has no such section', () => {
+  const on = (type) => getCompletions('arpR', 'lua', 4, { controlType: type })
+    .options.some((o) => o.label === 'arpRate');
+  assert.equal(on('Arp'), true, 'an Arpeggiator gets its own verbs');
+  assert.equal(on('Slider'), false, 'a Slider does not — it has no Arp section to drive');
+  assert.equal(on(''), true, 'and an unattached script is offered everything');
+});
+
+test('narrowing never touches the cross-cutting verbs', () => {
+  // The whole point is to remove what cannot work, not to make a Slider's script feel smaller.
+  const { options } = getCompletions('send', 'lua', 4, { controlType: 'Slider' });
+  const labels = options.map((o) => o.label);
+  assert.ok(labels.includes('sendCC'), 'MIDI still completes on a Slider');
+  assert.ok(labels.includes('sendNote'));
+});
+
+test('a document symbol is never narrowed away, whatever the control is', () => {
+  const src = 'local arpRateOfMine = 3\narpR';
+  const { options } = getCompletions(src, 'lua', src.length, { controlType: 'Slider' });
+  assert.ok(options.some((o) => o.label === 'arpRateOfMine'), "the user's own name always completes");
+});

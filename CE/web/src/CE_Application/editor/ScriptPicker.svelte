@@ -19,9 +19,15 @@
     panelModules,
     language as languageOf,
   } from '../scripting/panelApi.js';
+  import { moduleAppliesToType, describeType, isKnownType } from '../scripting/componentSchema.js';
 
   let {
     language = 'lua', scope = 'component', controls = [], onInsert,
+    // The control this script is attached to, by name. Given one, the picker narrows to what a
+    // control of that KIND can actually do — an Arpeggiator's verbs stop appearing next to a
+    // Slider. '*' (any control) and an unknown name narrow nothing, which is the honest answer
+    // when the picker cannot tell what it is aiming at.
+    target = '',
     // The panel being edited, for module filtering. Omit it and nothing is filtered — the picker
     // still works standalone (the debug route, a test) rather than showing an empty Commands tab.
     panel = null,
@@ -30,9 +36,12 @@
     onEnableModule = null,
     // Opening text for the search box, so a caller can point the picker at something.
     initialQuery = '',
+    // Which tab opens first. Commands is the one people want; the prop exists so a caller (or a
+    // test) can point the picker straight at the panel's paths.
+    initialTab = 'commands',
   } = $props();
 
-  let tab = $state('commands');
+  let tab = $state(initialTab);
   let query = $state(initialQuery);
   let expanded = $state(new Set());
 
@@ -65,17 +74,40 @@
   let filtering = $derived(moduleState?.mode === 'manual');
   const isEnabled = (module) => !filtering || !module || module.global || moduleState.enabled.includes(module.id);
 
+  /* --- narrowing to the target control ------------------------------------------------------
+   * The module list answers "what can ce.components.arp do". It never answered the question the
+   * person editing a script actually has: *what of this applies to the control I am on?* With a
+   * concrete target we can answer it — COMPONENT_TYPES says which sections a Slider has, and a
+   * family whose section it hasn't got is not a thing you can do to it.
+   *
+   * The toggle is not decoration. Narrowing hides real API, and someone who wants to see the whole
+   * surface (to learn it, or because they are about to retarget the script) must be able to. */
+  let targetType = $derived((() => {
+    const name = String(target ?? '').trim();
+    if (!name || name === '*' || name === 'self') return '';
+    const hit = (controls ?? []).find((c) => c.name === name);
+    return isKnownType(hit?.type) ? String(hit.type) : '';
+  })());
+  let narrowable = $derived(targetType !== '');
+  let narrowPref = $state(true);
+  let narrowing = $derived(narrowable && narrowPref);
+  const fitsTarget = (module) => !narrowing || !module || moduleAppliesToType(module.id, targetType);
+
   const matches = (m) => !q || m.id.toLowerCase().includes(q)
     || memberPath(m.id).toLowerCase().includes(q)
     || (m.summary ?? '').toLowerCase().includes(q);
 
   let allGroups = $derived(
     membersByModule()
-      .map((g) => ({ ...g, on: isEnabled(g.module), items: g.members.filter(matches) }))
+      .map((g) => ({ ...g, on: isEnabled(g.module), fits: fitsTarget(g.module), items: g.members.filter(matches) }))
       .filter((g) => g.items.length),
   );
-  let commandGroups = $derived(allGroups.filter((g) => g.on));
-  let offGroups = $derived(allGroups.filter((g) => !g.on));
+  // "Does not apply" beats "not enabled": enabling ce.components.arp would still not give a Slider
+  // an Arp section, so the weaker complaint is not the one to show.
+  let fittingGroups = $derived(allGroups.filter((g) => g.fits));
+  let unfitGroups = $derived(allGroups.filter((g) => !g.fits));
+  let commandGroups = $derived(fittingGroups.filter((g) => g.on));
+  let offGroups = $derived(fittingGroups.filter((g) => !g.on));
   let showOff = $state(false);
   // Searching opens the off section, the same way the Paths tab auto-opens matching controls.
   // Someone who types "sendCC" and gets "Not enabled — 1 module" with no way to see what matched
@@ -100,8 +132,14 @@
   );
 
   // Paths tab: each control's real leaves (full property set), filtered by the search query.
+  // Narrowing drops it to the one control the script is attached to — but only while the search
+  // box is empty. Typing is an explicit act of looking further afield, and a search that silently
+  // refused to leave the target would look broken.
+  let pathSource = $derived(
+    narrowing && !q ? controls.filter((c) => c.name === target) : controls,
+  );
   let pathControls = $derived(
-    controls
+    pathSource
       .map((c) => {
         const leaves = c.leaves ?? COMMON_LEAVES;
         const nameHit = c.name.toLowerCase().includes(q);
@@ -110,8 +148,9 @@
       })
       .filter((c) => c.show),
   );
-  // While searching, auto-open every matching control so the hits are visible.
-  function isOpen(name) { return q ? true : expanded.has(name); }
+  // While searching, auto-open every matching control so the hits are visible. Narrowed to a
+  // single target, open it too — one collapsed row is not a tree, it is a dead end.
+  function isOpen(name) { return q || (narrowing && name === target) ? true : expanded.has(name); }
 
   // Turn a snippet template into plain text for a <textarea> (no tab-stops).
   function plain(snippet) {
@@ -155,6 +194,17 @@
     <button class={['ptab', tab === 'events' && 'active']} onclick={() => tab = 'events'}>Events</button>
     <button class={['ptab', tab === 'commands' && 'active']} onclick={() => tab = 'commands'}>Commands</button>
   </div>
+  {#if narrowable}
+    <div class="pnarrow" data-testid="picker-narrow">
+      <span class="pd" title={describeType(targetType)}>{target} · {targetType}</span>
+      <div class="pseg">
+        <button class={['pseg-btn', narrowing && 'pseg-on']} onclick={() => narrowPref = true}
+                title={`Show only what applies to a ${targetType}`}>this control</button>
+        <button class={['pseg-btn', !narrowing && 'pseg-on']} onclick={() => narrowPref = false}
+                title="Show the whole API, including what this control has no section for">all</button>
+      </div>
+    </div>
+  {/if}
   <div class="psearch">
     <input placeholder="Search the API…" value={query} oninput={(e) => query = e.target.value} onfocus={(e) => e.target.select()} />
   </div>
@@ -245,7 +295,15 @@
       {/if}
     {/if}
 
-    {#if commandGroups.length === 0 && offGroups.length === 0}
+    {#if unfitGroups.length}
+      <div class="poff-head" data-testid="picker-unfit" role="button" tabindex="0" onclick={() => narrowPref = false}
+           onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && (narrowPref = false)}>
+        ▸ Not for a {targetType} — {unfitGroups.length} module{unfitGroups.length === 1 ? '' : 's'}
+        <span class="pd">this control has no such section · show anyway</span>
+      </div>
+    {/if}
+
+    {#if commandGroups.length === 0 && offGroups.length === 0 && unfitGroups.length === 0}
       <div class="pcat">Nothing matches “{query}”.</div>
     {/if}
   {/if}

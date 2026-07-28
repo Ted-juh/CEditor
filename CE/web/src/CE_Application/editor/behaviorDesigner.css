@@ -313,6 +313,11 @@
 .bd-app .pcat-sub{text-transform:none;letter-spacing:0;font-size:10px;color:var(--txt-faint);opacity:.7;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
 .bd-app .pspell{display:flex;align-items:center;gap:8px;padding:7px 10px 3px}
+/* The target chip: which control the picker is narrowed to, and the way back out to the whole API. */
+.bd-app .pnarrow{display:flex;align-items:center;gap:8px;padding:7px 10px 4px;
+  border-bottom:1px solid var(--line);background:var(--bg-2)}
+.bd-app .pnarrow .pd{flex:1 1 auto;font-family:var(--mono);font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bd-app .pseg{display:inline-flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden}
 .bd-app .pseg-btn{padding:2px 9px;font-size:11px;cursor:pointer;border:none;background:transparent;
   color:var(--txt-dim);font-family:var(--mono)}

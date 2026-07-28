@@ -71,6 +71,8 @@
     (scriptPanel?.controls ?? [])
       .map((c) => ({
         name: c?._children?.Core?.name ?? c?._children?.Core?.id,
+        // The component type, so the picker can narrow to what this KIND of control can do.
+        type: c?._children?.Core?.type ?? '',
         leaves: enumerateLeafPaths(c),
       }))
       .filter((c) => c.name)

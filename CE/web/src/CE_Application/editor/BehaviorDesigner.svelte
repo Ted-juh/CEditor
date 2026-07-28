@@ -124,6 +124,9 @@
   // 'self' target (the old component-scope default) reads as the wildcard here.
   let controlNames = $derived((controls ?? []).map((c) => c.name).filter(Boolean));
   let targetValue = $derived(selected ? (selected.target === 'self' || !selected.target ? '*' : selected.target) : '*');
+  // The KIND of control the script is attached to. Empty for the wildcard, which is the honest
+  // answer: a script that could run on anything must be offered everything.
+  let targetType = $derived((controls ?? []).find((c) => c.name === targetValue)?.type ?? '');
 
   // --- cross-script search (spans every lifecycle group) ---
   let searchQuery = $state('');
@@ -620,6 +623,7 @@
            needed because every edit is already captured in `scripts`. -->
       {#key selectedId}
         <CodeEditor bind:this={codeEditor} minHeight={140} language={selected.language} value={selected.source}
+          controlType={targetType}
           oninput={(v) => updateField('source', v)} onrun={() => runAndShow(selected)}
           oncaret={(line, col) => caret = { line, col }}
           ondiagnostics={(d) => liveDiagnostics = d}
@@ -823,7 +827,8 @@
 
 {#snippet dockBody()}
   {#if dockTab === 'insert'}
-    <ScriptPicker language={selected.language} scope={selected.scope} {controls} {panel} {onEnableModule} onInsert={insertAtCursor} />
+    <ScriptPicker language={selected.language} scope={selected.scope} target={targetValue}
+                  {controls} {panel} {onEnableModule} onInsert={insertAtCursor} />
   {:else if dockTab === 'library'}
     <div class="liblist">
       {#if $scriptLibrary.length === 0}
