@@ -111,6 +111,34 @@ function curve(v, shape)
   elseif shape == "s" then return v * v * (3 - 2 * v)
   else return v end
 end
+-- @module ce.math
+-- A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
+-- Seeded is the whole point: the language's own math.random cannot promise the same sequence in
+-- five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
+-- different in the editor and in the export.
+local __RND_DEFAULT = 0x9E3779B9
+local __rnd = __RND_DEFAULT
+function randomSeed(n)
+  local v = math.floor(tonumber(n) or 0) & 0xFFFFFFFF
+  -- 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
+  -- rather than "a generator that never moves".
+  if v == 0 then v = __RND_DEFAULT end
+  __rnd = v
+end
+function random(lo, hi)
+  local x = __rnd
+  x = (x ~ (x << 13)) & 0xFFFFFFFF
+  x = x ~ (x >> 17)
+  x = (x ~ (x << 5)) & 0xFFFFFFFF
+  __rnd = x
+  local r = x / 4294967296.0
+  if lo == nil or hi == nil then return r end
+  local a, b = math.floor(tonumber(lo) or 0), math.floor(tonumber(hi) or 0)
+  local low, high = math.min(a, b), math.max(a, b)
+  -- Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  return low + math.floor(r * (high - low + 1))
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 function noteName(n) n = math.floor(n) return NOTE_NAMES[(n % 12) + 1] .. tostring(math.floor(n / 12) - 1) end
@@ -265,8 +293,8 @@ local WEBVIEW_ONLY = {
 -- @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 -- @module ce.draw
-  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawText",
-  "drawRedraw",
+  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
+  "drawText","drawRedraw",
 -- @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 -- @module ce.components.split
@@ -385,6 +413,18 @@ local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 else
 local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
 
 function sendNote(channel, note, velocity) sendMidi({0x90 | __ch(channel), __note(note), __7(velocity)}) end
+function sendRPN(channel, msb, lsb, value)
+  -- RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
+  -- fine tuning (0,1) and coarse tuning (0,2).
+  local s = 0xB0 | __ch(channel)
+  local v = math.floor(tonumber(value) or 0); if v < 0 then v = 0 elseif v > 16383 then v = 16383 end
+  sendMidi({s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F})
+end
+-- Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
+function sendSongPosition(beats)
+  local b = math.floor(tonumber(beats) or 0); if b < 0 then b = 0 elseif b > 16383 then b = 16383 end
+  sendMidi({0xF2, b & 0x7F, (b >> 7) & 0x7F})
+end
 function sendNoteOff(channel, note, velocity) sendMidi({0x80 | __ch(channel), __note(note), __7(velocity or 0)}) end
 function sendProgramChange(channel, program, bankMsb, bankLsb)
   -- Bank select first: a device applies the bank that was in force when the program change lands.
@@ -510,6 +550,18 @@ local function __role(r) if r == nil or r == "" then return "mainSynth" end retu
 --
 -- A control with no value of its own is LEFT OUT rather than recorded as nothing, so restoring a
 -- snapshot cannot blank a label by writing nil over it.
+-- each(fn) — fn(name) for every control, containers included, in document order.
+function panelEach(fn)
+  if type(fn) ~= "function" then
+    log("each(fn) needs a function to call — nothing was walked")
+    return 0
+  end
+  local names = __panelQuery("controls", nil)
+  if names == nil then return 0 end
+  local n = 0
+  for _, name in ipairs(names) do fn(name) n = n + 1 end
+  return n
+end
 function panelSnapshot()
   local out = {}
   local names = __panelQuery("controls", nil)
@@ -568,17 +620,17 @@ end
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
-  ["ce.core"] = { emit = "emit", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit" },
-  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.core"] = { emit = "emit", error = "logError", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", write = "deviceWrite" },
-  ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
+  ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
-  ["ce.draw"] = { circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
-  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", find = "panelFind", info = "panelInfo", parent = "panelParent", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes" },
-  ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
+  ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
+  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", each = "panelEach", find = "panelFind", info = "panelInfo", parent = "panelParent", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes" },
+  ["ce.storage"] = { forget = "forgetSetting", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
   ["ce.components.recorder"] = { bars = "recorderBars", clear = "recorderClear", countIn = "recorderCountIn", load = "recorderLoad", nudge = "recorderNudge", play = "recorderPlay", quantize = "recorderQuantize", record = "recorderRecord", shift = "recorderShift", source = "recorderSource", stop = "recorderStop", store = "recorderStore", transpose = "recorderTranspose", undo = "recorderUndo" },
@@ -610,17 +662,17 @@ local __CE_MODULES = {
 }
 local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
-  { id = "ce.core", version = "1.0", runtime = "any" },
-  { id = "ce.midi", version = "1.1", runtime = "any" },
+  { id = "ce.core", version = "1.1", runtime = "any" },
+  { id = "ce.midi", version = "1.2", runtime = "any" },
   { id = "ce.device", version = "1.2", runtime = "any" },
-  { id = "ce.math", version = "1.0", runtime = "any" },
+  { id = "ce.math", version = "1.1", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },
-  { id = "ce.draw", version = "1.0", runtime = "webview" },
-  { id = "ce.panel", version = "1.1", runtime = "any" },
-  { id = "ce.storage", version = "1.0", runtime = "any" },
+  { id = "ce.draw", version = "1.1", runtime = "webview" },
+  { id = "ce.panel", version = "1.2", runtime = "any" },
+  { id = "ce.storage", version = "1.1", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },
   { id = "ce.components.recorder", version = "1.0", runtime = "webview" },
@@ -818,6 +870,9 @@ public:
             { host->saveSetting (juce::String (key), solToVar (v)); });
         g.set_function ("__loadSetting", [this] (std::string key)
             { return varToSol (lua, host->loadSetting (juce::String (key))); });
+        g.set_function ("listSettings", [this] () { return varToSol (lua, host->listSettings()); });
+        g.set_function ("forgetSetting", [this] (std::string key)
+            { return host->forgetSetting (juce::String (key)); });
 
         g.set_function ("run",  [this] (std::string target, sol::optional<sol::object> args)
             { return varToSol (lua, host->runAction (juce::String (target), args ? solToVar (*args) : juce::var())); });
@@ -825,6 +880,13 @@ public:
             { host->emitEvent (juce::String (name), data ? solToVar (*data) : juce::var()); });
         g.set_function ("log",  [this] (std::string msg, sol::optional<sol::object> v)
             { host->log (juce::String (msg), v ? solToVar (*v) : juce::var()); });
+        // logWarn / logError, NOT warn / error. A global `error` would shadow Lua's builtin — the
+        // standard way to raise — and turn it into a print, which is the quietest possible way to
+        // break a script. The readable spellings are ce.core.warn / ce.core.error.
+        g.set_function ("logWarn", [this] (std::string msg, sol::optional<sol::object> v)
+            { host->logAt ("warn", juce::String (msg), v ? solToVar (*v) : juce::var()); });
+        g.set_function ("logError", [this] (std::string msg, sol::optional<sol::object> v)
+            { host->logAt ("error", juce::String (msg), v ? solToVar (*v) : juce::var()); });
 
         // noTransmit/transmit blocks — wrap the user function in a transmit override.
         g.set_function ("noTransmit", [this] (sol::protected_function fn)

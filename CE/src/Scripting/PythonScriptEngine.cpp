@@ -307,6 +307,14 @@ PyObject* api_emit (PyObject*, PyObject* args)
     g_host->emitEvent (juce::String::fromUTF8 (name), (d && d != Py_None) ? pyToVar (d) : juce::var());
     Py_RETURN_NONE;
 }
+PyObject* api_logAt (PyObject*, PyObject* args)
+{
+    const char* kind = nullptr; const char* message = nullptr; PyObject* value = nullptr;
+    if (! PyArg_ParseTuple (args, "ss|O", &kind, &message, &value)) return nullptr;
+    g_host->logAt (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (message),
+                   value != nullptr ? pyToVar (value) : juce::var());
+    Py_RETURN_NONE;
+}
 PyObject* api_log (PyObject*, PyObject* args)
 {
     const char* msg = nullptr; PyObject* v = nullptr;
@@ -325,6 +333,16 @@ PyObject* api_saveSetting (PyObject*, PyObject* args)
     const char* key = nullptr; PyObject* v = nullptr;
     if (! PyArg_ParseTuple (args, "sO", &key, &v)) return nullptr;
     g_host->saveSetting (juce::String::fromUTF8 (key), pyToVar (v)); Py_RETURN_NONE;
+}
+PyObject* api_listSettings (PyObject*, PyObject*)
+{
+    return varToPy (g_host->listSettings());
+}
+PyObject* api_forgetSetting (PyObject*, PyObject* args)
+{
+    const char* key = nullptr;
+    if (! PyArg_ParseTuple (args, "s", &key)) return nullptr;
+    return PyBool_FromLong (g_host->forgetSetting (juce::String::fromUTF8 (key)) ? 1 : 0);
 }
 PyObject* api_loadSetting (PyObject*, PyObject* args)
 {
@@ -362,6 +380,8 @@ PyMethodDef apiMethods[] = {
     { "sendMidi",      api_sendMidi,      METH_VARARGS, nullptr },
     { "saveSetting",   api_saveSetting,   METH_VARARGS, nullptr },
     { "loadSetting",   api_loadSetting,   METH_VARARGS, nullptr },
+    { "listSettings",  api_listSettings,  METH_NOARGS,  nullptr },
+    { "forgetSetting", api_forgetSetting, METH_VARARGS, nullptr },
     { "requestDump",   api_requestDump,   METH_VARARGS, nullptr },
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
@@ -378,6 +398,7 @@ PyMethodDef apiMethods[] = {
     { "run",           api_run,           METH_VARARGS, nullptr },
     { "emit",          api_emit,          METH_VARARGS, nullptr },
     { "log",           api_log,           METH_VARARGS, nullptr },
+    { "logAt",         api_logAt,         METH_VARARGS, nullptr },
     { "beginTransmit", api_beginTransmit, METH_VARARGS, nullptr },
     { "endTransmit",   api_endTransmit,   METH_NOARGS,  nullptr },
     { "on",            api_on,            METH_VARARGS, nullptr },
@@ -555,6 +576,33 @@ def curve(v, shape="linear"):
     if shape == "log": return math.sqrt(max(0, v))
     if shape == "s":   return v * v * (3 - 2 * v)
     return v
+# @module ce.math
+# A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
+# Seeded is the whole point: the language's own random cannot promise the same sequence in five
+# runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
+# different in the editor and in the export.
+__RND_DEFAULT = 0x9E3779B9
+__rnd = [__RND_DEFAULT]
+def randomSeed(n):
+    import math
+    v = math.floor(n or 0) & 0xFFFFFFFF
+    # 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
+    # rather than "a generator that never moves".
+    __rnd[0] = __RND_DEFAULT if v == 0 else v
+def random(lo=None, hi=None):
+    import math
+    x = __rnd[0]
+    x = (x ^ (x << 13)) & 0xFFFFFFFF
+    x = x ^ (x >> 17)
+    x = (x ^ (x << 5)) & 0xFFFFFFFF
+    __rnd[0] = x
+    r = x / 4294967296.0
+    if lo is None or hi is None: return r
+    a, b = math.floor(lo or 0), math.floor(hi or 0)
+    low, high = min(a, b), max(a, b)
+    # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+    return low + math.floor(r * (high - low + 1))
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def noteName(n):
@@ -711,8 +759,8 @@ __WEBVIEW_ONLY = [
 # @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 # @module ce.draw
-  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawText",
-  "drawRedraw",
+  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
+  "drawText","drawRedraw",
 # @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 # @module ce.components.split
@@ -821,6 +869,15 @@ def uiDialog(opts=None, onChoice=None):
 # MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
 # makes them work identically in every runtime and every exported language. `note` accepts a MIDI
 # number or a name ("C3"), because a script that reads musically should be allowed to say so.
+# @module ce.core
+# Levels the console already renders differently, which a script could not reach until now.
+# Both PRINT — neither raises; a script wanting to stop raises its own exception.
+# logWarn / logError, NOT warn / error — a global `error` would shadow Lua's builtin in the
+# sibling engine, and the flat names have to be the same in every language.
+def logWarn(message, value=None):  return __api.logAt("warn", str(message), value)
+def logError(message, value=None): return __api.logAt("error", str(message), value)
+
+# @module ce.midi
 def sendMidi(b):                  return __api.sendMidi(b)
 def __ch(c):
     import math
@@ -835,6 +892,20 @@ def __note(n):
 
 def sendNote(channel, note, velocity):
     sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)])
+def sendRPN(channel, msb, lsb, value):
+    # RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
+    # fine tuning (0,1) and coarse tuning (0,2).
+    import math
+    s = 0xB0 | __ch(channel)
+    v = math.floor(value or 0)
+    v = 0 if v < 0 else (16383 if v > 16383 else v)
+    sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F])
+# Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
+def sendSongPosition(beats):
+    import math
+    b = math.floor(beats or 0)
+    b = 0 if b < 0 else (16383 if b > 16383 else b)
+    sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F])
 def sendNoteOff(channel, note, velocity=0):
     sendMidi([0x80 | __ch(channel), __note(note), __7(velocity)])
 def sendProgramChange(channel, program, bankMsb=None, bankLsb=None):
@@ -873,6 +944,15 @@ def __role(r):
 # snapshot cannot blank a label by writing None over it.
 def __panelQuery(kind, payload=None):
     return __api.panelQuery(kind, payload)
+# each(fn) — fn(name) for every control, containers included, in document order.
+def panelEach(fn):
+    if not callable(fn):
+        log("each(fn) needs a function to call — nothing was walked")
+        return 0
+    names = __panelQuery("controls", None)
+    if not names: return 0
+    for name in names: fn(name)
+    return len(names)
 def panelSnapshot():
     out = {}
     names = __panelQuery("controls", None)
@@ -928,6 +1008,9 @@ def deviceParameter(id, role=None):
 import types as __ce_state_types
 state = __ce_state_types.SimpleNamespace()
 def saveSetting(key, value):      return __api.saveSetting(str(key), value)
+# settings() lists every saved key; forget() deletes one and says whether there was one.
+def listSettings():               return __api.listSettings() or []
+def forgetSetting(key):           return __api.forgetSetting(str(key)) is True
 def loadSetting(key, fallback=None):
     v = __api.loadSetting(str(key))
     return fallback if v is None else v
@@ -939,17 +1022,17 @@ def loadSetting(key, fallback=None):
 # discoverability (ce.core.set is the same function as set).
 import types as __ce_types
 __CE_MODULES = {
-    "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
-    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.core": { "emit": "emit", "error": "logError", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
-    "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
+    "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
     "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
-    "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
-    "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes" },
-    "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
+    "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
+    "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "each": "panelEach", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes" },
+    "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
     "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
@@ -981,17 +1064,17 @@ __CE_MODULES = {
 }
 __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
-    { "id": "ce.core", "version": "1.0", "runtime": "any" },
-    { "id": "ce.midi", "version": "1.1", "runtime": "any" },
+    { "id": "ce.core", "version": "1.1", "runtime": "any" },
+    { "id": "ce.midi", "version": "1.2", "runtime": "any" },
     { "id": "ce.device", "version": "1.2", "runtime": "any" },
-    { "id": "ce.math", "version": "1.0", "runtime": "any" },
+    { "id": "ce.math", "version": "1.1", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
     { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
-    { "id": "ce.draw", "version": "1.0", "runtime": "webview" },
-    { "id": "ce.panel", "version": "1.1", "runtime": "any" },
-    { "id": "ce.storage", "version": "1.0", "runtime": "any" },
+    { "id": "ce.draw", "version": "1.1", "runtime": "webview" },
+    { "id": "ce.panel", "version": "1.2", "runtime": "any" },
+    { "id": "ce.storage", "version": "1.1", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.recorder", "version": "1.0", "runtime": "webview" },

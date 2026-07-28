@@ -6,7 +6,7 @@ import { isJuceAvailable } from '../bridge/bridge.js';
  * runtime error visibility (#9). The C++ ScriptRuntime emits 'scriptLog' / 'scriptError' /
  * 'scriptTrace' / 'scriptMidi' bridge events while scripts run (Model 2); they land here.
  *
- * Each entry: { id, time, kind: 'log'|'error'|'trace'|'midi', scriptId, message }
+ * Each entry: { id, time, kind: 'log'|'warn'|'error'|'trace'|'midi', scriptId, message }
  */
 
 const MAX = 1000;

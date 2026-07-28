@@ -177,6 +177,13 @@ public:
     // Debug (Q11).
     virtual void log (const juce::String& message, const juce::var& value) = 0;
 
+    /** log() at a LEVEL. `kind` is "log" | "warn" | "error" — the levels the console already
+        renders differently, which a script could not reach until now. Defaults to log() so a host
+        written before this still compiles and still prints; overriding it is what makes a warning
+        look like a warning. */
+    virtual void logAt (const juce::String& kind, const juce::String& message, const juce::var& value)
+    { juce::ignoreUnused (kind); log (message, value); }
+
     // Timers. startTimer(id, ms) starts a repeating timer that fires `onTimer` ({ id }) every ms
     // until stopTimer(id). Default no-op so alternative hosts need not implement them.
     virtual void startTimer (const juce::String& id, int intervalMs) { juce::ignoreUnused (id, intervalMs); }
@@ -188,6 +195,10 @@ public:
         already persists for as long as it is loaded. */
     virtual void saveSetting (const juce::String& key, const juce::var& value) { juce::ignoreUnused (key, value); }
     virtual juce::var loadSetting (const juce::String& key) { juce::ignoreUnused (key); return {}; }
+    /** Every saved key, as an array of strings. Empty means nothing written — not unavailable. */
+    virtual juce::var listSettings() { return juce::var (juce::Array<juce::var>()); }
+    /** Delete one. True when there WAS one, so a script can tell "cleaned up" from "nothing there". */
+    virtual bool forgetSetting (const juce::String& key) { juce::ignoreUnused (key); return false; }
 };
 
 // ----------------------------------------------------------------------------------------------

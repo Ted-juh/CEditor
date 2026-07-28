@@ -20,6 +20,31 @@
 
   // SVG needs "none" rather than an absent attribute to mean "do not paint this".
   const paint = (colour) => (colour == null || colour === '' ? 'none' : colour);
+
+  // Arc geometry. Angles arrive in DEGREES with 0 at twelve o'clock, increasing clockwise — the
+  // convention a knob's arc is described in. SVG measures from three o'clock, hence the -90.
+  function arcPoint(cx, cy, r, deg) {
+    const a = ((deg - 90) * Math.PI) / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function arcPath(c) {
+    const r = Math.max(0, c.r);
+    const sweep = c.to - c.from;
+    // A full turn (or more) has no arc endpoints to draw between — SVG would render nothing at
+    // all, since start and end coincide — so it becomes two half-circles.
+    if (Math.abs(sweep) >= 360) {
+      const [ax, ay] = arcPoint(c.cx, c.cy, r, 0);
+      const [bx, by] = arcPoint(c.cx, c.cy, r, 180);
+      return `M ${ax} ${ay} A ${r} ${r} 0 1 1 ${bx} ${by} A ${r} ${r} 0 1 1 ${ax} ${ay}`;
+    }
+    const [sx, sy] = arcPoint(c.cx, c.cy, r, c.from);
+    const [ex, ey] = arcPoint(c.cx, c.cy, r, c.to);
+    const large = Math.abs(sweep) > 180 ? 1 : 0;
+    const dir = sweep >= 0 ? 1 : 0;
+    const arc = `M ${sx} ${sy} A ${r} ${r} 0 ${large} ${dir} ${ex} ${ey}`;
+    // Filled means a pie slice: close through the centre.
+    return c.fill ? `${arc} L ${c.cx} ${c.cy} Z` : arc;
+  }
 </script>
 
 {#if commands.length}
@@ -48,6 +73,11 @@
           <circle
             cx={c.cx} cy={c.cy} r={Math.max(0, c.r)}
             fill={paint(c.fill)} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+        {:else if c.op === 'arc'}
+          <!-- Stroked as an open arc; filled as a pie slice, because a filled arc with no centre
+               would be a shape nobody asked for. -->
+          <path d={arcPath(c)}
+            fill={c.fill ? paint(c.fill) : 'none'} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
         {:else if c.op === 'line'}
           <!-- A line has no inside, so it is stroke-only whatever fill was set. -->
           <line

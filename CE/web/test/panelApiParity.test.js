@@ -491,9 +491,12 @@ test('a panel with no declaration follows its scripts, and an explicit list is o
 
 test('the cost of a panel is the sum of what it turned on', () => {
   const cost = panelModuleCost({ scripting: { modules: ['ce.math'] } });
-  assert.equal(cost.modules.length, 1, 'ce.core has no prelude of its own — its bytes are shared');
-  assert.equal(cost.modules[0].key, 'ce.math');
-  assert.ok(cost.total > 0 && cost.total === cost.modules[0].bytes);
+  // ce.core is billed alongside, because it now HAS a prelude of its own: warn()/error() are
+  // defined in the JavaScript and Python prelude text (Lua binds them from the host, so Lua's
+  // share is zero — which is exactly the sort of thing measuring rather than asserting catches).
+  const keys = cost.modules.map((m) => m.key).sort();
+  assert.deepEqual(keys, ['ce.core', 'ce.math']);
+  assert.ok(cost.total > 0 && cost.total === cost.modules.reduce((n, m) => n + m.bytes, 0));
   assert.ok(cost.shared > 0, 'the shared baseline is real and is reported separately');
   assert.ok(cost.unused.has('ce.midi'), 'and what declaring less would save is reported too');
 

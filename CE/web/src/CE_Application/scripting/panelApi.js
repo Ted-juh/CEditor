@@ -705,6 +705,21 @@ export const COMMANDS = [
     },
   },
   {
+    id: 'drawArc', category: 'Drawing', signature: 'drawArc(x, y, radius, from, to)',
+    summary: 'An arc centred on (x, y). Angles are DEGREES with 0 at twelve o\'clock, increasing clockwise — the way a knob\'s arc is described, and the same convention the Meter\'s arcStart/arcSweep use. Stroked with the current stroke; filled as a pie slice if a fill is set. The shape a knob ring, a radial meter or a pan indicator is, and the one thing path() could not express.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
+      { name: 'radius', type: 'number', required: true },
+      { name: 'from', type: 'number', required: true }, { name: 'to', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.draw.arc(${1:30}, ${2:30}, ${3:24}, 135, 135 + 270 * ${4:value})$0',
+      javascript: 'ce.draw.arc(${1:30}, ${2:30}, ${3:24}, 135, 135 + 270 * ${4:value});$0',
+    },
+  },
+  {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
     summary: 'Text at (x, y), which is its LEFT BASELINE. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".',
     runtime: RUNTIME_WEBVIEW,
@@ -986,6 +1001,25 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0', javascript: 'sendNRPN(${1:channel}, ${2:msb}, ${3:lsb}, ${4:value})$0' },
   },
+  {
+    id: 'sendRPN', category: 'Device / MIDI', signature: 'sendRPN(channel, msb, lsb, value)',
+    summary: 'Send a REGISTERED parameter number — the standard path for pitch-bend range (0,0), fine tuning (0,1) and coarse tuning (0,2), which is the kind of thing a panel sets once at load. Same shape as sendNRPN; the difference is CC 101/100 instead of 99/98.',
+    params: [
+      { name: 'channel', type: 'number', required: true },
+      { name: 'msb', type: 'number', required: true },
+      { name: 'lsb', type: 'number', required: true },
+      { name: 'value', type: 'value', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendRPN(${1:1}, 0, 0, ${2:2})  -- pitch-bend range$0', javascript: 'sendRPN(${1:1}, 0, 0, ${2:2});  // pitch-bend range$0' },
+  },
+  {
+    id: 'sendSongPosition', category: 'Device / MIDI', signature: 'sendSongPosition(beats)',
+    summary: 'Song Position Pointer — where in the song the next start should resume from, in MIDI beats (one beat = six clocks = a sixteenth note). The piece of sendTransport that was missing for anything driving an external sequencer.',
+    params: [{ name: 'beats', type: 'number', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'sendSongPosition(${1:0})$0', javascript: 'sendSongPosition(${1:0});$0' },
+  },
   // --- notes and channel messages -----------------------------------------------------------
   // Until these landed a script could turn a knob but not make a sound: sendCC/sendNRPN/sendSysex
   // were the entire MIDI vocabulary, which in a hardware editor ruled out auditioning a patch,
@@ -1125,6 +1159,21 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
   },
+  // The other two thirds of an interface. saveSetting/loadSetting could write and read a key and
+  // nothing could list or delete one, so a panel storing per-preset settings could never clean up
+  // after itself and could not show somebody what it had kept.
+  {
+    id: 'listSettings', category: 'Storage', signature: 'listSettings() -> list',
+    summary: 'Every key this panel has saved, in no particular order. An empty list means nothing has been written — not that settings are unavailable.',
+    params: [], scopes: 'any',
+    snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
+  },
+  {
+    id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key) -> boolean',
+    summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there".',
+    params: [{ name: 'key', type: 'string', required: true }], scopes: 'any',
+    snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
+  },
 
   /* --- Debug --- */
   {
@@ -1136,6 +1185,29 @@ export const COMMANDS = [
     ],
     scopes: 'any',
     snippet: { lua: 'log("${1:message}", ${2:value})$0', javascript: 'log("${1:message}", ${2:value})$0' },
+  },
+  // The console already renders these levels differently — the runtime uses the distinction
+  // constantly — and a script could not. Everything a panel author wrote landed at the same level,
+  // so a real failure read exactly like a debug print.
+  {
+    id: 'logWarn', category: 'Debug', signature: 'logWarn(message [, value])',
+    summary: 'Print at WARNING level: something is off but the panel carries on. Reads differently from log() in the console, which is the whole point.',
+    params: [
+      { name: 'message', type: 'string', required: true },
+      { name: 'value', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.core.warn("${1:message}")$0', javascript: 'ce.core.warn("${1:message}")$0' },
+  },
+  {
+    id: 'logError', category: 'Debug', signature: 'logError(message [, value])',
+    summary: 'Print at ERROR level: something the panel could not do. Reporting it does NOT stop the handler — this prints, it does not throw. To stop, use your language\'s own error()/throw, which is exactly why the flat name is logError and not error.',
+    params: [
+      { name: 'message', type: 'string', required: true },
+      { name: 'value', type: 'value', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.core.error("${1:message}")$0', javascript: 'ce.core.error("${1:message}")$0' },
   },
 ];
 
@@ -1284,6 +1356,15 @@ export const PANEL_COMMANDS = [
     snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
   },
   {
+    id: 'panelEach', category: 'Panel components', signature: 'panelEach(fn) -> number',
+    summary: 'Call `fn(name)` once for every control in the panel, containers included, in document order. Returns how many there were. Cross-runtime, like snapshot and for the same reason: walking the panel does not need a renderer. To ask what a control IS rather than what it is called, use ce.panel.info() — which does.',
+    params: [{ name: 'fn', type: 'function', required: true }], scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.each(function(name)\n  $0\nend)',
+      javascript: 'ce.panel.each(function (name) {\n  $0\n});',
+    },
+  },
+  {
     id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
     summary: 'Put the values back, and return how many landed. A name the panel no longer has is skipped rather than failing the whole restore — a snapshot taken before an edit is still worth most of what it holds.',
     params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
@@ -1318,6 +1399,13 @@ export const HELPERS = [
   { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Snap to the nearest step.' },
   { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)', summary: 'Apply a named response curve ("log","exp","s"…).' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
+  // Seeded, and seeded is the point: the language's own math.random cannot promise the same
+  // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
+  // sequence would sound different in the editor and in the exported plugin.
+  { id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
+    summary: 'A random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi INCLUSIVE — the form a script actually wants for a note or a step. Seeded, so the same seed replays the same sequence in every runtime.' },
+  { id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
+    summary: 'Set the seed. The same seed replays the same sequence — which is what makes a "random" patch something you can get back. Reseeding with 0 is treated as the default seed rather than as a dead generator.' },
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -1401,18 +1489,18 @@ export const MODULE_EXT_ROOT = 'ce.ext';   // reserved for installed third-party
 export const CE_API_VERSION = '1.0';
 
 export const MODULES = [
-  { id: 'ce.core', version: '1.0', requires: [], runtime: RUNTIME_ANY, global: true,
+  { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
     summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
   // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
   // cross-module call that `requires` does not cover, so this cannot be forgotten again.
-  { id: 'ce.midi', version: '1.1', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
+  { id: 'ce.midi', version: '1.2', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
     summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   { id: 'ce.device', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps. Needs the device host.' },
-  { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic. Pure — no host involved.' },
+  { id: 'ce.math', version: '1.1', requires: [], runtime: RUNTIME_ANY,
+    summary: 'Value and range arithmetic, plus a seeded random. Pure — no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
   { id: 'ce.time', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -1421,15 +1509,15 @@ export const MODULES = [
     summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
   { id: 'ce.ui', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Tell the person using the panel something, or ask them. Panel view only — there is nobody to tell with the window shut.' },
-  { id: 'ce.draw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+  { id: 'ce.draw', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
-  { id: 'ce.panel', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.panel', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Build the panel from a script: create, clone, parent and find controls — panel view only, each verb says so. snapshot/restore work anywhere.' },
-  { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.storage', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
@@ -1454,9 +1542,14 @@ export const MODULES = [
 // maps shortName -> memberId, which is how ce.components.setlist.next reaches `setlistNext`.
 // Every non-lifecycle member must appear exactly once — panelApiParity.test.js checks it.
 const MODULE_MEMBERS = {
-  'ce.core': ['set', 'get', 'log', 'on', 'off', 'emit', 'run', 'noTransmit', 'transmit'],
+  // The namespaced names read well; the FLAT aliases are deliberately more defensive, the same
+  // rule ce.time.playing/isPlaying follows. A global `error` would SHADOW Lua's builtin error(),
+  // turning the standard way to raise into a print — the quietest possible way to break a script.
+  'ce.core': { set: 'set', get: 'get', log: 'log', warn: 'logWarn', error: 'logError',
+               on: 'on', off: 'off', emit: 'emit', run: 'run',
+               noTransmit: 'noTransmit', transmit: 'transmit' },
   'ce.midi': [
-    'sendCC', 'sendNRPN', 'sendSysex', 'checksum', 'panic',
+    'sendCC', 'sendNRPN', 'sendRPN', 'sendSysex', 'checksum', 'panic', 'sendSongPosition',
     'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',
     'sendAftertouch', 'sendClock', 'sendTransport',
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
@@ -1471,7 +1564,10 @@ const MODULE_MEMBERS = {
     profile: 'deviceProfile', parameters: 'deviceParameters',
     parameter: 'deviceParameter', connected: 'deviceConnected',
   },
-  'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
+  // `random` and `seed` read better namespaced; flat they keep the randomSeed spelling, because
+  // a bare global called `seed` is exactly the collision §1 warned about.
+  'ce.math': { scale: 'scale', clamp: 'clamp', round: 'round', snap: 'snap', curve: 'curve',
+               lerp: 'lerp', random: 'random', seed: 'randomSeed' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {
@@ -1480,15 +1576,16 @@ const MODULE_MEMBERS = {
   'ce.ui': { notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog' },
   'ce.draw': {
     clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
-    circle: 'drawCircle', line: 'drawLine', path: 'drawPath', text: 'drawText',
+    circle: 'drawCircle', arc: 'drawArc', line: 'drawLine', path: 'drawPath', text: 'drawText',
     redraw: 'drawRedraw',
   },
   'ce.panel': {
-    snapshot: 'panelSnapshot', restore: 'panelRestore',
+    snapshot: 'panelSnapshot', restore: 'panelRestore', each: 'panelEach',
     create: 'panelCreate', clone: 'panelClone', destroy: 'panelDestroy',
     parent: 'panelParent', find: 'panelFind', info: 'panelInfo', types: 'panelTypes',
   },
-  'ce.storage': ['state', 'saveSetting', 'loadSetting'],
+  'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
+                  settings: 'listSettings', forget: 'forgetSetting' },
   'ce.time': {
     startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer', after: 'after',
     // The namespaced names read well; the FLAT aliases are deliberately more defensive.
@@ -1560,7 +1657,12 @@ export const MEMBER_MODULE = (() => {
 export function memberPath(memberId) {
   const at = memberModule()[memberId];
   if (!at) return memberId;
-  return moduleById(at.module)?.global ? at.name : `${at.module}.${at.name}`;
+  // A global module's members ARE globals, so their path is the bare name — unless the short name
+  // differs from the flat one, which is exactly the defensive case (ce.core.error is the readable
+  // spelling; the global is logError, because `error` would shadow Lua's builtin). There the
+  // namespaced path is the only place the short name exists, so it has to be spelled out.
+  if (moduleById(at.module)?.global) return at.name === memberId ? at.name : `${at.module}.${at.name}`;
+  return `${at.module}.${at.name}`;
 }
 
 /** Modules whose members a runtime must bind. Built-in only — this drives the parity suite, and

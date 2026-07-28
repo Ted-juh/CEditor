@@ -228,6 +228,20 @@ spec, so a verb cannot exist in one place and not another.
 Nothing to implement C++-side — every one of them is `runtime: 'webview'`. What matters here is
 that the generated stub list stays regenerated: **edit the spec, then run the generator.**
 
+### Levels, randomness, and the rest
+
+`ce.core.warn` / `.error` print at their own level (`ScriptHostApi::logAt`). Their FLAT names are
+`logWarn` / `logError`, not `warn` / `error`: a global `error` would shadow Lua's builtin and turn
+the standard way to raise into a print. Neither throws.
+
+`ce.math.random` / `.seed` is an xorshift32 written identically in every prelude — seeding with 0
+means the default, because 0 is a dead state; `random(lo, hi)` is inclusive at both ends.
+
+`ce.midi.sendRPN` is CC 101/100 where `sendNRPN` is 99/98. `sendSongPosition` is lsb first.
+`ce.panel.each(fn)` and `ce.storage.settings()` / `.forget(key)` complete their modules.
+`ce.draw.arc` is panel-view only like the rest of ce.draw. See §24 of
+`docs/scripting-modules-design.md`.
+
 ### Music theory
 
 `ce.music.scale(root, name)`, `.chord(root, type)` and `.quantize(note, root, name)`, over interval

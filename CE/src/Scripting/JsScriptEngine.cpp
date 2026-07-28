@@ -82,6 +82,33 @@ function scale(v, inLo, inHi, outLo, outHi) { return inHi === inLo ? outLo : out
 function snap(v, step) { return step === 0 ? v : Math.round(v / step) * step; }
 function lerp(a, b, t) { return a + (b - a) * t; }
 function curve(v, shape) { shape = shape || "linear"; if (shape === "exp") return v * v; if (shape === "log") return Math.sqrt(Math.max(0, v)); if (shape === "s") return v * v * (3 - 2 * v); return v; }
+// @module ce.math
+// A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
+// Seeded is the whole point: the language's own Math.random cannot promise the same sequence in
+// five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
+// different in the editor and in the export.
+var __RND_DEFAULT = 0x9E3779B9;
+var __rnd = __RND_DEFAULT;
+function randomSeed(n) {
+  var v = (Math.floor(Number(n) || 0)) >>> 0;
+  // 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
+  // rather than "a generator that never moves".
+  __rnd = v === 0 ? __RND_DEFAULT : v;
+}
+function random(lo, hi) {
+  var x = __rnd;
+  x = (x ^ (x << 13)) >>> 0;
+  x = (x ^ (x >>> 17)) >>> 0;
+  x = (x ^ (x << 5)) >>> 0;
+  __rnd = x;
+  var r = x / 4294967296;
+  if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
+  var a = Math.floor(Number(lo) || 0), b = Math.floor(Number(hi) || 0);
+  var low = Math.min(a, b), high = Math.max(a, b);
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  return low + Math.floor(r * (high - low + 1));
+}
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function noteName(n) { n = Math.floor(n); return __NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); }
@@ -209,8 +236,8 @@ var __WEBVIEW_ONLY = [
 // @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 // @module ce.draw
-  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawText",
-  "drawRedraw",
+  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
+  "drawText","drawRedraw",
 // @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 // @module ce.components.split
@@ -326,12 +353,33 @@ __global.uiDialog = function (opts, onChoice) {
 // MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
 // makes them work identically in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
+// @module ce.core
+// Levels the console already renders differently, which a script could not reach until now.
+// Both PRINT — neither throws; a script wanting to stop uses `throw`.
+// logWarn / logError, NOT warn / error — a global `error` would shadow Lua's builtin in the
+// sibling engine, and the flat names have to be the same in every language.
+function logWarn(message, value) { return __api.logAt("warn", String(message), value); }
+function logError(message, value) { return __api.logAt("error", String(message), value); }
+
+// @module ce.midi
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
 function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
 function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
 function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
 
 function sendNote(channel, note, velocity) { sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)]); }
+function sendRPN(channel, msb, lsb, value) {
+  // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
+  // fine tuning (0,1) and coarse tuning (0,2).
+  var s = 0xB0 | __ch(channel);
+  var v = Math.floor(Number(value) || 0); v = v < 0 ? 0 : (v > 16383 ? 16383 : v);
+  sendMidi([s, 0x65, __7(msb), s, 0x64, __7(lsb), s, 0x06, (v >> 7) & 0x7F, s, 0x26, v & 0x7F]);
+}
+// Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
+function sendSongPosition(beats) {
+  var b = Math.floor(Number(beats) || 0); b = b < 0 ? 0 : (b > 16383 ? 16383 : b);
+  sendMidi([0xF2, b & 0x7F, (b >> 7) & 0x7F]);
+}
 function sendNoteOff(channel, note, velocity) { sendMidi([0x80 | __ch(channel), __note(note), __7(velocity || 0)]); }
 function sendProgramChange(channel, program, bankMsb, bankLsb) {
   // Bank select first: a device applies the bank that was in force when the program change lands.
@@ -454,6 +502,17 @@ function __deviceQuery(kind, payload) { return __api.deviceQuery(kind, payload |
 // A control with no value of its own is LEFT OUT rather than recorded as nothing, so restoring a
 // snapshot cannot blank a label by writing null over it.
 function __panelQuery(kind, payload) { return __api.panelQuery(kind, payload || null); }
+// each(fn) — fn(name) for every control, containers included, in document order.
+function panelEach(fn) {
+  if (typeof fn !== "function") {
+    log("each(fn) needs a function to call — nothing was walked");
+    return 0;
+  }
+  var names = __panelQuery("controls", null);
+  if (!names) return 0;
+  for (var i = 0; i < names.length; i++) fn(names[i]);
+  return names.length;
+}
 function panelSnapshot() {
   var out = {}, names = __panelQuery("controls", null);
   if (!names) return out;
@@ -511,6 +570,9 @@ function deviceParameter(id, role) {
 // Settings go through the host, because they outlive the session.
 var state = {};
 function saveSetting(key, value) { return __api.saveSetting(String(key), value); }
+// settings() lists every saved key; forget() deletes one and says whether there was one.
+function listSettings() { return __api.listSettings() || []; }
+function forgetSetting(key) { return __api.forgetSetting(String(key)) === true; }
 function loadSetting(key, fallback) {
   var v = __api.loadSetting(String(key));
   return (v === undefined || v === null) ? fallback : v;
@@ -522,17 +584,17 @@ function loadSetting(key, fallback) {
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
-  "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
-  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.core": { "emit": "emit", "error": "logError", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
-  "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
+  "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
   "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
   "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
-  "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
-  "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes" },
-  "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
+  "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
+  "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "each": "panelEach", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes" },
+  "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
   "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
   "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
@@ -563,7 +625,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.2","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.1","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.2","runtime":"any"},{"id":"ce.device","version":"1.2","runtime":"any"},{"id":"ce.math","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.2","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -699,9 +761,13 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
     api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var { host->saveSetting (arg (a, 0).toString(), arg (a, 1)); return {}; });
     api->setMethod ("loadSetting", [host, arg] (const Args& a) -> juce::var { return host->loadSetting (arg (a, 0).toString()); });
+    api->setMethod ("listSettings", [host] (const Args&) -> juce::var { return host->listSettings(); });
+    api->setMethod ("forgetSetting", [host, arg] (const Args& a) -> juce::var { return host->forgetSetting (arg (a, 0).toString()); });
     api->setMethod ("run", [host, arg] (const Args& a) -> juce::var { return host->runAction (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("emit", [host, arg] (const Args& a) -> juce::var { host->emitEvent (arg (a, 0).toString(), arg (a, 1)); return {}; });
     api->setMethod ("log", [host, arg] (const Args& a) -> juce::var { host->log (arg (a, 0).toString(), arg (a, 1)); return {}; });
+    api->setMethod ("logAt", [host, arg] (const Args& a) -> juce::var
+        { host->logAt (arg (a, 0).toString(), arg (a, 1).toString(), arg (a, 2)); return {}; });
     api->setMethod ("beginTransmit", [host, arg] (const Args& a) -> juce::var { host->beginTransmitOverride ((bool) arg (a, 0)); return {}; });
     api->setMethod ("endTransmit", [host] (const Args&) -> juce::var { host->endTransmitOverride(); return {}; });
     return api;

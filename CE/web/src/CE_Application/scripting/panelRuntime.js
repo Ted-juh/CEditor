@@ -424,6 +424,39 @@ const musicNotes = (table, root, name) => {
   return steps.map((x) => base + x);
 };
 // @module ce.math
+// A seeded xorshift32, written the same way in every prelude and masked to 32 bits at every step.
+// Seeded is the whole point: the language's own math.random cannot promise the same sequence in
+// five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
+// different in the editor and in the export.
+const DEFAULT_SEED = 0x9E3779B9;
+let randomState = DEFAULT_SEED;
+
+function randomNext() {
+  let x = randomState;
+  x = (x ^ (x << 13)) >>> 0;
+  x = (x ^ (x >>> 17)) >>> 0;
+  x = (x ^ (x << 5)) >>> 0;
+  randomState = x;
+  return x / 4294967296;      // [0, 1)
+}
+
+function randomSeedImpl(n) {
+  const v = Math.floor(Number(n) || 0) >>> 0;
+  // 0 is a dead state for xorshift — it would return zero forever — so it means "the default"
+  // rather than "a generator that never moves".
+  randomState = v === 0 ? DEFAULT_SEED : v;
+}
+
+function randomImpl(lo, hi) {
+  const r = randomNext();
+  if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
+  const a = Math.floor(Number(lo)), b = Math.floor(Number(hi));
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return r;
+  // Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
+  const low = Math.min(a, b), high = Math.max(a, b);
+  return low + Math.floor(r * (high - low + 1));
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -432,6 +465,8 @@ const helpers = {
   lerp: (a, b, t) => a + (b - a) * t,
   curve: (v, shape) => (shape === 'exp' ? v * v : shape === 'log' ? Math.sqrt(Math.max(0, v)) : shape === 's' ? v * v * (3 - 2 * v) : v),
   // @module ce.music
+  random: (lo, hi) => randomImpl(lo, hi),
+  randomSeed: (n) => randomSeedImpl(n),
   noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
   noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
   // Scales, chords and snap-to-key. Same tables the C++ preludes are generated from, so a script
@@ -589,6 +624,19 @@ const midiApi = {
 
   sendCC: (ch, cc, v) =>
     sendRawMidi([0xB0 | (midiInt(ch, 1, 16) - 1), midiInt(cc, 0, 127), midiInt(v, 0, 127)], `cc_${midiInt(cc, 0, 127)}`),
+  // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range,
+  // fine tuning and coarse tuning, which is what a panel sets once at load.
+  sendRPN: (ch, msb, lsb, v) => {
+    const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
+    const val = midiInt(v, 0, 16383);
+    sendRawMidi([s, 0x65, midiInt(msb, 0, 127), s, 0x64, midiInt(lsb, 0, 127),
+      s, 0x06, (val >> 7) & 0x7f, s, 0x26, val & 0x7f], `rpn_${midiInt(msb, 0, 127)}_${midiInt(lsb, 0, 127)}`);
+  },
+  // Song Position Pointer: where the next start resumes from, in MIDI beats (six clocks each).
+  sendSongPosition: (beats) => {
+    const b = midiInt(beats, 0, 16383);
+    sendRawMidi([0xF2, b & 0x7f, (b >> 7) & 0x7f], 'songPosition');
+  },
   sendNRPN: (ch, msb, lsb, v) => {
     const s = 0xB0 | (midiInt(ch, 1, 16) - 1);
     const val = midiInt(v, 0, 16383);
@@ -682,6 +730,12 @@ const midiApi = {
     return null;
   },
 };
+
+/** One printer for log/warn/error, so the three cannot format differently. */
+function scriptPrint(kind, scriptId, message, value) {
+  addScriptTrace(kind, scriptId ?? '',
+    value !== undefined ? `${message} ${JSON.stringify(value)}` : String(message));
+}
 
 /* ------------------------------------------------------------------ API + executor */
 
@@ -1427,6 +1481,25 @@ function panelInfoImpl(name) {
  * longer has rather than failing the whole call — a snapshot taken before an edit is still worth
  * most of what it holds, and an all-or-nothing restore would throw the rest away.
  */
+/** each(fn) — fn(name) for every control, containers included, in document order. */
+function panelEachImpl(scriptId, fn) {
+  if (typeof fn !== 'function') {
+    addScriptTrace('error', scriptId ?? '', 'each(fn) needs a function to call — nothing was walked');
+    return 0;
+  }
+  const panel = activePanel();
+  if (!panel) return 0;
+  let n = 0;
+  // The names are collected BEFORE any is handed over: a callback that creates or destroys a
+  // control would otherwise be mutating the list it is being walked through.
+  const names = flatControls(panel.controls ?? [])
+    .map((c) => c?._children?.Core?.name).filter(Boolean);
+  for (const name of names) {
+    try { fn(name); n += 1; } catch (e) { reportScriptError(scriptId ?? '', e); return n; }
+  }
+  return n;
+}
+
 function panelSnapshotImpl() {
   const panel = activePanel();
   const out = {};
@@ -1765,6 +1838,20 @@ function loadSetting(key, fallback) {
   return v === undefined ? fallback : v;
 }
 
+/** Every key this panel has saved. Empty means nothing written — not "settings unavailable". */
+function listSettings() {
+  return Object.keys(settingsStore() ?? {});
+}
+
+/** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing there". */
+function forgetSetting(key) {
+  const store = settingsStore();
+  const k = String(key);
+  if (!store || !(k in store)) return false;
+  delete store[k];
+  return true;
+}
+
 // @module -
 function buildApi(ownerName, scriptId = '') {
   const self = {
@@ -1777,7 +1864,16 @@ function buildApi(ownerName, scriptId = '') {
     // set(path, v, { transmit: false }) is unaffected.
     set: (path, value, form) => setValue(path, value, typeof form === 'string' ? form : ''),
     get: (path, form) => getValue(path, form),
-    log: (msg, val) => addScriptTrace('log', '', val !== undefined ? `${msg} ${JSON.stringify(val)}` : String(msg)),
+    log: (msg, val) => scriptPrint('log', scriptId, msg, val),
+    // Levels the console already renders differently — the runtime uses the distinction constantly
+    // and a script could not, so a real failure read exactly like a debug print.
+    //
+    // logWarn / logError, NOT warn / error: a global `error` would SHADOW Lua's builtin in the
+    // sibling engine, turning the standard way to raise into a print. ce.core.warn/.error are the
+    // spellings anybody writes; the flat aliases are defensive, like isPlaying beside .playing.
+    logWarn: (msg, val) => scriptPrint('warn', scriptId, msg, val),
+    // Prints. Does NOT throw — a script wanting to stop uses its own language's error/throw.
+    logError: (msg, val) => scriptPrint('error', scriptId, msg, val),
     // MIDI/device — real raw send via the device bridge; bulk codec is a fast-follow.
     ...midiApi,
     // Zone Splitter — change the split from a footswitch.
@@ -1821,6 +1917,11 @@ function buildApi(ownerName, scriptId = '') {
         radius: Number(radius) > 0 ? Number(radius) : 0 }),
     drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
       { op: 'circle', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0 }),
+    // Angles in DEGREES, 0 at twelve o'clock, clockwise — the way a knob's arc is described, and
+    // the convention the Meter's arcStart/arcSweep already use. The renderer converts.
+    drawArc: (cx, cy, r, from, to) => pushCommand(null, ownerName,
+      { op: 'arc', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0,
+        from: Number(from) || 0, to: Number(to) || 0 }),
     drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
       { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
     drawPath: (points, closed) => pushCommand(null, ownerName,
@@ -1842,6 +1943,7 @@ function buildApi(ownerName, scriptId = '') {
     // The two ce.panel verbs that are NOT panel-view only. The C++ preludes build these on a host
     // query for the control names plus get/set; here the panel object is in hand, so the same walk
     // is direct. Same rules either way — see panelSnapshotImpl.
+    panelEach: (fn) => panelEachImpl(scriptId, fn),
     panelSnapshot: () => panelSnapshotImpl(),
     panelRestore: (snap) => panelRestoreImpl(snap),
     // ce.time — reads and musical timers
@@ -1862,6 +1964,8 @@ function buildApi(ownerName, scriptId = '') {
     state: stateFor(scriptId),
     saveSetting: (key, value) => saveSetting(key, value),
     loadSetting: (key, fallback) => loadSetting(key, fallback),
+    listSettings: () => listSettings(),
+    forgetSetting: (key) => forgetSetting(key),
     // The blocks gate set()'s transmission, not the explicit senders — same rule as the C++ host.
     // finally, not catch-and-continue: an exception inside the block must not leave the override
     // stuck on, or every later write in the panel inherits it.

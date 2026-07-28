@@ -105,10 +105,10 @@ the beginning.
 | `ce.core` | `set` `get` `log` `on` `off` `emit` `run`, lifecycle | any — **stays global** |
 | `ce.midi` | CC/NRPN/Sysex + note/PC/bend/aftertouch/clock, `panic`, `checksum`, the 14 encoders | any |
 | `ce.device` | dumps, `parameters()`, `profile()`, presets | any, needs device host |
-| `ce.math` | `scale` `clamp` `round` `snap` `curve` `lerp`, seeded `random` | any |
+| `ce.math` | `scale` `clamp` `round` `snap` `curve` `lerp`, seeded `random` | any — ✅ *complete* (§24) |
 | `ce.music` | note names, scales, chords, quantise-to-scale | any — ✅ *complete* (§20) |
 | `ce.time` | `tempo()`, `onBeat`/`onBar`, timers, `after`, `syncTimer` | any |
-| `ce.panel` | `create` `destroy` `clone` `parent` `find` `each` `snapshot` | structure: webview; `snapshot`/`restore` any — §22 |
+| `ce.panel` | `create` `destroy` `clone` `parent` `find` `each` `snapshot` | structure: webview; `snapshot`/`restore`/`each` any — §22, §24 |
 | `ce.draw` | the 2D context + `onDraw` | webview |
 | `ce.anim` | `animate` `spring` | values any, visuals webview |
 | `ce.ui` | `notify` `status` `dialog` | webview |
@@ -1367,3 +1367,52 @@ knob turn are indistinguishable downstream — the same rule the Setlist's index
 is its own host method rather than a sixth kind — `deviceQuery` is documented as reading the device
 profile, and hiding a send inside it would make that comment a lie. Both report themselves with no
 device host: `read` returns nothing, `write` returns `false` and says where it does work.
+
+---
+
+## 24. The last six — and one that turned out not to be missing
+
+The review list is empty. Six candidates, in one pass.
+
+| verb | why |
+|---|---|
+| `ce.math.random` / `.seed` | §2 said "seeded `random`" and it was never built |
+| `ce.midi.sendRPN` / `.sendSongPosition` | NRPN was there and RPN — the *standard* path for pitch-bend range and tuning — was not |
+| `ce.core.warn` / `.error` | the console renders levels; a script could not reach them |
+| `ce.panel.each` | §2 listed it; `find` gets one control, nothing iterated |
+| `ce.storage.settings` / `.forget` | two thirds of an interface: you could write and read a key, never list or delete one |
+| `ce.draw.arc` | knob rings, radial meters, pan indicators — the one shape `path()` cannot express |
+
+### `ce.draw.font` was not a gap
+
+I listed it in the review as missing. It is not: `drawText` already takes
+`{ size, align, family }` and the renderer honours all three. Reading the contract before adding to
+it is cheaper than the verb would have been.
+
+### Seeded means seeded
+
+An xorshift32, written identically in all four runtimes and masked to 32 bits at every step, with the
+sequence itself pinned by a cross-engine test — because "the same in every runtime" is the whole
+promise, and only comparing the actual numbers catches a masking slip in one language. Two rules:
+**0 is a dead state** for xorshift, so seeding with it means "the default" rather than a generator
+that returns zero forever; and `random(lo, hi)` is **inclusive at both ends**, which is the form a
+script wants for a note or a step.
+
+### The one that nearly shipped wrong
+
+`ce.core.error` was going to be a global called `error` — which in Lua **shadows the builtin**,
+turning the standard way to raise into a print. Every `onError` test in the C++ suite failed at once,
+which is the best possible outcome: the mistake was loud.
+
+The flat names are `logWarn` and `logError`; the readable spellings stay `ce.core.warn` and
+`ce.core.error`. That is the same rule `ce.time.playing` → `isPlaying` already follows: *the
+namespaced names read well, the flat aliases are deliberately defensive.* `memberPath` learned it
+too — a global module's member is normally reachable at its bare name, but where the short name
+differs from the flat one, the namespaced path is the only place the short name exists.
+
+### One thing measuring caught
+
+Adding `warn`/`error` gave `ce.core` a prelude of its own for the first time — in JavaScript and
+Python, where they are prelude text; Lua binds them from the host, so Lua's share is zero. A test
+asserting "ce.core has no prelude of its own" started failing, correctly. That asymmetry is invisible
+unless the cost is measured rather than asserted, which is why it is.

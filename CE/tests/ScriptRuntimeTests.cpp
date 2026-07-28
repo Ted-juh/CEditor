@@ -68,6 +68,13 @@ public:
 
     std::map<juce::String, juce::var> settings;
     void saveSetting (const juce::String& key, const juce::var& value) override { settings[key] = value; }
+    juce::var listSettings() override
+    {
+        juce::Array<juce::var> keys;
+        for (const auto& [k, v] : settings) { juce::ignoreUnused (v); keys.add (k); }
+        return juce::var (keys);
+    }
+    bool forgetSetting (const juce::String& key) override { return settings.erase (key) > 0; }
     juce::var loadSetting (const juce::String& key) override
     { auto it = settings.find (key); return it != settings.end() ? it->second : juce::var(); }
     void sendSysex (const juce::var&) override {}
@@ -189,6 +196,11 @@ public:
     { if (runtime != nullptr) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime != nullptr && runtime->animationRunning (path); }
+
+    // Levelled log lines, "warn:…" / "error:…", so a test can tell them apart from log().
+    juce::StringArray levelled;
+    void logAt (const juce::String& kind, const juce::String& message, const juce::var& value) override
+    { levelled.add (kind + ":" + message); log (message, value); }
 
     juce::StringArray uiMessages;
     void uiNotify (const juce::String& m, const juce::var&) override { uiMessages.add ("notify:" + m); }
@@ -1752,6 +1764,138 @@ int main()
         check (host.logs.contains ("wrote false"), "…and write() says false rather than claiming a send");
         check (host.deviceWrites.isEmpty(), "…and nothing went out");
         host.deviceHost = true;
+    }
+
+    // 30) The last of the list (design doc §24) ---------------------------------------------------
+    // ce.math.random/seed, ce.midi.sendRPN/sendSongPosition, ce.core.warn/error, ce.panel.each.
+    {
+        juce::Array<juce::var> lastScripts;
+        lastScripts.add (makeScript ("last", "lua", "panel", "onLast", "*",
+            "function onLast()\n"
+            "  ce.math.seed(12345)\n"
+            "  local a = {} for i = 1, 4 do a[i] = ce.math.random(1, 6) end\n"
+            "  ce.math.seed(12345)\n"
+            "  local b = {} for i = 1, 4 do b[i] = ce.math.random(1, 6) end\n"
+            "  local same = true for i = 1, 4 do if a[i] ~= b[i] then same = false end end\n"
+            "  log(\"repeat \" .. tostring(same))\n"
+            "  log(\"seq \" .. a[1] .. \",\" .. a[2] .. \",\" .. a[3] .. \",\" .. a[4])\n"
+            "  local inRange = true for i = 1, 4 do if a[i] < 1 or a[i] > 6 then inRange = false end end\n"
+            "  log(\"range \" .. tostring(inRange))\n"
+            "  local f = ce.math.random()\n"
+            "  log(\"float \" .. tostring(f >= 0 and f < 1))\n"
+            "  ce.math.seed(0)\n"
+            "  log(\"zeroseed \" .. tostring(ce.math.random() > 0))\n"
+            "end\n"
+            "function onMidi2()\n"
+            "  ce.midi.sendRPN(1, 0, 0, 2)\n"
+            "  ce.midi.sendSongPosition(16)\n"
+            "end\n"
+            "function onSay() ce.core.warn(\"careful\") ce.core.error(\"nope\") log(\"after\") end\n"));
+        lastScripts.add (makeScript ("lastjs", "javascript", "panel", "onLastJs", "*",
+            "function onLastJs() {\n"
+            "  ce.math.seed(12345);\n"
+            "  log('js seq ' + [ce.math.random(1,6), ce.math.random(1,6), ce.math.random(1,6), ce.math.random(1,6)].join(','));\n"
+            "}"));
+        runtime.loadScripts (juce::var (lastScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onLast", juce::var());
+        check (host.logs.contains ("repeat true"),
+               "the same seed replays the same sequence — which is what makes a random patch reproducible");
+        check (host.logs.contains ("range true"), "…two arguments give a whole number in [lo, hi]");
+        check (host.logs.contains ("float true"), "…and no arguments give a float in [0, 1)");
+        // 0 is a DEAD state for xorshift: seeded with it the generator would return zero forever.
+        check (host.logs.contains ("zeroseed true"), "seeding with 0 falls back to the default, not to a dead generator");
+
+        // The sequence itself is pinned, because "the same in every runtime" is the whole promise
+        // and only comparing the actual numbers can catch a masking slip in one language.
+        juce::String luaSeq;
+        for (const auto& l : host.logs) if (l.startsWith ("seq ")) luaSeq = l.substring (4);
+        check (luaSeq.isNotEmpty(), "…the sequence was recorded");
+        host.logs.clear();
+        runtime.runAction ("onLastJs", juce::var());
+        check (host.logs.contains ("js seq " + luaSeq),
+               "…and JavaScript produces the IDENTICAL sequence from the identical seed");
+
+        host.rawSends.clear();
+        runtime.runAction ("onMidi2", juce::var());
+        // RPN is CC 101/100 (0x65/0x64), where NRPN is 99/98 — a pitch-bend range of 2 semitones.
+        check (host.rawSends.contains ("B0 65 00 B0 64 00 B0 06 00 B0 26 02"),
+               "sendRPN uses CC 101/100, and splits the value into msb/lsb");
+        // Song position is LSB FIRST — the one place in MIDI where it is, and an easy thing to
+        // reverse. 16 beats = 0x10 lsb, 0x00 msb.
+        check (host.rawSends.contains ("F2 10 00"), "sendSongPosition is lsb first, then msb");
+
+        host.logs.clear(); host.levelled.clear();
+        runtime.runAction ("onSay", juce::var());
+        check (host.levelled.contains ("warn:careful"), "warn() reaches the host at warning level");
+        check (host.levelled.contains ("error:nope"), "…and error() at error level");
+        // error() PRINTS. It does not throw — a script wanting to stop uses its own language's.
+        check (host.logs.contains ("after"), "…and error() does not stop the handler; it prints");
+
+        // each(): one call per control, in document order, over the same panelQuery the snapshot
+        // walks — so what it iterates is exactly what a script could already address by name.
+        auto eachDoc = juce::JSON::parse (R"JSON({
+          "controls": [
+            { "_children": { "Core": { "name": "A" } } },
+            { "_children": { "Core": { "name": "Grp" },
+                             "Children": { "_children": {
+                               "k": { "_children": { "Core": { "name": "B" } } } } } } }
+          ]
+        })JSON");
+        ceditor::PanelValueModel eachModel;
+        eachModel.load (eachDoc);
+        TestHost eachHost;
+        eachHost.model = &eachModel;
+        ScriptRuntime eachRuntime (eachHost);
+        juce::Array<juce::var> eachScripts;
+        eachScripts.add (makeScript ("each", "lua", "panel", "onEach", "*",
+            "function onEach()\n"
+            "  local seen = \"\"\n"
+            "  local n = ce.panel.each(function(name) seen = seen .. name .. \" \" end)\n"
+            "  log(\"each \" .. n .. \" | \" .. seen)\n"
+            "  log(\"bad \" .. tostring(ce.panel.each(nil)))\n"
+            "end\n"));
+        eachRuntime.loadScripts (juce::var (eachScripts));
+        eachHost.logs.clear();
+        eachRuntime.runAction ("onEach", juce::var());
+        check (eachHost.logs.contains ("each 3 | A Grp B "),
+               "each() visits every control, containers included, in document order");
+        check (eachHost.logs.contains ("bad 0"), "…and calling it without a function walks nothing");
+    }
+
+    // 31) ce.storage.settings / forget, and ce.draw.arc (design doc §24) --------------------------
+    {
+        juce::Array<juce::var> storeScripts;
+        storeScripts.add (makeScript ("store", "lua", "panel", "onStore", "*",
+            "function onStore()\n"
+            "  saveSetting(\"a\", 1) saveSetting(\"b\", 2)\n"
+            "  local k = ce.storage.settings()\n"
+            "  log(\"keys \" .. #k .. \" \" .. table.concat(k, \",\"))\n"
+            "  log(\"gone \" .. tostring(ce.storage.forget(\"a\")))\n"
+            "  log(\"again \" .. tostring(ce.storage.forget(\"a\")))\n"
+            "  log(\"left \" .. #ce.storage.settings())\n"
+            "  log(\"read \" .. tostring(loadSetting(\"a\", \"none\")))\n"
+            "end\n"
+            "function onArc() log(\"arc \" .. tostring(ce.draw.arc(10, 10, 8, 135, 405))) end\n"));
+        runtime.loadScripts (juce::var (storeScripts));
+
+        host.settings.clear(); host.logs.clear(); errors.clear();
+        runtime.runAction ("onStore", juce::var());
+        check (host.logs.contains ("keys 2 a,b"), "settings() lists every saved key");
+        check (host.logs.contains ("gone true"), "forget() says there WAS one to delete");
+        // The distinction is the point: "cleaned up" has to read differently from "nothing there".
+        check (host.logs.contains ("again false"), "…and false the second time");
+        check (host.logs.contains ("left 1"), "…and the key is really gone");
+        check (host.logs.contains ("read none"), "…so loading it falls back");
+        check (errors.isEmpty(), "no errors from the storage verbs");
+
+        // arc is panel-view only, like the rest of ce.draw — the stub must explain itself and
+        // return nil rather than zero values, so tostring() of the result cannot throw.
+        host.logs.clear();
+        runtime.runAction ("onArc", juce::var());
+        check (host.logs.contains ("arc nil"), "ce.draw.arc window-closed yields nil, not no value");
+        check (host.logs.joinIntoString ("\n").contains ("panel window open"), "…having said why");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

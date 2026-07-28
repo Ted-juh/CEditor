@@ -7,12 +7,17 @@
 
   let { compact = false } = $props();
 
-  // Which kinds are visible. 'trace' folds into the generic bucket with 'log'.
-  let show = $state({ log: true, error: true, midi: true });
-  function kindBucket(kind) { return kind === 'error' ? 'error' : kind === 'midi' ? 'midi' : 'log'; }
+  // Which kinds are visible. 'trace' folds into the generic bucket with 'log'; 'warn' gets its own
+  // bucket, because a warning that is filtered away with the logs is a warning nobody reads.
+  let show = $state({ log: true, warn: true, error: true, midi: true });
+  function kindBucket(kind) {
+    if (kind === 'error') return 'error';
+    if (kind === 'warn') return 'warn';
+    return kind === 'midi' ? 'midi' : 'log';
+  }
 
   let counts = $derived.by(() => {
-    const c = { log: 0, error: 0, midi: 0 };
+    const c = { log: 0, warn: 0, error: 0, midi: 0 };
     for (const e of $scriptTrace) c[kindBucket(e.kind)]++;
     return c;
   });
@@ -30,7 +35,7 @@
     if (stick && listEl) listEl.scrollTop = listEl.scrollHeight;
   });
 
-  const ICON = { error: '✕', midi: '→', log: '›', trace: '·' };
+  const ICON = { error: '✕', warn: '!', midi: '→', log: '›', trace: '·' };
 </script>
 
 <div class={['sc', compact && 'compact']}>
@@ -38,6 +43,7 @@
     <span class="sc-title">Console</span>
     <span class="sc-filters">
       <button class={['sc-chip', 'log', show.log && 'on']} onclick={() => show.log = !show.log}>Logs {counts.log}</button>
+      <button class={['sc-chip', 'warn', show.warn && 'on']} onclick={() => show.warn = !show.warn}>Warnings {counts.warn}</button>
       <button class={['sc-chip', 'error', show.error && 'on']} onclick={() => show.error = !show.error}>Errors {counts.error}</button>
       <button class={['sc-chip', 'midi', show.midi && 'on']} onclick={() => show.midi = !show.midi}>MIDI {counts.midi}</button>
     </span>
@@ -70,6 +76,7 @@
     color: var(--txt-faint); cursor: pointer; font-size: 11px; padding: 2px 9px; line-height: 1.5;
   }
   .sc-chip.on.log { color: var(--txt); border-color: var(--line-2); }
+  .sc-chip.on.warn { color: #e6c46a; border-color: #8a6a20; }
   .sc-chip.on.error { color: #f0a59f; border-color: var(--red); }
   .sc-chip.on.midi { color: #8fc0f5; border-color: var(--blue); }
   .sc-chip:not(.on) { opacity: .5; }
@@ -79,9 +86,11 @@
   .sc.compact .sc-list { max-height: 150px; }
   .sc-empty { color: var(--txt-faint); font-size: 12px; padding: 14px; font-family: 'Archivo', system-ui, sans-serif; line-height: 1.5; }
   .sc-line { display: flex; gap: 8px; align-items: baseline; padding: 2px 8px; border-radius: 4px; }
+  .sc-line.warn { background: rgba(226, 185, 90, 0.09); }
   .sc-line.error { background: rgba(224, 99, 90, 0.1); }
   .sc-time { color: var(--txt-faint); flex-shrink: 0; font-size: 11px; }
   .sc-icon { flex-shrink: 0; width: 10px; text-align: center; }
+  .sc-line.warn .sc-icon, .sc-line.warn .sc-msg { color: #e6c46a; }
   .sc-line.error .sc-icon, .sc-line.error .sc-msg { color: #f0a59f; }
   .sc-line.midi .sc-icon, .sc-line.midi .sc-msg { color: #8fc0f5; }
   .sc-line.log .sc-icon { color: var(--txt-faint); }
