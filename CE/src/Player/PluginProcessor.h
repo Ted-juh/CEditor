@@ -303,6 +303,71 @@ private:
 #if CEDITOR_VALUE_LAYER
     // Window-closed automation -> MIDI. While the editor is open the WebView/JS sends (and we skip,
     // to avoid double-sends); when it closes we re-send current values then stream changes.
+   #if CEDITOR_SCRIPTING
+    // ce.time events, raised from this same 30Hz message-thread timer. That polling rate is the
+    // honest limit: a beat at 120bpm is 500ms, so onBeat lands within a frame of it — right for
+    // lighting an LED or stepping a sequencer, and NEVER to be used to time audio. Only
+    // TRANSITIONS are raised, so a stopped transport is silent rather than repeating itself.
+    int  lastScriptBeat = -1;
+    int  lastScriptBar = -1;
+    bool lastScriptPlaying = false;
+    double lastScriptBpm = 0.0;
+
+    void dispatchScriptTimeEvents()
+    {
+        if (scriptRuntime == nullptr) return;
+        const auto pos = hostPosition();
+
+        const bool playing = pos.valid && pos.playing;
+        const double bpm = pos.valid && pos.hasTempo ? pos.bpm : 0.0;
+        const int beatsPerBar = pos.valid && pos.hasTimeSig && pos.timeSigNumerator > 0
+                                  ? pos.timeSigNumerator : 4;
+
+        auto makePayload = [&] (int bar, int beat)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("playing", playing);
+            if (bpm > 0.0) o->setProperty ("bpm", bpm);
+            o->setProperty ("beats", pos.valid && pos.hasPpq ? pos.ppqPosition : 0.0);
+            o->setProperty ("bar", bar);
+            o->setProperty ("beat", beat);
+            o->setProperty ("beatsPerBar", beatsPerBar);
+            o->setProperty ("source", "host");
+            return juce::var (o);
+        };
+
+        // Transport edges: started, stopped, or the tempo moved enough to matter.
+        if (playing != lastScriptPlaying || std::abs (bpm - lastScriptBpm) > 0.001)
+        {
+            lastScriptPlaying = playing;
+            lastScriptBpm = bpm;
+            scriptRuntime->dispatchEvent ("onTransport", "panel", makePayload (0, 0));
+        }
+
+        if (! playing || ! pos.valid || ! pos.hasPpq)
+        {
+            // Stopped or position-less: forget where we were, so restarting raises the first beat
+            // again instead of swallowing it as "no change".
+            lastScriptBeat = -1;
+            lastScriptBar = -1;
+            return;
+        }
+
+        const int absoluteBeat = (int) std::floor (pos.ppqPosition);
+        if (absoluteBeat == lastScriptBeat) return;
+        lastScriptBeat = absoluteBeat;
+
+        const int bar = absoluteBeat / juce::jmax (1, beatsPerBar) + 1;
+        const int beat = absoluteBeat % juce::jmax (1, beatsPerBar) + 1;
+        scriptRuntime->dispatchEvent ("onBeat", "panel", makePayload (bar, beat));
+        if (bar != lastScriptBar)
+        {
+            lastScriptBar = bar;
+            scriptRuntime->dispatchEvent ("onBar", "panel", makePayload (bar, beat));
+        }
+    }
+   #endif
+
     void timerCallback() override
     {
         const bool windowOpen = getActiveEditor() != nullptr;
@@ -332,6 +397,7 @@ private:
             }
         }
        #if CEDITOR_SCRIPTING
+        dispatchScriptTimeEvents();
         // Window-closed value events: when a bound parameter changes (DAW automation), update the
         // mirror and dispatch onValueChanged so scripts react with the GUI closed (window-open the JS
         // runtime does this). Change-detected so it fires once per move, not every tick.
@@ -691,6 +757,24 @@ private:
         };
         // ce.storage settings. The plugin has no .cepanel to write, so they live in memory and ride
         // along in the DAW project state the processor already saves (see getStateInformation).
+        // ce.time. The playhead is already captured on the audio thread into plain atomics
+        // (captureHostPosition); this just reshapes the snapshot into the contract's vocabulary.
+        // `valid` is the host's own answer, so a DAW that reports no position gives the script
+        // valid=false rather than a plausible-looking 120bpm it never measured.
+        cb.transportState = [this] () -> juce::var
+        {
+            const auto pos = hostPosition();
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("valid", pos.valid);
+            o->setProperty ("playing", pos.valid && pos.playing);
+            o->setProperty ("recording", pos.valid && pos.recording);
+            if (pos.valid && pos.hasTempo) o->setProperty ("bpm", pos.bpm);
+            o->setProperty ("beats", pos.valid && pos.hasPpq ? pos.ppqPosition : 0.0);
+            o->setProperty ("beatsPerBar", pos.valid && pos.hasTimeSig && pos.timeSigNumerator > 0
+                                             ? pos.timeSigNumerator : 4);
+            o->setProperty ("source", "host");
+            return juce::var (o);
+        };
         cb.saveSetting = [this] (const juce::String& key, const juce::var& value) { scriptSettings.set (key, value); };
         cb.loadSetting = [this] (const juce::String& key) { return scriptSettings.getWithDefault (key, juce::var()); };
         cb.startTimer = [this] (const juce::String& id, int intervalMs) { scriptTimers.start (id, intervalMs); };

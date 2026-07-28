@@ -132,6 +132,14 @@ public:
     virtual juce::var deviceQuery (const juce::String& kind, const juce::var& payload)
     { juce::ignoreUnused (kind, payload); return {}; }
 
+    /** The transport, as one snapshot: { playing, bpm, beats, beatsPerBar, source, valid }.
+        `beats` counts quarter notes from the transport origin. One primitive behind tempo(),
+        isPlaying() and transportInfo(), so the three can never disagree with each other.
+
+        Void when nothing is reporting a transport, which is what makes `valid` false rather than
+        the panel inventing 120bpm and calling it a measurement. */
+    virtual juce::var transportState() { return {}; }
+
     // Flow / composition (Q6). run() is host-dispatched (works cross-language).
     virtual juce::var runAction (const juce::String& target, const juce::var& args) = 0;
     virtual void      emitEvent (const juce::String& name, const juce::var& data) = 0;

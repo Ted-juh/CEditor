@@ -247,6 +247,10 @@ PyObject* api_buildDump (PyObject*, PyObject* args)
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
     return varToPy (g_host->buildDump (juce::String::fromUTF8 (kind)));
 }
+PyObject* api_transportState (PyObject*, PyObject*)
+{
+    return varToPy (g_host->transportState());
+}
 PyObject* api_deviceQuery (PyObject*, PyObject* args)
 {
     const char* kind = nullptr; PyObject* payload = nullptr;
@@ -328,6 +332,7 @@ PyMethodDef apiMethods[] = {
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
+    { "transportState", api_transportState, METH_NOARGS,  nullptr },
     { "startTimer",    api_startTimer,    METH_VARARGS, nullptr },
     { "stopTimer",     api_stopTimer,     METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
@@ -358,6 +363,58 @@ def get(path, form="value"):      return __api.get(path, form)
 def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
 def sendNRPN(ch, msb, lsb, v):    return __api.sendNRPN(ch, msb, lsb, v)
 def sendSysex(b):                 return __api.sendSysex(b)
+# @module ce.time
+# Musical time. One host primitive behind tempo() / isPlaying() / transportInfo(), so the three can
+# never disagree; the conversions are pure arithmetic on top. Nothing here starts or stops the
+# transport — a panel does not own the DAW's playhead.
+def __transport():
+    t = __api.transportState()
+    if t is None:
+        return { "playing": False, "bpm": None, "beats": 0, "beatsPerBar": 4, "source": "none", "valid": False }
+    return t
+
+def transportInfo():
+    t = __transport()
+    bpb = t.get("beatsPerBar") or 4
+    if bpb < 1:
+        bpb = 4
+    beats = t.get("beats") or 0
+    import math as __ce_math
+    return {
+        "playing": t.get("playing") is True, "bpm": t.get("bpm"), "beats": beats,
+        "bar": int(__ce_math.floor(beats / bpb)) + 1,
+        "beat": int(__ce_math.floor(beats % bpb)) + 1,
+        "beatsPerBar": bpb, "source": t.get("source") or "none", "valid": t.get("valid") is True,
+    }
+
+def tempo():
+    b = __transport().get("bpm")
+    return b if b and b > 0 else None
+
+def isPlaying():
+    return __transport().get("playing") is True
+
+def beatsToMs(beats, bpm=None):
+    bpm = bpm or tempo()
+    if not bpm or bpm <= 0:
+        return None
+    return (float(beats) if beats is not None else 0.0) * 60000.0 / bpm
+
+def msToBeats(ms, bpm=None):
+    bpm = bpm or tempo()
+    if not bpm or bpm <= 0:
+        return None
+    return (float(ms) if ms is not None else 0.0) * bpm / 60000.0
+
+def syncTimer(id, beats):
+    ms = beatsToMs(beats)
+    if ms is None:
+        log("syncTimer(\"" + str(id) + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
+        return
+    # int(ms + 0.5), NOT round(ms): the prelude defines a global `round` (ce.math), which shadows
+    # the builtin here, and syncTimer must not depend on another module for one rounding.
+    startTimer(id, int(ms + 0.5))
+
 # @module ce.device
 def requestDump(kind):            return __api.requestDump(kind)
 def applyDump(b):                 return __api.applyDump(b)
@@ -606,7 +663,7 @@ __CE_MODULES = {
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
-    "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+    "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -621,7 +678,7 @@ __CE_META = [
     { "id": "ce.device", "version": "1.1", "runtime": "any" },
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.0", "runtime": "any" },
-    { "id": "ce.time", "version": "1.0", "runtime": "any" },
+    { "id": "ce.time", "version": "1.1", "runtime": "any" },
     { "id": "ce.storage", "version": "1.0", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },

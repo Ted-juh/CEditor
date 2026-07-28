@@ -467,3 +467,76 @@ test('with no profile mapped, the reads say so rather than inventing one', () =>
       /no device profile is mapped/);
   });
 });
+
+/* --------------------------------------------------------------------- ce.time (phase 3) */
+// The editor answers from the master clock (stores/transport.js); the player answers from the DAW
+// playhead. The conversions are the part that has to agree to the millisecond across runtimes —
+// a delay time computed in the editor and recomputed in the exported plugin must be the same
+// number, which is why beatsToMs is prelude arithmetic over one snapshot rather than per-engine.
+
+import { transport as transportStore } from '../src/CE_Application/stores/transport.js';
+
+function withTransport(state, fn) {
+  const before = get(transportStore);
+  transportStore.set({ ...before, ...state });
+  try { return fn(); } finally { transportStore.set(before); }
+}
+
+test('ce.time reads the clock', () => {
+  withTransport({ running: true, bpm: 120, beats: 6, beatsPerBar: 4, source: 'host' }, () => {
+    const api = scriptApiForTesting('', 'time-1');
+    assert.equal(api.tempo(), 120);
+    assert.equal(api.isPlaying(), true);
+
+    const t = api.transportInfo();
+    assert.equal(t.bar, 2, 'beat 6 of a 4/4 bar is bar 2…');
+    assert.equal(t.beat, 3, '…beat 3');
+    assert.equal(t.beatsPerBar, 4);
+    assert.equal(t.source, 'host');
+    assert.equal(t.valid, true);
+
+    assert.equal(api.ce.time.transport, api.transportInfo, 'both spellings are the same function');
+    assert.equal(api.ce.time.playing, api.isPlaying);
+  });
+});
+
+test('beatsToMs is the delay-time calculation, and msToBeats is its inverse', () => {
+  withTransport({ running: true, bpm: 120, beats: 0, beatsPerBar: 4 }, () => {
+    const api = scriptApiForTesting('', 'time-2');
+    // The same numbers ScriptRuntimeTests asserts in Lua and JavaScript. A panel that computes a
+    // delay time in the editor and again in the shipped plugin must get the same milliseconds.
+    assert.equal(api.beatsToMs(1), 500, 'a quarter note at 120bpm');
+    assert.equal(api.beatsToMs(0.75), 375, 'a dotted eighth');
+    assert.equal(api.beatsToMs(0.25), 125, 'a sixteenth');
+    assert.equal(api.msToBeats(375), 0.75);
+    assert.equal(api.beatsToMs(1, 90).toFixed(3), '666.667', 'an explicit bpm overrides the clock');
+    assert.equal(api.msToBeats(api.beatsToMs(1.75)), 1.75, 'round-trip');
+  });
+});
+
+test('with no tempo, the conversions are null rather than a number computed from nothing', () => {
+  withTransport({ running: false, bpm: 0, beats: 0 }, () => {
+    clearScriptTrace();
+    const api = scriptApiForTesting('', 'time-3');
+    assert.equal(api.tempo(), null);
+    assert.equal(api.isPlaying(), false);
+    assert.equal(api.beatsToMs(1), null);
+    assert.equal(api.msToBeats(500), null);
+
+    api.syncTimer('step', 0.25);
+    assert.match(get(scriptTrace).map((t) => String(t.message ?? '')).join('\n'),
+      /no tempo is being reported/, 'syncTimer says why it armed nothing');
+  });
+});
+
+test('a stopped transport still reports its tempo — stopped is not unknown', () => {
+  withTransport({ running: false, bpm: 96, beats: 12, beatsPerBar: 3 }, () => {
+    const api = scriptApiForTesting('', 'time-4');
+    assert.equal(api.tempo(), 96);
+    assert.equal(api.isPlaying(), false);
+    assert.equal(api.beatsToMs(1), 625, 'and the conversions still work');
+    const t = api.transportInfo();
+    assert.equal(t.bar, 5, '12 beats of 3/4 is bar 5');
+    assert.equal(t.beat, 1);
+  });
+});

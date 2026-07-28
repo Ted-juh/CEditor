@@ -344,7 +344,19 @@ const PRELUDE_SOURCES = [
 ];
 const MARKER = /^\s*(?:--|\/\/|#)\s*@module\s+(\S+)\s*$/;
 
-function preludeRegions({ file, open, close }) {
+// Strip line comments before the scan. A comment that MENTIONS a call is not a call — the header
+// of this file makes the point in the other direction (a matcher that accepts a comment would have
+// passed the drift this file exists to catch), and a matcher that reports one is the same defect
+// facing the other way. Block comments and strings are not handled; that is the standing caveat on
+// every text scan here, and over-stripping is the direction that could hide a real call, so the
+// patterns are deliberately conservative.
+function stripLineComments(line, language) {
+  if (language === 'lua') return line.replace(/--.*$/, '');
+  if (language === 'python') return line.replace(/#.*$/, '');
+  return line.replace(/\/\/.*$/, '');
+}
+
+function preludeRegions({ file, open, close, language }) {
   const text = readEngine(file);
   const from = text.indexOf(open);
   const to = text.indexOf(close, from);
@@ -355,7 +367,7 @@ function preludeRegions({ file, open, close }) {
   for (const line of text.slice(from + open.length, to).split('\n')) {
     const m = MARKER.exec(line);
     if (m) { current = m[1]; continue; }
-    regions.set(current, (regions.get(current) ?? '') + line + '\n');
+    regions.set(current, (regions.get(current) ?? '') + stripLineComments(line, language) + '\n');
   }
   return regions;
 }
@@ -380,7 +392,10 @@ test('a prelude region only calls members its module declares a dependency on', 
 
       for (const [name, ownerModule] of Object.entries(owner)) {
         if (allowed.has(ownerModule)) continue;
-        if (!new RegExp(`\\b${escapeRe(name)}\\s*\\(`).test(code)) continue;
+        // A BARE identifier call. `Math.round(...)` and `t:round(...)` reach a method on
+        // something else and are not calls to the module's member, so the look-behind excludes
+        // them — without it the guard reports a dependency on ce.math for every use of Math.round.
+        if (!new RegExp(`(?<![\\w.:])${escapeRe(name)}\\s*\\(`).test(code)) continue;
         problems.push(`${source.language} @module ${regionId} calls ${name}() from ${ownerModule}`
           + ` — add "${ownerModule}" to ${regionId}'s requires`);
       }

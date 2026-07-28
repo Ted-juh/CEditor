@@ -52,6 +52,7 @@ import { recorderScriptPatch } from '../utils/noteRecorderLayout.js';
 import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
+import { transport as transportStore } from '../stores/transport.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -883,6 +884,66 @@ function stopAllTimers() {
   timers.clear();
 }
 
+// @module ce.time
+/* -------------------------------------------------------------------------- ce.time reads */
+// The editor follows its own master clock (stores/transport.js), which follows the DAW when the
+// panel's transport source is "host" and an incoming MIDI clock when it is "external". The player
+// follows the DAW playhead directly. Both answer the same questions, which is what makes ce.time
+// cross-runtime rather than player-only.
+//
+// Nothing here starts or stops the transport. A panel does not own the clock, and a script that
+// could start it would be fighting whatever else is driving the panel.
+
+function transportSnapshot() {
+  const t = get(transportStore) ?? {};
+  const bpm = Number(t.bpm);
+  return {
+    playing: t.running === true,
+    bpm: Number.isFinite(bpm) && bpm > 0 ? bpm : null,
+    beats: Number(t.beats) || 0,
+    beatsPerBar: Number(t.beatsPerBar) > 0 ? Number(t.beatsPerBar) : 4,
+    source: String(t.source ?? 'internal'),
+    // The editor's clock always exists, so a position is always available — unlike a DAW that may
+    // report no playhead at all. Saying valid:true here is a measurement, not a guess.
+    valid: true,
+  };
+}
+
+function transportInfoRead() {
+  const t = transportSnapshot();
+  return {
+    ...t,
+    bar: Math.floor(t.beats / t.beatsPerBar) + 1,
+    beat: Math.floor(t.beats % t.beatsPerBar) + 1,
+  };
+}
+
+const tempoRead = () => transportSnapshot().bpm;
+const isPlayingRead = () => transportSnapshot().playing;
+
+function beatsToMsRead(beats, bpm) {
+  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  if (!rate || rate <= 0) return null;
+  return (Number(beats) || 0) * 60000 / rate;
+}
+
+function msToBeatsRead(ms, bpm) {
+  const rate = Number(bpm) > 0 ? Number(bpm) : tempoRead();
+  if (!rate || rate <= 0) return null;
+  return (Number(ms) || 0) * rate / 60000;
+}
+
+function syncTimerRead(id, beats) {
+  const ms = beatsToMsRead(beats);
+  if (ms == null) {
+    addScriptTrace('log', '',
+      `syncTimer("${id}"): no tempo is being reported, so there is no interval to compute. `
+      + 'Use startTimer with a millisecond interval, or wait for onTransport.');
+    return;
+  }
+  startTimer(id, Math.round(ms));
+}
+
 // @module ce.device
 /* ------------------------------------------------------------------------ ce.device reads */
 // What the synth actually IS, rather than what the panel author remembered. Four reads, backed in
@@ -1038,6 +1099,13 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.time — reads and musical timers
+    tempo: () => tempoRead(),
+    isPlaying: () => isPlayingRead(),
+    transportInfo: () => transportInfoRead(),
+    beatsToMs: (beats, bpm) => beatsToMsRead(beats, bpm),
+    msToBeats: (ms, bpm) => msToBeatsRead(ms, bpm),
+    syncTimer: (id, beats) => syncTimerRead(id, beats),
     // ce.device — reads
     deviceProfile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
     deviceParameters: (opts) => deviceParametersRead(opts ?? {}),
@@ -1915,6 +1983,59 @@ function onDeviceSessionStateChanged(state) {
   if (events.length) dispatchEvents(events);
 }
 
+/* --- source 8: musical time --- */
+// onBeat / onBar / onTransport, from the master clock. The store publishes at ~30Hz (PUBLISH_MS in
+// stores/transport.js), which is the honest accuracy limit and is stated on every one of these
+// members: a beat at 120bpm is 500ms, so the event lands within a frame of it. Right for an LED or
+// a setlist advance; never for timing audio.
+//
+// Only TRANSITIONS are raised. A stopped transport is silent rather than repeating itself, and
+// stopping forgets the position so restarting raises the first beat again instead of swallowing it
+// as "no change" — the same rule the player's timer follows, for the same reason.
+
+const clock = { beat: -1, bar: -1, playing: false, bpm: 0 };
+
+function onTransportChanged(state) {
+  if (live.dispatching || !live.enabledGlobal) return;
+
+  const playing = state?.running === true;
+  const bpmRaw = Number(state?.bpm);
+  const bpm = Number.isFinite(bpmRaw) && bpmRaw > 0 ? bpmRaw : 0;
+  const beatsPerBar = Number(state?.beatsPerBar) > 0 ? Number(state.beatsPerBar) : 4;
+  const beats = Number(state?.beats) || 0;
+
+  const payload = (bar, beat) => ({
+    playing, bpm: bpm || null, beats, bar, beat, beatsPerBar,
+    source: String(state?.source ?? 'internal'), valid: true,
+  });
+
+  const events = [];
+  if (playing !== clock.playing || Math.abs(bpm - clock.bpm) > 0.001) {
+    clock.playing = playing;
+    clock.bpm = bpm;
+    events.push({ event: 'onTransport', controlName: null, payload: payload(0, 0) });
+  }
+
+  if (!playing) {
+    clock.beat = -1;
+    clock.bar = -1;
+  } else {
+    const absoluteBeat = Math.floor(beats);
+    if (absoluteBeat !== clock.beat) {
+      clock.beat = absoluteBeat;
+      const bar = Math.floor(absoluteBeat / beatsPerBar) + 1;
+      const beat = (absoluteBeat % beatsPerBar) + 1;
+      events.push({ event: 'onBeat', controlName: null, payload: payload(bar, beat) });
+      if (bar !== clock.bar) {
+        clock.bar = bar;
+        events.push({ event: 'onBar', controlName: null, payload: payload(bar, beat) });
+      }
+    }
+  }
+
+  if (events.length) dispatchEvents(events);
+}
+
 /* --- source 7: decoded parameters arriving outside a dump --- */
 // deviceRuntimeState is the decoded { role: { parameterId: value } } mirror. A dump updates it in
 // one go (already covered by onDumpParsed); a single parameter echoed back by the synth updates
@@ -1965,6 +2086,7 @@ export function initPanelRuntime() {
   live.unsubs.push(latestSysexInputMessage.subscribe((p) => onSysexInputMessage(p)));
   live.unsubs.push(deviceSessionState.subscribe((s) => onDeviceSessionStateChanged(s)));
   live.unsubs.push(deviceRuntimeState.subscribe((s) => onDeviceRuntimeStateChanged(s)));
+  live.unsubs.push(transportStore.subscribe((s) => onTransportChanged(s)));
 }
 
 /** Pause/resume all live dispatch (the editor's "Live" toggle). */

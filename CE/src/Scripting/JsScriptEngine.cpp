@@ -193,6 +193,50 @@ function sendTransport(action) {
   else sendMidi([0xFA]);
 }
 
+// @module ce.time
+// Musical time. One host primitive behind tempo() / isPlaying() / transportInfo(), so the three
+// can never disagree; the conversions are pure arithmetic on top. Nothing here starts or stops the
+// transport — a panel does not own the DAW's playhead.
+function __transport() {
+  var t = __api.transportState();
+  if (t === null || t === undefined) {
+    return { playing: false, bpm: null, beats: 0, beatsPerBar: 4, source: "none", valid: false };
+  }
+  return t;
+}
+function transportInfo() {
+  var t = __transport();
+  var bpb = t.beatsPerBar || 4;
+  if (bpb < 1) bpb = 4;
+  var beats = t.beats || 0;
+  return {
+    playing: t.playing === true, bpm: t.bpm, beats: beats,
+    bar: Math.floor(beats / bpb) + 1,
+    beat: Math.floor(beats % bpb) + 1,
+    beatsPerBar: bpb, source: t.source || "none", valid: t.valid === true
+  };
+}
+function tempo() { var t = __transport(); return (t.bpm && t.bpm > 0) ? t.bpm : null; }
+function isPlaying() { return __transport().playing === true; }
+function beatsToMs(beats, bpm) {
+  bpm = bpm || tempo();
+  if (!bpm || bpm <= 0) return null;
+  return (Number(beats) || 0) * 60000 / bpm;
+}
+function msToBeats(ms, bpm) {
+  bpm = bpm || tempo();
+  if (!bpm || bpm <= 0) return null;
+  return (Number(ms) || 0) * bpm / 60000;
+}
+function syncTimer(id, beats) {
+  var ms = beatsToMs(beats);
+  if (ms === null) {
+    log("syncTimer(\"" + id + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.");
+    return;
+  }
+  startTimer(id, Math.round(ms));
+}
+
 // @module ce.device
 // Device READS — four wrappers over one host primitive, __api.deviceQuery, so the shape a script
 // sees is assembled here rather than per engine. Without a device host the query returns null and
@@ -244,7 +288,7 @@ var __CE_MODULES = {
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
   "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
-  "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
+  "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
   "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
   "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -253,7 +297,7 @@ var __CE_MODULES = {
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.0","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -372,6 +416,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("applyDump", [host, arg] (const Args& a) -> juce::var { host->applyDump (arg (a, 0)); return {}; });
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
+    api->setMethod ("transportState", [host] (const Args&) -> juce::var { return host->transportState(); });
     api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var
         { return host->deviceQuery (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });

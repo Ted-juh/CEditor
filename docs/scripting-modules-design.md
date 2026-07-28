@@ -220,7 +220,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 |---|---|---|
 | 1 | `ce.midi` note/PC/bend, `ce.storage` | A script can play a note and remember something. Both are small, both are cross-runtime, and both are current "why can't I just…" moments. |
 | 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11) |
-| 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. |
+| 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. ✅ *done* (§12) |
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. |
 | 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. |
@@ -582,3 +582,69 @@ now had been a void command where a wrong return value could not be observed.
   stringifies to `"undefined"`, so `deviceParameters({})` reached the host with `group:
   "undefined"` and matched nothing, while the Lua prelude simply has no key there. The JS prelude
   now omits absent keys, so the payload is byte-identical across the three engines.
+
+---
+
+## 12. `ce.time` — phase 3, as built
+
+Six members and three events. Cross-runtime, because both sides genuinely have a clock: the editor
+follows its own master clock (`stores/transport.js`, which follows the DAW when the panel's
+transport source is `host` and an incoming MIDI clock when it is `external`), and the exported
+plugin follows the DAW playhead the processor already captures.
+
+```lua
+ce.time.tempo()                  -- BPM, or nil. Read it; do not assume 120.
+ce.time.playing()                -- flat alias: isPlaying()
+ce.time.transport()              -- { playing, bpm, beats, bar, beat, beatsPerBar, source, valid }
+ce.time.beatsToMs(beats [, bpm]) -- the delay-time calculation a synth panel needs most
+ce.time.msToBeats(ms [, bpm])
+ce.time.syncTimer(id, beats)     -- startTimer with a musical interval
+onBeat(t)  onBar(t)  onTransport(t)
+```
+
+**The flat aliases are deliberately not the namespaced names.** `playing` and `transport` as bare
+globals are exactly the collision §1 opened with — ordinary words a panel author would reach for —
+so flat they are `isPlaying` and `transportInfo`, while the namespace reads `ce.time.playing()`.
+The contract already supported a short name differing from the member id (`ce.components.setlist.
+jump` is `setlistGoto`), so this cost one line.
+
+**Nothing here starts or stops the transport.** A panel does not own the DAW's playhead, and a verb
+that pretended to would put the panel in a fight with whatever else drives it.
+
+### One primitive, and one number that has to agree
+
+`transportState()` is the only thing that crosses to the host; `tempo()`, `isPlaying()` and
+`transport()` are prelude wrappers over that one snapshot, so the three cannot disagree with each
+other. `beatsToMs`/`msToBeats`/`syncTimer` are pure arithmetic on top — which matters more than it
+sounds: a dotted eighth at 120bpm is **375ms**, and a panel that computes a delay time in the
+editor and again in the shipped plugin has to get the same number. That is asserted in Lua, in
+JavaScript and in the WebView, against the same three values.
+
+`valid: false` means nothing is reporting a position, and then the rest of the snapshot is a
+*default rather than a measurement* — `tempo()` is nil, the conversions are nil, and `syncTimer`
+arms nothing and says why. A panel is never handed an invented 120bpm.
+
+### The accuracy limit, stated on every member
+
+`onBeat` / `onBar` / `onTransport` are raised by watching the position on the **message thread at
+roughly 30Hz** — the editor's clock publishes at that rate, and the player's timer already runs at
+it. A beat at 120bpm is 500ms, so the event lands within a frame of it: right for lighting an LED,
+advancing a setlist, stepping a sequencer. **Never for timing audio.** Only transitions are raised,
+and stopping forgets the position so restarting raises the first beat again rather than swallowing
+it as "no change".
+
+### Three defects this turned up
+
+- **`syncTimer` in Python called `ce.math`'s `round`, not the builtin.** The prelude defines a
+  global `round`, which shadows it. The slice-3 dependency guard caught it; rather than declare
+  `ce.math` a requirement of `ce.time` for one rounding, the Python prelude now uses `int(ms + 0.5)`
+  — matching Lua's `math.floor` and JS's `Math.round`, both stdlib.
+- **That same guard reported a false positive on `Math.round(`.** Its regex matched a bare
+  identifier anywhere, including after a dot. A member call is a *bare* identifier; anything reached
+  through `.` or `:` belongs to something else. Fixed with a look-behind — and the guard now strips
+  line comments before scanning, because a comment that *mentions* a call is not a call, and this
+  file's own header makes exactly that argument in the other direction.
+- **A test freed a payload it was still using.** `juce::DynamicObject` is reference-counted from
+  zero, so three temporary `juce::var(o)`s meant the first dispatch took the last reference with it
+  and the second read freed memory. One `const juce::var payload (o)`, reused. Worth recording
+  because it is the second reference-counting trap in this codebase's tests, not the first.

@@ -235,6 +235,53 @@ function sendTransport(action)
   else sendMidi({0xFA}) end
 end
 
+-- @module ce.time
+-- Musical time. One host primitive, __transportState, behind tempo() / isPlaying() /
+-- transportInfo(), so the three can never disagree — and beatsToMs/msToBeats/syncTimer are pure
+-- arithmetic on top, which is what keeps a delay-time calculation identical in every runtime.
+--
+-- Nothing here STARTS or STOPS the transport. A panel does not own the DAW's playhead, and
+-- pretending otherwise is how a panel ends up fighting its host.
+local function __transport()
+  local t = __transportState()
+  if t == nil then
+    return { playing = false, bpm = nil, beats = 0, beatsPerBar = 4, source = "none", valid = false }
+  end
+  return t
+end
+function transportInfo()
+  local t = __transport()
+  local bpb = t.beatsPerBar or 4
+  if bpb < 1 then bpb = 4 end
+  local beats = t.beats or 0
+  return {
+    playing = t.playing == true, bpm = t.bpm, beats = beats,
+    bar = math.floor(beats / bpb) + 1,
+    beat = math.floor(beats % bpb) + 1,
+    beatsPerBar = bpb, source = t.source or "none", valid = t.valid == true,
+  }
+end
+function tempo() local t = __transport() if t.bpm and t.bpm > 0 then return t.bpm end return nil end
+function isPlaying() return __transport().playing == true end
+function beatsToMs(beats, bpm)
+  bpm = bpm or tempo()
+  if bpm == nil or bpm <= 0 then return nil end
+  return (tonumber(beats) or 0) * 60000 / bpm
+end
+function msToBeats(ms, bpm)
+  bpm = bpm or tempo()
+  if bpm == nil or bpm <= 0 then return nil end
+  return (tonumber(ms) or 0) * bpm / 60000
+end
+function syncTimer(id, beats)
+  local ms = beatsToMs(beats)
+  if ms == nil then
+    log("syncTimer(\"" .. tostring(id) .. "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
+    return
+  end
+  startTimer(id, math.floor(ms + 0.5))
+end
+
 -- @module ce.device
 -- Device READS. All four are arithmetic-free wrappers over one host primitive, __deviceQuery,
 -- the way the channel messages are over sendMidi: the SHAPE a script sees is assembled here, so
@@ -278,7 +325,7 @@ local __CE_MODULES = {
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", requestDump = "requestDump", sendDump = "sendDump" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
-  ["ce.time"] = { startTimer = "startTimer", stopTimer = "stopTimer" },
+  ["ce.time"] = { beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -293,7 +340,7 @@ local __CE_META = {
   { id = "ce.device", version = "1.1", runtime = "any" },
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.0", runtime = "any" },
-  { id = "ce.time", version = "1.0", runtime = "any" },
+  { id = "ce.time", version = "1.1", runtime = "any" },
   { id = "ce.storage", version = "1.0", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },
@@ -445,6 +492,7 @@ public:
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
+        g.set_function ("__transportState", [this] () { return varToSol (lua, host->transportState()); });
         g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)
             { return varToSol (lua, host->deviceQuery (juce::String (kind),
                                                        payload ? solToVar (*payload) : juce::var())); });

@@ -139,6 +139,9 @@ typedef struct CeHostVtable {
      * way send_midi sits behind every channel message. */
     int  (CE_CALL *device_query)  (void* host_ctx, const CeStr* kind, const CeValue* payload /*nullable*/,
                                    CeValue* out /*host-owned, free_value*/);
+    /* The transport snapshot: { playing, bpm, beats, beatsPerBar, source, valid }. One primitive
+     * behind tempo(), isPlaying() and transportInfo() in the scripted engines. */
+    int  (CE_CALL *transport_state)(void* host_ctx, CeValue* out /*host-owned, free_value*/);
     /* NOTE on module opt-in (design doc §5): a panel declares the modules its scripts may use, and
      * the scripted engines enforce it by swapping the prelude's members for explaining stubs. A
      * native handler has no prelude — it calls these function pointers directly — so there is

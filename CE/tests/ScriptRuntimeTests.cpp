@@ -118,6 +118,27 @@ public:
     { if (runtime != nullptr) runtime->dispatchEvent (name, "panel", data); }
     void log (const juce::String& message, const juce::var&) override { logs.add (message); }
 
+    // A stand-in transport, so ce.time's reads have something real to read. All of them go through
+    // this one snapshot, which is the point: tempo(), isPlaying() and transportInfo() cannot
+    // disagree with each other because there is only one thing to disagree about.
+    bool  transportValid = true;
+    bool  transportPlaying = true;
+    double transportBpm = 120.0;
+    double transportBeats = 0.0;
+    int   transportBeatsPerBar = 4;
+    juce::var transportState() override
+    {
+        if (! transportValid) return {};
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("valid", true);
+        o->setProperty ("playing", transportPlaying);
+        if (transportBpm > 0.0) o->setProperty ("bpm", transportBpm);
+        o->setProperty ("beats", transportBeats);
+        o->setProperty ("beatsPerBar", transportBeatsPerBar);
+        o->setProperty ("source", "host");
+        return juce::var (o);
+    }
+
     juce::StringArray timerOps;
     void startTimer (const juce::String& id, int ms) override
     { timerOps.add ("start:" + id + ":" + juce::String (ms)); }
@@ -782,6 +803,110 @@ int main()
         check (host.logs.joinIntoString ("\n").contains ("deviceProfile() needs the ce.device module"),
                "…and says which module to enable");
         runtime.setEnabledModules ({});
+    }
+
+    // 17) ce.time (design doc §6 phase 3) ---------------------------------------------------------
+    // Reads plus pure arithmetic on top of one transport snapshot. The conversions are the point:
+    // beatsToMs is the delay-time calculation a synth panel needs most, and it has to give the same
+    // number in every runtime or a panel exported from the editor drifts.
+    {
+        juce::Array<juce::var> timeScripts;
+        timeScripts.add (makeScript ("time", "lua", "panel", "onTime", "*",
+            "function onTime()\n"
+            "  log(\"bpm \" .. tostring(tempo()))\n"
+            "  log(\"playing \" .. tostring(isPlaying()))\n"
+            "  local t = ce.time.transport()\n"
+            "  log(\"bar \" .. tostring(t.bar) .. \" beat \" .. tostring(t.beat) .. \" of \" .. tostring(t.beatsPerBar))\n"
+            "  log(\"valid \" .. tostring(t.valid) .. \" src \" .. tostring(t.source))\n"
+            "  local function fmt(v) if v == nil then return \"nil\" end return string.format(\"%.3f\", v) end\n"
+            "  log(\"dotted \" .. fmt(beatsToMs(0.75)))\n"
+            "  log(\"back \" .. fmt(msToBeats(375)))\n"
+            "  log(\"at90 \" .. fmt(beatsToMs(1, 90)))\n"
+            "  ce.time.syncTimer(\"step\", 0.25)\n"
+            "end\n"));
+        timeScripts.add (makeScript ("timejs", "javascript", "panel", "onTimeJs", "*",
+            "function onTimeJs(){\n"
+            "  var t = ce.time.transport();\n"
+            "  log('js bar ' + t.bar + ' beat ' + t.beat);\n"
+            "  log('js dotted ' + beatsToMs(0.75).toFixed(3));\n"
+            "  log('js bpm ' + tempo() + ' playing ' + isPlaying());\n"
+            "}"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (timeScripts));
+
+        // 120bpm, 4/4, sitting on beat 3 of bar 2 (beats counts quarter notes from the origin).
+        host.transportBeats = 6.0;
+        host.logs.clear(); host.timerOps.clear();
+        runtime.runAction ("onTime", juce::var());
+        check (host.logs.contains ("bpm 120"), "tempo() reads the reported BPM");
+        check (host.logs.contains ("playing true"), "isPlaying() reads the transport");
+        check (host.logs.contains ("bar 2 beat 3 of 4"),
+               "transport() derives a 1-based bar and beat from the beat position");
+        check (host.logs.contains ("valid true src host"), "…and reports where the position came from");
+        // A dotted eighth at 120bpm is 0.75 * 500ms = 375ms. This is THE number a delay-time
+        // control needs, and it has to be identical in every runtime.
+        check (host.logs.contains ("dotted 375.000"), "beatsToMs: a dotted eighth at 120bpm is 375ms");
+        check (host.logs.contains ("back 0.750"), "msToBeats is its exact inverse");
+        check (host.logs.contains ("at90 666.667"), "…and an explicit bpm overrides the reported one");
+        check (host.timerOps.contains ("start:step:125"),
+               "syncTimer arms a real timer with the musical interval (a sixteenth at 120bpm = 125ms)");
+
+        host.logs.clear();
+        runtime.runAction ("onTimeJs", juce::var());
+        check (host.logs.contains ("js bar 2 beat 3"), "the same derivation in JavaScript");
+        check (host.logs.contains ("js dotted 375.000"),
+               "…and the same delay time, to the millisecond (formatted identically on purpose: "
+               "Lua renders a float as 375.0 and JS as 375, and it is the VALUE that has to agree)");
+        check (host.logs.contains ("js bpm 120 playing true"), "…and the same reads");
+
+        // NOTHING REPORTING A TRANSPORT. The panel must not be handed an invented 120bpm: tempo()
+        // is nil, the conversions are nil, and syncTimer says why it did not arm.
+        host.transportValid = false;
+        host.logs.clear(); host.timerOps.clear();
+        runtime.runAction ("onTime", juce::var());
+        check (host.logs.contains ("bpm nil"), "with no transport, tempo() is nil rather than a guess");
+        check (host.logs.contains ("playing false"), "…isPlaying() is false");
+        check (host.logs.contains ("valid false src none"), "…and transport() says the position is not a measurement");
+        check (host.logs.contains ("dotted nil"), "…the conversions are nil, not a number computed from nothing");
+        check (host.timerOps.isEmpty(), "…and syncTimer arms nothing");
+        check (host.logs.joinIntoString ("\n").contains ("no tempo is being reported"),
+               "…having said so");
+        host.transportValid = true;
+
+        // A stopped transport still has a tempo and a position — stopped is not unknown.
+        host.transportPlaying = false;
+        host.logs.clear();
+        runtime.runAction ("onTime", juce::var());
+        check (host.logs.contains ("playing false") && host.logs.contains ("bpm 120"),
+               "a stopped transport still reports its tempo");
+        host.transportPlaying = true;
+
+        // The time events are declared and dispatchable — the runtime routes them like any other.
+        // One script per event: dispatchEvent routes by the script's DECLARED event, so a single
+        // script declaring onBeat would never receive onBar however many functions it defines.
+        juce::Array<juce::var> beatScripts;
+        beatScripts.add (makeScript ("beat", "lua", "panel", "onBeat", "*",
+            "function onBeat(t) log(\"beat \" .. tostring(t.bar) .. \":\" .. tostring(t.beat)) end\n"));
+        beatScripts.add (makeScript ("bar", "lua", "panel", "onBar", "*",
+            "function onBar(t) log(\"bar \" .. tostring(t.bar)) end\n"));
+        beatScripts.add (makeScript ("tr", "lua", "panel", "onTransport", "*",
+            "function onTransport(t) log(\"transport \" .. tostring(t.playing)) end\n"));
+        runtime.loadScripts (juce::var (beatScripts));
+        host.logs.clear();
+        {
+            // ONE var, reused. juce::DynamicObject is reference-counted and starts at zero, so each
+            // temporary juce::var(o) would take the last reference with it and free the object —
+            // the second dispatch would then read freed memory.
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("bar", 3); o->setProperty ("beat", 1); o->setProperty ("playing", true);
+            const juce::var payload (o);
+            runtime.dispatchEvent ("onBeat", "panel", payload);
+            runtime.dispatchEvent ("onBar", "panel", payload);
+            runtime.dispatchEvent ("onTransport", "panel", payload);
+        }
+        check (host.logs.contains ("beat 3:1"), "onBeat reaches a handler that declares it");
+        check (host.logs.contains ("bar 3"), "onBar too");
+        check (host.logs.contains ("transport true"), "and onTransport");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

@@ -111,6 +111,7 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Events & flow | `on` `off` `emit` `run` `startTimer` `stopTimer` | everywhere |
 | Device / MIDI | `sendCC` `sendNRPN` `sendSysex` `sendMidi` `requestDump` `applyDump` `sendDump` `buildDump` `checksum` `panic` | everywhere |
 | Device reads | `deviceProfile` `deviceParameters` `deviceParameter` `deviceConnected` | everywhere — need the device host |
+| Time | `tempo` `isPlaying` `transportInfo` `beatsToMs` `msToBeats` `syncTimer` | everywhere — the editor's master clock, the DAW playhead window-closed |
 | Channel messages | `sendNote` `sendNoteOff` `sendProgramChange` `sendPitchBend` `sendAftertouch` `sendClock` `sendTransport` | everywhere — arithmetic over `sendMidi`, defined in each prelude |
 | Storage | `state` `saveSetting` `loadSetting` | everywhere |
 | Debug | `log` | everywhere |
@@ -131,6 +132,20 @@ scratch that survives between handler calls in one session and is cleared when t
 `saveSetting`/`loadSetting` are the durable pair — the player stores them in the DAW session as a
 `ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
 the same two verbs either way.
+
+### Musical time
+
+`ce.time.tempo()`, `.playing()`, `.transport()`, `.beatsToMs()`, `.msToBeats()`, `.syncTimer()`,
+plus the `onBeat` / `onBar` / `onTransport` events. One host primitive, `transportState()`, backs
+the reads; the conversions are pure prelude arithmetic, so a dotted eighth at 120bpm is 375ms in
+every runtime — which is what a delay-time control depends on.
+
+The flat aliases of `.playing` and `.transport` are `isPlaying` and `transportInfo`: bare `playing`
+and `transport` as globals are too easy for a panel author to shadow by accident.
+
+`valid: false` means nothing is reporting a position; `tempo()` is then nil and the conversions are
+nil rather than computed from an invented 120bpm. The events are raised from a ~30Hz message-thread
+poll — fine for an LED or a sequencer step, never for timing audio.
 
 ### Device reads
 

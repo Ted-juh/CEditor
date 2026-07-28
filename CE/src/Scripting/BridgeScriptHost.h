@@ -42,6 +42,9 @@ public:
         // Unset means "no device host": the members report that rather than returning a quiet
         // nothing, which is the rule requiresDeviceHost has followed since it was introduced.
         std::function<juce::var (const juce::String& kind, const juce::var& payload)> deviceQuery;
+        // The transport snapshot behind tempo() / isPlaying() / transportInfo(). Unset means
+        // nothing is reporting one, and the prelude reports valid=false rather than guessing.
+        std::function<juce::var()> transportState;
         // Flow / debug. runAction and emitEvent are OPTIONAL: left unset, they fall through to the
         // ScriptRuntime, which resolves them against the loaded script set. That is the right
         // default — cross-script calls need the script set, not app state — so only override them
@@ -148,6 +151,8 @@ public:
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
     juce::var deviceQuery (const juce::String& kind, const juce::var& payload) override
     { return callbacks.deviceQuery ? callbacks.deviceQuery (kind, payload) : juce::var(); }
+    juce::var transportState() override
+    { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     juce::var runAction (const juce::String& target, const juce::var& args) override
     {
         if (callbacks.runAction) return callbacks.runAction (target, args);

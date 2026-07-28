@@ -290,6 +290,18 @@ export const PANEL_EVENTS = [
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A started timer fired. info.id.' },
 ];
 
+// Musical time. Raised by whichever runtime is following the clock — the editor's master clock, or
+// the DAW playhead window-closed — by watching the position on the MESSAGE THREAD at roughly 30Hz.
+//
+// That polling rate is the honest limit and it is stated everywhere these appear: a beat at 120bpm
+// is 500ms, so the event lands within a frame of it, which is right for lighting an LED, advancing
+// a setlist or stepping a sequencer. It is NOT sample-accurate and must never be used to time audio.
+export const TIME_EVENTS = [
+  { id: 'beat', fn: 'onBeat', payload: 'time', summary: 'A beat passed. time.bar, time.beat, time.beats, time.bpm. Message-thread accurate (~30Hz), not sample-accurate.' },
+  { id: 'bar', fn: 'onBar', payload: 'time', summary: 'A bar passed. time.bar, time.beats, time.beatsPerBar. Fires with the downbeat, alongside onBeat.' },
+  { id: 'transport', fn: 'onTransport', payload: 'time', summary: 'The transport started, stopped, or changed tempo. time.playing, time.bpm, time.source.' },
+];
+
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
   { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'A value arrived, decoded via the DPD. info.parameter, info.value.' },
@@ -302,7 +314,7 @@ export const DEVICE_EVENTS = [
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.' },
 ];
 
-export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, device: DEVICE_EVENTS };
+export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS };
 
 /* ------------------------------------------------------------------ commands */
 // The action verbs (Q1, Q2, Q6, Q9). Picker category "Commands". param.type drives validation.
@@ -453,6 +465,66 @@ export const COMMANDS = [
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
+  },
+
+  /* --- Time: tempo, transport and musical timers (design doc §6 phase 3) ---
+     Cross-runtime: the editor follows its own master clock (which follows the DAW when the panel's
+     transport source is "host"), the exported plugin follows the DAW playhead directly. Both can
+     answer the same questions, so these are `any` rather than player-only.
+
+     Every one of them is a READ or pure arithmetic. Nothing here starts or stops the transport —
+     a panel does not own the DAW's playhead, and pretending otherwise is how a panel fights its
+     host. */
+  {
+    id: 'tempo', category: 'Time', signature: 'tempo()',
+    summary: 'The current tempo in BPM, or nil when nothing is reporting one. Read it, do not assume 120.',
+    scopes: 'any',
+    snippet: { lua: 'local bpm = tempo() or 120$0', javascript: 'const bpm = tempo() ?? 120;$0' },
+  },
+  {
+    id: 'isPlaying', category: 'Time', signature: 'isPlaying()',
+    summary: 'Is the transport running? False when stopped, and when nothing is reporting a transport at all.',
+    scopes: 'any',
+    snippet: { lua: 'if isPlaying() then $0 end', javascript: 'if (isPlaying()) { $0 }' },
+  },
+  {
+    id: 'transportInfo', category: 'Time', signature: 'transportInfo()',
+    summary: 'The whole picture: { playing, bpm, beats, bar, beat, beatsPerBar, source, valid }. `beats` counts quarter notes from the transport origin; `bar` and `beat` are 1-based. `valid` is false when nothing is reporting a position, in which case the rest is a default rather than a measurement.',
+    scopes: 'any',
+    snippet: {
+      lua: 'local t = ce.time.transport()\nif t.valid then log("bar " .. t.bar) end$0',
+      javascript: 'const t = ce.time.transport();\nif (t.valid) log("bar " + t.bar);$0',
+    },
+  },
+  {
+    id: 'beatsToMs', category: 'Time', signature: 'beatsToMs(beats [, bpm])',
+    summary: 'Musical time to milliseconds at the current tempo — the delay-time calculation a synth panel needs most. Pass `bpm` to override. Returns nil when there is no tempo to work from.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'bpm', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'set("delayTime", beatsToMs(0.75))$0', javascript: 'set("delayTime", beatsToMs(0.75));$0' },
+  },
+  {
+    id: 'msToBeats', category: 'Time', signature: 'msToBeats(ms [, bpm])',
+    summary: 'The inverse of beatsToMs — how many quarter notes a duration spans at the current tempo.',
+    params: [
+      { name: 'ms', type: 'number', required: true },
+      { name: 'bpm', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'local beats = msToBeats(${1:500})$0', javascript: 'const beats = msToBeats(${1:500});$0' },
+  },
+  {
+    id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats)',
+    summary: 'startTimer with a MUSICAL interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo. The interval is computed WHEN YOU CALL IT and does not follow a later tempo change — re-arm it from onTransport if that matters.',
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'beats', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'syncTimer("${1:step}", 0.25)$0', javascript: 'syncTimer("${1:step}", 0.25);$0' },
   },
 
   /* --- Device: reads (design doc §6 phase 2) ---
@@ -897,8 +969,8 @@ export const MODULES = [
     summary: 'Value and range arithmetic. Pure — no host involved.' },
   { id: 'ce.music', version: '1.0', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers.' },
-  { id: 'ce.time', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Host timers. Musical time (tempo, beats) lands here next.' },
+  { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
   { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -936,7 +1008,16 @@ const MODULE_MEMBERS = {
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
   'ce.storage': ['state', 'saveSetting', 'loadSetting'],
-  'ce.time': ['startTimer', 'stopTimer'],
+  'ce.time': {
+    startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer',
+    // The namespaced names read well; the FLAT aliases are deliberately more defensive.
+    // `playing` and `transport` as bare globals are exactly the collision §1 warned about —
+    // ordinary words a panel author would reach for — so flat they are isPlaying and
+    // transportInfo. The contract already supports a short name differing from the member id
+    // (ce.components.setlist.jump is setlistGoto), so this costs nothing but a line here.
+    tempo: 'tempo', playing: 'isPlaying', transport: 'transportInfo',
+    beatsToMs: 'beatsToMs', msToBeats: 'msToBeats',
+  },
   'ce.components.split': {
     preset: 'splitPreset', mute: 'splitMute', channel: 'splitChannel',
     transpose: 'splitTranspose', point: 'splitPoint',
@@ -1347,6 +1428,7 @@ export function memberNames(member) {
 export const ALL_EVENTS = [
   ...CONTROL_EVENTS.map((e) => ({ ...e, group: 'control' })),
   ...PANEL_EVENTS.map((e) => ({ ...e, group: 'panel' })),
+  ...TIME_EVENTS.map((e) => ({ ...e, group: 'time' })),
   ...DEVICE_EVENTS.map((e) => ({ ...e, group: 'device' })),
 ];
 
