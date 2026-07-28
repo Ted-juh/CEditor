@@ -63,7 +63,13 @@ runtime.loadScripts (gatherScriptsFromPanel());  // array of {id,name,language,s
 **Lifecycle (task 6)** — call from the right moments:
 - `runtime.onPanelLoad()` — before the WebView/GUI exists (MIDI setup).
 - `runtime.onPanelReady (firstTime)` — when the WebView signals ready; `firstTime=false` on VST3 reopen.
-- `runtime.onPanelClose()` — teardown.
+- `runtime.onPanelClose()` — the *view* went away (window shut, preview stopped). The scripts keep
+  running: a plugin with its editor closed is still playing.
+- `runtime.onPanelDestroy()` — the *scripts* are going away (plugin unloaded). Call it FIRST at
+  shutdown, before stopping timers or unhooking the device service, so a handler restoring the synth
+  still has a working API. `loadScripts` already calls it on the outgoing set, so a panel switch or
+  a reload is covered; only real shutdown needs the explicit call. It fires at most once per loaded
+  set and is deliberately not called from `~ScriptRuntime` — see §17 of the design doc.
 - `onError(info)` needs no call: the runtime raises it itself, from `reportError`. See "Error
   reporting" below.
 - `runtime.onDawSaveState (store)` / `onDawRestoreState (store)` — from `PlayerAudioProcessor::get/setStateInformation`.

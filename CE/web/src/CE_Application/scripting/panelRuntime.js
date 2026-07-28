@@ -2197,7 +2197,10 @@ async function handlersFor(script) {
   if (hit && hit.key === key) return hit.handlers;
   clearListeners(script.id);
   const handlers = await getHandlers(script);
-  handlerCache.set(script.id, { key, handlers });
+  // The script record is kept alongside its handlers because the cache IS the loaded set: at
+  // teardown the panel it belonged to may already have been switched away from, so the declared
+  // event has to come from here rather than from whatever is active by then.
+  handlerCache.set(script.id, { key, handlers, script });
   return handlers;
 }
 
@@ -2217,6 +2220,46 @@ async function primeHandlers() {
   }
   const pending = errorHook.pending.splice(0);
   for (const [id, message] of pending) await dispatchErrorHook(id, message, 'load');
+}
+
+/* ------------------------------------------------------------------- onPanelDestroy */
+// Phase 5, and NOT the same moment as onPanelClose. Closing is the VIEW going away — preview
+// stopped, plugin window shut — while the scripts keep running; a plugin with its window closed is
+// still playing. Destroying is the SCRIPTS going away.
+//
+// The handler cache is the loaded set, so it is what gets told and what gets emptied. That makes
+// "exactly once per set" fall out of the code rather than needing a flag: a second call finds an
+// empty cache and does nothing.
+//
+// Two moments raise it in the editor, and one that looks like a third deliberately does not:
+//   • the active panel changed        → the outgoing panel's scripts are done;
+//   • the page is going away          → the app is closing;
+//   • an in-editor edit does NOT      → setLiveScripts runs on every keystroke, and a hook whose
+//     whole job is "restore the synth, send a final dump" must not fire once per character typed.
+//     Editing a script is a RELOAD of the set, not the destruction of it.
+export function destroyLoadedScripts() {
+  const loaded = [...handlerCache.values()];
+  if (!loaded.length) return;
+  handlerCache.clear();   // cleared FIRST: a handler that somehow re-enters must not be told twice
+
+  for (const entry of loaded) {
+    const s = entry?.script;
+    if (!s || s.enabled === false || s.event !== 'onPanelDestroy') continue;
+    const fn = entry.handlers?.onPanelDestroy;
+    if (typeof fn !== 'function') continue;
+    // Synchronous on purpose: a page unload will not wait for a promise, and a teardown hook that
+    // only half-runs depending on how it was triggered would be worse than one that never does.
+    // Everything a handler needs is still alive here — timers, state, the host — because this runs
+    // before resetScriptState.
+    try {
+      fn(undefined);
+      addScriptTrace('log', s.id, `ran onPanelDestroy() in "${s.name}"`);
+    } catch (e) {
+      // Reported the normal way, and teardown carries on: a failing teardown handler must not be
+      // able to keep the old script set alive.
+      reportScriptError(s.id, e);
+    }
+  }
 }
 
 /** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
@@ -2670,6 +2713,10 @@ export function initPanelRuntime() {
   snapshotValues();
   seedSessionSnapshot();
   live.unsubs.push(resolvedActivePanelId.subscribe((id) => {
+    // Destroy BEFORE the id moves. A handler restoring the synth reads and writes through the
+    // ACTIVE panel, so telling it goodbye after the switch would have it writing into the panel
+    // that just arrived. The guard also makes the subscriber's immediate first call a no-op.
+    if (String(id) !== String(live.activePanelId)) destroyLoadedScripts();
     live.activePanelId = id;
     resetScriptState();        // another panel's scripts, listeners and timers are not ours
     snapshotValues();          // switching panels shouldn't fire spurious changes
@@ -2684,6 +2731,14 @@ export function initPanelRuntime() {
   live.unsubs.push(deviceSessionState.subscribe((s) => onDeviceSessionStateChanged(s)));
   live.unsubs.push(deviceRuntimeState.subscribe((s) => onDeviceRuntimeStateChanged(s)));
   live.unsubs.push(transportStore.subscribe((s) => onTransportChanged(s)));
+
+  // The app is closing. `pagehide` rather than `beforeunload`: it is the one that also fires when
+  // the page is discarded rather than navigated away from, which is what closing a WebView does.
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    const onPageHide = () => destroyLoadedScripts();
+    window.addEventListener('pagehide', onPageHide);
+    live.unsubs.push(() => window.removeEventListener('pagehide', onPageHide));
+  }
 }
 
 /** Pause/resume all live dispatch (the editor's "Live" toggle). */

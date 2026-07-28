@@ -261,9 +261,16 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelClose', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelClose()',
-    summary: 'Phase 4 — really closing. Final cleanup, send a closing dump, all-notes-off.',
+    summary: 'Phase 4 — the VIEW is going away: preview stopped, or the plugin window was closed. Your scripts keep running (timers still tick, MIDI still arrives) — a plugin with its window shut is still playing. For "my scripts are being torn down", use onPanelDestroy.',
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
+  },
+  {
+    id: 'onPanelDestroy', kind: 'lifecycle', category: 'Lifecycle',
+    signature: 'onPanelDestroy()',
+    summary: 'Phase 5 — your SCRIPTS are going away: the panel was switched, the script set replaced, or the plugin unloaded. The last thing that runs. Everything still works here — timers, state, MIDI — so this is where you restore the synth, send a final dump, or release what you took. Fires exactly once per loaded script set, whether or not onPanelClose ever did; a window that was never opened never closed, but it is still destroyed.',
+    params: [],
+    snippet: { lua: 'function onPanelDestroy()\n  $0\nend', javascript: 'function onPanelDestroy() {\n  $0\n}' },
   },
   // RETURN what you want saved — do not mutate `store`. `store` arrives as a copy: each engine
   // marshals it into the script's own language (a fresh Lua table, a QuickJS object, a Python

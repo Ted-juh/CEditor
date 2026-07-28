@@ -232,7 +232,7 @@ Phase 4 needs a lifecycle phase that does not exist yet:
 onPanelLoad     → MIDI/init only, no controls yet          (exists)
 onPanelBuild    → structure: create/parent/bind here        (phase 4 — done, §13)
 onPanelReady    → GUI live, fill values                     (exists)
-onPanelDestroy  → real teardown, distinct from window close (still to do)
+onPanelDestroy  → real teardown, distinct from window close (done, §17)
 onError(info)   → the panel reports its own failures        (done, §16)
 ```
 
@@ -723,7 +723,8 @@ worse than one that did not run.
 Neither is needed to build a panel, and both are their own piece of work: real teardown has to be
 distinguished from a window close (which already has `onPanelClose`), and an error hook has to
 settle what happens when the error handler itself throws. Bundling them in would have meant doing
-both badly. `onError` was built afterwards, on its own — §16.
+both badly. Both were built afterwards, each on its own — `onError` in §16, `onPanelDestroy`
+in §17.
 
 ---
 
@@ -938,3 +939,68 @@ the C++ side looks its name up in the failed list as well, and `event` falls bac
   and drops it on destruction, deleting the payload under the loop. One `const juce::var` built
   before the loop fixes both that and the leak when no handler is declared. This is the second time
   this exact shape has appeared in this work; it is worth recognising on sight.
+
+---
+
+## 17. `onPanelDestroy` — phase 5, and why it is not `onPanelClose`
+
+The last hook from the §6 lifecycle list, and the whole reason it exists is a distinction the
+existing hook was quietly getting wrong:
+
+| | what happened | do the scripts keep running? |
+|---|---|---|
+| `onPanelClose` | the **view** went away — preview stopped, plugin window shut | **yes** — timers still tick, MIDI still arrives |
+| `onPanelDestroy` | the **scripts** went away — panel switched, set replaced, plugin unloaded | no; this is the last thing they run |
+
+A plugin whose editor window is closed is still playing. `onPanelClose` was summarised as "really
+closing", which is what a panel author would reasonably read as "your last chance" — and it is not.
+Anything you actually have to do once, at the end (restore the synth, send a closing dump, release
+a file), belonged in a hook that did not exist. Now it does.
+
+```lua
+function onPanelDestroy()
+  sendDump("patch")      -- everything still works here
+  panic()
+end
+```
+
+### Where it fires
+
+**Window-closed (`ScriptRuntime`).** `loadScripts` raises it on the outgoing set before replacing
+it, so a panel switch or a script reload gets it without every host remembering to call it; the
+player calls it explicitly in `~PlayerAudioProcessor`, first, before it stops timers or unhooks the
+device service. It is deliberately **not** called from `~ScriptRuntime`: running arbitrary script
+code against a host that may already be half torn down is the one thing a teardown hook must never
+do, and a crash during shutdown is the hardest kind to diagnose.
+
+**Panel view.** The handler cache *is* the loaded set, so the cache is what gets told and what gets
+emptied — "exactly once per set" falls out of the code rather than needing a flag. Two moments raise
+it: the active panel changing, and the page going away (`pagehide`, which unlike `beforeunload` also
+fires when a WebView is discarded rather than navigated).
+
+A third moment deliberately does **not**: `setLiveScripts` runs from a `$effect` on every keystroke
+in the script editor. A hook whose job is "send a final dump" firing once per character typed would
+spray MIDI at the synth. Editing a script is a *reload* of the set, not the destruction of it.
+
+### The guarantees, and what each is protecting
+
+- **Exactly once per loaded set.** A host that calls it at shutdown after a reload already sent one
+  must not tell the scripts they are going away twice — an idempotent teardown is easy to write, a
+  doubled one is not obviously wrong until the synth gets two dumps.
+- **It runs *before* anything is torn down.** Timers, `state`, `set()`, `sendCC()` and the device
+  service all still work inside it. A teardown hook that runs after teardown is decoration.
+- **It does not depend on `onPanelClose` having fired.** A window that was never opened was never
+  closed, but it was still loaded and still holds whatever it took — so it is still destroyed.
+- **A throw does not stop the teardown.** The error is reported the normal way (log + `onError`) and
+  the remaining scripts are still told. A failing teardown handler must not be able to keep the old
+  script set alive.
+- **An empty set raises nothing.** Firing for a panel with no scripts would make "once per loaded
+  set" a lie the first time somebody opened a blank panel.
+
+### The ordering bug this turned up
+
+The editor's panel-switch subscriber set `live.activePanelId` and *then* reset the script state. A
+teardown handler reads and writes through the **active** panel, so raising the hook after the switch
+would have had the outgoing panel's `onPanelDestroy` writing values into the panel that had just
+arrived — the exact opposite of cleaning up after itself. The destroy is dispatched before the id
+moves, which also makes the subscriber's immediate first call a no-op.

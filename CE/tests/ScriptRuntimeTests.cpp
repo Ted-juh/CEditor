@@ -1147,6 +1147,83 @@ int main()
                "a JavaScript onError sees a Lua script's failure — the hook is the runtime's, not one engine's");
     }
 
+    // 22) onPanelDestroy (design doc §6 phase 4 lifecycle, §17) -----------------------------------
+    // Phase 5, and the whole point is that it is NOT onPanelClose. Closing is the view going away
+    // while the scripts keep running — a plugin with its window shut is still playing. Destroying
+    // is the scripts themselves going away.
+    {
+        juce::Array<juce::var> teardown;
+        teardown.add (makeScript ("bye", "lua", "panel", "onPanelDestroy", "*",
+            "function onPanelDestroy() log(\"BYE\") sendCC(1, 7, 0) end\n"));
+        teardown.add (makeScript ("shut", "lua", "panel", "onPanelClose", "*",
+            "function onPanelClose() log(\"SHUT\") end\n"));
+        runtime.loadScripts (juce::var (teardown));
+
+        // Closing the window does NOT destroy: the scripts go on running afterwards.
+        host.logs.clear();
+        runtime.onPanelClose();
+        check (host.logs.contains ("SHUT"), "onPanelClose still fires when the view goes away");
+        check (! host.logs.contains ("BYE"),
+               "…and does NOT raise onPanelDestroy — a plugin with its window shut is still playing");
+
+        // Destroying does. Everything still works while it runs: the CC below has to reach the host.
+        host.logs.clear(); host.ccSends.clear();
+        runtime.onPanelDestroy();
+        check (host.logs.contains ("BYE"), "onPanelDestroy reaches a handler that declares it");
+        check (host.ccSends.contains ("1:7:0"), "…and the host is still there to receive what it sends");
+
+        // Exactly once per loaded set. A host that calls it at shutdown after something already
+        // destroyed the set must not tell the scripts they are going away a second time.
+        host.logs.clear();
+        runtime.onPanelDestroy();
+        check (! host.logs.contains ("BYE"), "a second call is a no-op — a set is destroyed once");
+
+        // A reload destroys the outgoing set before loading the new one, so a panel switch raises
+        // it without every host having to remember the call.
+        runtime.loadScripts (juce::var (teardown));
+        host.logs.clear();
+        runtime.loadScripts (juce::var (teardown));
+        check (host.logs.contains ("BYE"), "loading a new set destroys the old one first");
+
+        // …and the newly loaded set is armed again rather than being considered already destroyed.
+        host.logs.clear();
+        runtime.onPanelDestroy();
+        check (host.logs.contains ("BYE"), "…leaving the incoming set armed, not pre-destroyed");
+
+        // Never opening the window is not a reason to skip the teardown: something that was never
+        // shown was still loaded, and still holds whatever it took at load time.
+        juce::Array<juce::var> neverShown;
+        neverShown.add (makeScript ("bye", "lua", "panel", "onPanelDestroy", "*",
+            "function onPanelDestroy() log(\"BYE\") end\n"));
+        runtime.loadScripts (juce::var (neverShown));
+        host.logs.clear();
+        runtime.onPanelDestroy();
+        check (host.logs.contains ("BYE"), "a window that never opened never closed — but it is still destroyed");
+
+        // Loading nothing has nothing to destroy: firing for an empty set would make
+        // "exactly once per loaded set" a lie the first time a panel has no scripts.
+        runtime.loadScripts (juce::var (juce::Array<juce::var>()));
+        host.logs.clear();
+        runtime.onPanelDestroy();
+        check (host.logs.isEmpty(), "an empty script set raises nothing");
+
+        // A throw in the teardown is reported and the teardown completes — a failing handler must
+        // not be able to keep the old set alive.
+        juce::Array<juce::var> badBye;
+        badBye.add (makeScript ("throws", "lua", "panel", "onPanelDestroy", "*",
+            "function onPanelDestroy() error(\"teardown blew up\") end\n"));
+        badBye.add (makeScript ("bye", "lua", "panel", "onPanelDestroy", "*",
+            "function onPanelDestroy() log(\"BYE\") end\n"));
+        runtime.loadScripts (juce::var (badBye));
+        host.logs.clear(); errors.clear();
+        runtime.onPanelDestroy();
+        check (errors.joinIntoString ("\n").contains ("teardown blew up"), "a throw in teardown is reported");
+        check (host.logs.contains ("BYE"), "…and the other scripts are still told");
+        host.logs.clear();
+        runtime.onPanelDestroy();
+        check (host.logs.isEmpty(), "…and the set is still marked destroyed, not left half-alive");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

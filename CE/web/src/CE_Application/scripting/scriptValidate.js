@@ -23,7 +23,7 @@ const SCOPE_LIMITED = ALL_MEMBERS.filter((m) => Array.isArray(m.scopes)); // mem
 // looks fine in the editor and then quietly does nothing in the shipped plugin, so it is worth
 // saying out loud at edit time.
 const WINDOW_CLOSED_HANDLERS = new Set([
-  'onPanelLoad', 'onPanelClose', 'onDawSaveState', 'onDawRestoreState',
+  'onPanelLoad', 'onPanelClose', 'onPanelDestroy', 'onDawSaveState', 'onDawRestoreState',
   'onMidiIn', 'onCcIn', 'onSysexIn', 'onParameterReceived', 'onDumpReceived',
   'onDeviceConnected', 'onDeviceDisconnected', 'onTimer',
 ]);

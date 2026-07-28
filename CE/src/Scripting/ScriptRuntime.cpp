@@ -276,6 +276,12 @@ void ScriptRuntime::dispatchErrorHook (const juce::String& scriptId, const juce:
 void ScriptRuntime::loadScripts (const juce::var& scriptArray)
 {
     assertMessageThread();
+
+    // The outgoing set is being torn down, so tell it — while it still has engines, timers and
+    // state to say goodbye with. This is what makes onPanelDestroy fire on a panel switch and on
+    // a script-set reload, not only at shutdown, without every host having to remember to call it.
+    onPanelDestroy();
+
     scripts.clear();
     if (lua)    lua->reset();
     if (js)     js->reset();
@@ -339,6 +345,10 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     const auto pending = std::move (deferredErrors);
     deferredErrors.clear();
     for (const auto& [id, message] : pending) dispatchErrorHook (id, message, "load");
+
+    // Armed only if something actually loaded. Loading nothing has nothing to destroy, and firing
+    // a destroy for an empty set would make "exactly once per loaded set" a lie.
+    destroyPending = ! scripts.empty();
 }
 
 void ScriptRuntime::dispatchTo (const ScriptDefinition& def, const juce::String& fn, const juce::var& payload)
@@ -374,6 +384,19 @@ void ScriptRuntime::onPanelClose()
 {
     assertMessageThread();
     for (auto& s : scripts) if (s.event == "onPanelClose") dispatchTo (s, "onPanelClose", juce::var());
+}
+
+void ScriptRuntime::onPanelDestroy()
+{
+    assertMessageThread();
+    if (! destroyPending) return;   // already told them, or there was never a set to tell
+    destroyPending = false;
+
+    // Dispatched BEFORE anything is torn down, on purpose: a handler restoring the synth needs
+    // set(), sendCC() and its own `state` to still work. Whatever it throws is reported the normal
+    // way (log + onError) and the teardown carries on — a failing teardown handler must not be
+    // able to keep the old script set alive.
+    for (auto& s : scripts) if (s.event == "onPanelDestroy") dispatchTo (s, "onPanelDestroy", juce::var());
 }
 
 void ScriptRuntime::onDawSaveState (juce::var& store)

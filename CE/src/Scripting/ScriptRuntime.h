@@ -288,6 +288,18 @@ public:
     void onPanelLoad();
     void onPanelReady (bool firstTime);
     void onPanelClose();
+
+    /** Phase 5 — the loaded SCRIPTS are going away, which is not the same as the window closing.
+        A plugin whose editor is shut is still playing: `onPanelClose` says the view went, this
+        says the scripts themselves are being torn down (panel switched, script set replaced,
+        plugin unloaded). It is the last thing they run, and everything still works while it does.
+
+        Fires at most ONCE per loaded set, and `loadScripts` calls it for you before replacing an
+        existing set — so a host only has to call it explicitly at real shutdown. It is deliberately
+        NOT called from the destructor: running arbitrary script code against a host that may
+        already be half torn down is the one thing a teardown hook must never do. */
+    void onPanelDestroy();
+
     void onDawSaveState (juce::var& store);       // scripts write into `store`
     void onDawRestoreState (const juce::var& store);
 
@@ -411,6 +423,11 @@ private:
     bool inErrorHook = false;
     bool deferErrors = false;
     std::vector<std::pair<juce::String, juce::String>> deferredErrors;
+
+    // onPanelDestroy fires at most once per loaded set. Set by loadScripts, cleared by the
+    // dispatch — so a host that calls onPanelDestroy() at shutdown after a reload already sent
+    // one does not send a second, and a script cannot be told twice that it is going away.
+    bool destroyPending = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ScriptRuntime)
 };

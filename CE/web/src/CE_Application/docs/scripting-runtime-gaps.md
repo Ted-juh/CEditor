@@ -22,8 +22,8 @@ From `PluginProcessor.h` + `ScriptRuntime.cpp`:
 
 - `onValueChanged`
 - `onDumpReceived` (only on the `dumpMessageParsed` device callback)
-- Lifecycle: `onPanelLoad` / `onPanelReady` / `onPanelClose` /
-  `onDawSaveState` / `onDawRestoreState`
+- Lifecycle: `onPanelLoad` / `onPanelReady` / `onPanelClose` / `onPanelDestroy` /
+  `onDawSaveState` / `onDawRestoreState` / `onError`
 
 `ScriptHostApi` (outbound) backs: `getValue` / `setValue`, `sendCC` /
 `sendNRPN` / `sendSysex`, `requestDump` / `applyDump` / `sendDump` /

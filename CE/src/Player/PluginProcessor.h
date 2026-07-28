@@ -66,6 +66,12 @@ public:
 #if CEDITOR_VALUE_LAYER
     ~PlayerAudioProcessor() override
     {
+       #if CEDITOR_SCRIPTING
+        // FIRST, while everything a teardown handler needs still works: its timers, its state, the
+        // device service, set() and sendCC(). This is the plugin being unloaded — the real end of
+        // the scripts, as distinct from the window closing (onPanelClose), which they survive.
+        if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
+       #endif
         stopTimer();
        #if CEDITOR_SCRIPTING
         deviceService.setEventCallback (nullptr);  // stop device events reaching the about-to-die runtime

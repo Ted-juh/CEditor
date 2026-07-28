@@ -81,14 +81,15 @@
 
   // Which lifecycle group an event belongs to — drives nav grouping ONLY. This is a
   // display bucket; it has no effect on dispatch. The host fires each hook by name
-  // (onPanelLoad/onPanelReady/onPanelClose/onDawSaveState/onDawRestoreState) regardless
+  // (onPanelLoad/onPanelReady/onPanelClose/onPanelDestroy/onDawSaveState/onDawRestoreState) regardless
   // of which group it's shown under, so DAW save/restore stay handled correctly here.
   // The four real moments are kept distinct, in runtime order: startup → ready → runtime → shutdown.
   const DAW_STATE = new Set(['onDawSaveState', 'onDawRestoreState']);
   function screenOf(event) {
     if (event === 'onPanelLoad') return 'startup';   // Phase 1 — before the GUI exists
     if (event === 'onPanelReady') return 'ready';    // Phase 2 — GUI built, fill controls
-    if (event === 'onPanelClose') return 'shutdown'; // Phase 4 — really closing
+    if (event === 'onPanelClose') return 'shutdown';   // Phase 4 — the view is going away
+    if (event === 'onPanelDestroy') return 'shutdown'; // Phase 5 — the scripts are going away
     if (DAW_STATE.has(event)) return 'dawstate';     // host-driven save/restore (any time)
     return 'runtime';                                // Phase 3 — during use (events)
   }
