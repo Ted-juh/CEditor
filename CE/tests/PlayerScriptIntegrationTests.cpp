@@ -250,6 +250,55 @@ int main()
         check (modLogs.contains ("count 3"), "reloading the scripts does NOT clear saved settings");
     }
 
+    // ---------------------------------------------------------------------------------------
+    // The wire filters, as the PLAYER uses them.
+    //
+    // The engine-level test in ScriptRuntimeTests calls runtime.filterMidi() directly. That proves
+    // the chain works; it does NOT prove anything calls it — and for one commit, nothing did. The
+    // verbs were in the contract, the engines held the closures, and the exported plugin ran none
+    // of it. So this test asserts the thing that was actually missing: a send goes THROUGH the
+    // filter on its way out, and an inbound message goes through on its way in.
+    {
+        const char* kWirePanel = R"JSON({
+          "name": "Wire",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "w1", "name": "wire", "language": "lua", "scope": "panel", "event": "onPanelLoad", "target": "*", "enabled": true,
+              "source": "function onPanelLoad()\n  interceptMidiOut(function(b) if b[2] == 74 then return false end b[3] = 127 return b end)\n  interceptMidiIn(function(b) b[2] = b[2] + 12 return b end)\nend\nfunction onCcIn(e) log(\"cc \" .. e.cc) end\nfunction blast() sendCC(1, 80, 5) sendCC(1, 74, 5) end" }
+          ],
+          "controls": []
+        })JSON";
+
+        PanelValueModel wireModel;
+        wireModel.loadFromJson (kWirePanel);
+
+        juce::StringArray wireLogs, wireOut;
+        BridgeScriptHost::Callbacks wcb;
+        wcb.log = [&wireLogs] (const juce::String& m, const juce::var&) { wireLogs.add (m); };
+        wcb.getValue = [] (const juce::String&, const juce::String&) { return juce::var(); };
+        wcb.setValue = [] (const juce::String&, const juce::var&, bool, const juce::var&) {};
+        wcb.sendCC = [&wireOut] (int ch, int cc, const juce::var& v)
+            { wireOut.add (juce::String (ch) + ":" + juce::String (cc) + ":" + v.toString()); };
+
+        BridgeScriptHost wireHost (wcb);
+        ScriptRuntime wireRuntime (wireHost);
+        wireRuntime.loadScripts (gatherPanelScripts (wireModel.panel()));
+        wireRuntime.dispatchEvent ("onPanelLoad", "*", juce::var());
+
+        // Outbound: the player funnels every send through filterMidi before the wire.
+        juce::var outCc (juce::Array<juce::var> { 0xB0, 80, 5 });
+        check (wireRuntime.filterMidi (false, outCc), "player path: CC 80 survives the outbound filter");
+        check ((int) (*outCc.getArray())[2] == 127, "player path: and the filter rewrote its value");
+
+        juce::var blocked (juce::Array<juce::var> { 0xB0, 74, 5 });
+        check (! wireRuntime.filterMidi (false, blocked), "player path: CC 74 is swallowed outright");
+
+        // Inbound: the same, on the way in — before onCcIn or any binding sees it.
+        juce::var inNote (juce::Array<juce::var> { 0x90, 60, 100 });
+        check (wireRuntime.filterMidi (true, inNote), "player path: an inbound note passes");
+        check ((int) (*inNote.getArray())[1] == 72, "player path: transposed before any handler ran");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

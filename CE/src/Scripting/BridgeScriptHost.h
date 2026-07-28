@@ -34,6 +34,11 @@ public:
         std::function<void (int ch, int msb, int lsb, const juce::var& value)> sendNRPN;
         std::function<void (const juce::var& bytes)> sendSysex;
         std::function<void (const juce::var& bytes)> sendMidi;   // raw bytes, no wrapping
+        // routeMidi(role, fn) blocks and feedMidi(bytes). Left unset by a host that has neither,
+        // in which case the verbs report rather than pretending — see the overrides below.
+        std::function<void (const juce::String& role)> beginRoute;
+        std::function<void()> endRoute;
+        std::function<void (const juce::var& bytes)> feedMidi;
         std::function<void (const juce::String& kind)> requestDump;
         std::function<void (const juce::var& bytes)> applyDump;   // host should run inside an InboundScope
         std::function<void (const juce::String& kind)> sendDump;
@@ -151,6 +156,24 @@ public:
     void sendNRPN (int ch, int msb, int lsb, const juce::var& v) override { if (callbacks.sendNRPN && midiSendAllowed()) callbacks.sendNRPN (ch, msb, lsb, v); }
     void sendSysex (const juce::var& bytes) override                 { if (callbacks.sendSysex && midiSendAllowed()) callbacks.sendSysex (bytes); }
     void sendMidi (const juce::var& bytes) override                  { if (callbacks.sendMidi && midiSendAllowed()) callbacks.sendMidi (bytes); }
+    // routeMidi / feedMidi. A host that wires neither gets the honest failure rather than the quiet
+    // one: the block still RUNS (its sends go to the default device, which is what they did before
+    // routing existed), and feedMidi says it could not. Silence here is exactly the defect the
+    // window-closed audit kept finding — an API that reads as working and does nothing.
+    void beginRouteOverride (const juce::String& role) override
+    {
+        if (callbacks.beginRoute) { callbacks.beginRoute (role); routeWired = true; return; }
+        routeWired = false;
+        logAt ("warn", "routeMidi(\"" + role + "\"): this host has no MIDI routing, so the block's sends "
+                       "go to the default device.", juce::var());
+    }
+    void endRouteOverride() override { if (routeWired && callbacks.endRoute) callbacks.endRoute(); }
+
+    void feedMidi (const juce::var& bytes) override
+    {
+        if (callbacks.feedMidi) { callbacks.feedMidi (bytes); return; }
+        logAt ("error", "feedMidi(): this host has no MIDI input to inject into — nothing was fed.", juce::var());
+    }
     void requestDump (const juce::String& kind) override             { if (callbacks.requestDump) callbacks.requestDump (kind); }
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
@@ -202,6 +225,10 @@ public:
     { return callbacks.loadSetting ? callbacks.loadSetting (key) : juce::var(); }
 
 private:
+    // Whether the host actually wired routing, so endRouteOverride does not unbalance a host
+    // that never began one.
+    bool routeWired = false;
+
     // Scope (Q7) is NOT enforced here, and that is a decision rather than an omission. The
     // Device/MIDI verbs used to declare device/panel/project scope; enforcing that list denied a
     // COMPONENT script — a per-control script — the ability to send a CC, which is the ordinary

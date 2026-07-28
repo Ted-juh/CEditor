@@ -1717,3 +1717,36 @@ correct, and neither would have been noticed by hand.
 
 The alternative — leaving the note-off to the script — is the one MIDI mistake you *hear* rather
 than read. A hung voice is worth a module dependency.
+
+### The half that was missing, and the test that would have caught it
+
+§28 shipped `interceptMidiIn`/`Out`, `routeMidi` and `feedMidi` with the WebView side wired and
+**the player side not wired at all**. `ScriptRuntime::filterMidi` existed and nothing called it;
+`beginRouteOverride` and `feedMidi` were `ScriptHostApi` virtuals no host implemented, so both fell
+through to their default no-ops. In the exported plugin, three of the five verbs read as working and
+did nothing.
+
+That is the exact defect this document keeps recording — an undeclared boundary — and the C++ suite
+was green throughout, because every check called `runtime.filterMidi()` **directly**. Testing the
+chain is not testing that anything reaches it. The missing assertion was one level up, and it is now
+in `PlayerScriptIntegrationTests`: a send goes through the filter on its way out, an inbound message
+on its way in, driven the way the player drives them.
+
+The wiring itself:
+
+- **Outbound** — `scriptSendRawMidi` is the one funnel every script send passes, so the filter runs
+  there, on the assembled bytes rather than on each verb's arguments.
+- **Inbound** — the `midiInputMessage` tap became `deliverInboundMidi`, a named method, and the
+  filter runs before *any* of `onMidiIn` / `onCcIn` / `onNoteIn` is raised. Naming it is what lets
+  `feedMidi` mean exactly the same thing: same filters, same events, same order. Two copies of that
+  ordering would be two chances for a fed message to behave unlike a real one.
+- **`routeMidi` is honest rather than complete.** In the plugin, every script send leaves through the
+  plugin's own MIDI output bus, and which synth that reaches is the DAW's routing decision. The role
+  is recorded in the log line (`{route aux, DAW-routed here}`) instead of being silently accepted.
+  `routeMidi` is fully applied in the panel view, where sends are addressed to a device role
+  directly. A host wiring neither callback gets a `warn` from `BridgeScriptHost` and the block still
+  runs — the failure is stated, not swallowed.
+
+The general rule this earns: **a verb is not done when its runtime implements it, only when every
+host that claims it invokes it.** The parity suite checks that a name exists in each engine. Nothing
+checked that the app calls the engine, and for one commit that gap was the whole feature.

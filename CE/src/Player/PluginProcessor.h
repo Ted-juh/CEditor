@@ -467,9 +467,33 @@ private:
     // processBlock). The DAW routes that track to the synth's hardware port — the plugin never opens a
     // port itself (that's the standalone's job; a plugin opening hardware ports fights the host and is
     // not portable). `bytes` may be a multi-message stream (e.g. NRPN = 4 CCs); we split it.
-    void scriptSendRawMidi (const juce::String& actionId, const juce::Array<int>& bytes)
+    // The role a routeMidi(role, fn) block is in force for, empty outside one.
+    juce::String scriptRouteRole;
+
+    void scriptSendRawMidi (const juce::String& actionId, const juce::Array<int>& bytesIn)
     {
-        if (bytes.isEmpty()) return;
+        if (bytesIn.isEmpty()) return;
+
+        // interceptMidiOut runs HERE, at the one funnel every script send goes through, so a filter
+        // sees the assembled bytes rather than each verb's arguments. A filter that swallows the
+        // message stops it dead — nothing reaches the collector and nothing is reported as sent.
+        juce::Array<int> bytes = bytesIn;
+       #if CEDITOR_SCRIPTING
+        if (scriptRuntime != nullptr)
+        {
+            juce::Array<juce::var> asVar;
+            for (const int b : bytes) asVar.add (b);
+            juce::var payload (asVar);
+            if (! scriptRuntime->filterMidi (false, payload)) return;    // swallowed by a script
+            if (auto* arr = payload.getArray())
+            {
+                bytes.clearQuick();
+                for (const auto& x : *arr) bytes.add (juce::jlimit (0, 255, (int) x));
+            }
+            if (bytes.isEmpty()) return;
+        }
+       #endif
+
         std::vector<juce::uint8> raw;
         raw.reserve ((size_t) bytes.size());
         for (const int b : bytes) raw.push_back ((juce::uint8) (b & 0xff));
@@ -487,12 +511,85 @@ private:
 
         juce::StringArray hex;
         for (const int b : bytes) hex.add (juce::String::toHexString (b & 0xff).paddedLeft ('0', 2).toUpperCase());
-        scriptLogLine ("midi out  [" + actionId + "]  " + hex.joinIntoString (" "));
+        // The routed role is logged, not applied: in the plugin every script send leaves through the
+        // plugin's own MIDI output bus, and which synth that reaches is the DAW's routing decision,
+        // not ours. Saying so in the log is honest; silently accepting a role we cannot honour is the
+        // failure mode this whole audit keeps finding. routeMidi() is fully applied in the panel
+        // view, where sends are addressed to a device role directly.
+        scriptLogLine ("midi out  [" + actionId + "]"
+                       + (scriptRouteRole.isNotEmpty() ? "  {route " + scriptRouteRole + ", DAW-routed here}" : juce::String())
+                       + "  " + hex.joinIntoString (" "));
     }
 
     // Receive device events window-CLOSED and route them to the C++ runtime. PlayerHost owns the
     // single service callback while the window is open (routing to JS); it nulls it on close, so we
     // reclaim it here (at setup + on each close edge). The window check is belt-and-braces.
+    /** Deliver one inbound MIDI message to the scripts: interceptMidiIn first, then
+        onMidiIn / onCcIn / onNoteIn|onNoteOffIn. Named rather than inline because feedMidi() has to
+        mean EXACTLY this — same filters, same events, same order — and two copies of that ordering
+        would be two chances for a fed message to behave unlike a real one. */
+    void deliverInboundMidi (const juce::var& message)
+    {
+        auto* o = message.getDynamicObject();
+        if (o == nullptr || scriptRuntime == nullptr) return;
+
+        auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
+        const juce::String messageType = o->getProperty ("messageType").toString();
+
+        // interceptMidiIn runs BEFORE any of the three events below, so a filter that transposes or
+        // remaps is seen by every handler rather than by whichever one happened to be dispatched
+        // first — and a filter that swallows means no events at all.
+        {
+            juce::var filtered (bytes);
+            if (! scriptRuntime->filterMidi (true, filtered)) return;
+            if (auto* arr = filtered.getArray())
+            {
+                bytes.clearQuick();
+                for (const auto& x : *arr) bytes.add ((int) x);
+            }
+            if (bytes.isEmpty()) return;
+        }
+
+        const int status = bytes.size() > 0 ? (int) bytes.getReference (0) : 0;
+
+        auto* mo = new juce::DynamicObject();
+        mo->setProperty ("bytes", juce::var (bytes));
+        mo->setProperty ("status", status);
+        mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
+        scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
+
+        if (messageType == "cc" && bytes.size() >= 3)
+        {
+            auto* co = new juce::DynamicObject();
+            co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
+            co->setProperty ("cc", (int) bytes.getReference (1));
+            co->setProperty ("value", (int) bytes.getReference (2));
+            scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
+        }
+
+        // Notes. Classified from the STATUS BYTE rather than from messageType, so this and the
+        // WebView (panelRuntime noteEventFor) cannot decide differently — and because only the
+        // status byte settles the case below.
+        if (bytes.size() >= 3)
+        {
+            const int kind = status & 0xF0;
+            if (kind == 0x90 || kind == 0x80)
+            {
+                auto* no = new juce::DynamicObject();
+                // 1-16, matching sendNote, so onNoteIn -> sendNote echoes correctly.
+                no->setProperty ("channel", (status & 0x0F) + 1);
+                no->setProperty ("note", (int) bytes.getReference (1));
+                no->setProperty ("velocity", (int) bytes.getReference (2));
+                // A note-on with velocity 0 IS a note-off. Devices using running status send them
+                // constantly, and a panel that treated one as a note-on would hang a voice on every
+                // key release.
+                const bool off = (kind == 0x80) || ((int) bytes.getReference (2) == 0);
+                scriptRuntime->dispatchEvent (off ? "onNoteOffIn" : "onNoteIn", "", juce::var (no));
+            }
+        }
+    }
+
+
     void installScriptDeviceCallback()
     {
         deviceService.setEventCallback ([this] (const juce::String& name, const juce::var& payload)
@@ -500,51 +597,8 @@ private:
             if (getActiveEditor() != nullptr || scriptRuntime == nullptr) return;  // window open -> JS handles it
             auto* o = payload.getDynamicObject();
 
-            // Raw inbound taps (observational). onMidiIn for every message; onCcIn/onSysexIn refine it.
-            if (name == "midiInputMessage")
-            {
-                if (o == nullptr) return;
-                const auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
-                const juce::String messageType = o->getProperty ("messageType").toString();
-                const int status = bytes.size() > 0 ? (int) bytes.getReference (0) : 0;
-
-                auto* mo = new juce::DynamicObject();
-                mo->setProperty ("bytes", juce::var (bytes));
-                mo->setProperty ("status", status);
-                mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
-                scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
-
-                if (messageType == "cc" && bytes.size() >= 3)
-                {
-                    auto* co = new juce::DynamicObject();
-                    co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
-                    co->setProperty ("cc", (int) bytes.getReference (1));
-                    co->setProperty ("value", (int) bytes.getReference (2));
-                    scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
-                }
-
-                // Notes. Classified from the STATUS BYTE rather than from messageType, so this and
-                // the WebView (panelRuntime noteEventFor) cannot decide differently — and because
-                // only the status byte settles the case below.
-                if (bytes.size() >= 3)
-                {
-                    const int kind = status & 0xF0;
-                    if (kind == 0x90 || kind == 0x80)
-                    {
-                        auto* no = new juce::DynamicObject();
-                        // 1-16, matching sendNote, so onNoteIn -> sendNote echoes correctly.
-                        no->setProperty ("channel", (status & 0x0F) + 1);
-                        no->setProperty ("note", (int) bytes.getReference (1));
-                        no->setProperty ("velocity", (int) bytes.getReference (2));
-                        // A note-on with velocity 0 IS a note-off. Devices using running status send
-                        // them constantly, and a panel that treated one as a note-on would hang a
-                        // voice on every key release.
-                        const bool off = (kind == 0x80) || ((int) bytes.getReference (2) == 0);
-                        scriptRuntime->dispatchEvent (off ? "onNoteOffIn" : "onNoteIn", "", juce::var (no));
-                    }
-                }
-                return;
-            }
+            // Raw inbound taps. onMidiIn for every message; onCcIn/onNoteIn refine it.
+            if (name == "midiInputMessage") { deliverInboundMidi (payload); return; }
 
             if (name == "sysexInputMessage")
             {
@@ -664,6 +718,29 @@ private:
                 for (const auto& x : *arr) b.add (juce::jlimit (0, 255, (int) x));
             if (b.isEmpty()) return;
             scriptSendRawMidi ("raw", b);
+        };
+        // routeMidi(role, fn): the role in force for the block's sends. Stored rather than pushed
+        // through every sender, and restored by endRoute — a throw inside the block unwinds through
+        // the engine's own finally, so the override cannot outlive it.
+        cb.beginRoute = [this] (const juce::String& role) { scriptRouteRole = role; };
+        cb.endRoute   = [this] { scriptRouteRole.clear(); };
+
+        // feedMidi(bytes): inject as if the hardware had sent it. With the window closed there is no
+        // panel view to drive, so "as if received" means exactly what a real message means here —
+        // the same three script events, through the same inbound filters, in the same order.
+        cb.feedMidi = [this] (const juce::var& bytes)
+        {
+            juce::StringArray hex;
+            if (auto* arr = bytes.getArray())
+                for (const auto& x : *arr)
+                    hex.add (juce::String::toHexString (juce::jlimit (0, 255, (int) x)).paddedLeft ('0', 2));
+            if (hex.isEmpty()) return;
+            const int status = bytes.getArray() != nullptr && bytes.getArray()->size() > 0
+                             ? juce::jlimit (0, 255, (int) bytes.getArray()->getReference (0)) : 0;
+            auto* fo = new juce::DynamicObject();
+            fo->setProperty ("hex", hex.joinIntoString (" "));
+            fo->setProperty ("messageType", (status & 0xF0) == 0xB0 ? "cc" : "raw");
+            deliverInboundMidi (juce::var (fo));
         };
         cb.requestDump = [this] (const juce::String& kind)
         {
