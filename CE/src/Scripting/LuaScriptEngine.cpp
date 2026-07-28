@@ -620,7 +620,7 @@ end
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
-  ["ce.core"] = { emit = "emit", error = "logError", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn" },
+  ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", write = "deviceWrite" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap" },
@@ -833,8 +833,15 @@ public:
             return juce::var (o);
         };
 
+        // set() runs this script set's intercept() filters before the host sees the value, so a
+        // rule like "this knob only takes even numbers" holds for every write instead of being
+        // re-checked at each call site.
         g.set_function ("set", [this, buildOptions] (std::string path, sol::object value, sol::optional<sol::table> opts)
-            { host->setValue (juce::String (path), solToVar (value), buildOptions (opts)); });
+        {
+            auto v = solToVar (value);
+            if (! runFilters (juce::String (path), v)) return;
+            host->setValue (juce::String (path), v, buildOptions (opts));
+        });
         g.set_function ("get", [this] (std::string path, sol::optional<std::string> form)
             { return varToSol (lua, host->getValue (juce::String (path), form ? juce::String (*form) : juce::String ("value"))); });
 
@@ -909,6 +916,50 @@ public:
                 [this, &t, &e] (const Listener& l)
                 { return l.scriptId == currentScriptId && l.target == t && l.event == e; }),
                 listeners.end());
+        });
+
+        /* --- the reactive core: watch / compute / intercept / defineAction ---------------------
+         * The verbs that do what setting a property cannot. A property is a CONSTANT chosen at
+         * design time; each of these is a RULE the runtime keeps applying. Tagged with the
+         * registering script exactly as on() is, so reloading a script replaces its rules rather
+         * than stacking a second copy beside them. */
+
+        // watch(path, fn) — fn(value, previous) whenever ANY model path moves, not just the
+        // events somebody enumerated in advance. Seeded with the current value so registering is
+        // not itself reported as a change.
+        g.set_function ("watch", [this] (std::string path, sol::protected_function fn)
+        {
+            const juce::String p (path);
+            putRule (watchers, { currentScriptId, p, std::move (fn),
+                                 signatureOf (host->getValue (p, "value")), juce::var(), false });
+        });
+
+        // compute(path, fn) — the property becomes a formula. The runtime owns the re-evaluation,
+        // so it cannot fall out of step with an event the author forgot to hook.
+        g.set_function ("compute", [this] (std::string path, sol::protected_function fn)
+            { putRule (computeds, { currentScriptId, juce::String (path), std::move (fn), {}, juce::var(), false }); });
+
+        // intercept(path, fn) — middleware in front of every write to that path.
+        g.set_function ("intercept", [this] (std::string path, sol::protected_function fn)
+            { putRule (filters, { currentScriptId, juce::String (path), std::move (fn), {}, juce::var(), false }); });
+
+        // defineAction(name, fn) — a named verb the panel can be built out of, callable by
+        // run("name") from a script in any language.
+        g.set_function ("defineAction", [this] (std::string name, sol::protected_function fn)
+        {
+            const juce::String id = juce::String (name).trim();
+            if (id.isEmpty()) return;
+            const auto key = id.toLowerCase();
+            auto existing = actions.find (key);
+            if (existing != actions.end() && existing->second.scriptId != currentScriptId)
+            {
+                // Reported rather than silently overwritten: two scripts claiming one name is a
+                // real conflict, and load order deciding it is the worst way to resolve it.
+                host->logAt ("error", "defineAction(\"" + id + "\") — already defined by another script. "
+                                      "The later definition is ignored.", juce::var());
+                return;
+            }
+            actions[key] = { currentScriptId, id, std::move (fn) };
         });
 
         lua.script (kPrelude);
@@ -1002,10 +1053,160 @@ public:
         }
     }
 
-    void reset() override { envs.clear(); listeners.clear(); }
+    void reset() override
+    {
+        envs.clear();
+        listeners.clear();
+        watchers.clear(); computeds.clear(); filters.clear(); actions.clear();
+    }
+
+    /* --------------------------------------------------------------- the reactive core */
+
+    /** Settle the formulas, then report the changes.
+     *
+     * Computes run to a fixpoint FIRST so watchers see a settled model: a watcher that fired on
+     * the intermediate state would report a value the panel never actually held. Then the filters
+     * get a pass over their own paths, which is how a change that did not come through set() —
+     * the user moving a control, inbound MIDI, a dump landing — still obeys its rule.
+     */
+    void runReactive (const ScriptErrorSink& onError) override
+    {
+        if (watchers.empty() && computeds.empty() && filters.empty()) return;
+        if (reactiveDepth > 0) return;                 // a rule's own set() must not re-enter this
+        const ScopedDepth guard (reactiveDepth);
+        const Watchdog watchdog (*this);
+
+        for (int pass = 0; pass < kMaxSettlePasses; ++pass)
+        {
+            bool wrote = false;
+            for (auto& c : computeds)
+            {
+                if (c.failed) continue;
+                auto r = c.fn();
+                if (! r.valid()) { sol::error e = r; onError ("compute:" + c.path, juce::String (e.what())); c.failed = true; continue; }
+                if (r.return_count() == 0) continue;
+                auto next = solToVar (r);
+                if (signatureOf (next) == signatureOf (host->getValue (c.path, "value"))) continue;
+                host->setValue (c.path, next, juce::var());
+                wrote = true;
+            }
+            if (! wrote) break;
+            if (pass == kMaxSettlePasses - 1)
+                host->logAt ("error", "compute(): still changing after " + juce::String (kMaxSettlePasses)
+                             + " passes — two formulas are feeding each other. They are left at the "
+                               "last value rather than looped on.", juce::var());
+        }
+
+        // A filter has to be idempotent for this to settle (f(f(x)) == f(x)) — snapping, clamping
+        // and quantising all are. One that is not keeps correcting, and is cut off by the same
+        // pass limit above on the next tick rather than spinning here.
+        for (auto& f : filters)
+        {
+            auto current = host->getValue (f.path, "value");
+            if (current.isVoid()) continue;
+            auto decided = current;
+            if (! runFilters (f.path, decided)) continue;   // a veto has nothing to revert to
+            if (signatureOf (decided) != signatureOf (current))
+                host->setValue (f.path, decided, juce::var());
+        }
+
+        for (auto& w : watchers)
+        {
+            auto value = host->getValue (w.path, "value");
+            const auto sig = signatureOf (value);
+            if (sig == w.last) continue;
+            auto previous = w.lastValue;
+            w.last = sig;
+            w.lastValue = value;
+            auto r = w.fn (varToSol (lua, value), varToSol (lua, previous));
+            if (! r.valid()) { sol::error e = r; onError ("watch:" + w.path, juce::String (e.what())); }
+        }
+    }
+
+    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink&) override
+    {
+        return runFilters (path, value);
+    }
+
+    bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
+                     const ScriptErrorSink& onError) override
+    {
+        auto it = actions.find (name.toLowerCase());
+        if (it == actions.end()) return false;
+        const Watchdog guard (*this);
+        auto r = it->second.fn (varToSol (lua, args));
+        if (! r.valid()) { sol::error e = r; onError ("action:" + name, juce::String (e.what())); return true; }
+        result = r.return_count() > 0 ? solToVar (r) : juce::var();
+        return true;
+    }
+
+    juce::StringArray registeredActions() const override
+    {
+        juce::StringArray out;
+        for (auto& a : actions) out.add (a.second.name);
+        return out;
+    }
 
 private:
     struct Listener { juce::String scriptId, target, event; sol::protected_function fn; };
+
+    /** One shape for all three rule kinds — they differ only in when they are called. `last`/
+        `lastValue` are used by watchers, `failed` by computes; carrying the unused fields is
+        cheaper than three near-identical structs that drift apart. */
+    struct Rule
+    {
+        juce::String scriptId, path;
+        sol::protected_function fn;
+        juce::String last;
+        juce::var lastValue;
+        bool failed;
+    };
+    struct ActionDef { juce::String scriptId, name; sol::protected_function fn; };
+
+    /** A rule replaces the same script's rule for the same path rather than stacking beside it.
+        Two filters on one path would make the result depend on registration order — the kind of
+        thing that works until the scripts load in a different order. */
+    static void putRule (std::vector<Rule>& list, Rule&& rule)
+    {
+        for (auto& r : list)
+            if (r.scriptId == rule.scriptId && r.path == rule.path) { r = std::move (rule); return; }
+        list.push_back (std::move (rule));
+    }
+
+    /** Run every filter registered for `path`. False = a filter rejected the write outright;
+        nil/no return = no opinion, keep what we had; anything else replaces the value. */
+    bool runFilters (const juce::String& path, juce::var& value)
+    {
+        if (filters.empty() || filterDepth > 0) return true;   // a filter's own set() must not re-enter
+        const ScopedDepth guard (filterDepth);
+        for (auto& f : filters)
+        {
+            if (f.path != path) continue;
+            auto r = f.fn (varToSol (lua, value), varToSol (lua, value));
+            if (! r.valid()) { reportPF (r); continue; }
+            if (r.return_count() == 0) continue;
+            auto out = solToVar (r);
+            if (out.isBool() && ! (bool) out) return false;
+            if (out.isVoid()) continue;
+            value = out;
+        }
+        return true;
+    }
+
+    /** A stable comparison signature — arrays and objects compare by content, not identity. */
+    static juce::String signatureOf (const juce::var& v)
+    {
+        return v.isVoid() ? juce::String ("\1void") : juce::JSON::toString (v, true);
+    }
+
+    struct ScopedDepth
+    {
+        explicit ScopedDepth (int& d) : depth (d) { ++depth; }
+        ~ScopedDepth() { --depth; }
+        int& depth;
+    };
+
+    static constexpr int kMaxSettlePasses = 8;
 
     void reportPF (const sol::protected_function_result& r)
     {
@@ -1095,6 +1296,10 @@ private:
     sol::state lua;
     std::map<juce::String, sol::environment> envs;
     std::vector<Listener> listeners;
+    std::vector<Rule> watchers, computeds, filters;
+    std::map<juce::String, ActionDef> actions;   // key = lower-cased name
+    int reactiveDepth = 0;                       // >0 inside runReactive
+    int filterDepth = 0;                         // >0 inside a filter
     ScriptHostApi* host = nullptr;
     int watchdogDepth = 0;
     // Which script is executing, so on()/off() can tag and match listeners. Set around

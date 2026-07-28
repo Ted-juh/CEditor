@@ -257,6 +257,45 @@ public:
         and it is stated in NativeHandlerAbi.h rather than left to be discovered. */
     virtual void setExtensionModules (const juce::var& modules) { juce::ignoreUnused (modules); }
 
+    /** Re-evaluate this engine's compute() formulas and fire its watch() callbacks.
+
+        The reactive rules are language-native closures, so they can only live inside the engine
+        that made them — the runtime owns WHEN they run, the engine owns WHAT runs. Called after
+        every dispatch, because that is when the model has just moved.
+
+        Default no-op: an engine with no reactive verbs (the native-handler engine, whose modules
+        are compiled and cannot register a closure at runtime) has nothing to settle. */
+    virtual void runReactive (const ScriptErrorSink& onError) { juce::ignoreUnused (onError); }
+
+    /** Run this engine's intercept() filters for `path`.
+
+        Returns false when a filter rejected the write outright; otherwise `value` carries whatever
+        the filters made of it — possibly unchanged. Engine-local, because `set` is bound inside the
+        engine and this has to sit between that binding and the host.
+
+        Default: accept unchanged. An engine with no filters must not be able to block a write. */
+    virtual bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError)
+    {
+        juce::ignoreUnused (path, value, onError);
+        return true;
+    }
+
+    /** Call a defineAction()-registered action, if this engine has one by that name.
+
+        Returns false when it has not, so the caller can go on looking in the other engines — an
+        action defined in Lua has to be callable from a JavaScript script, which is the whole point
+        of naming it rather than calling a function directly. */
+    virtual bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
+                             const ScriptErrorSink& onError)
+    {
+        juce::ignoreUnused (name, args, result, onError);
+        return false;
+    }
+
+    /** The action names this engine has registered, for the editor's binding UI and for the
+        "no such action" message, which is far more use naming what DOES exist. */
+    virtual juce::StringArray registeredActions() const { return {}; }
+
     /** Drop all loaded scripts/environments. */
     virtual void reset() = 0;
 };

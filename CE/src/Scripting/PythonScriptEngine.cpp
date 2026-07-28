@@ -418,7 +418,121 @@ const char* kPrelude = R"PY(
 # @module -
 import ceditor as __api
 
-def set(path, value, opts=None): return __api.set(path, value, opts)
+# @module ce.core
+# --- the reactive core: watch / compute / intercept / defineAction ---------------------------
+# The verbs that do what setting a property cannot: a property is a CONSTANT chosen at design
+# time, each of these is a RULE the runtime keeps applying. Held per script namespace, the way
+# the JS prelude holds them per engine, so no script tagging is needed.
+import json as __json
+__watchers = []
+__computeds = []
+__filters = []
+__actions = {}
+__depth = {"filter": 0, "reactive": 0}
+__MAX_SETTLE = 8
+
+def __sig(v):
+    if v is None: return " none"
+    try: return __json.dumps(v, sort_keys=True)
+    except Exception: return str(v)
+
+def __putRule(lst, rule):
+    # A rule REPLACES the same path's rule rather than stacking beside it: two filters on one
+    # path would make the result depend on the order they happened to register in.
+    for i in range(len(lst)):
+        if lst[i]["path"] == rule["path"]:
+            lst[i] = rule
+            return
+    lst.append(rule)
+
+def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(get(path)), "prev": None})
+def compute(path, fn):   __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
+def intercept(path, fn): __putRule(__filters, {"path": path, "fn": fn})
+
+def defineAction(name, fn):
+    key = str(name or "").strip()
+    if not key or not callable(fn): return
+    __actions[key.lower()] = {"name": key, "fn": fn}
+
+def __actionNames(): return [a["name"] for a in __actions.values()]
+
+def __callAction(name, args):
+    a = __actions.get(str(name).lower())
+    if a is None: return {"found": False}
+    try: return {"found": True, "value": a["fn"](args)}
+    except Exception as err:
+        logError("action " + str(name) + ": " + str(err))
+        return {"found": True}
+
+def __applyIntercepts(path, value):
+    # Returns {"reject": True} or {"value": ...}.
+    if not __filters or __depth["filter"] > 0: return {"value": value}   # no re-entry from a filter's own set()
+    __depth["filter"] += 1
+    try:
+        for f in __filters:
+            if f["path"] != path: continue
+            try: out = f["fn"](value, value)
+            except Exception as err:
+                logError("intercept " + str(path) + ": " + str(err))
+                continue
+            if out is False: return {"reject": True}
+            if out is None: continue          # no opinion — keep what we had
+            value = out
+    finally:
+        __depth["filter"] -= 1
+    return {"value": value}
+
+def __runReactive():
+    # Computes settle first, so a watcher never sees an intermediate value the panel did not hold.
+    if not __watchers and not __computeds and not __filters: return
+    if __depth["reactive"] > 0: return
+    __depth["reactive"] += 1
+    try:
+        for _p in range(__MAX_SETTLE):
+            wrote = False
+            for c in __computeds:
+                if c["failed"]: continue
+                try: nxt = c["fn"]()
+                except Exception as err:
+                    logError("compute " + str(c["path"]) + ": " + str(err))
+                    c["failed"] = True
+                    continue
+                if nxt is None: continue
+                if __sig(nxt) == __sig(get(c["path"])): continue
+                set(c["path"], nxt)
+                wrote = True
+            if not wrote: break
+            if _p == __MAX_SETTLE - 1:
+                logError("compute(): still changing after " + str(__MAX_SETTLE) + " passes — two formulas "
+                         "are feeding each other. They are left at the last value rather than looped on.")
+        # Changes that never came through set() — the user moving a control, inbound MIDI, a dump
+        # landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
+        # clamping and quantising all are.
+        for f in __filters:
+            cur = get(f["path"])
+            if cur is None: continue
+            d = __applyIntercepts(f["path"], cur)
+            if d.get("reject"): continue      # a veto has nothing to revert to
+            if __sig(d["value"]) != __sig(cur): set(f["path"], d["value"])
+        for w in __watchers:
+            v = get(w["path"])
+            s = __sig(v)
+            if s == w["last"]: continue
+            previous = w["prev"]
+            w["last"] = s
+            w["prev"] = v
+            try: w["fn"](v, previous)
+            except Exception as err: logError("watch " + str(w["path"]) + ": " + str(err))
+    finally:
+        __depth["reactive"] -= 1
+
+# @module -
+# set() runs this script's intercept() filters before the host sees the value, so the rule holds
+# for every write instead of being re-checked at each call site.
+def set(path, value, opts=None):
+    d = __applyIntercepts(path, value)
+    if d.get("reject"): return None
+    return __api.set(path, d["value"], opts)
 def get(path, form="value"):      return __api.get(path, form)
 # @module ce.midi
 def sendCC(ch, cc, v):            return __api.sendCC(ch, cc, v)
@@ -1022,7 +1136,7 @@ def loadSetting(key, fallback=None):
 # discoverability (ce.core.set is the same function as set).
 import types as __ce_types
 __CE_MODULES = {
-    "ce.core": { "emit": "emit", "error": "logError", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn" },
+    "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
@@ -1268,6 +1382,28 @@ public:
     // single entry into Python overruns its wall-clock budget, which raises
     // KeyboardInterrupt in the interpreter and aborts the runaway handler.
     // The error surfaces through the normal error sink via fetchPyError().
+    /** Call a prelude function in one namespace. Returns the NEW reference, or nullptr after
+        reporting. `args` may be null for a no-arg call; ownership stays with the caller. */
+    PyObject* callPreludeRaw (PyObject* ns, const char* fn, PyObject* args,
+                              const ScriptErrorSink& onError, const juce::String& what)
+    {
+        PyObject* f = PyDict_GetItemString (ns, fn);       // borrowed
+        if (f == nullptr || ! PyCallable_Check (f)) return nullptr;
+        PyObject* r = args != nullptr ? PyObject_CallObject (f, args) : PyObject_CallNoArgs (f);
+        if (r == nullptr) { onError (what, fetchPyError()); return nullptr; }
+        return r;
+    }
+
+    /** The same, for a call whose result is not wanted. */
+    bool callPrelude (PyObject* ns, const char* fn, PyObject* args,
+                      const ScriptErrorSink& onError, const juce::String& what)
+    {
+        PyObject* r = callPreludeRaw (ns, fn, args, onError, what);
+        if (r == nullptr) return false;
+        Py_DECREF (r);
+        return true;
+    }
+
     juce::var dispatch (const juce::String& scriptId, const juce::String& fn,
                         const juce::var& payload, const ScriptErrorSink& onError) override
     {
@@ -1307,6 +1443,80 @@ public:
             else Py_DECREF (r);
         }
         Py_DECREF (arg);                                // release the single owned ref
+    }
+
+    /* --------------------------------------------------------------- the reactive core
+     * The rules live in each script's namespace (see __runReactive in the prelude), so the C++
+     * side is only the caller. Every namespace gets a pass: a formula in one script has to settle
+     * whatever moved in another. */
+    void runReactive (const ScriptErrorSink& onError) override
+    {
+        if (! interpreterOk) return;
+        g_host = host; g_engine = this;
+        const WatchdogScope guard (*this);
+        for (auto& kv : namespaces)
+            if (! callPrelude (kv.second, "__runReactive", nullptr, onError, "compute/watch")) { /* reported */ }
+    }
+
+    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override
+    {
+        if (! interpreterOk) return true;
+        g_host = host; g_engine = this;
+        for (auto& kv : namespaces)
+        {
+            PyObject* args = Py_BuildValue ("(sO)", path.toRawUTF8(), varToPy (value));
+            if (args == nullptr) { fetchPyError(); continue; }
+            PyObject* out = callPreludeRaw (kv.second, "__applyIntercepts", args, onError, "intercept:" + path);
+            Py_DECREF (args);
+            if (out == nullptr) continue;
+            auto decided = pyToVar (out);
+            Py_DECREF (out);
+            if (auto* o = decided.getDynamicObject())
+            {
+                if (o->hasProperty ("reject")) return false;
+                if (o->hasProperty ("value")) value = o->getProperty ("value");
+            }
+        }
+        return true;
+    }
+
+    bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
+                     const ScriptErrorSink& onError) override
+    {
+        if (! interpreterOk) return false;
+        g_host = host; g_engine = this;
+        const WatchdogScope guard (*this);
+        for (auto& kv : namespaces)
+        {
+            PyObject* a = Py_BuildValue ("(sO)", name.toRawUTF8(), varToPy (args));
+            if (a == nullptr) { fetchPyError(); continue; }
+            PyObject* out = callPreludeRaw (kv.second, "__callAction", a, onError, "action:" + name);
+            Py_DECREF (a);
+            if (out == nullptr) continue;
+            auto v = pyToVar (out);
+            Py_DECREF (out);
+            if (auto* o = v.getDynamicObject())
+                if ((bool) o->getProperty ("found")) { result = o->getProperty ("value"); return true; }
+        }
+        return false;
+    }
+
+    juce::StringArray registeredActions() const override
+    {
+        juce::StringArray out;
+        if (! interpreterOk) return out;
+        for (auto& kv : namespaces)
+        {
+            PyObject* f = PyDict_GetItemString (kv.second, "__actionNames");   // borrowed
+            if (f == nullptr || ! PyCallable_Check (f)) continue;
+            PyObject* r = PyObject_CallNoArgs (f);
+            if (r == nullptr) { PyErr_Clear(); continue; }
+            auto names = pyToVar (r);
+            Py_DECREF (r);
+            if (auto* arr = names.getArray())
+                for (auto& n : *arr) out.addIfNotAlreadyThere (n.toString());
+        }
+        return out;
     }
 
     void reset() override

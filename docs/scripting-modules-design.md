@@ -1552,3 +1552,93 @@ tests now build controls with `createControl` and walk **all 49 types** through
 actually take. That is the third time this project has been caught by a fixture that was easier to
 write than the real shape, and the rule earns another statement: **if the real object is available,
 the fixture is the real object.**
+
+## 27. `ce.core` expanded — the reactive core
+
+The module review asked a sharper question than the earlier passes: not *what verbs are missing*,
+but **what can a script do that setting a property cannot?**
+
+A properties panel stores a **constant**, decided once at design time. That is its whole nature, and
+no number of extra fields changes it. So the expansion is not more properties — it is verbs that
+store a **rule the runtime keeps applying**. Four of them, all in `ce.core`:
+
+| verb | what the panel cannot express |
+|---|---|
+| `watch(path, fn)` | *tell me when this moves* — for any model path, not the eleven events enumerated in advance |
+| `compute(path, fn)` | *this value follows those values* — a property that is a formula |
+| `intercept(path, fn)` | *every write passes through me first* — transform, clamp, quantise, or veto |
+| `defineAction(name, fn)` | *here is a verb the panel can be built out of* |
+
+`defineAction`'s flat name is not `action`: `action` alone reads as "call one", and the point of the
+verb is that it *defines* one. The other three are unambiguous and keep their names.
+
+### Why not "more properties"
+
+`compute` is the clearest case. A panel can hold `"cutoff 42"`. It can never hold *"whatever cutoff
+says"*. And a `valueChange` handler that writes the label is not the same thing: the handler fires
+only for the events somebody remembered to hook, so it falls out of step on load, on a dump landing,
+on any path that raises no event. A formula the runtime owns cannot fall out of step, because the
+runtime is what decides when to re-evaluate it.
+
+`defineAction` inverts the relationship the other three keep. Scripts have always been things the
+panel triggers. A registered action is a thing the panel is **made of** — `run("initPatch")` reaches
+it from any script in any language, and it is offered wherever the panel binds actions. A registered
+action deliberately beats a same-named handler: the registration is a declaration of intent, the
+coincidence is not.
+
+### The settle pass, and the order that matters
+
+One pass runs after every change, in a fixed order, and the order is the design:
+
+1. **Computes, to a fixpoint.** `b = a*2` and `c = b+1` both settle in one pass, so `c` never sees
+   the previous `b`. Capped at eight passes — two formulas feeding each other are cut off and
+   reported rather than looped on, and the cap lives *inside* one pass rather than bouncing through
+   the store subscription, where it would look like the editor had hung.
+2. **Filters, over their own paths.** `intercept` in the write path only catches writes that came
+   through `set` — which would make it a rule that holds for scripts and not for people. The user
+   dragging a control, inbound MIDI and a landing dump all write straight into the model, so the
+   filter is applied afterwards and the value corrected: the knob snaps rather than refusing to
+   move. This needs an idempotent filter to settle (`f(f(x)) == f(x)`), which snapping, clamping
+   and quantising all are.
+3. **Watchers, last**, so they only ever report a value the panel actually held. A watcher that
+   fired on the intermediate state would report a number that never existed.
+
+Three re-entry guards, because every one of these can write: a filter that calls `set` on its own
+path, a compute whose write triggers the pass that is already running, a rule firing inside a
+nested dispatch. In C++ the settle only runs at `dispatchDepth == 1` for the same reason.
+
+Rules belong to the script that registered them, exactly as `on` listeners do, and a rule *replaces*
+the same script's rule for the same path rather than stacking beside it — two filters on one path
+would make the result depend on the order the scripts happened to load in.
+
+### Cross-runtime, because nothing here needs a canvas
+
+None of the four is physically panel-view-only, so under the §7 rule none of them is declared
+`webview`. All four work in the Lua, JavaScript and Python engines with the window closed.
+
+Where the rules *live* follows each engine's existing shape rather than a new convention:
+
+- **Lua** keeps them in C++ (`std::vector<Rule>`, `sol::protected_function`), tagged by script,
+  because one `sol::state` is shared by every Lua script — the same reason `on`/`off` are tagged.
+- **JavaScript and Python** keep them in the **prelude**, in the script's own engine/namespace,
+  because those runtimes already give each script its own — so the arrays are scoped for free and
+  the C++ side is only the caller. This is exactly how `on`/`off` already differ between them.
+
+`ScriptEngine` grew four virtuals — `runReactive`, `applyIntercepts`, `callAction`,
+`registeredActions` — all defaulting to inert, so the native-handler engine (whose modules are
+compiled and cannot register a closure at runtime) is unaffected rather than broken. The split is
+deliberate: **the runtime owns *when* rules run, the engine owns *what* runs**, because a rule is a
+language-native closure and can only live where it was made.
+
+### The same NUL byte, twice in one session
+
+`__sig` returns a sentinel for "no value" that `JSON.stringify` can never produce. Written directly,
+that sentinel is a raw NUL — and a raw NUL in a C++ source file **truncates the string literal**, so
+QuickJS received half a prelude and reported `unexpected end of string` at a line number pointing at
+an innocent comment. Every JavaScript test failed at once and none of them said why.
+
+It happened first in `panelRuntime.js`, where it was harmless enough to miss, and then again in
+`JsScriptEngine.cpp`, where it took out an entire engine. Both sentinels are now written as the
+escape `"\u0000void"` — plain ASCII in a plain ASCII source file. The verification set gained a
+tree-wide NUL scan, because the one thing worse than an invisible character is an invisible
+character you have already met.

@@ -1898,6 +1898,57 @@ int main()
         check (host.logs.joinIntoString ("\n").contains ("panel window open"), "…having said why");
     }
 
+    // 32) The reactive core: watch / compute / intercept / defineAction (design doc §27) ---------
+    // The four verbs that do what setting a property cannot. A property is a CONSTANT chosen at
+    // design time; each of these is a RULE the runtime keeps applying. They are the first verbs
+    // whose whole behaviour is in WHEN they run, so the checks are about ordering and settling.
+    {
+        juce::Array<juce::var> rx;
+        rx.add (makeScript ("rx", "lua", "panel", "onRules", "*",
+            "function onRules()\n"
+            "  compute(\"b.value\", function() return (get(\"a.value\") or 0) * 2 end)\n"
+            "  intercept(\"c.value\", function(v) if v > 100 then return false end return v + 1 end)\n"
+            "  watch(\"a.value\", function(v, prev) log(\"watched \" .. tostring(v) .. \" from \" .. tostring(prev)) end)\n"
+            "  defineAction(\"initPatch\", function(args) log(\"init \" .. tostring(args)) return \"ok\" end)\n"
+            "end\n"
+            "function onMove() set(\"a.value\", 5) end\n"
+            "function onFilter() set(\"c.value\", 10) set(\"c.value\", 999) end\n"));
+        runtime.loadScripts (juce::var (rx));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onRules", juce::var());
+
+        // defineAction: run() reaches it by name, and its return value crosses back.
+        check (runtime.runAction ("initPatch", juce::var ("go")).toString() == "ok",
+               "defineAction: run() reaches the registered action and its result returns");
+
+        // compute: the formula is re-applied by the runtime, not by the script remembering to.
+        host.logs.clear();
+        runtime.dispatchEvent ("onMove", "*", juce::var());
+        runtime.runAction ("onMove", juce::var());
+        runtime.dispatchEvent ("onValueChanged", "a", juce::var (5));
+        check (host.values["b.value"].equals (juce::var (10)),
+               "compute: b followed a without the script ever writing b");
+
+        // watch: reports movement, and carries the previous value with the new one.
+        check (host.logs.joinIntoString ("\n").contains ("watched 5"),
+               "watch: fired for the path that moved");
+
+        // intercept: sits in front of the write — transforms, and rejects outright.
+        host.logs.clear();
+        runtime.runAction ("onFilter", juce::var());
+        check (host.values["c.value"].equals (juce::var (11)),
+               "intercept: the filter rewrote the value on its way in");
+        check (! host.values["c.value"].equals (juce::var (999)),
+               "intercept: returning false rejected the write outright");
+
+        // The message names what IS registered — far more use than only what is not.
+        errors.clear();
+        runtime.runAction ("initPtch", juce::var());
+        check (errors.joinIntoString ("\n").contains ("Registered actions: initPatch"),
+               "an unknown action names the ones that do exist");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

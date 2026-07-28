@@ -462,6 +462,18 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
     if (js)     js->deliverEvent (target, event, payload, onError);
     if (python) python->deliverEvent (target, event, payload, onError);
     if (native) native->deliverEvent (target, event, payload, onError);
+
+    // 3) The reactive rules settle LAST, and only at the outermost dispatch: compute() re-evaluates
+    //    its formulas, intercept() corrects anything that changed without going through set(), and
+    //    watch() reports what actually moved. Running them inside a nested dispatch would let a
+    //    watcher see a half-applied model.
+    if (dispatchDepth == 1)
+    {
+        if (lua)    lua->runReactive (onError);
+        if (js)     js->runReactive (onError);
+        if (python) python->runReactive (onError);
+        if (native) native->runReactive (onError);
+    }
 }
 
 juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& args)
@@ -487,6 +499,19 @@ juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& ar
     const juce::String action = dot >= 0 ? ref.substring (dot + 1) : ref;
     if (action.isEmpty()) return {};
 
+    // A defineAction()-registered action wins over a handler that happens to share the name: the
+    // registration is a deliberate declaration, the coincidence is not, and the deliberate one
+    // should not lose to it. An owner-qualified ref skips this — that spelling is asking for a
+    // particular script's function by name.
+    if (owner.isEmpty())
+    {
+        const ScriptErrorSink onActionError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+        juce::var result;
+        for (auto* eng : { lua.get(), js.get(), python.get(), native.get() })
+            if (eng != nullptr && eng->callAction (action, args, result, onActionError))
+                return result;
+    }
+
     for (auto& s : scripts)
     {
         // A bare "action" matches any script; "owner.action" must match the script's owner.
@@ -501,7 +526,11 @@ juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& ar
         return result;
     }
 
-    reportError ("runtime", "run('" + ref + "') found no script defining " + action + "()");
+    juce::StringArray defined;
+    for (auto* eng : { lua.get(), js.get(), python.get(), native.get() })
+        if (eng != nullptr) defined.addArray (eng->registeredActions());
+    reportError ("runtime", "run('" + ref + "') found no script defining " + action + "()"
+                 + (defined.isEmpty() ? juce::String() : ". Registered actions: " + defined.joinIntoString (", ")));
     return {};
 }
 

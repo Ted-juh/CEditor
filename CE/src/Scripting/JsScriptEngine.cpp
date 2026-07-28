@@ -42,7 +42,104 @@ function __deliver(target, event, payload) {
     if (l.e === event && (l.t === target || l.t === "*" || l.t === "self")) { try { l.fn(payload); } catch (err) { log("on " + event + ": " + err); } }
   }
 }
-function set(path, value, opts) { return __api.set(path, value, opts || null); }
+// @module ce.core
+/* --- the reactive core: watch / compute / intercept / defineAction ---------------------------
+ * The verbs that do what setting a property cannot: a property is a CONSTANT chosen at design
+ * time, each of these is a RULE the runtime keeps applying. In JS they live in the prelude rather
+ * than in C++, for the same reason on()/off() do — QuickJS gives each script its own engine, so
+ * these arrays are already scoped to one script and need no tagging. */
+var __watchers = [], __computeds = [], __filters = [], __actions = {};
+var __filterDepth = 0, __reactiveDepth = 0;
+
+function __sig(v) { return v === undefined ? "\u0000void" : JSON.stringify(v); }
+// A rule REPLACES the same path's rule rather than stacking beside it: two filters on one path
+// would make the result depend on the order they happened to register in.
+function __putRule(list, rule) {
+  for (var i = 0; i < list.length; i++) if (list[i].path === rule.path) { list[i] = rule; return; }
+  list.push(rule);
+}
+function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(get(path)), prev: undefined }); }
+function compute(path, fn) { __putRule(__computeds, { path: path, fn: fn, failed: false }); }
+function intercept(path, fn) { __putRule(__filters, { path: path, fn: fn }); }
+function defineAction(name, fn) {
+  var id = String(name == null ? "" : name).replace(/^\s+|\s+$/g, "");
+  if (!id || typeof fn !== "function") return;
+  __actions[id.toLowerCase()] = { name: id, fn: fn };
+}
+function __actionNames() { var out = []; for (var k in __actions) out.push(__actions[k].name); return out; }
+function __callAction(name, args) {
+  var a = __actions[String(name).toLowerCase()];
+  if (!a) return { found: false };
+  try { return { found: true, value: a.fn(args) }; }
+  catch (err) { logError("action " + name + ": " + err); return { found: true }; }
+}
+/* Run the filters for one path. Returns { reject } or { value }. */
+function __applyIntercepts(path, value) {
+  if (!__filters.length || __filterDepth > 0) return { value: value };   // no re-entry from a filter's own set()
+  __filterDepth++;
+  try {
+    for (var i = 0; i < __filters.length; i++) {
+      if (__filters[i].path !== path) continue;
+      var out;
+      try { out = __filters[i].fn(value, value); } catch (err) { logError("intercept " + path + ": " + err); continue; }
+      if (out === false) return { reject: true };
+      if (out === undefined || out === null) continue;   // no opinion — keep what we had
+      value = out;
+    }
+  } finally { __filterDepth--; }
+  return { value: value };
+}
+/* Settle the formulas, then correct anything a filter owns, then report the changes. Computes go
+ * first so a watcher never sees an intermediate value the panel did not actually hold. */
+var __MAX_SETTLE = 8;
+function __runReactive() {
+  if (!__watchers.length && !__computeds.length && !__filters.length) return;
+  if (__reactiveDepth > 0) return;
+  __reactiveDepth++;
+  try {
+    for (var pass = 0; pass < __MAX_SETTLE; pass++) {
+      var wrote = false;
+      for (var i = 0; i < __computeds.length; i++) {
+        var c = __computeds[i];
+        if (c.failed) continue;
+        var next;
+        try { next = c.fn(); } catch (err) { logError("compute " + c.path + ": " + err); c.failed = true; continue; }
+        if (next === undefined) continue;
+        if (__sig(next) === __sig(get(c.path))) continue;
+        set(c.path, next); wrote = true;
+      }
+      if (!wrote) break;
+      if (pass === __MAX_SETTLE - 1)
+        logError("compute(): still changing after " + __MAX_SETTLE + " passes — two formulas are feeding "
+                 + "each other. They are left at the last value rather than looped on.");
+    }
+    // Changes that never came through set() — the user moving a control, inbound MIDI, a dump
+    // landing — still obey their filter. Needs an idempotent filter to settle, which snapping,
+    // clamping and quantising all are.
+    for (var f = 0; f < __filters.length; f++) {
+      var cur = get(__filters[f].path);
+      if (cur === undefined) continue;
+      var d = __applyIntercepts(__filters[f].path, cur);
+      if (d.reject) continue;                       // a veto has nothing to revert to
+      if (__sig(d.value) !== __sig(cur)) set(__filters[f].path, d.value);
+    }
+    for (var w = 0; w < __watchers.length; w++) {
+      var rule = __watchers[w], v = get(rule.path), s = __sig(v);
+      if (s === rule.last) continue;
+      var previous = rule.prev;
+      rule.last = s; rule.prev = v;
+      try { rule.fn(v, previous); } catch (err) { logError("watch " + rule.path + ": " + err); }
+    }
+  } finally { __reactiveDepth--; }
+}
+// @module -
+// set() runs this script's intercept() filters before the host sees the value, so the rule holds
+// for every write instead of being re-checked at each call site.
+function set(path, value, opts) {
+  var d = __applyIntercepts(path, value);
+  if (d.reject) return undefined;
+  return __api.set(path, d.value, opts || null);
+}
 function get(path, form) { return __api.get(path, form || "value"); }
 
 // `self` — owner-relative set/get (Q7), parity with the Lua/Python preludes. __owner is injected per
@@ -584,7 +681,7 @@ function loadSetting(key, fallback) {
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
-  "ce.core": { "emit": "emit", "error": "logError", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn" },
+  "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
@@ -876,6 +973,71 @@ public:
                                      juce::var::NativeFunctionArgs (juce::var(), args, 3), &err);
             if (err.failed()) onError ("on:" + event, err.getErrorMessage());
         }
+    }
+
+    /* --------------------------------------------------------------- the reactive core
+     * The rules live in each engine's prelude (see __runReactive there), because QuickJS gives
+     * every script its own engine — so the arrays are already scoped to one script and the C++
+     * side is only the caller. Every engine gets a pass: a formula in one script has to settle
+     * whatever moved in another. */
+    void runReactive (const ScriptErrorSink& onError) override
+    {
+        for (auto& kv : engines)
+        {
+            juce::Result err = juce::Result::ok();
+            kv.second->callFunction (juce::Identifier ("__runReactive"),
+                                     juce::var::NativeFunctionArgs (juce::var(), nullptr, 0), &err);
+            if (err.failed()) onError ("compute/watch", err.getErrorMessage());
+        }
+    }
+
+    bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override
+    {
+        for (auto& kv : engines)
+        {
+            juce::Result err = juce::Result::ok();
+            const juce::var args[] = { path, value };
+            auto out = kv.second->callFunction (juce::Identifier ("__applyIntercepts"),
+                                                juce::var::NativeFunctionArgs (juce::var(), args, 2), &err);
+            if (err.failed()) { onError ("intercept:" + path, err.getErrorMessage()); continue; }
+            if (auto* o = out.getDynamicObject())
+            {
+                if (o->hasProperty ("reject")) return false;
+                if (o->hasProperty ("value")) value = o->getProperty ("value");
+            }
+        }
+        return true;
+    }
+
+    bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
+                     const ScriptErrorSink& onError) override
+    {
+        for (auto& kv : engines)
+        {
+            juce::Result err = juce::Result::ok();
+            const juce::var a[] = { name, args };
+            auto out = kv.second->callFunction (juce::Identifier ("__callAction"),
+                                                juce::var::NativeFunctionArgs (juce::var(), a, 2), &err);
+            if (err.failed()) { onError ("action:" + name, err.getErrorMessage()); continue; }
+            if (auto* o = out.getDynamicObject())
+                if ((bool) o->getProperty ("found")) { result = o->getProperty ("value"); return true; }
+        }
+        return false;
+    }
+
+    juce::StringArray registeredActions() const override
+    {
+        juce::StringArray out;
+        for (auto& kv : engines)
+        {
+            juce::Result err = juce::Result::ok();
+            auto names = kv.second->callFunction (juce::Identifier ("__actionNames"),
+                                                  juce::var::NativeFunctionArgs (juce::var(), nullptr, 0), &err);
+            if (err.failed()) continue;
+            if (auto* arr = names.getArray())
+                for (auto& n : *arr) out.addIfNotAlreadyThere (n.toString());
+        }
+        return out;
     }
 
     void reset() override { engines.clear(); }

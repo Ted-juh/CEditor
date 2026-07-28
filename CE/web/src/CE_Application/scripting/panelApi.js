@@ -441,6 +441,74 @@ export const COMMANDS = [
     scopes: 'any',
     snippet: { lua: 'off("${1:target}", "${2:event}")$0', javascript: 'off("${1:target}", "${2:event}")$0' },
   },
+
+  /* --- Reactive core -------------------------------------------------------------------------
+   * The four verbs that let a script do what setting a property cannot.
+   *
+   * A properties panel stores a CONSTANT, decided at design time. Everything below stores a RULE
+   * the runtime keeps applying: a value that follows other values, a filter every write passes
+   * through, an observer over the whole model rather than eleven pre-enumerated events, and a
+   * named action the panel can be built out of. */
+  {
+    id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
+    summary: 'Call fn(value, previous) whenever ANY model path changes — a nested section field, a '
+      + 'colour, a device binding — not just the eleven declared control events. Source-agnostic: it '
+      + 'fires whether a script, the user or inbound MIDI moved it.',
+    params: [
+      { name: 'path', type: 'string', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'watch("${1:cutoff.value}", function(${2:v}, prev)\n  $0\nend)',
+      javascript: 'watch("${1:cutoff.value}", (${2:v}, prev) => {\n  $0\n})',
+    },
+  },
+  {
+    id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
+    summary: 'Make a property a FORMULA instead of a constant: fn is re-evaluated whenever anything '
+      + 'moves, and its result is written to path. Unlike doing it in a handler, the runtime owns '
+      + 'the re-evaluation, so it cannot fall out of step with an event you forgot to hook.',
+    params: [
+      { name: 'path', type: 'string', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'compute("${1:label.text.text}", function()\n  return $0\nend)',
+      javascript: 'compute("${1:label.text.text}", () => {\n  return $0\n})',
+    },
+  },
+  {
+    id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
+    summary: 'Sit in front of every write to path. fn(value, prev) returns a replacement value to '
+      + 'transform it (clamp, quantize, snap), false to reject it, or nothing to accept it unchanged. '
+      + 'The panel has no way to express what happens WHEN a value changes; this does.',
+    params: [
+      { name: 'path', type: 'string', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'intercept("${1:cutoff.value}", function(${2:v}, prev)\n  return $0\nend)',
+      javascript: 'intercept("${1:cutoff.value}", (${2:v}, prev) => {\n  return $0\n})',
+    },
+  },
+  {
+    id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
+    summary: 'Register a named action this panel can be built out of: run("name") calls it from any '
+      + 'script in any language, and it is offered wherever the panel binds actions. Scripts stop '
+      + 'being only things the panel triggers and become things the panel is made of.',
+    params: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'defineAction("${1:initPatch}", function(${2:args})\n  $0\nend)',
+      javascript: 'defineAction("${1:initPatch}", (${2:args}) => {\n  $0\n})',
+    },
+  },
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
     summary: 'Announce a custom event; any script listening with on(name, …) reacts. Fire-and-forget, language-neutral.',
@@ -1545,9 +1613,12 @@ const MODULE_MEMBERS = {
   // The namespaced names read well; the FLAT aliases are deliberately more defensive, the same
   // rule ce.time.playing/isPlaying follows. A global `error` would SHADOW Lua's builtin error(),
   // turning the standard way to raise into a print — the quietest possible way to break a script.
+  // `action` flat is defineAction: `action` alone reads as "call one", and the whole point of the
+  // verb is that it DEFINES one. watch/compute/intercept are unambiguous, so they keep their names.
   'ce.core': { set: 'set', get: 'get', log: 'log', warn: 'logWarn', error: 'logError',
                on: 'on', off: 'off', emit: 'emit', run: 'run',
-               noTransmit: 'noTransmit', transmit: 'transmit' },
+               noTransmit: 'noTransmit', transmit: 'transmit',
+               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction' },
   'ce.midi': [
     'sendCC', 'sendNRPN', 'sendRPN', 'sendSysex', 'checksum', 'panic', 'sendSongPosition',
     'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',

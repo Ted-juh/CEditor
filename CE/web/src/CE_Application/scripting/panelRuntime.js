@@ -359,6 +359,21 @@ function setValue(path, value, formOrOpts = '') {
   }
 
   const modelPath = resolveModelPath(control, segs);
+
+  // intercept(): the script's filters get the value before the model does, so a rule like "this
+  // knob only takes even numbers" holds for every write rather than being re-checked at each
+  // call site. Skipped while a filter is already running — an interceptor that writes to its own
+  // path would otherwise re-enter itself forever.
+  if (filters.length && !interceptDepth) {
+    const key = `${String(control._children.Core.name ?? control._children.Core.id)}.${modelPath}`.toLowerCase();
+    interceptDepth += 1;
+    let decided;
+    try { decided = applyIntercepts(key, value, valueAtPath(control, modelPath)); }
+    finally { interceptDepth -= 1; }
+    if (decided === REJECTED) return;
+    value = decided;
+  }
+
   if (host) host.writeValue(control, modelPath, value);
   else updateControlProperty(control?._children?.Core?.id, modelPath, value);
 
@@ -964,6 +979,174 @@ function removeListener(scriptId, target, event) {
   }
 }
 
+/* --------------------------------------------------------------- the reactive core
+ * watch / compute / intercept / defineAction — the four verbs that do what setting a property
+ * cannot. A properties panel stores a CONSTANT decided at design time; each of these stores a RULE
+ * the runtime keeps applying.
+ *
+ * They belong to the script that registered them, exactly as `on` listeners do, so re-running a
+ * script replaces its rules instead of stacking a second copy.
+ */
+
+const watchers = [];        // { scriptId, key, path, fn, last }   — observe any model path
+const computeds = [];       // { scriptId, key, path, fn, failed } — a property that is a formula
+const filters = [];         // { scriptId, key, path, fn }         — middleware in front of a write
+const actions = new Map();  // name(lower) -> { scriptId, name, fn }
+
+/** The one spelling every rule is keyed by.
+ *  `set("cutoff.value")` and `set("cutoff.Value.value")` address the same field, so an interceptor
+ *  registered against either has to catch both — matching the text as typed would make the rule
+ *  depend on which shorthand the OTHER script happened to use. */
+function reactiveKey(path) {
+  const { name, segs } = splitScriptPath(splitAccessor(String(path ?? ''), '').path);
+  if (isPanelTarget(name)) return `panel.${segs.join('.')}`.toLowerCase();
+  const control = findControlByName(name);
+  if (!control) return String(path ?? '').toLowerCase();     // unresolvable: key on the raw text
+  const core = control._children.Core;
+  return `${String(core.name ?? core.id)}.${resolveModelPath(control, segs)}`.toLowerCase();
+}
+
+function clearReactive(scriptId) {
+  for (const list of [watchers, computeds, filters]) {
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].scriptId === scriptId) list.splice(i, 1);
+  }
+  for (const [key, a] of [...actions]) if (a.scriptId === scriptId) actions.delete(key);
+}
+
+/** A rule replaces the same script's rule for the same path, rather than stacking beside it.
+ *  Two interceptors on one path would make the result depend on registration order, which is the
+ *  kind of thing that works until the script is reloaded in a different order. */
+function putRule(list, rule) {
+  const at = list.findIndex((r) => r.scriptId === rule.scriptId && r.key === rule.key);
+  if (at >= 0) list[at] = rule; else list.push(rule);
+}
+
+function addWatch(scriptId, path, fn) {
+  if (typeof fn !== 'function') return;
+  // Seeded with the CURRENT value, not undefined: a watcher must not fire once on registration
+  // just because it has never seen the value before. It reports changes, not existence.
+  putRule(watchers, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, last: signatureOf(readWatch(path)) });
+}
+
+function addCompute(scriptId, path, fn) {
+  if (typeof fn !== 'function') return;
+  putRule(computeds, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, failed: false });
+}
+
+function addIntercept(scriptId, path, fn) {
+  if (typeof fn !== 'function') return;
+  putRule(filters, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn });
+}
+
+function defineActionImpl(scriptId, name, fn) {
+  const id = String(name ?? '').trim();
+  if (!id || typeof fn !== 'function') return;
+  const existing = actions.get(id.toLowerCase());
+  if (existing && existing.scriptId !== scriptId) {
+    // Reported, not silently overwritten: two scripts claiming one name is a real conflict, and
+    // whichever loaded last winning by accident is the worst way to resolve it.
+    addScriptTrace('error', scriptId,
+      `defineAction("${id}") — already defined by another script. The later definition is ignored.`);
+    return;
+  }
+  actions.set(id.toLowerCase(), { scriptId, name: id, fn });
+}
+
+/** A stable comparison signature — objects and arrays compare by content, not identity. */
+function signatureOf(value) {
+  if (value === undefined) return '\u0000undefined';
+  try { return JSON.stringify(value) ?? String(value); } catch { return String(value); }
+}
+
+/** Sentinel: an interceptor said no. Distinct from `undefined`, which means "accept unchanged". */
+const REJECTED = Symbol('rejected');
+
+// >0 while a filter is running. An interceptor that writes to the path it guards (a snap-to-grid
+// rule calling set() itself) would otherwise re-enter its own filter without end.
+let interceptDepth = 0;
+
+/**
+ * Run every interceptor registered for this path. Returns the value to write, or REJECTED.
+ * Called from setValue, so it covers script writes; the settle pass below catches changes that
+ * arrive from anywhere else (the user dragging a control, inbound MIDI) by correcting them after
+ * the fact — a snap rather than a veto, which is the best a diff-based observer can do honestly.
+ */
+function applyIntercepts(key, value, previous) {
+  let next = value;
+  for (const f of filters) {
+    if (f.key !== key) continue;
+    let out;
+    try { out = f.fn(next, previous); } catch (e) { reportScriptError(f.scriptId, e); continue; }
+    if (out === false) return REJECTED;
+    if (out === undefined || out === null) continue;     // no opinion — accept what we had
+    next = out;
+  }
+  return next;
+}
+
+// A compute that writes a value which makes another compute write again can ping-pong. The loop is
+// contained INSIDE one settle pass and cut off here rather than being allowed to bounce through the
+// store subscription, where it would look like the editor had hung.
+const MAX_SETTLE_PASSES = 8;
+
+/**
+ * Re-evaluate the formulas, then report the changes. Called after every source of value change.
+ *
+ * Computes run to a fixpoint first so watchers see a settled model: a watcher that fired on the
+ * intermediate state would report a value the user never actually had.
+ */
+function runReactive() {
+  if (!computeds.length && !watchers.length && !filters.length) return;
+  if (live.dispatching) return;
+  live.dispatching = true;
+  try {
+    for (let pass = 0; pass < MAX_SETTLE_PASSES; pass++) {
+      let wrote = false;
+      for (const c of computeds) {
+        if (c.failed) continue;
+        let next;
+        try { next = c.fn(); } catch (e) { reportScriptError(c.scriptId, e); c.failed = true; continue; }
+        if (next === undefined) continue;
+        if (signatureOf(next) === signatureOf(readWatch(c.path))) continue;
+        setValue(c.path, next);
+        wrote = true;
+      }
+      if (!wrote) break;
+      if (pass === MAX_SETTLE_PASSES - 1) {
+        addScriptTrace('error', '',
+          `compute(): still changing after ${MAX_SETTLE_PASSES} passes — two formulas are feeding each other. `
+          + 'They are left at the last value rather than looped on.');
+      }
+    }
+
+    // Interceptors, for changes that did NOT come through set(): the user dragging the control,
+    // inbound MIDI, a dump landing. Those never touch our write path, so the filter is applied
+    // after the fact and the value is corrected — the knob snaps rather than refusing to move.
+    // A filter has to be idempotent for this to settle (f(f(x)) == f(x)), which snapping, clamping
+    // and quantising all are; one that is not simply keeps correcting and is cut off with the
+    // computes below.
+    for (const f of filters) {
+      const current = readWatch(f.path);
+      if (current === undefined) continue;
+      const decided = applyIntercepts(f.key, current, current);
+      if (decided === REJECTED) continue;      // nothing to revert to — a veto needs a write to stop
+      if (signatureOf(decided) !== signatureOf(current)) setValue(f.path, decided);
+    }
+
+    for (const w of watchers) {
+      const value = readWatch(w.path);
+      const sig = signatureOf(value);
+      if (sig === w.last) continue;
+      const previous = w.lastValue;
+      w.last = sig;
+      w.lastValue = value;
+      try { w.fn(value, previous); } catch (e) { reportScriptError(w.scriptId, e); }
+    }
+  } finally {
+    live.dispatching = false;
+  }
+}
+
 // Same backstop as ScriptRuntime::dispatchEvent: emit → handler → emit → … is cut off at a fixed
 // depth and reported, rather than recursing until the tab dies.
 const MAX_EMIT_DEPTH = 16;
@@ -1006,6 +1189,19 @@ function runAction(ref, args) {
   const owner = dot > 0 ? text.slice(0, dot) : '';
   const action = dot > 0 ? text.slice(dot + 1) : text;
   if (!action) return undefined;
+
+  // A registered action wins over a same-named handler. defineAction() is an explicit declaration
+  // of intent; a function that happens to share the name is a coincidence, and the deliberate one
+  // should not lose to it. An owner-qualified ref still goes to the script scan, because that
+  // spelling is asking for a particular script's function by name.
+  if (!owner) {
+    const registered = actions.get(action.toLowerCase());
+    if (registered) {
+      try { return registered.fn(args); }
+      catch (e) { reportScriptError(registered.scriptId, e); return undefined; }
+    }
+  }
+
   for (const s of activeScripts()) {
     if (s.enabled === false) continue;
     if (owner && String(s.target ?? '').toLowerCase() !== owner.toLowerCase()) continue;
@@ -1013,9 +1209,25 @@ function runAction(ref, args) {
     if (typeof fn !== 'function') continue;
     try { return fn(args); } catch (e) { reportScriptError(s.id, e); return undefined; }
   }
-  addScriptTrace('error', '', `run("${text}") found no loaded script defining ${action}()`);
+  const defined = [...actions.values()].map((a) => a.name);
+  addScriptTrace('error', '', `run("${text}") found no loaded script defining ${action}()`
+    + (defined.length ? `. Registered actions: ${defined.join(', ')}` : ''));
   return undefined;
 }
+
+/** The actions scripts have registered, for the editor's binding UI. Names as declared. */
+export function registeredActions() {
+  return [...actions.values()].map((a) => a.name);
+}
+
+/** Drive one settle pass by hand. The live runtime does this off the store subscriptions; a test
+    has no store, so it needs the same entry point rather than a reimplementation of it. */
+export function runReactiveForTesting() { runReactive(); }
+
+/** Drop every loaded handler, listener, rule and timer — what a panel switch does. Exposed so a
+    test can start clean: rules outlive a single `set`, which is the whole point of them, and two
+    tests sharing this module would otherwise share each other's formulas and filters. */
+export function resetScriptStateForTesting() { resetScriptState(); }
 
 /* ------------------------------------------------------------------------- timers */
 // A repeating timer owned by the runtime, not the language: Lua can't hold a coroutine open across
@@ -1918,6 +2130,11 @@ function buildApi(ownerName, scriptId = '') {
     run: (ref, args) => runAction(ref, args),
     on: (target, event, fn) => addListener(scriptId, target, event, fn),
     off: (target, event) => removeListener(scriptId, target, event),
+    // the reactive core — rules the runtime keeps applying, not values it writes once
+    watch: (path, fn) => addWatch(scriptId, path, fn),
+    compute: (path, fn) => addCompute(scriptId, path, fn),
+    intercept: (path, fn) => addIntercept(scriptId, path, fn),
+    defineAction: (name, fn) => defineActionImpl(scriptId, name, fn),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
     after: (ms, fn) => afterFor(scriptId, ms, fn),
@@ -2540,12 +2757,15 @@ function cacheKey(script) {
   return [script?.language ?? '', ownerOf(script), script?.compiledJs ?? '', script?.source ?? ''].join('\u0000');
 }
 
-/** Load (or reuse) a script's handlers. Re-loading replaces the script's on(…) listeners. */
+/** Load (or reuse) a script's handlers. Re-loading replaces the script's on(…) listeners and its
+    watch/compute/intercept rules and actions — an edit must not leave the previous version's rules
+    running beside the new ones. */
 async function handlersFor(script) {
   const key = cacheKey(script);
   const hit = handlerCache.get(script.id);
   if (hit && hit.key === key) return hit.handlers;
   clearListeners(script.id);
+  clearReactive(script.id);
   const handlers = await getHandlers(script);
   // The script record is kept alongside its handlers because the cache IS the loaded set: at
   // teardown the panel it belonged to may already have been switched away from, so the declared
@@ -2616,6 +2836,10 @@ export function destroyLoadedScripts() {
 function resetScriptState() {
   handlerCache.clear();
   listeners.length = 0;
+  watchers.length = 0;
+  computeds.length = 0;
+  filters.length = 0;
+  actions.clear();
   stopAllTimers();
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
 }
@@ -2794,6 +3018,10 @@ function onPanelsChanged() {
   }
   live.last = next;
   if (events.length) dispatchEvents(events);
+  // The reactive rules settle AFTER the declared events, and run even when there were no
+  // events at all: a nested field moving (a colour, a section property) produces no
+  // control event, and watching exactly those is the point of watch().
+  runReactive();
 }
 
 /* --- source 2: preview overlay (user interaction) --- */
@@ -2856,6 +3084,10 @@ function onPreviewSessionsChanged(sessions) {
   }
   live.sessionLast = next;
   if (events.length) dispatchEvents(events);
+  // The reactive rules settle AFTER the declared events, and run even when there were no
+  // events at all: a nested field moving (a colour, a section property) produces no
+  // control event, and watching exactly those is the point of watch().
+  runReactive();
 }
 
 /* --- source 3: preview mode flag (lifecycle) --- */
