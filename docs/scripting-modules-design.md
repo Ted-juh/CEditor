@@ -222,7 +222,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11) |
 | 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. ✅ *done* (§12) |
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. ✅ *done* (§13) |
-| 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. |
+| 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. ✅ *done* (§14) |
 | 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. |
 | 7 | `ce.components.*` completion | The remaining 26 components. Most code, least new capability — deliberately last. |
 
@@ -724,3 +724,78 @@ Neither is needed to build a panel, and both are their own piece of work: real t
 distinguished from a window close (which already has `onPanelClose`), and an error hook has to
 settle what happens when the error handler itself throws. Bundling them in would have meant doing
 both badly.
+
+---
+
+## 14. `ce.draw` — phase 5, as built
+
+Oscilloscopes, envelope shapes, XY pads, readouts. The highest ceiling on the roadmap, and the one
+that needed the least new architecture, because it did not add a component type.
+
+```lua
+function onDraw(info)
+  ce.draw.clear()
+  ce.draw.stroke("#5B9BD5", 2)
+  local pts = {}
+  for i = 0, 63 do
+    pts[#pts + 1] = i * (info.width / 63)
+    pts[#pts + 1] = info.height / 2 + sample(i) * info.height / 2
+  end
+  ce.draw.path(pts)
+end
+```
+
+`clear` `fill` `stroke` `rect` `circle` `line` `path` `text` `redraw`, plus the `onDraw(info)` hook.
+
+### It draws on ANY control, and that is the whole reason it is small
+
+There is no `Canvas` component and nothing to place. A script draws on the control it is attached
+to (or one it names), and the overlay paints on top of that control's normal content — so a scope
+trace can go over a Background, a value readout over a Knob, a grid over a Container. Adding a
+component type would have meant defaults, sections, ports, an editor and a renderer; an overlay
+meant one Svelte component and one `{#if}`.
+
+Coordinates are the **control's own**, `(0,0)` at its top-left, and `info.width`/`info.height` are
+its size — so a drawing scales with whatever it is drawn on rather than with the panel. The overlay
+clips to the control, per control, so a script that draws outside the bounds cannot paint over its
+neighbours.
+
+### Immediate mode, and why the renderer holds no state
+
+Each verb records a command carrying the style **in force when it was issued**. Changing the stroke
+after a shape does not reach back and repaint it. The renderer then walks the list and emits one SVG
+element per command, in order — it has no style state of its own, so it cannot disagree with the
+script about what colour something is. Element order is paint order.
+
+Two consequences worth stating:
+
+- **Nothing repaints on its own.** `onDraw` runs when something asks for it; a script animates by
+  calling `ce.draw.redraw()` from `onTimer`. A per-frame callback nobody asked for is a performance
+  trap, and one that fires whether or not the panel is visible is a worse one.
+- **Nothing is persisted.** A drawing lives in a store, never in the panel document — the same rule
+  generated controls follow (§13), and stronger here, because a scope trace saved to disk would be
+  meaningless as well as wrong.
+
+Commands are published as they are appended rather than buffered and flushed at the end of a draw
+pass. That is not laziness: `dispatchEvents` is async (Lua and Python run through a WASM engine), so
+"the end of the pass" is not a moment the style state can be held across without a second redraw
+clobbering it. Svelte batches store updates within a tick, so a half-drawn frame is not observable.
+
+### The runtime boundary, stated precisely
+
+Panel view only: there is no surface with the window shut. The nine verbs are declared
+`runtime: 'webview'` and stubbed in the three C++ engines; `onDraw` is declared webview-only as a
+*hook*, so it is never probed for there.
+
+The guarantee about the hook is **"no runtime raises it"** — the window-closed lifecycle does not,
+and no event source does — rather than "the dispatcher refuses it". `ScriptRuntime::dispatchEvent`
+routes purely by a script's declared event and knows nothing about which hooks are webview-only.
+That distinction is worth writing down because a test asserting the stronger claim passes for the
+wrong reason.
+
+### What phase 5 did not include
+
+No gradients, no images, no transforms, no clipping regions beyond the control bounds, and no mouse
+input into a drawing (`pointer-events: none` — a drawing is decoration; a script that wants a click
+should use a control that reports one). Each of those is a real feature and none is needed for the
+things §6 named. `ce.anim` and `ce.ui` remain phase 6.

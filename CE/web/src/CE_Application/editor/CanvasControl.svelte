@@ -9,6 +9,7 @@
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import PixelDisplayRenderer from './PixelDisplayRenderer.svelte';
+  import ScriptDrawOverlay from './ScriptDrawOverlay.svelte';
   import MeterRenderer from './MeterRenderer.svelte';
   import EnvelopeRenderer from './EnvelopeRenderer.svelte';
   import MatrixRenderer from './MatrixRenderer.svelte';
@@ -2767,6 +2768,11 @@
     {#if isTransport}
       <TransportRenderer control={renderControl} width={displayW} height={displayH} />
     {/if}
+
+    <!-- ce.draw: whatever a script has drawn on THIS control, painted over its normal content.
+         Any control can be drawn on — that is what lets a script put a scope trace over a
+         Background or a readout over a Knob without a dedicated canvas component existing. -->
+    <ScriptDrawOverlay controlId={core?.id ?? ''} width={displayW} height={displayH} />
 
     {#if isPixelDisplay}
       <PixelDisplayRenderer

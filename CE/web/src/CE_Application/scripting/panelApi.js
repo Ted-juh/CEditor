@@ -229,6 +229,16 @@ export const LIFECYCLE_HOOKS = [
     },
   },
   {
+    id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
+    signature: 'onDraw(info)',
+    summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height — the control\'s own size, so the drawing scales with it. Called when something asks for a repaint, NOT every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.',
+    params: [{ name: 'info', type: 'object', fields: ['target', 'width', 'height'] }],
+    snippet: {
+      lua: 'function onDraw(info)\n  ce.draw.clear()\n  ce.draw.stroke("#5B9BD5", 2)\n  ce.draw.line(0, info.height / 2, info.width, info.height / 2)\n  $0\nend',
+      javascript: 'function onDraw(info) {\n  ce.draw.clear();\n  ce.draw.stroke("#5B9BD5", 2);\n  ce.draw.line(0, info.height / 2, info.width, info.height / 2);\n  $0\n}',
+    },
+  },
+  {
     id: 'onPanelReady', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelReady(info)',
     summary: 'Phase 2 — GUI ready. Read the synth, fill controls. May re-fire on VST3 window reopen; guard one-time work with `if info.firstTime`.',
@@ -475,6 +485,113 @@ export const COMMANDS = [
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
+  },
+
+  /* --- Drawing (design doc §6 phase 5) ---
+     Oscilloscopes, envelope editors, XY pads, spectrum displays. Immediate-mode: each verb
+     records a command carrying the style in force when it was issued, and the panel renders the
+     list on top of the target control. Coordinates are the CONTROL's own, (0,0) at its top-left,
+     so a drawing scales with whatever it is drawn on.
+
+     There is no new component type and no canvas to place — any control can be drawn on, which is
+     what lets a script put a scope trace over a Background or a value readout over a Knob.
+
+     Panel view only: there is no surface with the window shut. Nothing here is persisted either —
+     a drawing is a product of the script, never part of the document. */
+  {
+    id: 'drawClear', category: 'Drawing', signature: 'drawClear([target])',
+    summary: 'Throw away what was drawn on this control. The usual first line of onDraw, because a draw ADDS to the list rather than replacing it.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'target', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.clear()$0', javascript: 'ce.draw.clear();$0' },
+  },
+  {
+    id: 'drawFill', category: 'Drawing', signature: 'drawFill(colour)',
+    summary: 'The fill colour for the shapes that follow — a hex string such as "#5B9BD5", or nil for no fill.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'colour', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.fill("${1:#5B9BD5}")$0', javascript: 'ce.draw.fill("${1:#5B9BD5}");$0' },
+  },
+  {
+    id: 'drawStroke', category: 'Drawing', signature: 'drawStroke(colour [, width])',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'colour', type: 'string', required: false },
+      { name: 'width', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2})$0', javascript: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2});$0' },
+  },
+  {
+    id: 'drawRect', category: 'Drawing', signature: 'drawRect(x, y, w, h [, radius])',
+    summary: 'A rectangle in the control\'s own coordinates, with an optional corner radius.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
+      { name: 'w', type: 'number', required: true }, { name: 'h', type: 'number', required: true },
+      { name: 'radius', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20})$0', javascript: 'ce.draw.rect(${1:0}, ${2:0}, ${3:40}, ${4:20});$0' },
+  },
+  {
+    id: 'drawCircle', category: 'Drawing', signature: 'drawCircle(cx, cy, r)',
+    summary: 'A circle centred on (cx, cy).',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
+      { name: 'r', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8})$0', javascript: 'ce.draw.circle(${1:20}, ${2:20}, ${3:8});$0' },
+  },
+  {
+    id: 'drawLine', category: 'Drawing', signature: 'drawLine(x1, y1, x2, y2)',
+    summary: 'A straight line. Stroke only — a line has no inside.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'x1', type: 'number', required: true }, { name: 'y1', type: 'number', required: true },
+      { name: 'x2', type: 'number', required: true }, { name: 'y2', type: 'number', required: true },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0})$0', javascript: 'ce.draw.line(${1:0}, ${2:0}, ${3:100}, ${4:0});$0' },
+  },
+  {
+    id: 'drawPath', category: 'Drawing', signature: 'drawPath(points [, closed])',
+    summary: 'A polyline through a flat list of coordinates — { x1, y1, x2, y2, ... }. This is the scope trace and the envelope shape. `closed` joins the last point back to the first.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'points', type: 'array', required: true },
+      { name: 'closed', type: 'boolean', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'local pts = {}\nfor i = 0, 63 do\n  pts[#pts + 1] = i * (info.width / 63)\n  pts[#pts + 1] = info.height / 2\nend\nce.draw.path(pts)$0',
+      javascript: 'const pts = [];\nfor (let i = 0; i < 64; i++) pts.push(i * (info.width / 63), info.height / 2);\nce.draw.path(pts);$0',
+    },
+  },
+  {
+    id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
+    summary: 'Text at (x, y), which is its LEFT BASELINE. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
+      { name: 'text', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['size', 'align', 'family'] },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.text(${1:4}, ${2:12}, "${3:hello}")$0', javascript: 'ce.draw.text(${1:4}, ${2:12}, "${3:hello}");$0' },
+  },
+  {
+    id: 'drawRedraw', category: 'Drawing', signature: 'drawRedraw([target])',
+    summary: 'Ask for onDraw to run again. Nothing repaints on its own — that is deliberate, because a per-frame callback nobody asked for is a performance trap. Animate by calling this from onTimer.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'target', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.draw.redraw()$0', javascript: 'ce.draw.redraw();$0' },
   },
 
   /* --- Panel structure (design doc §6 phase 4) ---
@@ -1070,6 +1187,8 @@ export const MODULES = [
     summary: 'Note names and numbers.' },
   { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
+  { id: 'ce.draw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
   { id: 'ce.panel', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Build the panel from a script: create, clone, parent and find controls. Panel view only — there is no renderer with the window shut.' },
   { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -1108,6 +1227,11 @@ const MODULE_MEMBERS = {
   },
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
+  'ce.draw': {
+    clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
+    circle: 'drawCircle', line: 'drawLine', path: 'drawPath', text: 'drawText',
+    redraw: 'drawRedraw',
+  },
   'ce.panel': {
     create: 'panelCreate', clone: 'panelClone', destroy: 'panelDestroy',
     parent: 'panelParent', find: 'panelFind', info: 'panelInfo', types: 'panelTypes',

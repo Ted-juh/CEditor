@@ -944,6 +944,43 @@ int main()
                "onPanelBuild never fires window-closed — the lifecycle there has no build phase");
     }
 
+    // 19) ce.draw (design doc §6 phase 5) ---------------------------------------------------------
+    // Drawing needs a surface, and there is none with the window shut. Window-closed the verbs must
+    // EXPLAIN that rather than being undefined globals, and onDraw must never fire here at all.
+    {
+        juce::Array<juce::var> drawScripts;
+        drawScripts.add (makeScript ("draw", "lua", "component", "onDrawTest", "screen",
+            "function onDrawTest()\n"
+            "  ce.draw.clear()\n"
+            "  ce.draw.stroke(\"#5B9BD5\", 2)\n"
+            "  log(\"line \" .. tostring(ce.draw.line(0, 0, 100, 0)))\n"
+            "end\n"));
+        drawScripts.add (makeScript ("ondraw", "lua", "component", "onDraw", "screen",
+            "function onDraw(info) log(\"DRAW RAN\") end\n"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (drawScripts));
+
+        host.logs.clear();
+        runtime.runAction ("onDrawTest", juce::var());
+        const auto drew = host.logs.joinIntoString ("\n");
+        check (drew.contains ("panel window open"),
+               "a draw verb window-closed says it needs the panel view");
+        check (host.logs.contains ("line nil"),
+               "…and returns nil, so a script that checks the result sees the truth");
+
+        // onDraw never fires window-closed. That guarantee is "no runtime RAISES it" — the
+        // lifecycle does not, and no event source does — rather than "the dispatcher refuses it":
+        // ScriptRuntime::dispatchEvent routes purely by a script's declared event and knows
+        // nothing about which hooks are webview-only. So the thing to assert is that running the
+        // whole window-closed lifecycle leaves the handler untouched.
+        host.logs.clear();
+        runtime.onPanelLoad();
+        runtime.onPanelReady (true);
+        runtime.onPanelClose();
+        check (! host.logs.contains ("DRAW RAN"),
+               "the window-closed lifecycle never raises onDraw — there is no surface to paint on");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

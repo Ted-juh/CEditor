@@ -54,6 +54,7 @@ import { setlistScriptPatch } from '../utils/setlistLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
+import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, removeControlFromTree, remintControlIds,
@@ -863,6 +864,130 @@ function runAction(ref, args) {
 // handler calls and QuickJS has no setTimeout, so both need the host to keep time. Starting an id
 // that is already running re-times it rather than stacking a second interval.
 
+// @module ce.draw
+/* -------------------------------------------------------------------------------- ce.draw */
+// Oscilloscopes, envelope editors, XY pads, readouts. Immediate mode: each verb appends a command
+// carrying the style in force when it was issued, and the panel renders the list on top of the
+// target control. Coordinates are the CONTROL's own — (0,0) at its top-left — so a drawing scales
+// with whatever it is drawn on.
+//
+// Nothing repaints on its own. onDraw runs when something asks for it, and a script animates by
+// calling ce.draw.redraw() from onTimer. A per-frame callback nobody asked for is a performance
+// trap, and one that fires whether or not the panel is visible is a worse one.
+//
+// The command list is held in a store, never in the panel document: a drawing is a product of the
+// script, not part of the document, and a scope trace persisted to disk would be meaningless.
+
+// The style in force, and which control is being drawn on. Draws are not re-entrant — dispatch is
+// already guarded by live.dispatching — so one set of style state is enough.
+const drawState = { target: null, fill: null, stroke: null, strokeWidth: 1 };
+
+// controlId -> the commands drawn on it so far. Commands are appended and published as they
+// arrive rather than buffered and published at the end of a draw pass: dispatchEvents is async
+// (Lua and Python run through a WASM engine), so "the end of the pass" is not a moment this code
+// can hold style state across without a second redraw clobbering it. Svelte batches store updates
+// within a tick, so a half-drawn frame is not observable in practice.
+const drawCommands = new Map();
+
+/** Which control a draw verb applies to: the explicit target, else the one being drawn, else the
+ *  control the script is attached to. */
+function drawTarget(explicit, ownerName) {
+  const name = explicit != null && String(explicit) !== '' ? String(explicit)
+             : (drawState.target ?? ownerName);
+  if (!name || name === PANEL_TARGET) return null;
+  return controlNamed(name);
+}
+
+/** Append a command for `target`, with the style in force at this moment baked into it. */
+function pushCommand(explicit, ownerName, command) {
+  const control = drawTarget(explicit, ownerName);
+  if (!control) {
+    addScriptTrace('error', '',
+      'ce.draw: no control to draw on. Attach the script to a control, or pass a target name.');
+    return false;
+  }
+  const id = control._children.Core.id;
+  const list = drawCommands.get(id) ?? [];
+  list.push({ ...command, fill: drawState.fill, stroke: drawState.stroke, strokeWidth: drawState.strokeWidth });
+  drawCommands.set(id, list);
+  setDrawing(id, [...list]);
+  return true;
+}
+
+function drawClearImpl(explicit, ownerName) {
+  const control = drawTarget(explicit, ownerName);
+  if (!control) return false;
+  const id = control._children.Core.id;
+  drawCommands.delete(id);
+  clearDrawing(id);
+  return true;
+}
+
+function toPointList(points) {
+  // A flat { x1, y1, x2, y2, ... } list — the one shape every language expresses the same way: a
+  // Lua table, a JS array, a Python list. An odd trailing value is dropped rather than silently
+  // pairing with a zero.
+  const flat = Array.isArray(points) ? points : Object.values(points ?? {});
+  const out = [];
+  for (let i = 0; i + 1 < flat.length; i += 2) {
+    const x = Number(flat[i]);
+    const y = Number(flat[i + 1]);
+    if (Number.isFinite(x) && Number.isFinite(y)) out.push([x, y]);
+  }
+  return out;
+}
+
+/**
+ * Run one control's onDraw. The style resets first — a draw must not inherit the colours the last
+ * one happened to leave set, or a drawing changes depending on what ran before it.
+ */
+function runDrawPass(control) {
+  const core = control?._children?.Core;
+  if (!core?.id) return false;
+
+  const transform = control._children?.Transform ?? {};
+  drawState.target = core.name;
+  drawState.fill = null;
+  drawState.stroke = null;
+  drawState.strokeWidth = 1;
+
+  dispatchEvents([{
+    event: 'onDraw',
+    controlName: core.name,
+    payload: { target: core.name, width: Number(transform.width) || 0, height: Number(transform.height) || 0 },
+  }]);
+  return true;
+}
+
+function drawRedrawImpl(explicit, ownerName) {
+  const control = drawTarget(explicit, ownerName);
+  if (!control) {
+    addScriptTrace('error', '',
+      'ce.draw.redraw(): no control to redraw. Attach the script to a control, or pass a target name.');
+    return false;
+  }
+  return runDrawPass(control);
+}
+
+/** What a control currently has drawn on it. Exported for the renderer and the tests. */
+export function drawCommandsFor(controlName) {
+  const control = controlNamed(controlName);
+  return control ? (drawCommands.get(control._children.Core.id) ?? []) : [];
+}
+
+/** Forget every drawing — panel teardown, or a switch to another panel. */
+export function clearAllDrawings() {
+  drawCommands.clear();
+  clearDrawing(null);
+  // Reset the style too. It is module-level (draws are not re-entrant), so without this a colour
+  // set on one panel is still in force on the next — a drawing that changes depending on what ran
+  // before it is exactly the kind of order-dependence immediate mode is supposed to remove.
+  drawState.target = null;
+  drawState.fill = null;
+  drawState.stroke = null;
+  drawState.strokeWidth = 1;
+}
+
 // @module ce.panel
 /* ------------------------------------------------------------------- ce.panel structure */
 // Panels that build themselves: ask the device what it has, then generate a control per thing you
@@ -1324,6 +1449,28 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.draw — immediate-mode drawing on top of a control
+    drawClear: (target) => drawClearImpl(target, ownerName),
+    drawFill: (colour) => { drawState.fill = colour == null ? null : String(colour); },
+    drawStroke: (colour, width) => {
+      drawState.stroke = colour == null ? null : String(colour);
+      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+    },
+    drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
+      { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
+        radius: Number(radius) > 0 ? Number(radius) : 0 }),
+    drawCircle: (cx, cy, r) => pushCommand(null, ownerName,
+      { op: 'circle', cx: Number(cx) || 0, cy: Number(cy) || 0, r: Number(r) || 0 }),
+    drawLine: (x1, y1, x2, y2) => pushCommand(null, ownerName,
+      { op: 'line', x1: Number(x1) || 0, y1: Number(y1) || 0, x2: Number(x2) || 0, y2: Number(y2) || 0 }),
+    drawPath: (points, closed) => pushCommand(null, ownerName,
+      { op: 'path', points: toPointList(points), closed: closed === true }),
+    drawText: (x, y, text, opts) => pushCommand(null, ownerName,
+      { op: 'text', x: Number(x) || 0, y: Number(y) || 0, text: String(text ?? ''),
+        size: Number(opts?.size) > 0 ? Number(opts.size) : 12,
+        align: ['left', 'middle', 'right'].includes(opts?.align) ? opts.align : 'left',
+        family: opts?.family ? String(opts.family) : null }),
+    drawRedraw: (target) => drawRedrawImpl(target, ownerName),
     // ce.panel — structure
     panelCreate: (type, props) => panelCreateImpl(type, props, scriptId),
     panelClone: (name, props) => panelCloneImpl(name, props, scriptId),
@@ -2130,6 +2277,7 @@ function onPreviewModeChanged(on) {
     live.sessionLast.clear();
     stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
     clearGeneratedControls();   // …and a generated control outliving its build is just litter
+    clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
   }
   live.prevPreviewOn = on;
 }
