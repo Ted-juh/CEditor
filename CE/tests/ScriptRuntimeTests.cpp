@@ -154,9 +154,12 @@ public:
     void uiStatus (const juce::String& m) override { uiMessages.add ("status:" + m); }
 
     juce::StringArray timerOps;
+    // The ids alone, too: after() generates its own and a test needs to read it back rather than
+    // reconstruct the "start:<id>:<ms>" string it was recorded in.
+    juce::StringArray timerStarts, timerStops;
     void startTimer (const juce::String& id, int ms) override
-    { timerOps.add ("start:" + id + ":" + juce::String (ms)); }
-    void stopTimer (const juce::String& id) override { timerOps.add ("stop:" + id); }
+    { timerOps.add ("start:" + id + ":" + juce::String (ms)); timerStarts.add (id); }
+    void stopTimer (const juce::String& id) override { timerOps.add ("stop:" + id); timerStops.add (id); }
 };
 
 static int failures = 0;
@@ -1449,6 +1452,114 @@ int main()
         // does, this would come back as 0x94 and every echo panel would be off by one.
         check (host.rawSends.contains ("95 40 60"),
                "echoing onNoteIn straight back through sendNote lands on the SAME channel");
+    }
+
+    // 27) ce.time.after — a one-shot delay (design doc §21) ---------------------------------------
+    // Built on startTimer, so the host's timer machinery drives it and stopTimer cancels it. The
+    // TestHost records timer calls rather than running a real clock, so the tick is delivered by
+    // hand below — which is also the only way to assert the ORDER inside it.
+    {
+        juce::Array<juce::var> afterScripts;
+        afterScripts.add (makeScript ("aft", "lua", "panel", "onArm", "*",
+            "ARMED = nil\n"
+            "function onArm() ARMED = after(40, function() log(\"FIRED\") end) log(\"id \" .. tostring(ARMED)) end\n"
+            "function onArmBad() log(\"bad \" .. tostring(after(40))) end\n"
+            "function onArmChain()\n"
+            "  after(10, function() log(\"ONE\") after(10, function() log(\"TWO\") end) end)\n"
+            "end\n"
+            "function onArmThrow() after(10, function() log(\"RAN\") error(\"boom in the delay\") end) end\n"));
+        runtime.loadScripts (juce::var (afterScripts));
+
+        host.logs.clear(); host.timerStarts.clear(); errors.clear();
+        runtime.runAction ("onArm", juce::var());
+        check (host.timerStarts.size() == 1, "after() arms exactly one host timer");
+        const auto armedId = host.timerStarts[0];
+        check (armedId.startsWith ("__after:"), "…under an id of its own, not one the panel could collide with");
+        check (host.logs.contains ("id " + armedId), "…and hands that id back, so stopTimer can cancel it");
+
+        // The tick. A one-shot must fire its callback and NOT surface as onTimer — a one-shot is
+        // not a timer the panel declared, and every onTimer handler would have to filter it out.
+        host.logs.clear(); host.timerStops.clear();
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", armedId);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (host.logs.contains ("FIRED"), "the tick runs the callback");
+        check (host.timerStops.contains (armedId), "…and stops the timer, so it does not repeat");
+
+        // Ticking the same id again does nothing: the entry was removed before the callback ran.
+        host.logs.clear();
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", armedId);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (! host.logs.contains ("FIRED"), "a second tick for the same id fires nothing");
+
+        // Chaining: a callback scheduling the next one. This only works because the entry is
+        // cleared BEFORE the callback runs — otherwise the inner after() would be cancelled by the
+        // outer one's own stop. It is what a settle-then-send sequence looks like.
+        host.logs.clear(); host.timerStarts.clear();
+        runtime.runAction ("onArmChain", juce::var());
+        const auto first = host.timerStarts[0];
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", first);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (host.logs.contains ("ONE"), "the first one-shot ran");
+        check (host.timerStarts.size() == 2 && host.timerStarts[1] != first,
+               "…and scheduled a SECOND, under a new id");
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", host.timerStarts[1]);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (host.logs.contains ("TWO"), "…which fires in its turn");
+
+        // A callback that throws must not leave the one-shot repeating — the exact failure mode of
+        // the hand-rolled self-cancelling timer this verb exists to replace.
+        host.logs.clear(); host.timerStarts.clear(); host.timerStops.clear(); errors.clear();
+        runtime.runAction ("onArmThrow", juce::var());
+        const auto boomId = host.timerStarts[0];
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", boomId);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (host.logs.contains ("RAN"), "the throwing callback ran");
+        check (host.timerStops.contains (boomId), "…and the timer was stopped BEFORE it threw");
+        check (errors.joinIntoString ("\n").contains ("boom in the delay"), "…and the throw is reported");
+        host.logs.clear();
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", boomId);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (! host.logs.contains ("RAN"), "…and it is gone, not left armed forever");
+
+        // No function, nothing scheduled — and it says so rather than failing silently.
+        host.logs.clear(); host.timerStarts.clear();
+        runtime.runAction ("onArmBad", juce::var());
+        check (host.timerStarts.isEmpty(), "after() with no function schedules nothing");
+        check (host.logs.contains ("bad nil"), "…and returns nil");
+        check (host.logs.joinIntoString ("\n").contains ("needs a function"), "…having explained why");
+
+        // The JavaScript engine has no setTimeout either — same construction, same behaviour.
+        juce::Array<juce::var> afterJs;
+        afterJs.add (makeScript ("aftjs", "javascript", "panel", "onArmJs", "*",
+            "function onArmJs() { log('jsid ' + after(40, function () { log('JSFIRED'); })); }"));
+        runtime.loadScripts (juce::var (afterJs));
+        host.logs.clear(); host.timerStarts.clear();
+        runtime.runAction ("onArmJs", juce::var());
+        check (host.timerStarts.size() == 1, "the JavaScript engine arms a timer too");
+        {
+            auto* info = new juce::DynamicObject();
+            info->setProperty ("id", host.timerStarts[0]);
+            runtime.dispatchEvent ("onTimer", "", juce::var (info));
+        }
+        check (host.logs.contains ("JSFIRED"), "…and fires the callback on the tick");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

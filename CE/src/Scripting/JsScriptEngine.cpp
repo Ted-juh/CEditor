@@ -400,6 +400,38 @@ function syncTimer(id, beats) {
   startTimer(id, Math.round(ms));
 }
 
+// after(ms, fn) — run fn ONCE, ms from now. Built on startTimer rather than on anything new (there
+// is no setTimeout in QuickJS): the one-shot is a normal timer that removes itself, so stopTimer(id)
+// cancels it like anything else.
+//
+// The order inside the tick is why this exists instead of every panel hand-rolling it. The entry is
+// removed and the timer stopped BEFORE fn runs, so a callback that throws cannot leave a one-shot
+// repeating forever — which is precisely what the hand-rolled version does.
+var __after = {}, __afterN = 0;
+function after(ms, fn) {
+  if (typeof fn !== "function") {
+    log("after(ms, fn) needs a function to run — nothing was scheduled");
+    return undefined;
+  }
+  __afterN += 1;
+  var id = "__after:" + __afterN;
+  __after[id] = fn;
+  startTimer(id, ms);
+  return id;
+}
+// Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+// A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
+// onTimer — otherwise every script with an onTimer handler would have to filter ids it never made.
+on("*", "onTimer", function (info) {
+  var id = info ? info.id : undefined;
+  if (id === undefined || id === null) return;
+  var fn = __after[id];
+  if (!fn) return;
+  delete __after[id];
+  stopTimer(id);
+  fn();
+});
+
 // @module ce.anim
 // Values that move over time. The engine lives in the host so ONE list exists and the position is
 // a pure function of elapsed time — an incremental integrator per runtime would drift.
@@ -459,7 +491,7 @@ var __CE_MODULES = {
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
   "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
-  "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+  "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
   "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
@@ -495,7 +527,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

@@ -156,9 +156,14 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
   const lua = await new LuaFactory().createEngine();
   try {
     // sendCC/log are host bindings in the real engine; the pure helpers do not use them, and the
-    // panel-verb stubs only call log when invoked.
+    // panel-verb stubs only call log when invoked. `on` is different: the prelude CALLS it at load
+    // time, to register the one listener that drives after(). Leaving it out does not fail the
+    // helper being tested — it fails the whole prelude, before any of them are defined.
     lua.global.set('log', () => {});
     lua.global.set('sendCC', () => {});
+    lua.global.set('on', () => {});
+    lua.global.set('startTimer', () => {});
+    lua.global.set('stopTimer', () => {});
     await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
 
     const all = [...CASES, ...STRUCT_CASES];
@@ -184,6 +189,9 @@ test('the Lua prelude defines the panel verbs as stubs that log rather than erro
     const logged = [];
     lua.global.set('log', (m) => logged.push(String(m)));
     lua.global.set('sendCC', () => {});
+    lua.global.set('on', () => {});          // called at load time to arm after()
+    lua.global.set('startTimer', () => {});
+    lua.global.set('stopTimer', () => {});
     await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
     await lua.doString('setlistNext("Songs")');
     assert.equal(logged.length, 1);
@@ -200,6 +208,9 @@ test('panic expands to the same CC sequence in the Lua prelude as in the WebView
     const sent = [];
     lua.global.set('log', () => {});
     lua.global.set('sendCC', (ch, cc, v) => sent.push([ch, cc, v]));
+    lua.global.set('on', () => {});          // called at load time to arm after()
+    lua.global.set('startTimer', () => {});
+    lua.global.set('stopTimer', () => {});
     await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
 
     await lua.doString('panic({ channel = 3 })');

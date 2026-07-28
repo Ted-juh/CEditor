@@ -1443,6 +1443,9 @@ function startTimer(id, ms) {
   const period = Math.max(1, Math.round(Number(ms) || 0));
   stopTimer(key);
   timers.set(key, setInterval(() => {
+    // A one-shot is not a timer the panel declared, so it must NOT surface as onTimer — every
+    // script with an onTimer handler would have to learn to filter ids it never created.
+    if (runAfterCallback(key)) return;
     dispatchEvents([{ event: 'onTimer', controlName: null, payload: { id: key } }]);
   }, period));
 }
@@ -1455,7 +1458,46 @@ function stopTimer(id) {
   timers.delete(key);
 }
 
+/**
+ * after(ms, fn) — run `fn` once, then forget it.
+ *
+ * Built on the same timer map rather than on setTimeout, so it behaves identically to the C++
+ * preludes (which have no setTimeout and build it on startTimer) and so `stopTimer(id)` cancels it
+ * the way it cancels anything else. One map, one cancel verb, one set of semantics.
+ *
+ * The order inside the tick is the whole point of having this instead of a self-cancelling timer:
+ * the entry is removed and the timer stopped BEFORE the callback runs, so a callback that throws
+ * cannot leave a one-shot repeating forever — which is exactly what hand-rolled versions do.
+ */
+let afterSeq = 0;
+const afterCallbacks = new Map();   // timer id -> the function to run once
+
+function afterFor(scriptId, ms, fn) {
+  if (typeof fn !== 'function') {
+    addScriptTrace('error', scriptId ?? '', 'after(ms, fn) needs a function to run — nothing was scheduled');
+    return undefined;
+  }
+  afterSeq += 1;
+  const id = `__after:${afterSeq}`;
+  // The owner is stored with the callback so a throw inside it is reported against the script that
+  // scheduled it. By the time it fires there is no dispatch in progress to infer that from.
+  afterCallbacks.set(id, { fn, scriptId: scriptId ?? '' });
+  startTimer(id, ms);
+  return id;
+}
+
+/** Fire a one-shot if this tick belongs to one. Returns true when it handled the tick. */
+function runAfterCallback(id) {
+  const entry = afterCallbacks.get(id);
+  if (!entry) return false;
+  afterCallbacks.delete(id);
+  stopTimer(id);
+  try { entry.fn(); } catch (e) { reportScriptError(entry.scriptId, e); }
+  return true;
+}
+
 function stopAllTimers() {
+  afterCallbacks.clear();   // a one-shot outliving its panel would fire into nothing
   for (const handle of timers.values()) clearInterval(handle);
   timers.clear();
 }
@@ -1677,6 +1719,7 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    after: (ms, fn) => afterFor(scriptId, ms, fn),
     // ce.anim — values that move over time
     animateTo: (path, target, opts) => startAnimationImpl('to', path, target, opts ?? {}),
     animateSpring: (path, target, opts) => startAnimationImpl('spring', path, target, opts ?? {}),

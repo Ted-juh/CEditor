@@ -477,6 +477,19 @@ export const COMMANDS = [
     snippet: { lua: 'startTimer("${1:id}", ${2:250})$0', javascript: 'startTimer("${1:id}", ${2:250})$0' },
   },
   {
+    id: 'after', category: 'Events & Flow', signature: 'after(ms, fn) -> id',
+    summary: 'Run `fn` ONCE, `ms` from now. Every other timer here repeats, so a one-shot delay — send a program change, wait for the synth to settle, then send the dump — was written as a repeating timer that stops itself, which is easy to get wrong: a callback that throws before it cancels runs forever. Returns an id you can pass to stopTimer to cancel it before it fires.',
+    params: [
+      { name: 'ms', type: 'number', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'after(${1:250}, function()\n  $0\nend)',
+      javascript: 'after(${1:250}, function () {\n  $0\n});',
+    },
+  },
+  {
     id: 'stopTimer', category: 'Events & Flow', signature: 'stopTimer(id)',
     summary: 'Stop a timer started with startTimer. Stopping an unknown id is harmless.',
     params: [{ name: 'id', type: 'string', required: true }],
@@ -1353,7 +1366,7 @@ export const MODULES = [
     summary: 'Value and range arithmetic. Pure — no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
-  { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.time', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
   { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
@@ -1422,7 +1435,7 @@ const MODULE_MEMBERS = {
   },
   'ce.storage': ['state', 'saveSetting', 'loadSetting'],
   'ce.time': {
-    startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer',
+    startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer', after: 'after',
     // The namespaced names read well; the FLAT aliases are deliberately more defensive.
     // `playing` and `transport` as bare globals are exactly the collision §1 warned about —
     // ordinary words a panel author would reach for — so flat they are isPlaying and

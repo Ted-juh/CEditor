@@ -1222,3 +1222,47 @@ that silently did nothing — while omitting `"pentatonicMaj"` and `"pentatonicM
 understand, so the verb refused a perfectly valid value. The phase-7 test only checked that each
 enum offered the component's *default*, which it did. The spec reads the real table now, so the
 whole class of error is gone rather than that one instance of it.
+
+---
+
+## 21. `ce.time.after` — the one-shot
+
+Every timer in the API repeated. Send a program change, wait for the synth to settle, then send the
+dump — a sequence panels actually need — was written as a repeating timer that cancels itself, which
+every author reinvents and which has one failure mode nobody remembers.
+
+```lua
+sendProgramChange(1, 12)
+after(40, function() sendDump("patch") end)
+```
+
+### Built on `startTimer`, not beside it
+
+QuickJS has no `setTimeout`, so the C++ preludes had to build this on the timer machinery that
+already exists. The WebView does the same rather than reaching for `setTimeout` — one timer map, one
+cancel verb, one set of semantics. `after` returns the id it armed, so **`stopTimer(id)` cancels it**
+like anything else; no new verb was needed for that.
+
+Each prelude registers **one** `on("*", "onTimer", …)` listener at load time — from the prelude, so
+it belongs to no script and survives every reload of them — and swallows the ticks that belong to a
+one-shot. A one-shot is not a timer the panel declared, so surfacing it as `onTimer` would make every
+`onTimer` handler in every panel learn to filter ids it never created.
+
+### The order inside the tick is the whole point
+
+The entry is removed and the timer stopped **before** the callback runs. That buys two things, and
+they are the reason this is a verb rather than a snippet in the docs:
+
+- **A callback that throws cannot leave the one-shot repeating.** This is exactly what a hand-rolled
+  self-cancelling timer does wrong: it stops itself at the end of the callback, so a throw before
+  that line leaves it firing forever.
+- **A callback can schedule the next one.** Clearing first means the inner `after()` gets a fresh id
+  and is not cancelled by the outer one's own stop — which is what a settle-then-send chain is.
+
+### The fixture gap this turned up
+
+The prelude now calls `on()` at load time, and three Lua fixtures in `scriptPreludeAgreement.test.js`
+stubbed only `log` and `sendCC`. That does not fail the helper under test — it fails the **whole
+prelude**, before any helper is defined, so a test about `panic()` started reporting that `panic` was
+nil. Worth remembering: a prelude that does work at load time makes every fixture that loads it a
+dependency.

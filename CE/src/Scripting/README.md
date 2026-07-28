@@ -239,6 +239,16 @@ Three behaviours the cross-engine tests pin: an unknown name returns nil rather 
 "major"; a quantise tie goes **up**, always; and quantise keeps the octave it was given. See §20 of
 `docs/scripting-modules-design.md`.
 
+### One-shot delays
+
+`ce.time.after(ms, fn)` runs `fn` once and returns the timer id it armed, so `stopTimer(id)` cancels
+it. Built on `startTimer` (QuickJS has no `setTimeout`), with one prelude-level
+`on("*", "onTimer", …)` listener per engine that swallows the ticks belonging to a one-shot — so a
+one-shot never surfaces as `onTimer`.
+
+The entry is cleared and the timer stopped BEFORE the callback runs: a throw cannot leave it
+repeating, and a callback can schedule the next one. See §21 of `docs/scripting-modules-design.md`.
+
 ### Musical time
 
 `ce.time.tempo()`, `.playing()`, `.transport()`, `.beatsToMs()`, `.msToBeats()`, `.syncTimer()`,

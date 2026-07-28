@@ -456,6 +456,37 @@ function syncTimer(id, beats)
   startTimer(id, math.floor(ms + 0.5))
 end
 
+-- after(ms, fn) — run fn ONCE, ms from now. Built on startTimer rather than on anything new: the
+-- one-shot is a normal timer that removes itself, so stopTimer(id) cancels it like anything else.
+--
+-- The order inside the tick is why this exists instead of every panel hand-rolling it. The entry is
+-- removed and the timer stopped BEFORE fn runs, so a callback that throws cannot leave a one-shot
+-- repeating forever — which is precisely what the hand-rolled version does.
+local __after, __afterN = {}, 0
+function after(ms, fn)
+  if type(fn) ~= "function" then
+    log("after(ms, fn) needs a function to run — nothing was scheduled")
+    return nil
+  end
+  __afterN = __afterN + 1
+  local id = "__after:" .. tostring(__afterN)
+  __after[id] = fn
+  startTimer(id, ms)
+  return id
+end
+-- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+-- A one-shot is NOT a timer the panel declared, so it is swallowed here rather than surfacing as
+-- onTimer — otherwise every script with an onTimer handler would have to filter ids it never made.
+on("*", "onTimer", function(info)
+  local id = info ~= nil and info.id or nil
+  if id == nil then return end
+  local fn = __after[id]
+  if fn == nil then return end
+  __after[id] = nil
+  stopTimer(id)
+  fn()
+end)
+
 -- @module ce.anim
 -- Values that move over time. The engine lives in the host (ScriptRuntime) so ONE list exists and
 -- the position is a pure function of elapsed time — an incremental integrator in each runtime
@@ -508,7 +539,7 @@ local __CE_MODULES = {
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", requestDump = "requestDump", sendDump = "sendDump" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
-  ["ce.time"] = { beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
+  ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
   ["ce.draw"] = { circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
@@ -550,7 +581,7 @@ local __CE_META = {
   { id = "ce.device", version = "1.1", runtime = "any" },
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
-  { id = "ce.time", version = "1.1", runtime = "any" },
+  { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },
   { id = "ce.draw", version = "1.0", runtime = "webview" },
