@@ -12,7 +12,7 @@
 // today; the number is what the panel's scripting surface weighs, and it is the figure the Export
 // tab shows beside the (far larger) Python runtime cost.
 export const MODULE_COST = {
-  "-": { "javascript": 10441, "lua": 8588, "python": 9494, "webview": 82279 },
+  "-": { "javascript": 10463, "lua": 8609, "python": 9516, "webview": 82385 },
   "ce.anim": { "javascript": 651, "lua": 658, "python": 584, "webview": 5208 },
   "ce.components": { "javascript": 1516, "lua": 1823, "python": 1500, "webview": 8099 },
   "ce.device": { "javascript": 1734, "lua": 1133, "python": 1379, "webview": 4119 },
@@ -23,7 +23,7 @@ export const MODULE_COST = {
   "ce.panel": { "javascript": 228, "lua": 360, "python": 226, "webview": 10303 },
   "ce.storage": { "javascript": 501, "lua": 395, "python": 708, "webview": 1390 },
   "ce.time": { "javascript": 1693, "lua": 1807, "python": 2042, "webview": 2820 },
-  "ce.ui": { "javascript": 108, "lua": 108, "python": 107, "webview": 635 },
+  "ce.ui": { "javascript": 1153, "lua": 938, "python": 920, "webview": 1445 },
 };
 
 export const MODULE_COST_LANGUAGES = ["javascript","lua","python","webview"];

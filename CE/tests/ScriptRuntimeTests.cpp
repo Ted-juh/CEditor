@@ -1224,6 +1224,56 @@ int main()
         check (host.logs.isEmpty(), "…and the set is still marked destroyed, not left half-alive");
     }
 
+    // 23) ce.ui.dialog (design doc §18) -----------------------------------------------------------
+    // The one webview-only verb that owes its caller something. A script asks a question and waits
+    // in the callback; a callback that never runs leaves it waiting forever. So window-closed the
+    // verb answers the only honest answer there is — nobody is here — rather than going quiet.
+    {
+        juce::Array<juce::var> askScripts;
+        askScripts.add (makeScript ("ask", "lua", "panel", "onAsk", "*",
+            "function onAsk()\n"
+            "  local shown = ce.ui.dialog({ title = \"Overwrite?\", buttons = { \"Yes\", \"No\" } }, function(choice)\n"
+            "    log(\"ANSWER \" .. tostring(choice))\n"
+            "  end)\n"
+            "  log(\"SHOWN \" .. tostring(shown))\n"
+            "end\n"));
+        askScripts.add (makeScript ("askjs", "javascript", "panel", "onAskJs", "*",
+            "function onAskJs() {\n"
+            "  var shown = ce.ui.dialog({ title: 'Overwrite?' }, function (choice) {\n"
+            "    log('JS ANSWER ' + (choice === undefined ? 'nil' : choice));\n"
+            "  });\n"
+            "  log('JS SHOWN ' + shown);\n"
+            "}"));
+        askScripts.add (makeScript ("asknone", "lua", "panel", "onAskNone", "*",
+            "function onAskNone() log(\"RET \" .. tostring(ce.ui.dialog({ title = \"Hi\" }))) end\n"));
+        runtime.loadScripts (juce::var (askScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onAsk", juce::var());
+        check (host.logs.joinIntoString ("\n").contains ("panel window open"),
+               "dialog() window-closed says why it did nothing");
+        check (host.logs.contains ("ANSWER nil"),
+               "…and STILL calls the callback, with no answer — a script waiting on one is not left waiting");
+        check (host.logs.contains ("SHOWN false"),
+               "…and returns false, so a script can tell 'nobody answered' from 'nobody was asked'");
+
+        // The callback ordering matters: it runs before dialog() returns here, because there is
+        // nothing to wait for. A script must not assume otherwise, which is why it is asserted.
+        const auto order = host.logs.indexOf ("ANSWER nil") < host.logs.indexOf ("SHOWN false");
+        check (order, "the callback runs before the call returns when there is nobody to ask");
+
+        host.logs.clear();
+        runtime.runAction ("onAskJs", juce::var());
+        check (host.logs.contains ("JS ANSWER nil"), "the JavaScript engine answers the same way");
+        check (host.logs.contains ("JS SHOWN false"), "…and returns the same false");
+
+        // Omitting the callback entirely must not throw — it is optional.
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onAskNone", juce::var());
+        check (host.logs.contains ("RET false"), "the callback is optional");
+        check (errors.isEmpty(), "…and leaving it out raises nothing");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

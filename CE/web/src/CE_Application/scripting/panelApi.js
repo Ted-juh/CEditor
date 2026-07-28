@@ -556,9 +556,10 @@ export const COMMANDS = [
     snippet: { lua: 'if not ce.anim.running("${1:cutoff}") then $0 end', javascript: 'if (!ce.anim.running("${1:cutoff}")) { $0 }' },
   },
 
-  /* --- User feedback (design doc §6 phase 6) ---
-     Panel view only: there is nobody to tell with the window shut. Both are fire-and-forget, which
-     is why they are here and `dialog` is not — see the note in §15. */
+  /* --- User feedback (design doc §6 phase 6, §18) ---
+     Panel view only: there is nobody to tell with the window shut. `notify` and `status` are
+     fire-and-forget; `dialog` asks a question, and the answer arrives through a CALLBACK rather
+     than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
     summary: 'Show a brief message to whoever is using the panel. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000) }. For "the patch loaded", not for debugging — log() is for debugging.',
@@ -577,6 +578,20 @@ export const COMMANDS = [
     params: [{ name: 'message', type: 'string', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
+  },
+  {
+    id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
+    summary: 'Ask a question. The ANSWER comes back through `onChoice`, not as a return value — an answer arrives later than the call. `opts` carries { title, message, buttons (labels, default one "OK"), kind ("info" | "warn" | "error"), default (the label focused first) }. `onChoice` gets the chosen label, or nothing if the dialog was dismissed. The RETURN says whether a dialog was actually put on screen: false means there was nobody to ask (window shut, or one is already open) and your callback has already been called with no answer. Only one dialog at a time — a second call is refused rather than queued, so a runaway script cannot stack modals in front of somebody.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: ['title', 'message', 'buttons', 'kind', 'default'] },
+      { name: 'onChoice', type: 'function', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.ui.dialog({ title = "${1:Overwrite?}", buttons = { "Overwrite", "Cancel" } }, function(choice)\n  if choice == "Overwrite" then\n    $0\n  end\nend)',
+      javascript: 'ce.ui.dialog({ title: "${1:Overwrite?}", buttons: ["Overwrite", "Cancel"] }, function (choice) {\n  if (choice === "Overwrite") {\n    $0\n  }\n});',
+    },
   },
 
   /* --- Drawing (design doc §6 phase 5) ---
@@ -1281,8 +1296,8 @@ export const MODULES = [
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
   { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
-  { id: 'ce.ui', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Tell the person using the panel something. Panel view only — there is nobody to tell with the window shut.' },
+  { id: 'ce.ui', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Tell the person using the panel something, or ask them. Panel view only — there is nobody to tell with the window shut.' },
   { id: 'ce.draw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
   { id: 'ce.panel', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -1326,7 +1341,7 @@ const MODULE_MEMBERS = {
   'ce.anim': {
     to: 'animateTo', spring: 'animateSpring', stop: 'animateStop', running: 'animateRunning',
   },
-  'ce.ui': { notify: 'uiNotify', status: 'uiStatus' },
+  'ce.ui': { notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog' },
   'ce.draw': {
     clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
     circle: 'drawCircle', line: 'drawLine', path: 'drawPath', text: 'drawText',

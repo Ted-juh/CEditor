@@ -161,8 +161,15 @@ the value is; a second animation on a path replaces the first.
 
 `ce.ui.notify(message, opts)` and `ce.ui.status(message)`. Panel view only. A notification is an
 event and expires; a status is a state and stays until changed — which is why they are two verbs.
-`dialog` is deliberately absent: it exists to return an answer, answers are async, and this API is
-synchronous by design. See §15 of `docs/scripting-modules-design.md`.
+`ce.ui.dialog(opts, onChoice)` asks rather than tells. The ANSWER arrives through the callback; the
+return value says whether a dialog was actually shown, and `false` always means the callback has
+already run with no answer — so a script never has to wonder whether it is still waiting. One dialog
+at a time, refused rather than queued, and the callback runs exactly once however it ends (choice,
+dismissal, or panel teardown).
+
+`dialog` is the one webview-only verb that does NOT get the plain explaining stub window-closed: a
+script waiting in a callback would wait forever. It logs, calls back with no answer, and returns
+false. See §15 and §18 of `docs/scripting-modules-design.md`.
 
 ### Drawing
 

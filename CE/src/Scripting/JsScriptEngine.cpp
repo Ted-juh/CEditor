@@ -155,7 +155,9 @@ var __WEBVIEW_ONLY = [
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 // @module ce.ui
   // ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
-  "uiNotify","uiStatus",
+  // uiDialog is listed here too — it does not work window-closed either — but it needs more than
+  // the default stub, so it is redefined below: a dialog owes its caller a callback.
+  "uiNotify","uiStatus","uiDialog",
 // @module ce.draw
   // ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
   // the window shut. onDraw is declared webview-only too, so it never fires here.
@@ -170,6 +172,19 @@ for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
     };
   })(__WEBVIEW_ONLY[__i]);
 }
+
+// @module ce.ui
+// dialog() is the one webview-only verb that owes its caller something. A script asks a question
+// and waits in the callback; if the callback never runs, that script waits forever. So window-
+// closed it answers the only honest answer there is — nobody is here — and says so in the return
+// value, which is `false`: no dialog was shown, and your callback has already been called.
+// Assigned, NOT declared. A `function uiDialog()` declaration is hoisted to the top of the script,
+// so the stub loop above would run afterwards and overwrite it. An assignment executes in order.
+__global.uiDialog = function (opts, onChoice) {
+  log("[panel] dialog() needs the panel window open — there is nobody to ask with the window closed, so it counts as dismissed.");
+  if (typeof onChoice === 'function') onChoice(undefined);
+  return false;
+};
 
 // @module ce.midi
 // MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
@@ -310,7 +325,7 @@ var __CE_MODULES = {
   "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
   "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
-  "ce.ui": { "notify": "uiNotify", "status": "uiStatus" },
+  "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
   "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
   "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
   "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
@@ -321,7 +336,7 @@ var __CE_MODULES = {
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.0","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

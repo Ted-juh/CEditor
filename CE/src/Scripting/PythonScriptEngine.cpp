@@ -606,7 +606,9 @@ __WEBVIEW_ONLY = [
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 # @module ce.ui
   # ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
-  "uiNotify","uiStatus",
+  # uiDialog is listed here too — it does not work window-closed either — but it needs more than
+  # the default stub, so it is redefined below: a dialog owes its caller a callback.
+  "uiNotify","uiStatus","uiDialog",
 # @module ce.draw
   # ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
   # the window shut. onDraw is declared webview-only too, so it never fires here.
@@ -620,6 +622,16 @@ def __webviewOnly(name):
     return stub
 for __n in __WEBVIEW_ONLY:
     globals()[__n] = __webviewOnly(__n)
+
+# @module ce.ui
+# dialog() is the one webview-only verb that owes its caller something. A script asks a question
+# and waits in the callback; if the callback never runs, that script waits forever. So window-
+# closed it answers the only honest answer there is — nobody is here — and says so in the return
+# value, which is False: no dialog was shown, and your callback has already been called.
+def uiDialog(opts=None, onChoice=None):
+    log("[panel] dialog() needs the panel window open — there is nobody to ask with the window closed, so it counts as dismissed.")
+    if callable(onChoice): onChoice(None)
+    return False
 
 # @module ce.midi
 # MIDI channel messages — arithmetic over sendMidi, the way panic() is over sendCC, which is what
@@ -714,7 +726,7 @@ __CE_MODULES = {
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
     "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
-    "ce.ui": { "notify": "uiNotify", "status": "uiStatus" },
+    "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
     "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
     "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
     "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
@@ -733,7 +745,7 @@ __CE_META = [
     { "id": "ce.music", "version": "1.0", "runtime": "any" },
     { "id": "ce.time", "version": "1.1", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
-    { "id": "ce.ui", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.0", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.0", "runtime": "webview" },
     { "id": "ce.storage", "version": "1.0", "runtime": "any" },

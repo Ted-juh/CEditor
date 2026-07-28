@@ -55,7 +55,9 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
-import { notify as uiNotifyStore, setStatus as uiStatusStore, clearScriptUi } from '../stores/scriptUi.js';
+import {
+  notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
+} from '../stores/scriptUi.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, removeControlFromTree, remintControlIds,
@@ -1002,6 +1004,21 @@ function uiStatusImpl(message) {
   return true;
 }
 
+// dialog() asks a question, so it cannot answer it: the return value says whether anything was put
+// on screen, and the ANSWER arrives through the callback. Returning false always means the callback
+// has ALREADY run with no answer — a script never has to wonder whether it is still waiting.
+function uiDialogImpl(scriptId, opts, onChoice) {
+  const answer = (choice) => {
+    // A dialog's answer arrives long after the handler that asked has returned, so the callback is
+    // the one place a script's error can escape the dispatch path that would have reported it.
+    try { if (typeof onChoice === 'function') onChoice(choice); }
+    catch (e) { reportScriptError(scriptId, e); }
+  };
+  const id = uiDialogStore(opts, answer);
+  if (id == null) { answer(undefined); return false; }
+  return true;
+}
+
 // @module ce.draw
 /* -------------------------------------------------------------------------------- ce.draw */
 // Oscilloscopes, envelope editors, XY pads, readouts. Immediate mode: each verb appends a command
@@ -1595,6 +1612,7 @@ function buildApi(ownerName, scriptId = '') {
     // ce.ui — a message for whoever is using the panel
     uiNotify: (message, opts) => uiNotifyImpl(message, opts),
     uiStatus: (message) => uiStatusImpl(message),
+    uiDialog: (opts, onChoice) => uiDialogImpl(scriptId, opts, onChoice),
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
     drawFill: (colour) => { drawState.fill = colour == null ? null : String(colour); },

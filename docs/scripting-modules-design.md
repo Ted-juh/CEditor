@@ -864,13 +864,14 @@ Neither is a debugging tool. `log()` is for debugging, and the summaries say so.
 
 ### What phase 6 did not include: `ce.ui.dialog`
 
-§2 lists `notify` `status` `dialog`. The first two are fire-and-forget and are here. **`dialog` is
-not**, and the reason is structural rather than effort: a dialog exists to return an ANSWER, and an
+§2 lists `notify` `status` `dialog`. The first two are fire-and-forget and are here. **`dialog` was
+not**, and the reason was structural rather than effort: a dialog exists to return an ANSWER, and an
 answer is asynchronous, while this API is synchronous everywhere by design — the C++ engines
 dispatch handlers synchronously, which is exactly why `async`/`await` is warned about at edit time.
-A callback form (`ce.ui.dialog(opts, onChoice)`) is expressible and is the likely shape, but it
-needs modal UI and a decision about what happens when the panel closes with a dialog open. Shipping
-a half-answered dialog would have been worse than shipping none.
+A callback form (`ce.ui.dialog(opts, onChoice)`) is expressible and was the likely shape, but it
+needed modal UI and a decision about what happens when the panel closes with a dialog open. Shipping
+a half-answered dialog would have been worse than shipping none. It was built afterwards, once
+those two questions had answers — §18.
 
 ### Two defects this turned up
 
@@ -1004,3 +1005,59 @@ teardown handler reads and writes through the **active** panel, so raising the h
 would have had the outgoing panel's `onPanelDestroy` writing values into the panel that had just
 arrived — the exact opposite of cleaning up after itself. The destroy is dispatched before the id
 moves, which also makes the subscriber's immediate first call a no-op.
+
+---
+
+## 18. `ce.ui.dialog` — asking, not telling
+
+The verb §15 deferred, and the two questions that were blocking it now have answers.
+
+**"An answer is asynchronous, but the API is synchronous."** The answer does not come back from the
+call at all. It comes through a callback, and the return value answers a different question:
+
+```lua
+local shown = ce.ui.dialog({ title = "Overwrite the patch?", buttons = { "Overwrite", "Cancel" } },
+  function(choice)
+    if choice == "Overwrite" then sendDump("patch") end   -- choice is nil if it was dismissed
+  end)
+```
+
+`shown` is **whether a dialog was put on screen**, never the choice. And `false` carries a promise
+that makes it usable: *the callback has already run, with no answer*. So a script never has to work
+out whether it is still waiting — there are two states, not three. Window-closed, one dialog already
+open, and a dialog asking nothing all return `false`, and all of them have already called back.
+
+That is also what lets the C++ engines be honest. `dialog` is declared webview-only — a modal needs
+somewhere to be modal — but it is the one webview-only verb that *owes its caller something*: a
+script that asks a question and waits in the callback waits forever if the callback never runs. So
+window-closed it does not get the default explaining stub. It logs the explanation, calls back with
+no answer, and returns `false`. "Nobody is here to ask" and "the person dismissed it" are the same
+answer, and a script that handles a dismissal handles both without knowing it did.
+
+**"What happens when the panel closes with a dialog open?"** It is dismissed. `clearScriptUi()`
+settles the open question on teardown, so the callback runs exactly once no matter how the dialog
+ends. A callback that never runs is the one failure mode this API cannot afford — a script that
+cleans up in its callback would be left holding cleanup that never happens.
+
+### Three rules
+
+- **The callback runs exactly once** — on a choice, on a dismissal, or on teardown. Settling an
+  already-settled dialog does nothing, so a click racing a teardown cannot answer twice.
+- **One dialog at a time, and never a queue.** A second call is *refused* (returns `false`, calls
+  back with no answer) rather than stacked. A queue would let a script in a loop put a hundred
+  modals in front of somebody with no way out; refusing hands the decision back to the only party
+  that knows what to do about it. The chained case still works, because the callback runs after the
+  first dialog has closed: ask A, then ask B from inside A's callback.
+- **Every route out settles it.** A button, Escape, the backdrop, and panel teardown all go through
+  `answerDialog()`. A dialog that can be closed without settling is a script left waiting.
+
+### Two defects this turned up
+
+- **The JavaScript override was being eaten by its own stub list.** `uiDialog` is listed in the
+  engine's webview-only names (it genuinely does not work window-closed) and then redefined below
+  the stub loop. In Lua and Python that reads top-to-bottom and works; in JavaScript a `function
+  uiDialog()` *declaration* is hoisted to the top of the script, so the loop ran afterwards and
+  overwrote it with the silent stub. It is an assignment to the global now, which executes in order.
+- **The callback escapes the dispatch path.** It runs long after the handler that asked has
+  returned, so a throw inside it was not being caught by anything that would report it — the one
+  place a script error could vanish. It is wrapped and reported like any other script failure.

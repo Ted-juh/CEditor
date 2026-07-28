@@ -21,6 +21,7 @@
   import { initScriptConsoleBridge } from './CE_Application/stores/scriptConsole.js';
   import { initScriptModules } from './CE_Application/stores/scriptModules.js';
   import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
+  import ScriptDialog from './CE_Application/layout/ScriptDialog.svelte';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
@@ -368,6 +369,10 @@
   <!-- ce.ui.notify() toasts. Mounted once at the root, and fixed-position, so a message survives
        whatever tab or panel is on screen when the script raises it. -->
   <ScriptNotifications />
+
+  <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
+       that can be scrolled out of view is a script left waiting for an answer. -->
+  <ScriptDialog />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />
