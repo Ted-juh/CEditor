@@ -239,6 +239,20 @@ Three behaviours the cross-engine tests pin: an unknown name returns nil rather 
 "major"; a quantise tie goes **up**, always; and quantise keeps the octave it was given. See §20 of
 `docs/scripting-modules-design.md`.
 
+### Device parameters
+
+`ce.device.read(id [, role])` returns the LAST KNOWN value of a device parameter — the mirror of
+what the synth reported, not a live query. A parameter reported as `0` is a value; only one never
+reported comes back as nothing.
+
+`ce.device.write(id, value [, role])` encodes through the device profile and sends, returning
+whether the message was DISPATCHED (not whether the synth accepted it). It takes the same path a
+bound control takes, so a scripted change and a knob turn are indistinguishable downstream.
+
+`read` is a fifth `kind` on `ScriptHostApi::deviceQuery`; `write` is its own method, because
+`deviceQuery` reads the profile and hiding a send inside it would make that comment a lie. See §23
+of `docs/scripting-modules-design.md`.
+
 ### Panel snapshots
 
 `ce.panel.snapshot()` returns `{ controlName: value }` for every control that has a value;

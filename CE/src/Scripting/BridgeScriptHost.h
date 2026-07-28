@@ -43,6 +43,8 @@ public:
         // nothing, which is the rule requiresDeviceHost has followed since it was introduced.
         std::function<juce::var (const juce::String& kind, const juce::var& payload)> deviceQuery;
         std::function<juce::var (const juce::String& kind, const juce::var& payload)> panelQuery;
+        std::function<bool (const juce::String& parameterId, const juce::var& value,
+                            const juce::String& role)> deviceWrite;
         // The transport snapshot behind tempo() / isPlaying() / transportInfo(). Unset means
         // nothing is reporting one, and the prelude reports valid=false rather than guessing.
         std::function<juce::var()> transportState;
@@ -158,6 +160,10 @@ public:
 
     juce::var panelQuery (const juce::String& kind, const juce::var& payload) override
     { return callbacks.panelQuery ? callbacks.panelQuery (kind, payload) : juce::var(); }
+
+    bool deviceWrite (const juce::String& parameterId, const juce::var& value,
+                      const juce::String& role) override
+    { return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role); }
     juce::var transportState() override
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE

@@ -918,6 +918,38 @@ export const COMMANDS = [
       javascript: 'const p = deviceParameter("${1:cutoff}");\nif (p) log("max " + p.max);$0',
     },
   },
+  // read / write — the half of phase 2 that was missing. parameters() told a script WHAT the synth
+  // has and there was then no way to touch one unless a control happened to be bound to it: a panel
+  // that discovered eight oscillators could enumerate them and not address them.
+  {
+    id: 'deviceRead', category: 'Device / MIDI', signature: 'deviceRead(id [, role]) -> value',
+    summary: 'The LAST KNOWN value of a device parameter — what the synth most recently told us, from a dump or a parameter message. Not a live query: asking the synth is asynchronous, and this verb is not. Nothing comes back if the device has never reported it, which is different from zero.',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'local v = ce.device.read("${1:cutoff}")\nif v ~= nil then $0 end',
+      javascript: 'const v = ce.device.read("${1:cutoff}");\nif (v !== undefined) { $0 }',
+    },
+  },
+  {
+    id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
+    summary: 'Set a device parameter on the synth, by parameter id, whether or not a control is bound to it. The device profile encodes it. Returns whether the message was dispatched — not whether the synth accepted it, which nothing can know synchronously. `value` is in the parameter\'s own units, the ones deviceParameter() reports min and max for.',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'value', type: 'value', required: true },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.write("${1:cutoff}", ${2:64})$0',
+      javascript: 'ce.device.write("${1:cutoff}", ${2:64});$0',
+    },
+  },
   {
     id: 'deviceConnected', category: 'Device / MIDI', signature: 'deviceConnected([role])',
     summary: 'Is the device for this role connected and ready? Cheap to call, and the right guard before a dump request.',
@@ -1377,8 +1409,8 @@ export const MODULES = [
   // cross-module call that `requires` does not cover, so this cannot be forgotten again.
   { id: 'ce.midi', version: '1.1', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
     summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
-  { id: 'ce.device', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: what it is, what parameters it has, and bulk dumps. Needs the device host.' },
+  { id: 'ce.device', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps. Needs the device host.' },
   { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic. Pure — no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
@@ -1432,6 +1464,7 @@ const MODULE_MEMBERS = {
   ],
   'ce.device': {
     requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',
+    read: 'deviceRead', write: 'deviceWrite',
     // The reads drop the `device` prefix inside the namespace — ce.device.deviceProfile() stutters,
     // ce.device.profile() reads like what it is. The flat alias keeps the prefix because there it
     // is the only thing distinguishing it from a panel property.

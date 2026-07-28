@@ -533,6 +533,11 @@ end
 
 -- @module ce.device
 function deviceProfile(role) return __deviceQuery("profile", { role = __role(role) }) end
+-- read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
+-- query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
+-- profile and sends; it returns whether the message went out, not whether the synth accepted it.
+function deviceRead(id, role) return __deviceQuery("read", { role = __role(role), id = tostring(id) }) end
+function deviceWrite(id, value, role) return __deviceWrite(tostring(id), value, __role(role)) end
 function deviceConnected(role) return __deviceQuery("connected", { role = __role(role) }) == true end
 function deviceParameters(opts)
   opts = opts or {}
@@ -565,7 +570,7 @@ end
 local __CE_MODULES = {
   ["ce.core"] = { emit = "emit", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
-  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", requestDump = "requestDump", sendDump = "sendDump" },
+  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", write = "deviceWrite" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
@@ -607,7 +612,7 @@ local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "
 local __CE_META = {
   { id = "ce.core", version = "1.0", runtime = "any" },
   { id = "ce.midi", version = "1.1", runtime = "any" },
-  { id = "ce.device", version = "1.1", runtime = "any" },
+  { id = "ce.device", version = "1.2", runtime = "any" },
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
@@ -802,6 +807,9 @@ public:
         g.set_function ("__panelQuery", [this] (std::string kind, sol::optional<sol::table> payload)
             { return varToSol (lua, host->panelQuery (juce::String (kind),
                                                       payload ? solToVar (*payload) : juce::var())); });
+
+        g.set_function ("__deviceWrite", [this] (std::string id, sol::object value, std::string role)
+            { return host->deviceWrite (juce::String (id), solToVar (value), juce::String (role)); });
 
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });

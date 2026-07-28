@@ -132,6 +132,14 @@ public:
     virtual juce::var deviceQuery (const juce::String& kind, const juce::var& payload)
     { juce::ignoreUnused (kind, payload); return {}; }
 
+    /** SET a device parameter on the synth, by parameter id. Separate from deviceQuery because it
+        is not a query: the device profile encodes the value and the message goes out. Returns
+        whether it was dispatched — not whether the synth accepted it, which nothing here can know.
+        False with no device host, which is what makes the verb report itself rather than lie. */
+    virtual bool deviceWrite (const juce::String& parameterId, const juce::var& value,
+                              const juce::String& role)
+    { juce::ignoreUnused (parameterId, value, role); return false; }
+
     /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
         a host does not implement them itself. */
     virtual void startAnimation (const juce::String& kind, const juce::String& path,

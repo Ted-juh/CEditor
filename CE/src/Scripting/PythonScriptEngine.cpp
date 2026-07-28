@@ -284,6 +284,15 @@ PyObject* api_panelQuery (PyObject*, PyObject* args)
     return varToPy (g_host->panelQuery (juce::String::fromUTF8 (kind),
                                         payload != nullptr ? pyToVar (payload) : juce::var()));
 }
+PyObject* api_deviceWrite (PyObject*, PyObject* args)
+{
+    const char* id = nullptr; PyObject* value = nullptr; const char* role = nullptr;
+    if (! PyArg_ParseTuple (args, "sOs", &id, &value, &role)) return nullptr;
+    const bool ok = g_host->deviceWrite (juce::String::fromUTF8 (id),
+                                         value != nullptr ? pyToVar (value) : juce::var(),
+                                         juce::String::fromUTF8 (role));
+    return PyBool_FromLong (ok ? 1 : 0);
+}
 PyObject* api_run (PyObject*, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
@@ -359,6 +368,7 @@ PyMethodDef apiMethods[] = {
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
     { "panelQuery",    api_panelQuery,    METH_VARARGS, nullptr },
+    { "deviceWrite",   api_deviceWrite,   METH_VARARGS, nullptr },
     { "transportState", api_transportState, METH_NOARGS,  nullptr },
     { "animate",       api_animate,       METH_VARARGS, nullptr },
     { "animateStop",   api_animateStop,   METH_VARARGS, nullptr },
@@ -888,6 +898,13 @@ def __deviceQuery(kind, payload=None):
 
 def deviceProfile(role=None):
     return __deviceQuery("profile", { "role": __role(role) })
+# read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
+# query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
+# profile and sends; it returns whether the message went out, not whether the synth accepted it.
+def deviceRead(id, role=None):
+    return __deviceQuery("read", { "role": __role(role), "id": str(id) })
+def deviceWrite(id, value, role=None):
+    return __api.deviceWrite(str(id), value, __role(role)) is True
 
 def deviceConnected(role=None):
     return __deviceQuery("connected", { "role": __role(role) }) is True
@@ -924,7 +941,7 @@ import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
+    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
@@ -966,7 +983,7 @@ __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce
 __CE_META = [
     { "id": "ce.core", "version": "1.0", "runtime": "any" },
     { "id": "ce.midi", "version": "1.1", "runtime": "any" },
-    { "id": "ce.device", "version": "1.1", "runtime": "any" },
+    { "id": "ce.device", "version": "1.2", "runtime": "any" },
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },

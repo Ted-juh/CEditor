@@ -718,6 +718,20 @@ private:
             return juce::var (names);
         };
 
+        cb.deviceWrite = [this] (const juce::String& parameterId, const juce::var& value,
+                                 const juce::String& roleIn) -> bool
+        {
+            if (parameterId.isEmpty()) return false;
+            auto* req = new juce::DynamicObject();
+            req->setProperty ("deviceRole", roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn);
+            req->setProperty ("parameterId", parameterId);
+            req->setProperty ("value", value);
+            req->setProperty ("dryRun", false);      // actually send it
+            const auto result = deviceService.compileParameterMessage (juce::var (req), true);
+            auto* obj = result.getDynamicObject();
+            return obj != nullptr && (bool) obj->getProperty ("ok");
+        };
+
         cb.deviceQuery = [this] (const juce::String& kind, const juce::var& payload) -> juce::var
         {
             auto* p = payload.getDynamicObject();
@@ -733,6 +747,21 @@ private:
 
             if (kind == "connected")
                 return juce::var (ready);
+
+            // The LAST KNOWN value — what the synth most recently told us, from a dump or a
+            // parameter message. Not a live query: asking the synth is asynchronous and this verb
+            // is not. Void when it has never been reported, which is not the same as zero.
+            if (kind == "read")
+            {
+                const auto id = p != nullptr ? p->getProperty ("id").toString() : juce::String();
+                if (id.isEmpty()) return {};
+                auto* runtime = deviceService.getRuntimeState().getDynamicObject();
+                if (runtime == nullptr) return {};
+                auto* forRole = runtime->getProperty (role).getDynamicObject();
+                if (forRole == nullptr) return {};
+                const juce::Identifier key (id);
+                return forRole->hasProperty (key) ? forRole->getProperty (key) : juce::var();
+            }
 
             if (kind == "profile")
             {

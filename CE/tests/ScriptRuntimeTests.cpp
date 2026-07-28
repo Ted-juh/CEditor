@@ -81,6 +81,18 @@ public:
     // report rather than quietly answering "this synth has nothing".
     bool deviceHost = true;
     juce::StringArray deviceQueries;
+    // "role/parameterId" -> the value the synth last reported.
+    std::map<juce::String, juce::var> deviceValues;
+    juce::StringArray deviceWrites;
+
+    bool deviceWrite (const juce::String& id, const juce::var& value, const juce::String& role) override
+    {
+        if (! deviceHost || id.isEmpty()) return false;
+        deviceWrites.add (role + "/" + id + "=" + value.toString());
+        deviceValues[role + "/" + id] = value;   // the real service updates runtime state on send
+        return true;
+    }
+
     juce::var deviceQuery (const juce::String& kind, const juce::var& payload) override
     {
         auto* p = payload.getDynamicObject();
@@ -89,6 +101,15 @@ public:
         if (! deviceHost) return {};
 
         if (kind == "connected") return juce::var (role == "mainSynth");
+        // The LAST KNOWN value, from whatever the synth last reported. Absent means never reported,
+        // which a script has to be able to tell apart from zero — so the map holds a real 0 for
+        // "reso" and has no entry at all for anything else.
+        if (kind == "read")
+        {
+            const auto id = p != nullptr ? p->getProperty ("id").toString() : juce::String();
+            auto it = deviceValues.find (role + "/" + id);
+            return it != deviceValues.end() ? it->second : juce::var();
+        }
         if (kind == "profile")
         {
             if (role != "mainSynth") return {};
@@ -1671,6 +1692,66 @@ int main()
         bareRuntime.runAction ("onBare", juce::var());
         check (bare.logs.contains ("bare table 0"),
                "with no panel host, snapshot is an empty TABLE — never nil, so iterating it is safe");
+    }
+
+    // 29) ce.device.read / write (design doc §23) --------------------------------------------------
+    // parameters() said WHAT the synth has; there was then no way to touch one unless a control
+    // happened to be bound to it. read is the LAST KNOWN value; write encodes through the profile.
+    {
+        host.deviceHost = true;
+        host.deviceValues.clear(); host.deviceWrites.clear();
+        host.deviceValues["mainSynth/cutoff"] = juce::var (64);
+        host.deviceValues["mainSynth/reso"] = juce::var (0);   // a REAL zero, not "never reported"
+
+        juce::Array<juce::var> devScripts;
+        devScripts.add (makeScript ("dev", "lua", "panel", "onDev", "*",
+            "function onDev()\n"
+            "  log(\"cutoff \" .. tostring(ce.device.read(\"cutoff\")))\n"
+            "  log(\"reso \" .. tostring(ce.device.read(\"reso\")))\n"
+            "  log(\"never \" .. tostring(ce.device.read(\"nosuch\")))\n"
+            "  log(\"wrote \" .. tostring(ce.device.write(\"cutoff\", 100)))\n"
+            "  log(\"after \" .. tostring(ce.device.read(\"cutoff\")))\n"
+            "end\n"));
+        devScripts.add (makeScript ("devjs", "javascript", "panel", "onDevJs", "*",
+            "function onDevJs() {\n"
+            "  log('js read ' + ce.device.read('reso'));\n"
+            "  log('js wrote ' + ce.device.write('reso', 12));\n"
+            "  log('js role ' + ce.device.write('cutoff', 1, 'secondSynth'));\n"
+            "}"));
+        runtime.loadScripts (juce::var (devScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onDev", juce::var());
+        check (host.logs.contains ("cutoff 64"), "read() returns the last known value");
+        // A parameter reported as 0 must NOT read as "never reported" — a script deciding whether
+        // to initialise something would get it exactly backwards.
+        check (host.logs.contains ("reso 0"), "…and a real zero is a value, not an absence");
+        check (host.logs.contains ("never nil"), "…while one never reported is nil");
+        check (host.logs.contains ("wrote true"), "write() reports that the message was dispatched");
+        check (host.deviceWrites.contains ("mainSynth/cutoff=100"), "…and it reached the device host");
+        check (host.logs.contains ("after 100"), "…and a following read sees it");
+        check (errors.isEmpty(), "no errors from the device verbs");
+
+        host.logs.clear();
+        runtime.runAction ("onDevJs", juce::var());
+        check (host.logs.contains ("js read 0"), "the JavaScript engine reads the same way");
+        check (host.logs.contains ("js wrote true"), "…and writes the same way");
+        check (host.deviceWrites.contains ("secondSynth/cutoff=1"),
+               "…and an explicit role reaches the host as given, rather than defaulting to mainSynth");
+
+        // The role defaults to mainSynth rather than being left empty — the same rule the other
+        // device reads follow, so one omitted argument does not mean a different device.
+        check (host.deviceWrites.contains ("mainSynth/reso=12"), "an omitted role is mainSynth");
+
+        // Without a device host BOTH must report themselves rather than lie. read has nothing to
+        // return; write must not claim it sent something.
+        host.deviceHost = false;
+        host.logs.clear(); host.deviceWrites.clear();
+        runtime.runAction ("onDev", juce::var());
+        check (host.logs.contains ("cutoff nil"), "with no device host, read() is nil");
+        check (host.logs.contains ("wrote false"), "…and write() says false rather than claiming a send");
+        check (host.deviceWrites.isEmpty(), "…and nothing went out");
+        host.deviceHost = true;
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

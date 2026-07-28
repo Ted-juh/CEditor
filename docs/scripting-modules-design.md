@@ -219,7 +219,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | Phase | Module(s) | What becomes possible |
 |---|---|---|
 | 1 | `ce.midi` note/PC/bend, `ce.storage` | A script can play a note and remember something. Both are small, both are cross-runtime, and both are current "why can't I just…" moments. |
-| 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11) |
+| 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11); `read`/`write` finished it in §23 |
 | 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. ✅ *done* (§12) |
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. ✅ *done* (§13) |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. ✅ *done* (§14) |
@@ -1322,3 +1322,48 @@ that stopped at the top level would have silently missed most of a panel — lis
 
 Both lookups walk the whole tree now, in both runtimes. It is a pure expansion: a name that resolved
 before still resolves, and the ones that never could now do.
+
+---
+
+## 23. `ce.device.read` / `.write` — finishing phase 2
+
+Phase 2 gave a script `parameters()` and `profile()`: it could ask **what** the synth has. It then
+had no way to touch any of it unless a control happened to be bound to that parameter. A panel that
+discovered eight oscillators could enumerate them and not address them, which is a strange place to
+stop.
+
+```lua
+for _, p in ipairs(ce.device.parameters({ group = "OSC1" })) do
+  ce.device.write(p.id, ce.math.scale(macro, 0, 1, p.min, p.max))
+end
+```
+
+That is also what makes `onPanelBuild`'s generated panels worth generating: discover the parameters,
+create a control per one, and now actually drive them.
+
+### `read` is a mirror, not a question
+
+It returns the **last known** value — what the synth most recently told us, from a dump or a
+parameter message, kept in the device runtime state. It is not a live query, and it could not be:
+asking a synth is asynchronous, and every verb in this API is synchronous by design.
+
+The distinction that earns its own test in both suites: **a parameter reported as `0` is a value,
+not an absence.** Nothing comes back only when the device has never reported it at all. A script
+deciding whether to initialise something would get it exactly backwards if those two looked alike.
+
+### `write` promises dispatch, not agreement
+
+The device profile encodes the value and the message goes out. `true` means it was **dispatched** —
+not that the synth accepted it, which nothing can know synchronously. Saying so is better than a
+`true` that means less than it looks.
+
+It takes the same path a bound control takes (`compileParameterMessage` window-closed,
+`commitDeviceParameter` in the panel view, both with `dryRun: false`), so a scripted change and a
+knob turn are indistinguishable downstream — the same rule the Setlist's index follows.
+
+### The host surface
+
+`read` is a fifth `kind` on `deviceQuery`, because it genuinely is a query. `write` is **not**, so it
+is its own host method rather than a sixth kind — `deviceQuery` is documented as reading the device
+profile, and hiding a send inside it would make that comment a lie. Both report themselves with no
+device host: `read` returns nothing, `write` returns `false` and says where it does work.

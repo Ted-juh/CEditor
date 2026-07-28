@@ -1641,6 +1641,48 @@ function deviceConnectedRead(role = DEFAULT_ROLE) {
   return String((get(deviceSessionState) ?? {})[role]?.state ?? '') === 'ready';
 }
 
+/**
+ * read / write — the half of phase 2 that was missing. parameters() said WHAT the synth has and
+ * there was then no way to touch one unless a control happened to be bound to it.
+ *
+ * `read` is the LAST KNOWN value: what the synth most recently told us, from a dump or a parameter
+ * message, mirrored in deviceRuntimeState. It is NOT a live query — asking the synth is
+ * asynchronous and this verb is not — and nothing comes back when the device has never reported it,
+ * which a script must be able to tell apart from zero.
+ */
+function deviceValueRead(id, role) {
+  const key = String(id ?? '');
+  if (!key) return undefined;
+  const forRole = (get(deviceRuntimeState) ?? {})[role];
+  if (!forRole || typeof forRole !== 'object') return undefined;
+  const v = forRole[key];
+  return v === null ? undefined : v;
+}
+
+/**
+ * `write` encodes through the device profile and sends. The return says the message was DISPATCHED,
+ * not that the synth accepted it — the send crosses the bridge asynchronously and nothing here can
+ * know the answer synchronously. Saying so is better than a `true` that means less than it looks.
+ */
+function deviceValueWrite(id, value, role) {
+  const key = String(id ?? '');
+  if (!key) {
+    addScriptTrace('error', '', 'deviceWrite(id, value): a parameter id is required');
+    return false;
+  }
+  if (!isJuceAvailable()) {
+    addScriptTrace('error', '',
+      `deviceWrite(${JSON.stringify(key)}) needs the device host — encoding a parameter is the device `
+      + 'profile\'s codec, which runs in the host. It works in the exported plugin.');
+    return false;
+  }
+  // dryRun false: actually send it. The same path a control bound to this parameter takes, so a
+  // scripted change and a knob turn are indistinguishable downstream.
+  commitDeviceParameter({ deviceRole: role, parameterId: key, value, dryRun: false });
+  addScriptTrace('midi', '', `deviceWrite ${key} = ${JSON.stringify(value)}`);
+  return true;
+}
+
 function deviceParametersRead(opts = {}) {
   const role = opts.role || DEFAULT_ROLE;
   const profileId = roleMapping(role)?.profileId;
@@ -1814,6 +1856,8 @@ function buildApi(ownerName, scriptId = '') {
     deviceParameters: (opts) => deviceParametersRead(opts ?? {}),
     deviceParameter: (id, role) => deviceParameterRead(id, role || DEFAULT_ROLE),
     deviceConnected: (role) => deviceConnectedRead(role || DEFAULT_ROLE),
+    deviceRead: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    deviceWrite: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
     // ce.storage
     state: stateFor(scriptId),
     saveSetting: (key, value) => saveSetting(key, value),
