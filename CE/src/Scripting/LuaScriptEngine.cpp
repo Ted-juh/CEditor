@@ -235,6 +235,27 @@ function sendTransport(action)
   else sendMidi({0xFA}) end
 end
 
+-- @module ce.device
+-- Device READS. All four are arithmetic-free wrappers over one host primitive, __deviceQuery,
+-- the way the channel messages are over sendMidi: the SHAPE a script sees is assembled here, so
+-- no engine can invent a different parameter descriptor. Without a device host __deviceQuery
+-- returns nil and the host has already said why, so these hand back nil / an empty list rather
+-- than pretending the synth has nothing.
+local function __role(r) if r == nil or r == "" then return "mainSynth" end return tostring(r) end
+function deviceProfile(role) return __deviceQuery("profile", { role = __role(role) }) end
+function deviceConnected(role) return __deviceQuery("connected", { role = __role(role) }) == true end
+function deviceParameters(opts)
+  opts = opts or {}
+  local q = { role = __role(opts.role), query = opts.query, group = opts.group,
+              type = opts.type, access = opts.access, limit = opts.limit }
+  local r = __deviceQuery("parameters", q)
+  if r == nil then return {} end
+  return r
+end
+function deviceParameter(id, role)
+  return __deviceQuery("parameter", { role = __role(role), id = tostring(id) })
+end
+
 -- @module ce.storage
 -- ce.storage. `state` is a plain table: each script runs in its own sol::environment, which lives
 -- as long as the script is loaded, so it persists between handler calls without any host help.
@@ -254,7 +275,7 @@ end
 local __CE_MODULES = {
   ["ce.core"] = { emit = "emit", get = "get", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
-  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", requestDump = "requestDump", sendDump = "sendDump" },
+  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", requestDump = "requestDump", sendDump = "sendDump" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
   ["ce.time"] = { startTimer = "startTimer", stopTimer = "stopTimer" },
@@ -269,7 +290,7 @@ local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "
 local __CE_META = {
   { id = "ce.core", version = "1.0", runtime = "any" },
   { id = "ce.midi", version = "1.1", runtime = "any" },
-  { id = "ce.device", version = "1.0", runtime = "any" },
+  { id = "ce.device", version = "1.1", runtime = "any" },
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.0", runtime = "any" },
   { id = "ce.time", version = "1.0", runtime = "any" },
@@ -291,6 +312,10 @@ local function __ce_gate(__member, __module)
     local __m = string.gsub(__CE_GATE_MSG, "{member}", __member)
     __m = string.gsub(__m, "{module}", __module)
     log(__m)
+    -- An explicit "return nil", NOT a bare return: a Lua function with no return statement
+    -- yields ZERO values, so tostring(gatedRead()) errors with "value expected" rather than
+    -- printing "nil". Void commands never showed it; a gated read shows it on the first call.
+    return nil
   end
 end
 
@@ -420,6 +445,9 @@ public:
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
+        g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)
+            { return varToSol (lua, host->deviceQuery (juce::String (kind),
+                                                       payload ? solToVar (*payload) : juce::var())); });
 
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });

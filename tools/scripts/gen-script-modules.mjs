@@ -129,6 +129,10 @@ local function __ce_gate(__member, __module)
     local __m = string.gsub(__CE_GATE_MSG, "{member}", __member)
     __m = string.gsub(__m, "{module}", __module)
     log(__m)
+    -- An explicit "return nil", NOT a bare return: a Lua function with no return statement
+    -- yields ZERO values, so tostring(gatedRead()) errors with "value expected" rather than
+    -- printing "nil". Void commands never showed it; a gated read shows it on the first call.
+    return nil
   end
 end
 

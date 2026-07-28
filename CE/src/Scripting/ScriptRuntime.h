@@ -121,6 +121,17 @@ public:
     virtual void sendDump   (const juce::String& kind) = 0;
     virtual juce::var buildDump (const juce::String& kind) = 0;
 
+    /** READ the device profile. One primitive behind four script verbs (ce.device.profile /
+        .parameters / .parameter / .connected), the way sendMidi sits behind every channel message:
+        the shape a script sees is assembled in the prelude, so no engine can invent a different
+        parameter descriptor.
+
+        `kind` is "profile" | "parameters" | "parameter" | "connected"; `payload` carries the role
+        and any narrowing (query/group/type/access/limit/id). Returns void when there is no device
+        host, which is what makes the members report themselves as unavailable rather than lie. */
+    virtual juce::var deviceQuery (const juce::String& kind, const juce::var& payload)
+    { juce::ignoreUnused (kind, payload); return {}; }
+
     // Flow / composition (Q6). run() is host-dispatched (works cross-language).
     virtual juce::var runAction (const juce::String& target, const juce::var& args) = 0;
     virtual void      emitEvent (const juce::String& name, const juce::var& data) = 0;

@@ -134,6 +134,11 @@ typedef struct CeHostVtable {
     /* Settings that outlive the session. Where they land is the host's business. */
     void (CE_CALL *save_setting)  (void* host_ctx, const CeStr* key, const CeValue* value);
     int  (CE_CALL *load_setting)  (void* host_ctx, const CeStr* key, CeValue* out /*host-owned, free_value*/);
+    /* Read the device profile: kind = "profile" | "parameters" | "parameter" | "connected", with
+     * the role and any narrowing in `payload`. One primitive behind four script verbs, the same
+     * way send_midi sits behind every channel message. */
+    int  (CE_CALL *device_query)  (void* host_ctx, const CeStr* kind, const CeValue* payload /*nullable*/,
+                                   CeValue* out /*host-owned, free_value*/);
     /* NOTE on module opt-in (design doc §5): a panel declares the modules its scripts may use, and
      * the scripted engines enforce it by swapping the prelude's members for explaining stubs. A
      * native handler has no prelude — it calls these function pointers directly — so there is

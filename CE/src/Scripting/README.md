@@ -110,6 +110,7 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Transmit | `noTransmit` `transmit` | everywhere — they gate `set()`, **not** the explicit senders. `sendCC` inside `noTransmit` still sends. |
 | Events & flow | `on` `off` `emit` `run` `startTimer` `stopTimer` | everywhere |
 | Device / MIDI | `sendCC` `sendNRPN` `sendSysex` `sendMidi` `requestDump` `applyDump` `sendDump` `buildDump` `checksum` `panic` | everywhere |
+| Device reads | `deviceProfile` `deviceParameters` `deviceParameter` `deviceConnected` | everywhere — need the device host |
 | Channel messages | `sendNote` `sendNoteOff` `sendProgramChange` `sendPitchBend` `sendAftertouch` `sendClock` `sendTransport` | everywhere — arithmetic over `sendMidi`, defined in each prelude |
 | Storage | `state` `saveSetting` `loadSetting` | everywhere |
 | Debug | `log` | everywhere |
@@ -130,6 +131,18 @@ scratch that survives between handler calls in one session and is cleared when t
 `saveSetting`/`loadSetting` are the durable pair — the player stores them in the DAW session as a
 `ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
 the same two verbs either way.
+
+### Device reads
+
+`ce.device.profile()`, `.parameters([opts])`, `.parameter(id)` and `.connected()` ask the synth what
+it actually has, rather than hard-coding what the panel author remembered. All four are wrappers in
+each prelude over ONE host primitive, `deviceQuery(kind, payload)` — the same trick `sendMidi` plays
+for the channel messages, and the reason no engine can invent a different parameter descriptor.
+
+Window-closed they are synchronous calls into `DeviceProfileService`, complete on the first call. In
+the editor the parameter table arrives over the async bridge and is cached, so a cold first call
+returns `[]`, requests the load, and says which of those two things happened. See §11 of
+`docs/scripting-modules-design.md` for why that asymmetry is preferred to making the verbs async.
 
 ### Modules, and what a panel opts into
 

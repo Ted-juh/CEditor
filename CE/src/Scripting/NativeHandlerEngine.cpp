@@ -214,6 +214,15 @@ int CE_CALL host_load_setting (void* ctx, const CeStr* key, CeValue* out)
     return 0;
 }
 
+int CE_CALL host_device_query (void* ctx, const CeStr* kind, const CeValue* payload, CeValue* out)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    auto result = h->deviceQuery (kind ? fromCeStr (*kind) : juce::String(),
+                                  payload ? ceToVar (payload) : juce::var());
+    if (out != nullptr) *out = buildCeValue (result);
+    return 0;
+}
+
 void CE_CALL host_free_value (void* /*ctx*/, CeValue* v) { freeCeValueDeep (v); }
 void* CE_CALL host_alloc   (void* /*ctx*/, size_t n) { return std::malloc (n); }
 void  CE_CALL host_dealloc (void* /*ctx*/, void* p, size_t /*n*/) { std::free (p); }
@@ -436,6 +445,7 @@ private:
         m.vtable.begin_transmit = host_begin_transmit; m.vtable.end_transmit = host_end_transmit;
         m.vtable.send_midi = host_send_midi;
         m.vtable.save_setting = host_save_setting; m.vtable.load_setting = host_load_setting;
+        m.vtable.device_query = host_device_query;
 
         if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
         {

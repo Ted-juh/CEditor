@@ -606,6 +606,82 @@ private:
         cb.sendDump   = [] (const juce::String&) {};
        #endif
         cb.buildDump  = [] (const juce::String&) { return juce::var(); };
+        // ce.device reads. Window-CLOSED these are synchronous calls straight into
+        // DeviceProfileService, so a script gets the complete answer on the first call — unlike
+        // the editor, where the parameter table arrives over the async bridge (documented there).
+        cb.deviceQuery = [this] (const juce::String& kind, const juce::var& payload) -> juce::var
+        {
+            auto* p = payload.getDynamicObject();
+            auto role = p != nullptr ? p->getProperty ("role").toString() : juce::String();
+            if (role.isEmpty()) role = "mainSynth";
+
+            const auto session = deviceService.getSessionState();
+            auto* sessionObj = session.getDynamicObject();
+            const auto record = sessionObj != nullptr ? sessionObj->getProperty (role) : juce::var();
+            auto* recordObj = record.getDynamicObject();
+            const auto state = recordObj != nullptr ? recordObj->getProperty ("state").toString() : juce::String();
+            const bool ready = state == "ready";
+
+            if (kind == "connected")
+                return juce::var (ready);
+
+            if (kind == "profile")
+            {
+                const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
+                                                            : juce::String();
+                if (profileId.isEmpty()) return {};   // no profile mapped — nil, not an empty object
+
+                juce::String name = profileId;
+                if (auto* list = deviceService.listProfiles().getArray())
+                    for (const auto& item : *list)
+                        if (auto* o = item.getDynamicObject())
+                            if (o->getProperty ("id").toString() == profileId)
+                                name = o->getProperty ("name").toString();
+
+                auto* out = new juce::DynamicObject();
+                out->setProperty ("id", profileId);
+                out->setProperty ("name", name);
+                out->setProperty ("role", role);
+                out->setProperty ("connected", ready);
+                out->setProperty ("state", state.isNotEmpty() ? state : juce::String ("unknown"));
+                return juce::var (out);
+            }
+
+            if (kind == "parameters" || kind == "parameter")
+            {
+                auto* query = new juce::DynamicObject();
+                query->setProperty ("deviceRole", role);
+                // listProfileParameters pages; a script asking "what does this synth have" wants
+                // the lot, so ask for the service's maximum rather than its default page.
+                query->setProperty ("limit", 500);
+                if (p != nullptr)
+                {
+                    for (const char* key : { "query", "group", "type", "access" })
+                        if (p->getProperty (key).isString())
+                            query->setProperty (juce::Identifier (key), p->getProperty (key));
+                    if (kind == "parameters" && p->getProperty ("limit").isInt())
+                        query->setProperty ("limit", p->getProperty ("limit"));
+                }
+
+                const auto result = deviceService.listProfileParameters (juce::var (query));
+                auto* resultObj = result.getDynamicObject();
+                if (resultObj == nullptr || ! (bool) resultObj->getProperty ("ok"))
+                    return kind == "parameters" ? juce::var (juce::Array<juce::var>()) : juce::var();
+
+                const auto parameters = resultObj->getProperty ("parameters");
+                if (kind == "parameters") return parameters;
+
+                const auto wanted = p != nullptr ? p->getProperty ("id").toString() : juce::String();
+                if (auto* arr = parameters.getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (o->getProperty ("id").toString() == wanted)
+                                return item;
+                return {};   // no such parameter — nil, which is what the contract promises
+            }
+
+            return {};
+        };
         // runAction / emitEvent are left unset on purpose: BridgeScriptHost routes them to the
         // ScriptRuntime, which resolves them against the loaded scripts. Stubbing them here is
         // what made run() and emit() silent no-ops in the shipped plugin.

@@ -247,6 +247,13 @@ PyObject* api_buildDump (PyObject*, PyObject* args)
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
     return varToPy (g_host->buildDump (juce::String::fromUTF8 (kind)));
 }
+PyObject* api_deviceQuery (PyObject*, PyObject* args)
+{
+    const char* kind = nullptr; PyObject* payload = nullptr;
+    if (! PyArg_ParseTuple (args, "s|O", &kind, &payload)) return nullptr;
+    return varToPy (g_host->deviceQuery (juce::String::fromUTF8 (kind),
+                                         payload != nullptr ? pyToVar (payload) : juce::var()));
+}
 PyObject* api_run (PyObject*, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
@@ -320,6 +327,7 @@ PyMethodDef apiMethods[] = {
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
+    { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
     { "startTimer",    api_startTimer,    METH_VARARGS, nullptr },
     { "stopTimer",     api_stopTimer,     METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
@@ -547,6 +555,32 @@ def sendTransport(action="start"):
     elif action == "continue": sendMidi([0xFB])
     else: sendMidi([0xFA])
 
+# @module ce.device
+# Device READS — four wrappers over one host primitive, so the shape a script sees is assembled
+# here rather than per engine. Without a device host the query returns None and the host has
+# already said why; these hand back None / an empty list rather than pretending.
+def __role(r):
+    return "mainSynth" if r is None or r == "" else str(r)
+
+def __deviceQuery(kind, payload=None):
+    return __api.deviceQuery(kind, payload)
+
+def deviceProfile(role=None):
+    return __deviceQuery("profile", { "role": __role(role) })
+
+def deviceConnected(role=None):
+    return __deviceQuery("connected", { "role": __role(role) }) is True
+
+def deviceParameters(opts=None):
+    opts = opts or {}
+    r = __deviceQuery("parameters", { "role": __role(opts.get("role")), "query": opts.get("query"),
+                                      "group": opts.get("group"), "type": opts.get("type"),
+                                      "access": opts.get("access"), "limit": opts.get("limit") })
+    return r if r is not None else []
+
+def deviceParameter(id, role=None):
+    return __deviceQuery("parameter", { "role": __role(role), "id": str(id) })
+
 # @module ce.storage
 # ce.storage. `state` is a plain dict-like namespace: each script is exec'd into its OWN module
 # namespace, which lives as long as the script is loaded, so it persists between handler calls with
@@ -569,7 +603,7 @@ import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
+    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
     "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
@@ -584,7 +618,7 @@ __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce
 __CE_META = [
     { "id": "ce.core", "version": "1.0", "runtime": "any" },
     { "id": "ce.midi", "version": "1.1", "runtime": "any" },
-    { "id": "ce.device", "version": "1.0", "runtime": "any" },
+    { "id": "ce.device", "version": "1.1", "runtime": "any" },
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.0", "runtime": "any" },
     { "id": "ce.time", "version": "1.0", "runtime": "any" },

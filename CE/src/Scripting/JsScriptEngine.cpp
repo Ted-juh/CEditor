@@ -193,6 +193,35 @@ function sendTransport(action) {
   else sendMidi([0xFA]);
 }
 
+// @module ce.device
+// Device READS — four wrappers over one host primitive, __api.deviceQuery, so the shape a script
+// sees is assembled here rather than per engine. Without a device host the query returns null and
+// the host has already said why; these hand back null / an empty list rather than pretending.
+function __role(r) { return (r === undefined || r === null || r === "") ? "mainSynth" : String(r); }
+function __deviceQuery(kind, payload) { return __api.deviceQuery(kind, payload || null); }
+function deviceProfile(role) { return __deviceQuery("profile", { role: __role(role) }); }
+function deviceConnected(role) { return __deviceQuery("connected", { role: __role(role) }) === true; }
+// An undefined property must not be SENT. juce::var::undefined() stringifies to "undefined", so
+// an omitted filter reached the host as the literal filter value "undefined" and matched nothing,
+// while the Lua prelude simply has no key there. Omitting matches Lua and Python exactly.
+function __devOpts(role, opts) {
+  var q = { role: __role(role) };
+  var keys = ["query", "group", "type", "access", "limit"];
+  for (var i = 0; i < keys.length; i++) {
+    var v = opts[keys[i]];
+    if (v !== undefined && v !== null) q[keys[i]] = v;
+  }
+  return q;
+}
+function deviceParameters(opts) {
+  opts = opts || {};
+  var r = __deviceQuery("parameters", __devOpts(opts.role, opts));
+  return r || [];
+}
+function deviceParameter(id, role) {
+  return __deviceQuery("parameter", { role: __role(role), id: String(id) });
+}
+
 // @module ce.storage
 // ce.storage. `state` is a plain object: QuickJS gives each script its own engine, whose globals
 // live as long as the script is loaded, so it persists between handler calls with no host help.
@@ -212,7 +241,7 @@ function loadSetting(key, fallback) {
 var __CE_MODULES = {
   "ce.core": { "emit": "emit", "get": "get", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-  "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "requestDump": "requestDump", "sendDump": "sendDump" },
+  "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
   "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
   "ce.time": { "startTimer": "startTimer", "stopTimer": "stopTimer" },
@@ -224,7 +253,7 @@ var __CE_MODULES = {
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.0","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.0","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.0","runtime":"any"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -343,6 +372,8 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("applyDump", [host, arg] (const Args& a) -> juce::var { host->applyDump (arg (a, 0)); return {}; });
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
+    api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var
+        { return host->deviceQuery (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
     api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var { host->saveSetting (arg (a, 0).toString(), arg (a, 1)); return {}; });

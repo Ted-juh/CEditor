@@ -455,6 +455,62 @@ export const COMMANDS = [
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
 
+  /* --- Device: reads (design doc §6 phase 2) ---
+     Ask the synth what it actually HAS, rather than hard-coding what the panel author remembered.
+     All four are reads — nothing here changes a device — and all four need the device host,
+     because the profile and its parameter table live there.
+
+     One host primitive (`deviceQuery(kind, payload)`) backs all of them, the way sendMidi backs
+     every channel message: the shape a script sees is four named verbs defined in each prelude,
+     so the five runtimes cannot disagree about what a parameter descriptor looks like. */
+  {
+    id: 'deviceProfile', category: 'Device / MIDI', signature: 'deviceProfile([role])',
+    summary: 'The device profile mapped to a role — { id, name, role, connected, ... } — or nil when no profile is mapped. `role` defaults to "mainSynth".',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'local p = deviceProfile()\nif p then log("device " .. p.name) end$0',
+      javascript: 'const p = deviceProfile();\nif (p) log("device " + p.name);$0',
+    },
+  },
+  {
+    id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
+    summary: 'The profile\'s parameter descriptors: { id, name, group, type, min, max, access }. `opts` may carry { role, query, group, type, access, limit } to narrow the list. Returns an empty list, not nil, when there is nothing to report — while ce.device is enabled. A gated call returns nil like any other, because a module that is off has no answer to give.',
+    requiresDeviceHost: true,
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['role', 'query', 'group', 'type', 'access', 'limit'] }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, p in ipairs(deviceParameters({ group = "${1:Filter}" })) do\n  log(p.id .. " " .. p.name)\nend$0',
+      javascript: 'for (const p of deviceParameters({ group: "${1:Filter}" })) log(p.id + " " + p.name);$0',
+    },
+  },
+  {
+    id: 'deviceParameter', category: 'Device / MIDI', signature: 'deviceParameter(id [, role])',
+    summary: 'One parameter descriptor by id, or nil if the profile has no such parameter. Use it to ask whether a synth supports something before driving it.',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'local p = deviceParameter("${1:cutoff}")\nif p then log("max " .. tostring(p.max)) end$0',
+      javascript: 'const p = deviceParameter("${1:cutoff}");\nif (p) log("max " + p.max);$0',
+    },
+  },
+  {
+    id: 'deviceConnected', category: 'Device / MIDI', signature: 'deviceConnected([role])',
+    summary: 'Is the device for this role connected and ready? Cheap to call, and the right guard before a dump request.',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'if deviceConnected() then requestDump("patch") end$0',
+      javascript: 'if (deviceConnected()) requestDump("patch");$0',
+    },
+  },
+
   /* --- Device / MIDI: raw (Q9) --- */
   {
     id: 'sendCC', category: 'Device / MIDI', signature: 'sendCC(channel, cc, value)',
@@ -835,8 +891,8 @@ export const MODULES = [
   // cross-module call that `requires` does not cover, so this cannot be forgotten again.
   { id: 'ce.midi', version: '1.1', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
     summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
-  { id: 'ce.device', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Bulk dumps through the device profile. Needs the device host.' },
+  { id: 'ce.device', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'The connected synth: what it is, what parameters it has, and bulk dumps. Needs the device host.' },
   { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic. Pure — no host involved.' },
   { id: 'ce.music', version: '1.0', requires: [], runtime: RUNTIME_ANY,
@@ -869,7 +925,14 @@ const MODULE_MEMBERS = {
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
     'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
   ],
-  'ce.device': ['requestDump', 'applyDump', 'sendDump', 'buildDump'],
+  'ce.device': {
+    requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',
+    // The reads drop the `device` prefix inside the namespace — ce.device.deviceProfile() stutters,
+    // ce.device.profile() reads like what it is. The flat alias keeps the prefix because there it
+    // is the only thing distinguishing it from a panel property.
+    profile: 'deviceProfile', parameters: 'deviceParameters',
+    parameter: 'deviceParameter', connected: 'deviceConnected',
+  },
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
   'ce.storage': ['state', 'saveSetting', 'loadSetting'],

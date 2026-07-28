@@ -219,7 +219,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | Phase | Module(s) | What becomes possible |
 |---|---|---|
 | 1 | `ce.midi` note/PC/bend, `ce.storage` | A script can play a note and remember something. Both are small, both are cross-runtime, and both are current "why can't I just…" moments. |
-| 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. |
+| 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11) |
 | 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. |
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. |
@@ -527,3 +527,58 @@ weaken the contract they are held to; the resolution helpers read `allModules()`
   the module system provides is *namespacing and collision safety*, not isolation.
 - **A registry stays deferred.** The manifest already carries `id`, `version` and `requires`, so
   adding one later changes nothing about the format.
+
+---
+
+## 11. `ce.device` reads — phase 2, as built
+
+Four verbs, all reads, all cross-runtime, all `requiresDeviceHost`:
+
+```lua
+ce.device.profile([role])            -- { id, name, role, connected, state, ... } or nil
+ce.device.parameters([opts])         -- [{ id, name, group, type, min, max, access }]
+ce.device.parameter(id [, role])     -- one descriptor, or nil
+ce.device.connected([role])          -- the cheap guard before a dump request
+```
+
+`role` defaults to `"mainSynth"` everywhere. `opts` narrows the list by `role`, `query`, `group`,
+`type`, `access`, `limit`.
+
+**One host primitive, four verbs.** `deviceQuery(kind, payload)` is the only thing that crosses to
+the host; the four verbs are wrappers defined in each prelude — the same trick `sendMidi` plays for
+every channel message. That is what stops an engine inventing a different parameter descriptor, and
+it costs one `ScriptHostApi` virtual, one `BridgeScriptHost` callback and one appended ABI slot
+rather than four of each.
+
+Inside the namespace the reads drop the `device` prefix: `ce.device.profile()`, not
+`ce.device.deviceProfile()`. The flat alias keeps it, because there `deviceProfile` is the only
+thing distinguishing it from a panel property.
+
+### The asymmetry, stated
+
+In the **player** these are synchronous calls into `DeviceProfileService` and `parameters()` is
+complete on the first call. In the **editor** the parameter table arrives over the async bridge and
+is cached per profile, so a cold first call has nothing to hand back. It returns `[]`, *requests the
+load*, and says so — naming the asymmetry in the message, because an empty list from a cold cache
+and an empty list from a synth with no parameters are indistinguishable otherwise, and a script that
+cannot tell them apart will draw the wrong conclusion in silence. The next call is complete.
+
+That is the best a synchronous verb can do over an asynchronous source. Making the verbs async was
+the alternative and is worse: the C++ engines dispatch handlers synchronously, so an `await` here
+would work in the editor and get cut off in the shipped plugin — the exact defect round two was
+spent removing.
+
+### Two cross-runtime defects this turned up
+
+Both were pre-existing and both were found by *reads*, because every gated or host-less member up to
+now had been a void command where a wrong return value could not be observed.
+
+- **A Lua gate stub returned zero values, not nil.** A Lua function with no `return` statement
+  yields *nothing*, so `tostring(gatedRead())` raised `bad argument #1 (value expected)` instead of
+  printing `nil`. The generated stub now returns nil explicitly. A gated read still returns nil —
+  a module that is off has no answer to give — which is why the documented "returns an empty list"
+  holds while `ce.device` is enabled.
+- **JavaScript sent `undefined` option keys as the string `"undefined"`.** `juce::var::undefined()`
+  stringifies to `"undefined"`, so `deviceParameters({})` reached the host with `group:
+  "undefined"` and matched nothing, while the Lua prelude simply has no key there. The JS prelude
+  now omits absent keys, so the payload is byte-identical across the three engines.

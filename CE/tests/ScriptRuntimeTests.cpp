@@ -55,6 +55,61 @@ public:
     void applyDump (const juce::var&) override {}
     void sendDump (const juce::String&) override {}
     juce::var buildDump (const juce::String&) override { return {}; }
+
+    // A stand-in device profile, so ce.device's reads have something real to read. `deviceHost`
+    // off means "no device host attached", which is what the requiresDeviceHost members have to
+    // report rather than quietly answering "this synth has nothing".
+    bool deviceHost = true;
+    juce::StringArray deviceQueries;
+    juce::var deviceQuery (const juce::String& kind, const juce::var& payload) override
+    {
+        auto* p = payload.getDynamicObject();
+        const auto role = p != nullptr ? p->getProperty ("role").toString() : juce::String();
+        deviceQueries.add (kind + ":" + role);
+        if (! deviceHost) return {};
+
+        if (kind == "connected") return juce::var (role == "mainSynth");
+        if (kind == "profile")
+        {
+            if (role != "mainSynth") return {};
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("id", "test-cc-synth");
+            o->setProperty ("name", "Test CC Synth");
+            o->setProperty ("role", role);
+            o->setProperty ("connected", true);
+            return juce::var (o);
+        }
+        if (kind == "parameters" || kind == "parameter")
+        {
+            auto make = [] (const char* id, const char* name, const char* group, int max)
+            {
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("id", id); o->setProperty ("name", name);
+                o->setProperty ("group", group); o->setProperty ("type", "continuous");
+                o->setProperty ("min", 0); o->setProperty ("max", max);
+                return juce::var (o);
+            };
+            juce::Array<juce::var> all;
+            all.add (make ("cutoff", "Filter Cutoff", "Filter", 127));
+            all.add (make ("resonance", "Filter Resonance", "Filter", 127));
+            all.add (make ("attack", "Amp Attack", "Envelope", 100));
+
+            if (kind == "parameters")
+            {
+                const auto group = p != nullptr ? p->getProperty ("group").toString() : juce::String();
+                if (group.isEmpty()) return juce::var (all);
+                juce::Array<juce::var> hit;
+                for (const auto& v : all)
+                    if (v.getDynamicObject()->getProperty ("group").toString() == group) hit.add (v);
+                return juce::var (hit);
+            }
+            const auto wanted = p != nullptr ? p->getProperty ("id").toString() : juce::String();
+            for (const auto& v : all)
+                if (v.getDynamicObject()->getProperty ("id").toString() == wanted) return v;
+            return {};
+        }
+        return {};
+    }
     // Delegated to the runtime, the way BridgeScriptHost does when the app supplies no callback:
     // run() resolves against the loaded script set, which is what makes it work cross-language.
     juce::var runAction (const juce::String& ref, const juce::var& args) override
@@ -647,6 +702,86 @@ int main()
 
             runtime.setExtensionModules (juce::var());
         }
+    }
+
+    // 16) ce.device reads (design doc §6 phase 2) -------------------------------------------------
+    // Four verbs over ONE host primitive, so the shape a script sees is assembled in the prelude
+    // and no engine can invent a different parameter descriptor.
+    {
+        juce::Array<juce::var> devScripts;
+        devScripts.add (makeScript ("dev", "lua", "panel", "onDev", "*",
+            "function onDev()\n"
+            "  local p = ce.device.profile()\n"
+            "  log(\"profile \" .. tostring(p and p.name))\n"
+            "  log(\"connected \" .. tostring(ce.device.connected()))\n"
+            "  log(\"other \" .. tostring(ce.device.connected(\"aux\")))\n"
+            "  local all = ce.device.parameters() or {}\n"
+            "  log(\"count \" .. tostring(#all) .. \" first \" .. tostring(all[1] and all[1].id))\n"
+            "  local filt = ce.device.parameters({ group = \"Filter\" }) or {}\n"
+            "  log(\"filter \" .. tostring(#filt))\n"
+            "  local one = ce.device.parameter(\"resonance\")\n"
+            "  log(\"one \" .. tostring(one and one.name) .. \" max \" .. tostring(one and one.max))\n"
+            "  log(\"absent \" .. tostring(ce.device.parameter(\"nope\") == nil))\n"
+            "end\n"));
+        devScripts.add (makeScript ("devjs", "javascript", "panel", "onDevJs", "*",
+            "function onDevJs(){\n"
+            "  var p = ce.device.profile();\n"
+            "  log('js profile ' + (p ? p.name : 'nil'));\n"
+            "  log('js count ' + ce.device.parameters().length);\n"
+            "  log('js one ' + ce.device.parameter('cutoff').name);\n"
+            "  log('js absent ' + (ce.device.parameter('nope') === null || ce.device.parameter('nope') === undefined));\n"
+            "  log('js connected ' + ce.device.connected());\n"
+            "}"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (devScripts));
+
+        host.logs.clear(); host.deviceQueries.clear();
+        runtime.runAction ("onDev", juce::var());
+        check (host.logs.contains ("profile Test CC Synth"), "ce.device.profile() reads the mapped profile");
+        check (host.logs.contains ("connected true"), "ce.device.connected() answers for the default role");
+        check (host.logs.contains ("other false"), "…and for a role that is not ready");
+        check (host.logs.contains ("count 3 first cutoff"), "ce.device.parameters() returns the descriptors");
+        check (host.logs.contains ("filter 2"), "…and narrows by group");
+        check (host.logs.contains ("one Filter Resonance max 127"), "ce.device.parameter() finds one by id");
+        check (host.logs.contains ("absent true"), "…and returns nil for one the profile does not have");
+        check (host.deviceQueries.contains ("profile:mainSynth"),
+               "the role defaults to mainSynth rather than being left empty");
+
+        host.logs.clear();
+        runtime.runAction ("onDevJs", juce::var());
+        check (host.logs.contains ("js profile Test CC Synth"), "the same reads in JavaScript");
+        check (host.logs.contains ("js count 3"), "…returning the same descriptors");
+        check (host.logs.contains ("js one Filter Cutoff"), "…and the same lookup");
+        check (host.logs.contains ("js absent true"), "…and the same nil for an unknown id");
+        check (host.logs.contains ("js connected true"), "…and the same connection answer");
+
+        // No device host: the reads must degrade to nil / empty, NOT to a plausible-looking lie.
+        host.deviceHost = false;
+        host.logs.clear();
+        runtime.runAction ("onDev", juce::var());
+        check (host.logs.contains ("profile nil"), "with no device host, profile() is nil");
+        check (host.logs.contains ("connected false"), "…connected() is false");
+        check (host.logs.contains ("count 0 first nil"),
+               "…and parameters() is an EMPTY LIST, so iterating it is still safe");
+        host.deviceHost = true;
+
+        // And they are gated like any other ce.device member. A gated call returns nil — the
+        // module is off, so there is no answer to give, and the notice says which module to turn
+        // on. (That is why the documented "returns an empty list" holds only while it is enabled.)
+        juce::Array<juce::var> gatedDev;
+        gatedDev.add (makeScript ("devgate", "lua", "panel", "onDevGate", "*",
+            "function onDevGate()\n"
+            "  log(\"gated \" .. tostring(ce.device.profile()))\n"
+            "end\n"));
+        runtime.setEnabledModules ({ "ce.midi" });
+        runtime.loadScripts (juce::var (gatedDev));
+        host.logs.clear();
+        runtime.runAction ("onDevGate", juce::var());
+        check (host.logs.contains ("gated nil"),
+               "a gated read yields nil rather than no value at all — tostring() of it must not throw");
+        check (host.logs.joinIntoString ("\n").contains ("deviceProfile() needs the ce.device module"),
+               "…and says which module to enable");
+        runtime.setEnabledModules ({});
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

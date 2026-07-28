@@ -367,3 +367,103 @@ test('with no panel at all, nothing is gated', () => {
   assert.deepEqual(gateNotices(), []);
   assert.equal(ungated.ce.has('ce.midi'), true);
 });
+
+/* ------------------------------------------------------------------ ce.device reads (phase 2) */
+// The editor answers these from the device stores — the same data the device host would report.
+// The one honest asymmetry is the parameter table: synchronous and complete in the player, cached
+// and asynchronously filled here, so a cold first call says so instead of returning a bare [].
+
+import {
+  deviceProfiles, deviceRoleMappings, profileParameters, deviceSessionState,
+} from '../src/CE_Application/stores/deviceProfiles.js';
+import { resetDeviceReadCache } from '../src/CE_Application/scripting/panelRuntime.js';
+
+function withDevice({ profiles = [], mappings = {}, params = {}, session = {} }, fn) {
+  const before = {
+    profiles: get(deviceProfiles), mappings: get(deviceRoleMappings),
+    params: get(profileParameters), session: get(deviceSessionState),
+  };
+  deviceProfiles.set(profiles);
+  deviceRoleMappings.set(mappings);
+  profileParameters.set(params);
+  deviceSessionState.set(session);
+  resetDeviceReadCache();
+  try { return fn(); } finally {
+    deviceProfiles.set(before.profiles);
+    deviceRoleMappings.set(before.mappings);
+    profileParameters.set(before.params);
+    deviceSessionState.set(before.session);
+    resetDeviceReadCache();
+  }
+}
+
+const DEVICE_FIXTURE = {
+  profiles: [{ id: 'test-cc-synth', name: 'Test CC Synth' }],
+  mappings: { mainSynth: { role: 'mainSynth', profileId: 'test-cc-synth', midiDestination: { id: 'out-1', name: 'Out 1' } } },
+  session: { mainSynth: { state: 'ready', profileId: 'test-cc-synth' } },
+  params: {
+    'test-cc-synth': [
+      { id: 'cutoff', name: 'Filter Cutoff', group: 'Filter', type: 'continuous', min: 0, max: 127 },
+      { id: 'resonance', name: 'Filter Resonance', group: 'Filter', type: 'continuous', min: 0, max: 127 },
+      { id: 'attack', name: 'Amp Attack', group: 'Envelope', type: 'continuous', min: 0, max: 100 },
+    ],
+  },
+};
+
+test('ce.device.profile reports what is mapped to the role', () => {
+  withDevice(DEVICE_FIXTURE, () => {
+    const api = scriptApiForTesting('', 'dev-1');
+    const p = api.deviceProfile();
+    assert.equal(p.id, 'test-cc-synth');
+    assert.equal(p.name, 'Test CC Synth');
+    assert.equal(p.role, 'mainSynth');
+    assert.equal(p.connected, true);
+    assert.equal(api.ce.device.profile, api.deviceProfile, 'both spellings are the same function');
+  });
+});
+
+test('ce.device.connected answers per role', () => {
+  withDevice(DEVICE_FIXTURE, () => {
+    const api = scriptApiForTesting('', 'dev-2');
+    assert.equal(api.deviceConnected(), true);
+    assert.equal(api.deviceConnected('aux'), false, 'a role with no session is not connected');
+  });
+});
+
+test('ce.device.parameters reads the table and narrows it', () => {
+  withDevice(DEVICE_FIXTURE, () => {
+    const api = scriptApiForTesting('', 'dev-3');
+    assert.equal(api.deviceParameters().length, 3);
+    assert.deepEqual(api.deviceParameters({ group: 'Filter' }).map((p) => p.id), ['cutoff', 'resonance']);
+    assert.deepEqual(api.deviceParameters({ query: 'reson' }).map((p) => p.id), ['resonance']);
+    assert.equal(api.deviceParameters({ limit: 2 }).length, 2);
+    assert.equal(api.deviceParameter('attack').name, 'Amp Attack');
+    assert.equal(api.deviceParameter('nope'), null, 'an unknown id is null, not a guess');
+  });
+});
+
+test('a cold parameter cache SAYS it is cold rather than reporting an empty synth', () => {
+  // The failure this prevents: [] from a not-yet-loaded table looks exactly like [] from a synth
+  // with no parameters, and a script cannot tell them apart. So it says which one it is.
+  withDevice({ ...DEVICE_FIXTURE, params: {} }, () => {
+    clearScriptTrace();
+    const api = scriptApiForTesting('', 'dev-4');
+    assert.deepEqual(api.deviceParameters(), []);
+    const said = get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
+    assert.match(said, /has not been loaded yet/);
+    assert.match(said, /In the exported plugin this read is synchronous/,
+      'and names the asymmetry, so the editor behaviour is not mistaken for the shipped one');
+  });
+});
+
+test('with no profile mapped, the reads say so rather than inventing one', () => {
+  withDevice({ profiles: [], mappings: {}, params: {}, session: {} }, () => {
+    clearScriptTrace();
+    const api = scriptApiForTesting('', 'dev-5');
+    assert.equal(api.deviceProfile(), null);
+    assert.equal(api.deviceConnected(), false);
+    assert.deepEqual(api.deviceParameters(), []);
+    assert.match(get(scriptTrace).map((t) => String(t.message ?? '')).join('\n'),
+      /no device profile is mapped/);
+  });
+});

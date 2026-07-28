@@ -38,6 +38,10 @@ public:
         std::function<void (const juce::var& bytes)> applyDump;   // host should run inside an InboundScope
         std::function<void (const juce::String& kind)> sendDump;
         std::function<juce::var (const juce::String& kind)> buildDump;
+        // Reads against the device profile — what the synth IS and what parameters it has.
+        // Unset means "no device host": the members report that rather than returning a quiet
+        // nothing, which is the rule requiresDeviceHost has followed since it was introduced.
+        std::function<juce::var (const juce::String& kind, const juce::var& payload)> deviceQuery;
         // Flow / debug. runAction and emitEvent are OPTIONAL: left unset, they fall through to the
         // ScriptRuntime, which resolves them against the loaded script set. That is the right
         // default — cross-script calls need the script set, not app state — so only override them
@@ -142,6 +146,8 @@ public:
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
+    juce::var deviceQuery (const juce::String& kind, const juce::var& payload) override
+    { return callbacks.deviceQuery ? callbacks.deviceQuery (kind, payload) : juce::var(); }
     juce::var runAction (const juce::String& target, const juce::var& args) override
     {
         if (callbacks.runAction) return callbacks.runAction (target, args);

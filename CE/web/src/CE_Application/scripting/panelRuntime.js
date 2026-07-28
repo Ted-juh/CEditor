@@ -26,6 +26,7 @@ import { isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageP
 import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
+  deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
 } from '../stores/deviceProfiles.js';
 import {
   handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
@@ -882,6 +883,93 @@ function stopAllTimers() {
   timers.clear();
 }
 
+// @module ce.device
+/* ------------------------------------------------------------------------ ce.device reads */
+// What the synth actually IS, rather than what the panel author remembered. Four reads, backed in
+// the C++ engines by one host primitive; here they answer from the editor's device stores, which
+// are the same data the device host would report.
+//
+// ONE HONEST ASYMMETRY, stated rather than hidden. In the player, listProfileParameters is a
+// synchronous call into DeviceProfileService and deviceParameters() is complete on the first call.
+// In the EDITOR the parameter table arrives over the async bridge and is cached per profile, so the
+// first call on a cold cache has nothing to return. It says so, requests the load, and the next
+// call is complete — which is the best a synchronous verb can do over an asynchronous source, and
+// far better than returning an empty list that looks like "this synth has no parameters".
+
+const parameterRequests = new Set();   // profileIds we have already asked for, to not spam the bridge
+
+function roleMapping(role) {
+  const mappings = get(deviceRoleMappings) ?? {};
+  return mappings[role] ?? mappings[DEFAULT_ROLE] ?? null;
+}
+
+function deviceProfileRead(role = DEFAULT_ROLE) {
+  const mapping = roleMapping(role);
+  const profileId = mapping?.profileId;
+  if (!profileId) return null;
+  const listed = (get(deviceProfiles) ?? []).find((p) => String(p?.id) === String(profileId)) ?? null;
+  const session = (get(deviceSessionState) ?? {})[role] ?? null;
+  return {
+    id: profileId,
+    name: listed?.name ?? profileId,
+    role,
+    connected: String(session?.state ?? '') === 'ready',
+    state: String(session?.state ?? 'unknown'),
+    midiDestination: mapping?.midiDestination?.name ?? mapping?.midiDestination?.id ?? '',
+    midiInput: mapping?.midiInput?.name ?? mapping?.midiInput?.id ?? '',
+  };
+}
+
+function deviceConnectedRead(role = DEFAULT_ROLE) {
+  return String((get(deviceSessionState) ?? {})[role]?.state ?? '') === 'ready';
+}
+
+function deviceParametersRead(opts = {}) {
+  const role = opts.role || DEFAULT_ROLE;
+  const profileId = roleMapping(role)?.profileId;
+  if (!profileId) {
+    addScriptTrace('error', '', `deviceParameters(): no device profile is mapped to the "${role}" role.`);
+    return [];
+  }
+
+  const cached = (get(profileParameters) ?? {})[profileId];
+  if (!Array.isArray(cached) || !cached.length) {
+    // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
+    // different thing from "this synth has no parameters", and a script that cannot tell them
+    // apart will draw the wrong conclusion silently.
+    if (!parameterRequests.has(profileId)) {
+      parameterRequests.add(profileId);
+      try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
+    }
+    addScriptTrace('log', '',
+      `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
+      + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
+      + 'In the exported plugin this read is synchronous and complete on the first call.');
+    return [];
+  }
+
+  const wanted = (field, value) => !value || String(field ?? '').toLowerCase().includes(String(value).toLowerCase());
+  let out = cached.filter((p) => wanted(p?.group, opts.group)
+    && wanted(p?.type, opts.type)
+    && wanted(p?.access, opts.access)
+    && (!opts.query
+      || String(p?.id ?? '').toLowerCase().includes(String(opts.query).toLowerCase())
+      || String(p?.name ?? '').toLowerCase().includes(String(opts.query).toLowerCase())));
+  const limit = Number(opts.limit);
+  if (Number.isFinite(limit) && limit > 0) out = out.slice(0, limit);
+  return out;
+}
+
+function deviceParameterRead(id, role = DEFAULT_ROLE) {
+  const wanted = String(id ?? '');
+  if (!wanted) return null;
+  const all = deviceParametersRead({ role });
+  return all.find((p) => String(p?.id) === wanted) ?? null;
+}
+
+/** Forget which profiles we have asked for — used when the device session is torn down. */
+export function resetDeviceReadCache() { parameterRequests.clear(); }
+
 // @module ce.storage
 /* ------------------------------------------------------------------------------ ce.storage */
 // Two lifetimes, deliberately kept apart. `state` lives as long as the script is loaded — in the
@@ -950,6 +1038,11 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.device — reads
+    deviceProfile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
+    deviceParameters: (opts) => deviceParametersRead(opts ?? {}),
+    deviceParameter: (id, role) => deviceParameterRead(id, role || DEFAULT_ROLE),
+    deviceConnected: (role) => deviceConnectedRead(role || DEFAULT_ROLE),
     // ce.storage
     state: stateFor(scriptId),
     saveSetting: (key, value) => saveSetting(key, value),
