@@ -267,11 +267,37 @@ mkdirSync(outDir, { recursive: true });
   if (resolved.unknown.length) {
     console.warn(`  WARNING: unknown scripting module(s) ignored: ${resolved.unknown.join(', ')}`);
   }
-  panelDoc.scripting = { ...(panelDoc.scripting ?? {}), modules: resolved.enabled, apiVersion: api.CE_API_VERSION };
+  // Third-party modules the panel uses are COPIED into the export. A shipped plugin has no
+  // CEditor install to read one from, so a module left as a reference would break the export on
+  // anybody else's machine — including the author's, once they uninstall it. Only what the panel
+  // actually turned on: bundling the whole install would put someone else's module in an export
+  // that never calls it.
+  const ext = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/scripting/extensionModules.js')).href);
+  const bundled = ext.extensionsToBundle(resolved.enabled);
+  if (resolved.missing.length) {
+    // Not fatal, and deliberately so: the panel's other modules still work and the export still
+    // runs. What is NOT acceptable is being quiet about it.
+    console.warn(`  WARNING: ${resolved.missing.length} module(s) this panel needs are not installed `
+      + `and cannot be bundled: ${resolved.missing.join(', ')}. Calls into them will log a notice `
+      + 'in the exported plugin instead of acting.');
+  }
+
+  panelDoc.scripting = {
+    ...(panelDoc.scripting ?? {}),
+    modules: resolved.enabled,
+    apiVersion: api.CE_API_VERSION,
+  };
+  if (bundled.length) panelDoc.scripting.extensions = bundled;
+  else delete panelDoc.scripting.extensions;
+
   const cost = api.panelModuleCost(panelDoc);
   console.log(`Scripting: ${resolved.enabled.length} module(s) [${resolved.mode}] — ${resolved.enabled.join(', ')}`);
   console.log(`  surface ${(cost.total / 1024).toFixed(1)} KB across ${cost.languages.join(', ')}`
     + ` (+${(cost.shared / 1024).toFixed(1)} KB shared baseline)`);
+  if (bundled.length) {
+    console.log(`  bundled ${bundled.length} third-party module(s): `
+      + bundled.map((m) => `${m.id}@${m.version}`).join(', '));
+  }
 }
 
 const ep = await import(pathToFileURL(path.join(repo, 'CE/web/src/CE_Application/utils/exportParameters.js')).href);

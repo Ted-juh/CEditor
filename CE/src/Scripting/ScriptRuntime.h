@@ -183,6 +183,20 @@ public:
         gate — a compiled module's calls go through the vtable, which the host already checks. */
     virtual void setEnabledModules (const juce::StringArray& moduleIds) { juce::ignoreUnused (moduleIds); }
 
+    /** Install third-party modules (ce.ext.*) into this engine (design doc §8).
+
+        `modules` is an array of { id, version, runtime, members: [{ id, name }], prelude: {...} }.
+        The engine evaluates its own language's prelude — which defines the module's globals — and
+        then hands the member map to the generated `__ce_register_module`, after which the module
+        is indistinguishable from a built-in one: same namespace table, same gate, same ce.has().
+
+        A module whose prelude carries nothing for this language is skipped, not an error: a module
+        may legitimately ship Lua and JavaScript and no Python.
+
+        Default no-op: the native-handler engine has no prelude to append to. That is a real limit
+        and it is stated in NativeHandlerAbi.h rather than left to be discovered. */
+    virtual void setExtensionModules (const juce::var& modules) { juce::ignoreUnused (modules); }
+
     /** Drop all loaded scripts/environments. */
     virtual void reset() = 0;
 };
@@ -211,6 +225,15 @@ public:
         Call BEFORE loadScripts: the gate has to be in place before a script's top-level code runs,
         or a module-gated call at load time would slip through. */
     void setEnabledModules (const juce::StringArray& moduleIds);
+
+    /** Third-party modules this panel carries, from `scripting.extensions`. Also before
+        loadScripts, and before setEnabledModules has to mean anything: a module that is not
+        installed cannot be enabled. */
+    void setExtensionModules (const juce::var& modules);
+
+    /** Read `scripting.extensions` off a panel document — the copies the exporter baked in. A
+        shipped plugin has no CEditor install to read a module from, so the export carries it. */
+    static juce::var extensionsFromPanel (const juce::var& panel);
 
     /** What the gate is currently set to. Empty means ungated. */
     const juce::StringArray& enabledModules() const { return enabledModuleIds; }
@@ -278,6 +301,7 @@ private:
     void dispatchTo (const ScriptDefinition& def, const juce::String& fn, const juce::var& payload);
     void reportError (const juce::String& scriptId, const juce::String& message);
     void applyModuleGates();
+    void applyExtensionModules();
 
     ScriptHostApi& host;
     std::unique_ptr<ScriptEngine> lua;
@@ -288,6 +312,7 @@ private:
     std::vector<FailedScript> failed;
     std::function<void (const juce::String&)> errorLogger;
     juce::StringArray enabledModuleIds;   // empty = the panel declared nothing = every module on
+    juce::var extensionModules;           // ce.ext.* copies the panel carries (void = none)
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)

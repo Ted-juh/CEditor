@@ -494,6 +494,170 @@ int main()
                "so does a panel that isn't an object at all");
     }
 
+    // 15) third-party modules — ce.ext.* (design doc §8) ------------------------------------------
+    // A module installs into the app and the exporter bakes a copy into the panel, so the shipped
+    // plugin needs no install to read from. Here it arrives the way it arrives in the player: as
+    // `scripting.extensions` on the panel document, handed to setExtensionModules.
+    {
+        auto ext = juce::JSON::parse (R"JSON([{
+          "id": "ce.ext.roland_sysex",
+          "version": "1.0",
+          "runtime": "any",
+          "requires": ["ce.core", "ce.midi"],
+          "summary": "Roland address/checksum helpers.",
+          "members": [
+            { "id": "rolandAddress", "name": "address", "signature": "rolandAddress(a,b,c,d)" },
+            { "id": "rolandPack",    "name": "pack",    "signature": "rolandPack(addr, data)" }
+          ],
+          "prelude": {
+            "lua": "function rolandAddress(a,b,c,d) return {a,b,c,d} end\nfunction rolandPack(addr, data)\n  local body = {}\n  for i=1,#addr do body[#body+1] = addr[i] end\n  for i=1,#data do body[#body+1] = data[i] end\n  body[#body+1] = checksum(\"roland\", body)\n  return body\nend\n",
+            "javascript": "function rolandAddress(a,b,c,d){ return [a,b,c,d]; }\nfunction rolandPack(addr, data){ var body = addr.concat(data); body.push(checksum('roland', body)); return body; }\n"
+          }
+        }])JSON");
+
+        juce::Array<juce::var> extScripts;
+        extScripts.add (makeScript ("ext", "lua", "panel", "onExt", "*",
+            "function onExt()\n"
+            "  local a = ce.ext.roland_sysex.address(0x19, 0x01, 0x00, 0x00)\n"
+            "  log(\"addr \" .. tostring(#a) .. \" \" .. tostring(a[1]))\n"
+            "  local body = rolandPack(a, {0x40})\n"
+            "  log(\"packed \" .. tostring(#body) .. \" sum \" .. tostring(body[#body]))\n"
+            "  log(\"has \" .. tostring(ce.has(\"ce.ext.roland_sysex\")))\n"
+            "end\n"));
+
+        runtime.setExtensionModules (ext);
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (extScripts));
+
+        host.logs.clear();
+        runtime.runAction ("onExt", juce::var());
+        check (host.logs.contains ("addr 4 25"), "an installed module's members answer at ce.ext.<id>.<name>");
+        // 0x19+0x01+0x00+0x00+0x40 = 0x5A; the Roland checksum is (128 - 90) % 128 = 38.
+        check (host.logs.contains ("packed 6 sum 38"),
+               "…and the flat spelling works too, and it can call a built-in (checksum) from ce.midi");
+        check (host.logs.contains ("has true"), "ce.has() reports an installed module");
+
+        // The gate applies to a third-party module exactly as it does to a built-in one.
+        runtime.setEnabledModules ({ "ce.midi" });
+        host.logs.clear();
+        runtime.runAction ("onExt", juce::var());
+        check (host.logs.joinIntoString ("\n").contains ("needs the ce.ext.roland_sysex module"),
+               "a module the panel did not enable is gated like any other");
+
+        runtime.setEnabledModules ({ "ce.midi", "ce.ext.roland_sysex" });
+        host.logs.clear();
+        runtime.runAction ("onExt", juce::var());
+        check (host.logs.contains ("packed 6 sum 38"), "enabling it restores the real implementation");
+
+        // The same module, in the other engine. Its JS prelude is separate source, so this is what
+        // proves a module really is cross-runtime rather than Lua-shaped.
+        juce::Array<juce::var> jsExt;
+        jsExt.add (makeScript ("extjs", "javascript", "panel", "onExtJs", "*",
+            "function onExtJs(){ var b = ce.ext.roland_sysex.pack([0x19,1,0,0],[0x40]); "
+            "log('js ' + b.length + ' sum ' + b[b.length-1]); }"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (jsExt));
+        host.logs.clear();
+        runtime.runAction ("onExtJs", juce::var());
+        check (host.logs.contains ("js 6 sum 38"), "the same module computes the same bytes in JS");
+
+        // A module that ships no Python is SKIPPED there, not an error — and the engines that do
+        // carry it are unaffected. (Python is not built into this test binary; the equivalent for
+        // an engine with no source is asserted by the skip path being taken for it above.)
+        auto luaOnly = juce::JSON::parse (R"JSON([{
+          "id": "ce.ext.lua_only", "version": "1.0", "runtime": "any",
+          "members": [ { "id": "luaOnlyThing", "name": "thing" } ],
+          "prelude": { "lua": "function luaOnlyThing() return 7 end\n" }
+        }])JSON");
+        runtime.setExtensionModules (luaOnly);
+        juce::Array<juce::var> mixed;
+        mixed.add (makeScript ("m1", "lua", "panel", "onLua", "*",
+            "function onLua() log(\"lua \" .. tostring(ce.ext.lua_only.thing())) end\n"));
+        mixed.add (makeScript ("m2", "javascript", "panel", "onJs", "*",
+            "function onJs(){ log('js ' + (typeof ce.ext === 'undefined' || !ce.ext.lua_only ? 'absent' : 'present')); }"));
+        runtime.loadScripts (juce::var (mixed));
+        host.logs.clear();
+        runtime.runAction ("onLua", juce::var());
+        runtime.runAction ("onJs", juce::var());
+        check (host.logs.contains ("lua 7"), "a module runs in the language it ships");
+        check (host.logs.contains ("js absent"), "…and is honestly absent from the one it does not");
+
+        // A broken module is skipped, and does not take the rest of the prelude down with it.
+        auto broken = juce::JSON::parse (R"JSON([{
+          "id": "ce.ext.broken", "version": "1.0", "runtime": "any",
+          "members": [ { "id": "brokenThing", "name": "thing" } ],
+          "prelude": { "lua": "function brokenThing( -- unclosed\n" }
+        }])JSON");
+        runtime.setExtensionModules (broken);
+        juce::Array<juce::var> after;
+        after.add (makeScript ("a1", "lua", "panel", "onAfter", "*",
+            "function onAfter() log(\"still \" .. tostring(clamp(9, 0, 3))) end\n"));
+        runtime.loadScripts (juce::var (after));
+        host.logs.clear();
+        runtime.runAction ("onAfter", juce::var());
+        check (host.logs.contains ("still 3"), "a module that will not parse is skipped, not fatal");
+
+        runtime.setExtensionModules (juce::var());   // leave the runtime clean for anything after
+    }
+
+    // The SHIPPED reference module, loaded from the actual .cemodule file rather than a copy
+    // pasted in here. CE/web/test/extensionModules.test.js runs the same file through the WebView
+    // runtime and asserts the same bytes, so one artifact is checked in three of the four runtimes.
+    // (__FILE__ resolves the repo layout without needing a build-system define.)
+    {
+        const auto moduleFile = juce::File (__FILE__).getParentDirectory()   // CE/tests
+                                    .getParentDirectory()                     // CE
+                                    .getChildFile ("profiles").getChildFile ("modules")
+                                    .getChildFile ("ce.ext.roland_sysex.cemodule");
+        if (! moduleFile.existsAsFile())
+        {
+            check (false, "the reference module is where the docs say it is ("
+                          + moduleFile.getFullPathName() + ")");
+        }
+        else
+        {
+            juce::Array<juce::var> one;
+            one.add (juce::JSON::parse (moduleFile.loadFileAsString()));
+            runtime.setExtensionModules (juce::var (one));
+            runtime.setEnabledModules ({});
+
+            juce::Array<juce::var> refScripts;
+            refScripts.add (makeScript ("ref", "lua", "panel", "onRef", "*",
+                "function onRef()\n"
+                "  local a = ce.ext.roland_sysex.address(0x19, 0x01, 0x00, 0x00)\n"
+                "  local body = ce.ext.roland_sysex.pack(a, {0x40})\n"
+                "  log(\"lua \" .. table.concat(body, \",\"))\n"
+                "  local back = ce.ext.roland_sysex.unpack(body)\n"
+                "  log(\"valid \" .. tostring(back.valid) .. \" data \" .. tostring(back.data[1]))\n"
+                "end\n"));
+            refScripts.add (makeScript ("refjs", "javascript", "panel", "onRefJs", "*",
+                "function onRefJs(){ var b = ce.ext.roland_sysex.pack("
+                "ce.ext.roland_sysex.address(0x19,1,0,0), [0x40]); log('js ' + b.join(',')); }"));
+            runtime.loadScripts (juce::var (refScripts));
+
+            host.logs.clear();
+            runtime.runAction ("onRef", juce::var());
+            runtime.runAction ("onRefJs", juce::var());
+            // 0x19 + 0x01 + 0x40 = 90; the Roland checksum is (128 - 90) % 128 = 38.
+            check (host.logs.contains ("lua 25,1,0,0,64,38"),
+                   "the shipped ce.ext.roland_sysex packs the documented bytes in Lua");
+            check (host.logs.contains ("js 25,1,0,0,64,38"),
+                   "…and the identical bytes in JavaScript, from the same file");
+            check (host.logs.contains ("valid true data 64"), "…and reads its own message back");
+
+            runtime.setExtensionModules (juce::var());
+        }
+    }
+
+    // extensionsFromPanel: the panel document is where the copies come from.
+    {
+        auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");
+        check (ScriptRuntime::extensionsFromPanel (panel).size() == 1,
+               "extensionsFromPanel reads scripting.extensions");
+        check (! ScriptRuntime::extensionsFromPanel (juce::JSON::parse (R"({ "scripting": {} })")).isArray(),
+               "a panel carrying no modules reads as none");
+    }
+
     std::cout << "------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

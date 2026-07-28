@@ -296,8 +296,9 @@ A registry stays possible and stays deferred; the manifest already carries `id`,
 4. **Picker filtering** — the editor hides members from modules a panel has not enabled.
    ✅ *done*
 
-Then `ce.ext.*` install/resolve, and only after that does `ce.draw` or `ce.panel` structure add a
-verb. Getting the architecture right against a surface we already understand is much cheaper than
+5. **`ce.ext.*` install/resolve** — third-party modules, installed into the app. ✅ *done* (§10)
+
+Only after that does `ce.draw` or `ce.panel` structure add a verb. Getting the architecture right against a surface we already understand is much cheaper than
 getting it right against one we are inventing at the same time.
 
 ### How slice 1 landed
@@ -439,3 +440,90 @@ Two smaller things fell out:
 The picker is server-rendered in `scriptPicker.test.js` against real panel documents rather than
 tested through its helpers, because the interesting rule — filter on manual, never on auto — lives
 in the component and would otherwise be asserted nowhere.
+
+---
+
+## 10. `ce.ext.*` — third-party modules, as built
+
+Slice 5. §8 decided the shape (installed into the app, namespaced `ce.ext.<name>`, full support) and
+listed the three things that decision costs. All three are now paid.
+
+### The format
+
+One JSON file, `<id>.cemodule`: a manifest plus a prelude per language.
+
+```jsonc
+{
+  "id": "ce.ext.roland_sysex", "version": "1.0",
+  "requires": ["ce.core", "ce.midi"], "runtime": "any",
+  "summary": "…", "author": "…",
+  "members": [ { "id": "rolandAddress", "name": "address", "signature": "…", "summary": "…" } ],
+  "prelude": { "lua": "…", "javascript": "…", "python": "…", "webview": "…" }
+}
+```
+
+`id` is the flat global the prelude defines; `name` is what it answers to inside the namespace.
+**Both spellings exist for an extension exactly as they do for a built-in module** — which is the
+central decision here, because it means an extension needs *no new machinery anywhere*. It registers
+into the same tables, is gated by the same `__ce_apply_modules`, appears in the same picker group,
+is measured by the same cost accounting, and answers `ce.has()` the same way. `webview` falls back
+to `javascript`; a module that ships no Python simply does not exist in that engine, and `ce.has()`
+says so rather than pretending.
+
+`CE/profiles/modules/ce.ext.roland_sysex.cemodule` is the worked example — Roland address/checksum
+helpers, the module §8 named. It is not installed automatically. It is verified as a *file*: the
+C++ suite loads it and asserts the packed bytes in Lua and JavaScript, and the web suite loads the
+same file and asserts the same bytes in the WebView. One artifact, three runtimes.
+
+### The three costs, paid
+
+**1. The exporter bundles it.** A shipped plugin has no CEditor install to read from, so
+`extensionsToBundle()` copies each module the panel *turned on* into `scripting.extensions`, and
+the player reads it from there via `ScriptRuntime::extensionsFromPanel`. Only what is enabled —
+bundling the whole install would put someone else's module in an export that never calls it. A
+module the panel needs and this install lacks is warned about at export, loudly, and is not fatal.
+
+**2. Missing is named, never mysterious.** `resolveModules` now has a **`missing`** bucket distinct
+from `unknown`: an unresolved `ce.ext.*` id is a real third-party module this install does not
+have — a different problem with a different fix and a different sentence — while `ce.nonsense` is a
+typo. The rest of the panel keeps working. And because every exported panel carries its own copy,
+the Export tab can offer **"install from panel"**, which is the only answer that works offline,
+there being no registry to fetch from.
+
+**3. The install-time collision check is the name authority.** Without a registry nobody arbitrates
+names, so the authority is local and enforced at install: a module may not define a member any
+built-in module or any other installed module already defines, may not use a word that is a keyword
+in Lua, JavaScript or Python, and may not depend on something absent. A rejected module is not
+registered *at all* — a half-installed module is worse than an absent one — and a failed upgrade
+leaves the working copy in place rather than uninstalling it.
+
+### Where the code lives, and where it does not
+
+| | |
+|---|---|
+| Format, validation, install rules, registry | `scripting/extensionModules.js` |
+| Registration + resolution | `panelApi.js` (`allModules()`, `memberModule()`, …) |
+| Storage (`userAppData/CEditor/modules/*.cemodule`) | the host — `ValueTreeBridge::emitScriptModules` |
+| Evaluation | each engine's `setExtensionModules` + generated `__ce_register_module` |
+
+The host does **not** validate. It lists, stores and deletes files. Whether a manifest is a *legal*
+module depends on the API contract — which names are taken, which words are Lua keywords — and that
+contract lives in JavaScript, so that is where the decision is made. Two validators would be two
+answers.
+
+The built-in constants (`MODULES`, `MEMBER_MODULE`, `ALL_MEMBERS`) are deliberately **not** mutated.
+The parity suite holds five runtimes to exactly those, and an installed module must not be able to
+weaken the contract they are held to; the resolution helpers read `allModules()` instead.
+
+### The limits, stated
+
+- **A native handler cannot be extended.** C++/C#/Java handlers are compiled at export and call the
+  vtable directly — there is no prelude to append to. Recorded in `NativeHandlerAbi.h`; if the gate
+  ever needs to reach there it becomes an appended `is_module_enabled` query, not a change to an
+  existing slot.
+- **This is not a sandbox and does not pretend to be one.** A module's JavaScript is evaluated the
+  way a user's own script is (`new Function` with the API bound), and its Lua runs under the same
+  instruction budget a handler does. Both are code the person using the editor chose to run. What
+  the module system provides is *namespacing and collision safety*, not isolation.
+- **A registry stays deferred.** The manifest already carries `id`, `version` and `requires`, so
+  adding one later changes nothing about the format.

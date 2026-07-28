@@ -164,6 +164,31 @@ honest way to ask "can I call this here" before calling it.
 A native handler has no prelude and is not gated — it calls the vtable directly, and the host
 already checks every call. See the note in `NativeHandlerAbi.h`.
 
+### Third-party modules (`ce.ext.*`)
+
+A user can ship a module. It is one JSON file — `<id>.cemodule` — holding a manifest plus a prelude
+per language, installed into the app under `userAppData/CEditor/modules/`. `ScriptRuntime::
+setExtensionModules()` hands the list to every engine, which evaluates its own language's source and
+calls the generated `__ce_register_module` to wire the namespace. After that a third-party module is
+indistinguishable from a built-in one: same tables, same gate, same `ce.has()`, same picker group.
+
+Three rules make that safe:
+
+- **It must live under `ce.ext.*`** — provenance stays visible, and `ce.<module>` stays ours.
+- **Install-time collision check.** No registry means no name authority, so the authority is local:
+  a module may not define a member anything else already defines, may not use a word that is a
+  keyword in Lua/JS/Python, and may not depend on something absent. A rejected module is not
+  registered at all.
+- **The exporter copies it into the panel.** A shipped plugin has no CEditor install to read from,
+  so `scripting.extensions` carries the modules the panel enabled. The player loads them from there.
+
+`CE/profiles/modules/ce.ext.roland_sysex.cemodule` is the reference example. It is not installed by
+default; `ScriptRuntimeTests` loads that exact file and asserts the bytes it packs in Lua and JS.
+
+Not a sandbox, and it does not pretend to be one: a module's code runs at the same trust level as a
+script the user wrote. What this provides is namespacing and collision safety. A native handler
+(C++/C#/Java) has no prelude and cannot be extended — see the note in `NativeHandlerAbi.h`.
+
 Module sizes are **measured**, not declared: `@module <id>` markers delimit regions in each prelude
 and `tools/scripts/gen-script-modules.mjs` sums them into `moduleCost.generated.js`, which a test
 regenerates and diffs. Those are source bytes for the Export tab, not a binary delta — Lua and JS

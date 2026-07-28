@@ -681,6 +681,45 @@ export function onDeviceDiagnostics(callback) {
 }
 
 /** Request a font import dialog. C++ emits 'fontsImported' on success. */
+/* ------------------------------------------------- scripting modules (ce.ext.*) */
+// Third-party scripting modules install into the APP, not into a panel — a module extends what the
+// application can do, so every panel gets it. They live as .cemodule files under the user data dir;
+// the host owns that directory and the WebView never touches the filesystem itself.
+
+export function listScriptModules() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('listScriptModules', {});
+}
+
+/** Open a file picker and install whatever the user chooses. */
+export function importScriptModule() {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('importScriptModule', {});
+}
+
+/** Install a manifest we already hold — the copy an exported panel carries, typically. */
+export function installScriptModule(manifest) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('installScriptModule', { manifest });
+}
+
+export function removeScriptModule(moduleId) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('removeScriptModule', { id: moduleId });
+}
+
+export function onScriptModulesListed(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('scriptModulesListed', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
+export function onScriptModuleChanged(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('scriptModuleChanged', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 export function importFonts() {
   if (!isJuceAvailable()) {
     console.warn('[bridge] No JUCE backend — importFonts ignored');

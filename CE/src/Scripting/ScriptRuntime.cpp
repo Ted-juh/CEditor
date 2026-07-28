@@ -75,11 +75,39 @@ juce::StringArray ScriptRuntime::modulesFromPanel (const juce::var& panel)
     return out;
 }
 
+juce::var ScriptRuntime::extensionsFromPanel (const juce::var& panel)
+{
+    auto* obj = panel.getDynamicObject();
+    if (obj == nullptr) return {};
+    auto scripting = obj->getProperty ("scripting");
+    auto* s = scripting.getDynamicObject();
+    if (s == nullptr) return {};
+    auto list = s->getProperty ("extensions");
+    return list.isArray() ? list : juce::var();
+}
+
 void ScriptRuntime::setEnabledModules (const juce::StringArray& moduleIds)
 {
     assertMessageThread();
     enabledModuleIds = moduleIds;
     applyModuleGates();
+}
+
+void ScriptRuntime::setExtensionModules (const juce::var& modules)
+{
+    assertMessageThread();
+    extensionModules = modules;
+    applyExtensionModules();
+    applyModuleGates();   // a module that just arrived has to be gated like everything else
+}
+
+void ScriptRuntime::applyExtensionModules()
+{
+    if (! extensionModules.isArray()) return;
+    if (lua)    lua->setExtensionModules (extensionModules);
+    if (js)     js->setExtensionModules (extensionModules);
+    if (python) python->setExtensionModules (extensionModules);
+    if (native) native->setExtensionModules (extensionModules);
 }
 
 void ScriptRuntime::applyModuleGates()
@@ -112,8 +140,11 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     if (python) python->installApi (host);
     if (native) native->installApi (host);
 
-    // …and gate it down to the panel's declared modules BEFORE any script's top-level code runs.
-    // installApi is what (re)builds the prelude, so the gate has to be re-applied after it.
+    // Then, in this order and for a reason: installApi is what (re)builds the prelude, so the
+    // extensions have to be re-installed on top of the fresh prelude, and only then can the gate
+    // be applied — a module that is not installed cannot be enabled, and both have to be settled
+    // BEFORE any script's top-level code runs.
+    applyExtensionModules();
     applyModuleGates();
 
     failed.clear();

@@ -925,12 +925,13 @@ export const MEMBER_MODULE = (() => {
 
 /** Where a member lives: "set" for ce.core (global), "ce.midi.sendCC" otherwise. */
 export function memberPath(memberId) {
-  const at = MEMBER_MODULE[memberId];
+  const at = memberModule()[memberId];
   if (!at) return memberId;
-  return MODULE_BY_ID[at.module]?.global ? at.name : `${at.module}.${at.name}`;
+  return moduleById(at.module)?.global ? at.name : `${at.module}.${at.name}`;
 }
 
-/** Modules whose members a runtime must bind. */
+/** Modules whose members a runtime must bind. Built-in only — this drives the parity suite, and
+    an installed extension is not something the five runtimes are held to. */
 export function modulesForRuntime(runtime) {
   return MODULES.filter((m) => m.runtime === RUNTIME_ANY || m.runtime === runtime);
 }
@@ -939,6 +940,67 @@ export function modulesForRuntime(runtime) {
     provenance is visible and the first-party namespace stays ours. */
 export function isExtensionModule(id) {
   return String(id ?? '').startsWith(`${MODULE_EXT_ROOT}.`);
+}
+
+/* ------------------------------------------------------- installed extensions (ce.ext.*) */
+// Everything above is the FIRST-PARTY contract and stays a set of constants: the parity suite
+// holds five runtimes to exactly that, and an installed module must not be able to weaken it.
+// Extensions live in a registry beside it, and the resolution helpers below read
+// `allModules()` / `memberModule()` rather than the constants directly, so an installed module
+// is a first-class module everywhere it matters without ever editing the built-in list.
+//
+// Installing is validated in extensionModules.js — the format, the collision rules, disk I/O.
+// This file only holds the registration, because the resolution helpers are here.
+
+const EXTENSIONS = new Map();   // id -> { id, version, requires, runtime, summary, members: [...] }
+
+/** Add (or replace) an installed extension. Assumes an already-validated manifest. */
+export function registerExtension(ext) {
+  if (!ext?.id) return;
+  EXTENSIONS.set(ext.id, ext);
+}
+
+export function unregisterExtension(id) { EXTENSIONS.delete(id); }
+export function registeredExtensions() { return [...EXTENSIONS.values()]; }
+export function clearExtensions() { EXTENSIONS.clear(); }
+
+/** Built-in modules plus every installed extension, in that order. */
+export function allModules() {
+  return [...MODULES, ...EXTENSIONS.values()];
+}
+
+/** allModules() as a lookup. */
+export function moduleById(id) {
+  return MODULE_BY_ID[id] ?? EXTENSIONS.get(id) ?? null;
+}
+
+/** { shortName: memberId } for any module, built-in or installed. */
+export function memberMapFor(moduleId) {
+  const ext = EXTENSIONS.get(moduleId);
+  if (ext) return Object.fromEntries((ext.members ?? []).map((m) => [m.name ?? m.id, m.id]));
+  return moduleMemberMap(moduleId);
+}
+
+/** MEMBER_MODULE including installed extensions. */
+export function memberModule() {
+  const out = { ...MEMBER_MODULE };
+  for (const ext of EXTENSIONS.values()) {
+    for (const [shortName, memberId] of Object.entries(memberMapFor(ext.id))) {
+      out[memberId] = { module: ext.id, name: shortName };
+    }
+  }
+  return out;
+}
+
+/** Every member descriptor an extension contributes, shaped like a built-in one. */
+export function extensionMembers() {
+  const out = [];
+  for (const ext of EXTENSIONS.values()) {
+    for (const m of ext.members ?? []) {
+      out.push({ ...m, kind: 'command', runtime: ext.runtime ?? RUNTIME_ANY, extension: ext.id });
+    }
+  }
+  return out;
 }
 
 /* --------------------------------------------------------------- module opt-in (slice 3) */
@@ -963,33 +1025,48 @@ const ALWAYS_ENABLED = [MODULE_CORE];
  * rather than dropped: silently ignoring one is how a typo becomes a mystery.
  */
 export function resolveModules(declared) {
+  const known = allModules();
+  const byId = new Map(known.map((m) => [m.id, m]));
   const enabled = new Set(ALWAYS_ENABLED);
   const added = new Set();
   const unknown = [];
+  const missing = [];
   const queue = [];
+
+  const classify = (id, into) => {
+    if (byId.has(id)) { queue.push(id); return; }
+    // An unresolved ce.ext.* id is MISSING, not unknown: the panel names a real third-party
+    // module that this install does not have. That is a different problem with a different fix
+    // (install it) and a different message, so it gets its own bucket rather than being lumped
+    // in with a typo.
+    (isExtensionModule(id) ? missing : unknown).push(id);
+    if (into) into.push(id);
+  };
 
   for (const raw of Array.isArray(declared) ? declared : []) {
     const id = String(raw ?? '').trim();
-    if (!id) continue;
-    if (!MODULE_BY_ID[id]) { unknown.push(id); continue; }
-    queue.push(id);
+    if (id) classify(id);
   }
 
   while (queue.length) {
     const id = queue.shift();
     if (enabled.has(id)) continue;
     enabled.add(id);
-    for (const need of MODULE_BY_ID[id]?.requires ?? []) {
-      if (!enabled.has(need) && MODULE_BY_ID[need]) { added.add(need); queue.push(need); }
+    for (const need of byId.get(id)?.requires ?? []) {
+      if (enabled.has(need)) continue;
+      if (byId.has(need)) { added.add(need); queue.push(need); }
+      else if (isExtensionModule(need)) { if (!missing.includes(need)) missing.push(need); }
+      else if (!unknown.includes(need)) unknown.push(need);
     }
   }
 
   // Keep manifest order rather than insertion order, so two panels with the same set produce the
   // same list and a diff of the panel document stays readable.
   return {
-    enabled: MODULES.map((m) => m.id).filter((id) => enabled.has(id)),
+    enabled: known.map((m) => m.id).filter((id) => enabled.has(id)),
     added: [...added].filter((id) => !ALWAYS_ENABLED.includes(id)),
     unknown,
+    missing,
   };
 }
 
@@ -1014,19 +1091,20 @@ function escapeForRe(s) {
 export function modulesUsedBy(source) {
   const src = typeof source === 'string' ? source : '';
   if (!src) return [];
+  const known = allModules();
   const hit = new Set();
-  for (const [memberId, at] of Object.entries(MEMBER_MODULE)) {
+  for (const [memberId, at] of Object.entries(memberModule())) {
     if (hit.has(at.module)) continue;
-    if (MODULE_BY_ID[at.module]?.global) continue;      // ce.core is never gated, never scanned for
+    if (moduleById(at.module)?.global) continue;      // ce.core is never gated, never scanned for
     if (memberReferenceRe(memberId, at.name).test(src)) hit.add(at.module);
   }
   // A script may also address a module wholesale — `local midi = ce.midi`, `ce.has("ce.time")`.
-  for (const module of MODULES) {
+  for (const module of known) {
     if (hit.has(module.id) || module.global) continue;
     const path = escapeForRe(module.id);
     if (new RegExp(`\\b${path}\\b`).test(src)) hit.add(module.id);
   }
-  return MODULES.map((m) => m.id).filter((id) => hit.has(id));
+  return known.map((m) => m.id).filter((id) => hit.has(id));
 }
 
 /** The scripts a panel ships, flattened — panel-level plus per-control. Sources only. */
@@ -1067,7 +1145,7 @@ export const MODULE_GATE_MESSAGE =
   + 'follow the scripts automatically.';
 
 /** The notice a gated member reports instead of acting. Names the module, and what to do. */
-export function moduleGateMessage(memberId, moduleId = MEMBER_MODULE[memberId]?.module ?? '?') {
+export function moduleGateMessage(memberId, moduleId = memberModule()[memberId]?.module ?? '?') {
   return MODULE_GATE_MESSAGE.split('{member}').join(memberId).split('{module}').join(moduleId);
 }
 
@@ -1077,9 +1155,23 @@ export function moduleGateMessage(memberId, moduleId = MEMBER_MODULE[memberId]?.
 // component families share one indivisible stub block in the C++ preludes, so `ce.components`
 // is billed once rather than split five ways.
 
+/** What one installed extension's prelude weighs, summed over the languages it ships. */
+export function extensionCost(ext, languages = MODULE_COST_LANGUAGES) {
+  const prelude = ext?.prelude ?? {};
+  let bytes = 0;
+  for (const language of languages) {
+    const src = prelude[language] ?? (language === 'webview' ? prelude.javascript : null);
+    if (typeof src === 'string') bytes += src.length;
+  }
+  return bytes;
+}
+
 /** The cost key a module is billed under — itself, or the group that owns its bytes. */
 export function costKeyFor(moduleId) {
   if (MODULE_COST[moduleId]) return moduleId;
+  // An extension carries its own prelude, so it is billed under its own id rather than looked up
+  // in the generated table — which only knows about modules compiled into the app.
+  if (moduleById(moduleId) && isExtensionModule(moduleId)) return moduleId;
   const parts = String(moduleId ?? '').split('.');
   for (let i = parts.length - 1; i >= 2; i--) {
     const group = parts.slice(0, i).join('.');
@@ -1108,8 +1200,12 @@ export function panelModuleCost(panel, languages = MODULE_COST_LANGUAGES) {
     billed.get(key).push(id);
   }
 
+  const bytesFor = (key) => (isExtensionModule(key)
+    ? extensionCost(moduleById(key), languages)
+    : sum(key));
+
   const modules = [...billed.entries()]
-    .map(([key, ids]) => ({ key, ids, bytes: sum(key) }))
+    .map(([key, ids]) => ({ key, ids, bytes: bytesFor(key), extension: isExtensionModule(key) }))
     .sort((a, b) => b.bytes - a.bytes);
 
   return {
@@ -1118,7 +1214,7 @@ export function panelModuleCost(panel, languages = MODULE_COST_LANGUAGES) {
     total: modules.reduce((n, m) => n + m.bytes, 0),
     shared: sum(COST_SHARED_KEY),
     // What declaring fewer modules would save: everything not enabled, billed the same way.
-    unused: MODULES
+    unused: allModules()
       .map((m) => m.id)
       .filter((id) => !enabled.includes(id))
       .reduce((keys, id) => { const k = costKeyFor(id); if (k && !billed.has(k)) keys.add(k); return keys; }, new Set()),
@@ -1218,13 +1314,14 @@ export const ALL_HANDLER_NAMES = [
  * given, so no module owns them and no module gate applies.
  */
 export function membersByModule() {
-  const groups = MODULES.map((m) => ({ module: m, members: [] }));
+  const groups = allModules().map((m) => ({ module: m, members: [] }));
   const byId = new Map(groups.map((g) => [g.module.id, g]));
   const lifecycle = { module: null, members: [] };
+  const at = memberModule();
 
-  for (const m of ALL_MEMBERS) {
+  for (const m of [...ALL_MEMBERS, ...extensionMembers()]) {
     if (m.kind === 'lifecycle') { lifecycle.members.push(m); continue; }
-    byId.get(MEMBER_MODULE[m.id]?.module)?.members.push(m);
+    byId.get(at[m.id]?.module)?.members.push(m);
   }
   return [lifecycle, ...groups].filter((g) => g.members.length);
 }

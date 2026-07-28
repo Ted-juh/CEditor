@@ -59,6 +59,43 @@ juce::File findNodeExecutable()
 }
 } // namespace
 
+// Installed third-party scripting modules (ce.ext.*), one .cemodule file each. Per-user rather
+// than beside the exe, for the same reason the toolchain dir is: an installed build lives under
+// Program Files and a non-elevated app cannot write there.
+juce::File ValueTreeBridge::scriptModulesDirectory()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+              .getChildFile ("CEditor").getChildFile ("modules");
+}
+
+// Hand the WebView every manifest we hold, with the file it came from. Deliberately unvalidated:
+// whether a manifest is a legal module depends on the API contract (which names are already taken,
+// which words are keywords in Lua), and that contract lives on the web side. A file that is not
+// even JSON is reported as a null manifest rather than dropped, so a corrupt install is visible.
+void ValueTreeBridge::emitScriptModules() const
+{
+    juce::Array<juce::var> out;
+    const auto dir = scriptModulesDirectory();
+    if (dir.isDirectory())
+    {
+        for (const auto& entry : juce::RangedDirectoryIterator (dir, false, "*.cemodule",
+                                                                juce::File::findFiles))
+        {
+            auto* item = new juce::DynamicObject();
+            item->setProperty ("path", entry.getFile().getFullPathName());
+            item->setProperty ("manifest", juce::JSON::parse (entry.getFile().loadFileAsString()));
+            out.add (juce::var (item));
+        }
+    }
+
+    auto* payload = new juce::DynamicObject();
+    payload->setProperty ("modules", juce::var (out));
+    payload->setProperty ("directory", dir.getFullPathName());
+    if (browser != nullptr)
+        browser->emitEventIfBrowserIsVisible ("scriptModulesListed", juce::var (payload));
+}
+
+
 /**
  * Runs the VST3 exporter (tools/scripts/export-panel-vst3.mjs) as a child process, polled on the
  * message thread so the UI stays responsive. Each stdout/stderr line is emitted to JS as
@@ -910,6 +947,94 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             {
                 perfDebugEnabled = (bool) payload;
                 emitPerfDebug (juce::String ("native perf logging ") + (perfDebugEnabled ? "enabled" : "disabled"));
+            });
+        })
+        /* --- third-party scripting modules (ce.ext.*) -------------------------------------
+           A module extends what the APPLICATION can do, so it installs into the app rather than
+           into a panel: one copy, every panel gets it (scripting-modules-design.md §8). They live
+           as .cemodule files under the user data dir. The host owns that directory and does the
+           file I/O; whether a manifest is a LEGAL module is decided on the web side, because the
+           rules are about the API contract (which names are taken, which words are Lua keywords)
+           and the contract lives there. So these handlers deliberately do not validate — they
+           list, store and delete, and the editor refuses what it cannot accept. */
+        .withEventListener ("listScriptModules", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]() { emitScriptModules(); });
+        })
+        .withEventListener ("installScriptModule", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* o = payload.getDynamicObject();
+                const auto manifest = o != nullptr ? o->getProperty ("manifest") : juce::var();
+                auto* m = manifest.getDynamicObject();
+                const auto id = m != nullptr ? m->getProperty ("id").toString() : juce::String();
+                if (id.isEmpty())
+                    return;
+
+                auto dir = scriptModulesDirectory();
+                dir.createDirectory();
+                auto file = dir.getChildFile (juce::File::createLegalFileName (id) + ".cemodule");
+                file.replaceWithText (juce::JSON::toString (manifest, false));
+                emitScriptModules();
+            });
+        })
+        .withEventListener ("removeScriptModule", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                auto* o = payload.getDynamicObject();
+                const auto id = o != nullptr ? o->getProperty ("id").toString() : juce::String();
+                if (id.isEmpty())
+                    return;
+
+                scriptModulesDirectory()
+                    .getChildFile (juce::File::createLegalFileName (id) + ".cemodule")
+                    .deleteFile();
+                emitScriptModules();
+            });
+        })
+        .withEventListener ("importScriptModule", [this] (const juce::var&)
+        {
+            juce::MessageManager::callAsync ([this]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                fileChooser = std::make_unique<juce::FileChooser> (
+                    "Install Scripting Module",
+                    juce::File::getSpecialLocation (juce::File::userDocumentsDirectory),
+                    "*.cemodule;*.json");
+
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles,
+                    [this] (const juce::FileChooser& fc)
+                    {
+                        if (browser == nullptr)
+                            return;
+
+                        auto file = fc.getResult();
+                        if (file == juce::File())
+                            return;
+
+                        // Copy it in under its declared id, so the filename can never disagree with
+                        // the module it holds. A file that is not JSON, or has no id, is dropped
+                        // here — the editor reports the rest.
+                        const auto parsed = juce::JSON::parse (file.loadFileAsString());
+                        auto* m = parsed.getDynamicObject();
+                        const auto id = m != nullptr ? m->getProperty ("id").toString() : juce::String();
+                        if (id.isNotEmpty())
+                        {
+                            auto dir = scriptModulesDirectory();
+                            dir.createDirectory();
+                            dir.getChildFile (juce::File::createLegalFileName (id) + ".cemodule")
+                               .replaceWithText (file.loadFileAsString());
+                        }
+                        emitScriptModules();
+                    });
             });
         })
         .withEventListener ("importDeviceProfile", [this] (const juce::var&)

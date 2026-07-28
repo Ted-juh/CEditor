@@ -287,6 +287,20 @@ function __ce_apply_modules(enabled) {
   };
   __g.ce = ce;
 }
+
+// __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+// (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+// prelude first, so its globals already exist by the time this runs; re-applying the gate then
+// treats it exactly like anything else.
+function __ce_register_module(path, members, version, runtime) {
+  if (!Object.prototype.hasOwnProperty.call(__CE_MODULES, path)) __CE_ORDER.push(path);
+  __CE_MODULES[path] = members;
+  for (var i = 0; i < __CE_META.length; i++) {
+    if (__CE_META[i].id === path) { __CE_META[i].version = version; __CE_META[i].runtime = runtime; return; }
+  }
+  __CE_META.push({ id: path, version: version, runtime: runtime });
+}
+
 __ce_apply_modules(null);
 // END GENERATED module namespace
 )JS";
@@ -361,6 +375,21 @@ public:
         }
     }
 
+    // Also stored rather than applied: QuickJS gives each script its own engine, so a module has to
+    // be installed into each of them. Re-installing into engines that already exist keeps a module
+    // added mid-session usable without reloading every script.
+    void setExtensionModules (const juce::var& modules) override
+    {
+        extensions = modules;
+        const auto boot = extensionBoot();
+        if (boot.isEmpty()) return;
+        for (auto& [id, eng] : engines)
+        {
+            juce::ignoreUnused (id);
+            eng->execute (boot);
+        }
+    }
+
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
         // TypeScript runs as the JS the editor already transpiled (compiledSource). Raw TS — type
@@ -386,7 +415,7 @@ public:
         juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n";
         // …then gate the API down to the panel's declared modules. QuickJS gives every script its
         // own engine, so the gate is applied per script here rather than once for the language.
-        auto r1 = eng->execute (boot + juce::String (kJsPrelude) + "\n" + moduleGateCall());
+        auto r1 = eng->execute (boot + juce::String (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());
         if (r1.failed()) { onError (def.id, "prelude error: " + r1.getErrorMessage()); return false; }
 
         auto r2 = eng->execute (code);
@@ -434,6 +463,53 @@ public:
     void reset() override { engines.clear(); }
 
 private:
+    /** Each installed ce.ext.* module's JS prelude, followed by its registration call. Emitted as
+        one string because a QuickJS engine is fed source, not objects. A module that ships no
+        JavaScript contributes nothing here — its members simply never appear in this engine. */
+    juce::String extensionBoot() const
+    {
+        auto* arr = extensions.getArray();
+        if (arr == nullptr) return {};
+
+        juce::String out;
+        for (const auto& item : *arr)
+        {
+            auto* obj = item.getDynamicObject();
+            if (obj == nullptr) continue;
+            const auto id = obj->getProperty ("id").toString();
+            if (id.isEmpty()) continue;
+
+            juce::String source;
+            if (auto* prelude = obj->getProperty ("prelude").getDynamicObject())
+                source = prelude->getProperty ("javascript").toString();
+            if (source.isEmpty()) continue;
+
+            juce::StringArray pairs;
+            if (auto* list = obj->getProperty ("members").getArray())
+            {
+                for (const auto& m : *list)
+                {
+                    auto* mo = m.getDynamicObject();
+                    if (mo == nullptr) continue;
+                    const auto memberId = mo->getProperty ("id").toString();
+                    if (memberId.isEmpty()) continue;
+                    auto shortName = mo->getProperty ("name").toString();
+                    if (shortName.isEmpty()) shortName = memberId;
+                    pairs.add (shortName.quoted() + ":" + memberId.quoted());
+                }
+            }
+
+            auto version = obj->getProperty ("version").toString();
+            auto runtime = obj->getProperty ("runtime").toString();
+            if (runtime.isEmpty()) runtime = "any";
+
+            out << source << "\n"
+                << "__ce_register_module(" << id.quoted() << ",{" << pairs.joinIntoString (",") << "},"
+                << version.quoted() << "," << runtime.quoted() << ");\n";
+        }
+        return out;
+    }
+
     /** `__ce_apply_modules([...])`, or `(null)` for "the panel declared nothing — everything on". */
     juce::String moduleGateCall() const
     {
@@ -446,6 +522,7 @@ private:
     std::map<juce::String, std::unique_ptr<juce::JavascriptEngine>> engines;
     ScriptHostApi* host = nullptr;
     juce::StringArray enabledModules;
+    juce::var extensions;               // ce.ext.* modules the panel carries
 };
 
 } // namespace

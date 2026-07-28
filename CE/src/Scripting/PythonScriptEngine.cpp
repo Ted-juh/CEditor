@@ -646,6 +646,22 @@ def __ce_apply_modules(enabled):
     ce.has = __ce_has
     __g["ce"] = ce
 
+
+# __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+# (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+# prelude first, so its globals already exist by the time this runs; re-applying the gate then
+# treats it exactly like anything else.
+def __ce_register_module(path, members, version, runtime):
+    if path not in __CE_MODULES:
+        __CE_ORDER.append(path)
+    __CE_MODULES[path] = members
+    for __m in __CE_META:
+        if __m["id"] == path:
+            __m["version"] = version
+            __m["runtime"] = runtime
+            return
+    __CE_META.append({ "id": path, "version": version, "runtime": runtime })
+
 __ce_apply_modules(None)
 # END GENERATED module namespace
 )PY";
@@ -682,6 +698,20 @@ public:
         }
     }
 
+    // Each script has its own namespace dict, so a module has to be installed into each of them.
+    void setExtensionModules (const juce::var& modules) override
+    {
+        extensions = modules;
+        if (! interpreterOk) return;
+        const auto boot = extensionBoot();
+        if (boot.isEmpty()) return;
+        for (auto& [id, ns] : namespaces)
+        {
+            juce::ignoreUnused (id);
+            if (! exec (boot.toRawUTF8(), ns)) PyErr_Clear();
+        }
+    }
+
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
     {
         if (! interpreterOk) { onError (def.id, initInfo.isNotEmpty() ? initInfo : juce::String ("Python interpreter failed to initialize")); return false; }
@@ -703,7 +733,9 @@ public:
         // Prelude, then the module gate, then the user source — the gate has to be in place before
         // any top-level statement runs. Each script gets its own namespace dict, so the gate is
         // applied per script here rather than once for the language (as Lua can).
-        const bool preludeOk = exec (kPrelude, ns) && exec (moduleGateCall().toRawUTF8(), ns);
+        const bool preludeOk = exec (kPrelude, ns)
+                             && exec (extensionBoot().toRawUTF8(), ns)
+                             && exec (moduleGateCall().toRawUTF8(), ns);
         const bool sourceOk  = preludeOk && exec (def.source.toRawUTF8(), ns);
         currentScriptId = {};
         if (! preludeOk) { onError (def.id, "prelude error: " + fetchPyError()); Py_DECREF (ns); return false; }
@@ -804,6 +836,7 @@ private:
     // listener it was removing.
     juce::String currentScriptId;
     juce::StringArray enabledModules;   // empty = the panel declared nothing = every module on
+    juce::var extensions;               // ce.ext.* modules the panel carries
 
     // Wall-clock execution budget per outermost entry into Python (matches the
     // JS engine's 2s maximumExecutionTime).
@@ -873,6 +906,53 @@ private:
 
         PythonScriptEngine& engine;
     };
+
+    /** Each installed ce.ext.* module's Python prelude, followed by its registration call. A
+        module that ships no Python contributes nothing — its members never appear in this engine,
+        and ce.has() reports that truthfully rather than pretending. */
+    juce::String extensionBoot() const
+    {
+        auto* arr = extensions.getArray();
+        if (arr == nullptr) return {};
+
+        juce::String out;
+        for (const auto& item : *arr)
+        {
+            auto* obj = item.getDynamicObject();
+            if (obj == nullptr) continue;
+            const auto id = obj->getProperty ("id").toString();
+            if (id.isEmpty()) continue;
+
+            juce::String source;
+            if (auto* prelude = obj->getProperty ("prelude").getDynamicObject())
+                source = prelude->getProperty ("python").toString();
+            if (source.isEmpty()) continue;
+
+            juce::StringArray pairs;
+            if (auto* list = obj->getProperty ("members").getArray())
+            {
+                for (const auto& m : *list)
+                {
+                    auto* mo = m.getDynamicObject();
+                    if (mo == nullptr) continue;
+                    const auto memberId = mo->getProperty ("id").toString();
+                    if (memberId.isEmpty()) continue;
+                    auto shortName = mo->getProperty ("name").toString();
+                    if (shortName.isEmpty()) shortName = memberId;
+                    pairs.add (shortName.quoted() + ":" + memberId.quoted());
+                }
+            }
+
+            auto version = obj->getProperty ("version").toString();
+            auto runtime = obj->getProperty ("runtime").toString();
+            if (runtime.isEmpty()) runtime = "any";
+
+            out << source << "\n"
+                << "__ce_register_module(" << id.quoted() << ",{" << pairs.joinIntoString (",") << "},"
+                << version.quoted() << "," << runtime.quoted() << ")\n";
+        }
+        return out;
+    }
 
     /** `__ce_apply_modules([...])`, or `(None)` for "the panel declared nothing — everything on". */
     juce::String moduleGateCall() const

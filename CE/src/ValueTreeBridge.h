@@ -95,6 +95,15 @@ private:
     // progress to the WebView. Implemented in ValueTreeBridgeHandlers.cpp.
     void runToolchainJob (const juce::var& payload, const juce::String& subcommand);
 
+    // Where installed third-party scripting modules (ce.ext.*) live: one .cemodule file each,
+    // under the per-user data dir. Not beside the exe — an installed build puts that under
+    // Program Files, which a non-elevated app cannot write to.
+    static juce::File scriptModulesDirectory();
+
+    // Read every .cemodule in that directory and emit "scriptModulesListed" to the WebView, which
+    // validates them against the API contract and reports whatever it refuses.
+    void emitScriptModules() const;
+
     // Build the dot-notation path for a property change
     juce::String buildPath (const juce::ValueTree& node, const juce::Identifier& prop) const;
 

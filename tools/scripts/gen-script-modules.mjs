@@ -173,6 +173,21 @@ function __ce_apply_modules(enabled)
     return false
   end
 end
+
+-- __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+-- (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+-- prelude first, so its globals already exist by the time this runs; re-applying the gate then
+-- treats it exactly like anything else. An extension needs no machinery of its own — that is the
+-- whole point of giving it the same shape.
+function __ce_register_module(path, members, version, runtime)
+  if __CE_MODULES[path] == nil then __CE_ORDER[#__CE_ORDER + 1] = path end
+  __CE_MODULES[path] = members
+  for _, __m in ipairs(__CE_META) do
+    if __m.id == path then __m.version = version; __m.runtime = runtime; return end
+  end
+  __CE_META[#__CE_META + 1] = { id = path, version = version, runtime = runtime }
+end
+
 __ce_apply_modules(nil)
 -- ${END}`;
 }
@@ -264,6 +279,20 @@ function __ce_apply_modules(enabled) {
   };
   __g.ce = ce;
 }
+
+// __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+// (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+// prelude first, so its globals already exist by the time this runs; re-applying the gate then
+// treats it exactly like anything else.
+function __ce_register_module(path, members, version, runtime) {
+  if (!Object.prototype.hasOwnProperty.call(__CE_MODULES, path)) __CE_ORDER.push(path);
+  __CE_MODULES[path] = members;
+  for (var i = 0; i < __CE_META.length; i++) {
+    if (__CE_META[i].id === path) { __CE_META[i].version = version; __CE_META[i].runtime = runtime; return; }
+  }
+  __CE_META.push({ id: path, version: version, runtime: runtime });
+}
+
 __ce_apply_modules(null);
 // ${END}`;
 }
@@ -343,6 +372,22 @@ def __ce_apply_modules(enabled):
         return False
     ce.has = __ce_has
     __g["ce"] = ce
+
+
+# __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+# (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+# prelude first, so its globals already exist by the time this runs; re-applying the gate then
+# treats it exactly like anything else.
+def __ce_register_module(path, members, version, runtime):
+    if path not in __CE_MODULES:
+        __CE_ORDER.append(path)
+    __CE_MODULES[path] = members
+    for __m in __CE_META:
+        if __m["id"] == path:
+            __m["version"] = version
+            __m["runtime"] = runtime
+            return
+    __CE_META.append({ "id": path, "version": version, "runtime": runtime })
 
 __ce_apply_modules(None)
 # ${END}`;

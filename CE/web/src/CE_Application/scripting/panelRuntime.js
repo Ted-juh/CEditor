@@ -32,7 +32,9 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage,
+  allModules, moduleById, memberMapFor, registeredExtensions,
 } from './panelApi.js';
+import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
 import { syncDeviceRuntimeStateToPanelPreview } from '../utils/deviceBindingSync.js';
 import { scriptDocuments } from '../stores/scriptWorkspace.js';
@@ -967,6 +969,11 @@ function buildApi(ownerName, scriptId = '') {
     ...helpers,
   };
 
+  // Installed third-party modules (ce.ext.*) contribute their members to the SAME flat surface a
+  // built-in module does, before anything is gated — so they are gated, namespaced and discovered
+  // by exactly the same code, with no separate path to keep in step.
+  installExtensionMembers(api);
+
   // Modules the panel has not enabled become explaining stubs, before `ce` is assembled from the
   // flat surface — so the namespaced spelling and the flat alias are gated identically.
   const enabled = enabledModules();
@@ -1002,9 +1009,9 @@ function enabledModules() {
  */
 function applyModuleGates(flat, enabled) {
   if (enabled == null) return;
-  for (const module of MODULES) {
+  for (const module of allModules()) {
     if (module.global || enabled.has(module.id)) continue;
-    for (const memberId of Object.values(moduleMemberMap(module.id))) {
+    for (const memberId of Object.values(memberMapFor(module.id))) {
       if (isValueMember(MEMBER_BY_ID[memberId])) continue;
       const message = moduleGateMessage(memberId, module.id);
       flat[memberId] = () => addScriptTrace('log', '', message);
@@ -1025,14 +1032,14 @@ function applyModuleGates(flat, enabled) {
  */
 function buildModuleNamespace(flat, enabled = null) {
   const ce = {};
-  for (const module of MODULES) {
+  for (const module of allModules()) {
     const segments = module.id.split('.').slice(1);   // drop the "ce" root
     let node = ce;
     for (const segment of segments) {
       node[segment] ??= {};
       node = node[segment];
     }
-    for (const [shortName, memberId] of Object.entries(moduleMemberMap(module.id))) {
+    for (const [shortName, memberId] of Object.entries(memberMapFor(module.id))) {
       const bound = flat[memberId];
       if (typeof bound === 'function' || bound !== undefined) node[shortName] = bound;
     }
@@ -1041,18 +1048,88 @@ function buildModuleNamespace(flat, enabled = null) {
   ce.version = CE_API_VERSION;
   ce.runtime = RUNTIME_WEBVIEW;
   ce.language = 'javascript';
-  ce.modules = MODULES
+  ce.modules = allModules()
     .filter((m) => enabled == null || enabled.has(m.id))
     .map((m) => ({ id: m.id, version: m.version, runtime: m.runtime }));
   // Enabled AND reachable from here. A module the panel turned on that only runs in the player
   // still answers false, because the question ce.has() is asked to settle is "can I call this".
   ce.has = (moduleId) => {
-    const module = MODULE_BY_ID[moduleId];
+    const module = moduleById(moduleId);
     if (module == null) return false;
     if (enabled != null && !enabled.has(moduleId)) return false;
     return module.runtime === RUNTIME_ANY || module.runtime === RUNTIME_WEBVIEW;
   };
   return ce;
+}
+
+/* ------------------------------------------------------- installed third-party modules */
+// An installed ce.ext.* module ships JavaScript for this runtime. It is evaluated exactly the way
+// a user's JS script is — `new Function` with the panel API bound as arguments — because it IS the
+// same trust level: both are code the person using the editor chose to run. Nothing here is a
+// sandbox and nothing here pretends to be one.
+//
+// The compiled factory is cached per id@version, so a module is parsed once and only re-invoked to
+// re-bind the API (which differs per script: `self`, the script's own `state`).
+
+const extensionFactories = new Map();   // "id@version" -> { factory, keys } | null
+
+function extensionFactory(ext, apiKeys) {
+  const cacheKey = `${ext.id}@${ext.version}`;
+  const cached = extensionFactories.get(cacheKey);
+  if (cached !== undefined && cached?.keys === apiKeys) return cached;
+
+  const source = extensionSource(ext, 'webview');
+  const names = (ext.members ?? []).map((m) => m.id);
+  if (!source || !names.length) { extensionFactories.set(cacheKey, null); return null; }
+
+  // Collect exactly the members the manifest declares. A module that promises a member and does
+  // not define it hands back undefined, which is reported below rather than silently skipped.
+  const probe = names
+    .map((n) => `${JSON.stringify(n)}: (typeof ${n} !== 'undefined' ? ${n} : undefined)`)
+    .join(',');
+  try {
+    const entry = { factory: new Function(...apiKeys.split(','), `${source}\n;return {${probe}};`), keys: apiKeys };
+    extensionFactories.set(cacheKey, entry);
+    return entry;
+  } catch (e) {
+    addScriptTrace('error', '', `[module ${ext.id}] will not parse: ${e?.message ?? e}`);
+    extensionFactories.set(cacheKey, null);
+    return null;
+  }
+}
+
+/** Drop the compiled cache — after an install, an uninstall, or an upgrade. */
+export function resetExtensionCache() { extensionFactories.clear(); }
+
+/**
+ * Run every installed module's JavaScript and merge what it defines into the flat surface.
+ * A module that throws, will not parse, or does not define what it promised is REPORTED and
+ * skipped — never half-installed, and never fatal to the rest of the panel.
+ */
+function installExtensionMembers(flat) {
+  const extensions = registeredExtensions();
+  if (!extensions.length) return;
+
+  const apiKeys = Object.keys(flat).join(',');
+  for (const ext of extensions) {
+    const entry = extensionFactory(ext, apiKeys);
+    if (!entry) continue;
+    let produced = null;
+    try {
+      produced = entry.factory(...Object.keys(flat).map((k) => flat[k]));
+    } catch (e) {
+      addScriptTrace('error', '', `[module ${ext.id}] load error: ${e?.message ?? e}`);
+      continue;
+    }
+    for (const member of ext.members ?? []) {
+      const fn = produced?.[member.id];
+      if (typeof fn !== 'function') {
+        addScriptTrace('error', '', `[module ${ext.id}] declares ${member.id} but does not define it`);
+        continue;
+      }
+      flat[member.id] = fn;
+    }
+  }
 }
 
 // Driven from panelApi.js, never from a local copy. This list is what the executors probe for, so

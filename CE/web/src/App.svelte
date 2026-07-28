@@ -19,6 +19,7 @@
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initScriptConsoleBridge } from './CE_Application/stores/scriptConsole.js';
+  import { initScriptModules } from './CE_Application/stores/scriptModules.js';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
@@ -60,6 +61,7 @@
     initScriptWorkspaceBridge();
     initConsoleBridge();
     initScriptConsoleBridge();
+    initScriptModules();   // installed ce.ext.* modules, before any script can reach for one
     initPanelRuntime();
     syncPerfDebugToNative();
     initAppSettingsBridge();

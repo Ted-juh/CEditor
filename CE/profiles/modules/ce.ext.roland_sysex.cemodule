@@ -1,0 +1,52 @@
+{
+  "id": "ce.ext.roland_sysex",
+  "version": "1.0",
+  "runtime": "any",
+  "requires": ["ce.core", "ce.midi"],
+  "summary": "Roland address-mapped SysEx: build an address, pack a message, read one back.",
+  "author": "CEditor",
+  "homepage": "docs/scripting-modules-design.md",
+
+  "_comment": [
+    "A REFERENCE third-party module — the worked example the .cemodule format is documented",
+    "against. It is not installed automatically; install it from the Export tab (Scripting",
+    "Modules -> Extensions -> Install) to try it, or copy it as the starting point for your own.",
+    "",
+    "Note what it does NOT do: it defines no runtime of its own, ships no binary, and calls",
+    "checksum() straight out of ce.midi. A module is source plus a manifest, which is why the",
+    "same file works in the editor, in the exported plugin, and in all three scripting engines.",
+    "",
+    "Every member is listed twice over: `id` is the flat global its prelude defines, `name` is",
+    "what it answers to inside ce.ext.roland_sysex. Both spellings work, exactly as they do for a",
+    "built-in module, and the install-time collision check is what makes the flat one safe."
+  ],
+
+  "members": [
+    {
+      "id": "rolandAddress",
+      "name": "address",
+      "signature": "rolandAddress(a, b, c, d)",
+      "summary": "A 4-byte Roland parameter address as a byte array. Each byte is masked to 7 bits."
+    },
+    {
+      "id": "rolandPack",
+      "name": "pack",
+      "signature": "rolandPack(address, data)",
+      "summary": "address + data + Roland checksum, as the body of a DT1 message (no F0/F7 — sendSysex adds those)."
+    },
+    {
+      "id": "rolandUnpack",
+      "name": "unpack",
+      "signature": "rolandUnpack(body)",
+      "summary": "The inverse: { address, data, checksum, valid } from a received DT1 body."
+    }
+  ],
+
+  "prelude": {
+    "lua": "local function __r7(v) return math.floor(tonumber(v) or 0) % 128 end\nfunction rolandAddress(a, b, c, d)\n  return { __r7(a), __r7(b), __r7(c), __r7(d) }\nend\nfunction rolandPack(address, data)\n  local body = {}\n  for i = 1, #address do body[#body + 1] = __r7(address[i]) end\n  for i = 1, #data do body[#body + 1] = __r7(data[i]) end\n  body[#body + 1] = checksum(\"roland\", body)\n  return body\nend\nfunction rolandUnpack(body)\n  local address, data = {}, {}\n  for i = 1, 4 do address[i] = body[i] end\n  for i = 5, #body - 1 do data[#data + 1] = body[i] end\n  local sent = body[#body]\n  local expected = checksum(\"roland\", { table.unpack(body, 1, #body - 1) })\n  return { address = address, data = data, checksum = sent, valid = sent == expected }\nend\n",
+
+    "javascript": "function __r7(v) { return Math.floor(Number(v) || 0) % 128; }\nfunction rolandAddress(a, b, c, d) { return [__r7(a), __r7(b), __r7(c), __r7(d)]; }\nfunction rolandPack(address, data) {\n  var body = [];\n  for (var i = 0; i < address.length; i++) body.push(__r7(address[i]));\n  for (var j = 0; j < data.length; j++) body.push(__r7(data[j]));\n  body.push(checksum('roland', body));\n  return body;\n}\nfunction rolandUnpack(body) {\n  var address = body.slice(0, 4);\n  var data = body.slice(4, body.length - 1);\n  var sent = body[body.length - 1];\n  var expected = checksum('roland', body.slice(0, body.length - 1));\n  return { address: address, data: data, checksum: sent, valid: sent === expected };\n}\n",
+
+    "python": "def __r7(v):\n    try:\n        return int(v) % 128\n    except (TypeError, ValueError):\n        return 0\n\ndef rolandAddress(a, b, c, d):\n    return [__r7(a), __r7(b), __r7(c), __r7(d)]\n\ndef rolandPack(address, data):\n    body = [__r7(x) for x in address] + [__r7(x) for x in data]\n    body.append(checksum(\"roland\", body))\n    return body\n\ndef rolandUnpack(body):\n    sent = body[-1]\n    expected = checksum(\"roland\", body[:-1])\n    return { \"address\": body[:4], \"data\": body[4:-1], \"checksum\": sent, \"valid\": sent == expected }\n"
+  }
+}

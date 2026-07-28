@@ -646,10 +646,24 @@ private:
         installScriptDeviceCallback();   // receive window-closed device events (PlayerHost owns it open)
        #endif
 
-        // The panel's declared modules, BEFORE loadScripts — a script's top-level code runs during
-        // the load, so the gate has to already be in place. The exporter resolves `auto` and bakes
-        // an explicit list into the panel, so what arrives here is either a real list or nothing
-        // (nothing = every module on, which is what an unmigrated panel gets).
+        // Third-party modules FIRST — a module that is not installed cannot be enabled, and the
+        // exporter bundles a copy of each one this panel uses into the document precisely because
+        // a shipped plugin has no CEditor install to read them from.
+        const auto extensions = ceditor::scripting::ScriptRuntime::extensionsFromPanel (scriptValues.panel());
+        if (extensions.isArray())
+        {
+            scriptRuntime->setExtensionModules (extensions);
+            juce::StringArray ids;
+            for (const auto& e : *extensions.getArray())
+                if (auto* o = e.getDynamicObject())
+                    ids.add (o->getProperty ("id").toString() + "@" + o->getProperty ("version").toString());
+            scriptLogLine ("bundled modules: " + ids.joinIntoString (", "));
+        }
+
+        // Then the panel's declared modules, still BEFORE loadScripts — a script's top-level code
+        // runs during the load, so the gate has to already be in place. The exporter resolves
+        // `auto` and bakes an explicit list into the panel, so what arrives here is either a real
+        // list or nothing (nothing = every module on, which is what an unmigrated panel gets).
         const auto declaredModules = ceditor::scripting::ScriptRuntime::modulesFromPanel (scriptValues.panel());
         scriptRuntime->setEnabledModules (declaredModules);
         if (! declaredModules.isEmpty())

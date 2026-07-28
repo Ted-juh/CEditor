@@ -21,7 +21,12 @@
   import { formatFileSize, formatDate } from '../utils/formatting.js';
   import { validateScriptId } from '../utils/scriptIdValidation.js';
   import { collectPanelExportScripts } from '../scripting/scriptPanelExport.js';
-  import { MODULES, panelModules, panelModuleCost } from '../scripting/panelApi.js';
+  import { panelModules, panelModuleCost, allModules, isExtensionModule } from '../scripting/panelApi.js';
+  import { missingExtensionsFor } from '../scripting/extensionModules.js';
+  import {
+    scriptModules, scriptModuleProblems, browseForScriptModule,
+    installScriptModuleManifest, removeScriptModuleById,
+  } from '../stores/scriptModules.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { sectionCollapse, setCollapsed } from '../stores/sectionCollapse.js';
 
@@ -87,12 +92,29 @@
   let moduleState = $derived(panelModules(panel));
   let moduleCost = $derived(panelModuleCost(panel));
   let gatedModules = $derived(
-    MODULES.filter((m) => !m.global).map((m) => ({
+    // $scriptModules is read so the list re-derives when a module is installed or removed.
+    ($scriptModules, allModules()).filter((m) => !m.global).map((m) => ({
       ...m,
       on: moduleState.enabled.includes(m.id),
       required: moduleState.added.includes(m.id),
+      extension: isExtensionModule(m.id),
     }))
   );
+  // Modules this panel asks for that this install does not have. Not fatal — the rest of the panel
+  // works — but it has to be named, or a call that logs a notice looks like a bug in the script.
+  let missingModules = $derived(($scriptModules, missingExtensionsFor(panel)));
+
+  function installFromPanel(entry) {
+    const result = installScriptModuleManifest(entry.manifest);
+    if (!result.ok) window.alert?.(`Could not install ${entry.id}:\n\n${result.problems.join('\n')}`);
+  }
+
+  function removeModule(id) {
+    const ok = window.confirm?.(`Remove ${id}?\n\nPanels that use it will report its members as `
+      + 'unavailable until it is installed again. Exported plugins already carry their own copy '
+      + 'and are unaffected.');
+    if (ok) removeScriptModuleById(id);
+  }
   // Auto is the absence of a list, so switching to Manual has to write the currently-resolved set
   // — anything else would silently change what the panel can do the moment the mode flips.
   function setModuleMode(mode) {
@@ -663,12 +685,65 @@
                      onchange={(e) => toggleModule(m.id, e.target.checked)} />
               <span class="module-id">{m.id}</span>
               <span class="module-summary">{m.summary}</span>
+              {#if m.extension}<span class="module-tag">installed · v{m.version}</span>{/if}
               {#if m.required}<span class="module-tag">required by another module</span>{/if}
               {#if m.runtime !== 'any'}<span class="module-tag">{m.runtime} only</span>{/if}
             </label>
           {/each}
         </div>
       </PropertyCell>
+
+      {#if missingModules.length}
+        <PropertyCell label="Missing" span={4}
+                      hint="Modules this panel asks for that this install does not have. The rest of the panel is unaffected; calls into these log a notice naming the module instead of acting.">
+          <div class="module-list">
+            {#each missingModules as m (m.id)}
+              <div class="module-row module-missing">
+                <span class="module-id">{m.id}</span>
+                <span class="module-summary">
+                  not installed{m.version ? ` — the panel was built against v${m.version}` : ''}{m.author ? `, by ${m.author}` : ''}
+                </span>
+                {#if m.installable}
+                  <button class="penable-btn" onclick={() => installFromPanel(m)}
+                          title="This panel carries its own copy — install it from there">install from panel</button>
+                {:else}
+                  <span class="module-tag">no copy in this panel</span>
+                {/if}
+              </div>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+
+      <PropertyCell label="Extensions" span={4}
+                    hint="Third-party modules (ce.ext.*) install into the APP, not into a panel — one copy, every panel can use it. An export always carries its own copy, so a shipped plugin never depends on what is installed here.">
+        <div class="export-row">
+          <button class="export-action" onclick={() => browseForScriptModule()}>Install module…</button>
+          <span class="export-cost">
+            {$scriptModules.length} installed{$scriptModuleProblems.length ? `, ${$scriptModuleProblems.length} rejected` : ''}
+          </span>
+        </div>
+      </PropertyCell>
+      {#if $scriptModules.length}
+        <PropertyCell label="" span={4}>
+          <div class="module-list">
+            {#each $scriptModules as m (m.id)}
+              <div class="module-row">
+                <span class="module-id">{m.id}</span>
+                <span class="module-summary">v{m.version}{m.author ? ` · ${m.author}` : ''} — {m.summary}</span>
+                <button class="penable-btn" onclick={() => removeModule(m.id)}>remove</button>
+              </div>
+            {/each}
+          </div>
+        </PropertyCell>
+      {/if}
+      {#each $scriptModuleProblems as p (p.id)}
+        <PropertyCell label="" span={4}>
+          <span class="export-build-note module-rejected">
+            ⚠ {p.id} was refused: {p.problems.join(' ')}
+          </span>
+        </PropertyCell>
+      {/each}
       <PropertyCell label="" span={4}>
         <span class="export-build-note">
           {#if moduleState.unknown.length}
@@ -825,6 +900,14 @@
     flex: none; font-size: 10px; color: #8A7A4A; border: 1px solid #4A4230;
     border-radius: 3px; padding: 0 4px;
   }
+  .module-row.module-missing { color: #C4A854; cursor: default; }
+  .module-row.module-missing .module-summary { color: #8A7A4A; }
+  .penable-btn {
+    flex: none; font-size: 10px; padding: 1px 7px; border: 1px solid #444; border-radius: 4px;
+    background: transparent; color: #BBB; cursor: pointer;
+  }
+  .penable-btn:hover { border-color: #5B9BD5; color: #5B9BD5; }
+  .module-rejected { color: #C45454; }
 
   .validation-row {
     grid-column: span 4;

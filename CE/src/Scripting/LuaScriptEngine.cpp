@@ -335,6 +335,21 @@ function __ce_apply_modules(enabled)
     return false
   end
 end
+
+-- __ce_register_module(path, members, version, runtime) — add an INSTALLED third-party module
+-- (ce.ext.*) to the same tables the built-in ones live in. The host evaluates the module's own
+-- prelude first, so its globals already exist by the time this runs; re-applying the gate then
+-- treats it exactly like anything else. An extension needs no machinery of its own — that is the
+-- whole point of giving it the same shape.
+function __ce_register_module(path, members, version, runtime)
+  if __CE_MODULES[path] == nil then __CE_ORDER[#__CE_ORDER + 1] = path end
+  __CE_MODULES[path] = members
+  for _, __m in ipairs(__CE_META) do
+    if __m.id == path then __m.version = version; __m.runtime = runtime; return end
+  end
+  __CE_META[#__CE_META + 1] = { id = path, version = version, runtime = runtime }
+end
+
 __ce_apply_modules(nil)
 -- END GENERATED module namespace
 )LUA";
@@ -445,6 +460,7 @@ public:
         });
 
         lua.script (kPrelude);
+        installExtensions();
         applyModuleGates();
         return true;
     }
@@ -455,6 +471,12 @@ public:
     {
         enabledModules = moduleIds;
         applyModuleGates();
+    }
+
+    void setExtensionModules (const juce::var& modules) override
+    {
+        extensions = modules;
+        installExtensions();
     }
 
     bool loadScript (const ScriptDefinition& def, const ScriptErrorSink& onError) override
@@ -538,6 +560,66 @@ private:
         sol::error e = r; juce::Logger::writeToLog (juce::String ("[lua block] ") + e.what());
     }
 
+    /** Evaluate each installed ce.ext.* module's Lua prelude, then register it into the same
+        tables the built-in modules live in. Third-party top-level code runs under the SAME
+        instruction budget as a user script — a runaway loop in somebody's module must not be able
+        to hang the DAW any more than a runaway loop in a handler can. */
+    void installExtensions()
+    {
+        auto* arr = extensions.getArray();
+        if (arr == nullptr) return;
+
+        sol::protected_function reg = lua["__ce_register_module"];
+        if (! reg.valid()) return;   // prelude not installed yet
+
+        for (const auto& item : *arr)
+        {
+            auto* obj = item.getDynamicObject();
+            if (obj == nullptr) continue;
+            const auto id = obj->getProperty ("id").toString();
+            if (id.isEmpty()) continue;
+
+            juce::String source;
+            if (auto* prelude = obj->getProperty ("prelude").getDynamicObject())
+                source = prelude->getProperty ("lua").toString();
+            // A module may legitimately ship JS and no Lua. Skipping is right; the members simply
+            // never appear in this engine, and ce.has() reports the truth for whoever asks.
+            if (source.isEmpty()) continue;
+
+            {
+                const Watchdog guard (*this);
+                auto r = lua.safe_script (source.toStdString(), sol::script_pass_on_error);
+                if (! r.valid())
+                {
+                    sol::error e = r;
+                    juce::Logger::writeToLog ("[module " + id + "] load error: " + juce::String (e.what()));
+                    continue;   // a broken module is skipped, never half-registered
+                }
+            }
+
+            sol::table members = lua.create_table();
+            if (auto* list = obj->getProperty ("members").getArray())
+            {
+                for (const auto& m : *list)
+                {
+                    auto* mo = m.getDynamicObject();
+                    if (mo == nullptr) continue;
+                    const auto memberId = mo->getProperty ("id").toString();
+                    if (memberId.isEmpty()) continue;
+                    auto shortName = mo->getProperty ("name").toString();
+                    if (shortName.isEmpty()) shortName = memberId;
+                    members[shortName.toStdString()] = memberId.toStdString();
+                }
+            }
+
+            auto version = obj->getProperty ("version").toString();
+            auto runtime = obj->getProperty ("runtime").toString();
+            if (runtime.isEmpty()) runtime = "any";
+            auto rr = reg (id.toStdString(), members, version.toStdString(), runtime.toStdString());
+            if (! rr.valid()) reportPF (rr);
+        }
+    }
+
     /** Hand the prelude the panel's module list — or nil, meaning "declared nothing, all on". */
     void applyModuleGates()
     {
@@ -567,6 +649,7 @@ private:
     // both load (top-level on() calls) and dispatch (a handler subscribing later).
     juce::String currentScriptId;
     juce::StringArray enabledModules;   // empty = the panel declared nothing = every module on
+    juce::var extensions;               // ce.ext.* modules the panel carries
 };
 
 } // namespace
