@@ -1068,6 +1068,85 @@ int main()
                "…and says why rather than being an undefined global");
     }
 
+    // 21) onError (design doc §6 phase 4) ---------------------------------------------------------
+    // A panel reporting its own failures. Two rules that the tests below pin, because both are easy
+    // to lose in a refactor: the LOG always happens (onError is in addition, never instead), and an
+    // error raised inside onError is logged once and NOT re-dispatched.
+    {
+        juce::Array<juce::var> errScripts;
+        errScripts.add (makeScript ("boom", "lua", "panel", "onBoom", "*",
+            "function onBoom() error(\"kaboom\") end\n"));
+        errScripts.add (makeScript ("watch", "lua", "panel", "onError", "*",
+            "function onError(info)\n"
+            "  log(\"CAUGHT \" .. info.script .. \"|\" .. info.scriptId .. \"|\" .. info.phase\n"
+            "      .. \"|\" .. info.event .. \"|\" .. tostring(string.find(info.message, \"kaboom\") ~= nil))\n"
+            "end\n"));
+        runtime.loadScripts (juce::var (errScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onBoom", juce::var());
+        const auto caught = host.logs.joinIntoString ("\n");
+        check (caught.contains ("CAUGHT "), "onError reached a handler that declares it");
+        check (caught.contains ("|boom|dispatch|"),
+               "…carrying the failing script's id and the phase it failed in");
+        check (caught.contains ("|onBoom|true"),
+               "…the event it was raised from, and the message that was logged");
+        check (errors.joinIntoString ("\n").contains ("kaboom"),
+               "the error is STILL logged — onError is in addition to the log, never instead of it");
+
+        // The re-entry guard. A reporter that throws is logged once and never re-dispatched: were
+        // it re-dispatched, the second failure would call the same broken reporter, and so on.
+        juce::Array<juce::var> loopScripts;
+        loopScripts.add (makeScript ("boom", "lua", "panel", "onBoom", "*",
+            "function onBoom() error(\"kaboom\") end\n"));
+        loopScripts.add (makeScript ("bad", "lua", "panel", "onError", "*",
+            "function onError(info) log(\"REPORTING\") error(\"reporter is broken\") end\n"));
+        runtime.loadScripts (juce::var (loopScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onBoom", juce::var());
+        int reported = 0;
+        for (const auto& l : host.logs) if (l.contains ("REPORTING")) ++reported;
+        check (reported == 1, "a broken onError runs ONCE — it is not re-entered by its own failure");
+        check (errors.joinIntoString ("\n").contains ("(in onError)"),
+               "…and its failure is logged, marked as having come from the reporter");
+
+        // Load-time errors are DEFERRED. The script that fails to compile is listed first on
+        // purpose: dispatched eagerly, it would be reported to an onError that does not exist yet.
+        juce::Array<juce::var> loadScripts;
+        loadScripts.add (makeScript ("brokenload", "lua", "panel", "onNever", "*",
+            "function ( -- unclosed\n"));
+        loadScripts.add (makeScript ("watch", "lua", "panel", "onError", "*",
+            "function onError(info) log(\"LOADFAIL \" .. info.scriptId .. \"|\" .. info.phase) end\n"));
+        host.logs.clear();
+        runtime.loadScripts (juce::var (loadScripts));
+        check (host.logs.joinIntoString ("\n").contains ("LOADFAIL brokenload|load"),
+               "a load failure is held until every script is loaded, then reported with phase 'load'");
+
+        // No onError anywhere is not an error: the log is the whole contract in that case.
+        juce::Array<juce::var> quiet;
+        quiet.add (makeScript ("boom", "lua", "panel", "onBoom", "*",
+            "function onBoom() error(\"kaboom\") end\n"));
+        runtime.loadScripts (juce::var (quiet));
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onBoom", juce::var());
+        check (errors.joinIntoString ("\n").contains ("kaboom"),
+               "with no onError declared anywhere, the failure is still logged");
+
+        // The hook is not Lua's. It is dispatched by handler presence, so a JS script watching a
+        // Lua script's failure — the mixed-language case a real panel actually has — must work.
+        juce::Array<juce::var> mixed;
+        mixed.add (makeScript ("boom", "lua", "panel", "onBoom", "*",
+            "function onBoom() error(\"kaboom\") end\n"));
+        mixed.add (makeScript ("watchjs", "javascript", "panel", "onError", "*",
+            "function onError(info) { log(\"JSCAUGHT \" + info.scriptId + \"|\" + info.phase); }"));
+        runtime.loadScripts (juce::var (mixed));
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onBoom", juce::var());
+        check (host.logs.joinIntoString ("\n").contains ("JSCAUGHT boom|dispatch"),
+               "a JavaScript onError sees a Lua script's failure — the hook is the runtime's, not one engine's");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

@@ -229,6 +229,16 @@ export const LIFECYCLE_HOOKS = [
     },
   },
   {
+    id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
+    signature: 'onError(info)',
+    summary: 'A script failed. `info` carries script, scriptId, event, phase ("load" | "dispatch") and message. Runs everywhere, which is the point — window-closed there is nobody watching a log, so this is how a panel reports its own failures. The error is ALWAYS logged as well; this is in addition to that, never instead of it. An error raised inside onError is logged and not re-dispatched, so a broken reporter cannot loop.',
+    params: [{ name: 'info', type: 'object', fields: ['script', 'scriptId', 'event', 'phase', 'message'] }],
+    snippet: {
+      lua: 'function onError(info)\n  set("status.text", info.script .. ": " .. info.message)\n  $0\nend',
+      javascript: 'function onError(info) {\n  set("status.text", `${info.script}: ${info.message}`);\n  $0\n}',
+    },
+  },
+  {
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
     summary: 'Paint on top of the control this script is attached to. `info` carries target, width and height — the control\'s own size, so the drawing scales with it. Called when something asks for a repaint, NOT every frame: to animate, drive it from onTimer and call ce.draw.redraw(). Panel view only; there is no surface with the window shut.',

@@ -364,6 +364,9 @@ private:
     ScriptEngine* engineFor (const juce::String& language);
     void dispatchTo (const ScriptDefinition& def, const juce::String& fn, const juce::var& payload);
     void reportError (const juce::String& scriptId, const juce::String& message);
+    /** Raise onError in every script that declares it. `phase` is "load" or "dispatch". */
+    void dispatchErrorHook (const juce::String& scriptId, const juce::String& message,
+                            const juce::String& phase);
     void applyModuleGates();
     void applyExtensionModules();
 
@@ -400,6 +403,14 @@ private:
 
     static constexpr int maxDispatchDepth = 16; // emit→dispatch→emit feedback-loop backstop
     int dispatchDepth = 0;
+
+    // onError. `inErrorHook` is the re-entry guard: an error raised while reporting an error is
+    // logged and NOT re-dispatched, or a broken reporter loops until the stack dies.
+    // `deferErrors` holds load-time errors until every script is loaded — a script that fails
+    // first would otherwise be reported to an onError that does not exist yet.
+    bool inErrorHook = false;
+    bool deferErrors = false;
+    std::vector<std::pair<juce::String, juce::String>> deferredErrors;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ScriptRuntime)
 };

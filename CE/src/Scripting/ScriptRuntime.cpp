@@ -219,9 +219,58 @@ void ScriptRuntime::tickAnimations (double nowMs)
 
 void ScriptRuntime::reportError (const juce::String& scriptId, const juce::String& message)
 {
+    // The log ALWAYS happens. onError is in addition to it, never instead of it — a panel whose
+    // error handler is itself broken must not go silent.
     auto line = "[script " + scriptId + "] " + message;
     if (errorLogger) errorLogger (line);
     else juce::Logger::writeToLog (line);
+
+    if (deferErrors) { deferredErrors.emplace_back (scriptId, message); return; }
+    dispatchErrorHook (scriptId, message, "dispatch");
+}
+
+void ScriptRuntime::dispatchErrorHook (const juce::String& scriptId, const juce::String& message,
+                                       const juce::String& phase)
+{
+    if (inErrorHook) return;   // an error inside onError is logged and stops there
+
+    // Name the failing script, so the handler can say WHICH one rather than quote an opaque id.
+    // A script that failed to LOAD is not in `scripts` at all — it is in `failed` — so both are
+    // searched, and `event` is always present (empty when unknown) rather than sometimes absent.
+    juce::String name = scriptId, event;
+    bool named = false;
+    for (const auto& s : scripts)
+        if (s.id == scriptId) { if (s.name.isNotEmpty()) name = s.name; event = s.event; named = true; break; }
+    if (! named)
+        for (const auto& f : failed)
+            if (f.id == scriptId) { if (f.name.isNotEmpty()) name = f.name; break; }
+
+    auto* info = new juce::DynamicObject();
+    info->setProperty ("scriptId", scriptId);
+    info->setProperty ("script", name);
+    info->setProperty ("event", event);
+    info->setProperty ("phase", phase);
+    info->setProperty ("message", message);
+    // ONE var for the whole loop. Constructing juce::var(info) per iteration would let the first
+    // temporary take — and then drop — the only reference, deleting the object under the loop.
+    const juce::var payload (info);
+
+    inErrorHook = true;
+    for (const auto& def : scripts)
+    {
+        auto* eng = engineFor (def.language);
+        if (eng == nullptr || ! eng->hasHandler (def.id, "onError")) continue;
+        const ScriptErrorSink swallow = [this] (const juce::String& id, const juce::String& msg)
+        {
+            // Reported, never re-dispatched: this IS the error path.
+            auto l = "[script " + id + "] (in onError) " + msg;
+            if (errorLogger) errorLogger (l); else juce::Logger::writeToLog (l);
+        };
+        host.enterScript (def.context());
+        eng->dispatch (def.id, "onError", payload, swallow);
+        host.exitScript();
+    }
+    inErrorHook = false;
 }
 
 void ScriptRuntime::loadScripts (const juce::var& scriptArray)
@@ -247,6 +296,12 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
     applyModuleGates();
 
     failed.clear();
+
+    // Hold load errors until every script is loaded. A script that fails to compile FIRST would
+    // otherwise be reported to an onError handler that does not exist yet — which is precisely
+    // when a panel most wants to be told.
+    deferErrors = true;
+    deferredErrors.clear();
 
     if (auto* arr = scriptArray.getArray())
     {
@@ -279,6 +334,11 @@ void ScriptRuntime::loadScripts (const juce::var& scriptArray)
                                     loadError.isNotEmpty() ? loadError : juce::String ("failed to load") });
         }
     }
+
+    deferErrors = false;
+    const auto pending = std::move (deferredErrors);
+    deferredErrors.clear();
+    for (const auto& [id, message] : pending) dispatchErrorHook (id, message, "load");
 }
 
 void ScriptRuntime::dispatchTo (const ScriptDefinition& def, const juce::String& fn, const juce::var& payload)

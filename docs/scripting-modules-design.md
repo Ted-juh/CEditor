@@ -233,7 +233,7 @@ onPanelLoad     → MIDI/init only, no controls yet          (exists)
 onPanelBuild    → structure: create/parent/bind here        (phase 4 — done, §13)
 onPanelReady    → GUI live, fill values                     (exists)
 onPanelDestroy  → real teardown, distinct from window close (still to do)
-onError(info)   → the panel reports its own failures        (still to do)
+onError(info)   → the panel reports its own failures        (done, §16)
 ```
 
 ---
@@ -723,7 +723,7 @@ worse than one that did not run.
 Neither is needed to build a panel, and both are their own piece of work: real teardown has to be
 distinguished from a window close (which already has `onPanelClose`), and an error hook has to
 settle what happens when the error handler itself throws. Bundling them in would have meant doing
-both badly.
+both badly. `onError` was built afterwards, on its own — §16.
 
 ---
 
@@ -880,3 +880,61 @@ a half-answered dialog would have been worse than shipping none.
 - **"Has anything ticked yet" was inferred from `now == 0`.** Zero is a perfectly good tick time
   when the caller supplies it, so the seed-on-first-use guard fired every time and overwrote the
   caller's clock. It is a boolean now, in both runtimes.
+
+---
+
+## 16. `onError` — the panel reports its own failures
+
+The last hook from the §6 lifecycle list. A script fails; the panel gets told, in the panel, in its
+own language, and can do something about it — light a warning, fall back to a safe patch, show a
+toast — instead of the failure living only in a console the person using the panel never opens.
+
+```lua
+function onError(info)
+  -- info.script    the failing script's NAME ("Cutoff follow")
+  -- info.scriptId  its id, for matching against your own tables
+  -- info.event     the event it was raised from ("onValueChanged"), "" when unknown
+  -- info.phase     "load" (it would not compile) or "dispatch" (it threw while running)
+  -- info.message   the error text
+  if info.phase == "load" then
+    ce.ui.notify(info.script .. " could not load — running without it", { kind = "warn" })
+  end
+end
+```
+
+**Cross-runtime.** It is declared for both runtimes and dispatched by `ScriptRuntime` as well as by
+the WebView, because the failures a panel most wants to report are the ones nobody is watching — in
+a DAW, with the window shut. It is dispatched by *handler presence*, not by declared event, so any
+loaded script in any language can watch any other script's failure; a JavaScript `onError` seeing a
+Lua script's exception is a case both test suites pin.
+
+### Three rules, and why each exists
+
+- **The log always happens.** `onError` is *in addition* to the console line, never instead of it.
+  A panel whose own error handler is broken must not go silent — that is the one failure mode that
+  turns a diagnostic feature into a diagnostic *loss*.
+- **A failure inside `onError` is logged once and not re-dispatched.** Re-dispatching it would call
+  the same broken reporter again, and again. The guard is a flag held across the whole dispatch, so
+  it covers the *other* handlers too: one report per failure, never a cascade. The second line is
+  marked `(in onError)` so it is distinguishable from the original.
+- **Load-time failures are deferred until every script has loaded.** A script that fails to compile
+  first would otherwise be reported to an `onError` that does not exist yet — which is precisely
+  when a panel most wants to be told. Both runtimes hold load errors in a list and drain it after
+  the load loop, with `phase = "load"`.
+
+`info` is fully populated in every case: all five fields are always present and always strings, so
+a handler that concatenates them into a message shown to somebody can never print `undefined` in
+the middle of a sentence. A script that failed to *load* is not in the loaded-script list at all, so
+the C++ side looks its name up in the failed list as well, and `event` falls back to `""`.
+
+### Two defects this turned up
+
+- **The WebView read the handler cache one level too shallow.** The cache holds `{ key, handlers }`;
+  the first draft read `cache.get(id).onError` rather than `cache.get(id).handlers.onError`, so the
+  hook silently never fired. It was the mixed-script test — several loaded scripts, one throwing —
+  that exposed it, not the single-script case.
+- **One `DynamicObject`, several `juce::var` temporaries.** The C++ dispatch built `juce::var (info)`
+  *inside* the per-script loop from one raw pointer. The first temporary takes the only reference
+  and drops it on destruction, deleting the payload under the loop. One `const juce::var` built
+  before the loop fixes both that and the leak when no handler is declared. This is the second time
+  this exact shape has appeared in this work; it is worth recognising on sight.

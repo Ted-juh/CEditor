@@ -1900,7 +1900,7 @@ function runJsSource(source, scriptId, api, names) {
     const factory = new Function(...Object.keys(api), body);
     return factory(...Object.values(api)) || {};
   } catch (e) {
-    addScriptTrace('error', scriptId, `load error: ${e?.message ?? e}`);
+    reportScriptLoadError(scriptId, `load error: ${e?.message ?? e}`);
     return null;
   }
 }
@@ -1917,9 +1917,9 @@ async function loadHandlersTs(script) {
   if (typeof script.compiledJs === 'string' && script.compiledJs.length)
     return runJsSource(script.compiledJs, script.id, api, probeNames(script));
   const ts = await ensureTs();
-  if (!ts) { addScriptTrace('error', script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
+  if (!ts) { reportScriptLoadError(script.id, 'TypeScript compiler unavailable (offline?)'); return null; }
   const js = transpileTs(script.source);
-  if (js == null) { addScriptTrace('error', script.id, 'TypeScript transpile failed'); return null; }
+  if (js == null) { reportScriptLoadError(script.id, 'TypeScript transpile failed'); return null; }
   // Probe the transpiled JS as well: TypeScript's own declaration shapes are a superset.
   return runJsSource(js, script.id, api, [...new Set([...probeNames(script), ...declaredNames(js)])]);
 }
@@ -1946,7 +1946,7 @@ async function loadHandlersLua(script) {
   try {
     lua = await getLuaEngine();
   } catch (e) {
-    addScriptTrace('error', script.id, `Lua engine failed to start: ${e?.message ?? e}`);
+    reportScriptLoadError(script.id, `Lua engine failed to start: ${e?.message ?? e}`);
     return null;
   }
   const api = buildApi(ownerOf(script), script.id);
@@ -1960,7 +1960,7 @@ async function loadHandlersLua(script) {
     const handlers = await lua.doString(`${clear}\n${script.source}\nreturn {${collect}}`);
     return handlers || {};
   } catch (e) {
-    addScriptTrace('error', script.id, `load error: ${e?.message ?? e}`);
+    reportScriptLoadError(script.id, `load error: ${e?.message ?? e}`);
     return null;
   }
 }
@@ -1998,7 +1998,7 @@ async function loadHandlersPython(script) {
   try {
     py = await getPyodideEngine();
   } catch (e) {
-    addScriptTrace('error', script.id, `Pyodide failed to load: ${e?.message ?? e}`);
+    reportScriptLoadError(script.id, `Pyodide failed to load: ${e?.message ?? e}`);
     return null;
   }
   const api = buildApi(ownerOf(script), script.id);
@@ -2015,7 +2015,7 @@ async function loadHandlersPython(script) {
     }
     return handlers;
   } catch (e) {
-    addScriptTrace('error', script.id, `load error: ${e?.message ?? e}`);
+    reportScriptLoadError(script.id, `load error: ${e?.message ?? e}`);
     return null;
   }
 }
@@ -2108,11 +2108,64 @@ async function getHandlers(script) {
   return null;
 }
 
+/* -------------------------------------------------------------------------- onError */
+// A panel reporting its own failures. The LOG always happens; onError is in addition to it, never
+// instead of it, or a panel whose error handler is itself broken goes silent.
+//
+// Two guards, mirroring ScriptRuntime exactly:
+//   • inErrorHook — an error raised while reporting an error is logged and stops there, so a
+//     broken reporter cannot loop.
+//   • deferErrors — load-time errors are held until every script is loaded, because a script that
+//     fails to compile FIRST would otherwise be reported to an onError that does not exist yet,
+//     which is precisely when a panel most wants to be told.
+//
+// The hook is looked up by NAME rather than by property access, the way every other event is
+// raised — the handler is a script's export, and naming it here keeps it findable.
+const ERROR_HOOK = 'onError';
+const errorHook = { inHook: false, defer: false, pending: [] };
+
+async function dispatchErrorHook(scriptId, message, phase) {
+  if (errorHook.inHook) return;
+  const scripts = activeScripts();
+  const failing = scripts.find((s) => String(s.id) === String(scriptId));
+  const info = {
+    scriptId: String(scriptId ?? ''),
+    script: failing?.name || String(scriptId ?? ''),
+    event: failing?.event ?? '',
+    phase,
+    message: String(message ?? ''),
+  };
+
+  errorHook.inHook = true;
+  try {
+    for (const s of scripts) {
+      if (s.enabled === false) continue;
+      // The cache entry is { key, handlers } — the hook is read from the LOADED handlers, never
+      // loaded on demand: loading a script from inside the error path is how a reporter that
+      // itself fails to compile turns one error into two.
+      const fn = handlerCache.get(s.id)?.handlers?.[ERROR_HOOK];
+      if (typeof fn !== 'function') continue;
+      // Reported, never re-dispatched: this IS the error path.
+      try { fn(info); } catch (e) { addScriptTrace('error', s.id, `(in ${ERROR_HOOK}) ${e?.message ?? e}`); }
+    }
+  } finally {
+    errorHook.inHook = false;
+  }
+}
+
+/** Log a LOAD failure and, once everything is loaded, tell any onError handler about it. */
+function reportScriptLoadError(scriptId, message) {
+  addScriptTrace('error', scriptId, message);
+  if (errorHook.defer) errorHook.pending.push([scriptId, message]);
+  else dispatchErrorHook(scriptId, message, 'load');
+}
+
 // Report a thrown error as an error line plus a few call-stack frames (when available),
 // so the console shows the exception AND where it came from.
 function reportScriptError(scriptId, e) {
   const msg = e?.message ?? String(e);
   addScriptTrace('error', scriptId, msg);
+  dispatchErrorHook(scriptId, msg, 'dispatch');
   const stack = e && typeof e.stack === 'string' ? e.stack : '';
   if (stack) {
     const frames = stack.split('\n').map((s) => s.trim())
@@ -2150,10 +2203,20 @@ async function handlersFor(script) {
 
 /** Load every active script, so listeners exist and run() can resolve before anything dispatches. */
 async function primeHandlers() {
-  for (const s of activeScripts()) {
-    if (s.enabled === false) continue;
-    try { await handlersFor(s); } catch (e) { reportScriptError(s.id, e); }
+  // Errors raised WHILE loading are held: onError may be declared by a script that has not been
+  // loaded yet, and telling nobody is the one outcome this hook exists to prevent.
+  errorHook.defer = true;
+  errorHook.pending.length = 0;
+  try {
+    for (const s of activeScripts()) {
+      if (s.enabled === false) continue;
+      try { await handlersFor(s); } catch (e) { reportScriptLoadError(s.id, e?.message ?? String(e)); }
+    }
+  } finally {
+    errorHook.defer = false;
   }
+  const pending = errorHook.pending.splice(0);
+  for (const [id, message] of pending) await dispatchErrorHook(id, message, 'load');
 }
 
 /** Drop all cached handlers, listeners and timers — the script set or the panel changed. */
@@ -2647,6 +2710,8 @@ export function setLiveScripts(scripts, panelId = null) {
  * (so they can't be detected from a panelPreviewSessions diff). Works in the editor and the player.
  */
 export function dispatchInteraction(controlId, eventName, payload) {
-  if (!live.enabledGlobal || live.dispatching) return;
-  dispatchEvents([{ event: eventName, controlName: controlNameById(controlId), payload }]);
+  if (!live.enabledGlobal || live.dispatching) return undefined;
+  // The promise is returned rather than dropped. Callers in the UI ignore it — an interaction is
+  // fire-and-forget — but returning it is what lets anything else wait for the handlers to finish.
+  return dispatchEvents([{ event: eventName, controlName: controlNameById(controlId), payload }]);
 }

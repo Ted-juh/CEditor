@@ -64,6 +64,8 @@ runtime.loadScripts (gatherScriptsFromPanel());  // array of {id,name,language,s
 - `runtime.onPanelLoad()` — before the WebView/GUI exists (MIDI setup).
 - `runtime.onPanelReady (firstTime)` — when the WebView signals ready; `firstTime=false` on VST3 reopen.
 - `runtime.onPanelClose()` — teardown.
+- `onError(info)` needs no call: the runtime raises it itself, from `reportError`. See "Error
+  reporting" below.
 - `runtime.onDawSaveState (store)` / `onDawRestoreState (store)` — from `PlayerAudioProcessor::get/setStateInformation`.
   Serialize `store` (a `juce::var`) to/from the MemoryBlock. Handlers RETURN what they want saved;
   see "`onDawSaveState` returns; it does not mutate" below.
@@ -178,6 +180,27 @@ Everything a script creates is marked `Core.generatedBy`, cleared before each bu
 save. That makes a build idempotent and keeps the author's document free of it. The trade: a
 generated control is not an exported parameter and cannot be DAW-automated — drive it from a script.
 See §13 of `docs/scripting-modules-design.md`.
+
+### Error reporting
+
+`setErrorLogger` is still the floor and nothing changes about it: **every** script failure is logged
+through it, always. On top of that the runtime raises `onError(info)` on any loaded script that
+declares it, so the panel can report its own failures — light a warning, fall back to a safe patch,
+tell the person using it — instead of the failure living only in a log they never open.
+
+`info` carries `script`, `scriptId`, `event`, `phase` (`"load"` or `"dispatch"`) and `message`; all
+five are always present and always strings. Dispatch is by handler presence rather than declared
+event, so any loaded script in any language can watch any other's failure.
+
+Two guards, both in `ScriptRuntime` and mirrored exactly in the WebView runtime:
+- `inErrorHook` — a failure raised while reporting a failure is logged (marked `(in onError)`) and
+  stops there, so a broken reporter cannot loop.
+- `deferErrors` — `loadScripts` holds load-time errors until the whole load loop is done, then
+  drains them with `phase = "load"`. Without it, the first script that fails to compile would be
+  reported to an `onError` that has not been loaded yet.
+
+Cross-runtime by design: the failures a panel most wants to report are the ones happening in a DAW
+with the window shut. See §16 of `docs/scripting-modules-design.md`.
 
 ### Musical time
 
