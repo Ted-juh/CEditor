@@ -1103,15 +1103,68 @@ export const COMMANDS = [
     snippet: { lua: 'sendMidi({0x90, 60, 100})$0', javascript: 'sendMidi([0x90, 60, 100])$0' },
   },
   {
-    id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity)',
-    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it — call sendNoteOff to be explicit.',
+    id: 'sendNote', category: 'Device / MIDI', signature: 'sendNote(channel, note, velocity [, ms])',
+    summary: 'Note on. `note` is a MIDI number or a name ("C3"). Velocity 0 is a note off, as the MIDI spec has it. '
+      + 'Give `ms` and the note off is scheduled for you — every script that plays a note was otherwise '
+      + 'hand-rolling a timer for it, and a panel cannot play a note at all.',
     params: [
       { name: 'channel', type: 'number', required: true },
       { name: 'note', type: 'value', required: true },
       { name: 'velocity', type: 'number', required: true },
+      { name: 'ms', type: 'number', required: false },
     ],
     scopes: 'any',
     snippet: { lua: 'sendNote(${1:1}, ${2:60}, ${3:100})$0', javascript: 'sendNote(${1:1}, ${2:60}, ${3:100})$0' },
+  },
+  {
+    id: 'interceptMidiIn', category: 'Device / MIDI', signature: 'interceptMidiIn(fn)',
+    summary: 'Sit in the INBOUND path. fn(bytes) returns replacement bytes to rewrite the message, '
+      + 'false to swallow it, or nothing to pass it through — before the panel\'s bindings, the note '
+      + 'input and the transport see it. onCcIn only lets you react after a binding has already moved '
+      + 'the control; this is how a velocity curve, a channel remap or a MIDI-learn layer is built.',
+    params: [{ name: 'fn', type: 'function', required: true }],
+    scopes: 'any',
+    snippet: {
+      lua: 'interceptMidiIn(function(${1:bytes})\n  $0\n  return ${1:bytes}\nend)',
+      javascript: 'interceptMidiIn((${1:bytes}) => {\n  $0\n  return ${1:bytes}\n})',
+    },
+  },
+  {
+    id: 'interceptMidiOut', category: 'Device / MIDI', signature: 'interceptMidiOut(fn)',
+    summary: 'Sit in the OUTBOUND path — every message the panel sends, from a script or from a '
+      + 'control\'s own binding. Rewrite, thin or block it. CC flooding on a fast drag has no answer '
+      + 'from a panel, whose bindings are fixed and which has nothing between them and the port.',
+    params: [{ name: 'fn', type: 'function', required: true }],
+    scopes: 'any',
+    snippet: {
+      lua: 'interceptMidiOut(function(${1:bytes})\n  $0\n  return ${1:bytes}\nend)',
+      javascript: 'interceptMidiOut((${1:bytes}) => {\n  $0\n  return ${1:bytes}\n})',
+    },
+  },
+  {
+    id: 'feedMidi', category: 'Device / MIDI', signature: 'feedMidi(bytes)',
+    summary: 'Inject a message as if it had arrived from the hardware, so the panel\'s own bindings, '
+      + 'note input and transport all act on it. set() moves a control directly and bypasses every '
+      + 'binding; this is how a script-built arpeggiator or sequencer drives the panel instead of '
+      + 'around it. Inbound filters run on it, so a fed message obeys the same rules as a real one.',
+    params: [{ name: 'bytes', type: 'value', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'feedMidi(${1:{0x90, 60, 100\}})$0', javascript: 'feedMidi([${1:0x90, 60, 100}])$0' },
+  },
+  {
+    id: 'routeMidi', category: 'Device / MIDI', signature: 'routeMidi(role, fn)',
+    summary: 'Send everything in the block to a named device role instead of the default. Blocks '
+      + 'rather than a per-call argument, the same shape noTransmit() uses — a panel binds ONE device '
+      + 'at design time, so notes to one synth and CCs to another is otherwise impossible.',
+    params: [
+      { name: 'role', type: 'string', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'routeMidi("${1:aux}", function()\n  $0\nend)',
+      javascript: 'routeMidi("${1:aux}", () => {\n  $0\n})',
+    },
   },
   {
     id: 'sendNoteOff', category: 'Device / MIDI', signature: 'sendNoteOff(channel, note [, velocity])',
@@ -1563,8 +1616,12 @@ export const MODULES = [
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
   // cross-module call that `requires` does not cover, so this cannot be forgotten again.
-  { id: 'ce.midi', version: '1.2', requires: ['ce.core', 'ce.music'], runtime: RUNTIME_ANY,
-    summary: 'MIDI out — notes, programs, bend, aftertouch, clock, CC/NRPN/Sysex — plus panic, checksums and the 7-bit/nibble/ASCII encoders.' },
+  // ce.time is a real dependency now, not a convenience: sendNote's optional duration schedules the
+  // note off with after(). The prelude-dependency test caught it the moment the call appeared, which
+  // is exactly the drift that rule exists to stop.
+  { id: 'ce.midi', version: '1.3', requires: ['ce.core', 'ce.music', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'MIDI in and out — notes (with an optional duration), programs, bend, aftertouch, clock, '
+      + 'CC/NRPN/Sysex — plus wire filters, injection, routing, panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   { id: 'ce.device', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps. Needs the device host.' },
   { id: 'ce.math', version: '1.1', requires: [], runtime: RUNTIME_ANY,
@@ -1625,7 +1682,12 @@ const MODULE_MEMBERS = {
     'sendAftertouch', 'sendClock', 'sendTransport',
     'to7bit', 'from7bit', 'to14bit', 'from14bit', 'toNibbles', 'fromNibbles', 'nibblize',
     'denibblize', 'toAscii', 'fromAscii', 'toOffset', 'fromOffset', 'toSigned', 'fromSigned',
-  ],
+  ].reduce((acc, id) => { acc[id] = id; return acc; }, {
+    // The namespaced names read well; the flat aliases have to stay distinct from ce.core.intercept,
+    // which is a different thing entirely — one filters a model path, these filter the wire.
+    interceptIn: 'interceptMidiIn', interceptOut: 'interceptMidiOut',
+    feed: 'feedMidi', route: 'routeMidi',
+  }),
   'ce.device': {
     requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',
     read: 'deviceRead', write: 'deviceWrite',

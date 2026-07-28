@@ -412,7 +412,16 @@ local function __ch(c) c = math.floor(tonumber(c) or 1); if c < 1 then c = 1 els
 local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 elseif v > 127 then v = 127 end return v end
 local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
 
-function sendNote(channel, note, velocity) sendMidi({0x90 | __ch(channel), __note(note), __7(velocity)}) end
+-- A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
+-- timer for it, and getting that wrong means a hung voice — the one MIDI mistake you hear rather
+-- than read. A panel cannot play a note at all.
+function sendNote(channel, note, velocity, ms)
+  local n = __note(note)
+  sendMidi({0x90 | __ch(channel), n, __7(velocity)})
+  if ms ~= nil and ms > 0 then
+    after(ms, function() sendMidi({0x80 | __ch(channel), n, 0}) end)
+  end
+end
 function sendRPN(channel, msb, lsb, value)
   -- RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
   -- fine tuning (0,1) and coarse tuning (0,2).
@@ -621,7 +630,7 @@ end
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
-  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", nibblize = "nibblize", panic = "panic", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
+  ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", write = "deviceWrite" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
@@ -663,7 +672,7 @@ local __CE_MODULES = {
 local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
-  { id = "ce.midi", version = "1.2", runtime = "any" },
+  { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.2", runtime = "any" },
   { id = "ce.math", version = "1.1", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
@@ -901,6 +910,28 @@ public:
         g.set_function ("transmit", [this] (sol::protected_function fn)
             { host->beginTransmitOverride (true); auto r = fn(); host->endTransmitOverride(); if (! r.valid()) reportPF (r); });
 
+        // routeMidi(role, fn) — sends inside the block go to a named device instead of the default.
+        // Same block shape as noTransmit: the destination is a decision about a RUN of sends.
+        g.set_function ("routeMidi", [this] (std::string role, sol::protected_function fn)
+        {
+            host->beginRouteOverride (juce::String (role));
+            auto r = fn();
+            host->endRouteOverride();
+            if (! r.valid()) reportPF (r);
+        });
+
+        // feedMidi(bytes) — inject as if the hardware had sent it, so the panel's OWN bindings,
+        // note input and transport all act on it.
+        g.set_function ("feedMidi", [this] (sol::object bytes) { host->feedMidi (solToVar (bytes)); });
+
+        // interceptMidiIn / interceptMidiOut — filter the WIRE, as opposed to ce.core.intercept
+        // which filters a model path. Held here; the HOST calls applyMidiFilter, because inbound
+        // reaches the bindings long before any script sees it.
+        g.set_function ("interceptMidiIn", [this] (sol::protected_function fn)
+            { putFilter (midiIn, currentScriptId, std::move (fn)); });
+        g.set_function ("interceptMidiOut", [this] (sol::protected_function fn)
+            { putFilter (midiOut, currentScriptId, std::move (fn)); });
+
         // on(target, event, fn) — register a listener, tagged with the script registering it.
         // One sol::state is shared by every Lua script, so without the tag off() could not tell
         // whose listener it was removing (QuickJS gets an engine per script, so its prelude can
@@ -1058,6 +1089,7 @@ public:
         envs.clear();
         listeners.clear();
         watchers.clear(); computeds.clear(); filters.clear(); actions.clear();
+        midiIn.clear(); midiOut.clear();
     }
 
     /* --------------------------------------------------------------- the reactive core */
@@ -1128,6 +1160,25 @@ public:
         return runFilters (path, value);
     }
 
+    bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
+    {
+        auto& chain = inbound ? midiIn : midiOut;
+        if (chain.empty()) return true;
+        const Watchdog guard (*this);
+        for (auto& f : chain)
+        {
+            auto r = f.fn (varToSol (lua, bytes));
+            // A throwing filter passes the message through UNCHANGED. A broken script must not be
+            // able to silence a synth: report it and keep the MIDI flowing.
+            if (! r.valid()) { sol::error e = r; onError (f.scriptId, juce::String (e.what())); continue; }
+            if (r.return_count() == 0) continue;
+            auto out = solToVar (r);
+            if (out.isBool() && ! (bool) out) return false;      // swallowed
+            if (out.isArray() && out.getArray()->size() > 0) bytes = out;
+        }
+        return true;
+    }
+
     bool callAction (const juce::String& name, const juce::var& args, juce::var& result,
                      const ScriptErrorSink& onError) override
     {
@@ -1162,6 +1213,16 @@ private:
         bool failed;
     };
     struct ActionDef { juce::String scriptId, name; sol::protected_function fn; };
+    struct MidiFilter { juce::String scriptId; sol::protected_function fn; };
+
+    /** One filter per script per direction — a second registration replaces the first rather than
+        stacking, the same rule the value rules follow. */
+    static void putFilter (std::vector<MidiFilter>& list, const juce::String& scriptId, sol::protected_function&& fn)
+    {
+        for (auto& f : list)
+            if (f.scriptId == scriptId) { f.fn = std::move (fn); return; }
+        list.push_back ({ scriptId, std::move (fn) });
+    }
 
     /** A rule replaces the same script's rule for the same path rather than stacking beside it.
         Two filters on one path would make the result depend on registration order — the kind of
@@ -1297,6 +1358,7 @@ private:
     std::map<juce::String, sol::environment> envs;
     std::vector<Listener> listeners;
     std::vector<Rule> watchers, computeds, filters;
+    std::vector<MidiFilter> midiIn, midiOut;
     std::map<juce::String, ActionDef> actions;   // key = lower-cased name
     int reactiveDepth = 0;                       // >0 inside runReactive
     int filterDepth = 0;                         // >0 inside a filter

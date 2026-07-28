@@ -248,8 +248,12 @@ test('middle C is C4, and the docs now say so', () => {
 test('the note verbs build the bytes the MIDI spec calls for', () => {
   // Asserted against the runtime source rather than a captured send, since without a JUCE host the
   // bytes only reach the trace console. The C++ suite asserts the actual wire bytes.
-  assert.match(runtimeSource, /0x90 \| midiCh\(ch\), midiNote\(note\)/, 'note on is 0x90');
-  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), midiNote\(note\)/, 'note off is 0x80');
+  // `n` is midiNote(note), resolved once — sendNote now also schedules the note off when given a
+  // duration, and re-resolving the name for that would let a note start on one pitch and end on
+  // another if noteName ever changed under it.
+  assert.match(runtimeSource, /0x90 \| midiCh\(ch\), n,/, 'note on is 0x90');
+  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), n, 0/, 'the scheduled note off is 0x80');
+  assert.match(runtimeSource, /0x80 \| midiCh\(ch\), midiNote\(note\)/, 'and explicit sendNoteOff is 0x80');
   assert.match(runtimeSource, /0xC0 \| midiCh\(ch\)/, 'program change is 0xC0');
   assert.match(runtimeSource, /0xE0 \| midiCh\(ch\), v % 128, Math\.floor\(v \/ 128\)/, 'pitch bend is lsb then msb');
   assert.match(runtimeSource, /0xD0 \| midiCh\(ch\)/, 'channel pressure is 0xD0');

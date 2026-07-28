@@ -476,6 +476,16 @@ void ScriptRuntime::dispatchEvent (const juce::String& event, const juce::String
     }
 }
 
+bool ScriptRuntime::filterMidi (bool inbound, juce::var& bytes)
+{
+    assertMessageThread();
+    const ScriptErrorSink onError = [this] (const juce::String& id, const juce::String& msg) { reportError (id, msg); };
+    for (auto* eng : { lua.get(), js.get(), python.get(), native.get() })
+        if (eng != nullptr && ! eng->applyMidiFilter (inbound, bytes, onError))
+            return false;                       // the first swallow wins; nothing downstream runs
+    return true;
+}
+
 juce::var ScriptRuntime::runAction (const juce::String& ref, const juce::var& args)
 {
     assertMessageThread();

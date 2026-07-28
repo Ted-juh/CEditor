@@ -366,6 +366,19 @@ PyObject* api_beginTransmit (PyObject*, PyObject* args)
     g_host->beginTransmitOverride (on != 0); Py_RETURN_NONE;
 }
 PyObject* api_endTransmit (PyObject*, PyObject*) { g_host->endTransmitOverride(); Py_RETURN_NONE; }
+// routeMidi(role, fn) blocks — the destination for a RUN of sends, the same block shape
+// noTransmit() uses rather than a role argument threaded through thirteen signatures.
+PyObject* api_beginRoute (PyObject*, PyObject* args)
+{
+    const char* role = nullptr; if (! PyArg_ParseTuple (args, "s", &role)) return nullptr;
+    g_host->beginRouteOverride (juce::String::fromUTF8 (role)); Py_RETURN_NONE;
+}
+PyObject* api_endRoute (PyObject*, PyObject*) { g_host->endRouteOverride(); Py_RETURN_NONE; }
+PyObject* api_feedMidi (PyObject*, PyObject* args)
+{
+    PyObject* b = nullptr; if (! PyArg_ParseTuple (args, "O", &b)) return nullptr;
+    g_host->feedMidi (pyToVar (b)); Py_RETURN_NONE;
+}
 
 // on(target, event, fn) — defined here so it can capture the engine's listener registry.
 PyObject* api_on  (PyObject*, PyObject* args);  // fwd (needs the engine class)
@@ -400,6 +413,9 @@ PyMethodDef apiMethods[] = {
     { "log",           api_log,           METH_VARARGS, nullptr },
     { "logAt",         api_logAt,         METH_VARARGS, nullptr },
     { "beginTransmit", api_beginTransmit, METH_VARARGS, nullptr },
+    { "beginRoute",    api_beginRoute,    METH_VARARGS, nullptr },
+    { "endRoute",      api_endRoute,      METH_NOARGS,  nullptr },
+    { "feedMidi",      api_feedMidi,      METH_VARARGS, nullptr },
     { "endTransmit",   api_endTransmit,   METH_NOARGS,  nullptr },
     { "on",            api_on,            METH_VARARGS, nullptr },
     { "off",           api_off,           METH_VARARGS, nullptr },
@@ -1004,8 +1020,47 @@ def __7(v):
 def __note(n):
     return noteNumber(n) if isinstance(n, str) else __7(n)
 
-def sendNote(channel, note, velocity):
-    sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)])
+def sendNote(channel, note, velocity, ms=None):
+    # A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
+    # timer for it, and getting that wrong means a hung voice - the one MIDI mistake you hear rather
+    # than read. A panel cannot play a note at all.
+    n = __note(note)
+    sendMidi([0x90 | __ch(channel), n, __7(velocity)])
+    if ms is not None and ms > 0:
+        after(ms, lambda: sendMidi([0x80 | __ch(channel), n, 0]))
+
+# routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
+# ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
+# input and the transport long before any script sees it, so the HOST runs these chains.
+def routeMidi(role, fn):
+    __api.beginRoute(str(role or ""))
+    try: fn()
+    finally: __api.endRoute()
+
+def feedMidi(b): return __api.feedMidi(b)
+
+__midiIn = []
+__midiOut = []
+def interceptMidiIn(fn):
+    del __midiIn[:]
+    __midiIn.append(fn)
+def interceptMidiOut(fn):
+    del __midiOut[:]
+    __midiOut.append(fn)
+
+def __applyMidiFilter(inbound, b):
+    chain = __midiIn if inbound else __midiOut
+    for f in chain:
+        # A throwing filter passes the message through UNCHANGED: a broken script must not be able
+        # to silence a synth.
+        try: out = f(b)
+        except Exception as err:
+            logError("interceptMidi: " + str(err))
+            continue
+        if out is False: return {"swallow": True}
+        if out is None: continue
+        if len(out): b = out
+    return {"bytes": b}
 def sendRPN(channel, msb, lsb, value):
     # RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
     # fine tuning (0,1) and coarse tuning (0,2).
@@ -1137,7 +1192,7 @@ def loadSetting(key, fallback=None):
 import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+    "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
@@ -1179,7 +1234,7 @@ __CE_MODULES = {
 __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
-    { "id": "ce.midi", "version": "1.2", "runtime": "any" },
+    { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.2", "runtime": "any" },
     { "id": "ce.math", "version": "1.1", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
@@ -1456,6 +1511,28 @@ public:
         const WatchdogScope guard (*this);
         for (auto& kv : namespaces)
             if (! callPrelude (kv.second, "__runReactive", nullptr, onError, "compute/watch")) { /* reported */ }
+    }
+
+    bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
+    {
+        if (! interpreterOk) return true;
+        g_host = host; g_engine = this;
+        for (auto& kv : namespaces)
+        {
+            PyObject* a = Py_BuildValue ("(OO)", inbound ? Py_True : Py_False, varToPy (bytes));
+            if (a == nullptr) { fetchPyError(); continue; }
+            PyObject* out = callPreludeRaw (kv.second, "__applyMidiFilter", a, onError, "interceptMidi");
+            Py_DECREF (a);
+            if (out == nullptr) continue;
+            auto v = pyToVar (out);
+            Py_DECREF (out);
+            if (auto* o = v.getDynamicObject())
+            {
+                if (o->hasProperty ("swallow")) return false;
+                if (o->hasProperty ("bytes")) bytes = o->getProperty ("bytes");
+            }
+        }
+        return true;
     }
 
     bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override

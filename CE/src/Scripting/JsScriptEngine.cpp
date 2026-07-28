@@ -464,7 +464,35 @@ function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ?
 function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
 function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
 
-function sendNote(channel, note, velocity) { sendMidi([0x90 | __ch(channel), __note(note), __7(velocity)]); }
+// A duration schedules the note off — otherwise every script that plays a note hand-rolls a timer,
+// and getting that wrong means a hung voice, the one MIDI mistake you hear rather than read.
+function sendNote(channel, note, velocity, ms) {
+  var n = __note(note);
+  sendMidi([0x90 | __ch(channel), n, __7(velocity)]);
+  if (ms !== undefined && ms !== null && ms > 0)
+    after(ms, function () { sendMidi([0x80 | __ch(channel), n, 0]); });
+}
+// routeMidi / feedMidi / the wire filters. interceptMidiIn|Out filter the WIRE, as opposed to
+// ce.core.intercept which filters a model path: inbound reaches the panel's bindings, the note
+// input and the transport long before any script sees it, so the HOST runs these chains.
+function routeMidi(role, fn) { __api.beginRoute(String(role || "")); try { fn(); } finally { __api.endRoute(); } }
+function feedMidi(bytes) { return __api.feedMidi(bytes); }
+var __midiIn = [], __midiOut = [];
+function interceptMidiIn(fn) { __midiIn = [fn]; }
+function interceptMidiOut(fn) { __midiOut = [fn]; }
+function __applyMidiFilter(inbound, bytes) {
+  var chain = inbound ? __midiIn : __midiOut;
+  for (var i = 0; i < chain.length; i++) {
+    var out;
+    // A throwing filter passes the message through UNCHANGED: a broken script must not be able to
+    // silence a synth.
+    try { out = chain[i](bytes); } catch (err) { logError("interceptMidi: " + err); continue; }
+    if (out === false) return { swallow: true };
+    if (out === undefined || out === null) continue;
+    if (out.length) bytes = out;
+  }
+  return { bytes: bytes };
+}
 function sendRPN(channel, msb, lsb, value) {
   // RPN is NRPN with CC 101/100 instead of 99/98 — the standard path for pitch-bend range (0,0),
   // fine tuning (0,1) and coarse tuning (0,2).
@@ -682,7 +710,7 @@ function loadSetting(key, fallback) {
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
-  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
+  "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
   "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
@@ -722,7 +750,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.2","runtime":"any"},{"id":"ce.device","version":"1.2","runtime":"any"},{"id":"ce.math","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.2","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.2","runtime":"any"},{"id":"ce.math","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.2","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -866,6 +894,9 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("logAt", [host, arg] (const Args& a) -> juce::var
         { host->logAt (arg (a, 0).toString(), arg (a, 1).toString(), arg (a, 2)); return {}; });
     api->setMethod ("beginTransmit", [host, arg] (const Args& a) -> juce::var { host->beginTransmitOverride ((bool) arg (a, 0)); return {}; });
+    api->setMethod ("beginRoute", [host, arg] (const Args& a) -> juce::var { host->beginRouteOverride (arg (a, 0).toString()); return {}; });
+    api->setMethod ("endRoute",   [host]      (const Args&)   -> juce::var { host->endRouteOverride(); return {}; });
+    api->setMethod ("feedMidi",   [host, arg] (const Args& a) -> juce::var { host->feedMidi (arg (a, 0)); return {}; });
     api->setMethod ("endTransmit", [host] (const Args&) -> juce::var { host->endTransmitOverride(); return {}; });
     return api;
 }
@@ -989,6 +1020,24 @@ public:
                                      juce::var::NativeFunctionArgs (juce::var(), nullptr, 0), &err);
             if (err.failed()) onError ("compute/watch", err.getErrorMessage());
         }
+    }
+
+    bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError) override
+    {
+        for (auto& kv : engines)
+        {
+            juce::Result err = juce::Result::ok();
+            const juce::var args[] = { inbound, bytes };
+            auto out = kv.second->callFunction (juce::Identifier ("__applyMidiFilter"),
+                                                juce::var::NativeFunctionArgs (juce::var(), args, 2), &err);
+            if (err.failed()) { onError ("interceptMidi", err.getErrorMessage()); continue; }
+            if (auto* o = out.getDynamicObject())
+            {
+                if (o->hasProperty ("swallow")) return false;
+                if (o->hasProperty ("bytes")) bytes = o->getProperty ("bytes");
+            }
+        }
+        return true;
     }
 
     bool applyIntercepts (const juce::String& path, juce::var& value, const ScriptErrorSink& onError) override

@@ -4,6 +4,7 @@
  * C++ registers event listeners for: setProperty, requestFullState, undo, redo
  * C++ emits events: fullState, propUpdate
  */
+import { filterOutboundMidi } from '../scripting/midiFilters.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 
 /** Check if we're running inside a JUCE WebView with native integration */
@@ -375,7 +376,12 @@ export function compileRawMidiAction(payload) {
 
 export function triggerRawMidiAction(payload) {
   if (!isJuceAvailable()) return;
-  window.__JUCE__.backend.emitEvent('triggerRawMidiAction', payload ?? {});
+  // ce.midi.interceptOut sits here: this is the one door every outbound message goes through,
+  // a control's own binding as much as a script's sendCC. Filtering only the scripting side would
+  // leave the case that actually floods a synth — a fast drag — with no answer.
+  const filtered = filterOutboundMidi(payload ?? {});
+  if (filtered === null || filtered === undefined) return;      // a filter dropped it
+  window.__JUCE__.backend.emitEvent('triggerRawMidiAction', filtered);
 }
 
 export function parseDumpMessage(payload) {

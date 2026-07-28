@@ -471,7 +471,10 @@ test('a panel with no declaration follows its scripts, and an explicit list is o
 
   const auto = panelModules({ scripts });
   assert.equal(auto.mode, 'auto');
-  assert.deepEqual(auto.enabled, ['ce.core', 'ce.midi', 'ce.music']);
+  // ce.time rides in on ce.midi's requires — sendNote's optional duration schedules the note off
+  // with after(). Auto-detection follows the dependency graph, not just the names in the source,
+  // which is the difference between a module list that works and one that merely looks right.
+  assert.deepEqual(auto.enabled, ['ce.core', 'ce.midi', 'ce.music', 'ce.time']);
 
   const manual = panelModules({ scripts, scripting: { modules: ['ce.math'] } });
   assert.equal(manual.mode, 'manual');

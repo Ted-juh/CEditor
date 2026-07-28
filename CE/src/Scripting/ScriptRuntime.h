@@ -101,6 +101,19 @@ public:
     virtual void beginTransmitOverride (bool transmit) { juce::ignoreUnused (transmit); }
     virtual void endTransmitOverride() {}
 
+    // routeMidi(role, fn) blocks. Sends inside the block go to `role` instead of the default
+    // device. A block override rather than a role argument on thirteen senders: the destination is
+    // a decision about a RUN of sends, and threading it through every signature in four runtimes
+    // would be the same decision written thirteen times.
+    virtual void beginRouteOverride (const juce::String& role) { juce::ignoreUnused (role); }
+    virtual void endRouteOverride() {}
+
+    /** feedMidi(bytes) — inject as if the hardware had sent it, so the panel's own bindings, note
+        input and transport all act on it. set() moves a control directly and bypasses every
+        binding; this is the other thing. Default no-op: a host with no MIDI input to speak of has
+        nothing to inject into. */
+    virtual void feedMidi (const juce::var& bytes) { juce::ignoreUnused (bytes); }
+
     // Values (Q1, Q2, Q8). `form` is "value" (default) | "normalizedValue" | "midiValue".
     // `transmit`: whether to also send to the synth (the runtime computes the default from origin).
     virtual juce::var getValue (const juce::String& path, const juce::String& form) = 0;
@@ -296,6 +309,23 @@ public:
         "no such action" message, which is far more use naming what DOES exist. */
     virtual juce::StringArray registeredActions() const { return {}; }
 
+    /** Run this engine's interceptMidiIn / interceptMidiOut filters over one message.
+
+        `inbound` picks the chain. Returns false when a filter swallowed the message; otherwise
+        `bytes` carries whatever the filters made of it. Unlike the value filters, this one is
+        called by the HOST rather than by a binding inside the engine: inbound reaches the panel's
+        bindings, the note input and the transport long before any script sees it, and outbound
+        leaves from a control's own binding as often as from a sendCC. Filtering only where scripts
+        happen to look would be a rule that holds for scripts and not for the panel.
+
+        A throwing filter passes the message through UNCHANGED rather than dropping it — a broken
+        script must not be able to silence a synth. */
+    virtual bool applyMidiFilter (bool inbound, juce::var& bytes, const ScriptErrorSink& onError)
+    {
+        juce::ignoreUnused (inbound, bytes, onError);
+        return true;
+    }
+
     /** Drop all loaded scripts/environments. */
     virtual void reset() = 0;
 };
@@ -376,6 +406,17 @@ public:
         event which dispatches a handler that emits again … is cut off (and reported) once
         the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
+
+    /** Run every engine's interceptMidiIn / interceptMidiOut chain over one message.
+
+        The HOST calls this — from wherever inbound MIDI arrives, before the bindings act on it, and
+        from wherever outbound MIDI leaves, after the bindings have produced it. That placement is
+        the whole point: a filter applied only where scripts listen would be a rule that holds for
+        scripts and not for the panel.
+
+        Returns false when a filter swallowed the message (do not deliver / do not send); otherwise
+        `bytes` carries whatever the filters made of it. */
+    bool filterMidi (bool inbound, juce::var& bytes);
 
     // --- ce.anim: values that move over time (design doc §6 phase 6) -------------------------
     /** Start (or replace) an animation on `path`.

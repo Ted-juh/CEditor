@@ -55,6 +55,9 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
+import {
+  setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
+} from './midiFilters.js';
 import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
 import { SCALES, CHORDS } from './musicTheory.js';
@@ -592,11 +595,19 @@ function checksumOf(kind, bytes) {
   return (128 - sum) % 128;
 }
 
+// routeMidi(role, fn) — the destination for sends made inside the block. A block rather than a
+// per-call argument, the same shape noTransmit() uses: it keeps thirteen signatures unchanged and
+// reads as what it is, a decision that applies to a run of sends rather than to one of them.
+let routedRole = null;
+
 function sendRawMidi(bytes, actionId) {
   const message = toHexMessage(bytes);
+  const role = routedRole ?? DEFAULT_ROLE;
   if (isJuceAvailable()) {
-    triggerRawMidiAction({ deviceRole: DEFAULT_ROLE, actionId, message, dryRun: false });
-    addScriptTrace('midi', '', `→ ${actionId}: ${message}`);
+    // The outbound filters run inside triggerRawMidiAction, not here — a control's own binding
+    // sends through that door too, and interceptOut has to see those as well.
+    triggerRawMidiAction({ deviceRole: role, actionId, message, dryRun: false });
+    addScriptTrace('midi', '', `→ ${actionId}: ${message}${role === DEFAULT_ROLE ? '' : `  [${role}]`}`);
   } else {
     addScriptTrace('midi', '', `→ ${actionId}: ${message}  (no JUCE host — not sent)`);
   }
@@ -608,14 +619,80 @@ function sendRawMidi(bytes, actionId) {
 const midiCh = (c) => midiInt(c, 1, 16) - 1;
 const midiNote = (n) => (typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
 
+/* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------
+ * ce.core.intercept filters a MODEL PATH. These filter the WIRE, and they are a different thing:
+ * inbound reaches the panel's bindings, the note input and the transport long before any script
+ * sees it, and outbound leaves from a control's own binding as often as from a sendCC. So they are
+ * installed at the app's two choke points via midiFilters.js rather than applied here — see the
+ * note in that module for why the seam exists at all.
+ *
+ * Filters are per script and replace that script's previous one, the same rule the ce.core rules
+ * follow. Order across scripts is registration order, and each sees what the last one produced. */
+const midiIn = [];    // { scriptId, fn }
+const midiOut = [];   // { scriptId, fn }
+
+function putMidiFilter(list, scriptId, fn) {
+  if (typeof fn !== 'function') return;
+  const at = list.findIndex((f) => f.scriptId === scriptId);
+  if (at >= 0) list[at] = { scriptId, fn }; else list.push({ scriptId, fn });
+  installMidiFilters();
+}
+
+function clearMidiFiltersFor(scriptId) {
+  for (const list of [midiIn, midiOut]) {
+    for (let i = list.length - 1; i >= 0; i--) if (list[i].scriptId === scriptId) list.splice(i, 1);
+  }
+  installMidiFilters();
+}
+
+/** Run a chain over a message payload. Returns the payload, or null if a filter swallowed it. */
+function runMidiChain(list, payload, label) {
+  let bytes = hexToBytes(payload?.hex);
+  for (const f of list) {
+    let out;
+    try { out = f.fn(bytes.slice()); } catch (e) { reportScriptError(f.scriptId, e); continue; }
+    if (out === false) {
+      addScriptTrace('midi', f.scriptId, `${label}: swallowed ${toHexMessage(bytes)}`);
+      return null;
+    }
+    if (out === undefined || out === null) continue;    // no opinion — pass it on unchanged
+    const next = toByteArray(out).map((v) => midiInt(v, 0, 255) & 0xff);
+    if (!next.length) continue;                          // an empty array is not a decision
+    bytes = next;
+  }
+  return { ...payload, hex: toHexMessage(bytes) };
+}
+
+/** Put the current chains behind the app's two choke points, or take them away when empty. */
+function installMidiFilters() {
+  setInboundMidiFilter(midiIn.length ? (p) => runMidiChain(midiIn, p, 'in') : null);
+  setOutboundMidiFilter(midiOut.length ? (p) => runMidiChain(midiOut, p, 'out') : null);
+}
+
 const midiApi = {
   sendMidi: (bytes) => {
     const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
     if (!b.length) { addScriptTrace('error', '', 'sendMidi: no bytes given'); return; }
     sendRawMidi(b, 'raw');
   },
-  sendNote: (ch, note, velocity) =>
-    sendRawMidi([0x90 | midiCh(ch), midiNote(note), midiInt(velocity, 0, 127)], `note_${midiNote(note)}`),
+  sendNote: (ch, note, velocity, ms) => {
+    const n = midiNote(note);
+    sendRawMidi([0x90 | midiCh(ch), n, midiInt(velocity, 0, 127)], `note_${n}`);
+    // A duration schedules the note off. Not doing this was making every script that plays a note
+    // hand-roll a timer, and getting it wrong meant a hung voice — the one MIDI mistake you hear
+    // rather than read. The role is captured now, so a note started inside routeMidi() ends where
+    // it began even though the block has long since closed.
+    if (ms === undefined || ms === null) return;
+    const delay = Number(ms);
+    if (!Number.isFinite(delay) || delay <= 0) return;
+    const role = routedRole;
+    scheduleOneShot(delay, () => {
+      const previous = routedRole;
+      routedRole = role;
+      try { sendRawMidi([0x80 | midiCh(ch), n, 0], `noteoff_${n}`); }
+      finally { routedRole = previous; }
+    });
+  },
   sendNoteOff: (ch, note, velocity) =>
     sendRawMidi([0x80 | midiCh(ch), midiNote(note), midiInt(velocity ?? 0, 0, 127)], `noteoff_${midiNote(note)}`),
   sendProgramChange: (ch, program, bankMsb, bankLsb) => {
@@ -632,6 +709,24 @@ const midiApi = {
   sendAftertouch: (ch, pressure, note) => (note === undefined || note === null
     ? sendRawMidi([0xD0 | midiCh(ch), midiInt(pressure, 0, 127)], 'aftertouch')
     : sendRawMidi([0xA0 | midiCh(ch), midiNote(note), midiInt(pressure, 0, 127)], 'polyaftertouch')),
+  // feed(bytes) — inject as if the hardware had sent it, so the panel's OWN bindings, note input
+  // and transport all act on it. set() moves a control directly and bypasses every binding, which
+  // is a different thing: this is how a script-built arpeggiator drives the panel rather than
+  // fighting it. Inbound filters run on it, so a fed message obeys the same rules as a real one —
+  // a velocity curve that applies to the keyboard has to apply to the sequencer too.
+  feedMidi: (bytes) => {
+    const b = toByteArray(bytes).map((v) => midiInt(v, 0, 255) & 0xff);
+    if (!b.length) { addScriptTrace('error', '', 'feedMidi: no bytes given'); return; }
+    const status = b[0] ?? 0;
+    const kind = (status & 0xf0) === 0xb0 ? 'cc' : (status & 0xf0) === 0x90 || (status & 0xf0) === 0x80 ? 'note' : 'raw';
+    const payload = filterInboundMidi({ hex: toHexMessage(b), messageType: kind, fed: true });
+    if (!payload) return;                       // a filter swallowed what we fed it
+    addScriptTrace('midi', '', `← fed ${payload.hex}`);
+    latestMidiInputMessage.set(payload);
+  },
+  interceptMidiIn: null,      // bound per script in the api factory — it needs the caller's id
+  interceptMidiOut: null,
+  routeMidi: null,
   sendClock: () => sendRawMidi([0xF8], 'clock'),
   sendTransport: (action) => {
     const a = String(action ?? 'start').toLowerCase();
@@ -1834,6 +1929,11 @@ function afterFor(scriptId, ms, fn) {
   return id;
 }
 
+/** Schedule a one-shot the runtime owns, rather than one a script asked for. Used by sendNote's
+    duration, where the note off is the runtime's promise to keep and no script should be able to
+    cancel it by id. */
+function scheduleOneShot(ms, fn) { return afterFor('', ms, fn); }
+
 /** Fire a one-shot if this tick belongs to one. Returns true when it handled the tick. */
 function runAfterCallback(id) {
   const entry = afterCallbacks.get(id);
@@ -2131,6 +2231,17 @@ function buildApi(ownerName, scriptId = '') {
     on: (target, event, fn) => addListener(scriptId, target, event, fn),
     off: (target, event) => removeListener(scriptId, target, event),
     // the reactive core — rules the runtime keeps applying, not values it writes once
+    // the wire filters need the caller's id, so they are bound here rather than in midiApi
+    interceptMidiIn: (fn) => putMidiFilter(midiIn, scriptId, fn),
+    interceptMidiOut: (fn) => putMidiFilter(midiOut, scriptId, fn),
+    routeMidi: (role, fn) => {
+      if (typeof fn !== 'function') { addScriptTrace('error', scriptId, 'routeMidi(role, fn) needs a block to run'); return; }
+      const previous = routedRole;
+      routedRole = String(role ?? '') || null;
+      // finally, not a trailing restore: a throw inside the block must not leave every later send
+      // in the session pointed at the wrong synth.
+      try { fn(); } finally { routedRole = previous; }
+    },
     watch: (path, fn) => addWatch(scriptId, path, fn),
     compute: (path, fn) => addCompute(scriptId, path, fn),
     intercept: (path, fn) => addIntercept(scriptId, path, fn),
@@ -2766,6 +2877,7 @@ async function handlersFor(script) {
   if (hit && hit.key === key) return hit.handlers;
   clearListeners(script.id);
   clearReactive(script.id);
+  clearMidiFiltersFor(script.id);
   const handlers = await getHandlers(script);
   // The script record is kept alongside its handlers because the cache IS the loaded set: at
   // teardown the panel it belonged to may already have been switched away from, so the declared
@@ -2840,6 +2952,10 @@ function resetScriptState() {
   computeds.length = 0;
   filters.length = 0;
   actions.clear();
+  midiIn.length = 0;
+  midiOut.length = 0;
+  clearMidiFilters();
+  routedRole = null;
   stopAllTimers();
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
 }

@@ -66,6 +66,14 @@ public:
         rawSends.add (hex.joinIntoString (" "));
     }
 
+    // routeMidi / feedMidi. `routes` records the block boundaries as well as the role, because the
+    // bug worth catching is an override that is never lifted — every later send in the session
+    // would then go to the wrong synth, and nothing would say so.
+    juce::StringArray routes, fed;
+    void beginRouteOverride (const juce::String& role) override { routes.add (role); }
+    void endRouteOverride() override { routes.add ("<end>"); }
+    void feedMidi (const juce::var& bytes) override { fed.add (juce::JSON::toString (bytes, true)); }
+
     std::map<juce::String, juce::var> settings;
     void saveSetting (const juce::String& key, const juce::var& value) override { settings[key] = value; }
     juce::var listSettings() override
@@ -1947,6 +1955,53 @@ int main()
         runtime.runAction ("initPtch", juce::var());
         check (errors.joinIntoString ("\n").contains ("Registered actions: initPatch"),
                "an unknown action names the ones that do exist");
+    }
+
+    // 33) ce.midi expanded: wire filters, injection, routing, note duration (design doc §28) ------
+    {
+        juce::Array<juce::var> wire;
+        wire.add (makeScript ("wire", "lua", "panel", "onWire", "*",
+            "function onWire()\n"
+            "  interceptMidiOut(function(b) if b[1] == 0xB0 then return false end b[3] = 127 return b end)\n"
+            "  interceptMidiIn(function(b) b[2] = b[2] + 12 return b end)\n"
+            "end\n"
+            "function onSendNote() sendNote(1, 60, 20) end\n"
+            "function onSendCC() sendCC(1, 74, 40) end\n"
+            "function onRouted() routeMidi(\"aux\", function() sendCC(1, 74, 40) end) end\n"
+            "function onFed() feedMidi({0x90, 60, 100}) end\n"));
+        runtime.loadScripts (juce::var (wire));
+        runtime.runAction ("onWire", juce::var());
+
+        // interceptOut rewrites: velocity forced to 127 on the way out.
+        juce::var note = juce::var (juce::Array<juce::var> { 0x90, 60, 20 });
+        check (runtime.filterMidi (false, note), "interceptOut: a note is not swallowed");
+        check ((int) (*note.getArray())[2] == 127, "interceptOut: the filter rewrote the outgoing byte");
+
+        // …and swallows: CC blocked outright.
+        juce::var cc = juce::var (juce::Array<juce::var> { 0xB0, 74, 40 });
+        check (! runtime.filterMidi (false, cc), "interceptOut: returning false swallowed the message");
+
+        // interceptIn is a separate chain — transposing what arrives, before any binding sees it.
+        juce::var in = juce::var (juce::Array<juce::var> { 0x90, 60, 100 });
+        check (runtime.filterMidi (true, in), "interceptIn: passed through");
+        check ((int) (*in.getArray())[1] == 72, "interceptIn: transposed the incoming note");
+
+        // routeMidi: the block's sends carry the role, and it is put back afterwards.
+        host.routes.clear();
+        runtime.runAction ("onRouted", juce::var());
+        check (host.routes.contains ("aux"), "routeMidi: the block sent to the named role");
+        check (host.routes.contains ("<end>"), "routeMidi: and the override was lifted at the end");
+
+        // feedMidi: reaches the host's injection point, not the send path.
+        host.fed.clear();
+        runtime.runAction ("onFed", juce::var());
+        check (host.fed.size() == 1, "feedMidi: injected exactly one message");
+
+        // sendNote(ch, note, vel, ms) schedules the note off rather than leaving a hung voice.
+        host.rawSends.clear();
+        runtime.runAction ("onSendNote", juce::var());
+        check (host.rawSends.size() == 1, "sendNote without a duration sends one message");
+        check (host.rawSends[0] == "90 3C 14", "…and it is the note on, unfiltered at this level");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

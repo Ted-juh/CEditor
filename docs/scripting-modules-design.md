@@ -1642,3 +1642,78 @@ It happened first in `panelRuntime.js`, where it was harmless enough to miss, an
 escape `"\u0000void"` — plain ASCII in a plain ASCII source file. The verification set gained a
 tree-wide NUL scan, because the one thing worse than an invisible character is an invisible
 character you have already met.
+
+## 28. `ce.midi` expanded — the wire, not just the sends
+
+`ce.midi` was 29 members: **13 senders and 16 encoders**. All outbound, plus pure functions.
+Inbound was react-only — `onCcIn` fires *after* a binding has already moved the control — and no
+send had a destination, because a panel picks one device role at design time.
+
+Five expansions, all cross-runtime:
+
+| verb | what the panel cannot express |
+|---|---|
+| `interceptMidiIn(fn)` | rewrite, remap or swallow a message **before** the bindings act on it |
+| `interceptMidiOut(fn)` | rewrite, thin or block what the panel sends — from a script *or* from a binding |
+| `feedMidi(bytes)` | inject as if the hardware had sent it, driving the panel's own bindings |
+| `routeMidi(role, fn)` | send a block to a different device than the one bound at design time |
+| `sendNote(…, ms)` | a note that ends by itself |
+
+### Where the filters sit is the feature
+
+`ce.core.intercept` filters a **model path**. These filter the **wire**, and the difference is
+placement. Putting them in the scripting runtime would have been easy and nearly useless: inbound
+reaches the panel's bindings, the note input and the transport long before any script sees it, and
+outbound leaves from a control's own binding as often as from a `sendCC`. A filter applied only
+where scripts happen to look is a rule that holds for scripts and not for the panel — exactly the
+half-measure `ce.core.intercept` had to grow a settle pass to avoid.
+
+Both paths turned out to have exactly one door:
+
+```
+inbound   deviceProfileSession.js  →  latestMidiInputMessage.set(...)
+outbound  bridge.js                →  triggerRawMidiAction(...)
+```
+
+Neither can import `panelRuntime` — the runtime imports both, so it would be a cycle. Hence
+`midiFilters.js`: a registration seam holding one function per direction. The runtime keeps its own
+per-script chains and installs one filter; which script wins and in what order stays the runtime's
+business. In the C++ player the same split is a `ScriptRuntime::filterMidi(inbound, bytes)` the host
+calls at its own two doors.
+
+**A throwing filter passes the message through unchanged.** Failing closed would let a typo in one
+script turn into "my hardware stopped responding" — a symptom with no visible cause. The error is
+reported; the MIDI keeps flowing.
+
+### Why `feed` is not `set`
+
+`set("cutoff.value", 64)` moves a control and bypasses every binding. `feedMidi` goes in the front
+door, so the bindings, the note input and the transport all act on it — which is how a script-built
+arpeggiator or step sequencer drives the panel instead of fighting it. Fed messages run the inbound
+filters too: a velocity curve that applies to the keyboard has to apply to the sequencer.
+
+### Why routing is a block
+
+`routeMidi(role, fn)` rather than a `role` argument on thirteen senders. The destination is a
+decision about a *run* of sends, and threading it through every signature in four runtimes is the
+same decision written thirteen times. It copies `noTransmit(fn)`, which already had this shape, and
+the restore is in a `finally`: a throw inside the block must not leave every later send in the
+session pointed at the wrong synth. `sendNote`'s scheduled note-off captures the role at send time,
+so a note started inside a block ends where it began even though the block has long since closed.
+
+### What the machinery caught
+
+`sendNote`'s duration schedules the note off with `after()` — which is `ce.time`, not `ce.midi`. The
+prelude-dependency test failed the moment the call appeared:
+
+```
+lua @module ce.midi calls after() from ce.time — add "ce.time" to ce.midi's requires
+```
+
+So `ce.midi` declares `requires: ['ce.core', 'ce.music', 'ce.time']` now, and a second test failed
+in turn: a panel whose only script calls `sendCC` auto-detects `ce.time` as well, because
+auto-detection follows the dependency graph rather than the names in the source. Both failures were
+correct, and neither would have been noticed by hand.
+
+The alternative — leaving the note-off to the script — is the one MIDI mistake you *hear* rather
+than read. A hung voice is worth a module dependency.

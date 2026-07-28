@@ -441,7 +441,12 @@ export function initDeviceProfileBridge() {
   });
 
   onMidiInputMessage((payload) => {
-    latestMidiInputMessage.set(payload ?? null);
+    // ce.midi.interceptIn sits HERE, not in the scripting runtime, because everything downstream —
+    // the panel's bindings, the note input, the transport — reads this store. A filter applied only
+    // where scripts listen would be a rule that holds for scripts and not for the panel.
+    const filtered = filterInboundMidi(payload ?? null);
+    if (filtered === null || filtered === undefined) return;   // a filter swallowed it
+    latestMidiInputMessage.set(filtered);
   });
 
   onSysexInputMessage((payload) => {
