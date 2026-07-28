@@ -81,6 +81,22 @@ public:
         return setAtPath (control, resolveModelPath (control, split.second), toWrite);
     }
 
+    /** Every control's name, in document order, containers included — what ce.panel.snapshot walks.
+        Public because panelQuery("controls") answers from it; the walk itself stays private. */
+    juce::StringArray controlNames() const
+    {
+        juce::StringArray out;
+        forEachControl ([&out] (const juce::var& c)
+        {
+            if (auto* core = readChildValue (c, "Core").getDynamicObject())
+            {
+                const auto name = core->getProperty ("name").toString();
+                if (name.isNotEmpty()) out.add (name);
+            }
+        });
+        return out;
+    }
+
     /** A control's numeric range from its Behavior section. False when it hasn't got one. */
     static bool rangeOf (const juce::var& control, double& lo, double& hi)
     {
@@ -229,27 +245,55 @@ private:
         return { name, segs };
     }
 
-    juce::var findControlByName (const juce::String& name) const
+    /** Walk every control in the document, containers included, in document order.
+        Controls nest inside a container's `Children._children.<id>` (a map, not an array), which is
+        the same shape the editor's own containment walk follows. */
+    template <typename Fn>
+    void forEachControl (Fn&& fn) const
     {
         auto* obj = doc.getDynamicObject();
-        if (obj == nullptr) return {};
-        auto controls = obj->getProperty ("controls");
-        auto* arr = controls.getArray();
-        if (arr == nullptr) return {};
+        if (obj == nullptr) return;
+        auto* arr = obj->getProperty ("controls").getArray();
+        if (arr == nullptr) return;
+        for (const auto& c : *arr) visitControl (c, fn);
+    }
 
+    // Matches on name OR id, case-insensitively, and DOES descend into containers — a control
+    // inside a group was unreachable window-closed until snapshot needed to list one, at which
+    // point listing a name that get() could not read would have been worse than not listing it.
+    juce::var findControlByName (const juce::String& name) const
+    {
         const auto target = name.toLowerCase();
-        for (const auto& c : *arr)
+        juce::var found;
+        forEachControl ([&found, &target] (const juce::var& c)
         {
-            const auto core = readChildValue (c, "Core");
-            if (auto* coreObj = core.getDynamicObject())
+            if (found.isObject()) return;
+            if (auto* coreObj = readChildValue (c, "Core").getDynamicObject())
             {
                 const auto cname = coreObj->getProperty ("name").toString().toLowerCase();
                 const auto cid   = coreObj->getProperty ("id").toString().toLowerCase();
-                if (cname == target || cid == target) return c;
+                if (cname == target || cid == target) found = c;
             }
-        }
-        return {};
+        });
+        return found;
     }
+
+private:
+    template <typename Fn>
+    static void visitControl (const juce::var& control, Fn& fn)
+    {
+        if (! control.isObject()) return;
+        fn (control);
+        if (auto* kids = readChildValue (control, "Children").getDynamicObject())
+        {
+            auto nested = kids->getProperty ("_children");
+            if (auto* nestedObj = nested.getDynamicObject())
+                for (const auto& prop : nestedObj->getProperties())
+                    visitControl (prop.value, fn);
+        }
+    }
+
+public:
 
     // Common shorthands → canonical section path (mirrors SHORTHANDS in panelRuntime.js).
     static juce::String shorthand (const juce::String& lowerFirst)

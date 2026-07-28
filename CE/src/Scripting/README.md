@@ -239,6 +239,21 @@ Three behaviours the cross-engine tests pin: an unknown name returns nil rather 
 "major"; a quantise tie goes **up**, always; and quantise keeps the octave it was given. See §20 of
 `docs/scripting-modules-design.md`.
 
+### Panel snapshots
+
+`ce.panel.snapshot()` returns `{ controlName: value }` for every control that has a value;
+`ce.panel.restore(snap)` puts them back and returns how many landed. Both are `runtime: 'any'` —
+the only two `ce.panel` verbs that are, which makes `ce.panel` the first MIXED module (its structure
+verbs stay panel-view only and say so individually).
+
+Built on one host primitive, `ScriptHostApi::panelQuery("controls")`, plus `get`/`set` — so a
+snapshot sees exactly what a script could already address by name. A control with no value is left
+out rather than recorded as nothing; a name the panel no longer has is skipped rather than failing
+the whole restore. See §22 of `docs/scripting-modules-design.md`.
+
+`PanelValueModel::findControlByName` and `controlNames` both walk INTO containers. They did not
+before, which meant a control inside a Group was unaddressable by name window-closed.
+
 ### One-shot delays
 
 `ce.time.after(ms, fn)` runs `fn` once and returns the timer id it armed, so `stopTimer(id)` cancels

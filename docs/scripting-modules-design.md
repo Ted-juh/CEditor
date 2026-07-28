@@ -108,7 +108,7 @@ the beginning.
 | `ce.math` | `scale` `clamp` `round` `snap` `curve` `lerp`, seeded `random` | any |
 | `ce.music` | note names, scales, chords, quantise-to-scale | any — ✅ *complete* (§20) |
 | `ce.time` | `tempo()`, `onBeat`/`onBar`, timers, `after`, `syncTimer` | any |
-| `ce.panel` | `create` `destroy` `clone` `parent` `find` `each` `snapshot` | structure: webview |
+| `ce.panel` | `create` `destroy` `clone` `parent` `find` `each` `snapshot` | structure: webview; `snapshot`/`restore` any — §22 |
 | `ce.draw` | the 2D context + `onDraw` | webview |
 | `ce.anim` | `animate` `spring` | values any, visuals webview |
 | `ce.ui` | `notify` `status` `dialog` | webview |
@@ -1266,3 +1266,59 @@ stubbed only `log` and `sendCC`. That does not fail the helper under test — it
 prelude**, before any helper is defined, so a test about `panic()` started reporting that `panic` was
 nil. Worth remembering: a prelude that does work at load time makes every fixture that loads it a
 dependency.
+
+---
+
+## 22. `ce.panel.snapshot` / `.restore`, and the first mixed module
+
+Capture every control's value and put them back. A/B comparison, a scripted undo, "save what it was
+before I randomised it", and half of what a scene recall does — none of it expressible before
+without naming every control by hand.
+
+```lua
+local before = ce.panel.snapshot()
+randomisePatch()
+-- …and back, from a footswitch:
+ce.panel.restore(before)
+```
+
+### `ce.panel` is now MIXED, and that is the honest shape
+
+Creating a control needs a renderer. Reading and writing a value does not — and *"put the panel back
+how it was before the solo"* is a footswitch action in a DAW with the window shut, which is exactly
+where it has to work. So `snapshot` and `restore` are `runtime: 'any'` while the seven structure
+verbs beside them stay `runtime: 'webview'`.
+
+That makes `ce.panel` the first module whose members do not all share its runtime, and the module
+itself is declared `any`. Declaring it `webview` would make `ce.has("ce.panel")` tell a script to
+skip two verbs that work perfectly window-closed. The **per-member** markers are what state the
+boundary precisely; the module now says only "some of this reaches you", which is true.
+
+### One host primitive
+
+`panelQuery(kind, payload)`, alongside `deviceQuery` and for the same reason: one verb rather than a
+method per question, so adding a question later does not change the interface every host implements.
+`"controls"` returns the control names, and the preludes build both verbs on that plus `get`/`set` —
+so **what a snapshot can see is exactly what a script could already address by name.**
+
+### Two rules
+
+- **A control with no value of its own is left out**, not recorded as nothing. Otherwise a restore
+  could blank a Label by writing nil over it.
+- **A name the panel no longer has is skipped**, not fatal. A snapshot taken before an edit is still
+  worth most of what it holds, and an all-or-nothing restore would throw the rest away over one
+  renamed knob. `restore` returns how many landed, so a script can notice.
+
+### The bug this found, which was never snapshot's
+
+`get("Osc1Cutoff.value")` returned nothing for a knob that was plainly there — **if it lived inside
+a Group or Container.** Both runtimes looked up a control by name in the panel's *top-level* array
+only, so every grouped control was unaddressable by name. Most real panels group their controls.
+
+Nothing had noticed because the failure is quiet: `get` returns nothing, `set` reports "no such
+control", and a panel author assumes they typed the name wrong. Snapshot found it because a snapshot
+that stopped at the top level would have silently missed most of a panel — listing a name that
+`get()` could not read would have been worse than not listing it.
+
+Both lookups walk the whole tree now, in both runtimes. It is a pure expansion: a name that resolved
+before still resolves, and the ones that never could now do.

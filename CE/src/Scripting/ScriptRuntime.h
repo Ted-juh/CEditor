@@ -155,6 +155,13 @@ public:
         the panel inventing 120bpm and calling it a measurement. */
     virtual juce::var transportState() { return {}; }
 
+    /** Ask the panel document about itself. `kind` "controls" returns an array of control NAMES, in
+        document order — what ce.panel.snapshot walks. Kept as one query verb rather than a method
+        per question for the same reason deviceQuery is: a host that cannot answer returns nothing,
+        and adding a question later does not change the interface every host has to implement. */
+    virtual juce::var panelQuery (const juce::String& kind, const juce::var& payload)
+    { juce::ignoreUnused (kind, payload); return {}; }
+
     // Flow / composition (Q6). run() is host-dispatched (works cross-language).
     virtual juce::var runAction (const juce::String& target, const juce::var& args) = 0;
     virtual void      emitEvent (const juce::String& name, const juce::var& data) = 0;

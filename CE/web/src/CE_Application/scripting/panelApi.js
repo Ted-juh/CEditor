@@ -1241,6 +1241,23 @@ export const PANEL_COMMANDS = [
   panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
     [T, { name: 'ms', type: 'number', required: true }]),
 
+  // --- Panel values: snapshot / restore ---
+  // The two members of ce.panel that are NOT panel-view only. Creating a control needs a renderer;
+  // reading and writing a value does not, and "put the panel back how it was before the solo" is a
+  // footswitch action in a DAW with the window shut — which is exactly where it has to work.
+  {
+    id: 'panelSnapshot', category: 'Panel components', signature: 'panelSnapshot() -> object',
+    summary: 'Every control\'s current value, as an object keyed by control name. Pair it with saveSetting to keep one, or hold it in `state` for an A/B compare. Controls with no value of their own are left out rather than recorded as nothing.',
+    params: [], scopes: 'any',
+    snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
+  },
+  {
+    id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
+    summary: 'Put the values back, and return how many landed. A name the panel no longer has is skipped rather than failing the whole restore — a snapshot taken before an edit is still worth most of what it holds.',
+    params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
+    snippet: { lua: 'ce.panel.restore(before)$0', javascript: 'ce.panel.restore(before);$0' },
+  },
+
   // --- The other twenty-three families (phase 7) ---
   // Everything above was hand-written, because each of those actions is genuinely structural.
   // These are expanded from componentVerbs.js instead: the spec there is the single description of
@@ -1374,8 +1391,12 @@ export const MODULES = [
     summary: 'Tell the person using the panel something, or ask them. Panel view only — there is nobody to tell with the window shut.' },
   { id: 'ce.draw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
-  { id: 'ce.panel', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Build the panel from a script: create, clone, parent and find controls. Panel view only — there is no renderer with the window shut.' },
+  // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
+  // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
+  // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
+  // stubs are what state the boundary precisely; the module says "some of this reaches you".
+  { id: 'ce.panel', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Build the panel from a script: create, clone, parent and find controls — panel view only, each verb says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -1430,6 +1451,7 @@ const MODULE_MEMBERS = {
     redraw: 'drawRedraw',
   },
   'ce.panel': {
+    snapshot: 'panelSnapshot', restore: 'panelRestore',
     create: 'panelCreate', clone: 'panelClone', destroy: 'panelDestroy',
     parent: 'panelParent', find: 'panelFind', info: 'panelInfo', types: 'panelTypes',
   },

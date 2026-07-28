@@ -10,6 +10,7 @@
 // Prints PASS/FAIL per check and returns non-zero on any failure.
 
 #include "Scripting/ScriptRuntime.h"
+#include "Player/PanelValueModel.h"
 #include <juce_core/juce_core.h>
 #include <iostream>
 
@@ -24,11 +25,30 @@ public:
     juce::StringArray logs;
     juce::StringArray ccSends;
 
-    juce::var getValue (const juce::String& path, const juce::String&) override
-    { auto it = values.find (path); return it != values.end() ? it->second : juce::var(); }
+    // Values are a flat path->var map by default, which is all most tests need. Attach a
+    // PanelValueModel instead when a test needs REAL path semantics — sections, nesting, the
+    // "has a value at all" distinction snapshot depends on.
+    ceditor::PanelValueModel* model = nullptr;
+
+    juce::var getValue (const juce::String& path, const juce::String& form) override
+    {
+        if (model != nullptr) return model->getValue (path, form.isEmpty() ? "value" : form);
+        auto it = values.find (path); return it != values.end() ? it->second : juce::var();
+    }
 
     void setValue (const juce::String& path, const juce::var& value, const juce::var&) override
-    { values[path] = value; }
+    {
+        if (model != nullptr) { model->setValue (path, value); return; }
+        values[path] = value;
+    }
+
+    juce::var panelQuery (const juce::String& kind, const juce::var&) override
+    {
+        if (model == nullptr || kind != "controls") return {};
+        juce::Array<juce::var> names;
+        for (const auto& n : model->controlNames()) names.add (n);
+        return juce::var (names);
+    }
 
     void sendCC (int ch, int cc, const juce::var& v) override
     { ccSends.add (juce::String (ch) + ":" + juce::String (cc) + ":" + v.toString()); }
@@ -1560,6 +1580,97 @@ int main()
             runtime.dispatchEvent ("onTimer", "", juce::var (info));
         }
         check (host.logs.contains ("JSFIRED"), "…and fires the callback on the tick");
+    }
+
+    // 28) ce.panel.snapshot / restore (design doc §22) ---------------------------------------------
+    // The only two ce.panel verbs that reach window-closed. They are built on one host primitive —
+    // panelQuery("controls") — plus get/set, so what a snapshot can see is exactly what a script
+    // could already address by name.
+    {
+        // A minimal panel document, with one control nested inside a container. The nesting is the
+        // point: most real panels group their controls, and a snapshot that stopped at the top
+        // level would silently miss most of one.
+        auto panelDoc = juce::JSON::parse (R"JSON({
+          "controls": [
+            { "_children": { "Core": { "name": "Cutoff" }, "Value": { "value": 40 } } },
+            { "_children": { "Core": { "name": "Label1" } } },
+            { "_children": { "Core": { "name": "Osc1" },
+                             "Children": { "_children": {
+                               "k1": { "_children": { "Core": { "name": "Deep" }, "Value": { "value": 77 } } } } } } }
+          ]
+        })JSON");
+        ceditor::PanelValueModel model;
+        model.load (panelDoc);
+
+        check (model.controlNames().size() == 4, "controlNames lists every control, containers included");
+        check (model.controlNames().contains ("Deep"), "…including one nested inside a container");
+        check (model.getValue ("Deep.value").isDouble() || model.getValue ("Deep.value").isInt(),
+               "…and a nested control is READABLE by name, so listing it is not a lie");
+
+        // The host answers panelQuery("controls") from that model; get/set go through it too.
+        TestHost snapHost;
+        snapHost.model = &model;
+        ScriptRuntime snapRuntime (snapHost);
+        snapRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+
+        juce::Array<juce::var> snapScripts;
+        snapScripts.add (makeScript ("snap", "lua", "panel", "onSnap", "*",
+            "SAVED = nil\n"
+            "function onSnap()\n"
+            "  SAVED = ce.panel.snapshot()\n"
+            "  local n = 0 for _ in pairs(SAVED) do n = n + 1 end\n"
+            "  log(\"count \" .. n)\n"
+            "  log(\"cutoff \" .. tostring(SAVED[\"Cutoff\"]))\n"
+            "  log(\"deep \" .. tostring(SAVED[\"Deep\"]))\n"
+            "  log(\"label \" .. tostring(SAVED[\"Label1\"]))\n"
+            "end\n"
+            "function onWreck() set(\"Cutoff.value\", 99) set(\"Deep.value\", 1) end\n"
+            "function onPut() log(\"put \" .. tostring(ce.panel.restore(SAVED))) end\n"
+            "function onStale() log(\"stale \" .. tostring(ce.panel.restore({ Cutoff = 5, Ghost = 1 }))) end\n"
+            "function onJunk() log(\"junk \" .. tostring(ce.panel.restore(\"nope\"))) end\n"));
+        snapRuntime.loadScripts (juce::var (snapScripts));
+
+        snapHost.logs.clear();
+        snapRuntime.runAction ("onSnap", juce::var());
+        check (snapHost.logs.contains ("count 2"), "snapshot captures the controls that have a value");
+        check (snapHost.logs.contains ("cutoff 40"), "…keyed by name");
+        check (snapHost.logs.contains ("deep 77"), "…including the one inside the container");
+        // Left OUT, not recorded as nothing: otherwise a restore could blank a Label with nil.
+        check (snapHost.logs.contains ("label nil"), "…and a control with no value is left out entirely");
+
+        snapRuntime.runAction ("onWreck", juce::var());
+        check ((int) model.getValue ("Cutoff.value") == 99, "…(the panel really did move)");
+        snapHost.logs.clear();
+        snapRuntime.runAction ("onPut", juce::var());
+        check (snapHost.logs.contains ("put 2"), "restore reports how many values landed");
+        check ((int) model.getValue ("Cutoff.value") == 40, "…and puts them back");
+        check ((int) model.getValue ("Deep.value") == 77, "…nested ones included");
+
+        snapHost.logs.clear();
+        snapRuntime.runAction ("onStale", juce::var());
+        check (snapHost.logs.contains ("stale 1"),
+               "a name the panel no longer has is skipped, not fatal — a stale snapshot is still worth most of itself");
+        check ((int) model.getValue ("Cutoff.value") == 5, "…and the names that DO exist still land");
+
+        snapHost.logs.clear();
+        snapRuntime.runAction ("onJunk", juce::var());
+        check (snapHost.logs.contains ("junk 0"), "restoring something that is not a table changes nothing");
+
+        // With no panel host at all, snapshot is an EMPTY TABLE — iterating it must still be safe.
+        TestHost bare;
+        ScriptRuntime bareRuntime (bare);
+        juce::Array<juce::var> bareScripts;
+        bareScripts.add (makeScript ("bare", "lua", "panel", "onBare", "*",
+            "function onBare()\n"
+            "  local s = ce.panel.snapshot()\n"
+            "  local n = 0 for _ in pairs(s) do n = n + 1 end\n"
+            "  log(\"bare \" .. type(s) .. \" \" .. n)\n"
+            "end\n"));
+        bareRuntime.loadScripts (juce::var (bareScripts));
+        bare.logs.clear();
+        bareRuntime.runAction ("onBare", juce::var());
+        check (bare.logs.contains ("bare table 0"),
+               "with no panel host, snapshot is an empty TABLE — never nil, so iterating it is safe");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

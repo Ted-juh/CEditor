@@ -277,6 +277,13 @@ PyObject* api_deviceQuery (PyObject*, PyObject* args)
     return varToPy (g_host->deviceQuery (juce::String::fromUTF8 (kind),
                                          payload != nullptr ? pyToVar (payload) : juce::var()));
 }
+PyObject* api_panelQuery (PyObject*, PyObject* args)
+{
+    const char* kind = nullptr; PyObject* payload = nullptr;
+    if (! PyArg_ParseTuple (args, "s|O", &kind, &payload)) return nullptr;
+    return varToPy (g_host->panelQuery (juce::String::fromUTF8 (kind),
+                                        payload != nullptr ? pyToVar (payload) : juce::var()));
+}
 PyObject* api_run (PyObject*, PyObject* args)
 {
     const char* target = nullptr; PyObject* a = nullptr;
@@ -351,6 +358,7 @@ PyMethodDef apiMethods[] = {
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
+    { "panelQuery",    api_panelQuery,    METH_VARARGS, nullptr },
     { "transportState", api_transportState, METH_NOARGS,  nullptr },
     { "animate",       api_animate,       METH_VARARGS, nullptr },
     { "animateStop",   api_animateStop,   METH_VARARGS, nullptr },
@@ -846,6 +854,35 @@ def sendTransport(action="start"):
 def __role(r):
     return "mainSynth" if r is None or r == "" else str(r)
 
+# @module ce.panel
+# snapshot / restore. The only two ce.panel verbs that are NOT panel-view only: creating a control
+# needs a renderer, reading and writing a value does not — and "put the panel back how it was before
+# the solo" is a footswitch action in a DAW with the window shut.
+#
+# A control with no value of its own is LEFT OUT rather than recorded as nothing, so restoring a
+# snapshot cannot blank a label by writing None over it.
+def __panelQuery(kind, payload=None):
+    return __api.panelQuery(kind, payload)
+def panelSnapshot():
+    out = {}
+    names = __panelQuery("controls", None)
+    if not names: return out
+    for name in names:
+        v = get(name + ".value")
+        if v is not None: out[name] = v
+    return out
+def panelRestore(snap):
+    if not isinstance(snap, dict): return 0
+    n = 0
+    for name, v in snap.items():
+        # A name the panel no longer has is skipped rather than failing the whole restore: a
+        # snapshot taken before an edit is still worth most of what it holds.
+        if get(name + ".value") is not None:
+            set(name + ".value", v)
+            n += 1
+    return n
+
+# @module ce.device
 def __deviceQuery(kind, payload=None):
     return __api.deviceQuery(kind, payload)
 
@@ -894,7 +931,7 @@ __CE_MODULES = {
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
     "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
     "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
-    "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
+    "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes" },
     "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -936,7 +973,7 @@ __CE_META = [
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
     { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.0", "runtime": "webview" },
-    { "id": "ce.panel", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.panel", "version": "1.1", "runtime": "any" },
     { "id": "ce.storage", "version": "1.0", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },

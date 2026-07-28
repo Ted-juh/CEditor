@@ -95,7 +95,12 @@ function findControlByName(name) {
   const panel = activePanel();
   if (!panel) return null;
   const target = String(name ?? '').toLowerCase();
-  return panel.controls.find((c) => {
+  // flatControls, NOT panel.controls: a control inside a Group or Container was unreachable by
+  // name — get("Osc1Cutoff.value") returned nothing for a knob that was plainly there, in both
+  // runtimes, and most real panels group their controls. ce.panel.snapshot found it, because a
+  // snapshot that stopped at the top level would have silently missed most of a panel.
+  // A name that resolved before still resolves; this only adds the ones that never could.
+  return flatControls(panel.controls ?? []).find((c) => {
     const core = c?._children?.Core;
     return String(core?.name ?? '').toLowerCase() === target || String(core?.id ?? '').toLowerCase() === target;
   }) ?? null;
@@ -1415,6 +1420,39 @@ function panelInfoImpl(name) {
 }
 
 /**
+ * snapshot() / restore() — every control's value, captured and put back.
+ *
+ * A control with no value of its own is LEFT OUT rather than recorded as nothing: restoring must
+ * not be able to blank a Label by writing undefined over it. And restore SKIPS a name the panel no
+ * longer has rather than failing the whole call — a snapshot taken before an edit is still worth
+ * most of what it holds, and an all-or-nothing restore would throw the rest away.
+ */
+function panelSnapshotImpl() {
+  const panel = activePanel();
+  const out = {};
+  if (!panel) return out;
+  for (const control of flatControls(panel.controls ?? [])) {
+    const name = control?._children?.Core?.name;
+    if (!name) continue;
+    const v = getValue(`${name}.value`);
+    if (v !== undefined && v !== null) out[name] = v;
+  }
+  return out;
+}
+
+function panelRestoreImpl(snap) {
+  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return 0;
+  let n = 0;
+  for (const [name, value] of Object.entries(snap)) {
+    if (getValue(`${name}.value`) === undefined) continue;
+    setValue(`${name}.value`, value);
+    n += 1;
+  }
+  addScriptTrace('log', '', `panel restore: ${n} of ${Object.keys(snap).length} value(s)`);
+  return n;
+}
+
+/**
  * Remove every control a script generated. Called before onPanelBuild, which is what makes a build
  * idempotent — and called on panel teardown, so a session never leaves generated controls behind.
  */
@@ -1759,6 +1797,11 @@ function buildApi(ownerName, scriptId = '') {
     panelFind: (query) => panelFindImpl(query),
     panelInfo: (name) => panelInfoImpl(name),
     panelTypes: () => Object.keys(COMPONENT_TYPES),
+    // The two ce.panel verbs that are NOT panel-view only. The C++ preludes build these on a host
+    // query for the control names plus get/set; here the panel object is in hand, so the same walk
+    // is direct. Same rules either way — see panelSnapshotImpl.
+    panelSnapshot: () => panelSnapshotImpl(),
+    panelRestore: (snap) => panelRestoreImpl(snap),
     // ce.time — reads and musical timers
     tempo: () => tempoRead(),
     isPlaying: () => isPlayingRead(),

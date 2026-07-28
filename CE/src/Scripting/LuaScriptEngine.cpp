@@ -503,6 +503,35 @@ function animateRunning(path) return __animateRunning(path == nil and "" or tost
 -- returns nil and the host has already said why, so these hand back nil / an empty list rather
 -- than pretending the synth has nothing.
 local function __role(r) if r == nil or r == "" then return "mainSynth" end return tostring(r) end
+-- @module ce.panel
+-- snapshot / restore. The only two ce.panel verbs that are NOT panel-view only: creating a control
+-- needs a renderer, reading and writing a value does not — and "put the panel back how it was
+-- before the solo" is a footswitch action in a DAW with the window shut.
+--
+-- A control with no value of its own is LEFT OUT rather than recorded as nothing, so restoring a
+-- snapshot cannot blank a label by writing nil over it.
+function panelSnapshot()
+  local out = {}
+  local names = __panelQuery("controls", nil)
+  if names == nil then return out end
+  for _, name in ipairs(names) do
+    local v = get(name .. ".value")
+    if v ~= nil then out[name] = v end
+  end
+  return out
+end
+function panelRestore(snap)
+  if type(snap) ~= "table" then return 0 end
+  local n = 0
+  for name, v in pairs(snap) do
+    -- A name the panel no longer has is skipped rather than failing the whole restore: a snapshot
+    -- taken before an edit is still worth most of what it holds.
+    if get(name .. ".value") ~= nil then set(name .. ".value", v) n = n + 1 end
+  end
+  return n
+end
+
+-- @module ce.device
 function deviceProfile(role) return __deviceQuery("profile", { role = __role(role) }) end
 function deviceConnected(role) return __deviceQuery("connected", { role = __role(role) }) == true end
 function deviceParameters(opts)
@@ -543,7 +572,7 @@ local __CE_MODULES = {
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
   ["ce.draw"] = { circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
-  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", find = "panelFind", info = "panelInfo", parent = "panelParent", types = "panelTypes" },
+  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", find = "panelFind", info = "panelInfo", parent = "panelParent", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes" },
   ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -585,7 +614,7 @@ local __CE_META = {
   { id = "ce.anim", version = "1.0", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },
   { id = "ce.draw", version = "1.0", runtime = "webview" },
-  { id = "ce.panel", version = "1.0", runtime = "webview" },
+  { id = "ce.panel", version = "1.1", runtime = "any" },
   { id = "ce.storage", version = "1.0", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },
@@ -769,6 +798,10 @@ public:
         g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)
             { return varToSol (lua, host->deviceQuery (juce::String (kind),
                                                        payload ? solToVar (*payload) : juce::var())); });
+
+        g.set_function ("__panelQuery", [this] (std::string kind, sol::optional<sol::table> payload)
+            { return varToSol (lua, host->panelQuery (juce::String (kind),
+                                                      payload ? solToVar (*payload) : juce::var())); });
 
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });

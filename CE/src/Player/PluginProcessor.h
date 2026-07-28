@@ -708,6 +708,16 @@ private:
         // ce.device reads. Window-CLOSED these are synchronous calls straight into
         // DeviceProfileService, so a script gets the complete answer on the first call — unlike
         // the editor, where the parameter table arrives over the async bridge (documented there).
+        // What the panel document holds. One query verb, like deviceQuery, so a later question does
+        // not change the interface every host implements. "controls" is what ce.panel.snapshot walks.
+        cb.panelQuery = [this] (const juce::String& kind, const juce::var&) -> juce::var
+        {
+            if (kind != "controls") return {};
+            juce::Array<juce::var> names;
+            for (const auto& n : scriptValues.controlNames()) names.add (n);
+            return juce::var (names);
+        };
+
         cb.deviceQuery = [this] (const juce::String& kind, const juce::var& payload) -> juce::var
         {
             auto* p = payload.getDynamicObject();
