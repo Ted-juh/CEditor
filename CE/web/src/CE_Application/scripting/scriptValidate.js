@@ -3,6 +3,7 @@
 // Heuristic, language-agnostic checks driven by panelApi.js (the single source of truth):
 //   • the script defines a handler matching the event/lifecycle it runs on,
 //   • scope-limited commands (e.g. sendSysex) aren't used in the wrong scope,
+//   • a component verb is aimed at a control whose type actually has that section,
 //   • on(target,"event",…) references a real event name.
 //
 // Messages are GUIDANCE, not stack traces (spec: "a name should explain itself").
@@ -13,6 +14,8 @@ import {
   ALL_MEMBERS, EVENT_BY_ID, ALL_EVENTS, isValidInScope, WEBVIEW_ONLY_MEMBERS,
   MEMBER_MODULE, MODULE_BY_ID, modulesUsedBy, panelModules, memberPath,
 } from './panelApi.js';
+import { FAMILY_SECTIONS, memberAppliesToType, familiesForType, typeOfControl } from './componentSchema.js';
+import { flatControls } from '../utils/containment.js';
 
 const EVENT_FNS = new Set(ALL_EVENTS.map((e) => e.fn));
 const EVENT_IDS = new Set(ALL_EVENTS.map((e) => e.id));
@@ -30,6 +33,26 @@ const WINDOW_CLOSED_HANDLERS = new Set([
 
 function escapeRe(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// The component verbs, by flat name — the only members whose validity depends on WHAT the target
+// is rather than where the script runs. Everything else in the API applies to any control.
+const COMPONENT_MEMBERS = ALL_MEMBERS.filter((m) => FAMILY_SECTIONS[MEMBER_MODULE[m.id]?.module]);
+
+/** name (lower-cased) -> component type, over the whole tree. */
+function controlTypes(panel) {
+  const out = new Map();
+  // flatControls, not panel.controls: most real panels group their controls, and a check that
+  // stopped at the top level would report "no such control" for half of them — worse than the
+  // silence it replaces.
+  for (const control of flatControls(panel?.controls ?? [])) {
+    const core = control?._children?.Core;
+    const type = typeOfControl(control);
+    for (const key of [core?.name, core?.id]) {
+      if (key) out.set(String(key).toLowerCase(), type);
+    }
+  }
+  return out;
 }
 
 /** Validate one source-based script → array of { severity, message }.
@@ -116,7 +139,46 @@ export function validateScript(script, panel = null) {
     });
   }
 
-  // 5) on(target, "event", …) — flag unknown event names.
+  // 5) A component verb aimed at a control that has no such section.
+  //
+  //    The picker and autocomplete already narrow to the target's type, so this cannot be reached
+  //    by browsing — but it is trivially reached by pasting code in, by renaming a control, or by
+  //    changing what the script is attached to. Until this check existed those all produced a
+  //    script the editor called clean and the runtime quietly refused, which is the exact failure
+  //    the narrowing was meant to end.
+  //
+  //    Only a LITERAL first argument is checked. `arpRate(name, 4)` is unknowable without running
+  //    the thing, and guessing would put a red mark on correct code — much worse than silence.
+  if (panel) {
+    const types = controlTypes(panel);
+    for (const m of COMPONENT_MEMBERS) {
+      const callRe = new RegExp(`\\b${escapeRe(m.id)}\\s*\\(\\s*["']([^"']+)["']`, 'g');
+      const seen = new Set();
+      let call;
+      while ((call = callRe.exec(src)) !== null) {
+        const name = call[1];
+        if (seen.has(name.toLowerCase())) continue;   // one message per verb per target, not per call
+        seen.add(name.toLowerCase());
+
+        const type = types.get(name.toLowerCase());
+        // An unknown name is somebody else's problem: the panel may gain the control later, and
+        // this check is not the place to police spelling.
+        if (type === undefined || memberAppliesToType(m.id, type)) continue;
+
+        const own = familiesForType(type);
+        const instead = own.length
+          ? ` Its own verbs are ${own.join(', ')}.`
+          : ` A ${type} has no component verbs of its own — ce.midi, ce.draw and ce.anim work on it.`;
+        problems.push({
+          severity: 'error',
+          message: `${memberPath(m.id)}("${name}", …) — "${name}" is a ${type}, which has no `
+            + `${FAMILY_SECTIONS[MEMBER_MODULE[m.id].module]} section, so the call does nothing.${instead}`,
+        });
+      }
+    }
+  }
+
+  // 6) on(target, "event", …) — flag unknown event names.
   const onRe = /\bon\s*\(\s*[^,]+,\s*["']([^"']+)["']/g;
   let mtch;
   while ((mtch = onRe.exec(src)) !== null) {

@@ -56,6 +56,7 @@ import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
 import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
+import { typeOfControl, familiesForType } from './componentSchema.js';
 import { SCALES, CHORDS } from './musicTheory.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
@@ -745,12 +746,40 @@ function scriptPrint(kind, scriptId, message, value) {
 // pure reducer the editor's own buttons use, and writes the result back — so a
 // footswitch changing the split mid-set is one line.
 // @module ce.components
+/**
+ * The message for a component verb pointed at the wrong control.
+ *
+ * It used to name only what was missing — `"cutoffslider" is not an Arpeggiator (no Arp section)`.
+ * True, and no help: the person reading it already believed it WAS one, and the reply tells them
+ * nothing about what they have actually got. So say what it is, and what it can do instead.
+ *
+ * It also separates two failures the old text ran together. A name with no control behind it and a
+ * control of the wrong kind read identically before ("is not an Arpeggiator" for a typo), and they
+ * want opposite fixes — one is a spelling mistake, the other is a misunderstanding.
+ */
+function wrongTargetMessage(path, section, label) {
+  const article = /^[AEIOU]/i.test(label) ? 'an' : 'a';
+  const control = findControlByName(path);
+  if (!control) return `"${path}" — this panel has no control by that name.`;
+
+  const type = typeOfControl(control);
+  // No type at all is not a case the model produces, but a message is the wrong place to throw.
+  if (!type) return `"${path}" is not ${article} ${label} (no ${section} section).`;
+
+  const families = familiesForType(type);
+  const instead = families.length
+    ? `Its own verbs are ${families.join(', ')}.`
+    : `${/^[AEIOU]/i.test(type) ? 'An' : 'A'} ${type} has no component verbs of its own — `
+      + 'ce.midi, ce.draw and ce.anim all work on it.';
+  return `"${path}" is ${/^[AEIOU]/i.test(type) ? 'an' : 'a'} ${type}, not ${article} ${label}. ${instead}`;
+}
+
 function splitAction(path, action, args) {
   const target = String(path ?? '');
   const zonesPath = `${target}.SplitZone.zones`;
   const current = getValue(zonesPath);
   if (!Array.isArray(current)) {
-    addScriptTrace('error', '', `split: "${target}" is not a Zone Splitter (no SplitZone.zones)`);
+    addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
     return;
   }
   const next = applySplitScriptAction(current, action, args ?? {});
@@ -775,7 +804,7 @@ function phraseAction(path, action, args) {
   const target = String(path ?? '');
   const cfg = getValue(`${target}.Phrase`);
   if (!cfg || typeof cfg !== 'object') {
-    addScriptTrace('error', '', `phrase: "${target}" is not a Phrase Sequencer (no Phrase section)`);
+    addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
     return;
   }
   const patch = phraseScriptPatch(cfg, action, args ?? {}, () => Math.random());
@@ -808,7 +837,7 @@ function sectionAction(path, section, reducer, action, args) {
   const target = String(path ?? '');
   const cfg = getValue(`${target}.${section}`);
   if (!cfg || typeof cfg !== 'object') {
-    addScriptTrace('error', '', `${section.toLowerCase()}: "${target}" is not a ${section} (no ${section} section)`);
+    addScriptTrace('error', '', `${section.toLowerCase()}: ${wrongTargetMessage(target, section, section)}`);
     return;
   }
   const patch = reducer(cfg, action, args ?? {});
@@ -869,11 +898,7 @@ function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
   const cfg = getValue(`${path}.${verb.section}`);
   if (!cfg || typeof cfg !== 'object') {
-    // "an Arpeggiator", "a Looper". A message somebody reads when something has gone wrong is the
-    // worst place to look sloppy, and the rule is one line.
-    const article = /^[AEIOU]/i.test(verb.label) ? 'an' : 'a';
-    addScriptTrace('error', '',
-      `${verb.family}: "${path}" is not ${article} ${verb.label} (no ${verb.section} section)`);
+    addScriptTrace('error', '', `${verb.family}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
     return;
   }
   const patch = componentScriptPatch(verb, cfg, args);

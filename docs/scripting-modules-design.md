@@ -1494,3 +1494,61 @@ what this is" must not render as "this can do nothing".
 The asymmetry is deliberate, though: an *unknown component type* does narrow the component families
 to nothing. A type the build has never heard of should show an empty component tree loudly, rather
 than quietly offer all 28 families as if any of them would work.
+
+## 26. Closing the loop: the validator and the message
+
+§25 narrowed two surfaces. It also claimed a third — that the runtime error could name what the
+control *does* have — and left it unwired. Both halves are now built, and they are the same fact
+said at two different moments.
+
+### The validator is what makes narrowing hold
+
+The picker and autocomplete stop you *finding* the wrong verb. Neither stops you *writing* one.
+Paste a snippet in, rename a control, change what the script is attached to, and the narrowing has
+already happened — the source is what it is, and nothing looks at it again. Until this check
+existed all three produced a script the editor marked **✓ No problems** and the runtime quietly
+refused.
+
+`validateScript` now scans for a component verb with a **literal** first argument, resolves that
+name against the panel's controls (flattened — most panels group their controls, and stopping at
+the top level would report half of them as unknown), and errors when the type has no such section:
+
+```
+ce.components.arp.rate("cutoffslider", …) — "cutoffslider" is a Slider, which has no Arp
+section, so the call does nothing. A Slider has no component verbs of its own — ce.midi,
+ce.draw and ce.anim work on it.
+```
+
+Two deliberate silences. **A computed target is not guessed at**: `arpRate(name, 4)` is unknowable
+without running the thing, and a red mark on correct code is much worse than no mark on wrong code.
+**An unknown name is left alone**: the panel may gain that control later, and this is not the place
+to police spelling.
+
+### The message says what it is, not only what it isn't
+
+`"Cutoff" is not an Arpeggiator (no Arp section)` was true and no help. The person reading it
+already believed it was one; the reply told them nothing about what they had. It now reads
+`"Cutoff" is a Knob, not an Arpeggiator. A Knob has no component verbs of its own — …`, and where
+the control has a family of its own it names it: `Its own verbs are ce.components.looper`.
+
+It also separates two failures the old text ran together. A typo (`arpRate("Cutof", …)`) produced
+the same "is not an Arpeggiator" as pointing at the wrong control, and the two want opposite fixes.
+A name with nothing behind it now says so.
+
+One helper, four call sites — the three hand-written families and the generic phase-7 path all used
+the same sentence, so they all get the same better one.
+
+### The bug the fixtures were hiding
+
+`typeOfControl` read `_children.Core.type`. The model spells it **`controlType`** (`_type` is the
+string `"Core"`), and 66 other call sites already knew that — these two were the only ones that
+didn't. So in the running app every control reported no type at all, which fails *open*: nothing
+broke, nothing was wrongly hidden, and the whole feature simply did nothing.
+
+Every test passed, because every test built its own `{ Core: { type: 'Slider' } }` fixture and the
+fixture agreed with the bug. A hand-written fixture only ever tests the code against itself. The
+tests now build controls with `createControl` and walk **all 49 types** through
+`createControl → typeOfControl → familiesForType`, which is the path the picker and the validator
+actually take. That is the third time this project has been caught by a fixture that was easier to
+write than the real shape, and the rule earns another statement: **if the real object is available,
+the fixture is the real object.**

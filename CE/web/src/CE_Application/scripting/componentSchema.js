@@ -55,9 +55,10 @@ export function isKnownType(type) {
   return Object.prototype.hasOwnProperty.call(COMPONENT_TYPES, String(type ?? ''));
 }
 
-/** The component type of a control object, or '' if it has not got one. */
+/** The component type of a control object, or '' if it has not got one.
+ *  The field is `controlType`, not `type` — a control's `_type` is the string "Core". */
 export function typeOfControl(control) {
-  return String(control?._children?.Core?.type ?? '');
+  return String(control?._children?.Core?.controlType ?? '');
 }
 
 /**

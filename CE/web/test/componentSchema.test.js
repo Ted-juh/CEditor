@@ -12,7 +12,7 @@ import {
   FAMILY_SECTIONS, sectionsForType, isKnownType, typeOfControl,
   moduleAppliesToType, memberAppliesToType, familiesForType, describeType,
 } from '../src/CE_Application/scripting/componentSchema.js';
-import { COMPONENT_TYPES } from '../src/CE_Application/models/componentTypes.js';
+import { COMPONENT_TYPES, createControl } from '../src/CE_Application/models/componentTypes.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 import { MODULES, ALL_MEMBERS, memberModule } from '../src/CE_Application/scripting/panelApi.js';
 
@@ -105,10 +105,26 @@ test('every component verb applies to at least one type, and not to all of them'
 
 /* ----------------------------------------------------------------------- the read-outs */
 
-test('typeOfControl reads the Core section, and copes with a control that has none', () => {
-  assert.equal(typeOfControl({ _children: { Core: { type: 'Knob' } } }), 'Knob');
+test('typeOfControl reads a REAL control, and copes with one that has no type', () => {
+  // Built with createControl, not hand-written. A fabricated `{ Core: { type } }` fixture passed
+  // this while the code read the wrong field — the model spells it `controlType`, and a control's
+  // `_type` is the string "Core" — so narrowing read undefined for every control in the app and
+  // silently held nothing back. The fixture has to be the real shape or it proves nothing.
+  assert.equal(typeOfControl(createControl('Knob')), 'Knob');
+  assert.equal(typeOfControl(createControl('Arp')), 'Arp');
+  assert.equal(typeOfControl({ _children: { Core: {} } }), '');
   assert.equal(typeOfControl({}), '');
   assert.equal(typeOfControl(null), '');
+});
+
+test('a real control of every known type narrows the way its name says', () => {
+  // End to end through the model rather than through a string: createControl -> typeOfControl ->
+  // familiesForType. This is the path the picker and the validator actually take.
+  for (const type of Object.keys(COMPONENT_TYPES)) {
+    const control = createControl(type);
+    assert.equal(typeOfControl(control), type, `${type} reports its own type`);
+    assert.deepEqual(familiesForType(typeOfControl(control)), familiesForType(type));
+  }
 });
 
 test('describeType names what a control DOES have, for the message after a wrong guess', () => {

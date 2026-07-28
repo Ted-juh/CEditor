@@ -393,6 +393,62 @@ test('a verb aimed at the wrong kind of control says so', async () => {
   }
   const traced = get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
   // Named the way the editor names it — somebody reading this has an "Arpeggiator" in front of
-  // them, not an "Arp" — while still saying which section was looked for.
-  assert.match(traced, /"Cutoff" is not an Arpeggiator \(no Arp section\)/, `got:\n${traced}`);
+  // them, not an "Arp".
+  //
+  // It used to say only `"Cutoff" is not an Arpeggiator (no Arp section)`. True, and no help: the
+  // person reading it already believed it was one, and the reply told them nothing about what they
+  // had actually got. So it now names the type and what CAN drive it.
+  assert.match(traced, /"Cutoff" is a Knob, not an Arpeggiator/, `got:\n${traced}`);
+  assert.match(traced, /no component verbs of its own/, `got:\n${traced}`);
+});
+
+test('a verb aimed at a control that has a DIFFERENT family names that family', async () => {
+  const { scriptApiForTesting, setRuntimeHost } = await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { scriptTrace, clearScriptTrace } = await import('../src/CE_Application/stores/scriptConsole.js');
+  const { get } = await import('svelte/store');
+
+  const looper = createControl('Looper', 10, 10);
+  looper._children.Core.name = 'TheLooper';
+  const panel = {
+    id: 'p', name: 'Verbs', width: 800, height: 400, controls: [looper],
+    scripting: { modules: ['ce.components.arp'] },
+  };
+
+  setRuntimeHost({ panel, scripts: [], ...(await valueIo()) });
+  clearScriptTrace();
+  try {
+    scriptApiForTesting('', 'verb-script').arpRate('TheLooper', 4);
+  } finally {
+    setRuntimeHost(null);
+  }
+  const traced = get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
+  assert.match(traced, /"TheLooper" is a Looper, not an Arpeggiator/, `got:\n${traced}`);
+  assert.match(traced, /Its own verbs are ce\.components\.looper/, `got:\n${traced}`);
+});
+
+test('a target with no control behind it is a different message from the wrong kind', async () => {
+  // The old text ran the two together — a typo also read "is not an Arpeggiator" — and they want
+  // opposite fixes. One is a spelling mistake, the other is a misunderstanding.
+  const { scriptApiForTesting, setRuntimeHost } = await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { scriptTrace, clearScriptTrace } = await import('../src/CE_Application/stores/scriptConsole.js');
+  const { get } = await import('svelte/store');
+
+  const knob = createControl('Knob', 10, 10);
+  knob._children.Core.name = 'Cutoff';
+  const panel = {
+    id: 'p', name: 'Verbs', width: 800, height: 400, controls: [knob],
+    scripting: { modules: ['ce.components.arp'] },
+  };
+
+  setRuntimeHost({ panel, scripts: [], ...(await valueIo()) });
+  clearScriptTrace();
+  try {
+    scriptApiForTesting('', 'verb-script').arpRate('Cutof', 4);   // one letter short
+  } finally {
+    setRuntimeHost(null);
+  }
+  const traced = get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
+  assert.match(traced, /"Cutof" — this panel has no control by that name/, `got:\n${traced}`);
 });
