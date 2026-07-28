@@ -194,10 +194,21 @@ local WEBVIEW_ONLY = {
   "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
   "harmonyDegree",
   "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
+-- @module ce.panel
+  -- ce.panel structure (design doc §6 phase 4): creating a control needs a renderer, and there
+  -- is none with the window shut. onPanelBuild is declared webview-only too, so these are only
+  -- ever reached by a script that calls them from some other handler.
+  "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 }
+-- @module ce.components
 for _, name in ipairs(WEBVIEW_ONLY) do
   _G[name] = function()
     log("[panel] " .. name .. "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.")
+    -- An explicit "return nil", NOT a bare return. A Lua function with no return statement yields
+    -- ZERO values, so tostring(stub()) raises "value expected" rather than printing "nil". It went
+    -- unnoticed while every webview-only member was a void command; ce.panel.create() is the first
+    -- one whose RESULT a script reads, and it found it immediately. Same fix as the module gate.
+    return nil
   end
 end
 
@@ -326,6 +337,7 @@ local __CE_MODULES = {
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
   ["ce.time"] = { beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
+  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", find = "panelFind", info = "panelInfo", parent = "panelParent", types = "panelTypes" },
   ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -333,7 +345,7 @@ local __CE_MODULES = {
   ["ce.components.harmony"] = { channel = "harmonyChannel", degree = "harmonyDegree", inversion = "harmonyInversion", keepPlayed = "harmonyKeepPlayed", key = "harmonyKey", mode = "harmonyMode", octave = "harmonyOctave", outOfKey = "harmonyOutOfKey", scale = "harmonyScale", shape = "harmonyShape", size = "harmonySize", strum = "harmonyStrum", voiceLeading = "harmonyVoiceLeading", voicing = "harmonyVoicing" },
   ["ce.components.setlist"] = { crossfade = "setlistCrossfade", enable = "setlistEnable", jump = "setlistGoto", next = "setlistNext", prev = "setlistPrev", wrap = "setlistWrap" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.panel", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist" }
 local __CE_META = {
   { id = "ce.core", version = "1.0", runtime = "any" },
   { id = "ce.midi", version = "1.1", runtime = "any" },
@@ -341,6 +353,7 @@ local __CE_META = {
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.0", runtime = "any" },
   { id = "ce.time", version = "1.1", runtime = "any" },
+  { id = "ce.panel", version = "1.0", runtime = "webview" },
   { id = "ce.storage", version = "1.0", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },

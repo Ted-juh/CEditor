@@ -219,6 +219,16 @@ export const LIFECYCLE_HOOKS = [
     snippet: { lua: 'function onPanelLoad()\n  $0\nend', javascript: 'function onPanelLoad() {\n  $0\n}' },
   },
   {
+    id: 'onPanelBuild', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
+    signature: 'onPanelBuild()',
+    summary: 'Phase 1b — BUILD the panel. The place to create, clone and parent controls, typically from what the device reports. Runs after onPanelLoad and before onPanelReady, in the panel view only: there is no renderer window-closed, so nothing here can run in a DAW with the window shut. Every control a script creates is cleared before this fires, so the handler always starts from the authored panel and running it twice cannot double the layout.',
+    params: [],
+    snippet: {
+      lua: 'function onPanelBuild()\n  for i = 1, 4 do\n    ce.panel.create("Knob", { name = "osc" .. i, x = 20 + i * 90, y = 40 })\n  end\n  $0\nend',
+      javascript: 'function onPanelBuild() {\n  for (let i = 1; i <= 4; i++) {\n    ce.panel.create("Knob", { name: "osc" + i, x: 20 + i * 90, y: 40 });\n  }\n  $0\n}',
+    },
+  },
+  {
     id: 'onPanelReady', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelReady(info)',
     summary: 'Phase 2 — GUI ready. Read the synth, fill controls. May re-fire on VST3 window reopen; guard one-time work with `if info.firstTime`.',
@@ -465,6 +475,95 @@ export const COMMANDS = [
     params: [{ name: 'kind', type: 'dumpKind', required: true }],
     scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
+  },
+
+  /* --- Panel structure (design doc §6 phase 4) ---
+     Panels that build themselves. The thing the options UI structurally cannot do: ask the device
+     what it has, then generate a control per thing it found.
+
+     PANEL VIEW ONLY, and not by choice — creating a control needs a renderer, and there is none
+     with the window shut. The C++ engines define these as explaining stubs like every other
+     webview-only verb, and `onPanelBuild` is declared webview-only too so they are never even
+     reached there.
+
+     Everything a script creates is MARKED as generated and cleared before onPanelBuild runs, so a
+     build is idempotent by construction; generated controls are also stripped when the panel is
+     saved, so the author's document never fills up with them. The cost of that, stated plainly: a
+     generated control is not in the exported parameter list and cannot be DAW-automated. Drive it
+     from a script. */
+  {
+    id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
+    summary: 'Create a control and return its name (nil if the type is unknown — panelTypes() lists them). `props` may carry name, x, y, width, height, and any section override such as { Behavior = { min = 0, max = 127 } }.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'type', type: 'string', required: true },
+      { name: 'props', type: 'object', required: false, fields: ['name', 'x', 'y', 'width', 'height', 'parent'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.create("${1:Knob}", { name = "${2:cutoff}", x = 20, y = 40 })$0',
+      javascript: 'ce.panel.create("${1:Knob}", { name: "${2:cutoff}", x: 20, y: 40 });$0',
+    },
+  },
+  {
+    id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
+    summary: 'Copy an existing control, including its sections, and return the copy\'s name. The usual way to make eight of something the author designed once.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'props', type: 'object', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.clone("${1:template}", { name = "${2:copy}", y = 120 })$0',
+      javascript: 'ce.panel.clone("${1:template}", { name: "${2:copy}", y: 120 });$0',
+    },
+  },
+  {
+    id: 'panelDestroy', category: 'Panel structure', signature: 'panelDestroy(name)',
+    summary: 'Remove a control and everything inside it. Returns true if it was there. Refuses to remove a control the AUTHOR placed unless you pass its exact name — generated ones go freely.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'name', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'ce.panel.destroy("${1:name}")$0', javascript: 'ce.panel.destroy("${1:name}");$0' },
+  },
+  {
+    id: 'panelParent', category: 'Panel structure', signature: 'panelParent(name [, containerName])',
+    summary: 'Move a control into a container, or to the top level when `containerName` is nil. Returns true on success. A container is any control with a Children section — Container, Group.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'containerName', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.panel.parent("${1:knob}", "${2:row}")$0', javascript: 'ce.panel.parent("${1:knob}", "${2:row}");$0' },
+  },
+  {
+    id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
+    summary: 'The names of matching controls, nested ones included. `query` is a substring of the name, or a table: { type = "Knob", generated = true, parent = "row1" }. No query means every control.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'query', type: 'object', required: false, fields: ['name', 'type', 'generated', 'parent'] }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, n in ipairs(ce.panel.find({ type = "${1:Knob}" })) do\n  $0\nend',
+      javascript: 'for (const n of ce.panel.find({ type: "${1:Knob}" })) {\n  $0\n}',
+    },
+  },
+  {
+    id: 'panelInfo', category: 'Panel structure', signature: 'panelInfo(name)',
+    summary: 'What a control is: { name, id, type, x, y, width, height, parent, generated }, or nil if there is no such control.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'name', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'local c = ce.panel.info("${1:name}")$0', javascript: 'const c = ce.panel.info("${1:name}");$0' },
+  },
+  {
+    id: 'panelTypes', category: 'Panel structure', signature: 'panelTypes()',
+    summary: 'Every component type panelCreate accepts, as a list of names. Ask rather than guess — the list grows.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+    snippet: { lua: 'log(table.concat(ce.panel.types(), ", "))$0', javascript: 'log(ce.panel.types().join(", "));$0' },
   },
 
   /* --- Time: tempo, transport and musical timers (design doc §6 phase 3) ---
@@ -971,6 +1070,8 @@ export const MODULES = [
     summary: 'Note names and numbers.' },
   { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
+  { id: 'ce.panel', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Build the panel from a script: create, clone, parent and find controls. Panel view only — there is no renderer with the window shut.' },
   { id: 'ce.storage', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -1007,6 +1108,10 @@ const MODULE_MEMBERS = {
   },
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
+  'ce.panel': {
+    create: 'panelCreate', clone: 'panelClone', destroy: 'panelDestroy',
+    parent: 'panelParent', find: 'panelFind', info: 'panelInfo', types: 'panelTypes',
+  },
   'ce.storage': ['state', 'saveSetting', 'loadSetting'],
   'ce.time': {
     startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer',
@@ -1408,9 +1513,15 @@ export function handlerNamesForRuntime(runtime) {
   return [...hooks, ...ALL_EVENTS.map((e) => e.fn)];
 }
 
-/** The names the C++ engines define as "needs the panel window" stubs. */
+/** The names the C++ engines define as "needs the panel window" stubs.
+ *
+ *  COMMANDS only. A lifecycle hook is a function the script DEFINES, not a global the engine
+ *  binds, so stubbing one would define a handler that shadows the user's — and `onPanelBuild` is
+ *  already kept out of the player's probe list by handlerNamesForRuntime, which is the right
+ *  mechanism for a hook. (This only surfaced with onPanelBuild: the other runtime-limited hooks
+ *  are player-only, which never reached this path.) */
 export const WEBVIEW_ONLY_MEMBERS = ALL_MEMBERS
-  .filter((m) => memberRuntime(m) === RUNTIME_WEBVIEW)
+  .filter((m) => m.kind !== 'lifecycle' && memberRuntime(m) === RUNTIME_WEBVIEW)
   .map((m) => m.id);
 
 /** Is this member a VALUE rather than a callable? `state` is a table you read and write, not a

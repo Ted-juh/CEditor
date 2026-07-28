@@ -563,7 +563,12 @@ __WEBVIEW_ONLY = [
     "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
     "harmonyDegree",
     "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
+# @module ce.panel
+  # ce.panel structure (design doc §6 phase 4): creating a control needs a renderer, and there
+  # is none with the window shut.
+  "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 ]
+# @module ce.components
 def __webviewOnly(name):
     def stub(*args, **kwargs):
         log("[panel] " + name + "() needs the panel window open — that component is drawn and modelled "
@@ -664,6 +669,7 @@ __CE_MODULES = {
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
     "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+    "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
     "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -671,7 +677,7 @@ __CE_MODULES = {
     "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
     "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"]
 __CE_META = [
     { "id": "ce.core", "version": "1.0", "runtime": "any" },
     { "id": "ce.midi", "version": "1.1", "runtime": "any" },
@@ -679,6 +685,7 @@ __CE_META = [
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.0", "runtime": "any" },
     { "id": "ce.time", "version": "1.1", "runtime": "any" },
+    { "id": "ce.panel", "version": "1.0", "runtime": "webview" },
     { "id": "ce.storage", "version": "1.0", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },

@@ -221,7 +221,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | 1 | `ce.midi` note/PC/bend, `ce.storage` | A script can play a note and remember something. Both are small, both are cross-runtime, and both are current "why can't I just…" moments. |
 | 2 | `ce.device` reads | `parameters()`, `profile()` — a script can ask what the synth actually has. ✅ *done* (§11) |
 | 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. ✅ *done* (§12) |
-| 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. |
+| 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. ✅ *done* (§13) |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. |
 | 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. |
 | 7 | `ce.components.*` completion | The remaining 26 components. Most code, least new capability — deliberately last. |
@@ -230,10 +230,10 @@ Phase 4 needs a lifecycle phase that does not exist yet:
 
 ```
 onPanelLoad     → MIDI/init only, no controls yet          (exists)
-onPanelBuild    → structure: create/parent/bind here        (new — phase 4)
+onPanelBuild    → structure: create/parent/bind here        (phase 4 — done, §13)
 onPanelReady    → GUI live, fill values                     (exists)
-onPanelDestroy  → real teardown, distinct from window close (new)
-onError(info)   → the panel reports its own failures        (new)
+onPanelDestroy  → real teardown, distinct from window close (still to do)
+onError(info)   → the panel reports its own failures        (still to do)
 ```
 
 ---
@@ -648,3 +648,79 @@ it as "no change".
   zero, so three temporary `juce::var(o)`s meant the first dispatch took the last reference with it
   and the second read freed memory. One `const juce::var payload (o)`, reused. Worth recording
   because it is the second reference-counting trap in this codebase's tests, not the first.
+
+---
+
+## 13. `ce.panel` structure — phase 4, as built
+
+Panels that build themselves. Ask the device what it has, then generate a control per thing you
+found — the one capability the options UI structurally cannot provide.
+
+```lua
+function onPanelBuild()
+  for _, p in ipairs(ce.device.parameters({ group = "Oscillator" })) do
+    ce.panel.clone("template", { name = p.id, y = 40 })
+  end
+end
+```
+
+| | |
+|---|---|
+| `ce.panel.create(type, props)` | a new control; returns its name |
+| `ce.panel.clone(name, props)` | copy one the author designed — the usual way to make eight of something |
+| `ce.panel.destroy(name)` | it and everything inside it |
+| `ce.panel.parent(name [, container])` | move into a container, or `nil` for top level |
+| `ce.panel.find([query])` | names matching `{ type, generated, parent }` or a name substring |
+| `ce.panel.info(name)` | `{ name, id, type, x, y, width, height, parent, generated }` |
+| `ce.panel.types()` | every type `create` accepts — ask rather than guess, the list grows |
+
+`props` takes the flat conveniences (`name`, `x`, `y`, `width`, `height`, `parent`) and any section
+override, `{ Behavior = { min = 0, max = 127 } }`, **merged** into the section rather than replacing
+it — a script setting one field must not wipe the rest.
+
+### Idempotence is the whole design
+
+`onPanelBuild` fires on every load. Without a rule, a panel that generates eight rows has sixteen
+the second time and twenty-four the third, **and the accumulation is saved into the author's file**.
+So:
+
+1. Every control a script creates carries `Core.generatedBy`.
+2. Every generated control is removed *before* `onPanelBuild` runs.
+3. `serializePanel` strips them, top level and nested alike.
+
+The build therefore always starts from the authored panel, running it twice cannot double the
+layout, and the document on disk stays the panel the author drew. Generated names are also
+de-duplicated against everything already present, because two controls answering to `cutoff` is how
+`set("cutoff", …)` becomes ambiguous.
+
+**The cost of that rule, stated rather than discovered: a generated control is not in the exported
+parameter list and cannot be DAW-automated.** It is driven from a script, or not at all. That falls
+straight out of the export baking parameters ahead of time, and it is the honest trade for a layout
+that adapts to the device in front of it.
+
+### The runtime boundary
+
+Panel view only — creating a control needs a renderer, and there is none with the window shut. The
+seven verbs are declared `runtime: 'webview'` and stubbed in the three C++ engines like every other
+webview-only verb. `onPanelBuild` is declared webview-only *as a hook*, so the window-closed runtime
+does not merely no-op it — it never fires it. A build phase that half-ran with no renderer would be
+worse than one that did not run.
+
+### Two defects this turned up
+
+- **`WEBVIEW_ONLY_MEMBERS` was about to stub a lifecycle hook.** It filtered `ALL_MEMBERS` by
+  runtime, and `onPanelBuild` is the first webview-only *hook* — the others are player-only. Stubbing
+  it would have defined an `onPanelBuild` in each C++ prelude that shadows the user's. A hook is a
+  function the script DEFINES; `handlerNamesForRuntime` is the mechanism that already handles it.
+- **The webview-only stub returned zero values, not nil** — the same defect fixed in the module gate
+  during phase 3, in the *other* stub factory. It went unnoticed while every webview-only member was
+  a void command; `ce.panel.create()` is the first whose result a script reads, and
+  `tostring(create(...))` raised `value expected` on the first try.
+
+### What phase 4 did not include
+
+`onPanelDestroy` and `onError(info)` are listed beside `onPanelBuild` in §6 and are **not** here.
+Neither is needed to build a panel, and both are their own piece of work: real teardown has to be
+distinguished from a window close (which already has `onPanelClose`), and an error hook has to
+settle what happens when the error handler itself throws. Bundling them in would have meant doing
+both badly.

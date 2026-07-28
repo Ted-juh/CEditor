@@ -169,8 +169,27 @@ export function uniquePanelPaths(paths) {
   return unique;
 }
 
+/** Controls a script generated carry Core.generatedBy. They are a product of onPanelBuild, not a
+ *  part of the document, so saving must not persist them — otherwise every open-and-save doubles
+ *  the layout in the file, and the author's panel slowly fills with something they never drew.
+ *  The build regenerates them on load; that is the whole contract (design doc §13). */
+function stripGeneratedControls(controls) {
+  return (controls ?? [])
+    .filter((c) => c?._children?.Core?.generatedBy == null)
+    .map((c) => {
+      const kids = c?._children?.Children?._children;
+      if (!kids) return c;
+      const kept = Object.fromEntries(
+        Object.entries(kids).filter(([, child]) => child?._children?.Core?.generatedBy == null)
+          .map(([key, child]) => [key, stripGeneratedControls([child])[0] ?? child]),
+      );
+      return { ...c, _children: { ...c._children, Children: { ...c._children.Children, _children: kept } } };
+    });
+}
+
 export function serializePanel(panel, options = {}) {
   const { id, modified, ...data } = panel;
+  data.controls = stripGeneratedControls(data.controls);
   const deviceSession = options.deviceSession ?? data.deviceSession;
   if (deviceSession) data.deviceSession = normalizeProjectDeviceSession(deviceSession);
   else delete data.deviceSession;

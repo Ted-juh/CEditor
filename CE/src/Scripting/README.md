@@ -117,6 +117,7 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Debug | `log` | everywhere |
 | Helpers | `scale` `clamp` `round` `snap` `curve` `lerp` `noteName` `noteNumber` + 14 MIDI-encoding helpers | everywhere (pure, defined in each prelude) |
 | Panel components | 47 verbs: `split*` `phrase*` `recorder*` `harmony*` `setlist*` | **panel view only** — see below |
+| Panel structure | `panelCreate` `panelClone` `panelDestroy` `panelParent` `panelFind` `panelInfo` `panelTypes` | **panel view only** — creating a control needs a renderer |
 
 `checksum(type, bytes)` takes `"roland"`/`"yamaha"` (the same two's-complement 7-bit sum, both
 spellings accepted), `"sum"`, or `"xor"`. `panic([opts])` expands to All Sound Off → All Notes Off →
@@ -132,6 +133,18 @@ scratch that survives between handler calls in one session and is cleared when t
 `saveSetting`/`loadSetting` are the durable pair — the player stores them in the DAW session as a
 `ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
 the same two verbs either way.
+
+### Panel structure
+
+`ce.panel.create/clone/destroy/parent/find/info/types` let a panel build itself — generate a control
+per device parameter, then lay them out. Panel view only, so the C++ engines stub them, and the
+`onPanelBuild` hook (phase 1b, between `onPanelLoad` and `onPanelReady`) is declared webview-only so
+it never fires window-closed at all.
+
+Everything a script creates is marked `Core.generatedBy`, cleared before each build, and stripped on
+save. That makes a build idempotent and keeps the author's document free of it. The trade: a
+generated control is not an exported parameter and cannot be DAW-automated — drive it from a script.
+See §13 of `docs/scripting-modules-design.md`.
 
 ### Musical time
 

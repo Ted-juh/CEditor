@@ -909,6 +909,41 @@ int main()
         check (host.logs.contains ("transport true"), "and onTransport");
     }
 
+    // 18) ce.panel structure (design doc §6 phase 4) ----------------------------------------------
+    // Panel view only, and not by choice: creating a control needs a renderer. Window-closed the
+    // verbs must EXPLAIN that rather than being undefined globals, and onPanelBuild must never
+    // fire here at all — a build phase that half-ran with no renderer is worse than one that
+    // did not run.
+    {
+        juce::Array<juce::var> structScripts;
+        structScripts.add (makeScript ("struct", "lua", "panel", "onStruct", "*",
+            "function onStruct()\n"
+            "  ce.panel.create(\"Knob\", { name = \"osc1\" })\n"
+            "  log(\"created \" .. tostring(ce.panel.create(\"Knob\", { name = \"osc2\" })))\n"
+            "  log(\"found \" .. tostring(ce.panel.find()))\n"
+            "end\n"));
+        structScripts.add (makeScript ("build", "lua", "panel", "onPanelBuild", "*",
+            "function onPanelBuild() log(\"BUILD RAN\") end\n"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (structScripts));
+
+        host.logs.clear();
+        runtime.runAction ("onStruct", juce::var());
+        const auto said = host.logs.joinIntoString ("\n");
+        check (said.contains ("panel window open"),
+               "a structure verb window-closed says it needs the panel view");
+        check (said.contains ("created nil"),
+               "…and returns nil, so a script that checks the result sees the truth");
+
+        // onPanelBuild is declared webview-only, so the window-closed runtime must not have it in
+        // its handler list at all — not fire-and-do-nothing, never fire.
+        host.logs.clear();
+        runtime.onPanelLoad();
+        runtime.onPanelReady (true);
+        check (! host.logs.contains ("BUILD RAN"),
+               "onPanelBuild never fires window-closed — the lifecycle there has no build phase");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

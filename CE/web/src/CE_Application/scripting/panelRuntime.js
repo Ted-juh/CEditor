@@ -18,7 +18,7 @@
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
 import { get } from 'svelte/store';
-import { panels, resolvedActivePanelId } from '../stores/panels.js';
+import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js';
 import { updateControlProperty } from '../stores/controls.js';
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
@@ -53,6 +53,11 @@ import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
+import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
+import {
+  flatControls, findControlById, findParentOfControl, isContainerControl,
+  insertControlIntoTree, removeControlFromTree, remintControlIds,
+} from '../utils/containment.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -858,6 +863,226 @@ function runAction(ref, args) {
 // handler calls and QuickJS has no setTimeout, so both need the host to keep time. Starting an id
 // that is already running re-times it rather than stacking a second interval.
 
+// @module ce.panel
+/* ------------------------------------------------------------------- ce.panel structure */
+// Panels that build themselves: ask the device what it has, then generate a control per thing you
+// found. The one capability the options UI structurally cannot provide.
+//
+// PANEL VIEW ONLY, and not by choice — creating a control needs a renderer, and there is none with
+// the window shut. The C++ engines stub these with the same explaining stubs every webview-only
+// verb gets, and `onPanelBuild` is declared webview-only so they are never reached there.
+//
+// THE IDEMPOTENCE RULE, which is what makes this safe to ship: everything a script creates carries
+// `Core.generatedBy`, and every generated control is removed before onPanelBuild runs. So a build
+// always starts from the authored panel, running it twice cannot double the layout, and the panel
+// the author saves is still the panel the author drew. `serializePanel` strips them for the same
+// reason — a generated control is a product of the script, not a part of the document.
+//
+// The cost of that rule, stated rather than discovered: a generated control is NOT in the exported
+// parameter list and cannot be DAW-automated. It is driven from a script, or not at all.
+
+const GENERATED_KEY = 'generatedBy';
+
+/** Mutate the active panel's control tree through the same store update the editor uses. */
+function updateControls(fn) {
+  const panel = activePanel();
+  if (!panel) { addScriptTrace('error', '', 'ce.panel: no active panel to build.'); return false; }
+  const next = fn(panel.controls ?? []);
+  if (next == null) return false;
+  if (host) { panel.controls = next; return true; }        // player: the host owns the document
+  updatePanel(panel.id, { controls: next });
+  return true;
+}
+
+function allControls() {
+  return flatControls(activePanel()?.controls ?? []);
+}
+
+function controlNamed(name) {
+  const wanted = String(name ?? '').toLowerCase();
+  if (!wanted) return null;
+  return allControls().find((c) => String(c?._children?.Core?.name ?? '').toLowerCase() === wanted)
+    ?? allControls().find((c) => String(c?._children?.Core?.id ?? '') === String(name))
+    ?? null;
+}
+
+/** A name nothing else is using, so a generated control never collides with an authored one. */
+function uniqueControlName(base) {
+  const taken = new Set(allControls().map((c) => String(c?._children?.Core?.name ?? '').toLowerCase()));
+  const root = String(base ?? 'control');
+  if (!taken.has(root.toLowerCase())) return root;
+  for (let i = 2; i < 10000; i++) {
+    const candidate = `${root}${i}`;
+    if (!taken.has(candidate.toLowerCase())) return candidate;
+  }
+  return `${root}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Apply the flat convenience props (name/x/y/width/height) plus any section overrides. */
+function applyControlProps(control, props = {}, scriptId = '') {
+  const core = control._children.Core;
+  const transform = control._children.Transform;
+  if (props.name != null) core.name = String(props.name);
+  for (const [prop, key] of [['x', 'x'], ['y', 'y'], ['width', 'width'], ['height', 'height']]) {
+    if (props[prop] != null && Number.isFinite(Number(props[prop]))) transform[key] = Number(props[prop]);
+  }
+  // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
+  // script setting one field does not wipe the rest of the section.
+  for (const [section, values] of Object.entries(props)) {
+    if (!control._children[section] || typeof values !== 'object' || values == null) continue;
+    control._children[section] = { ...control._children[section], ...values };
+  }
+  core[GENERATED_KEY] = scriptId || 'script';
+  return control;
+}
+
+function panelCreateImpl(type, props, scriptId) {
+  const typeName = String(type ?? '');
+  if (!COMPONENT_TYPES[typeName]) {
+    addScriptTrace('error', '',
+      `ce.panel.create("${typeName}"): no such component type. ce.panel.types() lists them.`);
+    return null;
+  }
+  let control;
+  try { control = createControl(typeName); }
+  catch (e) { addScriptTrace('error', '', `ce.panel.create("${typeName}"): ${e?.message ?? e}`); return null; }
+
+  applyControlProps(control, props ?? {}, scriptId);
+  control._children.Core.name = uniqueControlName(control._children.Core.name);
+
+  const parentName = props?.parent ? String(props.parent) : null;
+  const parent = parentName ? controlNamed(parentName) : null;
+  if (parentName && !parent) {
+    addScriptTrace('error', '', `ce.panel.create: no control named "${parentName}" to parent into.`);
+  }
+  const parentId = parent && isContainerControl(parent) ? parent._children.Core.id : null;
+  if (parent && !parentId) {
+    addScriptTrace('error', '',
+      `ce.panel.create: "${parentName}" is not a container (it has no Children section), so the new control went to the top level.`);
+  }
+
+  return updateControls((controls) => insertControlIntoTree(controls, parentId, control))
+    ? control._children.Core.name
+    : null;
+}
+
+function panelCloneImpl(name, props, scriptId) {
+  const source = controlNamed(name);
+  if (!source) { addScriptTrace('error', '', `ce.panel.clone: no control named "${name}".`); return null; }
+
+  const copy = remintControlIds(source);
+  applyControlProps(copy, props ?? {}, scriptId);
+  if (props?.name == null) copy._children.Core.name = `${source._children.Core.name}_copy`;
+  copy._children.Core.name = uniqueControlName(copy._children.Core.name);
+  // A clone lands beside its source by default: in the same container, not at the top level.
+  const parentName = props?.parent != null ? String(props.parent) : null;
+  const parent = parentName ? controlNamed(parentName)
+                            : findParentOfControl(activePanel()?.controls ?? [], source._children.Core.id);
+  const parentId = parent && isContainerControl(parent) ? parent._children.Core.id : null;
+
+  return updateControls((controls) => insertControlIntoTree(controls, parentId, copy))
+    ? copy._children.Core.name
+    : null;
+}
+
+function panelDestroyImpl(name) {
+  const control = controlNamed(name);
+  if (!control) return false;
+  const id = control._children.Core.id;
+  // removeControlFromTree returns { controls, removed } — the node comes back so a caller that is
+  // MOVING rather than deleting can re-insert the real subtree instead of a copy of it.
+  return updateControls((controls) => removeControlFromTree(controls, id).controls);
+}
+
+function panelParentImpl(name, containerName) {
+  const control = controlNamed(name);
+  if (!control) { addScriptTrace('error', '', `ce.panel.parent: no control named "${name}".`); return false; }
+
+  let parentId = null;
+  if (containerName != null && String(containerName) !== '') {
+    const parent = controlNamed(containerName);
+    if (!parent) { addScriptTrace('error', '', `ce.panel.parent: no control named "${containerName}".`); return false; }
+    if (!isContainerControl(parent)) {
+      addScriptTrace('error', '',
+        `ce.panel.parent: "${containerName}" is not a container — only a control with a Children section can hold one.`);
+      return false;
+    }
+    if (parent._children.Core.id === control._children.Core.id) {
+      addScriptTrace('error', '', 'ce.panel.parent: a control cannot contain itself.');
+      return false;
+    }
+    // …nor can it be moved inside its own subtree, which would detach both from the panel.
+    if (flatControls([control]).some((c) => c._children.Core.id === parent._children.Core.id)) {
+      addScriptTrace('error', '',
+        `ce.panel.parent: "${containerName}" is inside "${name}", so moving one into the other would detach both.`);
+      return false;
+    }
+    parentId = parent._children.Core.id;
+  }
+
+  const id = control._children.Core.id;
+  return updateControls((controls) => {
+    const { controls: without, removed } = removeControlFromTree(controls, id);
+    // Re-insert the node that came OUT, not a copy of the one we looked up: the subtree keeps its
+    // ids, so anything already addressing a child by name still resolves after the move.
+    return removed ? insertControlIntoTree(without, parentId, removed) : null;
+  });
+}
+
+function controlSummary(control, controls) {
+  const core = control?._children?.Core ?? {};
+  const transform = control?._children?.Transform ?? {};
+  const parent = findParentOfControl(controls, core.id);
+  return {
+    name: core.name ?? '', id: core.id ?? '', type: core.controlType ?? '',
+    x: Number(transform.x) || 0, y: Number(transform.y) || 0,
+    width: Number(transform.width) || 0, height: Number(transform.height) || 0,
+    parent: parent?._children?.Core?.name ?? null,
+    generated: core[GENERATED_KEY] != null,
+  };
+}
+
+function panelFindImpl(query) {
+  const controls = activePanel()?.controls ?? [];
+  const q = typeof query === 'string' ? { name: query } : (query ?? {});
+  return flatControls(controls)
+    .map((c) => ({ control: c, info: controlSummary(c, controls) }))
+    .filter(({ info }) => {
+      if (q.name != null && !info.name.toLowerCase().includes(String(q.name).toLowerCase())) return false;
+      if (q.type != null && info.type !== String(q.type)) return false;
+      if (q.generated != null && info.generated !== (q.generated === true)) return false;
+      if (q.parent != null && info.parent !== String(q.parent)) return false;
+      return true;
+    })
+    .map(({ info }) => info.name);
+}
+
+function panelInfoImpl(name) {
+  const control = controlNamed(name);
+  if (!control) return null;
+  return controlSummary(control, activePanel()?.controls ?? []);
+}
+
+/**
+ * Remove every control a script generated. Called before onPanelBuild, which is what makes a build
+ * idempotent — and called on panel teardown, so a session never leaves generated controls behind.
+ */
+export function clearGeneratedControls() {
+  const panel = activePanel();
+  if (!panel) return 0;
+  const ids = flatControls(panel.controls ?? [])
+    .filter((c) => c?._children?.Core?.[GENERATED_KEY] != null)
+    .map((c) => c._children.Core.id);
+  if (!ids.length) return 0;
+  updateControls((controls) => ids.reduce((acc, id) => removeControlFromTree(acc, id).controls, controls));
+  return ids.length;
+}
+
+/** Is this control one a script made? Used by the save path, which strips them. */
+export function isGeneratedControl(control) {
+  return control?._children?.Core?.[GENERATED_KEY] != null;
+}
+
 // @module ce.time
 const timers = new Map();   // id -> interval handle
 
@@ -1099,6 +1324,14 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.panel — structure
+    panelCreate: (type, props) => panelCreateImpl(type, props, scriptId),
+    panelClone: (name, props) => panelCloneImpl(name, props, scriptId),
+    panelDestroy: (name) => panelDestroyImpl(name),
+    panelParent: (name, container) => panelParentImpl(name, container),
+    panelFind: (query) => panelFindImpl(query),
+    panelInfo: (name) => panelInfoImpl(name),
+    panelTypes: () => Object.keys(COMPONENT_TYPES),
     // ce.time — reads and musical timers
     tempo: () => tempoRead(),
     isPlaying: () => isPlayingRead(),
@@ -1884,14 +2117,19 @@ function onPreviewModeChanged(on) {
     const key = String(live.activePanelId ?? '');
     const firstTime = !live.readyFired.has(key);
     live.readyFired.add(key);
+    // Phase 1b sits between load and ready, and the clear is what makes it idempotent: a build
+    // always starts from the authored panel, so running it twice cannot double the layout.
+    clearGeneratedControls();
     dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
+      { event: 'onPanelBuild', controlName: null, payload: undefined },
       { event: 'onPanelReady', controlName: null, payload: { firstTime } },
     ]);
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
     dispatchEvents([{ event: 'onPanelClose', controlName: null, payload: undefined }]);
     live.sessionLast.clear();
     stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
+    clearGeneratedControls();   // …and a generated control outliving its build is just litter
   }
   live.prevPreviewOn = on;
 }
