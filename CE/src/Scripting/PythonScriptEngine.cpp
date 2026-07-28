@@ -247,6 +247,25 @@ PyObject* api_buildDump (PyObject*, PyObject* args)
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
     return varToPy (g_host->buildDump (juce::String::fromUTF8 (kind)));
 }
+PyObject* api_animate (PyObject*, PyObject* args)
+{
+    const char* kind = nullptr; const char* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
+    if (! PyArg_ParseTuple (args, "ssd|O", &kind, &path, &target, &opts)) return nullptr;
+    g_host->startAnimation (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (path), target,
+                            opts != nullptr ? pyToVar (opts) : juce::var());
+    Py_RETURN_NONE;
+}
+PyObject* api_animateStop (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    g_host->stopAnimation (juce::String::fromUTF8 (path)); Py_RETURN_NONE;
+}
+PyObject* api_animateRunning (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    if (g_host->animationRunning (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
 PyObject* api_transportState (PyObject*, PyObject*)
 {
     return varToPy (g_host->transportState());
@@ -333,6 +352,9 @@ PyMethodDef apiMethods[] = {
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
     { "transportState", api_transportState, METH_NOARGS,  nullptr },
+    { "animate",       api_animate,       METH_VARARGS, nullptr },
+    { "animateStop",   api_animateStop,   METH_VARARGS, nullptr },
+    { "animateRunning", api_animateRunning, METH_VARARGS, nullptr },
     { "startTimer",    api_startTimer,    METH_VARARGS, nullptr },
     { "stopTimer",     api_stopTimer,     METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
@@ -414,6 +436,21 @@ def syncTimer(id, beats):
     # int(ms + 0.5), NOT round(ms): the prelude defines a global `round` (ce.math), which shadows
     # the builtin here, and syncTimer must not depend on another module for one rounding.
     startTimer(id, int(ms + 0.5))
+
+# @module ce.anim
+# Values that move over time. The engine lives in the host so ONE list exists and the position is a
+# pure function of elapsed time — an incremental integrator per runtime would drift.
+def animateTo(path, target, opts=None):
+    __api.animate("to", str(path), float(target or 0), opts)
+
+def animateSpring(path, target, opts=None):
+    __api.animate("spring", str(path), float(target or 0), opts)
+
+def animateStop(path=None):
+    __api.animateStop("" if path is None else str(path))
+
+def animateRunning(path=None):
+    return __api.animateRunning("" if path is None else str(path))
 
 # @module ce.device
 def requestDump(kind):            return __api.requestDump(kind)
@@ -567,6 +604,9 @@ __WEBVIEW_ONLY = [
   # ce.panel structure (design doc §6 phase 4): creating a control needs a renderer, and there
   # is none with the window shut.
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
+# @module ce.ui
+  # ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
+  "uiNotify","uiStatus",
 # @module ce.draw
   # ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
   # the window shut. onDraw is declared webview-only too, so it never fires here.
@@ -673,6 +713,8 @@ __CE_MODULES = {
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
     "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
     "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+    "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
+    "ce.ui": { "notify": "uiNotify", "status": "uiStatus" },
     "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
     "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
     "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
@@ -682,7 +724,7 @@ __CE_MODULES = {
     "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
     "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"]
 __CE_META = [
     { "id": "ce.core", "version": "1.0", "runtime": "any" },
     { "id": "ce.midi", "version": "1.1", "runtime": "any" },
@@ -690,6 +732,8 @@ __CE_META = [
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
     { "id": "ce.music", "version": "1.0", "runtime": "any" },
     { "id": "ce.time", "version": "1.1", "runtime": "any" },
+    { "id": "ce.anim", "version": "1.0", "runtime": "any" },
+    { "id": "ce.ui", "version": "1.0", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.0", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.0", "runtime": "webview" },
     { "id": "ce.storage", "version": "1.0", "runtime": "any" },

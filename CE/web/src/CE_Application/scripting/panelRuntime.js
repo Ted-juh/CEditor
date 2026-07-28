@@ -55,6 +55,7 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
+import { notify as uiNotifyStore, setStatus as uiStatusStore, clearScriptUi } from '../stores/scriptUi.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, removeControlFromTree, remintControlIds,
@@ -864,6 +865,143 @@ function runAction(ref, args) {
 // handler calls and QuickJS has no setTimeout, so both need the host to keep time. Starting an id
 // that is already running re-times it rather than stacking a second interval.
 
+// @module ce.anim
+/* --------------------------------------------------------------------------------- ce.anim */
+// Values that move over time. CROSS-RUNTIME: a sweep triggered by a note has to work in a DAW with
+// the panel shut, so the C++ ScriptRuntime carries the same engine — and the two must agree.
+//
+// They agree because the position is a PURE FUNCTION OF ELAPSED TIME, never an accumulated step.
+// Two integrators ticking independently drift apart within a second; two evaluations of the same
+// formula at the same elapsed time cannot. These two functions are the formula, and
+// ScriptRuntime::animationEase / animationSpring are the identical C++ pair.
+
+/** The four shapes ce.math.curve() offers, computed the same way, so knowing one is knowing both. */
+export function animationEase(progress, curve) {
+  const v = Math.min(1, Math.max(0, Number(progress) || 0));
+  if (curve === 'exp') return v * v;
+  if (curve === 'log') return Math.sqrt(v);
+  if (curve === 's') return v * v * (3 - 2 * v);
+  return v;
+}
+
+/** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
+export function animationSpring(progress, damping, frequency) {
+  const x = Math.min(1, Math.max(0, Number(progress) || 0));
+  if (x >= 1) return 1;
+  return 1 - Math.exp(-damping * x) * Math.cos(frequency * x);
+}
+
+const animations = new Map();   // path -> descriptor
+let animationTimer = null;
+const ANIMATION_TICK_MS = 16;   // ~60Hz in the panel view; the player ticks at its own 30Hz
+
+// The clock an animation starts from is the LAST TICK, not the wall clock — exactly what
+// ScriptRuntime does, so the two runtimes measure elapsed time against the same origin. Reading
+// the wall clock here instead would work in production and diverge the moment a caller drives time
+// itself, which is how the C++ and JS engines end up disagreeing without anyone noticing.
+let animationNowMs = 0;
+// Whether a tick has EVER happened — not `animationNowMs === 0`, because zero is a perfectly good
+// tick time when the caller drives the clock (which the tests do, and which is the only way to
+// test an animation without waiting on a real one).
+let animationTicked = false;
+
+function animationNow() { return Date.now(); }
+
+function startAnimationImpl(kind, path, target, opts = {}) {
+  const key = String(path ?? '');
+  if (!key) return false;
+
+  const number = (name, fallback) => {
+    const v = Number(opts?.[name]);
+    return Number.isFinite(v) ? v : fallback;
+  };
+  const spring = kind === 'spring';
+  // `from` defaults to where the value IS, so an animation starts from the truth rather than from
+  // wherever the previous one happened to stop.
+  const fromRaw = opts?.from != null ? Number(opts.from) : Number(getValue(key, 'value'));
+  const from = Number.isFinite(fromRaw) ? fromRaw : 0;
+
+  // Nothing has ticked yet on a fresh panel, so seed the origin from the clock the interval below
+  // will use — otherwise the first animation measures against zero and finishes instantly.
+  if (!animationTicked) { animationNowMs = animationNow(); animationTicked = true; }
+
+  animations.set(key, {                       // …replacing any animation already on this path:
+    kind: spring ? 'spring' : 'to',            // a value has one destination
+    path: key,
+    from,
+    to: Number(target) || 0,
+    startMs: animationNowMs,
+    duration: Math.max(1, number('duration', spring ? 600 : 300)),
+    curve: typeof opts?.curve === 'string' ? opts.curve : 'linear',
+    damping: number('damping', 6),
+    frequency: number('frequency', 12),
+  });
+
+  if (animationTimer == null && typeof setInterval === 'function') {
+    animationTimer = setInterval(() => tickAnimations(animationNow()), ANIMATION_TICK_MS);
+  }
+  return true;
+}
+
+function stopAnimationImpl(path) {
+  if (path == null || String(path) === '') animations.clear();
+  else animations.delete(String(path));
+  if (!animations.size && animationTimer != null) {
+    clearInterval(animationTimer);
+    animationTimer = null;
+  }
+  return true;
+}
+
+function animationRunningImpl(path) {
+  if (path == null || String(path) === '') return animations.size > 0;
+  return animations.has(String(path));
+}
+
+/** Advance every animation to `nowMs` and write the values. Exported so tests drive time directly
+ *  rather than sleeping — an animation test that waits on a real clock is a flaky test. */
+export function tickAnimations(nowMs) {
+  animationNowMs = Number(nowMs) || 0;
+  animationTicked = true;
+  if (!animations.size) return;
+  // Iterate a copy: a set() can run a script that starts or stops an animation.
+  for (const a of [...animations.values()]) {
+    const progress = Math.min(1, Math.max(0, (nowMs - a.startMs) / a.duration));
+    const eased = a.kind === 'spring'
+      ? animationSpring(progress, a.damping, a.frequency)
+      : animationEase(progress, a.curve);
+    setValue(a.path, a.from + (a.to - a.from) * eased);
+    if (progress >= 1) stopAnimationImpl(a.path);
+  }
+}
+
+/** Panel teardown: an animation writing into a panel that is gone is just noise. */
+export function stopAllAnimations() {
+  stopAnimationImpl('');
+  animationNowMs = 0;      // the next panel starts its own clock
+  animationTicked = false;
+}
+
+// @module ce.ui
+/* ----------------------------------------------------------------------------------- ce.ui */
+// Telling the person using the panel something. Panel view only — there is nobody to tell with the
+// window shut, which is why these are stubbed in the C++ engines rather than made cross-runtime.
+
+function uiNotifyImpl(message, opts) {
+  const text = String(message ?? '').trim();
+  if (!text) return false;
+  uiNotifyStore(text, {
+    kind: opts?.kind,
+    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+  });
+  return true;
+}
+
+function uiStatusImpl(message) {
+  uiStatusStore(message ?? '');
+  return true;
+}
+
 // @module ce.draw
 /* -------------------------------------------------------------------------------- ce.draw */
 // Oscilloscopes, envelope editors, XY pads, readouts. Immediate mode: each verb appends a command
@@ -1449,6 +1587,14 @@ function buildApi(ownerName, scriptId = '') {
     off: (target, event) => removeListener(scriptId, target, event),
     startTimer: (id, ms) => startTimer(id, ms),
     stopTimer: (id) => stopTimer(id),
+    // ce.anim — values that move over time
+    animateTo: (path, target, opts) => startAnimationImpl('to', path, target, opts ?? {}),
+    animateSpring: (path, target, opts) => startAnimationImpl('spring', path, target, opts ?? {}),
+    animateStop: (path) => stopAnimationImpl(path),
+    animateRunning: (path) => animationRunningImpl(path),
+    // ce.ui — a message for whoever is using the panel
+    uiNotify: (message, opts) => uiNotifyImpl(message, opts),
+    uiStatus: (message) => uiStatusImpl(message),
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
     drawFill: (colour) => { drawState.fill = colour == null ? null : String(colour); },
@@ -2278,6 +2424,8 @@ function onPreviewModeChanged(on) {
     stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
     clearGeneratedControls();   // …and a generated control outliving its build is just litter
     clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
+    stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
+    clearScriptUi();            // …and a message about a panel nobody is looking at is worse
   }
   live.prevPreviewOn = on;
 }

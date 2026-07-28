@@ -397,6 +397,12 @@ private:
             }
         }
        #if CEDITOR_SCRIPTING
+        // ce.anim, from the same message-thread timer as everything else. The engine lives in
+        // ScriptRuntime so ONE list exists; this only hands it the clock. 30Hz means a 300ms ramp
+        // gets ~9 steps, which is right for a value and would be wrong for audio — nothing here
+        // touches the audio thread.
+        if (scriptRuntime != nullptr)
+            scriptRuntime->tickAnimations ((double) juce::Time::getMillisecondCounterHiRes());
         dispatchScriptTimeEvents();
         // Window-closed value events: when a bound parameter changes (DAW automation), update the
         // mirror and dispatch onValueChanged so scripts react with the GUI closed (window-open the JS

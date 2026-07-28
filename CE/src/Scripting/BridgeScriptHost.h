@@ -45,6 +45,9 @@ public:
         // The transport snapshot behind tempo() / isPlaying() / transportInfo(). Unset means
         // nothing is reporting one, and the prelude reports valid=false rather than guessing.
         std::function<juce::var()> transportState;
+        // ce.ui — unset in the shipped plugin, which has no surface to show anything on.
+        std::function<void (const juce::String& message, const juce::var& opts)> uiNotify;
+        std::function<void (const juce::String& message)> uiStatus;
         // Flow / debug. runAction and emitEvent are OPTIONAL: left unset, they fall through to the
         // ScriptRuntime, which resolves them against the loaded script set. That is the right
         // default — cross-script calls need the script set, not app state — so only override them
@@ -153,6 +156,20 @@ public:
     { return callbacks.deviceQuery ? callbacks.deviceQuery (kind, payload) : juce::var(); }
     juce::var transportState() override
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
+    // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
+    // place or two hosts would each run their own copy of the same sweep.
+    void startAnimation (const juce::String& kind, const juce::String& path,
+                         double target, const juce::var& opts) override
+    { if (runtime) runtime->startAnimation (kind, path, target, opts); }
+    void stopAnimation (const juce::String& path) override
+    { if (runtime) runtime->stopAnimation (path); }
+    bool animationRunning (const juce::String& path) override
+    { return runtime && runtime->animationRunning (path); }
+    // ce.ui is panel-view only; a host with a surface supplies these, the shipped plugin does not.
+    void uiNotify (const juce::String& message, const juce::var& opts) override
+    { if (callbacks.uiNotify) callbacks.uiNotify (message, opts); }
+    void uiStatus (const juce::String& message) override
+    { if (callbacks.uiStatus) callbacks.uiStatus (message); }
     juce::var runAction (const juce::String& target, const juce::var& args) override
     {
         if (callbacks.runAction) return callbacks.runAction (target, args);

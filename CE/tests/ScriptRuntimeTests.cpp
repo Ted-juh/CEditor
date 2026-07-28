@@ -139,6 +139,20 @@ public:
         return juce::var (o);
     }
 
+    // ce.anim routes to the runtime, the way BridgeScriptHost does — the animation list has to
+    // live in ONE place, so a host forwards rather than keeping its own.
+    void startAnimation (const juce::String& kind, const juce::String& path,
+                         double target, const juce::var& opts) override
+    { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
+    void stopAnimation (const juce::String& path) override
+    { if (runtime != nullptr) runtime->stopAnimation (path); }
+    bool animationRunning (const juce::String& path) override
+    { return runtime != nullptr && runtime->animationRunning (path); }
+
+    juce::StringArray uiMessages;
+    void uiNotify (const juce::String& m, const juce::var&) override { uiMessages.add ("notify:" + m); }
+    void uiStatus (const juce::String& m) override { uiMessages.add ("status:" + m); }
+
     juce::StringArray timerOps;
     void startTimer (const juce::String& id, int ms) override
     { timerOps.add ("start:" + id + ":" + juce::String (ms)); }
@@ -979,6 +993,79 @@ int main()
         runtime.onPanelClose();
         check (! host.logs.contains ("DRAW RAN"),
                "the window-closed lifecycle never raises onDraw — there is no surface to paint on");
+    }
+
+    // 20) ce.anim + ce.ui (design doc §6 phase 6) --------------------------------------------------
+    // ce.anim is CROSS-RUNTIME: a sweep triggered by a note has to work with the panel shut. The
+    // WebView runs the same two formulas, and the fixture below is the one both are pinned to —
+    // CE/web/test/scriptAnim.test.js asserts these exact numbers.
+    {
+        // The formulas first, directly. If these drift from the JS pair, every animation drifts.
+        check (std::abs (ScriptRuntime::animationEase (0.5, "linear") - 0.5) < 1e-9, "ease linear(0.5) = 0.5");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "exp") - 0.25) < 1e-9, "ease exp(0.5) = 0.25");
+        check (std::abs (ScriptRuntime::animationEase (0.25, "log") - 0.5) < 1e-9, "ease log(0.25) = 0.5");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "s") - 0.5) < 1e-9, "ease s(0.5) = 0.5");
+        check (std::abs (ScriptRuntime::animationEase (2.0, "linear") - 1.0) < 1e-9, "progress is clamped past the end");
+        check (std::abs (ScriptRuntime::animationSpring (1.0, 6.0, 12.0) - 1.0) < 1e-12,
+               "a spring lands EXACTLY on its target, never near it");
+
+        juce::Array<juce::var> animScripts;
+        animScripts.add (makeScript ("anim", "lua", "panel", "onSweep", "*",
+            "function onSweep()\n"
+            "  ce.anim.to(\"cutoff\", 100, { duration = 1000, curve = \"linear\", from = 0 })\n"
+            "  log(\"running \" .. tostring(ce.anim.running(\"cutoff\")))\n"
+            "  log(\"other \" .. tostring(ce.anim.running(\"resonance\")))\n"
+            "end\n"
+            "function onCancel() ce.anim.stop(\"cutoff\") end\n"));
+        runtime.setEnabledModules ({});
+        runtime.loadScripts (juce::var (animScripts));
+
+        host.logs.clear();
+        runtime.tickAnimations (0.0);          // establish the clock before anything starts
+        runtime.runAction ("onSweep", juce::var());
+        check (host.logs.contains ("running true"), "ce.anim.running() sees the animation it just started");
+        check (host.logs.contains ("other false"), "…and only that one");
+
+        // A linear 0 -> 100 over 1000ms. These are the numbers the WebView is pinned to as well.
+        runtime.tickAnimations (250.0);
+        check (std::abs ((double) host.values["cutoff"] - 25.0) < 1e-9, "linear ramp: 25% in, value is 25");
+        runtime.tickAnimations (500.0);
+        check (std::abs ((double) host.values["cutoff"] - 50.0) < 1e-9, "…50% in, value is 50");
+        runtime.tickAnimations (1000.0);
+        check (std::abs ((double) host.values["cutoff"] - 100.0) < 1e-9, "…and it ends exactly on the target");
+        check (! runtime.animationRunning ("cutoff"), "a finished animation stops running");
+
+        // Starting a second animation on the same path REPLACES the first — a value has one
+        // destination, and two writers on one path is a fight nobody wins.
+        runtime.tickAnimations (2000.0);
+        runtime.startAnimation ("to", "cutoff", 0.0, juce::var());
+        runtime.startAnimation ("to", "cutoff", 50.0, juce::var());
+        runtime.tickAnimations (2000.0 + 300.0);   // 300ms is the default duration
+        check (std::abs ((double) host.values["cutoff"] - 50.0) < 1e-9,
+               "the second animation replaced the first rather than fighting it");
+
+        // stop() leaves the value where it got to — it does not snap to the target or revert.
+        runtime.tickAnimations (3000.0);
+        host.values["cutoff"] = juce::var (0.0);
+        runtime.startAnimation ("to", "cutoff", 100.0, juce::JSON::parse (R"JSON({"duration":1000,"from":0})JSON"));
+        runtime.tickAnimations (3400.0);
+        const double atStop = (double) host.values["cutoff"];
+        runtime.runAction ("onCancel", juce::var());
+        runtime.tickAnimations (3900.0);
+        check (std::abs ((double) host.values["cutoff"] - atStop) < 1e-9,
+               "stop() leaves the value where it got to");
+        check (! runtime.animationRunning(), "…and nothing is running afterwards");
+
+        // ce.ui is webview-only: window-closed the verbs must explain themselves.
+        juce::Array<juce::var> uiScripts;
+        uiScripts.add (makeScript ("ui", "lua", "panel", "onSay", "*",
+            "function onSay() ce.ui.notify(\"hello\") ce.ui.status(\"busy\") end\n"));
+        runtime.loadScripts (juce::var (uiScripts));
+        host.logs.clear(); host.uiMessages.clear();
+        runtime.runAction ("onSay", juce::var());
+        check (host.uiMessages.isEmpty(), "ce.ui does nothing window-closed…");
+        check (host.logs.joinIntoString ("\n").contains ("panel window open"),
+               "…and says why rather than being an undefined global");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

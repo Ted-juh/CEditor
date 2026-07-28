@@ -20,6 +20,7 @@
   import { initConsoleBridge } from './CE_Application/stores/console.js';
   import { initScriptConsoleBridge } from './CE_Application/stores/scriptConsole.js';
   import { initScriptModules } from './CE_Application/stores/scriptModules.js';
+  import ScriptNotifications from './CE_Application/layout/ScriptNotifications.svelte';
   import { initPanelRuntime } from './CE_Application/scripting/panelRuntime.js';
   import { initHistory, undo, redo } from './CE_Application/stores/history.js';
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
@@ -363,6 +364,10 @@
       <StatusBar />
     </div>
   </div>
+
+  <!-- ce.ui.notify() toasts. Mounted once at the root, and fixed-position, so a message survives
+       whatever tab or panel is on screen when the script raises it. -->
+  <ScriptNotifications />
 
   {#if showShortcuts}
     <ShortcutsOverlay show={showShortcuts} onclose={() => showShortcuts = false} />

@@ -119,6 +119,8 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Panel components | 47 verbs: `split*` `phrase*` `recorder*` `harmony*` `setlist*` | **panel view only** — see below |
 | Panel structure | `panelCreate` `panelClone` `panelDestroy` `panelParent` `panelFind` `panelInfo` `panelTypes` | **panel view only** — creating a control needs a renderer |
 | Drawing | `drawClear` `drawFill` `drawStroke` `drawRect` `drawCircle` `drawLine` `drawPath` `drawText` `drawRedraw` | **panel view only** — drawing needs a surface |
+| Animation | `animateTo` `animateSpring` `animateStop` `animateRunning` | everywhere — the engine lives in ScriptRuntime |
+| User feedback | `uiNotify` `uiStatus` | **panel view only** — nobody to tell with the window shut |
 
 `checksum(type, bytes)` takes `"roland"`/`"yamaha"` (the same two's-complement 7-bit sum, both
 spellings accepted), `"sum"`, or `"xor"`. `panic([opts])` expands to All Sound Off → All Notes Off →
@@ -134,6 +136,25 @@ scratch that survives between handler calls in one session and is cleared when t
 `saveSetting`/`loadSetting` are the durable pair — the player stores them in the DAW session as a
 `ScriptSettings` child of its plugin state, the editor under `panel.scripting.settings`. Scripts see
 the same two verbs either way.
+
+### Animation
+
+`ce.anim.to/spring/stop/running` move a value over time. CROSS-RUNTIME — a sweep triggered by a
+note has to work with the panel shut — so the engine lives in `ScriptRuntime` and the host only
+supplies the clock (`tickAnimations(nowMs)`, called from the player's 30Hz timer).
+
+The position is a PURE FUNCTION of elapsed time, `from + (to - from) * ease(elapsed/duration)`,
+never an accumulated step: two integrators drift, two evaluations of one formula cannot.
+`ScriptRuntime::animationEase`/`animationSpring` and the JS pair in `panelRuntime.js` are pinned to
+the same fixture by both test suites. A spring lands exactly on its target; `from` defaults to where
+the value is; a second animation on a path replaces the first.
+
+### User feedback
+
+`ce.ui.notify(message, opts)` and `ce.ui.status(message)`. Panel view only. A notification is an
+event and expires; a status is a state and stays until changed — which is why they are two verbs.
+`dialog` is deliberately absent: it exists to return an answer, answers are async, and this API is
+synchronous by design. See §15 of `docs/scripting-modules-design.md`.
 
 ### Drawing
 

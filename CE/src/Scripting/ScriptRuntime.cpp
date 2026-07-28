@@ -2,6 +2,9 @@
 
 #include <juce_events/juce_events.h>
 
+#include <algorithm>
+#include <cmath>
+
 namespace ceditor::scripting
 {
 
@@ -116,6 +119,102 @@ void ScriptRuntime::applyModuleGates()
     if (js)     js->setEnabledModules (enabledModuleIds);
     if (python) python->setEnabledModules (enabledModuleIds);
     if (native) native->setEnabledModules (enabledModuleIds);
+}
+
+// --- ce.anim ------------------------------------------------------------------------------------
+// The position is a PURE FUNCTION of elapsed time. That is the whole design: the WebView runtime
+// evaluates the same two formulas, so an animation started in the editor and an animation started
+// in the shipped plugin pass through identical values at identical moments. An incremental
+// integrator would have been easier to write and impossible to hold to that.
+
+double ScriptRuntime::animationEase (double progress, const juce::String& curve)
+{
+    const double v = juce::jlimit (0.0, 1.0, progress);
+    // Deliberately the same four shapes ce.math.curve() offers, computed the same way, so an
+    // author who knows one knows the other.
+    if (curve == "exp") return v * v;
+    if (curve == "log") return std::sqrt (v);
+    if (curve == "s")   return v * v * (3.0 - 2.0 * v);
+    return v;
+}
+
+double ScriptRuntime::animationSpring (double progress, double damping, double frequency)
+{
+    const double x = juce::jlimit (0.0, 1.0, progress);
+    if (x >= 1.0) return 1.0;   // pinned, so a spring ALWAYS finishes exactly on its target
+    return 1.0 - std::exp (-damping * x) * std::cos (frequency * x);
+}
+
+void ScriptRuntime::startAnimation (const juce::String& kind, const juce::String& path,
+                                    double target, const juce::var& opts)
+{
+    assertMessageThread();
+    if (path.isEmpty()) return;
+
+    auto* o = opts.getDynamicObject();
+    auto number = [o] (const char* key, double fallback)
+    {
+        if (o == nullptr || ! o->hasProperty (key)) return fallback;
+        const double v = (double) o->getProperty (key);
+        return std::isfinite (v) ? v : fallback;
+    };
+
+    Animation a;
+    a.kind = kind == "spring" ? "spring" : "to";
+    a.path = path;
+    a.to = target;
+    a.duration = juce::jmax (1.0, number ("duration", a.kind == "spring" ? 600.0 : 300.0));
+    a.damping = number ("damping", 6.0);
+    a.frequency = number ("frequency", 12.0);
+    if (o != nullptr && o->hasProperty ("curve")) a.curve = o->getProperty ("curve").toString();
+    // Nothing has ticked yet on a freshly constructed runtime, so seed the origin from the same
+    // clock the host ticks with — otherwise the first animation measures against zero and is
+    // already finished by its first tick. The WebView runtime does exactly this.
+    if (! animationTicked) { animationNowMs = (double) juce::Time::getMillisecondCounterHiRes(); animationTicked = true; }
+    a.startMs = animationNowMs;
+
+    // `from` defaults to where the value IS, so an animation always starts from the truth rather
+    // than from wherever the last one happened to end.
+    a.from = (o != nullptr && o->hasProperty ("from")) ? (double) o->getProperty ("from")
+                                                       : (double) host.getValue (path, "value");
+    if (! std::isfinite (a.from)) a.from = 0.0;
+
+    stopAnimation (path);   // a value has one destination
+    animations.push_back (a);
+}
+
+void ScriptRuntime::stopAnimation (const juce::String& path)
+{
+    if (path.isEmpty()) { animations.clear(); return; }
+    animations.erase (std::remove_if (animations.begin(), animations.end(),
+                                      [&path] (const Animation& a) { return a.path == path; }),
+                      animations.end());
+}
+
+bool ScriptRuntime::animationRunning (const juce::String& path) const
+{
+    if (path.isEmpty()) return ! animations.empty();
+    for (const auto& a : animations) if (a.path == path) return true;
+    return false;
+}
+
+void ScriptRuntime::tickAnimations (double nowMs)
+{
+    animationNowMs = nowMs;
+    animationTicked = true;
+    if (animations.empty()) return;
+
+    // Iterate a copy: a set() can run a script that starts or stops an animation, and mutating the
+    // list mid-walk is how that turns into a dangling iterator.
+    const auto snapshot = animations;
+    for (const auto& a : snapshot)
+    {
+        const double progress = juce::jlimit (0.0, 1.0, (nowMs - a.startMs) / a.duration);
+        const double eased = a.kind == "spring" ? animationSpring (progress, a.damping, a.frequency)
+                                                : animationEase (progress, a.curve);
+        host.setValue (a.path, juce::var (a.from + (a.to - a.from) * eased), juce::var());
+        if (progress >= 1.0) stopAnimation (a.path);
+    }
 }
 
 void ScriptRuntime::reportError (const juce::String& scriptId, const juce::String& message)

@@ -199,6 +199,9 @@ local WEBVIEW_ONLY = {
   -- is none with the window shut. onPanelBuild is declared webview-only too, so these are only
   -- ever reached by a script that calls them from some other handler.
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
+-- @module ce.ui
+  -- ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
+  "uiNotify","uiStatus",
 -- @module ce.draw
   -- ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
   -- the window shut. onDraw is declared webview-only too, so it never fires here.
@@ -297,6 +300,15 @@ function syncTimer(id, beats)
   startTimer(id, math.floor(ms + 0.5))
 end
 
+-- @module ce.anim
+-- Values that move over time. The engine lives in the host (ScriptRuntime) so ONE list exists and
+-- the position is a pure function of elapsed time — an incremental integrator in each runtime
+-- would drift apart from the others within a second.
+function animateTo(path, target, opts) __animate("to", tostring(path), tonumber(target) or 0, opts or {}) end
+function animateSpring(path, target, opts) __animate("spring", tostring(path), tonumber(target) or 0, opts or {}) end
+function animateStop(path) __animateStop(path == nil and "" or tostring(path)) end
+function animateRunning(path) return __animateRunning(path == nil and "" or tostring(path)) end
+
 -- @module ce.device
 -- Device READS. All four are arithmetic-free wrappers over one host primitive, __deviceQuery,
 -- the way the channel messages are over sendMidi: the SHAPE a script sees is assembled here, so
@@ -341,6 +353,8 @@ local __CE_MODULES = {
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", round = "round", scale = "scale", snap = "snap" },
   ["ce.music"] = { noteName = "noteName", noteNumber = "noteNumber" },
   ["ce.time"] = { beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
+  ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
+  ["ce.ui"] = { notify = "uiNotify", status = "uiStatus" },
   ["ce.draw"] = { circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
   ["ce.panel"] = { clone = "panelClone", create = "panelCreate", destroy = "panelDestroy", find = "panelFind", info = "panelInfo", parent = "panelParent", types = "panelTypes" },
   ["ce.storage"] = { loadSetting = "loadSetting", saveSetting = "saveSetting", state = "state" },
@@ -350,7 +364,7 @@ local __CE_MODULES = {
   ["ce.components.harmony"] = { channel = "harmonyChannel", degree = "harmonyDegree", inversion = "harmonyInversion", keepPlayed = "harmonyKeepPlayed", key = "harmonyKey", mode = "harmonyMode", octave = "harmonyOctave", outOfKey = "harmonyOutOfKey", scale = "harmonyScale", shape = "harmonyShape", size = "harmonySize", strum = "harmonyStrum", voiceLeading = "harmonyVoiceLeading", voicing = "harmonyVoicing" },
   ["ce.components.setlist"] = { crossfade = "setlistCrossfade", enable = "setlistEnable", jump = "setlistGoto", next = "setlistNext", prev = "setlistPrev", wrap = "setlistWrap" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.draw", "ce.panel", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist" }
 local __CE_META = {
   { id = "ce.core", version = "1.0", runtime = "any" },
   { id = "ce.midi", version = "1.1", runtime = "any" },
@@ -358,6 +372,8 @@ local __CE_META = {
   { id = "ce.math", version = "1.0", runtime = "any" },
   { id = "ce.music", version = "1.0", runtime = "any" },
   { id = "ce.time", version = "1.1", runtime = "any" },
+  { id = "ce.anim", version = "1.0", runtime = "any" },
+  { id = "ce.ui", version = "1.0", runtime = "webview" },
   { id = "ce.draw", version = "1.0", runtime = "webview" },
   { id = "ce.panel", version = "1.0", runtime = "webview" },
   { id = "ce.storage", version = "1.0", runtime = "any" },
@@ -511,6 +527,11 @@ public:
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
+        g.set_function ("__animate", [this] (std::string kind, std::string path, double target, sol::optional<sol::table> opts)
+            { host->startAnimation (juce::String (kind), juce::String (path), target,
+                                    opts ? solToVar (*opts) : juce::var()); });
+        g.set_function ("__animateStop", [this] (std::string path) { host->stopAnimation (juce::String (path)); });
+        g.set_function ("__animateRunning", [this] (std::string path) { return host->animationRunning (juce::String (path)); });
         g.set_function ("__transportState", [this] () { return varToSol (lua, host->transportState()); });
         g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)
             { return varToSol (lua, host->deviceQuery (juce::String (kind),

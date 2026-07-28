@@ -223,7 +223,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | 3 | `ce.time` | Tempo, beats, musical timers. Unlocks every time-based idea at once. ✅ *done* (§12) |
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. ✅ *done* (§13) |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. ✅ *done* (§14) |
-| 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. |
+| 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. ✅ *done* (§15) |
 | 7 | `ce.components.*` completion | The remaining 26 components. Most code, least new capability — deliberately last. |
 
 Phase 4 needs a lifecycle phase that does not exist yet:
@@ -799,3 +799,84 @@ No gradients, no images, no transforms, no clipping regions beyond the control b
 input into a drawing (`pointer-events: none` — a drawing is decoration; a script that wants a click
 should use a control that reports one). Each of those is a real feature and none is needed for the
 things §6 named. `ce.anim` and `ce.ui` remain phase 6.
+
+---
+
+## 15. `ce.anim` and `ce.ui` — phase 6, as built
+
+### `ce.anim` — values that move
+
+```lua
+ce.anim.to("cutoff", 127, { duration = 500, curve = "s" })
+ce.anim.spring("cutoff", 127)
+ce.anim.stop("cutoff")        -- no path stops everything
+ce.anim.running("cutoff")
+```
+
+**Cross-runtime**, which §2 promised as "values any, visuals webview" and which is the whole
+difficulty: a sweep triggered by a note has to work in a DAW with the panel shut, so the C++
+`ScriptRuntime` carries the same engine as the WebView and the two have to agree.
+
+They agree because **the position is a pure function of elapsed time**, never an accumulated step:
+
+```
+value = from + (to - from) * ease(elapsed / duration)
+```
+
+Two integrators ticking independently drift apart within a second. Two evaluations of the same
+formula at the same elapsed time cannot. `ScriptRuntime::animationEase` / `animationSpring` and the
+exported `animationEase` / `animationSpring` in `panelRuntime.js` are that formula twice, and both
+test suites pin them to the same table — `ease(0.5,"exp") = 0.25`, `ease(0.25,"log") = 0.5`, a
+linear 0→100 over 1000ms reading 25 / 50 / 100 at 250 / 500 / 1000ms. The curves are deliberately
+the same four `ce.math.curve()` offers, computed the same way, so knowing one is knowing both.
+
+Three rules the tests exist to hold:
+
+- **A spring lands exactly on its target**, because the position is pinned to 1 at the end rather
+  than left wherever a damped cosine happened to be.
+- **`from` defaults to where the value IS**, so an animation starts from the truth rather than from
+  wherever the last one stopped.
+- **A second animation on a path replaces the first.** A value has one destination, and two writers
+  on one path is a fight whose outcome depends on iteration order.
+
+The engine lives in the runtime, not in a prelude and not in a host callback, so exactly one
+animation list exists. The host only supplies the clock: the player ticks it from the same 30Hz
+message-thread timer the beat events use, the editor from a ~60Hz interval. Nothing touches the
+audio thread.
+
+### `ce.ui` — telling somebody something
+
+```lua
+ce.ui.notify("Patch loaded", { kind = "warn", duration = 5000 })
+ce.ui.status("Recording")     -- no message clears it
+```
+
+Panel view only: there is nobody to tell with the window shut.
+
+**Two lifetimes, deliberately different.** A notification is an EVENT — it appears, it expires, it
+is gone. A status is a STATE — it stays until the script changes or clears it. Collapsing them into
+one verb would mean either a state that vanishes or an event that never does. `notify` renders as a
+toast at the app root (so it survives whatever tab is on screen); `status` writes the status bar's
+left-hand item.
+
+Neither is a debugging tool. `log()` is for debugging, and the summaries say so.
+
+### What phase 6 did not include: `ce.ui.dialog`
+
+§2 lists `notify` `status` `dialog`. The first two are fire-and-forget and are here. **`dialog` is
+not**, and the reason is structural rather than effort: a dialog exists to return an ANSWER, and an
+answer is asynchronous, while this API is synchronous everywhere by design — the C++ engines
+dispatch handlers synchronously, which is exactly why `async`/`await` is warned about at edit time.
+A callback form (`ce.ui.dialog(opts, onChoice)`) is expressible and is the likely shape, but it
+needs modal UI and a decision about what happens when the panel closes with a dialog open. Shipping
+a half-answered dialog would have been worse than shipping none.
+
+### Two defects this turned up
+
+- **The two runtimes disagreed about the clock origin.** The C++ engine started an animation from
+  the last tick; the WebView started it from the wall clock. Both work in production and they
+  diverge the instant a caller drives time itself — which is the only way to test an animation
+  without waiting on a real one. The WebView now matches the C++ convention.
+- **"Has anything ticked yet" was inferred from `now == 0`.** Zero is a perfectly good tick time
+  when the caller supplies it, so the seed-on-first-use guard fired every time and overwrote the
+  caller's clock. It is a boolean now, in both runtimes.

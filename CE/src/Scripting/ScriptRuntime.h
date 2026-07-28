@@ -132,6 +132,21 @@ public:
     virtual juce::var deviceQuery (const juce::String& kind, const juce::var& payload)
     { juce::ignoreUnused (kind, payload); return {}; }
 
+    /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
+        a host does not implement them itself. */
+    virtual void startAnimation (const juce::String& kind, const juce::String& path,
+                                 double target, const juce::var& opts)
+    { juce::ignoreUnused (kind, path, target, opts); }
+    virtual void stopAnimation (const juce::String& path) { juce::ignoreUnused (path); }
+    virtual bool animationRunning (const juce::String& path) { juce::ignoreUnused (path); return false; }
+
+    /** ce.ui — tell whoever is using the panel something. Panel view only, so the default is a
+        no-op and the C++ engines stub the verbs; this exists for a host that DOES have a surface
+        (the editor's WebView bridge) rather than for the shipped plugin. */
+    virtual void uiNotify (const juce::String& message, const juce::var& opts)
+    { juce::ignoreUnused (message, opts); }
+    virtual void uiStatus (const juce::String& message) { juce::ignoreUnused (message); }
+
     /** The transport, as one snapshot: { playing, bpm, beats, beatsPerBar, source, valid }.
         `beats` counts quarter notes from the transport origin. One primitive behind tempo(),
         isPlaying() and transportInfo(), so the three can never disagree with each other.
@@ -285,6 +300,36 @@ public:
         the nesting exceeds a fixed depth, instead of recursing until the stack dies. */
     void dispatchEvent (const juce::String& event, const juce::String& target, const juce::var& payload);
 
+    // --- ce.anim: values that move over time (design doc §6 phase 6) -------------------------
+    /** Start (or replace) an animation on `path`.
+
+        `kind` is "to" (eased ramp) or "spring" (damped oscillation). `opts` carries duration,
+        curve/damping/frequency and an optional `from`. Starting a second animation on the same
+        path REPLACES the first — a value has one destination.
+
+        The position is a pure function of elapsed time, never an accumulated step: two runtimes
+        integrating independently drift apart, two runtimes evaluating the same formula at the same
+        elapsed time cannot. animationValueAt() below is that formula, and it is the thing the
+        WebView runtime has to match. */
+    void startAnimation (const juce::String& kind, const juce::String& path,
+                         double target, const juce::var& opts);
+
+    /** Stop one animation, or every one when `path` is empty. The value stays where it got to. */
+    void stopAnimation (const juce::String& path = {});
+
+    /** Is `path` animating? With an empty path, is anything? */
+    bool animationRunning (const juce::String& path = {}) const;
+
+    /** Advance every animation to `nowMs` and write the values. The host calls this from whatever
+        message-thread timer it already runs — 30Hz in the player, which is what the beat events
+        use too. Nothing here touches the audio thread. */
+    void tickAnimations (double nowMs);
+
+    /** THE position formula, shared by every runtime. Exposed so tests can pin it directly.
+        `progress` is elapsed/duration, already clamped to 0..1 by the caller. */
+    static double animationEase (double progress, const juce::String& curve);
+    static double animationSpring (double progress, double damping, double frequency);
+
     /** run("target.action" [, args]) — call a named function defined by another script.
         `ref` is "owner.action" (the action on the script attached to `owner`) or a bare "action"
         (the first script that defines it, whatever it is attached to). Returns the handler's
@@ -332,6 +377,22 @@ private:
     std::function<void (const juce::String&)> errorLogger;
     juce::StringArray enabledModuleIds;   // empty = the panel declared nothing = every module on
     juce::var extensionModules;           // ce.ext.* copies the panel carries (void = none)
+
+    struct Animation
+    {
+        juce::String kind;     // "to" | "spring"
+        juce::String path;
+        double from = 0.0, to = 0.0;
+        double startMs = 0.0, duration = 300.0;
+        juce::String curve = "linear";
+        double damping = 6.0, frequency = 12.0;
+    };
+    std::vector<Animation> animations;
+    double animationNowMs = 0.0;   // the last tick, so a new animation starts from a known moment
+    // Whether a tick has EVER happened — not `animationNowMs == 0`, because zero is a perfectly
+    // good tick time when the caller drives the clock, which is the only way to test an animation
+    // without waiting on a real one.
+    bool animationTicked = false;
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)

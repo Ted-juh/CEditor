@@ -487,6 +487,81 @@ export const COMMANDS = [
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
 
+  /* --- Animation (design doc §6 phase 6) ---
+     Move a value over time instead of jumping it. CROSS-RUNTIME, and deliberately so: a filter
+     sweep triggered by a note has to work in a DAW with the panel shut, which is what §2 meant by
+     "values any, visuals webview". Animating a VISUAL property is panel-view only for the obvious
+     reason, but that falls out of what the path addresses rather than needing its own rule.
+
+     The position is a PURE FUNCTION OF ELAPSED TIME — from + (to - from) * ease(elapsed/duration)
+     — never an accumulated step. Two runtimes integrating independently would drift apart; two
+     runtimes evaluating the same formula at the same elapsed time cannot. */
+  {
+    id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
+    summary: 'Move a value to `target` over time. `opts` may carry { duration (ms, default 300), curve ("linear" | "exp" | "log" | "s"), from }. Starting a second animation on the same path replaces the first — a value has one destination.',
+    params: [
+      { name: 'path', type: 'path', required: true },
+      { name: 'target', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['duration', 'curve', 'from'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.anim.to("${1:cutoff}", ${2:127}, { duration = ${3:500}, curve = "s" })$0',
+      javascript: 'ce.anim.to("${1:cutoff}", ${2:127}, { duration: ${3:500}, curve: "s" });$0',
+    },
+  },
+  {
+    id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
+    summary: 'Move a value to `target` with a damped oscillation — it overshoots and settles. `opts` may carry { duration (ms, default 600), damping (default 6), frequency (default 12), from }.',
+    params: [
+      { name: 'path', type: 'path', required: true },
+      { name: 'target', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['duration', 'damping', 'frequency', 'from'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.anim.spring("${1:cutoff}", ${2:127})$0',
+      javascript: 'ce.anim.spring("${1:cutoff}", ${2:127});$0',
+    },
+  },
+  {
+    id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
+    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running.',
+    params: [{ name: 'path', type: 'path', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
+  },
+  {
+    id: 'animateRunning', category: 'Animation', signature: 'animateRunning([path])',
+    summary: 'Is `path` being animated right now? With no path, is anything? The guard before starting a gesture you do not want to interrupt.',
+    params: [{ name: 'path', type: 'path', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'if not ce.anim.running("${1:cutoff}") then $0 end', javascript: 'if (!ce.anim.running("${1:cutoff}")) { $0 }' },
+  },
+
+  /* --- User feedback (design doc §6 phase 6) ---
+     Panel view only: there is nobody to tell with the window shut. Both are fire-and-forget, which
+     is why they are here and `dialog` is not — see the note in §15. */
+  {
+    id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
+    summary: 'Show a brief message to whoever is using the panel. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000) }. For "the patch loaded", not for debugging — log() is for debugging.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'message', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['kind', 'duration'] },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'ce.ui.notify("${1:Patch loaded}")$0', javascript: 'ce.ui.notify("${1:Patch loaded}");$0' },
+  },
+  {
+    id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message])',
+    summary: 'Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'message', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
+  },
+
   /* --- Drawing (design doc §6 phase 5) ---
      Oscilloscopes, envelope editors, XY pads, spectrum displays. Immediate-mode: each verb
      records a command carrying the style in force when it was issued, and the panel renders the
@@ -1187,6 +1262,10 @@ export const MODULES = [
     summary: 'Note names and numbers.' },
   { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
+  { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
+  { id: 'ce.ui', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Tell the person using the panel something. Panel view only — there is nobody to tell with the window shut.' },
   { id: 'ce.draw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
   { id: 'ce.panel', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -1227,6 +1306,10 @@ const MODULE_MEMBERS = {
   },
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
   'ce.music': ['noteName', 'noteNumber'],
+  'ce.anim': {
+    to: 'animateTo', spring: 'animateSpring', stop: 'animateStop', running: 'animateRunning',
+  },
+  'ce.ui': { notify: 'uiNotify', status: 'uiStatus' },
   'ce.draw': {
     clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
     circle: 'drawCircle', line: 'drawLine', path: 'drawPath', text: 'drawText',

@@ -153,6 +153,9 @@ var __WEBVIEW_ONLY = [
   // ce.panel structure (design doc §6 phase 4): creating a control needs a renderer, and there
   // is none with the window shut.
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
+// @module ce.ui
+  // ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
+  "uiNotify","uiStatus",
 // @module ce.draw
   // ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
   // the window shut. onDraw is declared webview-only too, so it never fires here.
@@ -246,6 +249,14 @@ function syncTimer(id, beats) {
   startTimer(id, Math.round(ms));
 }
 
+// @module ce.anim
+// Values that move over time. The engine lives in the host so ONE list exists and the position is
+// a pure function of elapsed time — an incremental integrator per runtime would drift.
+function animateTo(path, target, opts) { __api.animate("to", String(path), Number(target) || 0, opts || null); }
+function animateSpring(path, target, opts) { __api.animate("spring", String(path), Number(target) || 0, opts || null); }
+function animateStop(path) { __api.animateStop(path === undefined || path === null ? "" : String(path)); }
+function animateRunning(path) { return __api.animateRunning(path === undefined || path === null ? "" : String(path)); }
+
 // @module ce.device
 // Device READS — four wrappers over one host primitive, __api.deviceQuery, so the shape a script
 // sees is assembled here rather than per engine. Without a device host the query returns null and
@@ -298,6 +309,8 @@ var __CE_MODULES = {
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
   "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
   "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+  "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
+  "ce.ui": { "notify": "uiNotify", "status": "uiStatus" },
   "ce.draw": { "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
   "ce.panel": { "clone": "panelClone", "create": "panelCreate", "destroy": "panelDestroy", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "types": "panelTypes" },
   "ce.storage": { "loadSetting": "loadSetting", "saveSetting": "saveSetting", "state": "state" },
@@ -307,8 +320,8 @@ var __CE_MODULES = {
   "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.0","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -427,6 +440,12 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("applyDump", [host, arg] (const Args& a) -> juce::var { host->applyDump (arg (a, 0)); return {}; });
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
+    api->setMethod ("animate", [host, arg] (const Args& a) -> juce::var
+        { host->startAnimation (arg (a, 0).toString(), arg (a, 1).toString(), (double) arg (a, 2), arg (a, 3)); return {}; });
+    api->setMethod ("animateStop", [host, arg] (const Args& a) -> juce::var
+        { host->stopAnimation (arg (a, 0).toString()); return {}; });
+    api->setMethod ("animateRunning", [host, arg] (const Args& a) -> juce::var
+        { return host->animationRunning (arg (a, 0).toString()); });
     api->setMethod ("transportState", [host] (const Args&) -> juce::var { return host->transportState(); });
     api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var
         { return host->deviceQuery (arg (a, 0).toString(), arg (a, 1)); });
