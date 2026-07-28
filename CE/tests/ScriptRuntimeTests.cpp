@@ -1346,6 +1346,111 @@ int main()
         runtime.setEnabledModules ({});
     }
 
+    // 25) ce.music — scales, chords, snap-to-key (design doc §20) ---------------------------------
+    // Pure arithmetic over tables GENERATED into every prelude, so the numbers below are the same
+    // fixtures CE/web/test/scriptMusic.test.js runs. If one engine disagrees, a panel quantises
+    // differently with the window open and shut, which is the failure this pinning exists to catch.
+    {
+        juce::Array<juce::var> musicScripts;
+        musicScripts.add (makeScript ("mus", "lua", "panel", "onMusic", "*",
+            "local function j(t) if t == nil then return \"nil\" end\n"
+            "  local s = \"\" for i, v in ipairs(t) do s = s .. (i > 1 and \",\" or \"\") .. tostring(v) end return s end\n"
+            "function onMusic()\n"
+            "  log(\"cmaj \" .. j(ce.music.scale(60)))\n"
+            "  log(\"amin \" .. j(ce.music.scale(\"A3\", \"minor\")))\n"
+            "  log(\"pent \" .. j(ce.music.scale(60, \"pentatonicMin\")))\n"
+            "  log(\"dm7 \" .. j(ce.music.chord(62, \"min7\")))\n"
+            "  log(\"add9 \" .. j(ce.music.chord(60, \"add9\")))\n"
+            "  log(\"q61 \" .. tostring(ce.music.quantize(61, 60, \"major\")))\n"
+            "  log(\"q63 \" .. tostring(ce.music.quantize(63, 60, \"major\")))\n"
+            "  log(\"q73 \" .. tostring(ce.music.quantize(73, 60, \"major\")))\n"
+            "  log(\"qblues \" .. tostring(ce.music.quantize(61, 60, \"blues\")))\n"
+            "  log(\"bad \" .. tostring(ce.music.scale(60, \"lokrian\")))\n"
+            "  log(\"badchord \" .. tostring(ce.music.chord(60, \"nope\")))\n"
+            "  log(\"badq \" .. tostring(ce.music.quantize(61, 60, \"nope\")))\n"
+            "end\n"));
+        musicScripts.add (makeScript ("musjs", "javascript", "panel", "onMusicJs", "*",
+            "function onMusicJs() {\n"
+            "  log('js cmaj ' + ce.music.scale(60).join(','));\n"
+            "  log('js amin ' + ce.music.scale('A3', 'minor').join(','));\n"
+            "  log('js dm7 ' + ce.music.chord(62, 'min7').join(','));\n"
+            "  log('js q61 ' + ce.music.quantize(61, 60, 'major'));\n"
+            "  log('js q73 ' + ce.music.quantize(73, 60, 'major'));\n"
+            "  log('js bad ' + (ce.music.scale(60, 'lokrian') === undefined));\n"
+            "}"));
+        runtime.loadScripts (juce::var (musicScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onMusic", juce::var());
+        check (host.logs.contains ("cmaj 60,62,64,65,67,69,71"), "scale(): C major from middle C, root not repeated");
+        check (host.logs.contains ("amin 57,59,60,62,64,65,67"), "…and it takes a note NAME for the root");
+        check (host.logs.contains ("pent 60,63,65,67,70"), "…a pentatonic is five notes, not seven");
+        check (host.logs.contains ("dm7 62,65,69,72"), "chord(): Dm7");
+        check (host.logs.contains ("add9 60,64,67,74"), "…and add9 puts the 9th above the octave");
+        // The tie rule. C# is one semitone from C and one from D; without a stated rule each engine
+        // would pick its own and a panel would quantise differently window-open and window-closed.
+        check (host.logs.contains ("q61 62"), "quantize(): a tie goes UP");
+        check (host.logs.contains ("q63 64"), "…and otherwise it takes the nearer note");
+        check (host.logs.contains ("q73 74"), "…keeping the octave it was given, not folding to one");
+        check (host.logs.contains ("qblues 60"), "…and it moves DOWN when down is nearer");
+        check (host.logs.contains ("bad nil"), "an unknown scale is nil, not a silent 'major'");
+        check (host.logs.contains ("badchord nil"), "…so is an unknown chord");
+        check (host.logs.contains ("badq nil"), "…and quantize does not pass the note through");
+        check (errors.isEmpty(), "no errors from the music verbs");
+
+        host.logs.clear();
+        runtime.runAction ("onMusicJs", juce::var());
+        check (host.logs.contains ("js cmaj 60,62,64,65,67,69,71"), "the JavaScript engine agrees, note for note");
+        check (host.logs.contains ("js amin 57,59,60,62,64,65,67"), "…including the name-as-root form");
+        check (host.logs.contains ("js dm7 62,65,69,72"), "…and the chords");
+        check (host.logs.contains ("js q61 62"), "…and the tie rule");
+        check (host.logs.contains ("js q73 74"), "…and the octave");
+        check (host.logs.contains ("js bad true"), "…and an unknown name is undefined there too");
+    }
+
+    // 26) onNoteIn / onNoteOffIn --------------------------------------------------------------------
+    // Declared cross-runtime, so a script can react to played notes in a DAW with the window shut.
+    // The classification itself lives in PluginProcessor (it decodes the inbound MIDI); what is
+    // asserted here is that the runtime raises the events at all, to a handler that declares them.
+    {
+        juce::Array<juce::var> noteScripts2;
+        noteScripts2.add (makeScript ("noteon", "lua", "panel", "onNoteIn", "*",
+            "function onNoteIn(n) log(\"ON \" .. n.channel .. \"/\" .. n.note .. \"/\" .. n.velocity) end\n"));
+        noteScripts2.add (makeScript ("noteoff", "lua", "panel", "onNoteOffIn", "*",
+            "function onNoteOffIn(n) log(\"OFF \" .. n.channel .. \"/\" .. n.note) end\n"));
+        runtime.loadScripts (juce::var (noteScripts2));
+
+        host.logs.clear();
+        {
+            auto* n = new juce::DynamicObject();
+            n->setProperty ("channel", 6); n->setProperty ("note", 64); n->setProperty ("velocity", 96);
+            runtime.dispatchEvent ("onNoteIn", "", juce::var (n));
+        }
+        {
+            auto* n = new juce::DynamicObject();
+            n->setProperty ("channel", 6); n->setProperty ("note", 64); n->setProperty ("velocity", 0);
+            runtime.dispatchEvent ("onNoteOffIn", "", juce::var (n));
+        }
+        check (host.logs.contains ("ON 6/64/96"), "onNoteIn reaches a handler that declares it");
+        check (host.logs.contains ("OFF 6/64"), "…and so does onNoteOffIn");
+
+        // The channel is 1-16, matching sendNote, so the obvious thing to do with the event works.
+        juce::Array<juce::var> echoScripts;
+        echoScripts.add (makeScript ("echo", "lua", "panel", "onNoteIn", "*",
+            "function onNoteIn(n) sendNote(n.channel, n.note, n.velocity) end\n"));
+        runtime.loadScripts (juce::var (echoScripts));
+        host.rawSends.clear();
+        {
+            auto* n = new juce::DynamicObject();
+            n->setProperty ("channel", 6); n->setProperty ("note", 64); n->setProperty ("velocity", 96);
+            runtime.dispatchEvent ("onNoteIn", "", juce::var (n));
+        }
+        // 0x95 = note-on, channel nibble 5 = channel 6. If the event reported 0-based like onCcIn
+        // does, this would come back as 0x94 and every echo panel would be off by one.
+        check (host.rawSends.contains ("95 40 60"),
+               "echoing onNoteIn straight back through sendNote lands on the SAME channel");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

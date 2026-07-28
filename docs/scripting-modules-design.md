@@ -106,7 +106,7 @@ the beginning.
 | `ce.midi` | CC/NRPN/Sysex + note/PC/bend/aftertouch/clock, `panic`, `checksum`, the 14 encoders | any |
 | `ce.device` | dumps, `parameters()`, `profile()`, presets | any, needs device host |
 | `ce.math` | `scale` `clamp` `round` `snap` `curve` `lerp`, seeded `random` | any |
-| `ce.music` | note names, scales, chords, quantise-to-scale | any |
+| `ce.music` | note names, scales, chords, quantise-to-scale | any — ✅ *complete* (§20) |
 | `ce.time` | `tempo()`, `onBeat`/`onBar`, timers, `after`, `syncTimer` | any |
 | `ce.panel` | `create` `destroy` `clone` `parent` `find` `each` `snapshot` | structure: webview |
 | `ce.draw` | the 2D context + `onDraw` | webview |
@@ -1148,3 +1148,77 @@ The error a verb raises against the wrong control named the *section*: `"Cutoff"
 Somebody reading that has an **Arpeggiator** in front of them — the section name is an internal
 detail, and the article was wrong as well. It names the family the way the editor does now, and
 still says which section was looked for.
+
+---
+
+## 20. `ce.music` completed, and `onNoteIn`
+
+Two things that turned out to be one slice. `ce.music` shipped as `noteName` and `noteNumber` —
+a quarter of what &sect;2 defined it as. And the most common message on the wire had no event of its
+own. Each makes the other worth having: an event that hands you a played note is thin without the
+arithmetic to decide what to do with it, and the arithmetic is academic if nothing tells you a note
+arrived.
+
+```lua
+function onNoteIn(n)
+  -- snap what was played into the key the panel is in, then pass it on
+  sendNote(n.channel, ce.music.quantize(n.note, ce.music.number("D3"), "dorian"), n.velocity)
+end
+```
+
+### The tables are the panel's own
+
+`ce.music.scale("dorian")` and a Chord Pad set to `dorian` have to mean the same seven notes. The
+only way to guarantee that is for there to be one table, so `scripting/musicTheory.js` re-exports
+the Chord Pad's `SCALES` rather than restating it, and the generator emits it into all three C++
+preludes.
+
+That is a sharper reason to generate than the phase-7 stub lists had. A mistyped *name* is a missing
+global: it fails loudly, in one engine, immediately. A mistyped **interval** is silent — it loads,
+it runs, and the panel is a semitone out in one scale, in the exported plugin, and correct in the
+editor.
+
+### Three rules worth stating
+
+- **An unknown name returns nothing.** Not `"major"`. A script that asked for `"lokrian"` should be
+  able to find out that this build has never heard of it; quietly substituting a scale that happens
+  to sound plausible is the worst of the three options.
+- **A tie goes UP.** `quantize` searches outwards from the note, testing `+d` before `-d`, so C&sharp;
+  in C major is always D and never C. Without a stated rule five engines would each pick their own
+  and a panel would quantise differently with the window open and shut.
+- **`quantize` keeps its octave.** It matches on pitch class but returns a real pitch, so snapping
+  C&sharp;5 gives D5 rather than dropping an octave to D4.
+
+`chord(root, type)` is an **absolute shape**, not a scale degree — "what is a D minor 7" does not
+depend on a key. Stacking thirds *on* a degree is a different question, and `stackedChord` in the
+Chord Pad already answers it.
+
+### The channel argument, and an inconsistency it exposed
+
+`onNoteIn` reports `channel` as **1&ndash;16**, matching `sendNote`, so the most obvious thing a
+script does with the event works:
+
+```lua
+sendNote(n.channel, n.note, n.velocity)   -- echoes on the channel it arrived on
+```
+
+`onCcIn` reports **0-based** while `sendCC` takes 1-based, so the equivalent CC echo has been off by
+one since it shipped. That is older than this work and cannot be changed without breaking panels
+that already compensate, so both summaries now state their convention explicitly rather than leaving
+it to be discovered. Fixing `onCcIn` is a separate decision with a migration attached.
+
+### The case everybody gets wrong
+
+A **note-on with velocity 0 is a note-off**. Devices using running status send them constantly, and a
+panel that treated one as a note-on would hang a voice on every key release. Both runtimes classify
+from the **status byte** rather than from the host's `messageType`, partly because only the status
+byte settles that case, and partly so the two cannot decide differently.
+
+### One defect this turned up in phase 7
+
+The component verb specs carried a hand-written scale list offering `"pentatonic"` and `"chromatic"`
+— which no component understands, so `ce.components.arp.scale(target, "pentatonic")` wrote a name
+that silently did nothing — while omitting `"pentatonicMaj"` and `"pentatonicMin"`, which they do
+understand, so the verb refused a perfectly valid value. The phase-7 test only checked that each
+enum offered the component's *default*, which it did. The spec reads the real table now, so the
+whole class of error is gone rather than that one instance of it.

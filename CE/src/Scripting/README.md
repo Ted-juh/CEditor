@@ -123,6 +123,7 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Channel messages | `sendNote` `sendNoteOff` `sendProgramChange` `sendPitchBend` `sendAftertouch` `sendClock` `sendTransport` | everywhere — arithmetic over `sendMidi`, defined in each prelude |
 | Storage | `state` `saveSetting` `loadSetting` | everywhere |
 | Debug | `log` | everywhere |
+| Music | `noteName` `noteNumber` `scaleNotes` `chordNotes` `quantizeNote` | everywhere (pure; tables generated into each prelude) |
 | Helpers | `scale` `clamp` `round` `snap` `curve` `lerp` `noteName` `noteNumber` + 14 MIDI-encoding helpers | everywhere (pure, defined in each prelude) |
 | Panel components | 229 verbs across 28 families: `split*` `phrase*` `recorder*` `harmony*` `setlist*` hand-written, the other 23 families expanded from `scripting/componentVerbs.js` | **panel view only** — see below |
 | Panel structure | `panelCreate` `panelClone` `panelDestroy` `panelParent` `panelFind` `panelInfo` `panelTypes` | **panel view only** — creating a control needs a renderer |
@@ -226,6 +227,17 @@ spec, so a verb cannot exist in one place and not another.
 
 Nothing to implement C++-side — every one of them is `runtime: 'webview'`. What matters here is
 that the generated stub list stays regenerated: **edit the spec, then run the generator.**
+
+### Music theory
+
+`ce.music.scale(root, name)`, `.chord(root, type)` and `.quantize(note, root, name)`, over interval
+tables GENERATED into every prelude from `CE/web/src/CE_Application/scripting/musicTheory.js` — which
+re-exports the Chord Pad's own `SCALES`, so a script and a component asking for "dorian" cannot mean
+different notes. Regenerate after touching that file.
+
+Three behaviours the cross-engine tests pin: an unknown name returns nil rather than falling back to
+"major"; a quantise tie goes **up**, always; and quantise keeps the octave it was given. See §20 of
+`docs/scripting-modules-design.md`.
 
 ### Musical time
 

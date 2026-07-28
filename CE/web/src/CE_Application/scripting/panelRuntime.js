@@ -56,6 +56,7 @@ import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
 import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
+import { SCALES, CHORDS } from './musicTheory.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
 } from '../stores/scriptUi.js';
@@ -405,6 +406,18 @@ export function readWatch(path) {
 
 // @module ce.music
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+// A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is.
+const musicPitch = (v) => (typeof v === 'string'
+  ? helpers.noteNumber(v)
+  : Math.floor(Number(v) || 0));
+const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
+const musicNotes = (table, root, name) => {
+  const steps = musicSteps(table, name);
+  if (!steps) return undefined;
+  const base = musicPitch(root);
+  return steps.map((x) => base + x);
+};
 // @module ce.math
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
@@ -416,6 +429,26 @@ const helpers = {
   // @module ce.music
   noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
   noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
+  // Scales, chords and snap-to-key. Same tables the C++ preludes are generated from, so a script
+  // that quantises to dorian gets the same note whether the window is open or shut. An unknown
+  // name returns undefined rather than guessing "major" — asking for something this build does not
+  // know should be findable, not silently corrected.
+  scaleNotes: (root, scale) => musicNotes(SCALES, root, scale),
+  chordNotes: (root, type) => musicNotes(CHORDS, root, type),
+  quantizeNote: (note, root, scale) => {
+    const steps = musicSteps(SCALES, scale);
+    if (!steps) return undefined;
+    const n = musicPitch(note), base = musicPitch(root);
+    const inKey = new Set(steps.map((x) => (((base + x) % 12) + 12) % 12));
+    // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested
+    // before the -d one, so a note exactly between two scale tones lands on the same one in every
+    // runtime. Without a stated rule the five engines would each pick their own.
+    for (let d = 0; d <= 6; d += 1) {
+      if (inKey.has((((n + d) % 12) + 12) % 12)) return n + d;
+      if (inKey.has((((n - d) % 12) + 12) % 12)) return n - d;
+    }
+    return n;
+  },
 
 // @module ce.midi
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
@@ -2632,6 +2665,30 @@ function hexToBytes(hex) {
   return out;
 }
 
+/**
+ * Classify a note message. Derived from the STATUS BYTE, not from the host's `messageType`, for two
+ * reasons: the C++ player does the same arithmetic so the two runtimes cannot disagree, and only
+ * the status byte can settle the case below.
+ *
+ * A note-on with velocity 0 IS a note-off — devices using running status send them constantly, and
+ * a panel that treated one as a note-on would hang a voice on every key release. Getting that wrong
+ * is precisely the decoding this event exists to save every panel author from doing by hand.
+ *
+ * `channel` is 1-16, matching sendNote, so `onNoteIn` → `sendNote` echoes correctly. (onCcIn
+ * reports 0-based; that is older than this and cannot be changed without breaking panels that
+ * already compensate — hence the note in its summary.)
+ */
+export function noteEventForTesting(bytes) { return noteEventFor(bytes); }
+
+function noteEventFor(bytes) {
+  if (bytes.length < 3) return null;
+  const kind = bytes[0] & 0xf0;
+  if (kind !== 0x90 && kind !== 0x80) return null;
+  const payload = { channel: (bytes[0] & 0x0f) + 1, note: bytes[1], velocity: bytes[2] };
+  const off = kind === 0x80 || bytes[2] === 0;
+  return { event: off ? 'onNoteOffIn' : 'onNoteIn', payload };
+}
+
 function onMidiInputMessage(payload) {
   if (live.dispatching || !live.enabledGlobal) return;
   if (!payload) return;
@@ -2647,6 +2704,8 @@ function onMidiInputMessage(payload) {
     events.push({ event: 'onCcIn', controlName: null,
       payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2] } });
   }
+  const note = noteEventFor(bytes);
+  if (note) events.push({ event: note.event, controlName: null, payload: note.payload });
   dispatchEvents(events, { inbound: true });
 }
 

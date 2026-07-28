@@ -348,7 +348,15 @@ export const DEVICE_EVENTS = [
   { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump arrived. dump.bytes, dump.kind. Use applyDump(dump.bytes) to fill the panel.' },
   // raw (escape hatch)
   { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI arrived (raw). midi.bytes, midi.channel, midi.status.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A CC arrived. cc.channel, cc.cc, cc.value. NOTE: cc.channel is 0-based here, unlike sendCC and unlike onNoteIn — a long-standing quirk that cannot be changed without breaking panels that already compensate.' },
+  // The most common message on the wire had no event of its own: a panel reacting to played notes
+  // had to take onMidiIn and decode status nibbles by hand, in every language, including the
+  // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
+  // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
+  { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
+    summary: 'A note was played. note.channel (1-16, matching sendNote), note.note, note.velocity. A note-on with velocity 0 is NOT one of these — it is a note-off, and arrives as onNoteOffIn.' },
+  { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
+    summary: 'A note was released. note.channel (1-16), note.note, note.velocity (the release velocity, 0 when the device sent a note-on with velocity 0 instead of a note-off).' },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'Raw SysEx arrived.' },
   { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device connected.' },
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.' },
@@ -1255,6 +1263,35 @@ export const HELPERS = [
   // semitones. The code is right and stays; the wording is what was wrong.
   { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C).' },
   { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4.' },
+  // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
+  // tables are the panel's OWN: a script asking for "dorian" and a Chord Pad set to "dorian" mean
+  // the same seven notes, because there is one table (scripting/musicTheory.js) generated into
+  // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
+  {
+    id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
+    summary: 'The notes of one octave of a scale, ascending from `root`. Seven notes for the modes, five for the pentatonics, six for blues — the root is not repeated at the top. `scale` defaults to "major"; an unknown name returns nothing rather than guessing.',
+    params: [
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'chordNotes', category: 'Music', signature: 'chordNotes(root [, type]) -> list',
+    summary: 'The notes of a chord, ascending from `root` — an absolute shape, not a scale degree. `type` defaults to "major"; major minor dim aug sus2 sus4 power maj6 min6 dom7 maj7 min7 minMaj7 dim7 m7b5 aug7 add9 dom9 maj9 min9. An unknown type returns nothing.',
+    params: [
+      { name: 'root', type: 'value', required: true },
+      { name: 'type', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
+    summary: 'Snap a note to the nearest one in a scale, searching both directions. A tie goes UP, always, so two runtimes cannot disagree about a note exactly between two scale tones. `scale` defaults to "major"; an unknown name returns nothing.',
+    params: [
+      { name: 'note', type: 'value', required: true },
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: false },
+    ],
+  },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
   { id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)', summary: 'Pack v into `count` 7-bit bytes; order = "msb"/"lsb" first (14/21/28-bit).' },
   { id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)', summary: 'Unpack 7-bit bytes back to a value.' },
@@ -1314,8 +1351,8 @@ export const MODULES = [
     summary: 'The connected synth: what it is, what parameters it has, and bulk dumps. Needs the device host.' },
   { id: 'ce.math', version: '1.0', requires: [], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic. Pure — no host involved.' },
-  { id: 'ce.music', version: '1.0', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers.' },
+  { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
+    summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
   { id: 'ce.time', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
   { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -1368,7 +1405,8 @@ const MODULE_MEMBERS = {
     parameter: 'deviceParameter', connected: 'deviceConnected',
   },
   'ce.math': ['scale', 'clamp', 'round', 'snap', 'curve', 'lerp'],
-  'ce.music': ['noteName', 'noteNumber'],
+  'ce.music': { name: 'noteName', number: 'noteNumber',
+                scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {
     to: 'animateTo', spring: 'animateSpring', stop: 'animateStop', running: 'animateRunning',
   },

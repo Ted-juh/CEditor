@@ -519,6 +519,74 @@ def noteNumber(name):
     if not m: return 0
     i = __NOTES.index(m.group(1)) if m.group(1) in __NOTES else -1
     return 0 if i < 0 else (int(m.group(2)) + 1) * 12 + i
+
+# BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.music
+__CE_SCALES = {}
+__CE_CHORDS = {}
+__CE_SCALES["major"] = [0,2,4,5,7,9,11]
+__CE_SCALES["minor"] = [0,2,3,5,7,8,10]
+__CE_SCALES["harmonicMinor"] = [0,2,3,5,7,8,11]
+__CE_SCALES["melodicMinor"] = [0,2,3,5,7,9,11]
+__CE_SCALES["dorian"] = [0,2,3,5,7,9,10]
+__CE_SCALES["phrygian"] = [0,1,3,5,7,8,10]
+__CE_SCALES["lydian"] = [0,2,4,6,7,9,11]
+__CE_SCALES["mixolydian"] = [0,2,4,5,7,9,10]
+__CE_SCALES["locrian"] = [0,1,3,5,6,8,10]
+__CE_SCALES["pentatonicMaj"] = [0,2,4,7,9]
+__CE_SCALES["pentatonicMin"] = [0,3,5,7,10]
+__CE_SCALES["blues"] = [0,3,5,6,7,10]
+__CE_CHORDS["major"] = [0,4,7]
+__CE_CHORDS["minor"] = [0,3,7]
+__CE_CHORDS["dim"] = [0,3,6]
+__CE_CHORDS["aug"] = [0,4,8]
+__CE_CHORDS["sus2"] = [0,2,7]
+__CE_CHORDS["sus4"] = [0,5,7]
+__CE_CHORDS["power"] = [0,7]
+__CE_CHORDS["maj6"] = [0,4,7,9]
+__CE_CHORDS["min6"] = [0,3,7,9]
+__CE_CHORDS["dom7"] = [0,4,7,10]
+__CE_CHORDS["maj7"] = [0,4,7,11]
+__CE_CHORDS["min7"] = [0,3,7,10]
+__CE_CHORDS["minMaj7"] = [0,3,7,11]
+__CE_CHORDS["dim7"] = [0,3,6,9]
+__CE_CHORDS["m7b5"] = [0,3,6,10]
+__CE_CHORDS["aug7"] = [0,4,8,10]
+__CE_CHORDS["add9"] = [0,4,7,14]
+__CE_CHORDS["dom9"] = [0,4,7,10,14]
+__CE_CHORDS["maj9"] = [0,4,7,11,14]
+__CE_CHORDS["min9"] = [0,3,7,10,14]
+# END GENERATED music tables
+
+# Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
+# or a name ("C4"), the way sendNote does. An unknown scale or chord name returns None rather than
+# guessing "major" — a script that asked for something this build does not know should find out.
+def __pitch(v):
+    import math
+    return noteNumber(v) if isinstance(v, str) else math.floor(v or 0)
+def __steps(tbl, name, fallback):
+    return tbl.get(fallback if name is None else str(name))
+def scaleNotes(root, scale=None):
+    s = __steps(__CE_SCALES, scale, "major")
+    if s is None: return None
+    base = __pitch(root)
+    return [base + x for x in s]
+def chordNotes(root, chordType=None):
+    s = __steps(__CE_CHORDS, chordType, "major")
+    if s is None: return None
+    base = __pitch(root)
+    return [base + x for x in s]
+def quantizeNote(note, root, scale=None):
+    s = __steps(__CE_SCALES, scale, "major")
+    if s is None: return None
+    n = __pitch(note); base = __pitch(root)
+    inKey = set((base + x) % 12 for x in s)
+    # Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
+    # the -d one, so a note exactly between two scale tones lands on the same one in every runtime.
+    for d in range(0, 7):
+        if (n + d) % 12 in inKey: return n + d
+        if (n - d) % 12 in inKey: return n - d
+    return n
 # @module ce.midi
 def to14bit(v):
     import math; v = math.floor(v); return { "msb": math.floor(v / 128) % 128, "lsb": v % 128 }
@@ -792,7 +860,7 @@ __CE_MODULES = {
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
-    "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
+    "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
     "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
@@ -834,7 +902,7 @@ __CE_META = [
     { "id": "ce.midi", "version": "1.1", "runtime": "any" },
     { "id": "ce.device", "version": "1.1", "runtime": "any" },
     { "id": "ce.math", "version": "1.0", "runtime": "any" },
-    { "id": "ce.music", "version": "1.0", "runtime": "any" },
+    { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.1", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
     { "id": "ce.ui", "version": "1.1", "runtime": "webview" },

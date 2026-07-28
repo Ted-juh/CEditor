@@ -25,6 +25,9 @@ const { MODULES, moduleMemberMap, MODULE_BY_ID, MODULE_CORE, MODULE_GATE_MESSAGE
         WEBVIEW_ONLY_MEMBERS, memberModule }
   = await import(`file://${apiPath}`);
 
+const musicPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'musicTheory.js');
+const { SCALES, CHORDS } = await import(`file://${musicPath}`);
+
 export const BEGIN = 'BEGIN GENERATED module namespace';
 export const END = 'END GENERATED module namespace';
 
@@ -33,6 +36,13 @@ export const END = 'END GENERATED module namespace';
 // mistype one, and a mistyped stub is an undefined global in exactly one engine.
 export const STUBS_BEGIN = 'BEGIN GENERATED webview-only stubs';
 export const STUBS_END = 'END GENERATED webview-only stubs';
+
+// ce.music's interval tables. Generated for a sharper reason than the stub lists: a mistyped NAME
+// is a missing global, which fails loudly in one engine. A mistyped INTERVAL is a wrong note — it
+// loads fine, runs fine, and the panel is subtly out of key in the export and correct in the
+// editor. Twelve scales and twenty chords across four runtimes is not a thing to hand-copy.
+export const MUSIC_BEGIN = 'BEGIN GENERATED music tables';
+export const MUSIC_END = 'END GENERATED music tables';
 
 // A short name has to be a legal member name in EVERY language a prelude is generated for. Lua is
 // the strict one: `goto` is a keyword there, so both `{ goto = ... }` and `t.goto(...)` fail to
@@ -609,6 +619,46 @@ for __n in __WEBVIEW_ONLY:
 # ${STUBS_END}`;
 }
 
+/* --------------------------------------------------------------- ce.music interval tables */
+// Emitted as a plain map from name to an ascending list of semitone offsets. The three verbs built
+// on top (scaleNotes / chordNotes / quantizeNote) are hand-written per prelude — they are six lines
+// each, and their ANSWERS are pinned by tests that run the same fixtures through every engine.
+
+const musicRows = (fmt) => [
+  ...Object.entries(SCALES).map(([k, v]) => fmt('__CE_SCALES', k, v)),
+  ...Object.entries(CHORDS).map(([k, v]) => fmt('__CE_CHORDS', k, v)),
+];
+
+export function luaMusicBlock() {
+  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = {${v.join(',')}}`);
+  return `-- ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+-- @module ce.music
+__CE_SCALES = {}
+__CE_CHORDS = {}
+${rows.join('\n')}
+-- ${MUSIC_END}`;
+}
+
+export function jsMusicBlock() {
+  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = [${v.join(',')}];`);
+  return `// ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// @module ce.music
+var __CE_SCALES = {};
+var __CE_CHORDS = {};
+${rows.join('\n')}
+// ${MUSIC_END}`;
+}
+
+export function pythonMusicBlock() {
+  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = [${v.join(',')}]`);
+  return `# ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+# @module ce.music
+__CE_SCALES = {}
+__CE_CHORDS = {}
+${rows.join('\n')}
+# ${MUSIC_END}`;
+}
+
 /* ------------------------------------------------------------------------------- splicing */
 
 // Two generated regions per engine now: the ce.* namespace block, and the window-closed stub list.
@@ -625,6 +675,12 @@ const STUB_TARGETS = [
   { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaStubBlock },
   { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsStubBlock },
   { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonStubBlock },
+];
+
+const MUSIC_TARGETS = [
+  { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaMusicBlock },
+  { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsMusicBlock },
+  { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonMusicBlock },
 ];
 
 /** Replace an existing generated block, or append one just before the prelude's closing delimiter. */
@@ -652,8 +708,11 @@ function run() {
     const path = join(repo, target.file);
     const source = readFileSync(path, 'utf8');
     const stubs = STUB_TARGETS.find((t) => t.file === target.file);
+    const music = MUSIC_TARGETS.find((t) => t.file === target.file);
     const next = splice(
-      splice(source, stubs.block(), null, STUBS_BEGIN, STUBS_END),
+      splice(
+        splice(source, music.block(), null, MUSIC_BEGIN, MUSIC_END),
+        stubs.block(), null, STUBS_BEGIN, STUBS_END),
       target.block(), target.end);
 
     if (mode === '--write') {

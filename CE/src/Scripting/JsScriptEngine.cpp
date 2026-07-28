@@ -86,6 +86,70 @@ function curve(v, shape) { shape = shape || "linear"; if (shape === "exp") retur
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function noteName(n) { n = Math.floor(n); return __NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); }
 function noteNumber(name) { var m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; var i = __NOTES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; }
+
+// BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// @module ce.music
+var __CE_SCALES = {};
+var __CE_CHORDS = {};
+__CE_SCALES["major"] = [0,2,4,5,7,9,11];
+__CE_SCALES["minor"] = [0,2,3,5,7,8,10];
+__CE_SCALES["harmonicMinor"] = [0,2,3,5,7,8,11];
+__CE_SCALES["melodicMinor"] = [0,2,3,5,7,9,11];
+__CE_SCALES["dorian"] = [0,2,3,5,7,9,10];
+__CE_SCALES["phrygian"] = [0,1,3,5,7,8,10];
+__CE_SCALES["lydian"] = [0,2,4,6,7,9,11];
+__CE_SCALES["mixolydian"] = [0,2,4,5,7,9,10];
+__CE_SCALES["locrian"] = [0,1,3,5,6,8,10];
+__CE_SCALES["pentatonicMaj"] = [0,2,4,7,9];
+__CE_SCALES["pentatonicMin"] = [0,3,5,7,10];
+__CE_SCALES["blues"] = [0,3,5,6,7,10];
+__CE_CHORDS["major"] = [0,4,7];
+__CE_CHORDS["minor"] = [0,3,7];
+__CE_CHORDS["dim"] = [0,3,6];
+__CE_CHORDS["aug"] = [0,4,8];
+__CE_CHORDS["sus2"] = [0,2,7];
+__CE_CHORDS["sus4"] = [0,5,7];
+__CE_CHORDS["power"] = [0,7];
+__CE_CHORDS["maj6"] = [0,4,7,9];
+__CE_CHORDS["min6"] = [0,3,7,9];
+__CE_CHORDS["dom7"] = [0,4,7,10];
+__CE_CHORDS["maj7"] = [0,4,7,11];
+__CE_CHORDS["min7"] = [0,3,7,10];
+__CE_CHORDS["minMaj7"] = [0,3,7,11];
+__CE_CHORDS["dim7"] = [0,3,6,9];
+__CE_CHORDS["m7b5"] = [0,3,6,10];
+__CE_CHORDS["aug7"] = [0,4,8,10];
+__CE_CHORDS["add9"] = [0,4,7,14];
+__CE_CHORDS["dom9"] = [0,4,7,10,14];
+__CE_CHORDS["maj9"] = [0,4,7,11,14];
+__CE_CHORDS["min9"] = [0,3,7,10,14];
+// END GENERATED music tables
+
+// Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
+// or a name ("C4"), the way sendNote does. An unknown scale or chord name returns undefined rather
+// than guessing "major" — a script that asked for something this build does not know should find out.
+function __pitch(v) { return typeof v === "string" ? noteNumber(v) : Math.floor(Number(v) || 0); }
+function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+function scaleNotes(root, scale) {
+  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
+  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+}
+function chordNotes(root, chordType) {
+  var s = __steps(__CE_CHORDS, chordType, "major"); if (!s) return undefined;
+  var base = __pitch(root); var out = []; for (var i = 0; i < s.length; i++) out.push(base + s[i]); return out;
+}
+function quantizeNote(note, root, scale) {
+  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
+  var n = __pitch(note), base = __pitch(root), inKey = {};
+  for (var i = 0; i < s.length; i++) inKey[(((base + s[i]) % 12) + 12) % 12] = true;
+  // Search outwards from the note itself. A TIE GOES UP, always: the +d candidate is tested before
+  // the -d one, so a note exactly between two scale tones lands on the same one in every runtime.
+  for (var d = 0; d <= 6; d++) {
+    if (inKey[(((n + d) % 12) + 12) % 12]) return n + d;
+    if (inKey[(((n - d) % 12) + 12) % 12]) return n - d;
+  }
+  return n;
+}
 // @module ce.midi
 function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
 function from14bit(msb, lsb) { return msb * 128 + lsb; }
@@ -394,7 +458,7 @@ var __CE_MODULES = {
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "nibblize": "nibblize", "panic": "panic", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "requestDump": "requestDump", "sendDump": "sendDump" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "round": "round", "scale": "scale", "snap": "snap" },
-  "ce.music": { "noteName": "noteName", "noteNumber": "noteNumber" },
+  "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
   "ce.time": { "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
@@ -431,7 +495,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

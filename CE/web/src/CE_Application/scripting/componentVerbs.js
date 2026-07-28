@@ -34,6 +34,8 @@
 // 1-based indexing throughout, on purpose: it is what the editor's own lists show, and a script
 // that says "scene 3" should mean the third one whichever language it is written in.
 
+import { SCALE_NAMES } from './musicTheory.js';
+
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
 
@@ -46,8 +48,12 @@ const NOTE = { min: 0, max: 127 };
 const CHANNEL = { min: 1, max: 16 };
 const VELOCITY = { min: 1, max: 127 };
 const DIVISIONS = ['1/1', '1/2', '1/4', '1/8', '1/8T', '1/16', '1/16T', '1/32'];
-const SCALES = ['major', 'minor', 'dorian', 'phrygian', 'lydian', 'mixolydian', 'locrian',
-  'harmonicMinor', 'melodicMinor', 'pentatonic', 'blues', 'chromatic'];
+// The panel's OWN scale ids, not a list retyped beside them. Phase 7 shipped a hand-written list
+// that offered "pentatonic" and "chromatic" (which no component understands, so the verb wrote a
+// name that silently did nothing) and omitted "pentatonicMaj"/"pentatonicMin" (which they do
+// understand, so the verb refused a value that was perfectly valid). Reading the table removes the
+// whole class of error — and it is the same table ce.music.scale answers from.
+const SCALES = SCALE_NAMES;
 
 /**
  * The families. `id` is the namespace (ce.components.<id>), `section` the model section the verbs

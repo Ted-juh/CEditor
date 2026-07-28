@@ -522,6 +522,27 @@ private:
                     co->setProperty ("value", (int) bytes.getReference (2));
                     scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
                 }
+
+                // Notes. Classified from the STATUS BYTE rather than from messageType, so this and
+                // the WebView (panelRuntime noteEventFor) cannot decide differently — and because
+                // only the status byte settles the case below.
+                if (bytes.size() >= 3)
+                {
+                    const int kind = status & 0xF0;
+                    if (kind == 0x90 || kind == 0x80)
+                    {
+                        auto* no = new juce::DynamicObject();
+                        // 1-16, matching sendNote, so onNoteIn -> sendNote echoes correctly.
+                        no->setProperty ("channel", (status & 0x0F) + 1);
+                        no->setProperty ("note", (int) bytes.getReference (1));
+                        no->setProperty ("velocity", (int) bytes.getReference (2));
+                        // A note-on with velocity 0 IS a note-off. Devices using running status send
+                        // them constantly, and a panel that treated one as a note-on would hang a
+                        // voice on every key release.
+                        const bool off = (kind == 0x80) || ((int) bytes.getReference (2) == 0);
+                        scriptRuntime->dispatchEvent (off ? "onNoteOffIn" : "onNoteIn", "", juce::var (no));
+                    }
+                }
                 return;
             }
 
