@@ -134,44 +134,116 @@ function panic(opts) {
   }
 }
 
-// @module ce.components
-// Panel-component verbs (panelApi.js PANEL_COMMANDS). The Zone Splitter, Phrase Sequencer,
-// Recorder, Harmoniser and Setlist are modelled and rendered in the panel view; there is no C++
-// counterpart to drive with the window closed. Defining them here as explaining stubs means a
-// script that strays across the boundary says so, instead of dying on an undefined global.
+// @module -
+// Every member declared runtime:'webview' in panelApi.js. The components are modelled and rendered
+// in the panel view; there is no C++ counterpart to drive with the window closed. Defining them
+// here as explaining stubs means a script that strays across the boundary says so, instead of dying on an undefined global.
+// The list below is GENERATED — 248 names maintained by hand in three files is 744 chances to
+// mistype one, and a mistyped stub is a missing name in exactly one engine.
+// BEGIN GENERATED webview-only stubs — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 var __WEBVIEW_ONLY = [
-  "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
-  "phraseSeed","phraseClear","phraseKey","phraseScale","phraseTranspose","phraseDirection","phraseRun","phraseCell",
-  "recorderRecord","recorderStop","recorderPlay","recorderClear","recorderUndo","recorderQuantize",
-  "recorderTranspose","recorderBars","recorderSource","recorderNudge","recorderShift","recorderStore",
-  "recorderLoad","recorderCountIn",
-  "harmonyMode","harmonyKey","harmonyScale","harmonySize","harmonyShape","harmonyVoicing","harmonyInversion",
-  "harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel","harmonyVoiceLeading","harmonyStrum",
-  "harmonyDegree",
-  "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
-// @module ce.panel
-  // ce.panel structure (design doc §6 phase 4): creating a control needs a renderer, and there
-  // is none with the window shut.
-  "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
 // @module ce.ui
-  // ce.ui (design doc §6 phase 6): there is nobody to tell with the window shut.
-  // uiDialog is listed here too — it does not work window-closed either — but it needs more than
-  // the default stub, so it is redefined below: a dialog owes its caller a callback.
   "uiNotify","uiStatus","uiDialog",
 // @module ce.draw
-  // ce.draw (design doc §6 phase 5): drawing needs a surface, and there is none with
-  // the window shut. onDraw is declared webview-only too, so it never fires here.
-  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawText","drawRedraw"
+  "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawText",
+  "drawRedraw",
+// @module ce.panel
+  "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
+// @module ce.components.split
+  "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
+// @module ce.components.phrase
+  "phraseSeed","phraseClear","phraseKey","phraseScale","phraseTranspose","phraseDirection",
+  "phraseRun","phraseCell",
+// @module ce.components.recorder
+  "recorderRecord","recorderStop","recorderPlay","recorderClear","recorderUndo","recorderQuantize",
+  "recorderTranspose","recorderBars","recorderSource","recorderNudge","recorderShift",
+  "recorderStore","recorderLoad","recorderCountIn",
+// @module ce.components.harmony
+  "harmonyMode","harmonyKey","harmonyScale","harmonySize","harmonyShape","harmonyVoicing",
+  "harmonyInversion","harmonyOctave","harmonyOutOfKey","harmonyKeepPlayed","harmonyChannel",
+  "harmonyVoiceLeading","harmonyStrum","harmonyDegree",
+// @module ce.components.setlist
+  "setlistNext","setlistPrev","setlistGoto","setlistEnable","setlistWrap","setlistCrossfade",
+// @module ce.components.arp
+  "arpRun","arpPattern","arpRate","arpDivision","arpSync","arpOctaves","arpGate","arpSwing",
+  "arpLatch","arpKey","arpScale","arpDegree","arpChordType","arpVelocity","arpChannel","arpEuclid",
+  "arpEuclidSteps","arpEuclidPulses","arpEuclidRotate",
+// @module ce.components.chordpad
+  "chordPadMode","chordPadKey","chordPadScale","chordPadChordType","chordPadVoicing",
+  "chordPadInversion","chordPadOctave","chordPadVelocity","chordPadChannel","chordPadStrum",
+  "chordPadLatch",
+// @module ce.components.noteribbon
+  "noteRibbonMode","noteRibbonKey","noteRibbonScale","noteRibbonBaseNote","noteRibbonOctaves",
+  "noteRibbonBendRange","noteRibbonVelocity","noteRibbonChannel","noteRibbonLatch",
+// @module ce.components.drumpads
+  "drumPadsMap","drumPadsBaseNote","drumPadsMode","drumPadsGate","drumPadsVelocity",
+  "drumPadsChannel","drumPadsRows","drumPadsCols",
+// @module ce.components.turing
+  "turingRun","turingRate","turingDivision","turingSync","turingLength","turingRandomness",
+  "turingQuantize","turingGate","turingStep",
+// @module ce.components.looper
+  "looperRun","looperSeconds","looperBars","looperSync","looperQuantize","looperLane",
+  "looperLaneRest",
+// @module ce.components.orbit
+  "orbitRun","orbitRate","orbitBars","orbitSync","orbitPhase","orbitNode","orbitNodeRadius",
+  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth",
+// @module ce.components.kinetic
+  "kineticRun","kineticSync","kineticGravity","kineticBounce","kineticFriction","kineticKeepAlive",
+  "kineticLaunch","kineticVelocity",
+// @module ce.components.constellation
+  "constellationProbe","constellationMode","constellationBlend","constellationRun",
+  "constellationRate","constellationSync","constellationBars","constellationLinks",
+// @module ce.components.timbre
+  "timbreMove","timbrePower","timbreAnchorX","timbreAnchorY",
+// @module ce.components.router
+  "routerSource","routerCc","routerChannel","routerPoly","routerInvert","routerDeadzone",
+  "routerInput","routerDest","routerDestDepth",
+// @module ce.components.macro
+  "macroValue","macroSlot","macroSlotDepth","macroSlotCurve","macroSlotMin","macroSlotMax",
+// @module ce.components.matrix
+  "matrixCell","matrixClear","matrixBipolar","matrixStep",
+// @module ce.components.constraint
+  "constraintMode","constraintGap","constraintMember",
+// @module ce.components.envelope
+  "envelopePreset","envelopePointX","envelopePointY","envelopePointCurve","envelopeSustain",
+  "envelopeLoop","envelopeLoopStart","envelopeLoopEnd","envelopeTimeMax","envelopePhase",
+// @module ce.components.ribbon
+  "ribbonValue","ribbonBipolar","ribbonReturnMode","ribbonReturnValue","ribbonReturnRate",
+  "ribbonSnap",
+// @module ce.components.crossfader
+  "crossfaderMix","crossfaderLaw","crossfaderBipolar","crossfaderDetent","crossfaderReturnToCenter",
+  "crossfaderReturnRate",
+// @module ce.components.joystick
+  "joystickMove","joystickBipolar","joystickReturnToCenter","joystickReturnAxes",
+  "joystickReturnRate",
+// @module ce.components.meter
+  "meterValue","meterScale","meterPeakHold","meterHoldMs","meterDecay",
+// @module ce.components.transport
+  "transportBpm","transportSwing","transportSource","transportBeatsPerBar","transportBeatUnit",
+  "transportLoop","transportLoopStart","transportLoopBars","transportCountIn","transportClockOut",
+// @module ce.components.panic
+  "panicSetScope","panicSetChannel","panicSetResetControllers","panicSetCentreBend",
+  "panicSetClearLocal",
+// @module ce.components.lcd
+  "lcdText","lcdClear","lcdBacklight","lcdBrightness","lcdContrast","lcdScroll","lcdScrollSpeed",
+  "lcdBlink","lcdCursor","lcdCursorAt","lcdValue",
+// @module ce.components.pixel
+  "pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow","pixelAnim",
+  "pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop",
 ];
+// @module -
 var __global = (typeof globalThis !== 'undefined') ? globalThis : this;
-// @module ce.components
 for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
   __global[__WEBVIEW_ONLY[__i]] = (function (name) {
     return function () {
       log("[panel] " + name + "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.");
+      // undefined, explicitly — the JS engine has no zero-value hazard, but a stub whose result a
+      // script reads has to read as "nothing", the same as the Lua and Python ones.
+      return undefined;
     };
   })(__WEBVIEW_ONLY[__i]);
 }
+// END GENERATED webview-only stubs
 
 // @module ce.ui
 // dialog() is the one webview-only verb that owes its caller something. A script asks a question
@@ -334,9 +406,32 @@ var __CE_MODULES = {
   "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
   "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "wrap": "setlistWrap" },
+  "ce.components.arp": { "channel": "arpChannel", "chordType": "arpChordType", "degree": "arpDegree", "division": "arpDivision", "euclid": "arpEuclid", "euclidPulses": "arpEuclidPulses", "euclidRotate": "arpEuclidRotate", "euclidSteps": "arpEuclidSteps", "gate": "arpGate", "key": "arpKey", "latch": "arpLatch", "octaves": "arpOctaves", "pattern": "arpPattern", "rate": "arpRate", "run": "arpRun", "scale": "arpScale", "swing": "arpSwing", "sync": "arpSync", "velocity": "arpVelocity" },
+  "ce.components.chordpad": { "channel": "chordPadChannel", "chordType": "chordPadChordType", "inversion": "chordPadInversion", "key": "chordPadKey", "latch": "chordPadLatch", "mode": "chordPadMode", "octave": "chordPadOctave", "scale": "chordPadScale", "strum": "chordPadStrum", "velocity": "chordPadVelocity", "voicing": "chordPadVoicing" },
+  "ce.components.noteribbon": { "baseNote": "noteRibbonBaseNote", "bendRange": "noteRibbonBendRange", "channel": "noteRibbonChannel", "key": "noteRibbonKey", "latch": "noteRibbonLatch", "mode": "noteRibbonMode", "octaves": "noteRibbonOctaves", "scale": "noteRibbonScale", "velocity": "noteRibbonVelocity" },
+  "ce.components.drumpads": { "baseNote": "drumPadsBaseNote", "channel": "drumPadsChannel", "cols": "drumPadsCols", "gate": "drumPadsGate", "map": "drumPadsMap", "mode": "drumPadsMode", "rows": "drumPadsRows", "velocity": "drumPadsVelocity" },
+  "ce.components.turing": { "division": "turingDivision", "gate": "turingGate", "length": "turingLength", "quantize": "turingQuantize", "randomness": "turingRandomness", "rate": "turingRate", "run": "turingRun", "step": "turingStep", "sync": "turingSync" },
+  "ce.components.looper": { "bars": "looperBars", "lane": "looperLane", "laneRest": "looperLaneRest", "quantize": "looperQuantize", "run": "looperRun", "seconds": "looperSeconds", "sync": "looperSync" },
+  "ce.components.orbit": { "bars": "orbitBars", "node": "orbitNode", "nodeAngle": "orbitNodeAngle", "nodeDepth": "orbitNodeDepth", "nodeRadius": "orbitNodeRadius", "nodeRatio": "orbitNodeRatio", "phase": "orbitPhase", "rate": "orbitRate", "run": "orbitRun", "sync": "orbitSync" },
+  "ce.components.kinetic": { "bounce": "kineticBounce", "friction": "kineticFriction", "gravity": "kineticGravity", "keepAlive": "kineticKeepAlive", "launch": "kineticLaunch", "run": "kineticRun", "sync": "kineticSync", "velocity": "kineticVelocity" },
+  "ce.components.constellation": { "bars": "constellationBars", "blend": "constellationBlend", "links": "constellationLinks", "mode": "constellationMode", "probe": "constellationProbe", "rate": "constellationRate", "run": "constellationRun", "sync": "constellationSync" },
+  "ce.components.timbre": { "anchorX": "timbreAnchorX", "anchorY": "timbreAnchorY", "move": "timbreMove", "power": "timbrePower" },
+  "ce.components.router": { "cc": "routerCc", "channel": "routerChannel", "deadzone": "routerDeadzone", "dest": "routerDest", "destDepth": "routerDestDepth", "input": "routerInput", "invert": "routerInvert", "poly": "routerPoly", "source": "routerSource" },
+  "ce.components.macro": { "slot": "macroSlot", "slotCurve": "macroSlotCurve", "slotDepth": "macroSlotDepth", "slotMax": "macroSlotMax", "slotMin": "macroSlotMin", "value": "macroValue" },
+  "ce.components.matrix": { "bipolar": "matrixBipolar", "cell": "matrixCell", "clear": "matrixClear", "step": "matrixStep" },
+  "ce.components.constraint": { "gap": "constraintGap", "member": "constraintMember", "mode": "constraintMode" },
+  "ce.components.envelope": { "loop": "envelopeLoop", "loopEnd": "envelopeLoopEnd", "loopStart": "envelopeLoopStart", "phase": "envelopePhase", "pointCurve": "envelopePointCurve", "pointX": "envelopePointX", "pointY": "envelopePointY", "preset": "envelopePreset", "sustain": "envelopeSustain", "timeMax": "envelopeTimeMax" },
+  "ce.components.ribbon": { "bipolar": "ribbonBipolar", "returnMode": "ribbonReturnMode", "returnRate": "ribbonReturnRate", "returnValue": "ribbonReturnValue", "snap": "ribbonSnap", "value": "ribbonValue" },
+  "ce.components.crossfader": { "bipolar": "crossfaderBipolar", "detent": "crossfaderDetent", "law": "crossfaderLaw", "mix": "crossfaderMix", "returnRate": "crossfaderReturnRate", "returnToCenter": "crossfaderReturnToCenter" },
+  "ce.components.joystick": { "bipolar": "joystickBipolar", "move": "joystickMove", "returnAxes": "joystickReturnAxes", "returnRate": "joystickReturnRate", "returnToCenter": "joystickReturnToCenter" },
+  "ce.components.meter": { "decay": "meterDecay", "holdMs": "meterHoldMs", "peakHold": "meterPeakHold", "scale": "meterScale", "value": "meterValue" },
+  "ce.components.transport": { "beatUnit": "transportBeatUnit", "beatsPerBar": "transportBeatsPerBar", "bpm": "transportBpm", "clockOut": "transportClockOut", "countIn": "transportCountIn", "loop": "transportLoop", "loopBars": "transportLoopBars", "loopStart": "transportLoopStart", "source": "transportSource", "swing": "transportSwing" },
+  "ce.components.panic": { "centreBend": "panicSetCentreBend", "channel": "panicSetChannel", "clearLocal": "panicSetClearLocal", "resetControllers": "panicSetResetControllers", "scope": "panicSetScope" },
+  "ce.components.lcd": { "backlight": "lcdBacklight", "blink": "lcdBlink", "brightness": "lcdBrightness", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "scroll": "lcdScroll", "scrollSpeed": "lcdScrollSpeed", "text": "lcdText", "value": "lcdValue" },
+  "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist"];
-var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.0","runtime":"any"},{"id":"ce.midi","version":"1.1","runtime":"any"},{"id":"ce.device","version":"1.1","runtime":"any"},{"id":"ce.math","version":"1.0","runtime":"any"},{"id":"ce.music","version":"1.0","runtime":"any"},{"id":"ce.time","version":"1.1","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.0","runtime":"webview"},{"id":"ce.panel","version":"1.0","runtime":"webview"},{"id":"ce.storage","version":"1.0","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

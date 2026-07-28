@@ -1274,6 +1274,78 @@ int main()
         check (errors.isEmpty(), "…and leaving it out raises nothing");
     }
 
+    // 24) phase 7 — the other twenty-three component families (design doc §19) -------------------
+    // 182 verbs, generated into every prelude from one spec. Window-closed they are stubs, like
+    // every other component verb, and what matters here is that they EXIST and explain themselves:
+    // a missing name is an undefined-global crash in one engine only, which is exactly the failure
+    // a generated list is meant to make impossible.
+    {
+        juce::Array<juce::var> compScripts;
+        compScripts.add (makeScript ("comp", "lua", "panel", "onComp", "*",
+            "function onComp()\n"
+            "  log(\"flat \" .. type(arpRate))\n"
+            "  log(\"ns \" .. type(ce.components.arp.rate))\n"
+            "  log(\"same \" .. tostring(ce.components.arp.rate == arpRate))\n"
+            "  log(\"lcd \" .. type(ce.components.lcd.text))\n"
+            "  log(\"matrix \" .. type(ce.components.matrix.cell))\n"
+            "  log(\"ret \" .. tostring(ce.components.arp.rate(\"x\", 4)))\n"
+            "end\n"));
+        compScripts.add (makeScript ("compjs", "javascript", "panel", "onCompJs", "*",
+            "function onCompJs() {\n"
+            "  log('js flat ' + typeof arpRate);\n"
+            "  log('js same ' + (ce.components.arp.rate === arpRate));\n"
+            "  log('js orbit ' + typeof ce.components.orbit.nodeRadius);\n"
+            "}"));
+        runtime.loadScripts (juce::var (compScripts));
+
+        host.logs.clear(); errors.clear();
+        runtime.runAction ("onComp", juce::var());
+        check (host.logs.contains ("flat function"), "a phase-7 verb exists as a flat global");
+        check (host.logs.contains ("ns function"), "…and at ce.components.<family>.<verb>");
+        check (host.logs.contains ("same true"), "…and the two spellings are the SAME function");
+        check (host.logs.contains ("lcd function"), "so does a family whose section is not its name (lcd -> Display)");
+        check (host.logs.contains ("matrix function"), "…and one with a grid verb");
+        check (host.logs.contains ("ret nil"),
+               "a stub returns nil, not zero values — tostring() of the result must not throw");
+        check (host.logs.joinIntoString ("\n").contains ("panel window open"),
+               "…having explained why it did nothing");
+
+        host.logs.clear();
+        runtime.runAction ("onCompJs", juce::var());
+        check (host.logs.contains ("js flat function"), "the JavaScript engine defines them too");
+        check (host.logs.contains ("js same true"), "…with the same identity");
+        check (host.logs.contains ("js orbit function"), "…including the item-shaped verbs");
+        check (errors.isEmpty(), "no engine raised an error defining 182 new stubs");
+
+        // Gating still holds: a family the panel did not enable is a gate stub, not a name that
+        // silently works. This is the phase-3 promise applied to twenty-three new modules at once.
+        runtime.setEnabledModules ({ "ce.core", "ce.components.arp" });
+        juce::Array<juce::var> gateScripts;
+        gateScripts.add (makeScript ("gate", "lua", "panel", "onGate", "*",
+            "function onGate()\n"
+            "  local listed = {}\n"
+            "  for _, m in ipairs(ce.modules) do listed[m.id] = true end\n"
+            "  log(\"listed \" .. tostring(listed[\"ce.components.arp\"] == true))\n"
+            "  log(\"unlisted \" .. tostring(listed[\"ce.components.orbit\"] == true))\n"
+            "  log(\"has \" .. tostring(ce.has(\"ce.components.arp\")))\n"
+            "  log(\"gated \" .. tostring(orbitRate(\"x\", 1)))\n"
+            "end\n"));
+        runtime.loadScripts (juce::var (gateScripts));
+        host.logs.clear();
+        runtime.runAction ("onGate", juce::var());
+        check (host.logs.contains ("listed true"), "a declared family appears in ce.modules");
+        check (host.logs.contains ("unlisted false"), "…and an undeclared one does not");
+        // ce.has() answers "can I use this HERE", not "did the panel declare it". Every phase-7
+        // family is panel-view only, so the honest answer window-closed is false even for one the
+        // panel turned on — which is the whole reason ce.has exists rather than a list lookup.
+        check (host.logs.contains ("has false"),
+               "…while ce.has() still says no, because a component verb cannot work window-closed");
+        check (host.logs.contains ("gated nil"), "a gated verb yields nil rather than no value at all");
+        check (host.logs.joinIntoString ("\n").contains ("ce.components.orbit"),
+               "…and the gate names the module to turn on");
+        runtime.setEnabledModules ({});
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

@@ -124,7 +124,7 @@ index had to be floored first. `solToVar` already folded the other direction; th
 | Storage | `state` `saveSetting` `loadSetting` | everywhere |
 | Debug | `log` | everywhere |
 | Helpers | `scale` `clamp` `round` `snap` `curve` `lerp` `noteName` `noteNumber` + 14 MIDI-encoding helpers | everywhere (pure, defined in each prelude) |
-| Panel components | 47 verbs: `split*` `phrase*` `recorder*` `harmony*` `setlist*` | **panel view only** — see below |
+| Panel components | 229 verbs across 28 families: `split*` `phrase*` `recorder*` `harmony*` `setlist*` hand-written, the other 23 families expanded from `scripting/componentVerbs.js` | **panel view only** — see below |
 | Panel structure | `panelCreate` `panelClone` `panelDestroy` `panelParent` `panelFind` `panelInfo` `panelTypes` | **panel view only** — creating a control needs a renderer |
 | Drawing | `drawClear` `drawFill` `drawStroke` `drawRect` `drawCircle` `drawLine` `drawPath` `drawText` `drawRedraw` | **panel view only** — drawing needs a surface |
 | Animation | `animateTo` `animateSpring` `animateStop` `animateRunning` | everywhere — the engine lives in ScriptRuntime |
@@ -214,6 +214,18 @@ Two guards, both in `ScriptRuntime` and mirrored exactly in the WebView runtime:
 
 Cross-runtime by design: the failures a panel most wants to report are the ones happening in a DAW
 with the window shut. See §16 of `docs/scripting-modules-design.md`.
+
+### Component verbs
+
+Twenty-eight families. The first five (Zone Splitter, Phrase, Recorder, Harmoniser, Setlist) each
+have a hand-written reducer in `CE/web/src/CE_Application/utils/*Layout.js`, because their actions
+are structural. The other twenty-three are declared as DATA in
+`CE/web/src/CE_Application/scripting/componentVerbs.js` and expanded from there: the descriptors,
+the implementations, the stub names in these preludes, and the documentation all come from the one
+spec, so a verb cannot exist in one place and not another.
+
+Nothing to implement C++-side — every one of them is `runtime: 'webview'`. What matters here is
+that the generated stub list stays regenerated: **edit the spec, then run the generator.**
 
 ### Musical time
 
@@ -333,7 +345,7 @@ control does, so the list was withdrawn rather than enforced as written.
 |---|---|
 | `async` / `await` in a handler | The WebView awaits a returned promise; the C++ engines dispatch synchronously and drop it, so anything after the first `await` never runs in the export. `scriptValidate` warns. Use `onTimer` for work that has to wait. |
 | `onDawSaveState` / `onDawRestoreState` | Declared `runtime: 'player'`. The editor has no DAW to save a project, so they never fire in preview — test them in the exported plugin. |
-| the 47 panel-component verbs | Declared `runtime: 'webview'`, stubbed with an explanation here. |
+| the panel-component verbs | Declared `runtime: 'webview'`, stubbed with an explanation here. The stub lists are GENERATED into all three preludes — 248 names by hand in three files is 744 chances to mistype one, and a mistyped stub is an undefined global in exactly one engine. Run `node tools/scripts/gen-script-modules.mjs --write` after touching the contract. |
 
 ### `onDawSaveState` returns; it does not mutate
 `store` arrives as a **copy** — each engine marshals it into the script's own language, so writing

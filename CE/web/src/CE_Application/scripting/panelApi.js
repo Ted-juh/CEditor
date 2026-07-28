@@ -26,6 +26,9 @@
 // snippet; otherwise the call looks identical in Lua and JS.
 
 import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
+import {
+  COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
+} from './componentVerbs.js';
 
 export { MODULE_COST, MODULE_COST_LANGUAGES };
 
@@ -1098,6 +1101,12 @@ export const COMMANDS = [
 // `target` is the component's control name. All are panel/component scope: a device script
 // runs before the GUI exists, so there is no component to talk to yet.
 
+// Argument types, from the verb kind. `targetRef` stays the first argument of every verb.
+const PARAM_TYPE_FOR = {
+  num: 'number', int: 'number', bool: 'boolean', str: 'string', enum: 'string',
+  xy: 'number', cell: 'number', line: 'value',
+};
+
 const panelVerb = (id, signature, summary, params) => ({
   id, signature, summary, params, category: 'Panel components',
   runtime: RUNTIME_WEBVIEW, scopes: ['component', 'panel'],
@@ -1210,6 +1219,21 @@ export const PANEL_COMMANDS = [
     [T, { name: 'wrap', type: 'boolean', required: false }]),
   panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
     [T, { name: 'ms', type: 'number', required: true }]),
+
+  // --- The other twenty-three families (phase 7) ---
+  // Everything above was hand-written, because each of those actions is genuinely structural.
+  // These are expanded from componentVerbs.js instead: the spec there is the single description of
+  // a verb's field, kind, range and prose, and the descriptor, the implementation, the C++ stub
+  // name and the documentation are all derived from it. A verb that exists in one place and not
+  // another stops being possible.
+  ...COMPONENT_VERBS.map((verb) => panelVerb(verb.id, verbSignature(verb), verbSummary(verb),
+    [T, ...verbArgs(verb).map((name) => ({
+      name,
+      type: PARAM_TYPE_FOR[verb.k === 'item' ? verb.kind : verb.k] ?? 'value',
+      // A boolean verb toggles when called bare, so its argument is genuinely optional. Every
+      // other argument is required — calling `arpRate(target)` is a mistake, not a query.
+      required: !(verb.k === 'bool' && verb.toggle),
+    }))])),
 ];
 
 /* ------------------------------------------------------------------- helpers */
@@ -1314,6 +1338,13 @@ export const MODULES = [
     summary: 'Harmoniser. Panel view only.' },
   { id: 'ce.components.setlist', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Setlist. Panel view only.' },
+  // …and one per remaining family, expanded from the same spec the verbs come from. One module
+  // per family rather than one for all of them: a panel with an Arpeggiator should not pay for the
+  // LCD, the Matrix and the Orbit, and the cost report is per module.
+  ...COMPONENT_FAMILIES.map((fam) => ({
+    id: moduleIdFor(fam.id), version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: `${fam.summary} Panel view only — the component is modelled there.`,
+  })),
 ];
 
 // module id -> the members it owns. A plain array means "keep the member's own name"; an object
@@ -1383,6 +1414,14 @@ const MODULE_MEMBERS = {
     channel: 'harmonyChannel', voiceLeading: 'harmonyVoiceLeading', strum: 'harmonyStrum',
     degree: 'harmonyDegree',
   },
+  // One entry per phase-7 family: { run: 'arpRun', rate: 'arpRate', … }, so a script writes
+  // ce.components.arp.rate(...) and the flat arpRate(...) still resolves to the same function.
+  ...Object.fromEntries(COMPONENT_FAMILIES.map((fam) => [
+    moduleIdFor(fam.id),
+    Object.fromEntries(fam.verbs.map((verb) => [
+      verb.v, fam.prefix + verb.v.charAt(0).toUpperCase() + verb.v.slice(1),
+    ])),
+  ])),
   'ce.components.setlist': {
     // `jump`, not `goto`: goto is a Lua 5.4 keyword, so both the generated table and the call site
     // ce.components.setlist.goto(...) would fail to parse. The generator refuses reserved words in
@@ -1656,16 +1695,33 @@ export function extensionCost(ext, languages = MODULE_COST_LANGUAGES) {
 
 /** The cost key a module is billed under — itself, or the group that owns its bytes. */
 export function costKeyFor(moduleId) {
-  if (MODULE_COST[moduleId]) return moduleId;
+  return costKeysFor(moduleId)[0] ?? null;
+}
+
+/**
+ * EVERY cost key a module is charged against: its own, plus each ancestor group that carries
+ * shared bytes.
+ *
+ * Before phase 7 a module had exactly one key, because the five component families shared one
+ * indivisible stub block and were billed as the `ce.components` group. Generating the stub lists
+ * split those bytes per family — so each family now has its own key AND still leans on a shared
+ * `ce.components` region (the generic verb machinery every family goes through). Billing only the
+ * most specific key would silently drop that region from every panel's total.
+ *
+ * A group is charged ONCE however many of its modules are enabled — that is what makes it a group.
+ */
+export function costKeysFor(moduleId) {
+  const keys = [];
+  if (MODULE_COST[moduleId]) keys.push(moduleId);
   // An extension carries its own prelude, so it is billed under its own id rather than looked up
   // in the generated table — which only knows about modules compiled into the app.
-  if (moduleById(moduleId) && isExtensionModule(moduleId)) return moduleId;
+  else if (moduleById(moduleId) && isExtensionModule(moduleId)) return [moduleId];
   const parts = String(moduleId ?? '').split('.');
   for (let i = parts.length - 1; i >= 2; i--) {
     const group = parts.slice(0, i).join('.');
-    if (MODULE_COST[group]) return group;
+    if (MODULE_COST[group]) keys.push(group);
   }
-  return null;
+  return keys;
 }
 
 /**
@@ -1682,10 +1738,10 @@ export function panelModuleCost(panel, languages = MODULE_COST_LANGUAGES) {
 
   const billed = new Map();          // cost key -> the modules charged to it
   for (const id of enabled) {
-    const key = costKeyFor(id);
-    if (!key) continue;
-    if (!billed.has(key)) billed.set(key, []);
-    billed.get(key).push(id);
+    for (const key of costKeysFor(id)) {
+      if (!billed.has(key)) billed.set(key, []);
+      billed.get(key).push(id);
+    }
   }
 
   const bytesFor = (key) => (isExtensionModule(key)
@@ -1705,7 +1761,10 @@ export function panelModuleCost(panel, languages = MODULE_COST_LANGUAGES) {
     unused: allModules()
       .map((m) => m.id)
       .filter((id) => !enabled.includes(id))
-      .reduce((keys, id) => { const k = costKeyFor(id); if (k && !billed.has(k)) keys.add(k); return keys; }, new Set()),
+      .reduce((keys, id) => {
+        for (const k of costKeysFor(id)) if (!billed.has(k)) keys.add(k);
+        return keys;
+      }, new Set()),
   };
 }
 

@@ -55,6 +55,7 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
+import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
 } from '../stores/scriptUi.js';
@@ -765,6 +766,43 @@ const harmoniserApi = {
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
   harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
 };
+
+// --- The other twenty-three families (phase 7) -------------------------------
+// Same shape as everything above — read the section, reduce, write back only what changed — but
+// built in one loop from componentVerbs.js rather than typed out 182 times. `sectionAction` cannot
+// be reused verbatim because these verbs take POSITIONAL arguments rather than a named action, so
+// this is its sibling: identical error text, identical no-op reporting, one extra hop to the spec.
+// @module ce.components
+function componentVerbAction(verb, target, args) {
+  const path = String(target ?? '');
+  const cfg = getValue(`${path}.${verb.section}`);
+  if (!cfg || typeof cfg !== 'object') {
+    // "an Arpeggiator", "a Looper". A message somebody reads when something has gone wrong is the
+    // worst place to look sloppy, and the rule is one line.
+    const article = /^[AEIOU]/i.test(verb.label) ? 'an' : 'a';
+    addScriptTrace('error', '',
+      `${verb.family}: "${path}" is not ${article} ${verb.label} (no ${verb.section} section)`);
+    return;
+  }
+  const patch = componentScriptPatch(verb, cfg, args);
+  const keys = Object.keys(patch);
+  if (keys.length === 0) {
+    // A no-op is by design: an out-of-range index, an unrecognised enum, or a value that clamps to
+    // what it already was. Reported anyway — silence looks exactly like a dead footswitch.
+    addScriptTrace('log', '',
+      `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — nothing to change`);
+    return;
+  }
+  for (const key of keys) setValue(`${path}.${verb.section}.${key}`, patch[key]);
+  addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
+}
+
+const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
+  verb.id,
+  // Rest args rather than a fixed arity: the verbs take one, two or three, and a wrapper that
+  // named them would have to be generated per kind for no gain. `target` is always first.
+  (target, ...rest) => componentVerbAction(verb, target, rest),
+]));
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
 const setlistApi = {
@@ -1597,6 +1635,8 @@ function buildApi(ownerName, scriptId = '') {
     ...harmoniserApi,
     // Setlist — next song, from a button or a script.
     ...setlistApi,
+    // …and the other twenty-three families, expanded from componentVerbs.js.
+    ...componentVerbApi,
     // flow
     emit: (name, data) => deliverEmit(String(name ?? ''), null, data),
     run: (ref, args) => runAction(ref, args),

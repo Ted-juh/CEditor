@@ -224,7 +224,7 @@ The architecture is only worth it for what it carries. Sequenced by dependency, 
 | 4 | `ce.panel` structure + `onPanelBuild` | **Panels that build themselves from the device.** Eight oscillators discovered → eight rows generated. The thing the options UI structurally cannot do. ✅ *done* (§13) |
 | 5 | `ce.draw` | Oscilloscopes, envelope editors, XY pads, spectrum displays. The highest ceiling on the list. ✅ *done* (§14) |
 | 6 | `ce.anim`, `ce.ui` | Motion and user-facing feedback. ✅ *done* (§15) |
-| 7 | `ce.components.*` completion | The remaining 26 components. Most code, least new capability — deliberately last. |
+| 7 | `ce.components.*` completion | The remaining components. Most code, least new capability — deliberately last. ✅ *done* (§19) |
 
 Phase 4 needs a lifecycle phase that does not exist yet:
 
@@ -1061,3 +1061,90 @@ cleans up in its callback would be left holding cleanup that never happens.
 - **The callback escapes the dispatch path.** It runs long after the handler that asked has
   returned, so a throw inside it was not being caught by anything that would report it — the one
   place a script error could vanish. It is wrapped and reported like any other script failure.
+
+---
+
+## 19. `ce.components.*` completion — phase 7, as built
+
+The last phase, and the one the roadmap called "most code, least new capability". Twenty-three more
+component families, 182 verbs — and the interesting decision was refusing to write them.
+
+### The five were hand-written. The twenty-three are data.
+
+Each of the original five families earned a bespoke reducer, because each of their actions is
+genuinely structural: seed a grid from a named pattern, step an index through only the *enabled*
+scenes, patch one zone inside an array. Twenty-three more in that style would have been several
+thousand lines of near-identical code, and near-identical code is exactly how things drift apart —
+the Recorder growing a clamp the Harmoniser never got.
+
+So `scripting/componentVerbs.js` is a **spec**. A family declares its section and its verbs; one
+generic reducer turns a verb call into a patch; and four things downstream are derived from it:
+
+| derived | from the spec |
+|---|---|
+| `panelApi.js` | the member descriptors, signatures, summaries, modules and the `ce.components.<family>.<verb>` map |
+| `panelRuntime.js` | the implementations, in one loop |
+| `gen-script-modules.mjs` | the window-closed stub names in all three C++ engines |
+| the docs | the signature text, so prose cannot disagree with the code |
+
+Adding a verb is one line, and the parity tests fail until every runtime agrees about it.
+
+### Nine verb kinds, and why that is enough
+
+`num` `int` `bool` `str` `enum` cover the scalars; `xy` sets two numbers at once (a puck, a probe);
+`item` sets one property of one element of an array (a macro slot's depth, an orbit node's radius);
+`cell` addresses a flat grid (the mod matrix) or a plain list (a Turing step); `line` writes one row
+of an LCD. Everything the twenty-three families actually need is one of those.
+
+Two behaviours fall out of the kinds and are worth stating:
+
+- **A bare `bool` call toggles.** `ce.components.arp.run(target)` flips it; passing a value sets it.
+  One footswitch does both jobs, which is what a footswitch is for.
+- **An unrecognised `enum` value is a no-op, never a wrong setting.** A typo that leaves the
+  arpeggiator alone is debuggable; one that quietly sets it to `"up"` is not.
+
+Indices are **1-based** throughout — it is what the editor's own lists show, and "scene 3" should
+mean the third one in every language.
+
+### What is deliberately not a verb
+
+Colours, sizes, label text, and anything else you set once in the inspector and never touch again.
+`set()` already reaches all of it by path. A verb earns its place by being worth driving *while
+somebody is playing* — mid-song, from a footswitch, from an incoming CC. That test is what keeps
+182 from becoming 600.
+
+### The stub lists became generated, and that changed the cost model
+
+248 members are declared `runtime: 'webview'` now. Maintained by hand in three C++ engines, that is
+744 chances to mistype one — and a mistyped stub is an undefined global in *exactly one* engine,
+which is the hardest kind of divergence to notice. The lists are generated, with an `@module` marker
+per family so the cost measurement can attribute the bytes.
+
+That split a number that used to be lumped. `ce.components` was billed as one indivisible block for
+all five families; now each family pays for its own stub names, and only the machinery they share
+is billed to the group. So `costKeyFor` became `costKeysFor`: a module is charged its **own** key
+*and* each ancestor group, with a group charged once however many of its modules are on. Billing
+only the most specific key would have silently dropped the shared region from every panel's total.
+
+### Testing a generated surface
+
+Sampling does not work here — a hand-picked verb test proves nothing about the 181 you did not pick.
+The tests are written against the spec instead, and each of these found something or would have:
+
+- every family names a section the model **actually has** (a verb writing `Arpeggiator.rate` when
+  the section is `Arp` would report "not an Arpeggiator" for a control that plainly is one);
+- every verb writes a field that section actually has, and every `item` verb names a property its
+  elements actually carry;
+- every `enum` verb offers the value the component **ships with** — a default a verb cannot express
+  means the panel starts in a state a script cannot restore;
+- every verb, fed a plausible argument, produces a patch touching the field it declares. A verb that
+  silently does nothing for every input is the failure mode a spec-driven surface is most prone to,
+  and it is invisible one verb at a time;
+- no verb mutates the config it was handed.
+
+### One thing that was simply wrong
+
+The error a verb raises against the wrong control named the *section*: `"Cutoff" is not a Arp`.
+Somebody reading that has an **Arpeggiator** in front of them — the section name is an internal
+detail, and the article was wrong as well. It names the family the way the editor does now, and
+still says which section was looked for.

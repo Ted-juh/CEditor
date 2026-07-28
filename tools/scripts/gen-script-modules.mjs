@@ -21,11 +21,18 @@ const repo = join(here, '..', '..');
 const apiPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'panelApi.js');
 
 const { MODULES, moduleMemberMap, MODULE_BY_ID, MODULE_CORE, MODULE_GATE_MESSAGE, CE_API_VERSION,
-        ALL_MEMBERS, isValueMember, RUNTIME_ANY, RUNTIME_PLAYER }
+        ALL_MEMBERS, isValueMember, RUNTIME_ANY, RUNTIME_PLAYER, RUNTIME_WEBVIEW, memberRuntime,
+        WEBVIEW_ONLY_MEMBERS, memberModule }
   = await import(`file://${apiPath}`);
 
 export const BEGIN = 'BEGIN GENERATED module namespace';
 export const END = 'END GENERATED module namespace';
+
+// The window-closed stub list is generated for the same reason the namespace block is, and became
+// worth generating at phase 7: 248 names maintained by hand in three files is 744 chances to
+// mistype one, and a mistyped stub is an undefined global in exactly one engine.
+export const STUBS_BEGIN = 'BEGIN GENERATED webview-only stubs';
+export const STUBS_END = 'END GENERATED webview-only stubs';
 
 // A short name has to be a legal member name in EVERY language a prelude is generated for. Lua is
 // the strict one: `goto` is a keyword there, so both `{ goto = ... }` and `t.goto(...)` fail to
@@ -500,25 +507,138 @@ export const MODULE_COST_LANGUAGES = ${JSON.stringify(languages)};
 `;
 }
 
+/* ------------------------------------------------------------- webview-only stub lists */
+// Members declared runtime:'webview' exist in the C++ engines as EXPLAINING STUBS: the panel view
+// is where those components are modelled and rendered, so there is nothing to drive with the
+// window shut, and a name that says why it did nothing beats an undefined global.
+//
+// Grouped by owning module so the cost measurement can attribute the bytes: `@module` markers are
+// emitted between the groups, and the stub factory itself sits under the shared bucket because no
+// single module pays for it.
+
+/** [{ module, names }] in manifest order — the grouping the emitted markers follow. */
+function webviewOnlyGroups() {
+  // memberModule() returns the WHOLE map (memberId -> { module, name }) rather than one lookup —
+  // it is rebuilt per call to fold in the installed extensions, so it is read once here.
+  const owners = memberModule();
+  const byModule = new Map();
+  for (const id of WEBVIEW_ONLY_MEMBERS) {
+    const mod = owners[id]?.module ?? MODULE_CORE;
+    if (!byModule.has(mod)) byModule.set(mod, []);
+    byModule.get(mod).push(id);
+  }
+  // Manifest order, so the emitted list reads the way the module list does — and so the output is
+  // stable: a Map iterated in insertion order would reorder whenever a member moved in panelApi.
+  const order = MODULES.map((m) => m.id);
+  return [...byModule.entries()]
+    .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+    .map(([module, names]) => ({ module, names }));
+}
+
+/** Wrap a group's names onto lines of at most ~100 columns, quoted and comma-separated. */
+function nameLines(names, indent) {
+  const lines = [];
+  let line = '';
+  for (const name of names) {
+    const piece = `"${name}",`;
+    if (line && (indent.length + line.length + piece.length) > 100) { lines.push(indent + line); line = ''; }
+    line += piece;
+  }
+  if (line) lines.push(indent + line);
+  return lines;
+}
+
+const STUB_MESSAGE = '() needs the panel window open — that component is drawn and modelled in the '
+  + 'panel view, so there is nothing to drive while the window is closed.';
+
+function stubList(comment, open, close, indent) {
+  const out = [];
+  for (const { module, names } of webviewOnlyGroups()) {
+    out.push(`${comment} @module ${module}`);
+    out.push(...nameLines(names, indent));
+  }
+  return [open, ...out, close].join('\n');
+}
+
+export function luaStubBlock() {
+  return `-- ${STUBS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${stubList('--', 'local WEBVIEW_ONLY = {', '}', '  ')}
+-- @module ${COST_SHARED}
+for _, name in ipairs(WEBVIEW_ONLY) do
+  _G[name] = function()
+    log("[panel] " .. name .. "${STUB_MESSAGE}")
+    -- An explicit "return nil", NOT a bare return. A Lua function with no return statement yields
+    -- ZERO values, so tostring(stub()) raises "value expected" rather than printing "nil". It went
+    -- unnoticed while every webview-only member was a void command; ce.panel.create() is the first
+    -- one whose RESULT a script reads, and it found it immediately. Same fix as the module gate.
+    return nil
+  end
+end
+-- ${STUBS_END}`;
+}
+
+export function jsStubBlock() {
+  return `// ${STUBS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${stubList('//', 'var __WEBVIEW_ONLY = [', '];', '  ')}
+// @module ${COST_SHARED}
+var __global = (typeof globalThis !== 'undefined') ? globalThis : this;
+for (var __i = 0; __i < __WEBVIEW_ONLY.length; __i++) {
+  __global[__WEBVIEW_ONLY[__i]] = (function (name) {
+    return function () {
+      log("[panel] " + name + "${STUB_MESSAGE}");
+      // undefined, explicitly — the JS engine has no zero-value hazard, but a stub whose result a
+      // script reads has to read as "nothing", the same as the Lua and Python ones.
+      return undefined;
+    };
+  })(__WEBVIEW_ONLY[__i]);
+}
+// ${STUBS_END}`;
+}
+
+export function pythonStubBlock() {
+  return `# ${STUBS_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+${stubList('#', '__WEBVIEW_ONLY = [', ']', '  ')}
+# @module ${COST_SHARED}
+def __webviewOnly(name):
+    def stub(*args, **kwargs):
+        log("[panel] " + name + "${STUB_MESSAGE}")
+        return None
+    return stub
+for __n in __WEBVIEW_ONLY:
+    globals()[__n] = __webviewOnly(__n)
+# ${STUBS_END}`;
+}
+
 /* ------------------------------------------------------------------------------- splicing */
 
+// Two generated regions per engine now: the ce.* namespace block, and the window-closed stub list.
+// The stub list has no append fallback — it replaces a region that must already be marked, because
+// WHERE it sits matters (the uiDialog override below it depends on running afterwards) and a
+// generator that guessed the position would put it somewhere subtly wrong.
 const TARGETS = [
   { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaBlock, end: ')LUA";' },
   { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsBlock, end: ')JS";' },
   { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonBlock, end: ')PY";' },
 ];
 
+const STUB_TARGETS = [
+  { file: 'CE/src/Scripting/LuaScriptEngine.cpp', block: luaStubBlock },
+  { file: 'CE/src/Scripting/JsScriptEngine.cpp', block: jsStubBlock },
+  { file: 'CE/src/Scripting/PythonScriptEngine.cpp', block: pythonStubBlock },
+];
+
 /** Replace an existing generated block, or append one just before the prelude's closing delimiter. */
-function splice(source, block, endDelimiter) {
-  const beginAt = source.indexOf(BEGIN);
+function splice(source, block, endDelimiter, begin = BEGIN, end = END) {
+  const beginAt = source.indexOf(begin);
   if (beginAt !== -1) {
     // Widen to the whole comment line that opens the block, and to the end of the closing one.
     const lineStart = source.lastIndexOf('\n', beginAt) + 1;
-    const endAt = source.indexOf(END, beginAt);
+    const endAt = source.indexOf(end, beginAt);
     if (endAt === -1) throw new Error('generated block has no end marker');
     const lineEnd = source.indexOf('\n', endAt);
     return source.slice(0, lineStart) + block + source.slice(lineEnd);
   }
+  if (endDelimiter === null) throw new Error(`${begin} region not found — it must already be marked`);
   const closeAt = source.indexOf(endDelimiter);
   if (closeAt === -1) throw new Error(`could not find the prelude delimiter ${endDelimiter}`);
   return `${source.slice(0, closeAt)}\n${block}\n${source.slice(closeAt)}`;
@@ -531,7 +651,10 @@ function run() {
   for (const target of TARGETS) {
     const path = join(repo, target.file);
     const source = readFileSync(path, 'utf8');
-    const next = splice(source, target.block(), target.end);
+    const stubs = STUB_TARGETS.find((t) => t.file === target.file);
+    const next = splice(
+      splice(source, stubs.block(), null, STUBS_BEGIN, STUBS_END),
+      target.block(), target.end);
 
     if (mode === '--write') {
       if (next !== source) { writeFileSync(path, next); console.log(`wrote ${target.file}`); }

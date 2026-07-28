@@ -497,14 +497,24 @@ test('the cost of a panel is the sum of what it turned on', () => {
   assert.ok(cost.shared > 0, 'the shared baseline is real and is reported separately');
   assert.ok(cost.unused.has('ce.midi'), 'and what declaring less would save is reported too');
 
-  // The five component families share one stub block, billed once rather than five times.
+  // Component families are billed per family AND share a group. Before phase 7 the five families
+  // shared one indivisible hand-written stub block and were billed once for all of them; the stub
+  // lists are generated per module now, so each family pays for its own names — and the generic
+  // machinery they all go through is still charged once, as `ce.components`.
   const one = panelModuleCost({ scripting: { modules: ['ce.components.split'] } });
-  const all = panelModuleCost({
-    scripting: { modules: MODULES.filter((m) => m.id.startsWith('ce.components.')).map((m) => m.id) },
-  });
-  assert.equal(one.total, all.total, 'ce.components is billed as one indivisible block');
-  assert.equal(all.modules.length, 1);
-  assert.equal(all.modules[0].ids.length, 5, '…and says which five modules it covers');
+  const two = panelModuleCost({ scripting: { modules: ['ce.components.split', 'ce.components.arp'] } });
+  assert.ok(two.total > one.total, 'a second family costs more than one — it has its own names');
+
+  const groupOf = (cost) => cost.modules.find((m) => m.key === 'ce.components');
+  assert.ok(groupOf(one), 'the shared component machinery is billed');
+  assert.equal(groupOf(one).bytes, groupOf(two).bytes,
+    'and billed ONCE however many families are on — that is what makes it a group');
+  assert.equal(groupOf(two).ids.length, 2, '…while naming every family charged to it');
+
+  // Every component family resolves to a key, so none of them is silently free.
+  for (const m of MODULES.filter((x) => x.id.startsWith('ce.components.'))) {
+    assert.ok(costKeyFor(m.id), `${m.id} has no cost key`);
+  }
 });
 
 test('a gated member explains itself in the same words everywhere', () => {
