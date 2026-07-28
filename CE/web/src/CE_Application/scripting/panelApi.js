@@ -1201,15 +1201,50 @@ export const ALL_HANDLER_NAMES = [
   ...ALL_EVENTS.map((e) => e.fn),
 ];
 
-/** Group commands + helpers + lifecycle by their `category`, for the picker's "Commands" side. */
-export function membersByCategory() {
-  const order = ['Lifecycle', 'Values', 'Transmit', 'Events & Flow', 'Device / MIDI', 'Panel components', 'Debug', 'Value / range', 'Music', 'MIDI encoding'];
-  const map = new Map(order.map((c) => [c, []]));
+// `category` on a member is now a descriptive tag only. It used to be the picker's grouping
+// (membersByCategory), which is exactly the grouping design doc §1 says does not scale: 47 panel
+// verbs in one bucket beside `clamp`. membersByModule() replaced it — modules are what a user
+// writes, and since slice 3 they are also what decides whether a member is reachable at all.
+
+/**
+ * The picker's grouping: one group per module, in manifest order, plus Lifecycle first.
+ *
+ * Categories were the old grouping and they do not survive contact with 47 panel-component verbs
+ * presented flat beside `clamp` (design doc §1). Modules are the grouping the user now writes in,
+ * and — since slice 3 — the grouping that decides what a panel can reach at all, so the picker and
+ * the runtime finally answer to the same list.
+ *
+ * `module` is null for the Lifecycle group: those are functions a script DEFINES, not names it is
+ * given, so no module owns them and no module gate applies.
+ */
+export function membersByModule() {
+  const groups = MODULES.map((m) => ({ module: m, members: [] }));
+  const byId = new Map(groups.map((g) => [g.module.id, g]));
+  const lifecycle = { module: null, members: [] };
+
   for (const m of ALL_MEMBERS) {
-    if (!map.has(m.category)) map.set(m.category, []);
-    map.get(m.category).push(m);
+    if (m.kind === 'lifecycle') { lifecycle.members.push(m); continue; }
+    byId.get(MEMBER_MODULE[m.id]?.module)?.members.push(m);
   }
-  return [...map.entries()].filter(([, items]) => items.length).map(([category, items]) => ({ category, items }));
+  return [lifecycle, ...groups].filter((g) => g.members.length);
+}
+
+/**
+ * The snippet with its leading name rewritten to the canonical module path — `ce.midi.sendCC(…)`
+ * rather than `sendCC(…)`. `ce.core` is `global: true`, so its members come back untouched.
+ *
+ * Both spellings work and will keep working; this is which one the picker TEACHES. Inserting the
+ * flat name while the rest of the system talks in modules would be teaching the deprecated form.
+ */
+export function namespacedSnippet(member, languageId) {
+  const flat = insertSnippet(member, languageId);
+  const path = memberPath(member?.id);
+  if (!flat || !member?.id || path === member.id) return flat;
+  // EVERY standalone occurrence, not just the first: `state`'s snippet mentions it twice
+  // (`state.count = (state.count or 0) + 1`), and rewriting only the leading one would insert a
+  // line that uses both spellings at once. The negative look-behind stops a name that is already
+  // part of a path from being prefixed twice.
+  return flat.replace(new RegExp(`(?<![\\w.])${escapeForRe(member.id)}\\b`, 'g'), path);
 }
 
 /** Is a member valid in a given scope? `scopes: 'any'` or undefined => valid everywhere. */

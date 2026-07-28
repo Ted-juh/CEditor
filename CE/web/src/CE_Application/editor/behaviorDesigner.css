@@ -308,6 +308,25 @@
 .bd-app .pitem.invalid{opacity:.45}
 .bd-app .pitem .pn{font-family:var(--mono);font-size:12px;color:var(--txt)}
 .bd-app .pitem .pd{font-size:11px;color:var(--txt-faint);margin-top:1px}
+/* Picker: module grouping + the ce.*/flat spelling toggle, and the collapsed "not enabled" tail. */
+.bd-app .pcat{display:flex;align-items:baseline;gap:8px}
+.bd-app .pcat-sub{text-transform:none;letter-spacing:0;font-size:10px;color:var(--txt-faint);opacity:.7;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto}
+.bd-app .pspell{display:flex;align-items:center;gap:8px;padding:7px 10px 3px}
+.bd-app .pseg{display:inline-flex;border:1px solid var(--line-2);border-radius:5px;overflow:hidden}
+.bd-app .pseg-btn{padding:2px 9px;font-size:11px;cursor:pointer;border:none;background:transparent;
+  color:var(--txt-dim);font-family:var(--mono)}
+.bd-app .pseg-btn:hover{color:var(--txt)}
+.bd-app .pseg-btn.pseg-on{background:var(--accent);color:#fff}
+.bd-app .poff-head{display:flex;align-items:baseline;gap:8px;padding:10px 10px 6px;margin-top:6px;
+  border-top:1px solid var(--line);cursor:pointer;font-size:11px;color:var(--txt-dim)}
+.bd-app .poff-head:hover{color:var(--txt)}
+.bd-app .pcat-off{opacity:.6}
+.bd-app .pitem-off{opacity:.4;cursor:default;border-left-color:transparent}
+.bd-app .pitem-off:hover{background:transparent;border-left-color:transparent}
+.bd-app .penable{font-size:10px;padding:1px 7px;border:1px solid var(--line-2);border-radius:4px;
+  background:transparent;color:var(--txt-dim);cursor:pointer;text-transform:none;letter-spacing:0}
+.bd-app .penable:hover{border-color:var(--accent);color:var(--accent)}
 .bd-app .ptree .pctrl{padding:6px 10px;cursor:pointer;font-weight:600;font-size:12px;color:var(--txt)}
 .bd-app .ptree .pctrl:hover{background:var(--panel)}
 .bd-app .ptree .pleaf{padding:4px 10px 4px 26px;cursor:pointer;font-family:var(--mono);font-size:12px;color:var(--txt-dim)}

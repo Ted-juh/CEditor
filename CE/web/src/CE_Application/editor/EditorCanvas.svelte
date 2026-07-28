@@ -57,6 +57,16 @@
   let scriptPanel = $derived(
     scriptDoc?.panelId ? ($panels.find((p) => String(p.id) === String(scriptDoc.panelId)) ?? null) : null
   );
+  // Turn a scripting module on from the picker. Only reachable when the panel pins a MANUAL list —
+  // on auto the list follows the scripts, so there is nothing to switch.
+  function enableScriptModule(moduleId) {
+    if (!scriptPanel) return;
+    const scripting = scriptPanel.scripting ?? {};
+    if (!Array.isArray(scripting.modules)) return;
+    if (scripting.modules.includes(moduleId)) return;
+    updatePanel(scriptPanel.id, { scripting: { ...scripting, modules: [...scripting.modules, moduleId] } });
+  }
+
   let behaviorControls = $derived(
     (scriptPanel?.controls ?? [])
       .map((c) => ({
@@ -598,8 +608,10 @@
           <BehaviorDesigner
             panelName={scriptPanel?.name ?? 'Scripts'}
             panelId={scriptPanel?.id ?? null}
+            panel={scriptPanel}
             controls={behaviorControls}
             initialScripts={(scriptDoc?.scripts ?? []).filter(isSourceScript)}
+            onEnableModule={enableScriptModule}
             onChange={(scripts) => updateScriptDocument($activeEditorTab.id, { scripts })} />
         {/key}
       {:else if canvasPanel}

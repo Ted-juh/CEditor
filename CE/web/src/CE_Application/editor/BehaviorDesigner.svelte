@@ -28,7 +28,11 @@
   // controls = the live panel's component tree (for the path picker).
   // initialScripts = the panel's existing scripts (empty for a fresh panel; the debug route
   // passes a demo set). Real persistence back to the panel model is follow-on wiring.
-  let { panelName = 'Untitled Panel', panelId = null, controls = [], initialScripts = [], onChange = null } = $props();
+  // `panel` is the panel document, for the picker's module filtering and for validating a
+  // script against the modules the panel declares. Null on the standalone debug route, where
+  // there is no document — the picker then shows everything rather than nothing.
+  let { panelName = 'Untitled Panel', panelId = null, panel = null, controls = [], initialScripts = [],
+        onEnableModule = null, onChange = null } = $props();
 
   let codeEditor = $state(null);   // the CodeEditor instance, for insert-at-cursor
   // Right-hand docked panel: one column with Insert / Library / History tabs (default open).
@@ -112,7 +116,7 @@
   let liveDiagnostics = $state([]);
   let problems = $derived([
     ...liveDiagnostics.map((d) => ({ severity: 'error', message: `Line ${d.line}: ${d.message}` })),
-    ...(selected ? validateScript(selected) : []),
+    ...(selected ? validateScript(selected, panel) : []),
   ]);
 
   // Target attachment: the panel's control names, plus the "Any control" wildcard. A legacy
@@ -275,7 +279,7 @@
   function collapseAll() { expanded = new Set(); }
 
   // --- Test / Trace screen state ---
-  let allProblems = $derived(scripts.flatMap((s) => validateScript(s).map((p) => ({ ...p, script: s.name }))));
+  let allProblems = $derived(scripts.flatMap((s) => validateScript(s, panel).map((p) => ({ ...p, script: s.name }))));
   let breakpoints = $state([]);              // { path, op, value } — "run until"; runtime enforces (later)
   let bpPath = $state(''); let bpOp = $state('>'); let bpValue = $state('');
   let watchPaths = $state([]); let watchInput = $state('');
@@ -490,7 +494,7 @@
   let problemSevByScript = $derived.by(() => {
     const m = {};
     for (const s of scripts) {
-      const ps = validateScript(s);
+      const ps = validateScript(s, panel);
       if (ps.some((p) => p.severity === 'error')) m[s.id] = 'error';
       else if (ps.some((p) => p.severity === 'warn')) m[s.id] = 'warn';
     }
@@ -818,7 +822,7 @@
 
 {#snippet dockBody()}
   {#if dockTab === 'insert'}
-    <ScriptPicker language={selected.language} scope={selected.scope} {controls} onInsert={insertAtCursor} />
+    <ScriptPicker language={selected.language} scope={selected.scope} {controls} {panel} {onEnableModule} onInsert={insertAtCursor} />
   {:else if dockTab === 'library'}
     <div class="liblist">
       {#if $scriptLibrary.length === 0}

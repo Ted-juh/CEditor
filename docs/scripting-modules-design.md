@@ -294,6 +294,7 @@ A registry stays possible and stays deferred; the manifest already carries `id`,
 3. **Opt-in + cost** — a panel declares its modules, the exporter bundles only those, the Export tab
    reports the size. ✅ *done*
 4. **Picker filtering** — the editor hides members from modules a panel has not enabled.
+   ✅ *done*
 
 Then `ce.ext.*` install/resolve, and only after that does `ce.draw` or `ce.panel` structure add a
 verb. Getting the architecture right against a surface we already understand is much cheaper than
@@ -400,3 +401,41 @@ Two things the work turned up:
   parity never checked it — the generated block built `ce.midi` and friends and stopped there. Slice
   3 gives it a real answer to return, so `ce.version`, `ce.runtime`, `ce.language`, `ce.modules` and
   `ce.has` are now generated into all three preludes alongside the module tables.
+
+### How slice 4 landed
+
+The picker now groups **by module**, which retires the `category` grouping §1 opened this document
+by complaining about — 47 panel-component verbs in one bucket beside `clamp`. Groups are
+`ce.core`, `ce.midi`, `ce.components.setlist` and so on, in manifest order, with `Lifecycle` first
+because those are functions a script *defines* rather than names it is given, so no module owns
+them. `membersByCategory()` had one caller and is gone; `category` survives as a descriptive tag.
+
+**It inserts the canonical spelling.** `ce.midi.sendCC(…)`, not `sendCC(…)`, with `ce.core` left
+unprefixed because it is `global: true`. Both spellings work and will keep working — this is about
+which one the editor *teaches*, and teaching the deprecated form while the rest of the system talks
+in modules would be incoherent. A two-button toggle switches to flat and is remembered.
+
+**Filtering applies to a MANUAL list only, never to auto.** That is the one real decision in this
+slice and it is worth stating plainly: auto derives the module list from what the scripts already
+reference, so filtering on auto would mean you cannot discover a verb until you have already used
+it — the picker would only ever show you what you already knew. On auto, inserting the call is what
+turns the module on. On a pinned list the user has made a decision, and the picker respects it.
+
+Even then, nothing *vanishes*. Modules that are off collapse into one **"Not enabled — N modules"**
+tail: expandable, dimmed, not insertable, with an `enable` button per module when the host passes a
+handler. A verb you cannot find is a worse problem than one you have to switch on. Searching opens
+that tail automatically — the same rule the Paths tab already used for matching controls — because
+typing `sendCC` and getting back a collapsed count tells you less than nothing.
+
+Two smaller things fell out:
+
+- **`namespacedSnippet` had to rewrite every occurrence, not just the first.** `state`'s snippet
+  mentions the name twice (`state.count = (state.count or 0) + 1`), so a leading-only rewrite would
+  have inserted a line using both spellings at once. A negative look-behind keeps an already-
+  qualified name from being prefixed twice.
+- **Search matches the module path too.** `ce.midi.send` finds the send verbs, because the path is
+  what the user now writes and searching for it should not come up empty.
+
+The picker is server-rendered in `scriptPicker.test.js` against real panel documents rather than
+tested through its helpers, because the interesting rule — filter on manual, never on auto — lives
+in the component and would otherwise be asserted nowhere.
