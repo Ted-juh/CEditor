@@ -1068,6 +1068,48 @@ def dbPosition(fraction, floorDb=-60, ceilDb=6):
         return 0
     db = 20 * math.log10(max(frac, 1e-4))
     return norm((db - floor) / (ceil - floor), 0, 1)
+# Taming what arrives on the wire. smooth is NOT approach: approach moves a FIXED step (a rate
+# limit), this moves a PROPORTION of what is left, which settles fast then creeps. It is lerp
+# underneath; the reasons it is a member are the coefficient clamp and that it ARRIVES - a one-pole
+# is asymptotic, so left alone it sits at 0.9999 and the control transmits forever.
+def smooth(current, target, coefficient, epsilon=None):
+    frm, to = __num(current), __num(target)
+    k = norm(coefficient, 0, 1)
+    tol = abs(__num(epsilon, 1e-4)) or 1e-4
+    if abs(to - frm) <= tol:
+        return to
+    return frm + (to - frm) * k
+
+# A Schmitt trigger: on at `high`, off at `low`, HOLDS between. A plain threshold chatters, and on
+# a bound control that is dozens of MIDI messages a second.
+def hysteresis(value, on, low, high):
+    v, lo, hi = __num(value), __num(low), __num(high)
+    if lo > hi:
+        lo, hi = hi, lo
+    return v > lo if on is True else v >= hi
+
+# A mean SMEARS a spike across the result; a median rejects it.
+def median(values):
+    l = sorted(__nums(values))
+    if not l:
+        return None
+    mid = len(l) // 2
+    return l[mid] if len(l) % 2 else (l[mid - 1] + l[mid]) / 2
+
+# The inverse of shape(), for going device -> panel THROUGH a taper. The same k as shape().
+def unshape(y, curve, tension=None):
+    import math
+    v = norm(y, 0, 1)
+    ten = __num(tension, 0) or 1.6
+    k = 1 + max(0, ten)
+    name = str(curve)
+    if name == "exp": return v ** (1 / k)
+    if name == "log": return 1 - (1 - v) ** (1 / k)
+    # The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
+    if name in ("scurve", "s"): return 0.5 - math.sin(math.asin(1 - 2 * v) / 3)
+    # hold is a step, so this returns the EARLIEST input that produces the output.
+    if name == "hold": return 1 if v >= 1 else 0
+    return v
 # @module ce.math
 # A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 # Seeded is the whole point: the language's own random cannot promise the same sequence in five
@@ -1660,7 +1702,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1702,7 +1744,7 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.4", "runtime": "any" },
+    { "id": "ce.math", "version": "1.5", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },

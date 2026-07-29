@@ -1777,7 +1777,7 @@ export const HELPERS = [
   // anything it worked out alongside a bound control came out subtly different. These are the
   // app's own functions, matched exactly.
   { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
-    summary: 'The panel\'s OWN curve warp — the one an Envelope segment and a Router breakpoint use. Not the same thing as curve(): curve() is the older, simpler family (exp is v², log is √v, and the s-curve is spelled "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension exponent. A script that read a curve name straight out of a control and passed it to curve() therefore got either an unknown-shape notice or a different number. Both spellings of the s-curve are accepted here. `tension` defaults to 1.6, not 0, because that is what the app does — an unset tension is not a straight line.' },
+    summary: 'The panel\'s OWN curve warp — the one an Envelope segment and a Router breakpoint use. Not the same thing as curve(): curve() is the older, simpler family (exp is v², log is √v, and the s-curve is spelled "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension exponent. A script that read a curve name straight out of a control and passed it to curve() therefore got either an unknown-shape notice or a different number. Both spellings of the s-curve are accepted here. `tension` defaults to 1.6, not 0, because that is what the app does — an unset tension is not a straight line. AND WITH `tension = 1` THIS IS THE MACRO FAMILY: a Macro slot\'s curve is exactly shape(v, curve, 1), which is the third of the three curve families in the app and the one nothing else names.' },
   { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
     summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the REMAINING range rescales to fill 0–1 so response starts right at the edge of the dead zone. The rescale is the part a hand-rolled version leaves out, and leaving it out loses the top of the range.' },
   { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
@@ -1788,6 +1788,19 @@ export const HELPERS = [
     summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. A script drawing its own scale with ce.draw had to reinvent the minor-tick spacing, and getting it wrong puts the minors visibly out of step with the ones the app draws beside them.' },
   { id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
     summary: 'Where a level sits on a dB meter, 0–1. gainToDb answers "how many dB is this"; this answers "how far up the meter does it go", which is the question a script drawing a meter is asking. Defaults match the Meter component: floor -60, ceiling +6.' },
+
+  // --- taming what arrives on the wire (design doc §34) ---
+  // A controller does not send tidy numbers. It sends a value that jitters, crosses a threshold
+  // repeatedly, spikes once, and has already been through a taper. These four are what a script
+  // needs to make that usable, and none of them composes out of what was already here.
+  { id: 'smooth', category: 'Value / range', signature: 'smooth(current, target, coefficient [, epsilon])',
+    summary: 'One-pole exponential smoothing — settles fast then creeps, which is the response a jittery expression pedal or a noisy CC wants. Not the same job as approach(), which moves a FIXED step and is a rate limit. It is lerp underneath, and is a member rather than a line for two reasons: the coefficient is clamped to 0–1, and it ARRIVES. A one-pole is asymptotic — left alone it sits at 0.9999 forever and a control smoothed with it transmits forever — so it snaps to the target inside `epsilon` (1e-4 by default). That snap is what a hand-rolled version leaves out, and the symptom is a panel that never stops sending.' },
+  { id: 'hysteresis', category: 'Value / range', signature: 'hysteresis(value, on, low, high)',
+    summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and HOLDS in between. `on` is the state it is in now, and the return is the state it should be. A plain threshold chatters — a CC hovering on the line flips a switch dozens of times a second, which on a bound control is dozens of MIDI messages a second. Two thresholds plus the current state is the fix, and nothing else in the module composes to it.' },
+  { id: 'median', category: 'Value / range', signature: 'median(values)',
+    summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Distinct from mean() and the reason is the point: a mean SMEARS a spike across the result, a median rejects it. On a noisy controller reading that is the difference between a glitch you can hear and one you cannot.' },
+  { id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
+    summary: 'The inverse of shape(). Going device → panel THROUGH a taper needs it: a value shaped on the way out has to be un-shaped on the way back, or the control lands somewhere other than where it started. Only map() is invertible by hand — swap x and y — while a named curve is not. `hold` is a step, so many inputs give the same output and there is no true inverse; it returns the earliest input that produces the output, which is the only answer that is a function.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
@@ -1903,7 +1916,7 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.math', version: '1.5', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
@@ -2003,7 +2016,10 @@ const MODULE_MEMBERS = {
                // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute
                // different families and collapsing them would change what existing panels sound like.
                shape: 'shapeCurve', deadzone: 'deadzone', weights: 'weightsFor',
-               blendBy: 'blendBy', ticks: 'tickStops', dbPosition: 'dbPosition' },
+               blendBy: 'blendBy', ticks: 'tickStops', dbPosition: 'dbPosition',
+               // All four stay bare flat: unlike `min`/`max`/`sum`/`mean`, none of these is a name
+               // a panel author would give their own helper, so a qualifier would only be noise.
+               smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {

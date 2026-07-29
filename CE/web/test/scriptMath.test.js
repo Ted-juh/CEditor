@@ -601,3 +601,104 @@ test('weights and blendBy reproduce a morph pad', () => {
   assert.ok(Math.abs(api.blendBy([0, 100], [0.25, 0.75]) - 75) < 1e-9);
   assert.equal(api.blendBy([], []), 0);
 });
+
+/* ==========================================================================================
+   Taming what arrives on the wire (design doc §34).
+
+   A controller does not send tidy numbers: it jitters, crosses a threshold repeatedly, spikes
+   once, and has already been through a taper. None of these four composes out of what was here.
+   ========================================================================================== */
+
+test('the four wire-taming members are declared and bound', () => {
+  for (const id of ['smooth', 'hysteresis', 'median', 'unshape']) {
+    assert.ok(MEMBER_BY_ID[id], `${id} is not declared`);
+    // All four stay bare flat: unlike min/max/sum/mean, none is a name a panel author would give
+    // their own helper, so a qualifier would only be noise.
+    assert.equal(memberPath(id), `ce.math.${id}`);
+    assert.equal(typeof api[id], 'function');
+  }
+});
+
+test('smooth settles fast then creeps, and ARRIVES', () => {
+  // A proportion of what is left, not a fixed step — the difference from approach().
+  assert.equal(api.smooth(0, 10, 0.5), 5);
+  assert.equal(api.smooth(5, 10, 0.5), 7.5);
+  assert.equal(api.approach(0, 10, 0.5), 0.5, 'approach moves a fixed step instead');
+
+  // The reason it is a member rather than a lerp: a one-pole is asymptotic, so without the snap a
+  // control smoothed with it transmits forever. 200 steps must land exactly.
+  let v = 0;
+  for (let i = 0; i < 200; i += 1) v = api.smooth(v, 10, 0.3);
+  assert.equal(v, 10);
+
+  // The coefficient is clamped, so a caller's stray 1.5 cannot overshoot.
+  assert.equal(api.smooth(0, 10, 1.5), 10);
+  assert.equal(api.smooth(0, 10, -1), 0);
+  // A wider epsilon arrives sooner.
+  assert.equal(api.smooth(9.9, 10, 0.5, 0.5), 10);
+});
+
+test('hysteresis holds between the thresholds, which is what stops the chatter', () => {
+  // Off below `high`, on at `high`, and it does not drop out until below `low`.
+  assert.equal(api.hysteresis(0.5, false, 0.4, 0.6), false);
+  assert.equal(api.hysteresis(0.6, false, 0.4, 0.6), true);
+  assert.equal(api.hysteresis(0.5, true, 0.4, 0.6), true, 'it HOLDS in the middle');
+  assert.equal(api.hysteresis(0.4, true, 0.4, 0.6), false);
+  // Thresholds the other way round mean the same thing rather than being an error.
+  assert.equal(api.hysteresis(0.6, false, 0.6, 0.4), true);
+
+  // The point, measured: a value dithering on a single threshold flips constantly, and with two it
+  // does not. On a bound control every one of those flips is a MIDI message.
+  const dither = Array.from({ length: 40 }, (_, i) => 0.5 + (i % 2 ? 0.01 : -0.01));
+  let plainFlips = 0;
+  let plain = false;
+  for (const v of dither) { const next = v >= 0.5; if (next !== plain) plainFlips += 1; plain = next; }
+  let hystFlips = 0;
+  let on = false;
+  for (const v of dither) { const next = api.hysteresis(v, on, 0.4, 0.6); if (next !== on) hystFlips += 1; on = next; }
+  assert.ok(plainFlips > 30, `a plain threshold flipped ${plainFlips} times`);
+  assert.equal(hystFlips, 0);
+});
+
+test('median rejects a spike where mean smears it', () => {
+  assert.equal(api.median([1, 2, 3]), 2);
+  assert.equal(api.median([3, 1, 2]), 2, 'order does not matter');
+  assert.equal(api.median([1, 2, 3, 4]), 2.5, 'even counts average the middle pair');
+  assert.equal(api.median([]), undefined, 'like mean, an empty list has none');
+  assert.equal(api.median([5]), 5);
+
+  // One bad reading in a steady stream: the median ignores it, the mean does not.
+  const spiked = [50, 50, 127, 50, 50];
+  assert.equal(api.median(spiked), 50);
+  assert.ok(api.meanOf(spiked) > 65, `the mean was dragged to ${api.meanOf(spiked)}`);
+  // The original is not reordered underneath the caller.
+  assert.deepEqual(spiked, [50, 50, 127, 50, 50]);
+});
+
+test('unshape inverts shape, which is what a taper needs on the way back', () => {
+  for (const curve of ['linear', 'exp', 'log', 'scurve', 's']) {
+    for (const tension of [0, 1, 3]) {
+      for (const t of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1]) {
+        const there = api.shapeCurve(t, curve, tension);
+        const back = api.unshape(there, curve, tension);
+        assert.ok(Math.abs(back - t) < 1e-9, `${curve}/${tension} round-trip failed at ${t}: got ${back}`);
+      }
+    }
+  }
+});
+
+test('unshape says the honest thing about hold, which has no true inverse', () => {
+  // A step maps many inputs to one output, so this returns the EARLIEST input that produces it —
+  // the only answer that is a function.
+  assert.equal(api.unshape(0, 'hold'), 0);
+  assert.equal(api.unshape(0.5, 'hold'), 0);
+  assert.equal(api.unshape(1, 'hold'), 1);
+  assert.equal(api.shapeCurve(api.unshape(1, 'hold'), 'hold'), 1);
+});
+
+test('shape() reproduces the Macro family too, at tension 1', () => {
+  // The doc gap this closes: all three curve families in the app are reachable, but nothing said
+  // that a Macro slot's curve is shape(v, curve, 1).
+  assert.match(MEMBER_BY_ID.shapeCurve.summary, /MACRO FAMILY/);
+  assert.match(MEMBER_BY_ID.shapeCurve.summary, /shape\(v, curve, 1\)/);
+});

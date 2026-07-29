@@ -459,6 +459,58 @@ function dbPosition(fraction, floorDb, ceilDb)
   local db = 20 * math.log(math.max(frac, 1e-4), 10)
   return norm((db - floor) / (ceil - floor), 0, 1)
 end
+-- Taming what arrives on the wire. A controller does not send tidy numbers: it jitters, crosses a
+-- threshold repeatedly, spikes once, and has already been through a taper.
+-- smooth is NOT approach: approach moves a FIXED step (a rate limit), this moves a PROPORTION of
+-- what is left, which settles fast then creeps. It is lerp underneath; the reasons it is a member
+-- are the coefficient clamp and that it ARRIVES. A one-pole is asymptotic, so left alone it sits
+-- at 0.9999 forever and a control smoothed with it transmits forever.
+function smooth(current, target, coefficient, epsilon)
+  local from, to = __num(current), __num(target)
+  local k = norm(coefficient, 0, 1)
+  local tol = math.abs(__num(epsilon, 1e-4))
+  if tol == 0 then tol = 1e-4 end
+  if math.abs(to - from) <= tol then return to end
+  return from + (to - from) * k
+end
+-- A Schmitt trigger: on at `high`, off at `low`, HOLDS between. A plain threshold chatters - a CC
+-- hovering on the line flips a switch dozens of times a second, and on a bound control that is
+-- dozens of MIDI messages a second.
+function hysteresis(value, on, low, high)
+  local v, lo, hi = __num(value), __num(low), __num(high)
+  if lo > hi then lo, hi = hi, lo end
+  if on == true then return v > lo end
+  return v >= hi
+end
+-- A mean SMEARS a spike across the result; a median rejects it. On a noisy controller reading that
+-- is the difference between a glitch you can hear and one you cannot.
+function median(values)
+  local l = __nums(values)
+  if #l == 0 then return nil end
+  table.sort(l)
+  local mid = math.floor(#l / 2)
+  if #l % 2 == 1 then return l[mid + 1] end
+  return (l[mid] + l[mid + 1]) / 2
+end
+-- The inverse of shape(), for going device -> panel THROUGH a taper. The same k as shape(),
+-- including the 1.6 default: an inverse computed against a different exponent inverts nothing.
+function unshape(y, curve, tension)
+  local v = norm(y, 0, 1)
+  local ten = __num(tension, 0)
+  if ten == 0 then ten = 1.6 end
+  local k = 1 + math.max(0, ten)
+  local name = tostring(curve)
+  if name == "exp" then return v ^ (1 / k)
+  elseif name == "log" then return 1 - (1 - v) ^ (1 / k)
+  -- The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and would
+  -- not agree to the last bit across five runtimes.
+  elseif name == "scurve" or name == "s" then return 0.5 - math.sin(math.asin(1 - 2 * v) / 3)
+  -- hold is a step: many inputs give one output, so this returns the EARLIEST that produces it,
+  -- which is the only answer that is a function.
+  elseif name == "hold" then if v >= 1 then return 1 else return 0 end
+  end
+  return v
+end
 -- @module ce.math
 -- A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 -- Seeded is the whole point: the language's own math.random cannot promise the same sequence in
@@ -1073,7 +1125,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", snap = "snap", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -1115,7 +1167,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.4", runtime = "any" },
+  { id = "ce.math", version = "1.5", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },

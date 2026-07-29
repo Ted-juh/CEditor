@@ -1031,6 +1031,86 @@ function dbPositionImpl(fraction, floorDb, ceilDb) {
   return normImpl((db - floor) / (ceil - floor), 0, 1);
 }
 
+/* --------------------------------------------------- ce.math: taming what arrives on the wire */
+
+/**
+ * smooth(current, target, coefficient [, epsilon]) — one-pole exponential smoothing.
+ *
+ * Not the same job as approach(). approach moves a FIXED step, which is a rate limit; this moves a
+ * PROPORTION of the remaining distance, which settles fast and then creeps — the response a jittery
+ * expression pedal or a noisy CC wants.
+ *
+ * It is `lerp` underneath and says so, but two things are the reason it is a member rather than a
+ * line: the coefficient is clamped to 0–1, and it ARRIVES. A one-pole is asymptotic — left alone it
+ * sits at 0.9999 forever and a control smoothed with it transmits forever. Snapping inside epsilon
+ * is what a hand-rolled version leaves out, and the symptom is a panel that never stops sending.
+ */
+function smoothImpl(current, target, coefficient, epsilon) {
+  const from = num(current);
+  const to = num(target);
+  const k = normImpl(coefficient, 0, 1);
+  const tol = Math.abs(num(epsilon, 1e-4)) || 1e-4;
+  if (Math.abs(to - from) <= tol) return to;
+  return from + (to - from) * k;
+}
+
+/**
+ * hysteresis(value, on, low, high) — a Schmitt trigger: turns on at `high`, off at `low`, and
+ * HOLDS in between. `on` is the state it is currently in, and the return is the state it should be.
+ *
+ * A plain threshold chatters: a CC hovering on the line flips a switch dozens of times a second,
+ * which on a bound control is dozens of messages a second. Two thresholds and the current state is
+ * the fix, and nothing else in the module composes to it.
+ */
+function hysteresisImpl(value, on, low, high) {
+  const v = num(value);
+  let lo = num(low);
+  let hi = num(high);
+  // A caller who passes them the other way round means the same thing; refusing would be pedantry.
+  if (lo > hi) { const t = lo; lo = hi; hi = t; }
+  return on === true ? v > lo : v >= hi;
+}
+
+/**
+ * median(values) — the middle value, or the mean of the two middle ones.
+ *
+ * Distinct from mean() and the reason is the whole point: a mean SMEARS a spike across the result,
+ * a median rejects it. For a noisy controller reading, that is the difference between a glitch you
+ * can hear and one you cannot.
+ */
+function medianImpl(values) {
+  const list = toNumberList(values).slice().sort((a, b) => a - b);
+  if (!list.length) return undefined;
+  const mid = list.length >> 1;
+  return list.length % 2 ? list[mid] : (list[mid - 1] + list[mid]) / 2;
+}
+
+/**
+ * unshape(y, curve [, tension]) — the inverse of shape().
+ *
+ * Going device → panel THROUGH a taper needs it: a value that was shaped on the way out has to be
+ * un-shaped on the way back, or the control lands somewhere else than it started. Only map() is
+ * invertible by hand (swap x and y); a named curve is not.
+ *
+ * `hold` is a step, so many inputs give the same output and there is no true inverse. It returns
+ * the EARLIEST input that produces the output, which is the only answer that is a function.
+ */
+function unshapeImpl(y, curve, tension) {
+  const v = normImpl(y, 0, 1);
+  // The same k as shape(), including the 1.6 default — an inverse computed against a different
+  // exponent would be an inverse of nothing.
+  const k = 1 + Math.max(0, num(tension, 0) || 1.6);
+  switch (String(curve)) {
+    case 'exp': return v ** (1 / k);
+    case 'log': return 1 - (1 - v) ** (1 / k);
+    // The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and
+    // would not agree to the last bit across five runtimes.
+    case 'scurve': case 's': return 0.5 - Math.sin(Math.asin(1 - 2 * v) / 3);
+    case 'hold': return v >= 1 ? 1 : 0;
+    default: return v;
+  }
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -1059,6 +1139,11 @@ const helpers = {
   blendBy: (values, weights) => blendByImpl(values, weights),
   tickStops: (major, minor) => ticksImpl(major, minor),
   dbPosition: (fraction, floorDb, ceilDb) => dbPositionImpl(fraction, floorDb, ceilDb),
+  // taming what arrives on the wire
+  smooth: (current, target, coefficient, epsilon) => smoothImpl(current, target, coefficient, epsilon),
+  hysteresis: (value, on, low, high) => hysteresisImpl(value, on, low, high),
+  median: (values) => medianImpl(values),
+  unshape: (y, curve, tension) => unshapeImpl(y, curve, tension),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   randomChoice: (values, weights) => randomChoiceImpl(values, weights),
   // range and normalisation

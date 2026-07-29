@@ -2221,3 +2221,61 @@ actually reports, a curve tensioned per performance, a blend over anchors discov
 rather than placed at design time, a scale drawn with `ce.draw` whose ticks line up with the ones
 beside it. A stored property can hold one setting of each of these. A script can hold the rule that
 chooses it.
+
+---
+
+## 34. `ce.math` — taming what arrives on the wire
+
+The last four, and a documentation fix.
+
+A controller does not send tidy numbers. It sends a value that jitters, crosses a threshold
+repeatedly, spikes once, and has already been through a taper. §32 and §33 gave `ce.math` the
+arithmetic to *shape* a value; these are what a script needs to make an incoming one usable, and
+none of them composes out of what was already there.
+
+| | |
+|---|---|
+| `ce.math.smooth(current, target, coefficient [, epsilon])` | one-pole exponential smoothing |
+| `ce.math.hysteresis(value, on, low, high)` | a Schmitt trigger |
+| `ce.math.median(values)` | spike rejection |
+| `ce.math.unshape(y, curve [, tension])` | the inverse of `shape()` |
+
+### Each one earns its place against a neighbour that looks like it
+
+- **`smooth` is not `approach`.** `approach` moves a **fixed step** — a rate limit. `smooth` moves a
+  **proportion of what is left**, so it settles fast and then creeps, which is the response a jittery
+  pedal wants. It is `lerp` underneath and says so; the two reasons it is a member rather than a line
+  are that the coefficient is clamped, and that it **arrives**. A one-pole is asymptotic — left alone
+  it sits at 0.9999 forever, and a control smoothed with it **transmits forever**. Snapping inside
+  `epsilon` is exactly what a hand-rolled version leaves out, and the test drives 200 steps and
+  asserts it lands on the integer.
+- **`median` is not `mean`.** A mean *smears* a spike across the result; a median rejects it. The
+  test puts one 127 in a stream of 50s: the median is 50, the mean is over 65.
+- **`hysteresis` has no neighbour at all.** Nothing in the module composed to it, and the cost of
+  not having it is measurable: the test dithers a value across a single threshold and counts the
+  flips — over 30 with a plain comparison, **zero** with two thresholds. On a bound control every
+  one of those flips is a MIDI message.
+- **`unshape` is the direction that was missing.** `shape` takes a value out through a taper;
+  nothing brought one back. Only `map` is invertible by hand — swap x and y — while a named curve
+  is not, so a value that went out shaped landed somewhere else on the way in.
+
+`unshape` uses the **closed-form** inverse of smoothstep (`0.5 − sin(asin(1 − 2y) / 3)`) rather than
+solving the cubic numerically: a numeric solve would be slower and, more to the point, would not
+agree to the last bit across five runtimes. And it computes `k` the same way `shape` does, 1.6
+default included — an inverse against a different exponent is an inverse of nothing.
+
+`hold` is a step, so many inputs give one output and there is no true inverse. It returns the
+**earliest** input that produces the output, which is the only answer that is a function, and the
+summary says so rather than pretending.
+
+### The documentation fix: the third curve family was reachable and unnamed
+
+§33 said there are three curve families in the app and the script API matched none of the panel's,
+then added `shape()` — the Envelope/Router warp. That left the impression the Macro family was still
+out of reach. It is not: **`shape(v, curve, 1)` IS `macroWarp`, exactly, for all four curves.**
+Verified rather than reasoned — with `tension = 1` the exponent `k` is 2, which turns `exp` into `x²`
+and `log` into `1 − (1 − x)²`, and the s-curve is the same formula in both.
+
+So all three families were covered by the second commit and nothing said so. `shape`'s summary now
+names it. That is worth recording as its own kind of gap: **a capability nobody can find is not a
+capability**, and the fix was a sentence rather than a function.
