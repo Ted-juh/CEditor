@@ -2887,3 +2887,110 @@ The layers are different here, because **`ce.anim`'s engine is not in the prelud
 - **Colour animation** — the Animations section does not do it either; it drives transform, opacity
   and size as CSS transitions. There is nothing to reach parity with.
 - **Triggers** (`stateChange` / `valueChange`) — `ce.core.watch` plus `to`, already composable.
+
+---
+
+## 40. `ce.ui` — addressing what you said, and asking a question that is not a button
+
+`ce.ui` was three members: `notify`, `status`, `dialog`. The three **lifetimes** were right from the
+start and are unchanged — a notification is an event and expires, a status is a state and persists,
+a dialog is a question and waits for an answer. Collapsing any two would give you a state that
+vanishes, an event that never does, or a question nobody can answer.
+
+What was missing was everything about **addressing** them, and what **kind** of question you can ask.
+
+### The bar here is not the Properties panel
+
+For every module so far the comparison has been "what can a stored property express that a script
+cannot". That question does not apply here: the Properties panel is a *design-time* surface and has
+no run-time messaging at all.
+
+The bar is what **the app itself** does to talk to whoever is using it:
+
+| the app does this | where |
+|---|---|
+| asks for a line of **text** | `NotepadEditor` reaches for the browser's `prompt()` to rename a note |
+| offers a **list** to pick from | listboxes throughout the editor |
+| **dismisses** a message | `ScriptNotifications` — every toast is a button that clears itself |
+| **copies to the clipboard** | six places: `ColorSettings`, `ConsolePanel`, `ParameterBrowserTab`, `CustomPackageLibrary`, `DebugPanel` |
+
+A script could do none of those. It could put a message on screen and never take it back; it could
+ask "OK or Cancel" and nothing else.
+
+Two smaller things were being computed and then thrown away. `notify()` builds an id and the runtime
+discarded it, returning `true` — so a message could not be named, and therefore could not be
+replaced or dismissed. And `dialogOpen()` existed in the store, unexposed: `dialog()` returning
+`false` meant either *"there is nobody to ask"* or *"one is already open"*, which want opposite
+handling and looked identical.
+
+### Six new members: 3 → 9
+
+| namespaced | flat | what |
+|---|---|---|
+| `ce.ui.prompt(opts, fn)` | `uiPrompt` | ask for **text** |
+| `ce.ui.choose(opts, fn)` | `uiChoose` | pick from a **list**, optionally several |
+| `ce.ui.dismiss([id])` | `uiDismiss` | take a message back; no id clears all |
+| `ce.ui.update(id, msg [, opts])` | `uiUpdate` | replace a live message **in place** |
+| `ce.ui.state()` | `uiState` | `{ status, statusKind, notifications, dialog }` |
+| `ce.ui.copy(text)` | `uiCopy` | put text on the clipboard |
+
+**`prompt` and `choose` are `dialog` with a different SHAPE of question, not two more modals.** The
+store grew an `ask` field — `"choice" | "text" | "list"` — and the shape decides what the answer
+*is*: a button label, a string, or a selection. One dialog open at a time whatever it is asking, one
+callback contract, one teardown. Three separate verbs' worth of machinery would have been three
+chances for a question to be left unanswered.
+
+A text or list question gets a fixed accept/cancel pair rather than the caller's `buttons`, because
+"how do I say yes" is not part of the question being asked — and it keeps Escape and the backdrop
+meaning the same thing in all three shapes. **A cancel answers with nothing, not with `""` or
+`[]`**: an empty string is something somebody might mean, and *"I did not answer"* is not one of the
+things it means.
+
+**`update` is what makes progress possible.** Dismissing and re-notifying flickers and drops the
+message to the bottom of the stack every time, so in practice people stack ten toasts instead.
+`notify(msg, { duration = 0 })` gives you a message that stays; `update(id, …)` replaces its text
+where it sits; and `update` returning **false** is how a script learns the message was dismissed by
+hand and it should stop updating one.
+
+**`copy` says ATTEMPTED, not landed.** The write is asynchronous and a browser will decline it
+without a user gesture behind it, so the return is honest about what it knows and a refusal is
+reported to the console — the same rule `ce.device.write` follows. There is deliberately **no**
+matching read: a script silently helping itself to whatever somebody last copied is not a panel's
+business.
+
+### Two changes to existing verbs
+
+- **`notify()` returns its id** instead of `true`. Nothing else here is addressable without it.
+- **`status(message, { kind })`** joins `notify`'s vocabulary, and `StatusBar` renders it. A state
+  can be a warning, and "Device not responding" in the same grey as "Ready" is a warning nobody
+  sees. The store's status went from a bare string to `{ message, kind }`; `state()` reads it back,
+  which it could not before at all.
+
+### One name that had to give way
+
+`state` is already a flat member — `ce.storage.state`, and it was there first. Two modules cannot
+own the bare word, so ce.ui's read is `uiState` and the namespaced spelling `ce.ui.state()` carries
+the nice name. `prompt` and `copy` are §1 collisions of the ordinary kind: exactly the words a panel
+author reaches for.
+
+### How it is tested
+
+There is no cross-runtime layer here, and that is not a gap. Every one of these is a person-facing
+affordance, so every one is `RUNTIME_WEBVIEW` — the C++ engines carry the generated explaining
+stubs, and `panelApiParity.test.js` is what checks they exist and say why. `scriptUi.test.js` drives
+the verbs against the real store and the real dialog lifecycle, including the two failure modes that
+matter most: a question that is refused must have **already** answered its callback, and teardown
+must settle an open question rather than drop it. A callback that never runs is the one thing this
+API cannot afford.
+
+### What is deliberately still absent
+
+- **`confirm(message, fn)`** — sugar over `dialog` with two buttons.
+- **A `progress` or `busy` verb** — `notify` with `duration = 0` plus `update` *is* progress. A
+  second way to say it is the incoherence that ruled out `ce.anim.lfo`.
+- **Reading the clipboard** — see above.
+- **Opening a URL** — a panel that can navigate somebody's browser is not a panel.
+- **The editor's own chrome** (menus, the shortcuts overlay, the insight panels) — a panel script
+  drives the panel, not the application around it.
+- **A message attached to a CONTROL** rather than to the window. There is no per-control run-time
+  message in the app to reach parity with; when there is one, this is the sweep that finds it.

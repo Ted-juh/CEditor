@@ -90,6 +90,8 @@ import {
 } from '../utils/transportLayout.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
+  dismissNotification as uiDismissStore, updateNotification as uiUpdateStore,
+  uiSnapshot as uiSnapshotStore,
 } from '../stores/scriptUi.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
@@ -2881,18 +2883,73 @@ export function stopAllAnimations() {
 // Telling the person using the panel something. Panel view only — there is nobody to tell with the
 // window shut, which is why these are stubbed in the C++ engines rather than made cross-runtime.
 
+// notify() returns its ID, not merely true. The id was always computed and then thrown away, and
+// without it nothing else here is addressable: a message you cannot name is a message you cannot
+// take back or replace, which is why "Sending dump… 40%" used to mean ten stacked toasts.
 function uiNotifyImpl(message, opts) {
   const text = String(message ?? '').trim();
-  if (!text) return false;
-  uiNotifyStore(text, {
+  if (!text) return undefined;
+  return uiNotifyStore(text, {
+    kind: opts?.kind,
+    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+  }) ?? undefined;
+}
+
+/** Take a message back. No id clears every one — "stop saying things" is a real request, and making
+ *  a script remember six ids to make it would be busywork. Returns how many went. */
+function uiDismissImpl(id) {
+  return uiDismissStore(id == null ? null : Number(id));
+}
+
+/** Replace a live message in place. Returns false when it has already gone, which is how a script
+ *  learns its progress message was dismissed by hand and it should stop updating one. */
+function uiUpdateImpl(id, message, opts) {
+  if (id == null) return false;
+  return uiUpdateStore(Number(id), message, {
     kind: opts?.kind,
     duration: opts?.duration != null ? Number(opts.duration) : undefined,
   });
+}
+
+function uiStatusImpl(message, opts) {
+  uiStatusStore(message ?? '', { kind: opts?.kind });
   return true;
 }
 
-function uiStatusImpl(message) {
-  uiStatusStore(message ?? '');
+/** What is on screen. One read rather than three, and the only way a script can tell dialog()'s
+ *  false apart: "nobody to ask" and "one already open" want different handling. */
+function uiStateImpl() {
+  return uiSnapshotStore();
+}
+
+/**
+ * Put text on the clipboard — the thing the app itself does in six places (a colour, a console
+ * dump, a parameter table) and a script could not do at all.
+ *
+ * The write is ASYNCHRONOUS and the browser may refuse it outright when the page has no user
+ * gesture behind it, so the return says the copy was ATTEMPTED, not that it landed. Saying so is
+ * better than a `true` that means less than it looks — the same rule ce.device.write follows.
+ */
+function uiCopyImpl(scriptId, text) {
+  const value = text == null ? '' : String(text);
+  if (!value) return false;
+  const clip = typeof navigator !== 'undefined' ? navigator.clipboard : null;
+  if (!clip || typeof clip.writeText !== 'function') {
+    addScriptTrace('log', scriptId ?? '',
+      'ce.ui.copy(): this build has no clipboard to write to — nothing was copied.');
+    return false;
+  }
+  try {
+    const p = clip.writeText(value);
+    // A rejected promise here is the browser declining, not a script error: reported, never thrown
+    // into a handler that has long since returned.
+    if (p && typeof p.catch === 'function') {
+      p.catch(() => addScriptTrace('log', scriptId ?? '',
+        'ce.ui.copy(): the browser refused the clipboard write (it usually wants a click behind it).'));
+    }
+  } catch {
+    return false;
+  }
   return true;
 }
 
@@ -4232,8 +4289,16 @@ function buildApi(ownerName, scriptId = '') {
     animateFinish: (path) => animationFinishImpl(path),
     // ce.ui — a message for whoever is using the panel
     uiNotify: (message, opts) => uiNotifyImpl(message, opts),
-    uiStatus: (message) => uiStatusImpl(message),
+    uiDismiss: (id) => uiDismissImpl(id),
+    uiUpdate: (id, message, opts) => uiUpdateImpl(id, message, opts),
+    uiStatus: (message, opts) => uiStatusImpl(message, opts),
+    uiState: () => uiStateImpl(),
+    uiCopy: (text) => uiCopyImpl(scriptId, text),
     uiDialog: (opts, onChoice) => uiDialogImpl(scriptId, opts, onChoice),
+    // prompt and choose are dialog() with a different SHAPE of question — one modal at a time,
+    // one callback contract, one teardown, whatever is being asked.
+    uiPrompt: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'text' }, onAnswer),
+    uiChoose: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'list' }, onAnswer),
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
     drawFill: (colour) => { drawState.fill = colour == null ? null : String(colour); },

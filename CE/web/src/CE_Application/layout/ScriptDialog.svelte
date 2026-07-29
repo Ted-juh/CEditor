@@ -8,19 +8,59 @@
   import { scriptDialog, answerDialog } from '../stores/scriptUi.js';
 
   let dialogEl = $state(null);
+  // What the person has typed or picked, before they commit to it. Held here rather than in the
+  // store because an unanswered edit is not an answer — the store learns it when a button is
+  // pressed, and never if the dialog is dismissed.
+  let text = $state('');
+  let picked = $state([]);
 
-  // Focus the default button when a dialog appears. Without this the modal traps the eye but not
-  // the keyboard, and Enter goes to whatever was focused behind it.
+  $effect(() => {
+    const d = $scriptDialog;
+    if (!d) return;
+    text = d.value ?? '';
+    picked = d.selected ? [d.selected] : [];
+  });
+
+  // Focus the thing the person is meant to act on. For a question with a FIELD that is the field,
+  // not the button: a text dialog that opens with OK focused makes you reach for the mouse to
+  // answer a question you could have typed.
   $effect(() => {
     if (!$scriptDialog || !dialogEl) return;
-    const target = dialogEl.querySelector('.dialog-default') ?? dialogEl.querySelector('button');
+    const target = dialogEl.querySelector('.dialog-input')
+      ?? dialogEl.querySelector('.dialog-default')
+      ?? dialogEl.querySelector('button');
     target?.focus();
+    if (target?.select) target.select();
   });
+
+  /** The answer this dialog's SHAPE produces. The shape decides the type — a label, a string, or
+   *  a selection — which is the whole reason `ask` exists. */
+  function answerFor(label) {
+    const d = $scriptDialog;
+    if (!d || d.ask === 'choice') return label;
+    // A cancel on a text or list dialog is a DISMISSAL, not an empty answer: "" and [] are things
+    // somebody might mean, and "I did not answer" is not one of them.
+    if (label !== d.buttons[0]) return undefined;
+    if (d.ask === 'text') return text;
+    return d.multiple ? [...picked] : (picked[0] ?? undefined);
+  }
+
+  function togglePick(item) {
+    const d = $scriptDialog;
+    if (!d) return;
+    if (!d.multiple) { picked = [item]; return; }
+    picked = picked.includes(item) ? picked.filter((p) => p !== item) : [...picked, item];
+  }
 
   function onKeydown(e) {
     if (!$scriptDialog) return;
     // Escape dismisses — the callback runs with no answer, the same as clicking away.
     if (e.key === 'Escape') { e.stopPropagation(); answerDialog(undefined); }
+    // Enter in a field accepts, which is what every text prompt anywhere does.
+    if (e.key === 'Enter' && $scriptDialog.ask === 'text') {
+      e.stopPropagation();
+      answerDialog(answerFor($scriptDialog.buttons[0]));
+    }
   }
 </script>
 
@@ -42,11 +82,31 @@
     {#if $scriptDialog.message}
       <div class="dialog-message">{$scriptDialog.message}</div>
     {/if}
+    {#if $scriptDialog.ask === 'text'}
+      <input
+        class="dialog-input"
+        type="text"
+        bind:value={text}
+        placeholder={$scriptDialog.placeholder}
+        aria-label={$scriptDialog.title}
+      />
+    {:else if $scriptDialog.ask === 'list'}
+      <div class="dialog-list" role="listbox" aria-label={$scriptDialog.title} tabindex="-1">
+        {#each $scriptDialog.items as item (item)}
+          <button
+            class={['dialog-option', picked.includes(item) && 'dialog-option-on']}
+            role="option"
+            aria-selected={picked.includes(item)}
+            onclick={() => togglePick(item)}
+          >{item}</button>
+        {/each}
+      </div>
+    {/if}
     <div class="dialog-buttons">
       {#each $scriptDialog.buttons as label (label)}
         <button
           class={['dialog-button', label === $scriptDialog.default && 'dialog-default']}
-          onclick={() => answerDialog(label)}
+          onclick={() => answerDialog(answerFor(label))}
         >{label}</button>
       {/each}
     </div>
@@ -54,6 +114,48 @@
 {/if}
 
 <style>
+  .dialog-input {
+    width: 100%;
+    margin: 10px 0 4px;
+    padding: 6px 8px;
+    box-sizing: border-box;
+    font: inherit;
+    color: inherit;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 4px;
+  }
+
+  .dialog-list {
+    /* Scrolls rather than growing: a list of forty presets must not push the buttons off screen,
+       which is the failure that makes a picker unanswerable. */
+    max-height: 220px;
+    overflow-y: auto;
+    margin: 10px 0 4px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 4px;
+  }
+
+  .dialog-option {
+    display: block;
+    width: 100%;
+    padding: 5px 8px;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .dialog-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .dialog-option-on {
+    background: rgba(0, 122, 204, 0.55);
+  }
+
   .dialog-backdrop {
     position: fixed;
     inset: 0;

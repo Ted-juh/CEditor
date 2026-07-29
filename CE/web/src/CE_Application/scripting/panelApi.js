@@ -722,7 +722,7 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a brief message to whoever is using the panel. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000) }. For "the patch loaded", not for debugging — log() is for debugging.',
+    summary: 'Show a brief message to whoever is using the panel, and return its ID. `opts` may carry { kind ("info" | "warn" | "error"), duration (ms, default 3000; 0 or less means until dismissed) }. For "the patch loaded", not for debugging — log() is for debugging. The id is what makes the message addressable: ce.ui.update(id, …) replaces it in place and ce.ui.dismiss(id) takes it back, which together are how you show progress instead of stacking ten toasts.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'message', type: 'string', required: true },
@@ -732,10 +732,13 @@ export const COMMANDS = [
     snippet: { lua: 'ce.ui.notify("${1:Patch loaded}")$0', javascript: 'ce.ui.notify("${1:Patch loaded}");$0' },
   },
   {
-    id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message])',
-    summary: 'Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event.',
+    id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
+    summary: 'Put a line in the status bar and leave it there. No message clears it. Unlike notify this persists, so it suits a state ("Recording", "Synced") rather than an event. `opts` may carry { kind ("info" | "warn" | "error") }, the same vocabulary notify uses and for the same reason: a state can be a warning, and "Device not responding" in the same colour as "Ready" is a warning nobody sees. Read it back with ce.ui.state().',
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'message', type: 'string', required: false }],
+    params: [
+      { name: 'message', type: 'string', required: false },
+      { name: 'opts', type: 'object', required: false, fields: ['kind'] },
+    ],
     scopes: 'any',
     snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
   },
@@ -752,6 +755,84 @@ export const COMMANDS = [
       lua: 'ce.ui.dialog({ title = "${1:Overwrite?}", buttons = { "Overwrite", "Cancel" } }, function(choice)\n  if choice == "Overwrite" then\n    $0\n  end\nend)',
       javascript: 'ce.ui.dialog({ title: "${1:Overwrite?}", buttons: ["Overwrite", "Cancel"] }, function (choice) {\n  if (choice === "Overwrite") {\n    $0\n  }\n});',
     },
+  },
+
+  /* --- User feedback, the rest of it (design doc §40) ---
+     notify/status/dialog got the three LIFETIMES right — an event that expires, a state that
+     persists, a question that waits. What they left out was addressing them, and what KIND of
+     question you can ask.
+
+     The bar here is not the Properties panel, which has no run-time messaging at all. It is what
+     the APP does to talk to whoever is using it: it asks for text (the browser's prompt(), where a
+     note is renamed), it offers lists to pick from, its own toasts can be dismissed by clicking
+     them, and it copies to the clipboard in six places. A script could do none of those. */
+  {
+    id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
+    summary: 'Ask for TEXT. The answer comes back through `onAnswer` as a string — or nothing if the question was cancelled or dismissed, which is deliberately distinguishable from an empty string: "" is something somebody might mean, and "I did not answer" is not. `opts` carries { title, message, value (what the field starts with), placeholder, accept / cancel (button labels), kind }. Enter accepts. This is what the app itself reaches for the browser\'s prompt() to do; a script had only a button question, so "name this patch" was unaskable. Returns whether a dialog went on screen — false means the callback has already run with no answer.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: true,
+        fields: ['title', 'message', 'value', 'placeholder', 'accept', 'cancel', 'kind'] },
+      { name: 'onAnswer', type: 'function', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.ui.prompt({ title = "${1:Name this patch}", value = get("patchName") }, function(name)\n  if name ~= nil then set("patchName", name) end\nend)$0',
+      javascript: 'ce.ui.prompt({ title: "${1:Name this patch}", value: get("patchName") }, (name) => {\n  if (name !== undefined) set("patchName", name);\n});$0',
+    },
+  },
+  {
+    id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
+    summary: 'Pick from a LIST. `opts` carries { title, message, items (the choices), default (the one selected first), multiple, accept / cancel, kind }. The answer is the chosen item — or a list of them when `multiple` — and nothing when cancelled. Buttons stop working past about three choices, and picking one preset out of forty is a list; the panel is full of listboxes for exactly this reason and a script had no way to offer one. The list scrolls rather than growing, so forty items cannot push the buttons off screen.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: true,
+        fields: ['title', 'message', 'items', 'default', 'multiple', 'accept', 'cancel', 'kind'] },
+      { name: 'onAnswer', type: 'function', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.ui.choose({ title = "${1:Load which preset?}", items = names }, function(pick)\n  if pick ~= nil then $0 end\nend)',
+      javascript: 'ce.ui.choose({ title: "${1:Load which preset?}", items: names }, (pick) => {\n  if (pick !== undefined) { $0 }\n});',
+    },
+  },
+  {
+    id: 'uiDismiss', category: 'User feedback', signature: 'uiDismiss([id]) -> number',
+    summary: 'Take a message back — the thing whoever is looking at it can already do by clicking it. With no id it clears every one, because "stop saying things" is a real request and making a script remember six ids to make it would be busywork. Returns how many went.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'id', type: 'number', required: false }],
+    scopes: 'any',
+    snippet: { lua: 'ce.ui.dismiss(${1:id})$0', javascript: 'ce.ui.dismiss(${1:id});$0' },
+  },
+  {
+    id: 'uiUpdate', category: 'User feedback', signature: 'uiUpdate(id, message [, opts]) -> boolean',
+    summary: 'Replace a live message IN PLACE, keeping its position in the stack. This is what makes progress possible: dismissing and re-notifying flickers and drops the message to the bottom every time, so in practice people stack ten toasts instead. Give the original notify a duration of 0 and it stays until you dismiss it. `opts` may carry { kind, duration }; leaving duration out keeps a sticky message sticky and gives a timed one its full life back. Returns false when that message has already gone — which is how you learn it was dismissed by hand and you should stop updating it.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'id', type: 'number', required: true },
+      { name: 'message', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['kind', 'duration'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'local id = ce.ui.notify("${1:Working}…", { duration = 0 })\n-- …later\nce.ui.update(id, "${1:Working}… done")$0',
+      javascript: 'const id = ce.ui.notify("${1:Working}…", { duration: 0 });\n// …later\nce.ui.update(id, "${1:Working}… done");$0',
+    },
+  },
+  {
+    id: 'uiState', category: 'User feedback', signature: 'uiState() -> table',
+    summary: 'What is on screen: { status, statusKind, notifications ([{ id, message, kind, sticky }]), dialog }. One read rather than three, the same shape ce.time.timers() and ce.panel.entries() settled on — and the only way to tell dialog()\'s false apart: "there is nobody to ask" and "one is already open" want completely different handling, and both used to look identical.',
+    runtime: RUNTIME_WEBVIEW,
+    scopes: 'any',
+    snippet: { lua: 'if not ce.ui.state().dialog then $0 end', javascript: 'if (!ce.ui.state().dialog) { $0 }' },
+  },
+  {
+    id: 'uiCopy', category: 'User feedback', signature: 'uiCopy(text) -> boolean',
+    summary: 'Put text on the clipboard — a SysEx string, a patch name, a parameter table. The app does this in six places of its own and a script could not do it at all. The write is asynchronous and a browser may refuse it outright without a click behind it, so the return says the copy was ATTEMPTED rather than that it landed; a refusal is reported to the console. There is deliberately no matching read: a script silently helping itself to whatever somebody last copied is not a panel\'s business.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'text', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'ce.ui.copy(bytesToHex(buildDump("patch")))$0', javascript: 'ce.ui.copy(bytesToHex(buildDump("patch")));$0' },
   },
 
   /* --- Drawing (design doc §6 phase 5) ---
@@ -2198,8 +2279,8 @@ export const MODULES = [
   // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
   { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
     summary: 'Move a value over time instead of jumping it: to a destination, with a spring, or through a shape you draw — delayed, staggered, repeating, tempo-synced, and telling you when it is done. Cross-runtime: a sweep has to work with the panel shut too.' },
-  { id: 'ce.ui', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Tell the person using the panel something, or ask them. Panel view only — there is nobody to tell with the window shut.' },
+  { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Tell the person using the panel something, take it back, or replace it; ask them a question — a choice, a line of text, or a pick from a list; and put something on their clipboard. Panel view only — there is nobody to tell, ask or copy for with the window shut.' },
   { id: 'ce.draw', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
@@ -2308,7 +2389,13 @@ const MODULE_MEMBERS = {
     pause: 'animatePause', resume: 'animateResume', reverse: 'animateReverse',
     finish: 'animateFinish',
   },
-  'ce.ui': { notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog' },
+  'ce.ui': {
+    notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog',
+    // `prompt`, `choose`, `copy`, `state`, `update` and `dismiss` are all §1 collisions as bare
+    // globals — prompt and copy especially — so the flat spellings keep the ui prefix.
+    prompt: 'uiPrompt', choose: 'uiChoose', dismiss: 'uiDismiss',
+    update: 'uiUpdate', state: 'uiState', copy: 'uiCopy',
+  },
   'ce.draw': {
     clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
     circle: 'drawCircle', arc: 'drawArc', line: 'drawLine', path: 'drawPath', text: 'drawText',

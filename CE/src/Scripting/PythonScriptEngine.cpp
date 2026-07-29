@@ -1962,7 +1962,7 @@ __WEBVIEW_ONLY = [
 # @module ce.device
   "deviceBind","deviceUnbind",
 # @module ce.ui
-  "uiNotify","uiStatus","uiDialog",
+  "uiNotify","uiStatus","uiDialog","uiPrompt","uiChoose","uiDismiss","uiUpdate","uiState","uiCopy",
 # @module ce.draw
   "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
   "drawText","drawRedraw",
@@ -2350,7 +2350,7 @@ __CE_MODULES = {
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
-    "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
+    "ce.ui": { "choose": "uiChoose", "copy": "uiCopy", "dialog": "uiDialog", "dismiss": "uiDismiss", "notify": "uiNotify", "prompt": "uiPrompt", "state": "uiState", "status": "uiStatus", "update": "uiUpdate" },
     "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
     "ce.panel": { "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "patch": "panelPatch", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
     "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
@@ -2392,7 +2392,7 @@ __CE_META = [
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.1", "runtime": "any" },
-    { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
+    { "id": "ce.ui", "version": "1.2", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.1", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.3", "runtime": "any" },
     { "id": "ce.storage", "version": "1.1", "runtime": "any" },
