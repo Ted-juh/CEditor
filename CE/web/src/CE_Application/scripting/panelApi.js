@@ -29,6 +29,15 @@ import { MODULE_COST, MODULE_COST_LANGUAGES } from './moduleCost.generated.js';
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, moduleIdFor, verbSignature, verbSummary, verbArgs,
 } from './componentVerbs.js';
+import { HAND_WRITTEN_VALUES } from './componentTables.js';
+
+/** `"a", "b" or "c"` from a table, for a summary that names the values a verb accepts.
+ *
+ *  Interpolated rather than typed out, for the reason componentTables.js exists: five of these
+ *  summaries named values the reducer REFUSES. harmonyOutOfKey was documented as "skip"/"nearest"/
+ *  "pass" where the engine has pass/nearest/mute, so a script author following the contract wrote
+ *  "skip" and got nothing — the documentation was the bug. */
+const oneOf = (values) => values.map((x) => `"${x}"`).join(', ');
 
 export { MODULE_COST, MODULE_COST_LANGUAGES };
 
@@ -2176,7 +2185,8 @@ export const PANEL_COMMANDS = [
     [T, { name: 'semitones', type: 'number', required: true }]),
   panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set the loop length in bars.',
     [T, { name: 'bars', type: 'number', required: true }]),
-  panelVerb('recorderSource', 'recorderSource(target, source)', 'Choose what gets recorded ("keys"/"harmony"/"both").',
+  panelVerb('recorderSource', 'recorderSource(target, source)',
+    `Choose what gets recorded — ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
     [T, { name: 'source', type: 'string', required: true }]),
   panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Shift the take in time by `by` ticks.',
     [T, { name: 'by', type: 'number', required: true }]),
@@ -2190,7 +2200,8 @@ export const PANEL_COMMANDS = [
     [T, { name: 'bars', type: 'number', required: true }]),
 
   // --- Harmoniser ---
-  panelVerb('harmonyMode', 'harmonyMode(target, mode)', 'Harmoniser mode ("off"/"diatonic"/"fixed"/"chord").',
+  panelVerb('harmonyMode', 'harmonyMode(target, mode)',
+    `Harmoniser mode — ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
     [T, { name: 'mode', type: 'string', required: true }]),
   panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song.',
     [T, { name: 'key', type: 'string', required: true }]),
@@ -2200,19 +2211,22 @@ export const PANEL_COMMANDS = [
     [T, { name: 'size', type: 'number', required: true }]),
   panelVerb('harmonyShape', 'harmonyShape(target, shape)', 'Apply a named chord shape / preset.',
     [T, { name: 'shape', type: 'string', required: true }]),
-  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)', 'Voicing spread ("close"/"open"/"drop2"…).',
+  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
+    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}. There is no fourth.`,
     [T, { name: 'voicing', type: 'string', required: true }]),
   panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
     [T, { name: 'inversion', type: 'number', required: true }]),
   panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Octave offset for the added voices.',
     [T, { name: 'octave', type: 'number', required: true }]),
-  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)', 'What to do with out-of-key notes ("skip"/"nearest"/"pass").',
+  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)',
+    `What to do with out-of-key notes — ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
     [T, { name: 'mode', type: 'string', required: true }]),
   panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Keep or drop the note actually played.',
     [T, { name: 'keep', type: 'boolean', required: false }]),
   panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'MIDI channel for the harmony voices.',
     [T, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)', 'Voice-leading strategy ("off"/"nearest"/"smooth").',
+  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)',
+    `Voice-leading strategy — ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
     [T, { name: 'mode', type: 'string', required: true }]),
   panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
     [T, { name: 'ms', type: 'number', required: true }]),
@@ -2232,6 +2246,31 @@ export const PANEL_COMMANDS = [
     [T, { name: 'wrap', type: 'boolean', required: false }]),
   panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
     [T, { name: 'ms', type: 'number', required: true }]),
+
+  /* --- Reading the five (design doc §44) ---
+     Every component member in the API was a WRITE. The twenty-three spec-driven families now read
+     by VERB name, because their spec knows which field each verb writes; these five predate that
+     spec and have no such map, so they read by the MODEL field name — which is the name their own
+     summaries already use. `read(target)` with no field is the whole section either way, so the
+     one shape a script is most likely to want is the same across all twenty-eight. */
+  panelVerb('splitRead', 'splitRead(target [, field])',
+    'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
+    + 'By model field name rather than by verb name: this family predates the component spec.',
+    [T, { name: 'field', type: 'string', required: false }]),
+  panelVerb('phraseRead', 'phraseRead(target [, field])',
+    'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
+    [T, { name: 'field', type: 'string', required: false }]),
+  panelVerb('recorderRead', 'recorderRead(target [, field])',
+    'Read the Phrase Recorder\'s state — the whole section, or one field by name. This is how a '
+    + 'script finds out whether it is recording, and what the take actually contains.',
+    [T, { name: 'field', type: 'string', required: false }]),
+  panelVerb('harmonyRead', 'harmonyRead(target [, field])',
+    'Read the Harmoniser\'s settings — the whole section, or one field by name.',
+    [T, { name: 'field', type: 'string', required: false }]),
+  panelVerb('setlistRead', 'setlistRead(target [, field])',
+    'Read the Setlist — the whole section, or one field by name. `scenes` is the list, and `index` '
+    + 'is where it is, which a script had no way to ask before.',
+    [T, { name: 'field', type: 'string', required: false }]),
 
   // --- Panel values: snapshot / restore ---
   // The two members of ce.panel that are NOT panel-view only. Creating a control needs a renderer;
@@ -2772,24 +2811,26 @@ const MODULE_MEMBERS = {
   },
   'ce.components.split': {
     preset: 'splitPreset', mute: 'splitMute', channel: 'splitChannel',
-    transpose: 'splitTranspose', point: 'splitPoint',
+    transpose: 'splitTranspose', point: 'splitPoint', read: 'splitRead',
   },
   'ce.components.phrase': {
     seed: 'phraseSeed', clear: 'phraseClear', key: 'phraseKey', scale: 'phraseScale',
     transpose: 'phraseTranspose', direction: 'phraseDirection', run: 'phraseRun', cell: 'phraseCell',
+    read: 'phraseRead',
   },
   'ce.components.recorder': {
     record: 'recorderRecord', stop: 'recorderStop', play: 'recorderPlay', clear: 'recorderClear',
     undo: 'recorderUndo', quantize: 'recorderQuantize', transpose: 'recorderTranspose',
     bars: 'recorderBars', source: 'recorderSource', nudge: 'recorderNudge', shift: 'recorderShift',
     store: 'recorderStore', load: 'recorderLoad', countIn: 'recorderCountIn',
+    read: 'recorderRead',
   },
   'ce.components.harmony': {
     mode: 'harmonyMode', key: 'harmonyKey', scale: 'harmonyScale', size: 'harmonySize',
     shape: 'harmonyShape', voicing: 'harmonyVoicing', inversion: 'harmonyInversion',
     octave: 'harmonyOctave', outOfKey: 'harmonyOutOfKey', keepPlayed: 'harmonyKeepPlayed',
     channel: 'harmonyChannel', voiceLeading: 'harmonyVoiceLeading', strum: 'harmonyStrum',
-    degree: 'harmonyDegree',
+    degree: 'harmonyDegree', read: 'harmonyRead',
   },
   // One entry per phase-7 family: { run: 'arpRun', rate: 'arpRate', … }, so a script writes
   // ce.components.arp.rate(...) and the flat arpRate(...) still resolves to the same function.
@@ -2805,6 +2846,7 @@ const MODULE_MEMBERS = {
     // any of the three languages so this cannot be reintroduced by accident.
     next: 'setlistNext', prev: 'setlistPrev', jump: 'setlistGoto',
     enable: 'setlistEnable', wrap: 'setlistWrap', crossfade: 'setlistCrossfade',
+    read: 'setlistRead',
   },
 };
 

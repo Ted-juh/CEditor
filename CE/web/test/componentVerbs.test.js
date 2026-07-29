@@ -239,6 +239,10 @@ test('a verb that needs a list finds none and yields nothing', () => {
 
 /* ------------------------------------------------------- every verb, driven at least once */
 
+// The five kinds every family gets (§44) address the whole component rather than one field, so
+// they have no patch to make and are exercised in scriptComponents.test.js instead.
+const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove'];
+
 test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a
   // patch touching the field it declares. A verb that silently does nothing for every input is the
@@ -256,6 +260,8 @@ test('every verb either changes something or explains why it cannot', () => {
         return [1, row[verb.item] === 0.375 ? 0.5 : 0.375];
       }
       case 'cell': return verb.clear ? [] : (verb.grid ? [1, 1, 0.375] : [1, 0.375]);
+      // An index set is addressed 1-based and toggles with no second argument.
+      case 'indexset': return [1];
       case 'line': return verb.clear ? [] : [1, 'spec-probe'];
       default: {
         const current = SECTION_DEFAULTS[verb.section][verb.f];
@@ -269,6 +275,10 @@ test('every verb either changes something or explains why it cannot', () => {
 
   const dead = [];
   for (const verb of COMPONENT_VERBS) {
+    // read/size/fill/insert/remove are not writes of a declared field, so they never reach this
+    // reducer — they are driven end to end against a real control in scriptComponents.test.js,
+    // which carries the same catch-all for them.
+    if (REDUCERLESS_KINDS.includes(verb.k)) continue;
     const cfg = cfgFor(verb.section);
     const patch = componentScriptPatch(verb, cfg, sample(verb));
     const keys = Object.keys(patch);

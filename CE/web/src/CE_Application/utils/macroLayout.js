@@ -35,6 +35,10 @@ export function macroSlots(control) {
 }
 
 // Shape a 0..1 macro position by an assignment's curve.
+// The curves macroWarp implements. ce.components.macro.slotCurve offers exactly these — note
+// "scurve", not "s": a verb offering "s" wrote a name this switch has no case for.
+export const MACRO_CURVES = ['linear', 'exp', 'log', 'scurve'];
+
 export function macroWarp(t, curve) {
   const x = clamp01(num(t, 0));
   switch (String(curve)) {

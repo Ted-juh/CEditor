@@ -46,6 +46,11 @@ export function ribbonValueFromPx(px, py, geom, vertical) {
   return clamp01((num(px, 0) - geom.x0) / geom.w);
 }
 
+// Where a ribbon springs back to on release. Exported as a table because the script verb
+// ce.components.ribbon.returnMode has to offer exactly these and no others — a verb that accepts a
+// mode the switch below has no case for writes a setting that silently does nothing.
+export const RIBBON_RETURN_MODES = ['none', 'center', 'min', 'max', 'rest'];
+
 // The rest value the ribbon returns to on release, or null when it latches.
 export function ribbonReturnTarget(control) {
   const cfg = ribbonConfig(control);

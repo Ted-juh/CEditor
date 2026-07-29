@@ -6,6 +6,7 @@
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -22,9 +23,8 @@
   function updateLane(i, key, value) {
     setLanes(lanes.map((l, idx) => idx === i ? { ...l, [key]: value } : l));
   }
-  function addLane() {
-    setLanes([...lanes, { id: `g${Date.now()}`, label: `Lane ${lanes.length + 1}`, points: [], rest: 0, enabled: true }]);
-  }
+  // Shared with ce.components.looper.insert() — see componentElements.js.
+  function addLane() { setLanes(componentListWithElement('Looper', 'lanes', lanes, lp)); }
   function removeLane(i) { setLanes(lanes.filter((_, idx) => idx !== i)); }
   function clearLane(i) { updateLane(i, 'points', []); }
   function pointCount(l) { return Array.isArray(l?.points) ? l.points.length : 0; }

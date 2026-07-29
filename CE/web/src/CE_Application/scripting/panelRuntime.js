@@ -74,7 +74,13 @@ import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
 import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
-import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
+import {
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
+} from './componentVerbs.js';
+import {
+  componentListWithElement, componentListWithoutElement,
+} from '../utils/componentElements.js';
+import { patchOf, isUnchanged } from '../utils/scriptPatchOutcome.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
 import {
   SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
@@ -2090,6 +2096,7 @@ const splitApi = {
   splitChannel: (target, zone, channel) => splitAction(target, 'channel', { zone, channel }),
   splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', { zone, transpose: semitones }),
   splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', { zone, note }),
+  splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
 };
 
 // --- Phrase Sequencer --------------------------------------------------------
@@ -2124,29 +2131,48 @@ const phraseApi = {
   phraseDirection: (target, direction) => phraseAction(target, 'direction', { direction }),
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
   phraseCell: (target, step, row, on) => phraseAction(target, 'cell', { step, row, on }),
+  phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
 };
 
 // --- Recorder / Harmoniser / Setlist -----------------------------------------
 // All three follow the Phrase Sequencer's shape exactly: read the section, hand
 // it to a pure reducer, write back only the fields that changed. One helper,
 // because three near-identical copies is how they drift apart.
+/**
+ * Returns whether the component now holds what the call asked for.
+ *
+ * True covers both "written" and "already that way" — the second is what UNCHANGED marks, and the
+ * distinction matters: a script writing `if not setlistEnable(s, 3, true) then warn() end` must
+ * not warn because scene 3 was already enabled. False means the call was REFUSED, which for these
+ * five reducers is the only other way a patch comes back empty: they build a patch from the
+ * request without consulting the current value, so nothing back means nothing accepted.
+ *
+ * Every one of these used to return undefined for all three outcomes.
+ */
 function sectionAction(path, section, reducer, action, args) {
   const target = String(path ?? '');
   const cfg = getValue(`${target}.${section}`);
   if (!cfg || typeof cfg !== 'object') {
     addScriptTrace('error', '', `${section.toLowerCase()}: ${wrongTargetMessage(target, section, section)}`);
-    return;
+    return false;
   }
-  const patch = reducer(cfg, action, args ?? {});
+  const result = reducer(cfg, action, args ?? {});
+  const patch = patchOf(result);
   const keys = Object.keys(patch);
   if (keys.length === 0) {
-    // Not an error: an unknown argument or a move that changes nothing is a
-    // no-op by design. Silence would look like a dead footswitch, though.
-    addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
-    return;
+    if (isUnchanged(result)) {
+      addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} — already that way`);
+      return true;
+    }
+    // Refused, and said so at error level: it reads exactly like a dead footswitch otherwise, and
+    // a scene name that does not exist is a typo somebody needs to see.
+    addScriptTrace('error', '',
+      `${section.toLowerCase()} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed`);
+    return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
   addScriptTrace('log', '', `${section.toLowerCase()} ${target}: ${action} → ${keys.join(', ')}`);
+  return true;
 }
 const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
 const recorderApi = {
@@ -2165,6 +2191,7 @@ const recorderApi = {
   recorderStore: (target, slot, name) => recAction(target, 'store', { slot, name }),
   recorderLoad: (target, slot) => recAction(target, 'load', { slot }),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
+  recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
 };
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
@@ -2183,6 +2210,7 @@ const harmoniserApi = {
   harmonyVoiceLeading: (target, mode) => harmAction(target, 'voiceLeading', { voiceLeading: mode }),
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
   harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', { degree, chord }),
+  harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
 };
 
 // --- The other twenty-three families (phase 7) -------------------------------
@@ -2196,27 +2224,345 @@ function componentVerbAction(verb, target, args) {
   const cfg = getValue(`${path}.${verb.section}`);
   if (!cfg || typeof cfg !== 'object') {
     addScriptTrace('error', '', `${verb.family}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
-    return;
+    return false;
   }
   const patch = componentScriptPatch(verb, cfg, args);
   const keys = Object.keys(patch);
+  const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
   if (keys.length === 0) {
-    // A no-op is by design: an out-of-range index, an unrecognised enum, or a value that clamps to
-    // what it already was. Reported anyway — silence looks exactly like a dead footswitch.
-    addScriptTrace('log', '',
-      `${verb.family} ${path}: ${verb.v}(${args.map((x) => JSON.stringify(x) ?? 'nil').join(', ')}) — nothing to change`);
-    return;
+    // An empty patch is two different things here, and this reducer DOES compare against the
+    // current value — so ask the spec whether the request was one the component could have
+    // honoured at all. "Already that way" is a success; an unknown enum or an index past the end
+    // of the list is not, and used to be indistinguishable from both success and silence.
+    if (componentRequestLegal(verb, cfg, args)) {
+      addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
+      return true;
+    }
+    addScriptTrace('error', '',
+      `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed`
+      + (verb.values ? `. One of: ${verb.values.join(', ')}.` : ''));
+    return false;
   }
   for (const key of keys) setValue(`${path}.${verb.section}.${key}`, patch[key]);
   addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${keys.join(', ')}`);
+  return true;
 }
+
+
+/* --------------------------------------------------------- reading a component (design doc §44)
+ *
+ * Every one of the 229 component members was a WRITE. A script could set the arpeggiator's pattern
+ * and could not ask what it was — so "next pattern", "if it is synced then…", and reading back a
+ * generated sequence were all impossible, and a shadow copy in `state` desyncs the moment somebody
+ * touches the control.
+ *
+ * ce.core.get() technically reached these — get("MyArp.Arp.syncToTransport") works — but it needs
+ * the section name and the INTERNAL field name, which is exactly the vocabulary the verbs exist to
+ * hide, and it hands back raw 0-based arrays against verbs that are 1-based. So the read is by verb
+ * name, in the verbs' own units, and 1-based throughout.
+ */
+
+/** verb name -> spec, per family. Built once from the same list the writers come from. */
+const COMPONENT_VERB_BY_NAME = COMPONENT_VERBS.reduce((acc, verb) => {
+  (acc[verb.family] ??= {})[verb.v] = verb;
+  return acc;
+}, {});
+
+/** The kinds `read` answers with one value rather than a list. */
+const SCALAR_KINDS = ['num', 'int', 'bool', 'str', 'enum'];
+
+/** The section config for a component verb's target, or nothing (having said why). */
+function componentConfig(verb, path, forWhat) {
+  const cfg = getValue(`${path}.${verb.section}`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `${verb.family}.${forWhat}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
+    return null;
+  }
+  return cfg;
+}
+
+/** The list an indexed verb addresses, in document order. */
+function componentList(cfg, verb) {
+  return Array.isArray(cfg[verb.f]) ? cfg[verb.f] : null;
+}
+
+/** One scalar verb's current value, in the verb's own units. */
+function componentScalarValue(cfg, verb) {
+  if (verb.k === 'xy') {
+    // The two axes as a table under the names the verb takes them by, so `move` reads back the way
+    // it is written rather than as the model's field names.
+    const [nameX, nameY] = verb.args ?? ['x', 'y'];
+    const base = verb.flat ? cfg : (cfg[verb.f] && typeof cfg[verb.f] === 'object' ? cfg[verb.f] : {});
+    const un = (n) => (verb.oneBased && Number.isFinite(Number(n)) ? Number(n) + 1 : n);
+    return { [nameX]: un(base[verb.fx]), [nameY]: un(base[verb.fy]) };
+  }
+  const raw = cfg[verb.f];
+  // oneBased verbs are stored one lower than they are written, so they read back one higher.
+  if (verb.oneBased && Number.isFinite(Number(raw))) return Number(raw) + 1;
+  return raw;
+}
+
+/** The whole list an indexed verb addresses, in verb vocabulary. */
+function componentListValue(cfg, verb) {
+  const list = componentList(cfg, verb);
+  if (!list) return null;
+  if (verb.k === 'item') return list.map((row) => (row && typeof row === 'object' ? row[verb.item] : undefined));
+  if (verb.k === 'cell' && verb.grid) {
+    // A grid reads back as rows of columns, matching how `cell(target, row, col, amount)` addresses
+    // it. A flat list of sixty-four numbers would be technically the same data and unusable.
+    const cols = Array.isArray(cfg.cols) ? cfg.cols.length : 0;
+    const rows = Array.isArray(cfg.rows) ? cfg.rows.length : 0;
+    if (!cols || !rows) return [];
+    return Array.from({ length: rows }, (_, r) => list.slice(r * cols, r * cols + cols));
+  }
+  return [...list];
+}
+
+function componentReadAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'read');
+  if (!cfg) return undefined;
+  const [name, index, index2] = args;
+  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
+
+  // read(target) — every scalar verb of this component, keyed by the name it is written by.
+  if (name === undefined || name === null || name === '') {
+    const out = {};
+    for (const [verbName, spec] of Object.entries(specs)) {
+      if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
+    }
+    return out;
+  }
+
+  const spec = specs[String(name)];
+  if (!spec) {
+    addScriptTrace('error', '',
+      `${verb.family}.read: "${name}" is not a verb of this component. One of: `
+      + `${Object.keys(specs).filter((k) => k !== 'read').sort().join(', ')}.`);
+    return undefined;
+  }
+  if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
+
+  const list = componentListValue(cfg, spec);
+  if (!list) return undefined;
+  if (index === undefined || index === null) return list;
+
+  // 1-based, as everywhere else in this module — and for a grid the second index is the column.
+  const at = Math.round(Number(index)) - 1;
+  if (!Number.isFinite(at) || at < 0 || at >= list.length) return undefined;
+  const row = list[at];
+  if (spec.k === 'cell' && spec.grid && index2 !== undefined && index2 !== null) {
+    const col = Math.round(Number(index2)) - 1;
+    return Array.isArray(row) && col >= 0 && col < row.length ? row[col] : undefined;
+  }
+  return row;
+}
+
+/** Which indexed verbs a family has, and how long each one's list is. */
+function componentSizeAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'size');
+  if (!cfg) return undefined;
+  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
+  const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
+
+  const sizeOf = (spec) => {
+    const list = componentList(cfg, spec);
+    if (!list) return undefined;
+    if (spec.k === 'cell' && spec.grid) {
+      // A crosspoint is addressed by two indices, so one number would not be an answer.
+      return { rows: Array.isArray(cfg.rows) ? cfg.rows.length : 0,
+               cols: Array.isArray(cfg.cols) ? cfg.cols.length : 0 };
+    }
+    return list.length;
+  };
+
+  const [name] = args;
+  if (name === undefined || name === null || name === '') {
+    return Object.fromEntries(lists.map(([verbName, spec]) => [verbName, sizeOf(spec)]));
+  }
+  const spec = specs[String(name)];
+  if (!spec || !LIST_KINDS.includes(spec.k)) {
+    addScriptTrace('error', '',
+      `${verb.family}.size: "${name}" does not address a list. One of: `
+      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    return undefined;
+  }
+  return sizeOf(spec);
+}
+
+/** Write a whole list in one call — one document change instead of one per element. */
+function componentFillAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'fill');
+  if (!cfg) return false;
+  const [name, values] = args;
+  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
+  const spec = specs[String(name ?? '')];
+  const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
+  if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
+    addScriptTrace('error', '',
+      `${verb.family}.fill: "${name}" does not address a list. One of: `
+      + `${lists.map(([k]) => k).sort().join(', ')}.`);
+    return false;
+  }
+  if (!Array.isArray(values)) {
+    addScriptTrace('error', '', `${verb.family}.fill("${name}"): needs a list of values.`);
+    return false;
+  }
+  const list = componentList(cfg, spec);
+  if (!list) return false;
+
+  // A grid takes ROWS of columns — the shape read() gives back — and each row is placed at its own
+  // row index. Flattening first would put a short second row inside the first one, which is how a
+  // 2x2 fill silently landed as four cells along the top.
+  const grid = spec.k === 'cell' && spec.grid;
+  const calls = [];
+  if (grid) {
+    const cols = Array.isArray(cfg.cols) ? cfg.cols.length : 0;
+    const rows = Array.isArray(cfg.rows) ? cfg.rows.length : 0;
+    if (values.length > rows || values.some((row) => Array.isArray(row) && row.length > cols)) {
+      addScriptTrace('error', '',
+        `${verb.family}.fill("${name}"): does not fit a ${rows}x${cols} grid — refused. `
+        + `${verb.family}.size("${name}") gives its shape.`);
+      return false;
+    }
+    values.forEach((row, r) => {
+      (Array.isArray(row) ? row : [row]).forEach((value, c) => calls.push([r + 1, c + 1, value]));
+    });
+  } else {
+    if (values.length > list.length) {
+      // Refused rather than truncated: silently dropping half a pattern is worse than not writing
+      // it, and the caller can ask size() first.
+      addScriptTrace('error', '',
+        `${verb.family}.fill("${name}"): ${values.length} values for a list of ${list.length} — `
+        + `refused. ${verb.family}.size("${name}") says how many there are.`);
+      return false;
+    }
+    values.forEach((value, i) => calls.push([i + 1, value]));
+  }
+
+  // Each element goes through the SAME reducer one call would use, so a value written in bulk is
+  // clamped, coerced and refused exactly as a value written singly. Then ONE write at the end,
+  // which is the whole point: sixteen steps used to be sixteen document changes.
+  let next = list;
+  let wrote = false;
+  for (const args of calls) {
+    const patch = componentScriptPatch(spec, { ...cfg, [spec.f]: next }, args);
+    if (patch[spec.f]) { next = patch[spec.f]; wrote = true; }
+  }
+  if (!wrote) {
+    addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
+    return true;
+  }
+  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${calls.length} value(s)`);
+  return true;
+}
+
+/** Add one element to a component's list, using the template the canvas uses. */
+function componentInsertAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'insert');
+  if (!cfg) return false;
+  const spec = componentListSpec(verb, 'insert', args[0]);
+  if (!spec) return false;
+  const list = componentList(cfg, spec) ?? [];
+  const at = args[1] === undefined || args[1] === null ? null : Math.round(Number(args[1])) - 1;
+  const next = componentListWithElement(verb.section, spec.f, list, cfg, at);
+  if (!next) {
+    addScriptTrace('error', '',
+      `${verb.family}.insert("${spec.v}"): this component's ${spec.f} cannot be grown from a script.`);
+    return false;
+  }
+  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  addScriptTrace('log', '', `${verb.family} ${path}: insert("${spec.v}") → ${next.length}`);
+  return true;
+}
+
+/** …and take one away, when the component does not need it. */
+function componentRemoveAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'remove');
+  if (!cfg) return false;
+  const spec = componentListSpec(verb, 'remove', args[0]);
+  if (!spec) return false;
+  const list = componentList(cfg, spec) ?? [];
+  // No index removes the last, which is what "one fewer" means without saying which.
+  const at = args[1] === undefined || args[1] === null
+    ? list.length - 1
+    : Math.round(Number(args[1])) - 1;
+  const next = componentListWithoutElement(verb.section, spec.f, list, at);
+  if (!next) {
+    addScriptTrace('error', '',
+      `${verb.family}.remove("${spec.v}", ${args[1] ?? 'last'}): refused — either there is no such `
+      + 'element, or this component needs it.');
+    return false;
+  }
+  setValue(`${path}.${verb.section}.${spec.f}`, next);
+  addScriptTrace('log', '', `${verb.family} ${path}: remove("${spec.v}") → ${next.length}`);
+  return true;
+}
+
+/** The list-addressing verb a name refers to, having complained if it is not one. */
+function componentListSpec(verb, forWhat, name) {
+  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
+  const lists = Object.entries(specs).filter(([, x]) => LIST_KINDS.includes(x.k) && !x.clear);
+  const spec = specs[String(name ?? '')];
+  if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
+  addScriptTrace('error', '',
+    `${verb.family}.${forWhat}: "${name}" does not address a list. One of: `
+    + `${lists.map(([k]) => k).sort().join(', ')}.`);
+  return null;
+}
+
+/** The five kinds every family gets are not writes of a field, so they dispatch elsewhere. */
+const COMPONENT_KIND_ACTION = {
+  read: componentReadAction,
+  size: componentSizeAction,
+  fill: componentFillAction,
+  insert: componentInsertAction,
+  remove: componentRemoveAction,
+};
 
 const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
   verb.id,
   // Rest args rather than a fixed arity: the verbs take one, two or three, and a wrapper that
   // named them would have to be generated per kind for no gain. `target` is always first.
-  (target, ...rest) => componentVerbAction(verb, target, rest),
+  (target, ...rest) => {
+    const special = COMPONENT_KIND_ACTION[verb.k];
+    return special
+      ? special(verb, String(target ?? ''), rest)
+      : componentVerbAction(verb, target, rest);
+  },
 ]));
+
+/**
+ * The read for the five hand-written families, by MODEL field name.
+ *
+ * The twenty-three spec-driven families read by verb name because their spec says which field each
+ * verb writes. These five have no such map — they are five hand-written reducers that predate it —
+ * so rather than hand-type a forty-seven entry verb→field table (the exact thing §44 spent its
+ * first half deleting), they read by the field name their own summaries already use. `read(target)`
+ * with no field is the whole section, which is the same answer the other twenty-three give.
+ */
+function sectionRead(path, section, label, field) {
+  const target = String(path ?? '');
+  const cfg = getValue(`${target}.${section}`);
+  if (!cfg || typeof cfg !== 'object') {
+    addScriptTrace('error', '', `${label}.read: ${wrongTargetMessage(target, section, label)}`);
+    return undefined;
+  }
+  if (field === undefined || field === null || field === '') {
+    // Without the private live-state keys the renderer parks here: `__phase` is where the preview
+    // surface is in a sequence this frame, not something a script set or can set.
+    return Object.fromEntries(Object.entries(cfg).filter(([k]) => !k.startsWith('_')));
+  }
+  const name = String(field);
+  const key = Object.keys(cfg).find((k) => k.toLowerCase() === name.toLowerCase());
+  if (key === undefined || key.startsWith('_')) {
+    addScriptTrace('error', '',
+      `${label}.read: "${field}" is not a field of this component. One of: `
+      + `${Object.keys(cfg).filter((k) => !k.startsWith('_')).sort().join(', ')}.`);
+    return undefined;
+  }
+  return cfg[key];
+}
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
 const setlistApi = {
@@ -2228,6 +2574,7 @@ const setlistApi = {
   setlistEnable: (target, scene, enabled) => setAction(target, 'enable', { scene, enabled: enabled !== false }),
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
+  setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
 };
 
 /* -------------------------------------------------------------- flow: on / emit / run */

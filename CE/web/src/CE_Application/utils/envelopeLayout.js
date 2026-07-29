@@ -59,6 +59,12 @@ export function envFromPx(px, py, geom) {
 // Ease t∈[0,1] by the segment's curve shape (warps how y moves across the
 // segment). exp = slow→fast (convex), log = fast→slow (concave), scurve = eased
 // both ends. `tension` (≥0) sharpens exp/log.
+// The curves envWarp implements, and the shapes envelopePreset() knows. Both are tables because
+// ce.components.envelope.pointCurve and .preset have to offer exactly these: a verb offering "s"
+// or "asr" writes a name neither switch has a case for, and the envelope stays linear/ADSR.
+export const ENVELOPE_CURVES = ['linear', 'exp', 'log', 'scurve', 'hold'];
+export const ENVELOPE_PRESETS = ['adsr', 'ad', 'ar', 'dahdsr', 'mseg', 'free'];
+
 export function envWarp(t, curve, tension = 0) {
   const tt = clamp01(num(t, 0));
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
@@ -216,6 +222,50 @@ export function envelopeStageValues(control) {
     peakIndex,
     sustainIndex,
   };
+}
+
+/* --- Growing and shrinking the breakpoint list ------------------------------
+ * Lifted out of EnvelopeEditor.svelte's Add/Remove buttons so a script reaches the same shape
+ * decisions the canvas does. Both are here rather than in componentElements.js because neither is
+ * a template: a new breakpoint goes into the WIDEST gap (so it lands somewhere you can grab) and
+ * takes its right-hand neighbour's curve, and the endpoints are not removable at all — an envelope
+ * that starts in the middle, or has one point, is not an envelope.
+ */
+
+/** The points with one added, at `at` (0-based) or at the widest gap. Never returns nothing. */
+export function envelopePointAdded(points, at = null) {
+  const sorted = normalizePoints(Array.isArray(points) ? points : []);
+  if (sorted.length < 2) {
+    return normalizePoints([...sorted, { id: nextPointId(sorted), x: 1, y: 0, curve: 'linear', tension: 0 }]);
+  }
+  let gapAt = 1;
+  if (Number.isInteger(at) && at > 0 && at < sorted.length) {
+    gapAt = at;
+  } else {
+    let gap = -1;
+    for (let i = 1; i < sorted.length; i += 1) {
+      const g = sorted[i].x - sorted[i - 1].x;
+      if (g > gap) { gap = g; gapAt = i; }
+    }
+  }
+  const x = (sorted[gapAt - 1].x + sorted[gapAt].x) / 2;
+  const y = (sorted[gapAt - 1].y + sorted[gapAt].y) / 2;
+  const next = [...sorted];
+  next.splice(gapAt, 0, { id: nextPointId(sorted), x, y, curve: sorted[gapAt].curve ?? 'linear', tension: 0 });
+  return next;
+}
+
+/** The points with the 0-based `at` removed, or NOTHING when it must not be. */
+export function envelopePointRemoved(points, at) {
+  const list = Array.isArray(points) ? points : [];
+  if (list.length <= 2 || !Number.isInteger(at) || at <= 0 || at >= list.length - 1) return null;
+  return list.filter((_, i) => i !== at);
+}
+
+/** The lowest `e<n>` not already used, so two adds in one millisecond cannot collide. */
+export function nextPointId(points) {
+  const taken = new Set((Array.isArray(points) ? points : []).map((p) => String(p?.id ?? '')));
+  for (let n = 0; ; n += 1) { const id = `e${n}`; if (!taken.has(id)) return id; }
 }
 
 // Preset shapes → { points, sustainIndex, lockYIndices }. Envelope presets lock

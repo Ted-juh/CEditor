@@ -3382,3 +3382,195 @@ the editor is only readable by the export if all four spell the key identically.
   document itself is written in. A second format would need a second hand-written Lua parser.
 - **Size limits and quotas.** `info().bytes` reports; enforcing a ceiling is the host's business, and
   the local store already refuses cleanly when a browser's quota is hit.
+
+## 44. `ce.components` — twenty-nine verbs that offered values no component has, and 229 that could not be read
+
+`ce.components` was 28 modules and 229 members: 23 families generated from the data spec in
+`componentVerbs.js`, plus 5 hand-written ones (split, phrase, recorder, harmony, setlist).
+
+Nothing here is a Properties-panel gap either — these verbs exist precisely because the inspector is
+design-time and a footswitch is not. The gaps are internal, and the first one is a bug.
+
+### Gap one: the enum values were hand-typed, and 24 of 28 were wrong
+
+`componentVerbs.js` carried its enum values as literals beside the components. Its own comment
+records that going off once:
+
+> *"Phase 7 shipped a hand-written list that offered "pentatonic" and "chromatic" (which no component
+> understands, so the verb wrote a name that silently did nothing) and omitted
+> "pentatonicMaj"/"pentatonicMin" (which they do understand, so the verb refused a value that was
+> perfectly valid)."*
+
+That fix was applied to **scales and nothing else**. Reproduced live before the change:
+
+```
+arpPattern("MyArp", "converge") -> undefined   stored = "converge"   ← the Arp has no such pattern
+arpPattern("MyArp", "chord")    -> undefined   stored = "converge"   ← the Arp DOES have this one
+```
+
+| verb | accepted, component ignores | refused, component accepts |
+|---|---|---|
+| `arp.pattern` | converge, diverge | **chord** |
+| `arp.division`, `turing.division` | — | **1/2D 1/4D 1/8D 1/16D 1/2T 1/4T** |
+| `arp.chordType`, `chordpad.chordType` | ninth, sus2, sus4, power | — |
+| `chordpad.mode` | scale | — |
+| `chordpad.voicing` | open, drop3 | — |
+| `noteribbon.mode` | bend | **chromatic** |
+| `drumpads.mode` | gate | **oneShot** |
+| `constellation.mode` | nearest | — |
+| `constraint.mode` | max, ordered | **order, ratio, mirror** |
+| `crossfader.law` | transition | — |
+| `envelope.preset` | asr, dadsr, custom | **dahdsr, mseg, free** |
+| `envelope.pointCurve`, `macro.slotCurve` | s | **scurve** |
+| `ribbon.returnMode` | zero, value | **min, max, rest** |
+| `router.source` | control, pitchbend | **polyAftertouch, breath, expression, foot, link** |
+| `router.poly` | lowest, average | — |
+| `panic.scope` | panel | — |
+| `transport.source` | midi, tap | **external** |
+| `lcd.scroll` | auto | — |
+| `pixel.anim` | sprite, image | **file** |
+| `joystick.returnAxes` | none | — |
+
+The divisions row is a direct internal contradiction: **`ce.time.divisions()` already answered from
+the transport's real fourteen** — same panel, same script — while `ce.components.arp.division`
+offered a hand-typed eight.
+
+`transport.beatUnit` was wrong in a different way: an enum of six where the transport clamps *any*
+integer 1..32, so a script could not write 3/4's 3 or 12/8's 12. It is an `int` now.
+
+And the five hand-written families' **documentation** lied where their reducers did not:
+`harmonyOutOfKey` was described as `"skip"/"nearest"/"pass"` where the engine has
+`pass/nearest/mute`, so an author following the contract wrote `"skip"` and got nothing. Four more
+like it. Those summaries now interpolate the table.
+
+**Nothing failed, because no test asserted the values.** `componentTables.js` now imports the table
+each component's own switch reads, `componentVerbs.js` spells no value at all, an enum verb with no
+table entry throws at import, and `componentEnums.test.js` asserts the binding **by identity** — a
+copy would drift the same way. The LCD and Pixel display have no util module to import from, so
+their two tables are pinned against the `<select>` the editor renders, read out of the `.svelte`
+source: derived by test where it cannot be derived by import.
+
+### Gap two: every one of the 229 was a write, and returned nothing
+
+`orbitNode("MyOrbit", 99, false)` returned `undefined` — identical to success. So did an unknown
+enum, a control of the wrong type, and a value that was already correct.
+
+A verb now returns **whether the component holds what was asked**. Three outcomes, and the middle
+one is why a boolean is not enough on its own:
+
+| | returns | console |
+|---|---|---|
+| written | `true` | what changed |
+| already that way | `true` | "already that way" |
+| refused | `false` | at **error** level, with the values it does accept |
+
+"Already that way" *must* be true, or `if not arp.pattern(a, choice) then warn() end` fires because
+the arp was already on that pattern. Telling it from a refusal took two different mechanisms,
+because the two halves of the module differ: the generated reducer compares against the current
+value, so the spec answers `componentRequestLegal()`; the five hand-written reducers build a patch
+from the request without consulting the current value, so an empty patch *is* a refusal — except at
+the two places they were already comparing, which now return a shared `UNCHANGED` marker. No
+reducer had to be rewritten to gain the distinction.
+
+### Gap three: nothing could be read
+
+A script could set the arpeggiator's pattern and could not ask what it was. No "next pattern", no
+"if it is synced then…", and no reading anything the component *generated* — the Turing's steps, the
+Recorder's take, the Matrix's amounts, the LCD's lines, the Envelope's breakpoints.
+
+`ce.core.get("MyArp.Arp.syncToTransport")` did work. But it needs the section name and the
+**internal field name** — `syncToTransport`, `euclidPulses`, `peakDecayPerSec`, `gateThreshold`,
+`loopStartBar` — which is exactly the vocabulary the verbs exist to hide, and it hands back raw
+0-based arrays against verbs that are 1-based.
+
+### Gap four: the lists could be edited and not measured or grown
+
+An `item` verb writes property X of element N. Nothing said how many elements there were, and
+nothing could add or remove one. `ce.panel`'s collection verbs cover the *editor's* sections
+(`States, Bindings, Animations, Parts…`), not these. So a script could not add a split zone, an
+envelope breakpoint, an orbit node, a router destination, a macro slot, a constraint member or a
+timbre anchor — all of which the canvas grows with a button.
+
+### Gap five: sixteen steps were sixteen document changes
+
+A Turing pattern was 16 calls, an 8×8 matrix 64 — each its own reducer pass and its own store write.
+
+### Five verbs every family gets: 229 → 302
+
+Appended once, after the families are declared, rather than written into 23 literals.
+
+| namespaced | what |
+|---|---|
+| `read(target [, name [, index]])` | by **verb** name, in the verbs' units, 1-based |
+| `size(target [, name])` | how many an indexed verb can address; the Matrix answers `{rows, cols}` |
+| `fill(target, name, values)` | a whole list in one call, one document change |
+| `insert(target, name [, index])` | the element the canvas adds, appended or before an index |
+| `remove(target, name [, index])` | …and away again |
+
+`read` is unconditional. `size`/`fill` exist iff the family has a list. `insert`/`remove` exist iff
+it has an **`item`** list — a `cell` or `line` list is fixed-length and sized by a verb of its own
+(the Turing's step count is `length`, the LCD's row count is the display's `rows`), so growing one
+from here would fight the verb that owns it. `turingInsert` does not exist, and that is the design.
+
+`fill` runs each element through **the same reducer one call would use**, so a value written in bulk
+cannot land somewhere a single write could not — and it refuses a list longer than the component has
+rather than truncating, because silently dropping half a pattern is worse than not writing it.
+
+The five hand-written families gained a `read` too, but by **model field name** rather than verb
+name: they predate the spec and have no verb→field map, and hand-typing a 47-entry one is the exact
+thing the first half of this phase spent its time deleting. `read(target)` with no name is the whole
+section either way, so the shape a script is most likely to want is the same across all 28.
+
+### The element templates came out of the buttons
+
+Seven "Add" handlers built their element inline in their own `.svelte` editor, so the template only
+the canvas knew was one the export could not reproduce. Same move as §42 with `stores/alignment.js`:
+they are now `utils/componentElements.js` and the editors call it. The Envelope keeps its own two in
+`envelopeLayout.js`, because a new breakpoint going into the **widest gap** and the endpoints being
+unremovable are shape decisions rather than a template.
+
+One thing changed on the way out: element ids were `${prefix}${Date.now()}`, which collides when two
+are added inside a millisecond — reachable from a script in a way it never was from a mouse. They
+are the lowest unused number now: stable, unique, and diffable.
+
+### Seven fields the phase-7 spec skipped
+
+`phase` on the Arp, the Turing and the Looper — the Orbit and the Envelope already had it, so a
+script could put those on the downbeat and not the arpeggiator. `arp.mutes`, which needed a **new
+kind**: it is a sorted set of muted step indices, not a boolean per step, so neither `item` nor
+`cell` fits it; `indexset` is generic, and a test asserts it agrees with the grid's own
+`toggleMute()`. `arp.inputChannel`, `arp.baseOctave` and `arp.source` — what the arp listens to,
+which is a performance choice. And `meter.valueMin`/`valueMax`/`dbFloor`/`dbCeil`: `meter.value` was
+documented as being "in the meter's own units, between valueMin and valueMax" and a script could
+neither set them nor read them.
+
+Everything else the sweep found undriven is colours, `editable` and `show*` — set once in the
+inspector, correctly excluded, exactly as `componentVerbs.js` says at the top.
+
+### How it is tested
+
+`componentEnums.test.js` is the regression: the values are the app's tables **by identity**, every
+enum verb has an entry, every entry has a verb, the two editor-pinned tables match the `<select>`,
+and each of the twenty-four specific values that used to be wrong is named.
+
+`scriptComponents.test.js` is behaviour, against real controls from the app's own `createControl` —
+one per family. It asserts each of the three outcomes separately, that `read` speaks the writers'
+vocabulary (`sync`, and *not* `syncToTransport`), that a 1-based verb reads back the number it was
+written with, that a grid reads and fills in rows, and that `insert` produces **the app's own
+template** and `envelopeInsert` the envelope's own placement — imported, not copied. It ends with
+the sibling of `componentVerbs.test.js`'s catch-all: every `read`/`size`/`fill`/`insert`/`remove`
+driven on a real control, because a verb that silently does nothing for every input is invisible one
+verb at a time.
+
+### What is deliberately still absent
+
+- **Component events.** No `onStep`, no `onScene`, no `onTakeFinished` — a script can drive a
+  component and cannot hear from one. It is the largest thing left in this module and it is its own
+  phase: `arpFireStep` in `PanelPreviewSurface.svelte` is where one would be raised, which is per
+  family surface work rather than a change to the spec.
+- **Colours, sizes and `show*`.** The inspector's, and the file has said so since phase 7.
+- **Growing a `cell` or `line` list.** Owned by another verb; see above.
+- **The Matrix's rows and columns as objects.** `size` reports the shape and `cell` addresses it;
+  defining a new modulation source is a document edit, not a performance one.
+- **A verb→field map for the five hand-written families.** Their `read` is by field name and says
+  so. Restating 47 mappings by hand is the defect this phase opened by removing.

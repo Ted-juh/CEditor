@@ -10,6 +10,9 @@ function num(value, fallback = 0) {
 }
 function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 
+// A plain fraction, or the fraction's decibel value across [dbFloor, dbCeil].
+export const METER_SCALES = ['linear', 'db'];
+
 export function meterConfig(control) {
   return control?._children?.Meter ?? {};
 }

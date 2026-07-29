@@ -14,6 +14,11 @@ function num(value, fallback = 0) {
 }
 function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 
+// Snap recalls the nearest star exactly; blend morphs between them by distance. Two, not three:
+// ce.components.constellation.mode offered a "nearest" the field below has no case for, so it
+// behaved as blend while reading as snap.
+export const CONSTELLATION_MODES = ['blend', 'snap'];
+
 export function constellationConfig(control) {
   return control?._children?.Constellation ?? {};
 }

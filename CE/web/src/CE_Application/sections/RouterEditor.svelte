@@ -9,6 +9,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -54,9 +55,8 @@
   function updateDest(i, key, value) {
     setDests(dests.map((d, idx) => idx === i ? { ...d, [key]: value } : d));
   }
-  function addDest() {
-    setDests([...dests, { id: `r${Date.now()}`, label: `Dest ${dests.length + 1}`, depth: 1, min: 0, max: 1, enabled: true }]);
-  }
+  // Shared with ce.components.router.insert() — see componentElements.js.
+  function addDest() { setDests(componentListWithElement('Router', 'destinations', dests, r)); }
   function removeDest(i) { setDests(dests.filter((_, idx) => idx !== i)); }
   function depthPct(d) { return Math.round(num(d?.depth, 1) * 100); }
   // Which standard sources are "external" (need the synth/controller to send them).

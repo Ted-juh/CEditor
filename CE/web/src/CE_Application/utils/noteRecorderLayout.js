@@ -30,6 +30,10 @@ export const MAX_EVENTS = 512;          // a hard stop, so a stuck input can't g
 // pressing record mid-loop and having it start *there* gives you a take whose
 // downbeat is wherever your hand was, which is never what you wanted.
 export const RECORDER_STATES = ['idle', 'armed', 'recording', 'overdub'];
+// What a take captures. Exported so the script verb's documentation names the values the
+// reducer below actually accepts — it used to say "keys"/"harmony"/"both", none of which
+// are these.
+export const RECORDER_SOURCES = ['input', 'panel', 'both'];
 export const RECORDER_STATE_LABELS = {
   idle: 'Idle', armed: 'Armed', recording: 'Recording', overdub: 'Overdub',
 };
@@ -515,7 +519,7 @@ export function recorderScriptPatch(cfg, action, args = {}) {
     }
     case 'source': {
       const s = String(a.source ?? '');
-      return ['input', 'panel', 'both'].includes(s) ? { source: s } : {};
+      return RECORDER_SOURCES.includes(s) ? { source: s } : {};
     }
     case 'nudge': {
       if (busy) return {};

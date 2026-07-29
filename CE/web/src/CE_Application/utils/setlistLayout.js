@@ -9,6 +9,8 @@
 // Pure: a list and an index in, messages and a patch out. The MIDI and the
 // writes live in the preview surface.
 
+import { UNCHANGED } from './scriptPatchOutcome.js';
+
 function num(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -360,7 +362,9 @@ export function setlistScriptPatch(cfg, action, args = {}) {
         : scenes.findIndex((s) => s.name === key || s.id === key);
       if (at < 0 || at >= scenes.length) return {};
       const want = a.enabled !== false;
-      if ((scenes[at].enabled !== false) === want) return {};
+      // Already that way: accepted, nothing to write. NOT the same as a refusal, and the script
+      // verb's return value now depends on the difference.
+      if ((scenes[at].enabled !== false) === want) return UNCHANGED;
       return { scenes: scenes.map((s, i) => (i === at ? { ...s, enabled: want } : s)) };
     }
     case 'crossfade': {
@@ -369,7 +373,7 @@ export function setlistScriptPatch(cfg, action, args = {}) {
     }
     case 'wrap': {
       const want = a.wrap === undefined ? !wrap : a.wrap !== false;
-      return want === wrap ? {} : { wrap: want };
+      return want === wrap ? UNCHANGED : { wrap: want };
     }
     default:
       return {};

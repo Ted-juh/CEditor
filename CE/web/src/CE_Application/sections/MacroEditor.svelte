@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -21,9 +22,9 @@
   function updateSlot(i, key, value) {
     setSlots(slots.map((s, idx) => idx === i ? { ...s, [key]: value } : s));
   }
-  function addSlot() {
-    setSlots([...slots, { id: `m${Date.now()}`, label: `Dest ${slots.length + 1}`, depth: 1, curve: 'linear', min: 0, max: 1, enabled: true }]);
-  }
+  // The template lives in componentElements.js so ce.components.macro.insert() adds the same
+  // assignment this button does.
+  function addSlot() { setSlots(componentListWithElement('Macro', 'slots', slots, m)); }
   function removeSlot(i) { setSlots(slots.filter((_, idx) => idx !== i)); }
   // Depth in percent (−100..100) ↔ −1..1.
   function depthPct(s) { return Math.round(num(s?.depth, 1) * 100); }

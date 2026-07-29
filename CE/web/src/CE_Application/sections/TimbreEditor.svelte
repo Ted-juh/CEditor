@@ -9,6 +9,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -40,11 +41,9 @@
   function updateAnchorValue(i, targetId, value) {
     setAnchors(anchors.map((a, idx) => idx === i ? { ...a, values: { ...(a.values ?? {}), [targetId]: value } } : a));
   }
-  function addAnchor() {
-    const values = {};
-    for (const t of targets) values[t.id] = 0.5;
-    setAnchors([...anchors, { id: `a${Date.now()}`, label: `Anchor ${anchors.length + 1}`, x: 0.5, y: 0.5, values }]);
-  }
+  // Shared with ce.components.timbre.insert() — see componentElements.js. The anchor carries a
+  // value per morph target, which is why the template is given the whole section.
+  function addAnchor() { setAnchors(componentListWithElement('Timbre', 'anchors', anchors, tb)); }
   function removeAnchor(i) { setAnchors(anchors.filter((_, idx) => idx !== i)); }
   function av(a, id) { return num(a?.values?.[id], 0); }
 

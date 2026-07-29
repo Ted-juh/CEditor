@@ -40,6 +40,9 @@ export function constraintMembers(control) {
 // Given the current member VALUES (array of 0..1), a mode, the index that just
 // changed and its new value, return a new values array that satisfies the rule.
 // Pure — same inputs always give the same result.
+// The modes applyConstraint implements. ce.components.constraint.mode offers exactly these.
+export const CONSTRAINT_MODES = ['sum', 'order', 'ratio', 'mirror', 'free'];
+
 export function applyConstraint(values, mode, index, newValue, opts = {}) {
   const v = (Array.isArray(values) ? values : []).map((x) => clamp01(num(x, 0)));
   const n = v.length;

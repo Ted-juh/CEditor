@@ -24,6 +24,10 @@ export function crossfaderVertical(control) {
 //  - linear:      A = 1−m, B = m         (sums to 1; −6 dB at centre)
 //  - equalPower:  A = cos, B = sin        (constant power; −3 dB at centre)
 //  - sharp:       A = min(1, 2(1−m)), B = min(1, 2m)  (full either side, cut only near the far end)
+// The laws the switch below implements. A table rather than a list retyped beside the script verb:
+// ce.components.crossfader.law must offer exactly these.
+export const CROSSFADER_LAWS = ['linear', 'equalPower', 'sharp'];
+
 export function crossfaderGains(mix, law = 'equalPower') {
   const m = clamp01(num(mix, 0.5));
   switch (String(law)) {

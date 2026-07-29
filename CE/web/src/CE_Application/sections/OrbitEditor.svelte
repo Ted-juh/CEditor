@@ -6,6 +6,7 @@
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -22,13 +23,8 @@
   function updateNode(i, key, value) {
     setNodes(nodes.map((s, idx) => idx === i ? { ...s, [key]: value } : s));
   }
-  function addNode() {
-    setNodes([...nodes, {
-      id: `n${Date.now()}`, label: `Node ${nodes.length + 1}`,
-      radius: 0.6, angle: (nodes.length * 60) % 360, ratio: 1,
-      output: 'y', depth: 1, invert: false, enabled: true,
-    }]);
-  }
+  // Shared with ce.components.orbit.insert() — see componentElements.js.
+  function addNode() { setNodes(componentListWithElement('Orbit', 'nodes', nodes, o)); }
   function removeNode(i) { setNodes(nodes.filter((_, idx) => idx !== i)); }
   // Radius / depth in percent for a friendlier UI.
   function pct(v, f = 100) { return Math.round(num(v, f / 100) * 100); }

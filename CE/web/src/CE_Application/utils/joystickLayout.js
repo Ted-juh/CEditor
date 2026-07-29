@@ -10,6 +10,9 @@ function num(value, fallback = 0) {
 }
 function clamp01(n) { return n < 0 ? 0 : n > 1 ? 1 : n; }
 
+// Which axes spring back. joystickGlide reads exactly these, and so does the editor's picker.
+export const JOYSTICK_RETURN_AXES = ['both', 'x', 'y'];
+
 export function joystickConfig(control) {
   return control?._children?.Joystick ?? {};
 }

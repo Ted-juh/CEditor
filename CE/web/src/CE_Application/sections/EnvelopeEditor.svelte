@@ -1,7 +1,9 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
-  import { envelopePreset, normalizePoints } from '../utils/envelopeLayout.js';
+  import {
+    envelopePreset, normalizePoints, envelopePointAdded, envelopePointRemoved,
+  } from '../utils/envelopeLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -37,23 +39,12 @@
   function updatePoint(i, key, value) {
     setPoints(points.map((p, idx) => idx === i ? { ...p, [key]: value } : p));
   }
-  function addPoint() {
-    const sorted = normalizePoints(points);
-    // Insert at the widest gap so the new node is easy to grab.
-    let gapAt = 1; let gap = -1;
-    for (let i = 1; i < sorted.length; i += 1) {
-      const g = sorted[i].x - sorted[i - 1].x;
-      if (g > gap) { gap = g; gapAt = i; }
-    }
-    const x = (sorted[gapAt - 1].x + sorted[gapAt].x) / 2;
-    const y = (sorted[gapAt - 1].y + sorted[gapAt].y) / 2;
-    const next = [...sorted];
-    next.splice(gapAt, 0, { id: `e${Date.now()}`, x, y, curve: sorted[gapAt].curve ?? 'linear', tension: 0 });
-    setPoints(next);
-  }
+  // Both live in envelopeLayout.js so ce.components.envelope.insert()/.remove() make the same
+  // shape decisions this button does — the widest-gap placement and the endpoints being fixed.
+  function addPoint() { setPoints(envelopePointAdded(points)); }
   function removePoint(i) {
-    if (points.length <= 2 || i <= 0 || i >= points.length - 1) return;
-    setPoints(points.filter((_, idx) => idx !== i));
+    const next = envelopePointRemoved(points, i);
+    if (next) setPoints(next);
   }
 
   function hexToInput(argb) {

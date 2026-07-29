@@ -5,6 +5,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
 
+  import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
@@ -20,7 +21,8 @@
 
   function setMembers(next) { set('members', next); }
   function updateMember(i, key, value) { setMembers(members.map((m, idx) => idx === i ? { ...m, [key]: value } : m)); }
-  function addMember() { setMembers([...members, { id: `c${Date.now()}`, label: `Member ${members.length + 1}`, value: 0.5 }]); }
+  // Shared with ce.components.constraint.insert() — see componentElements.js.
+  function addMember() { setMembers(componentListWithElement('Constraint', 'members', members, cs)); }
   function removeMember(i) { setMembers(members.filter((_, idx) => idx !== i)); }
 
   const MODE_HINTS = {

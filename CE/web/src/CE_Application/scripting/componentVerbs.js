@@ -34,10 +34,20 @@
 // 1-based indexing throughout, on purpose: it is what the editor's own lists show, and a script
 // that says "scene 3" should mean the third one whichever language it is written in.
 
-import { SCALE_NAMES } from './musicTheory.js';
+import { VERB_VALUES } from './componentTables.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
+// A sorted list of INDICES that are on — the Arpeggiator stores its muted steps that way,
+// as a set rather than a boolean per step, so neither `item` nor `cell` fits it.
+const INDEXSET = 'indexset';
+// …and the five every family gets for free, appended below rather than declared per family.
+const READ = 'read', SIZE = 'size', FILL = 'fill', INSERT = 'insert', REMOVE = 'remove';
+export const READ_KINDS = [READ, SIZE];
+export const ARRAY_KINDS = [FILL, INSERT, REMOVE];
+/** The kinds that address an array by a verb name — what `size`, `fill`, `insert` and `remove`
+ *  take, and what `read` returns a list for. */
+export const LIST_KINDS = [ITEM, CELL, LINE];
 
 /** A verb: v = name inside the namespace, f = the field it writes, k = kind. */
 const v = (name, field, kind, extra = {}) => ({ v: name, f: field, k: kind, ...extra });
@@ -47,13 +57,10 @@ const UNIT = { min: 0, max: 1 };
 const NOTE = { min: 0, max: 127 };
 const CHANNEL = { min: 1, max: 16 };
 const VELOCITY = { min: 1, max: 127 };
-const DIVISIONS = ['1/1', '1/2', '1/4', '1/8', '1/8T', '1/16', '1/16T', '1/32'];
-// The panel's OWN scale ids, not a list retyped beside them. Phase 7 shipped a hand-written list
-// that offered "pentatonic" and "chromatic" (which no component understands, so the verb wrote a
-// name that silently did nothing) and omitted "pentatonicMaj"/"pentatonicMin" (which they do
-// understand, so the verb refused a value that was perfectly valid). Reading the table removes the
-// whole class of error — and it is the same table ce.music.scale answers from.
-const SCALES = SCALE_NAMES;
+// NO enum values are written here. Every one comes from componentTables.js, which imports the
+// table the component's own switch reads — see the note at the top of that file for the
+// twenty-four verbs that were wrong before it existed. `values` is filled in below, once, from
+// VERB_VALUES, and a verb with no entry there is a build error rather than a silent literal.
 
 /**
  * The families. `id` is the namespace (ce.components.<id>), `section` the model section the verbs
@@ -66,35 +73,45 @@ export const COMPONENT_FAMILIES = [
     summary: 'Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator.',
     verbs: [
       v('run', 'running', BOOL, { toggle: true, doc: 'Start or stop the arpeggiator. No argument toggles.' }),
-      v('pattern', 'pattern', ENUM, { values: ['up', 'down', 'updown', 'downup', 'converge', 'diverge', 'random', 'asPlayed'] }),
+      v('pattern', 'pattern', ENUM),
       v('rate', 'rate', NUM, { ...RATE, doc: 'Free-running rate in steps per second. Ignored while synced.' }),
-      v('division', 'division', ENUM, { values: DIVISIONS, doc: 'Note value per step while synced to the transport.' }),
+      v('division', 'division', ENUM, { doc: 'Note value per step while synced to the transport.' }),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),
       v('octaves', 'octaves', INT, { min: 1, max: 6 }),
       v('gate', 'gate', NUM, { ...UNIT, doc: 'How much of each step is held, 0..1.' }),
       v('swing', 'swing', NUM, { min: -1, max: 1 }),
       v('latch', 'latch', BOOL, { toggle: true }),
       v('key', 'key', INT, { min: 0, max: 11, doc: 'Root as a pitch class, 0 = C.' }),
-      v('scale', 'scale', ENUM, { values: SCALES }),
+      v('scale', 'scale', ENUM),
       v('degree', 'degree', INT, { min: 0, max: 6 }),
-      v('chordType', 'chordType', ENUM, { values: ['triad', 'seventh', 'ninth', 'sus2', 'sus4', 'power'] }),
+      v('chordType', 'chordType', ENUM),
       v('velocity', 'velocity', INT, VELOCITY),
       v('channel', 'channel', INT, CHANNEL),
       v('euclid', 'euclidEnabled', BOOL, { toggle: true }),
       v('euclidSteps', 'euclidSteps', INT, { min: 1, max: 32 }),
       v('euclidPulses', 'euclidPulses', INT, { min: 0, max: 32 }),
       v('euclidRotate', 'euclidRotate', INT, { min: -32, max: 32 }),
+      // The four the phase-7 spec skipped. `phase` was already a verb on the Orbit and the
+      // Envelope, so a script could put those on the downbeat and not the Arpeggiator; `mutes`
+      // was per-step muting reachable from the grid and nowhere else, while the Looper's lanes
+      // and the Orbit's nodes both had one; and the two below are what the arp LISTENS to, which
+      // is a performance choice rather than an inspector one.
+      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the sequence it is, 0..1 — 0 is the downbeat.' }),
+      v('mute', 'mutes', INDEXSET, { doc: 'Mute or unmute one step, 1-based. No third argument toggles.' }),
+      v('inputChannel', 'inputChannel', INT, { min: 0, max: 16, doc: 'Which channel it takes notes from. 0 means omni.' }),
+      v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),
+      v('source', 'source', ENUM, { doc: 'Where the notes come from: its own chord, a linked Chord Pad, or incoming MIDI.' }),
     ],
   },
   {
     id: 'chordpad', section: 'ChordPad', prefix: 'chordPad', label: 'Chord Pad',
     summary: 'Re-key, re-voice and re-channel the Chord Pad without touching the layout.',
     verbs: [
-      v('mode', 'mode', ENUM, { values: ['chords', 'notes', 'scale'] }),
+      v('mode', 'mode', ENUM),
       v('key', 'key', INT, { min: 0, max: 11 }),
-      v('scale', 'scale', ENUM, { values: SCALES }),
-      v('chordType', 'chordType', ENUM, { values: ['triad', 'seventh', 'ninth', 'sus2', 'sus4', 'power'] }),
-      v('voicing', 'voicing', ENUM, { values: ['close', 'open', 'drop2', 'drop3', 'spread'] }),
+      v('scale', 'scale', ENUM),
+      v('chordType', 'chordType', ENUM),
+      v('voicing', 'voicing', ENUM),
       v('inversion', 'inversion', INT, { min: 0, max: 3 }),
       v('octave', 'octave', INT, { min: -4, max: 4 }),
       v('velocity', 'velocity', INT, VELOCITY),
@@ -107,9 +124,9 @@ export const COMPONENT_FAMILIES = [
     id: 'noteribbon', section: 'NoteRibbon', prefix: 'noteRibbon', label: 'Note Ribbon',
     summary: 'Re-key and re-range the Note Ribbon: scale, span, bend depth, channel.',
     verbs: [
-      v('mode', 'mode', ENUM, { values: ['snap', 'glide', 'bend'] }),
+      v('mode', 'mode', ENUM),
       v('key', 'key', INT, { min: 0, max: 11 }),
-      v('scale', 'scale', ENUM, { values: SCALES }),
+      v('scale', 'scale', ENUM),
       v('baseNote', 'baseNote', INT, NOTE),
       v('octaves', 'octaves', INT, { min: 1, max: 6 }),
       v('bendRange', 'bendRange', NUM, { min: 0, max: 24 }),
@@ -122,9 +139,9 @@ export const COMPONENT_FAMILIES = [
     id: 'drumpads', section: 'DrumPads', prefix: 'drumPads', label: 'Drum Pads',
     summary: 'Re-map the Drum Pads: note map, base note, gate length, channel.',
     verbs: [
-      v('map', 'map', ENUM, { values: ['gm', 'chromatic', 'custom'] }),
+      v('map', 'map', ENUM),
       v('baseNote', 'baseNote', INT, NOTE),
-      v('mode', 'mode', ENUM, { values: ['momentary', 'toggle', 'gate'] }),
+      v('mode', 'mode', ENUM),
       v('gate', 'gateMs', NUM, { min: 1, max: 5000 }),
       v('velocity', 'velocity', INT, VELOCITY),
       v('channel', 'channel', INT, CHANNEL),
@@ -140,13 +157,14 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('run', 'running', BOOL, { toggle: true }),
       v('rate', 'rate', NUM, RATE),
-      v('division', 'division', ENUM, { values: DIVISIONS }),
+      v('division', 'division', ENUM),
       v('sync', 'syncToTransport', BOOL, { toggle: true }),
       v('length', 'length', INT, { min: 1, max: 64 }),
       v('randomness', 'randomness', NUM, UNIT),
       v('quantize', 'quantizeLevels', INT, { min: 0, max: 32, doc: '0 leaves the steps continuous.' }),
       v('gate', 'gateThreshold', NUM, UNIT),
       v('step', 'steps', CELL, { ...UNIT, doc: 'Set one step of the sequence, 1-based.' }),
+      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the sequence it is, 0..1.' }),
     ],
   },
   {
@@ -160,6 +178,7 @@ export const COMPONENT_FAMILIES = [
       v('quantize', 'quantizeLoop', BOOL, { toggle: true }),
       v('lane', 'lanes', ITEM, { item: 'enabled', kind: BOOL, doc: 'Enable or mute one lane, 1-based.' }),
       v('laneRest', 'lanes', ITEM, { item: 'rest', kind: NUM, ...UNIT }),
+      v('phase', 'phase', NUM, { ...UNIT, doc: 'Where in the loop it is, 0..1.' }),
     ],
   },
   {
@@ -200,7 +219,7 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('probe', '', XY, { fx: 'probeX', fy: 'probeY', ...UNIT, flat: true,
         doc: 'Move the probe. The targets follow, which is the whole point.' }),
-      v('mode', 'mode', ENUM, { values: ['blend', 'nearest', 'snap'] }),
+      v('mode', 'mode', ENUM),
       v('blend', 'blendPower', NUM, { min: 0.1, max: 16 }),
       v('run', 'running', BOOL, { toggle: true, doc: 'Let the probe wander on its own.' }),
       v('rate', 'wanderRate', NUM, { min: 0, max: 4 }),
@@ -225,10 +244,10 @@ export const COMPONENT_FAMILIES = [
     id: 'router', section: 'Router', prefix: 'router', label: 'Router',
     summary: 'Re-point the Router: source, CC, channel, deadzone, and each destination\'s depth.',
     verbs: [
-      v('source', 'source', ENUM, { values: ['modwheel', 'aftertouch', 'velocity', 'cc', 'control', 'pitchbend'] }),
+      v('source', 'source', ENUM),
       v('cc', 'ccNumber', INT, { min: 0, max: 127 }),
       v('channel', 'inputChannel', INT, { min: 0, max: 16, doc: '0 means omni.' }),
-      v('poly', 'polyMode', ENUM, { values: ['highest', 'lowest', 'last', 'average'] }),
+      v('poly', 'polyMode', ENUM),
       v('invert', 'invert', BOOL, { toggle: true }),
       v('deadzone', 'deadzone', NUM, UNIT),
       v('input', 'testInput', NUM, { ...UNIT, doc: 'Drive the router directly, as the test input does.' }),
@@ -243,7 +262,7 @@ export const COMPONENT_FAMILIES = [
       v('value', 'value', NUM, UNIT),
       v('slot', 'slots', ITEM, { item: 'enabled', kind: BOOL }),
       v('slotDepth', 'slots', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1 }),
-      v('slotCurve', 'slots', ITEM, { item: 'curve', kind: ENUM, values: ['linear', 'exp', 'log', 's'] }),
+      v('slotCurve', 'slots', ITEM, { item: 'curve', kind: ENUM }),
       v('slotMin', 'slots', ITEM, { item: 'min', kind: NUM, ...UNIT }),
       v('slotMax', 'slots', ITEM, { item: 'max', kind: NUM, ...UNIT }),
     ],
@@ -263,7 +282,7 @@ export const COMPONENT_FAMILIES = [
     id: 'constraint', section: 'Constraint', prefix: 'constraint', label: 'Constraint',
     summary: 'Move one member of a Constraint group — the others rebalance around it.',
     verbs: [
-      v('mode', 'mode', ENUM, { values: ['sum', 'max', 'ordered', 'free'] }),
+      v('mode', 'mode', ENUM),
       v('gap', 'minGap', NUM, UNIT),
       v('member', 'members', ITEM, { item: 'value', kind: NUM, ...UNIT }),
     ],
@@ -272,10 +291,10 @@ export const COMPONENT_FAMILIES = [
     id: 'envelope', section: 'Envelope', prefix: 'envelope', label: 'Envelope',
     summary: 'Reshape an Envelope: a preset, a single breakpoint, the sustain point, the loop.',
     verbs: [
-      v('preset', 'preset', ENUM, { values: ['adsr', 'ad', 'ar', 'asr', 'dadsr', 'custom'] }),
+      v('preset', 'preset', ENUM),
       v('pointX', 'points', ITEM, { item: 'x', kind: NUM, ...UNIT }),
       v('pointY', 'points', ITEM, { item: 'y', kind: NUM, ...UNIT }),
-      v('pointCurve', 'points', ITEM, { item: 'curve', kind: ENUM, values: ['linear', 'exp', 'log', 's', 'hold'] }),
+      v('pointCurve', 'points', ITEM, { item: 'curve', kind: ENUM }),
       v('sustain', 'sustainIndex', INT, { min: -1, max: 64, doc: '1-based; -1 for no sustain point.', oneBased: true }),
       v('loop', 'loopEnabled', BOOL, { toggle: true }),
       v('loopStart', 'loopStart', INT, { min: 0, max: 64, oneBased: true }),
@@ -292,7 +311,7 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('value', 'value', NUM, UNIT),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
-      v('returnMode', 'returnMode', ENUM, { values: ['none', 'center', 'zero', 'value'] }),
+      v('returnMode', 'returnMode', ENUM),
       v('returnValue', 'returnValue', NUM, UNIT),
       v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
       v('snap', 'snap', NUM, UNIT),
@@ -303,7 +322,7 @@ export const COMPONENT_FAMILIES = [
     summary: 'Drive a Crossfader and change its law.',
     verbs: [
       v('mix', 'mix', NUM, UNIT),
-      v('law', 'law', ENUM, { values: ['linear', 'equalPower', 'transition', 'sharp'] }),
+      v('law', 'law', ENUM),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
       v('detent', 'detent', NUM, UNIT),
       v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
@@ -317,7 +336,7 @@ export const COMPONENT_FAMILIES = [
       v('move', '', XY, { fx: 'x', fy: 'y', ...UNIT, flat: true }),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
       v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
-      v('returnAxes', 'returnAxes', ENUM, { values: ['both', 'x', 'y', 'none'] }),
+      v('returnAxes', 'returnAxes', ENUM),
       v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
     ],
   },
@@ -326,10 +345,17 @@ export const COMPONENT_FAMILIES = [
     summary: 'Drive a Meter from a script — a level a panel computes itself has nowhere else to go.',
     verbs: [
       v('value', 'value', NUM, { min: -1e9, max: 1e9, doc: 'In the meter\'s own units, between valueMin and valueMax.' }),
-      v('scale', 'scale', ENUM, { values: ['linear', 'db'] }),
+      v('scale', 'scale', ENUM),
       v('peakHold', 'peakHold', BOOL, { toggle: true }),
       v('holdMs', 'peakHoldMs', NUM, { min: 0, max: 60000 }),
       v('decay', 'peakDecayPerSec', NUM, { min: 0, max: 100 }),
+      // `value` is documented as being in the meter's own units, between these two — and a
+      // script could neither set them nor read them, so re-scaling a meter for a different
+      // parameter meant editing the panel.
+      v('valueMin', 'valueMin', NUM, { min: -1e9, max: 1e9 }),
+      v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9 }),
+      v('dbFloor', 'dbFloor', NUM, { min: -200, max: 0, doc: 'The dB the bottom of the scale means.' }),
+      v('dbCeil', 'dbCeil', NUM, { min: -200, max: 60, doc: 'The dB the top of the scale means.' }),
     ],
   },
 
@@ -340,9 +366,11 @@ export const COMPONENT_FAMILIES = [
     verbs: [
       v('bpm', 'bpm', NUM, { min: 20, max: 400 }),
       v('swing', 'swing', NUM, { min: -1, max: 1 }),
-      v('source', 'source', ENUM, { values: ['internal', 'host', 'midi', 'tap'] }),
+      v('source', 'source', ENUM),
       v('beatsPerBar', 'beatsPerBar', INT, { min: 1, max: 32 }),
-      v('beatUnit', 'beatUnit', ENUM, { values: [1, 2, 4, 8, 16, 32] }),
+      // Not an enum: the transport clamps ANY integer here, so a list of six refused 3, 12 and
+      // every other unit it accepts.
+      v('beatUnit', 'beatUnit', INT, { min: 1, max: 32 }),
       v('loop', 'loopEnabled', BOOL, { toggle: true }),
       v('loopStart', 'loopStartBar', INT, { min: 1, max: 9999 }),
       v('loopBars', 'loopLengthBars', INT, { min: 1, max: 9999 }),
@@ -354,7 +382,7 @@ export const COMPONENT_FAMILIES = [
     id: 'panic', section: 'Panic', prefix: 'panicSet', label: 'Panic',
     summary: 'Configure what a Panic button sends. Sending it is the global panic().',
     verbs: [
-      v('scope', 'scope', ENUM, { values: ['all', 'channel', 'panel'] }),
+      v('scope', 'scope', ENUM),
       v('channel', 'channel', INT, CHANNEL),
       v('resetControllers', 'resetControllers', BOOL, { toggle: true }),
       v('centreBend', 'centreBend', BOOL, { toggle: true }),
@@ -370,10 +398,10 @@ export const COMPONENT_FAMILIES = [
       v('backlight', 'backlightOn', BOOL, { toggle: true }),
       v('brightness', 'brightness', NUM, { min: 0, max: 100 }),
       v('contrast', 'contrast', NUM, { min: 0, max: 100 }),
-      v('scroll', 'scroll', ENUM, { values: ['off', 'left', 'right', 'auto'] }),
+      v('scroll', 'scroll', ENUM),
       v('scrollSpeed', 'scrollSpeed', NUM, { min: 0, max: 60 }),
       v('blink', 'blink', BOOL, { toggle: true }),
-      v('cursor', 'cursor', ENUM, { values: ['off', 'block', 'underline'] }),
+      v('cursor', 'cursor', ENUM),
       v('cursorAt', '', XY, { fx: 'cursorCol', fy: 'cursorRow', min: 1, max: 256, flat: true, oneBased: true,
         args: ['col', 'row'],
         doc: 'Put the cursor at (column, row), both 1-based.' }),
@@ -389,7 +417,7 @@ export const COMPONENT_FAMILIES = [
       v('contrast', 'contrast', NUM, { min: 0, max: 100 }),
       v('gamma', 'gamma', NUM, { min: 0.1, max: 4 }),
       v('glow', 'glow', NUM, UNIT),
-      v('anim', 'animMode', ENUM, { values: ['off', 'preset', 'sprite', 'image'] }),
+      v('anim', 'animMode', ENUM),
       v('animPreset', 'animPreset', STR),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
       v('animLoop', 'animLoop', BOOL, { toggle: true }),
@@ -400,6 +428,84 @@ export const COMPONENT_FAMILIES = [
 /* ---------------------------------------------------------------------------- the spec */
 
 /** Every verb, flattened, with the member id each one is reachable by. */
+/* ---------------------------------------------------------------------- enum values
+ * Filled in from componentTables.js, in one place, AFTER the families are declared — so the spec
+ * above never spells a value and cannot drift from the component that reads it. A verb with no
+ * entry throws at import: an enum with no source of truth is the bug this whole file just had
+ * twenty-four instances of, and a missing table must fail loudly rather than become an empty list
+ * that refuses everything.
+ */
+for (const fam of COMPONENT_FAMILIES) {
+  for (const verb of fam.verbs) {
+    // The kind that carries an enum may be the verb's own, or the item kind of an array property
+    // (macro.slotCurve writes `curve` on one slot).
+    if (verb.k !== ENUM && verb.kind !== ENUM) continue;
+    const key = `${fam.id}.${verb.v}`;
+    const values = VERB_VALUES[key];
+    if (!Array.isArray(values) || !values.length) {
+      throw new Error(`componentVerbs: ${key} is an enum with no entry in componentTables.VERB_VALUES`);
+    }
+    verb.values = values;
+  }
+}
+
+/* --------------------------------------------------------- the five every family gets
+ *
+ * Appended once, here, rather than written into twenty-three family literals. All five were absent
+ * for the same reason: the spec was built as a list of things to SET, and nothing else was asked.
+ *
+ *   read    every verb of this family had a write and no read, so a script could set the
+ *           arpeggiator's pattern and could not ask what it was. "Next pattern" was impossible
+ *           without a shadow copy in `state`, which desyncs the moment somebody touches the control.
+ *   size    an `item` verb addresses element N and nothing said how many there are.
+ *   fill    sixteen Turing steps were sixteen calls, an 8x8 matrix sixty-four — each its own
+ *           reducer pass and its own store write.
+ *   insert  the arrays could be edited and not grown. Adding a zone, an envelope point, an orbit
+ *           node or a router destination was reachable from the canvas and from nowhere else.
+ *   remove
+ *
+ * They address an array by its VERB name (`fill(t, "step", …)`, not `fill(t, "steps", …)`), so the
+ * vocabulary a script learns for writing is the vocabulary it uses for everything else.
+ */
+const FAMILY_VERBS = [
+  { v: 'read', k: READ, doc:
+    'Read back what the other verbs set, by their own names. `read(target)` is every scalar verb of '
+    + 'this component as a table; `read(target, "pattern")` is one; `read(target, "step")` is the '
+    + 'whole list an indexed verb addresses, and `read(target, "step", 3)` is one element, 1-based '
+    + 'as everywhere else. Nothing back when the target is not this kind of component.' },
+  { v: 'size', k: SIZE, doc:
+    'How many elements an indexed verb can address. `size(target)` is a table of every list this '
+    + 'component has; `size(target, "node")` is one number. The Mod Matrix answers { rows, cols }, '
+    + 'because a crosspoint is addressed by both.' },
+  { v: 'fill', k: FILL, doc:
+    'Write a whole list in one call — `fill(target, "step", {0, 0.5, 1})`. One document change and '
+    + 'one undo step instead of one per element. A list longer than the component has is refused '
+    + 'rather than truncated: silently dropping half a pattern is worse than not writing it.' },
+  { v: 'insert', k: INSERT, doc:
+    'Add one element to a list, using the same template the canvas uses. Appends by default, or '
+    + 'inserts BEFORE a 1-based index. Returns whether it grew.' },
+  { v: 'remove', k: REMOVE, doc:
+    'Remove one element of a list, 1-based. Removes the last when no index is given. Refused when '
+    + 'the component needs the element it was asked to drop — an envelope keeps its endpoints.' },
+];
+
+for (const fam of COMPONENT_FAMILIES) {
+  const lists = fam.verbs.filter((verb) => LIST_KINDS.includes(verb.k) && !verb.clear);
+  // insert/remove need an element TEMPLATE, so they only apply to `item` lists — collections of
+  // objects the canvas can genuinely grow (nodes, slots, destinations, points). A `cell` or `line`
+  // list is fixed-length and sized by a verb of its own — the Turing's step count is `length`, the
+  // LCD's row count is the display's `rows` — so growing one from here would fight that verb.
+  const growable = lists.some((verb) => verb.k === ITEM);
+  for (const spec of FAMILY_VERBS) {
+    if (spec.k === READ) { fam.verbs.push({ ...spec, f: '' }); continue; }
+    // A verb that could never apply is worse than no verb: it reads as a capability and answers
+    // nothing.
+    if (!lists.length) continue;
+    if ((spec.k === INSERT || spec.k === REMOVE) && !growable) continue;
+    fam.verbs.push({ ...spec, f: '' });
+  }
+}
+
 export const COMPONENT_VERBS = COMPONENT_FAMILIES.flatMap((fam) =>
   fam.verbs.map((verb) => ({
     ...verb,
@@ -546,6 +652,23 @@ export function componentScriptPatch(verb, cfg, args = []) {
       return { [verb.f]: list.map((x, i) => (i === at ? next : x)) };
     }
 
+    case INDEXSET: {
+      // A SET of indices that are on, stored 0-based and sorted, addressed 1-based like everything
+      // else here. No second argument toggles, so one footswitch mutes and unmutes.
+      const list = (Array.isArray(c[verb.f]) ? c[verb.f] : [])
+        .map((n) => Math.round(Number(n)))
+        .filter((n) => Number.isFinite(n));
+      const at = Math.round(Number(a)) - 1;
+      // No length to bound against — the set is sparse and the sequence it indexes is built
+      // elsewhere — so the only illegal index is one that is not a whole number at or above zero.
+      if (!Number.isFinite(at) || at < 0) return {};
+      const on = list.includes(at);
+      const want = b === undefined || b === null ? !on : (b !== false && b !== 0 && b !== '');
+      if (want === on) return {};
+      const next = want ? [...list, at].sort((x, y) => x - y) : list.filter((n) => n !== at);
+      return { [verb.f]: next };
+    }
+
     case LINE: {
       const list = Array.isArray(c[verb.f]) ? c[verb.f] : null;
       if (!list) return {};
@@ -565,6 +688,65 @@ export function componentScriptPatch(verb, cfg, args = []) {
   }
 }
 
+/**
+ * Whether a call is one this component could honour — asked when the patch came back empty.
+ *
+ * `componentScriptPatch` returns nothing for two different reasons: the value asked for is already
+ * the value held, or the value is one the component does not have. A script needs to tell those
+ * apart (`if not arp.pattern(a, choice) then …` must not fire because the arp was already on that
+ * pattern), and so does whoever is reading the console.
+ *
+ * This answers the second question without the reducer having to carry a second channel: an enum is
+ * legal iff it is one of the component's own values, an index is legal iff it addresses an element
+ * that exists, and a number is legal iff it is a number.
+ */
+export function componentRequestLegal(verb, cfg, args = []) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const [a, b] = args;
+  const listOf = (field) => (Array.isArray(c[field]) ? c[field] : null);
+
+  switch (verb.k) {
+    case BOOL: case STR:
+      return true;                                    // anything coerces; no argument toggles
+    case NUM: case INT:
+      return a === undefined || a === null ? false : Number.isFinite(Number(a));
+    case ENUM:
+      return coerce(ENUM, a, verb, c[verb.f]) !== null;
+    case XY: {
+      // At least one axis has to be a usable number — moving neither is not a move.
+      const usable = (x) => x !== undefined && x !== null && Number.isFinite(Number(x));
+      return usable(a) || usable(b);
+    }
+    case INDEXSET:
+      return Number.isFinite(Number(a)) && Math.round(Number(a)) - 1 >= 0;
+    case ITEM: {
+      const list = listOf(verb.f);
+      if (!list || indexOf(a, list.length) === null) return false;
+      const row = list[indexOf(a, list.length)];
+      return coerce(verb.kind, b, verb, (row && typeof row === 'object' ? row : {})[verb.item]) !== null;
+    }
+    case LINE: {
+      const list = listOf(verb.f);
+      return verb.clear ? Boolean(list) : Boolean(list) && indexOf(a, list.length) !== null;
+    }
+    case CELL: {
+      const list = listOf(verb.f);
+      if (!list) return false;
+      if (verb.clear) return true;
+      if (verb.grid) {
+        const rows = Array.isArray(c.rows) ? c.rows.length : 0;
+        const cols = Array.isArray(c.cols) ? c.cols.length : 0;
+        const r = indexOf(a, rows), col = indexOf(b, cols);
+        return r !== null && col !== null && r * cols + col < list.length
+               && clampNum(args[2], verb) !== null;
+      }
+      return indexOf(a, list.length) !== null && clampNum(b, verb) !== null;
+    }
+    default:
+      return false;
+  }
+}
+
 /* ---------------------------------------------------------------------- signature text */
 // The contract wants a human-readable signature per verb. Deriving it from the spec is what keeps
 // the documentation from disagreeing with the implementation — there is only one description.
@@ -576,7 +758,14 @@ export function verbArgs(verb) {
     case ITEM: return ['index', verb.item];
     case CELL: return verb.clear ? [] : (verb.grid ? ['row', 'col', 'amount'] : ['index', 'value']);
     case LINE: return verb.clear ? [] : ['row', 'text'];
+    case INDEXSET: return ['index', 'on'];
     case BOOL: return [verb.v];
+    // The five every family gets. Their optional arguments are rendered in verbSignature, which is
+    // why they read as a plain list here.
+    case READ: return ['name', 'index'];
+    case SIZE: return ['name'];
+    case FILL: return ['name', 'values'];
+    case INSERT: case REMOVE: return ['name', 'index'];
     default: return [verb.v];
   }
 }
@@ -584,10 +773,17 @@ export function verbArgs(verb) {
 export function verbSignature(verb) {
   const args = verbArgs(verb);
   // A boolean with no argument toggles, so its argument is shown as optional.
-  const rendered = verb.k === BOOL && verb.toggle
-    ? `target [, ${args[0]}]`
-    : ['target', ...args].join(', ');
-  return `${verb.id}(${rendered})`;
+  if (verb.k === BOOL && verb.toggle) return `${verb.id}(target [, ${args[0]}])`;
+  // An index set toggles when the second argument is left off, the same way a bool does.
+  if (verb.k === INDEXSET) return `${verb.id}(target, index [, on])`;
+  switch (verb.k) {
+    case READ: return `${verb.id}(target [, name [, index]])`;
+    case SIZE: return `${verb.id}(target [, name]) -> number|table`;
+    case FILL: return `${verb.id}(target, name, values) -> boolean`;
+    case INSERT: return `${verb.id}(target, name [, index]) -> boolean`;
+    case REMOVE: return `${verb.id}(target, name [, index]) -> boolean`;
+    default: return `${verb.id}(${['target', ...args].join(', ')})`;
+  }
 }
 
 export function verbSummary(verb) {

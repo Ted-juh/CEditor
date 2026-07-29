@@ -148,8 +148,16 @@ export function degreeChord(keyPc, scale, degree, size = 3, flats = true) {
   };
 }
 
+// One chord per pad, or one scale note per pad. Two, not three — the "scale" a script verb used to
+// offer is not a mode this engine has, so it silently meant "chords".
+export const CHORDPAD_MODES = ['chords', 'notes'];
+// How many scale thirds a pad stacks. stackedChord() takes a SIZE, and the only distinction the
+// pads draw from chordType is seventh (4) versus everything else (3) — so a verb offering "ninth",
+// "sus2", "sus4" or "power" was writing four different names for "triad".
+export const CHORD_TYPES = ['triad', 'seventh'];
 // --- Voicing → actual MIDI note numbers --------------------------------------
 // baseOctave 4 ⇒ tonic near middle C (MIDI 60). `voicing`: close | spread | drop2.
+export const CHORDPAD_VOICINGS = ['close', 'spread', 'drop2'];
 export function chordNotes(keyPc, offsets, { baseOctave = 4, voicing = 'close', inversion = 0 } = {}) {
   const root = 12 * (clampInt(baseOctave, -1, 8) + 1) + mod12(keyPc);
   let notes = (Array.isArray(offsets) ? offsets : []).map((o) => root + Math.round(num(o, 0)));
