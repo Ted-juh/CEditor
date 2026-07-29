@@ -75,6 +75,7 @@ import {
   QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
+import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
 // way to promise it. The C++ preludes cannot import, so they transliterate — and
@@ -2402,13 +2403,70 @@ export function resetScriptStateForTesting() { resetScriptState(); }
 // formula at the same elapsed time cannot. These two functions are the formula, and
 // ScriptRuntime::animationEase / animationSpring are the identical C++ pair.
 
-/** The four shapes ce.math.curve() offers, computed the same way, so knowing one is knowing both. */
+/**
+ * A CSS cubic-bezier, evaluated numerically — P0 (0,0), P3 (1,1), the two control points given.
+ *
+ * This exists because the Properties panel's Animations section stores its easings as bezier
+ * CONTROL POINTS (a CSS transition needs no evaluator) and ce.anim writes values rather than
+ * stylesheets. Adopting the panel's names with lookalike formulas — 1-(1-t)² for outQuad, which is
+ * NOT what cubic-bezier(0.25, 0.46, 0.45, 0.94) traces — would be a second curve wearing the same
+ * name, and an author who set outCubic in the panel and wrote curve = "outCubic" beside it would
+ * get two different motions with nothing to tell them apart.
+ *
+ * The iteration counts are FIXED rather than "until it converges". Four runtimes have to produce
+ * the same double from the same input, and a loop that stops on a tolerance stops after a different
+ * number of steps the moment one of them rounds differently.
+ */
+const bezierAt = (s, a, b) => (((1 - 3 * b + 3 * a) * s + (3 * b - 6 * a)) * s + (3 * a)) * s;
+const bezierSlope = (s, a, b) => 3 * (1 - 3 * b + 3 * a) * s * s + 2 * (3 * b - 6 * a) * s + 3 * a;
+
+export function cubicBezierEase(t, x1, y1, x2, y2) {
+  const x = Math.min(1, Math.max(0, Number(t) || 0));
+  if (x1 === y1 && x2 === y2) return x;            // the identity curve is a straight line
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  // Newton-Raphson on the x polynomial: eight steps, then bisection to finish. Newton alone can
+  // wander when the slope is near zero (an ease-out's tail), and bisection alone is slow.
+  let s = x;
+  for (let i = 0; i < 8; i += 1) {
+    const slope = bezierSlope(s, x1, x2);
+    if (slope === 0) break;
+    s -= (bezierAt(s, x1, x2) - x) / slope;
+  }
+  if (!(s >= 0) || !(s <= 1)) {
+    let lo = 0;
+    let hi = 1;
+    s = x;
+    for (let i = 0; i < 24; i += 1) {
+      if (bezierAt(s, x1, x2) < x) lo = s; else hi = s;
+      s = (lo + hi) / 2;
+    }
+  }
+  return bezierAt(s, y1, y2);
+}
+
+/**
+ * Every curve ce.anim animates along.
+ *
+ * Two vocabularies, kept apart on purpose. `linear|exp|log|s` are ce.math.curve()'s, computed the
+ * same way so knowing one is knowing both. `inQuad|outQuad|inOutQuad|outCubic` are the Properties
+ * panel's, evaluated as the beziers the panel stores. They are close relatives — exp is t², inQuad
+ * is a bezier that LOOKS like t² — and deliberately not merged, because calling them the same thing
+ * would be a claim about the numbers that is not true.
+ *
+ * An unknown name returns undefined rather than silently going linear. Before this, curve =
+ * "outCubic" — a name the Properties panel offers three feet away — was linear in every runtime and
+ * said nothing. startAnimationImpl reports it, the way ce.math.curve() has since §30.
+ */
 export function animationEase(progress, curve) {
   const v = Math.min(1, Math.max(0, Number(progress) || 0));
+  if (curve === undefined || curve === null || curve === 'linear') return v;
   if (curve === 'exp') return v * v;
   if (curve === 'log') return Math.sqrt(v);
   if (curve === 's') return v * v * (3 - 2 * v);
-  return v;
+  const b = EASING_BEZIERS[String(curve)];
+  if (b) return cubicBezierEase(v, b[0], b[1], b[2], b[3]);
+  return undefined;
 }
 
 /** A damped oscillation, pinned to exactly 1 at the end so a spring always lands on its target. */
@@ -2434,15 +2492,153 @@ let animationTicked = false;
 
 function animationNow() { return Date.now(); }
 
-function startAnimationImpl(kind, path, target, opts = {}) {
+// Groups exist so a call with SEVERAL paths gets ONE completion. `done` on a six-path sweep means
+// "when the sweep is over", not six times; the group counts down and the last one out fires it.
+let animationGroupSeq = 0;
+const animationGroups = new Map();   // group id -> { remaining, done, scriptId, completed, paths }
+
+/** Run a script's callback and report a throw against THAT script — the same contract after()
+ *  keeps, so a broken completion handler is attributed rather than swallowed. */
+function runScriptCallback(scriptId, label, fn) {
+  try { fn(); } catch (e) { reportScriptError(scriptId, e); }
+}
+
+// An envelope is sampled into this many SEGMENTS (so ANIM_SAMPLES + 1 values, the last landing
+// exactly on t = 1). This IS an approximation of the drawn shape, and worth stating plainly: at a
+// sharp corner the sampled peak can sit ~0.1% below the drawn one. It is far finer than the tick
+// rate the value is written at, so nothing reads the difference — and it is the same number in
+// every runtime, which is the property that actually matters.
+export const ANIM_SAMPLES = 1024;
+
+/** Sample a { x, y, curve } point list into a flat table of y values, using ce.math.map — which IS
+ *  the Envelope component's envValueAt, so the sampled shape is the shape the panel draws. */
+function sampleEnvelope(points) {
+  const out = [];
+  for (let i = 0; i <= ANIM_SAMPLES; i += 1) {
+    const y = Number(mapCurveImpl(i / ANIM_SAMPLES, points));
+    out.push(Number.isFinite(y) ? y : 0);
+  }
+  return out;
+}
+
+/** Read a sampled shape at 0..1, linearly between samples. */
+function sampleAt(samples, t) {
+  if (!samples || !samples.length) return 0;
+  const x = Math.min(1, Math.max(0, Number(t) || 0)) * (samples.length - 1);
+  const i = Math.floor(x);
+  if (i >= samples.length - 1) return samples[samples.length - 1];
+  return samples[i] + (samples[i + 1] - samples[i]) * (x - i);
+}
+
+const animNumber = (opts, name, fallback) => {
+  const v = Number(opts?.[name]);
+  return Number.isFinite(v) ? v : fallback;
+};
+
+/** The transport position an animation with `sync` measures against. */
+function animationBeats() {
+  const t = transportSnapshot();
+  return t.valid ? t.beats : 0;
+}
+
+/** How far through its current cycle an animation is, 0..1. Delay is BEFORE the move, so a delayed
+ *  animation reads 0 and holds its `from` value rather than jumping. */
+function animationProgress(a, nowMs, beats) {
+  if (a.paused) return a.heldProgress;
+  if (a.sync) {
+    const span = a.syncBeats > 0 ? a.syncBeats : 1;
+    return Math.min(1, Math.max(0, (beats - a.startBeats) / span));
+  }
+  return Math.min(1, Math.max(0, (nowMs - a.startMs) / a.duration));
+}
+
+/** The value an animation is at, at a given progress. */
+function animationValueOf(a, progress) {
+  if (a.kind === 'envelope') {
+    // The shape was SAMPLED at start (see ANIM_SAMPLES); between samples the read is linear.
+    // Sampling rather than evaluating map() on every tick is what lets the C++ engine run the same
+    // envelope: map()'s per-point curves live in the preludes, and the alternative was a fifth
+    // implementation of them in ScriptRuntime.cpp. One table, interpolated identically everywhere.
+    const shaped = sampleAt(a.samples, progress);
+    return a.from + (a.to - a.from) * (Number.isFinite(shaped) ? shaped : 0);
+  }
+  const eased = a.kind === 'spring'
+    ? animationSpring(progress, a.damping, a.frequency)
+    : animationEase(progress, a.curve);
+  return a.from + (a.to - a.from) * (Number.isFinite(eased) ? eased : progress);
+}
+
+/** Run (and forget) the completion callback for one animation. `completed` says whether it got
+ *  there: a stopped animation reports false, so "then do X" can tell finishing from cancelling. */
+function fireAnimationDone(a, completed) {
+  if (a.groupId != null) {
+    const group = animationGroups.get(a.groupId);
+    if (!group) return;
+    group.remaining -= 1;
+    if (!completed) group.completed = false;
+    if (group.remaining > 0) return;
+    animationGroups.delete(a.groupId);
+    if (typeof group.done !== 'function') return;
+    runScriptCallback(group.scriptId, 'done', () => group.done({ paths: group.paths, completed: group.completed }));
+    return;
+  }
+  if (typeof a.done !== 'function') return;
+  const fn = a.done;
+  a.done = null;                          // once, whatever happens next
+  runScriptCallback(a.scriptId, 'done', () => fn({ path: a.path, completed }));
+}
+
+/** Drop an animation without firing anything — panel teardown, and the internal half of stop(). */
+function dropAnimation(key) {
+  animations.delete(key);
+  if (!animations.size && animationTimer != null) {
+    clearInterval(animationTimer);
+    animationTimer = null;
+  }
+}
+
+function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = null) {
+  // A LIST of paths is one call, one shape, one completion. Six paths with six hand-computed
+  // delays was the alternative, and `stagger` is why the list is worth having at all.
+  if (Array.isArray(path)) {
+    const paths = path.map((p) => String(p ?? '')).filter(Boolean);
+    if (!paths.length) return false;
+    const stagger = animNumber(opts, 'stagger', 0);
+    const done = typeof opts?.done === 'function' ? opts.done : null;
+    let groupId = null;
+    if (done) {
+      animationGroupSeq += 1;
+      groupId = animationGroupSeq;
+      animationGroups.set(groupId, {
+        remaining: paths.length, done, completed: true, paths,
+        scriptId: scriptId,
+      });
+    }
+    let ok = true;
+    paths.forEach((p, i) => {
+      const each = { ...opts, delay: animNumber(opts, 'delay', 0) + stagger * i, done: undefined };
+      if (!startAnimationImpl(scriptId, kind, p, target, each, groupId)) ok = false;
+    });
+    return ok;
+  }
+
   const key = String(path ?? '');
   if (!key) return false;
 
-  const number = (name, fallback) => {
-    const v = Number(opts?.[name]);
-    return Number.isFinite(v) ? v : fallback;
-  };
+  const groupId = group;
   const spring = kind === 'spring';
+  const envelope = kind === 'envelope';
+
+  // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name the
+  // Properties panel offers three feet away, and it was linear here in every runtime.
+  let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
+  if (!spring && !envelope && animationEase(0.5, curve) === undefined) {
+    addScriptTrace('log', scriptId,
+      `ce.anim: "${curve}" is not a curve this build knows — animating linear. `
+      + `Try one of: ${ANIM_CURVE_NAMES.join(', ')}.`);
+    curve = 'linear';
+  }
+
   // `from` defaults to where the value IS, so an animation starts from the truth rather than from
   // wherever the previous one happened to stop.
   const fromRaw = opts?.from != null ? Number(opts.from) : Number(getValue(key, 'value'));
@@ -2452,16 +2648,59 @@ function startAnimationImpl(kind, path, target, opts = {}) {
   // will use — otherwise the first animation measures against zero and finishes instantly.
   if (!animationTicked) { animationNowMs = animationNow(); animationTicked = true; }
 
+  // A duration in BEATS is resolved once, here. `sync` is the stronger thing: the position is
+  // derived from the transport's beat count, so the animation FREEZES when the transport stops and
+  // stretches when the tempo drops — which is what every synced component in the panel does and no
+  // script could ask for.
+  const sync = opts?.sync === true;
+  const beatsOpt = opts?.beats != null ? Number(opts.beats) : null;
+  const defaultMs = spring ? 600 : 300;
+  let duration = Math.max(1, animNumber(opts, 'duration', defaultMs));
+  let syncBeats = 0;
+  if (Number.isFinite(beatsOpt) && beatsOpt > 0) {
+    syncBeats = beatsOpt;
+    const ms = beatsToMsRead(beatsOpt);
+    if (ms != null) duration = Math.max(1, ms);
+    else if (sync === false) {
+      addScriptTrace('log', scriptId,
+        'ce.anim: no tempo is being reported, so `beats` has no length — using `duration` instead.');
+    }
+  } else if (sync) {
+    syncBeats = msToBeatsRead(duration) ?? 1;
+  }
+
+  const delay = Math.max(0, animNumber(opts, 'delay', 0));
+  // repeat: 0 runs once, n runs n more times, -1 runs until stopped. Anything a script can start
+  // forever it must be able to stop, which is what list()/value() and panel teardown are for.
+  const repeatRaw = Math.round(animNumber(opts, 'repeat', 0));
+  const repeat = repeatRaw < 0 ? -1 : repeatRaw;
+
+  const previous = animations.get(key);
+  if (previous) fireAnimationDone(previous, false);   // replaced is not finished
+
   animations.set(key, {                       // …replacing any animation already on this path:
-    kind: spring ? 'spring' : 'to',            // a value has one destination
+    kind: envelope ? 'envelope' : (spring ? 'spring' : 'to'),   // a value has one destination
     path: key,
     from,
     to: Number(target) || 0,
-    startMs: animationNowMs,
-    duration: Math.max(1, number('duration', spring ? 600 : 300)),
-    curve: typeof opts?.curve === 'string' ? opts.curve : 'linear',
-    damping: number('damping', 6),
-    frequency: number('frequency', 12),
+    samples: envelope ? opts.samples : null,
+    startMs: animationNowMs + delay,
+    startBeats: animationBeats() + (sync ? (msToBeatsRead(delay) ?? 0) : 0),
+    delay,
+    duration,
+    sync,
+    syncBeats,
+    curve,
+    damping: animNumber(opts, 'damping', 6),
+    frequency: animNumber(opts, 'frequency', 12),
+    repeat,
+    cycle: 0,
+    pingpong: opts?.pingpong === true,
+    paused: false,
+    heldProgress: 0,
+    done: typeof opts?.done === 'function' ? opts.done : null,
+    scriptId: scriptId,
+    groupId,
   });
 
   if (animationTimer == null && typeof setInterval === 'function') {
@@ -2470,13 +2709,39 @@ function startAnimationImpl(kind, path, target, opts = {}) {
   return true;
 }
 
-function stopAnimationImpl(path) {
-  if (path == null || String(path) === '') animations.clear();
-  else animations.delete(String(path));
-  if (!animations.size && animationTimer != null) {
-    clearInterval(animationTimer);
-    animationTimer = null;
+/** envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
+ *
+ *  `to` and `spring` both go from A to B; an ADSR does not, and it is the single most obvious thing
+ *  a synth panel animates. The points are the Envelope component's own — { x, y, curve } in 0..1 —
+ *  and the lookup is ce.math.map, which IS envValueAt, so a script's sweep and the Envelope drawn
+ *  beside it trace the same line. */
+function startEnvelopeImpl(scriptId, path, points, opts = {}) {
+  const list = Array.isArray(points) ? points : null;
+  if (!list || list.length < 2) {
+    addScriptTrace('log', scriptId,
+      'ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.');
+    return false;
   }
+  const lo = opts?.from != null ? Number(opts.from) : 0;
+  const hi = opts?.to != null ? Number(opts.to) : 1;
+  return startAnimationImpl(scriptId, 'envelope', path, hi, {
+    ...opts,
+    samples: sampleEnvelope(list),
+    from: Number.isFinite(lo) ? lo : 0,
+  });
+}
+
+function stopAnimationImpl(path) {
+  if (path == null || String(path) === '') {
+    for (const a of [...animations.values()]) fireAnimationDone(a, false);
+    animations.clear();
+    if (animationTimer != null) { clearInterval(animationTimer); animationTimer = null; }
+    return true;
+  }
+  const key = String(path);
+  const a = animations.get(key);
+  if (a) fireAnimationDone(a, false);
+  dropAnimation(key);
   return true;
 }
 
@@ -2485,30 +2750,132 @@ function animationRunningImpl(path) {
   return animations.has(String(path));
 }
 
+/** Where an animation IS — running() says whether, this says how far. Nil when nothing is running
+ *  on the path, which is what tells "finished" from "half way". */
+function animationValueImpl(path) {
+  const a = animations.get(String(path ?? ''));
+  if (!a) return undefined;
+  const progress = animationProgress(a, animationNowMs, animationBeats());
+  const remaining = a.sync ? null : Math.max(0, a.duration * (1 - progress));
+  return {
+    path: a.path,
+    kind: a.kind,
+    value: animationValueOf(a, progress),
+    progress,
+    from: a.from,
+    to: a.to,
+    elapsed: a.sync ? null : a.duration * progress,
+    remaining,
+    paused: a.paused,
+    cycle: a.cycle,
+    sync: a.sync,
+  };
+}
+
+/** Every animation running, in path order. The read `ce.time.timers()` and `ce.panel.entries()`
+ *  both got, and the one that makes `repeat = -1` safe to offer: a script can always find what it
+ *  started and stop it. */
+function animationListImpl() {
+  return [...animations.keys()].sort().map((k) => animationValueImpl(k));
+}
+
+/** Hold an animation where it is. stop() is destructive and there was no non-destructive hold, so
+ *  "pause the sweep while the user drags" meant stopping it and rebuilding the rest by hand. */
+function animationPauseImpl(path) {
+  const key = String(path ?? '');
+  const a = animations.get(key);
+  if (!a || a.paused) return false;
+  a.heldProgress = animationProgress(a, animationNowMs, animationBeats());
+  a.paused = true;
+  return true;
+}
+
+function animationResumeImpl(path) {
+  const key = String(path ?? '');
+  const a = animations.get(key);
+  if (!a || !a.paused) return false;
+  // Re-anchor so the held progress reads the same at the moment of resuming: the animation carries
+  // on rather than restarting, which is the whole difference from stop-and-start-again.
+  a.startMs = animationNowMs - a.heldProgress * a.duration;
+  a.startBeats = animationBeats() - a.heldProgress * (a.syncBeats || 1);
+  a.paused = false;
+  return true;
+}
+
+/** Turn a running animation around from where it is, travelling back at the SAME RATE — a move
+ *  that was 80% done takes 80% of its duration to get home. `to(path, from)` would restart it at
+ *  the full duration, so an almost-finished move would take as long to come back as the whole
+ *  journey took: a bounce rather than a snap back. */
+function animationReverseImpl(path) {
+  const key = String(path ?? '');
+  const a = animations.get(key);
+  if (!a) return false;
+  const progress = animationProgress(a, animationNowMs, animationBeats());
+  const target = a.from;
+  a.from = a.to;
+  a.to = target;
+  // An envelope reverses its SHAPE as well as its direction — running the samples backwards,
+  // which is what "play that envelope in reverse" means and what mirroring the points would only
+  // approximate once a per-point curve is involved.
+  if (a.kind === 'envelope') a.samples = [...a.samples].reverse();
+  a.heldProgress = 1 - progress;
+  a.startMs = animationNowMs - (1 - progress) * a.duration;
+  a.startBeats = animationBeats() - (1 - progress) * (a.syncBeats || 1);
+  return true;
+}
+
+/** Jump to the target and complete — done() fires with completed = true. stop() leaves the value
+ *  stranded halfway, which is right for a cancel and wrong for "skip the animation". */
+function animationFinishImpl(path) {
+  const key = String(path ?? '');
+  const a = animations.get(key);
+  if (!a) return false;
+  setValue(a.path, animationValueOf(a, 1));
+  fireAnimationDone(a, true);
+  dropAnimation(key);
+  return true;
+}
+
 /** Advance every animation to `nowMs` and write the values. Exported so tests drive time directly
  *  rather than sleeping — an animation test that waits on a real clock is a flaky test. */
 export function tickAnimations(nowMs) {
   animationNowMs = Number(nowMs) || 0;
   animationTicked = true;
   if (!animations.size) return;
+  const beats = animationBeats();
   // Iterate a copy: a set() can run a script that starts or stops an animation.
   for (const a of [...animations.values()]) {
-    const progress = Math.min(1, Math.max(0, (nowMs - a.startMs) / a.duration));
-    const eased = a.kind === 'spring'
-      ? animationSpring(progress, a.damping, a.frequency)
-      : animationEase(progress, a.curve);
-    setValue(a.path, a.from + (a.to - a.from) * eased);
-    if (progress >= 1) stopAnimationImpl(a.path);
+    if (a.paused) continue;
+    if (animations.get(a.path) !== a) continue;      // replaced mid-walk
+    const progress = animationProgress(a, animationNowMs, beats);
+    setValue(a.path, animationValueOf(a, progress));
+    if (progress < 1) continue;
+
+    // A cycle finished. Repeat if there is one left, else complete.
+    if (a.repeat !== 0) {
+      if (a.repeat > 0) a.repeat -= 1;
+      a.cycle += 1;
+      // ping-pong swaps the ends so the NEXT cycle comes back, which is the only way to express a
+      // continuous modulator without a second verb that means the same thing.
+      if (a.pingpong) { const t = a.from; a.from = a.to; a.to = t; }
+      a.startMs = animationNowMs;
+      a.startBeats = beats;
+      continue;
+    }
+    fireAnimationDone(a, true);
+    dropAnimation(a.path);
   }
 }
 
-/** Panel teardown: an animation writing into a panel that is gone is just noise. */
+/** Panel teardown: an animation writing into a panel that is gone is just noise — and neither is a
+ *  completion callback into a script set that no longer exists, so nothing is fired here. */
 export function stopAllAnimations() {
-  stopAnimationImpl('');
+  animations.clear();
+  animationGroups.clear();
+  if (animationTimer != null) { clearInterval(animationTimer); animationTimer = null; }
   animationNowMs = 0;      // the next panel starts its own clock
   animationTicked = false;
 }
-
 // @module ce.ui
 /* ----------------------------------------------------------------------------------- ce.ui */
 // Telling the person using the panel something. Panel view only — there is nobody to tell with the
@@ -3852,10 +4219,17 @@ function buildApi(ownerName, scriptId = '') {
     stopTimer: (id) => stopTimer(id),
     after: (ms, fn) => afterFor(scriptId, ms, fn),
     // ce.anim — values that move over time
-    animateTo: (path, target, opts) => startAnimationImpl('to', path, target, opts ?? {}),
-    animateSpring: (path, target, opts) => startAnimationImpl('spring', path, target, opts ?? {}),
+    animateTo: (path, target, opts) => startAnimationImpl(scriptId, 'to', path, target, opts ?? {}),
+    animateSpring: (path, target, opts) => startAnimationImpl(scriptId, 'spring', path, target, opts ?? {}),
+    animateEnvelope: (path, points, opts) => startEnvelopeImpl(scriptId, path, points, opts ?? {}),
     animateStop: (path) => stopAnimationImpl(path),
     animateRunning: (path) => animationRunningImpl(path),
+    animateValue: (path) => animationValueImpl(path),
+    animateList: () => animationListImpl(),
+    animatePause: (path) => animationPauseImpl(path),
+    animateResume: (path) => animationResumeImpl(path),
+    animateReverse: (path) => animationReverseImpl(path),
+    animateFinish: (path) => animationFinishImpl(path),
     // ce.ui — a message for whoever is using the panel
     uiNotify: (message, opts) => uiNotifyImpl(message, opts),
     uiStatus: (message) => uiStatusImpl(message),

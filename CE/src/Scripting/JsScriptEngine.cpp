@@ -675,7 +675,7 @@ function noteNumber(name) {
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME;
+var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME, __CE_EASINGS;
 __CE_SCALES = {};
 __CE_SCALES["major"] = [0,2,4,5,7,9,11];
 __CE_SCALES["minor"] = [0,2,3,5,7,8,10];
@@ -784,6 +784,12 @@ __CE_TIME = {};
 __CE_TIME["ppqn"] = 24;
 __CE_TIME["minBpm"] = 20;
 __CE_TIME["maxBpm"] = 300;
+// @module ce.anim
+__CE_EASINGS = {};
+__CE_EASINGS["inQuad"] = [0.55,0.085,0.68,0.53];
+__CE_EASINGS["outQuad"] = [0.25,0.46,0.45,0.94];
+__CE_EASINGS["inOutQuad"] = [0.455,0.03,0.515,0.955];
+__CE_EASINGS["outCubic"] = [0.215,0.61,0.355,1];
 // @module ce.music
 // END GENERATED music tables
 
@@ -1498,10 +1504,91 @@ function clockTempo(intervalsMs) {
 // @module ce.anim
 // Values that move over time. The engine lives in the host so ONE list exists and the position is
 // a pure function of elapsed time — an incremental integrator per runtime would drift.
-function animateTo(path, target, opts) { __api.animate("to", String(path), Number(target) || 0, opts || null); }
-function animateSpring(path, target, opts) { __api.animate("spring", String(path), Number(target) || 0, opts || null); }
+//
+// `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
+// this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
+// a completion callback can be a plain argument in every language.
+var __animDone = {}, __animGroup = {}, __animGroupN = 0;
+
+// An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
+// own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
+// envelope at all: map()'s per-point curves live in this prelude, not in C++.
+var __ANIM_SAMPLES = 1024;
+function __animSample(points) {
+  var out = [];
+  for (var i = 0; i <= __ANIM_SAMPLES; i++) {
+    var y = Number(map(i / __ANIM_SAMPLES, points));
+    out.push(isFinite(y) ? y : 0);
+  }
+  return out;
+}
+
+function __animPaths(path) {
+  if (!path || typeof path === "string" || path.length === undefined) return null;
+  var out = [];
+  for (var i = 0; i < path.length; i++) { var p = String(path[i]); if (p) out.push(p); }
+  return out;
+}
+
+function __animStart(kind, path, target, opts) {
+  opts = opts || {};
+  var list = __animPaths(path), o = {}, k;
+  for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
+  o.done = undefined;
+  if (typeof opts.done === "function") {
+    if (list) {
+      __animGroupN += 1;
+      __animGroup[__animGroupN] = opts.done;
+      o.group = __animGroupN;
+    } else {
+      __animDone[String(path)] = opts.done;
+    }
+  }
+  __api.animate(kind, list ? list : String(path), Number(target) || 0, o);
+}
+
+function animateTo(path, target, opts) { __animStart("to", path, target, opts); }
+function animateSpring(path, target, opts) { __animStart("spring", path, target, opts); }
+// envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
+// `to` has one destination; an envelope goes up before it comes down, which is the single most
+// obvious thing a synth panel animates and the one thing `to` cannot express.
+function animateEnvelope(path, points, opts) {
+  if (!points || points.length === undefined || points.length < 2) {
+    log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 — nothing was started.");
+    return false;
+  }
+  var o = {}, k;
+  if (opts) for (k in opts) if (Object.prototype.hasOwnProperty.call(opts, k)) o[k] = opts[k];
+  o.samples = __animSample(points);
+  o.from = Number(o.from) || 0;
+  var to = o.to === undefined || o.to === null ? 1 : Number(o.to);
+  o.to = undefined;
+  __animStart("envelope", path, to, o);
+  return true;
+}
 function animateStop(path) { __api.animateStop(path === undefined || path === null ? "" : String(path)); }
 function animateRunning(path) { return __api.animateRunning(path === undefined || path === null ? "" : String(path)); }
+function animateValue(path) { return __api.animateValue(path === undefined || path === null ? "" : String(path)); }
+function animateList() { return __api.animateList(); }
+function animatePause(path) { return __api.animatePause(path === undefined || path === null ? "" : String(path)); }
+function animateResume(path) { return __api.animateResume(path === undefined || path === null ? "" : String(path)); }
+function animateReverse(path) { return __api.animateReverse(path === undefined || path === null ? "" : String(path)); }
+function animateFinish(path) { return __api.animateFinish(path === undefined || path === null ? "" : String(path)); }
+
+// Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+on("*", "__animDone", function (info) {
+  if (!info) return;
+  if (info.group !== undefined && info.group !== null) {
+    var g = __animGroup[info.group];
+    delete __animGroup[info.group];
+    if (g) g({ paths: info.paths, completed: info.completed === true });
+    return;
+  }
+  var key = String(info.path === undefined ? "" : info.path);
+  var fn = __animDone[key];
+  delete __animDone[key];
+  if (fn) fn({ path: key, completed: info.completed === true });
+});
 
 // @module ce.device
 // Device READS — four wrappers over one host primitive, __api.deviceQuery, so the shape a script
@@ -1665,7 +1752,7 @@ var __CE_MODULES = {
   "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
-  "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
+  "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
   "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
   "ce.panel": { "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "patch": "panelPatch", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
@@ -1700,7 +1787,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -1820,11 +1907,22 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("sendDump", [host, arg] (const Args& a) -> juce::var { host->sendDump (arg (a, 0).toString()); return {}; });
     api->setMethod ("buildDump", [host, arg] (const Args& a) -> juce::var { return host->buildDump (arg (a, 0).toString()); });
     api->setMethod ("animate", [host, arg] (const Args& a) -> juce::var
-        { host->startAnimation (arg (a, 0).toString(), arg (a, 1).toString(), (double) arg (a, 2), arg (a, 3)); return {}; });
+        { host->startAnimation (arg (a, 0).toString(), arg (a, 1), (double) arg (a, 2), arg (a, 3)); return {}; });
     api->setMethod ("animateStop", [host, arg] (const Args& a) -> juce::var
         { host->stopAnimation (arg (a, 0).toString()); return {}; });
     api->setMethod ("animateRunning", [host, arg] (const Args& a) -> juce::var
         { return host->animationRunning (arg (a, 0).toString()); });
+    api->setMethod ("animateValue", [host, arg] (const Args& a) -> juce::var
+        { return host->animationValue (arg (a, 0).toString()); });
+    api->setMethod ("animateList", [host] (const Args&) -> juce::var { return host->animationList(); });
+    api->setMethod ("animatePause", [host, arg] (const Args& a) -> juce::var
+        { return host->animationPause (arg (a, 0).toString()); });
+    api->setMethod ("animateResume", [host, arg] (const Args& a) -> juce::var
+        { return host->animationResume (arg (a, 0).toString()); });
+    api->setMethod ("animateReverse", [host, arg] (const Args& a) -> juce::var
+        { return host->animationReverse (arg (a, 0).toString()); });
+    api->setMethod ("animateFinish", [host, arg] (const Args& a) -> juce::var
+        { return host->animationFinish (arg (a, 0).toString()); });
     api->setMethod ("transportState", [host] (const Args&) -> juce::var { return host->transportState(); });
     api->setMethod ("nowMs", [host] (const Args&) -> juce::var { return host->nowMs(); });
     api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var

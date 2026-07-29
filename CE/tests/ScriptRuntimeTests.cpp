@@ -231,13 +231,25 @@ public:
 
     // ce.anim routes to the runtime, the way BridgeScriptHost does — the animation list has to
     // live in ONE place, so a host forwards rather than keeping its own.
-    void startAnimation (const juce::String& kind, const juce::String& path,
+    void startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
     { if (runtime != nullptr) runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime != nullptr) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime != nullptr && runtime->animationRunning (path); }
+    juce::var animationValue (const juce::String& path) override
+    { return runtime != nullptr ? runtime->animationValue (path) : juce::var(); }
+    juce::var animationList() override
+    { return runtime != nullptr ? runtime->animationList() : juce::var(); }
+    bool animationPause (const juce::String& path) override
+    { return runtime != nullptr && runtime->animationPause (path); }
+    bool animationResume (const juce::String& path) override
+    { return runtime != nullptr && runtime->animationResume (path); }
+    bool animationReverse (const juce::String& path) override
+    { return runtime != nullptr && runtime->animationReverse (path); }
+    bool animationFinish (const juce::String& path) override
+    { return runtime != nullptr && runtime->animationFinish (path); }
 
     // Levelled log lines, "warn:…" / "error:…", so a test can tell them apart from log().
     juce::StringArray levelled;
@@ -2607,6 +2619,134 @@ int main()
         check (line ("tm ").contains ("grid,other"),
                tag + ": timers lists what was started by name, sorted (got " + line ("tm ") + ")");
         check (line ("tm2 ").contains ("0"), tag + ": …and forgets them when they are stopped");
+    }
+
+    // 39) ce.anim: the panel's easings, envelopes, repeat, and the four verbs stop() is not
+    //     (design doc §39)
+    //
+    // ce.anim's engine is NOT in the preludes — it lives HERE, in ScriptRuntime — so the
+    // cross-runtime pair is this file and the WebView runtime, and scriptPreludeAgreement.test.js
+    // cannot see it. These are the same fixtures CE/web/test/scriptAnim.test.js asserts.
+    {
+        // The named easings are the Properties panel's cubic-beziers, evaluated numerically. The
+        // numbers below came from the WebView solver: if the two ever disagree, an author who set
+        // outCubic in the Animations section and wrote curve = "outCubic" in a script would get two
+        // different motions with nothing to tell them apart.
+        check (std::abs (ScriptRuntime::animationEase (0.25, "outCubic") - 0.6003000532022035) < 1e-9,
+               "outCubic is the panel's bezier, not a lookalike cubic");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "outQuad") - 0.7713235622464706) < 1e-9,
+               "outQuad is the panel's bezier — 1-(1-t)^2 would be 0.75");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "inQuad") - 0.25599323438193494) < 1e-9,
+               "inQuad likewise — t^2 would be 0.25");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "inOutQuad") - 0.5147843674574845) < 1e-9,
+               "inOutQuad");
+        // ce.math.curve's four are unchanged and deliberately NOT merged with the panel's: exp is
+        // t^2, inQuad is a bezier that looks like t^2, and calling them one thing would be a claim
+        // about the numbers that is not true.
+        check (std::abs (ScriptRuntime::animationEase (0.5, "exp") - 0.25) < 1e-12, "exp is still t^2");
+        check (std::abs (ScriptRuntime::animationEase (0.25, "log") - 0.5) < 1e-12, "log is still sqrt");
+        check (std::abs (ScriptRuntime::animationEase (0.5, "s") - 0.5) < 1e-12, "s is still smoothstep");
+        // An unknown curve is REPORTED, not silently linear. "outCubic" used to land here.
+        bool known = true;
+        ScriptRuntime::animationEase (0.5, "easeInOutBack", &known);
+        check (! known, "an unknown curve says so rather than animating linear in silence");
+        ScriptRuntime::animationEase (0.5, "outCubic", &known);
+        check (known, "…and the panel's own names are known");
+
+        check (std::abs (ScriptRuntime::cubicBezierEase (0.5, 0.0, 0.0, 1.0, 1.0) - 0.5) < 1e-12,
+               "the identity bezier is a straight line");
+        check (ScriptRuntime::cubicBezierEase (0.0, 0.25, 0.46, 0.45, 0.94) == 0.0
+                && ScriptRuntime::cubicBezierEase (1.0, 0.25, 0.46, 0.45, 0.94) == 1.0,
+               "and every curve is exact at both ends");
+    }
+
+    {
+        TestHost animHost;
+        ScriptRuntime anim (animHost);
+        anim.tickAnimations (0.0);
+
+        auto opts = [] (std::initializer_list<std::pair<const char*, juce::var>> pairs)
+        {
+            auto* o = new juce::DynamicObject();
+            for (const auto& p : pairs) o->setProperty (p.first, p.second);
+            return juce::var (o);
+        };
+
+        // A plain move, eased by the panel's own curve.
+        anim.startAnimation ("to", juce::var ("a"), 100.0,
+                             opts ({ { "duration", 1000.0 }, { "from", 0.0 }, { "curve", "outCubic" } }));
+        anim.tickAnimations (250.0);
+        check (std::abs ((double) animHost.values["a"] - 60.03000532022035) < 1e-9,
+               "the host engine animates along the same bezier the WebView does");
+
+        // value(): running() answers whether, this answers how far.
+        const auto v = anim.animationValue ("a");
+        check (v.getDynamicObject() != nullptr, "animationValue describes a running animation");
+        check (std::abs ((double) v.getProperty ("progress", {}) - 0.25) < 1e-9, "…including its progress");
+        check (std::abs ((double) v.getProperty ("remaining", {}) - 750.0) < 1e-9, "…and what is left");
+        check (! anim.animationValue ("nothing").getDynamicObject(),
+               "and nothing at all for a path that is not animating");
+
+        // pause holds; resume carries on rather than restarting.
+        check (anim.animationPause ("a"), "pause holds a running animation");
+        anim.tickAnimations (900.0);
+        check (std::abs ((double) animHost.values["a"] - 60.03000532022035) < 1e-9,
+               "time passing does not move a paused animation");
+        check (! anim.animationPause ("a"), "…and a paused one is not paused twice");
+        check (anim.animationResume ("a"), "resume picks it up");
+        anim.tickAnimations (1150.0);
+        check (std::abs ((double) animHost.values["a"] - 60.03000532022035) > 1e-9,
+               "…and it carries on from where it was rather than restarting");
+
+        // finish lands exactly and completes; stop leaves the value where it got to.
+        check (anim.animationFinish ("a"), "finish lands on the target");
+        check (std::abs ((double) animHost.values["a"] - 100.0) < 1e-9, "…exactly on it");
+        check (! anim.animationRunning ("a"), "…and the animation is over");
+        check (! anim.animationFinish ("a"), "finishing nothing refuses honestly");
+
+        // repeat + pingpong: the continuous modulator, without a second verb that means the same.
+        anim.stopAnimation();
+        anim.tickAnimations (0.0);
+        anim.startAnimation ("to", juce::var ("r"), 10.0,
+                             opts ({ { "duration", 100.0 }, { "from", 0.0 },
+                                     { "repeat", 2.0 }, { "pingpong", true } }));
+        anim.tickAnimations (100.0);
+        check (std::abs ((double) animHost.values["r"] - 10.0) < 1e-9, "the first cycle arrives");
+        anim.tickAnimations (200.0);
+        check (std::abs ((double) animHost.values["r"] - 0.0) < 1e-9, "…and ping-pong brings it back");
+        anim.tickAnimations (300.0);
+        check (! anim.animationRunning ("r"), "three cycles in all: the first plus two repeats");
+
+        // A list of paths is one call; stagger offsets each in turn.
+        anim.stopAnimation();
+        anim.tickAnimations (0.0);
+        juce::Array<juce::var> paths { juce::var ("x"), juce::var ("y"), juce::var ("z") };
+        anim.startAnimation ("to", juce::var (paths), 10.0,
+                             opts ({ { "duration", 100.0 }, { "from", 0.0 }, { "stagger", 100.0 } }));
+        check (anim.animationList().getArray() != nullptr
+                && anim.animationList().getArray()->size() == 3, "one call, three animations");
+        anim.tickAnimations (100.0);
+        check (! anim.animationRunning ("x"), "the first has landed");
+        check (anim.animationRunning ("z"), "…and the last has not begun");
+
+        // An envelope goes UP before it comes down — the thing `to` cannot express at all. The
+        // shape arrives pre-sampled, because map()'s per-point curves live in the preludes.
+        anim.stopAnimation();
+        anim.tickAnimations (0.0);
+        juce::Array<juce::var> samples;
+        for (int i = 0; i <= 1024; ++i)
+        {
+            const double t = (double) i / 1024.0;
+            samples.add (t < 0.25 ? t / 0.25 : (1.0 - (t - 0.25) / 0.75));
+        }
+        anim.startAnimation ("envelope", juce::var ("e"), 100.0,
+                             opts ({ { "duration", 1000.0 }, { "from", 0.0 },
+                                     { "samples", juce::var (samples) } }));
+        anim.tickAnimations (250.0);
+        check (std::abs ((double) animHost.values["e"] - 100.0) < 0.2, "the peak is a quarter of the way in");
+        anim.tickAnimations (625.0);
+        check (std::abs ((double) animHost.values["e"] - 50.0) < 0.2, "…and it falls back through the middle");
+        anim.stopAnimation();
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

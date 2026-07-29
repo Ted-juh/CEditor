@@ -22,6 +22,7 @@
 // uses MessageManager::callAsync for its event callback).
 
 #include <juce_core/juce_core.h>
+#include <array>
 #include <functional>
 #include <map>
 #include <memory>
@@ -164,12 +165,23 @@ public:
     { juce::ignoreUnused (what, id, spec); return false; }
 
     /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
-        a host does not implement them itself. */
-    virtual void startAnimation (const juce::String& kind, const juce::String& path,
+        a host only forwards. `path` is a string OR a list of strings: one call, one shape, one
+        completion, which is what makes `stagger` worth having. */
+    virtual void startAnimation (const juce::String& kind, const juce::var& path,
                                  double target, const juce::var& opts)
     { juce::ignoreUnused (kind, path, target, opts); }
     virtual void stopAnimation (const juce::String& path) { juce::ignoreUnused (path); }
     virtual bool animationRunning (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    /** Where an animation IS, and everything running. running() answers whether; these answer how
+        far, which is what a progress read or a decision to interrupt actually needs. */
+    virtual juce::var animationValue (const juce::String& path) { juce::ignoreUnused (path); return {}; }
+    virtual juce::var animationList() { return {}; }
+    /** Hold / carry on / turn around / land it. stop() is a cancel and always was; these are the
+        four things a script wanted that a cancel is not. */
+    virtual bool animationPause (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    virtual bool animationResume (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    virtual bool animationReverse (const juce::String& path) { juce::ignoreUnused (path); return false; }
+    virtual bool animationFinish (const juce::String& path) { juce::ignoreUnused (path); return false; }
 
     /** ce.ui — tell whoever is using the panel something. Panel view only, so the default is a
         no-op and the C++ engines stub the verbs; this exists for a host that DOES have a surface
@@ -454,24 +466,42 @@ public:
         integrating independently drift apart, two runtimes evaluating the same formula at the same
         elapsed time cannot. animationValueAt() below is that formula, and it is the thing the
         WebView runtime has to match. */
-    void startAnimation (const juce::String& kind, const juce::String& path,
-                         double target, const juce::var& opts);
+    void startAnimation (const juce::String& kind, const juce::var& path,
+                         double target, const juce::var& opts = {});
 
-    /** Stop one animation, or every one when `path` is empty. The value stays where it got to. */
+    /** Stop one animation, or every one when `path` is empty. The value stays where it got to, and
+        the completion callback fires with completed = false — a cancel is an outcome. */
     void stopAnimation (const juce::String& path = {});
 
     /** Is `path` animating? With an empty path, is anything? */
     bool animationRunning (const juce::String& path = {}) const;
 
+    /** Where it is: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle,
+        sync }, or void when nothing is running on the path. `elapsed`/`remaining` are void for a
+        transport-synced animation — how long it has left depends on a tempo nobody has played. */
+    juce::var animationValue (const juce::String& path) const;
+    /** Every animation running, in path order, each as animationValue describes it. */
+    juce::var animationList() const;
+
+    bool animationPause (const juce::String& path);    ///< Hold where it is, without ending it.
+    bool animationResume (const juce::String& path);   ///< Carry on — continuing, not restarting.
+    bool animationReverse (const juce::String& path);  ///< Turn around, back at the same rate.
+    bool animationFinish (const juce::String& path);   ///< Land on the target and complete.
+
     /** Advance every animation to `nowMs` and write the values. The host calls this from whatever
-        message-thread timer it already runs — 30Hz in the player, which is what the beat events
-        use too. Nothing here touches the audio thread. */
+        timer it already runs. */
     void tickAnimations (double nowMs);
 
-    /** THE position formula, shared by every runtime. Exposed so tests can pin it directly.
-        `progress` is elapsed/duration, already clamped to 0..1 by the caller. */
-    static double animationEase (double progress, const juce::String& curve);
+    /** The easing curves, exposed for testing and shared by every runtime. `known` reports whether
+        the name was recognised — an unknown curve used to be silently linear, including for the
+        names the Properties panel itself offers. */
+    static double animationEase (double progress, const juce::String& curve, bool* known = nullptr);
     static double animationSpring (double progress, double damping, double frequency);
+    /** A CSS cubic-bezier evaluated numerically, so a script animating with "outCubic" traces the
+        path the panel's transition does rather than a lookalike. Fixed iteration counts: four
+        runtimes have to produce the same double, and a loop that stops on a tolerance stops after a
+        different number of steps the moment one of them rounds differently. */
+    static double cubicBezierEase (double t, double x1, double y1, double x2, double y2);
 
     // --- ce.device: declaring what the app was not shipped knowing (design doc §29) -----------
     /** A parameter or a dump layout a SCRIPT declared, for a synth the app has no profile for.
@@ -564,14 +594,34 @@ private:
 
     struct Animation
     {
-        juce::String kind;     // "to" | "spring"
+        juce::String kind;     // "to" | "spring" | "envelope"
         juce::String path;
         double from = 0.0, to = 0.0;
-        double startMs = 0.0, duration = 300.0;
+        std::vector<double> samples;   // envelope only: the drawn shape, pre-sampled by the prelude
+        double startMs = 0.0, duration = 300.0, delay = 0.0;
+        double startBeats = 0.0, syncBeats = 0.0;
+        bool sync = false;             // position derived from transport beats, not the wall clock
         juce::String curve = "linear";
         double damping = 6.0, frequency = 12.0;
+        int repeat = 0, cycle = 0;     // repeat < 0 runs until stopped
+        bool pingpong = false, paused = false;
+        double heldProgress = 0.0;
+        int groupId = 0;               // 0 = alone; otherwise one completion for the whole call
     };
     std::vector<Animation> animations;
+    struct AnimationGroup { int remaining = 0; bool completed = true; juce::StringArray paths; };
+    std::map<int, AnimationGroup> animationGroups;
+    int animationGroupSeq = 0;
+    /** Progress, value, and the completion emit — shared by the tick and by the four verbs that
+        need to know where an animation is without advancing it. */
+    double animationProgressOf (const Animation& a, double nowMs, double beats) const;
+    double animationValueOf (const Animation& a, double progress) const;
+    void   fireAnimationDone (const Animation& a, bool completed);
+    juce::var animationDescribe (const Animation& a) const;
+    double animationBeatsNow();
+    double transportBpm();
+    double beatsToMs (double beats);
+    Animation* animationFor (const juce::String& path);
     double animationNowMs = 0.0;   // the last tick, so a new animation starts from a known moment
     // Whether a tick has EVER happened — not `animationNowMs == 0`, because zero is a perfectly
     // good tick time when the caller drives the clock, which is the only way to test an animation

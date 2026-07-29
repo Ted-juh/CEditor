@@ -257,9 +257,11 @@ PyObject* api_buildDump (PyObject*, PyObject* args)
 }
 PyObject* api_animate (PyObject*, PyObject* args)
 {
-    const char* kind = nullptr; const char* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
-    if (! PyArg_ParseTuple (args, "ssd|O", &kind, &path, &target, &opts)) return nullptr;
-    g_host->startAnimation (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (path), target,
+    // `path` is a str OR a list of str — one call, one shape, one completion — so it comes through
+    // as an object and pyToVar decides which it was.
+    const char* kind = nullptr; PyObject* path = nullptr; double target = 0.0; PyObject* opts = nullptr;
+    if (! PyArg_ParseTuple (args, "sOd|O", &kind, &path, &target, &opts)) return nullptr;
+    g_host->startAnimation (juce::String::fromUTF8 (kind), pyToVar (path), target,
                             opts != nullptr ? pyToVar (opts) : juce::var());
     Py_RETURN_NONE;
 }
@@ -272,6 +274,39 @@ PyObject* api_animateRunning (PyObject*, PyObject* args)
 {
     const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
     if (g_host->animationRunning (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+PyObject* api_animateValue (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    return varToPy (g_host->animationValue (juce::String::fromUTF8 (path)));
+}
+PyObject* api_animateList (PyObject*, PyObject*)
+{
+    return varToPy (g_host->animationList());
+}
+PyObject* api_animatePause (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    if (g_host->animationPause (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+PyObject* api_animateResume (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    if (g_host->animationResume (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+PyObject* api_animateReverse (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    if (g_host->animationReverse (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+PyObject* api_animateFinish (PyObject*, PyObject* args)
+{
+    const char* path = nullptr; if (! PyArg_ParseTuple (args, "s", &path)) return nullptr;
+    if (g_host->animationFinish (juce::String::fromUTF8 (path))) Py_RETURN_TRUE;
     Py_RETURN_FALSE;
 }
 PyObject* api_transportState (PyObject*, PyObject*)
@@ -420,6 +455,12 @@ PyMethodDef apiMethods[] = {
     { "animate",       api_animate,       METH_VARARGS, nullptr },
     { "animateStop",   api_animateStop,   METH_VARARGS, nullptr },
     { "animateRunning", api_animateRunning, METH_VARARGS, nullptr },
+    { "animateValue",  api_animateValue,  METH_VARARGS, nullptr },
+    { "animateList",   api_animateList,   METH_NOARGS,  nullptr },
+    { "animatePause",  api_animatePause,  METH_VARARGS, nullptr },
+    { "animateResume", api_animateResume, METH_VARARGS, nullptr },
+    { "animateReverse", api_animateReverse, METH_VARARGS, nullptr },
+    { "animateFinish", api_animateFinish, METH_VARARGS, nullptr },
     { "startTimer",    api_startTimer,    METH_VARARGS, nullptr },
     { "stopTimer",     api_stopTimer,     METH_VARARGS, nullptr },
     { "run",           api_run,           METH_VARARGS, nullptr },
@@ -828,17 +869,102 @@ def clockTempo(intervalsMs):
 # @module ce.anim
 # Values that move over time. The engine lives in the host so ONE list exists and the position is a
 # pure function of elapsed time — an incremental integrator per runtime would drift.
+#
+# `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
+# this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
+# a completion callback can be a plain argument in every language.
+__animDone = {}
+__animGroup = {}
+__animGroupN = [0]
+
+# An envelope's shape is SAMPLED here, with map() - ce.math's, which is the Envelope component's own
+# envValueAt - and the host interpolates the samples. That is what lets the host engine run an
+# envelope at all: map()'s per-point curves live in this prelude, not in C++.
+__ANIM_SAMPLES = 1024
+def __animSample(points):
+    out = []
+    for i in range(__ANIM_SAMPLES + 1):
+        try: y = float(map(i / __ANIM_SAMPLES, points))
+        except (TypeError, ValueError): y = 0.0
+        out.append(y)
+    return out
+
+def __animPaths(path):
+    if isinstance(path, (list, tuple)):
+        return [str(p) for p in path if str(p)]
+    return None
+
+def __animStart(kind, path, target, opts):
+    opts = opts or {}
+    lst = __animPaths(path)
+    o = dict(opts)
+    o.pop("done", None)
+    fn = opts.get("done") if isinstance(opts, dict) else None
+    if callable(fn):
+        if lst is not None:
+            __animGroupN[0] += 1
+            __animGroup[__animGroupN[0]] = fn
+            o["group"] = __animGroupN[0]
+        else:
+            __animDone[str(path)] = fn
+    __api.animate(kind, lst if lst is not None else str(path), float(target or 0), o)
+
 def animateTo(path, target, opts=None):
-    __api.animate("to", str(path), float(target or 0), opts)
+    __animStart("to", path, target, opts)
 
 def animateSpring(path, target, opts=None):
-    __api.animate("spring", str(path), float(target or 0), opts)
+    __animStart("spring", path, target, opts)
+
+# envelope(path, points, opts) - drive a value THROUGH a shape rather than between two numbers.
+# `to` has one destination; an envelope goes up before it comes down, which is the single most
+# obvious thing a synth panel animates and the one thing `to` cannot express.
+def animateEnvelope(path, points, opts=None):
+    if not isinstance(points, (list, tuple)) or len(points) < 2:
+        log("ce.anim.envelope(path, points): needs at least two points, each { x, y } in 0..1 - nothing was started.")
+        return False
+    o = dict(opts or {})
+    o["samples"] = __animSample(points)
+    o["from"] = float(o.get("from") or 0)
+    to = o.pop("to", None)
+    __animStart("envelope", path, 1 if to is None else to, o)
+    return True
 
 def animateStop(path=None):
     __api.animateStop("" if path is None else str(path))
 
 def animateRunning(path=None):
     return __api.animateRunning("" if path is None else str(path))
+
+def animateValue(path=None):
+    return __api.animateValue("" if path is None else str(path))
+
+def animateList():
+    return __api.animateList()
+
+def animatePause(path=None):
+    return __api.animatePause("" if path is None else str(path))
+
+def animateResume(path=None):
+    return __api.animateResume("" if path is None else str(path))
+
+def animateReverse(path=None):
+    return __api.animateReverse("" if path is None else str(path))
+
+def animateFinish(path=None):
+    return __api.animateFinish("" if path is None else str(path))
+
+# Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+def __animDoneTick(info):
+    if not hasattr(info, "get"): return
+    gid = info.get("group")
+    if gid is not None:
+        fn = __animGroup.pop(gid, None)
+        if fn is not None: fn({ "paths": info.get("paths"), "completed": info.get("completed") is True })
+        return
+    key = str(info.get("path") or "")
+    fn = __animDone.pop(key, None)
+    if fn is not None: fn({ "path": key, "completed": info.get("completed") is True })
+on("*", "__animDone", __animDoneTick)
 
 # @module ce.device
 # requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
@@ -1544,6 +1670,12 @@ __CE_TIME = {}
 __CE_TIME["ppqn"] = 24
 __CE_TIME["minBpm"] = 20
 __CE_TIME["maxBpm"] = 300
+# @module ce.anim
+__CE_EASINGS = {}
+__CE_EASINGS["inQuad"] = [0.55,0.085,0.68,0.53]
+__CE_EASINGS["outQuad"] = [0.25,0.46,0.45,0.94]
+__CE_EASINGS["inOutQuad"] = [0.455,0.03,0.515,0.955]
+__CE_EASINGS["outCubic"] = [0.215,0.61,0.355,1]
 # @module ce.music
 # END GENERATED music tables
 
@@ -2217,7 +2349,7 @@ __CE_MODULES = {
     "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
-    "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
+    "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
     "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
     "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
     "ce.panel": { "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "patch": "panelPatch", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
@@ -2259,7 +2391,7 @@ __CE_META = [
     { "id": "ce.math", "version": "1.7", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
-    { "id": "ce.anim", "version": "1.0", "runtime": "any" },
+    { "id": "ce.anim", "version": "1.1", "runtime": "any" },
     { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.1", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.3", "runtime": "any" },

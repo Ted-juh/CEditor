@@ -95,15 +95,23 @@ function normalizeRange(value, min, max) {
   return (value - min) / span;
 }
 
+// The named easings, as their cubic-bezier control points [x1, y1, x2, y2]. A table rather than a
+// switch of strings because ce.anim evaluates these NUMERICALLY: a script animating with
+// curve = "outCubic" has to trace the same path the panel's CSS transition does, and a lookalike
+// (1 - (1-t)^2 for outQuad, say) is a second curve wearing the same name. One table, two consumers.
+export const EASING_BEZIERS = {
+  inQuad:    [0.55,  0.085, 0.68,  0.53],
+  outQuad:   [0.25,  0.46,  0.45,  0.94],
+  inOutQuad: [0.455, 0.03,  0.515, 0.955],
+  outCubic:  [0.215, 0.61,  0.355, 1],
+};
+export const EASING_NAMES = ['linear', ...Object.keys(EASING_BEZIERS)];
+
 function easingToCss(name) {
-  switch (String(name ?? 'outQuad')) {
-    case 'linear': return 'linear';
-    case 'inQuad': return 'cubic-bezier(0.55, 0.085, 0.68, 0.53)';
-    case 'outQuad': return 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-    case 'inOutQuad': return 'cubic-bezier(0.455, 0.03, 0.515, 0.955)';
-    case 'outCubic': return 'cubic-bezier(0.215, 0.61, 0.355, 1)';
-    default: return 'ease';
-  }
+  const key = String(name ?? 'outQuad');
+  if (key === 'linear') return 'linear';
+  const b = EASING_BEZIERS[key];
+  return b ? `cubic-bezier(${b[0]}, ${b[1]}, ${b[2]}, ${b[3]})` : 'ease';
 }
 
 function treeValueAtPath(node, path) {

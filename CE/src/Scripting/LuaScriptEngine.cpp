@@ -755,6 +755,12 @@ __CE_TIME = {}
 __CE_TIME["ppqn"] = 24
 __CE_TIME["minBpm"] = 20
 __CE_TIME["maxBpm"] = 300
+-- @module ce.anim
+__CE_EASINGS = {}
+__CE_EASINGS["inQuad"] = {0.55,0.085,0.68,0.53}
+__CE_EASINGS["outQuad"] = {0.25,0.46,0.45,0.94}
+__CE_EASINGS["inOutQuad"] = {0.455,0.03,0.515,0.955}
+__CE_EASINGS["outCubic"] = {0.215,0.61,0.355,1}
 -- @module ce.music
 -- END GENERATED music tables
 
@@ -1537,10 +1543,95 @@ end
 -- Values that move over time. The engine lives in the host (ScriptRuntime) so ONE list exists and
 -- the position is a pure function of elapsed time — an incremental integrator in each runtime
 -- would drift apart from the others within a second.
-function animateTo(path, target, opts) __animate("to", tostring(path), tonumber(target) or 0, opts or {}) end
-function animateSpring(path, target, opts) __animate("spring", tostring(path), tonumber(target) or 0, opts or {}) end
+--
+-- `done` is a FUNCTION the script owns, so the host cannot call it: the engine emits __animDone and
+-- this routes it to the function stored here. Exactly how after()'s one-shot works, and the reason
+-- a completion callback can be a plain argument in every language.
+local __animDone, __animGroup, __animGroupN = {}, {}, 0
+
+-- An envelope's shape is SAMPLED here, with map() — ce.math's, which is the Envelope component's
+-- own envValueAt — and the host interpolates the samples. That is what lets the host engine run an
+-- envelope at all: map()'s per-point curves live in this prelude, not in C++.
+local __ANIM_SAMPLES = 1024
+local function __animSample(points)
+  local out = {}
+  for i = 0, __ANIM_SAMPLES do
+    local y = tonumber(map(i / __ANIM_SAMPLES, points))
+    out[i + 1] = y or 0
+  end
+  return out
+end
+
+local function __animPaths(path)
+  if type(path) == "table" then
+    local out = {}
+    for i = 1, #path do local p = tostring(path[i]) if p ~= "" then out[#out + 1] = p end end
+    return out
+  end
+  return nil
+end
+
+local function __animStart(kind, path, target, opts)
+  opts = opts or {}
+  local list = __animPaths(path)
+  local o = {}
+  for k, v in pairs(opts) do o[k] = v end
+  o.done = nil
+  if type(opts.done) == "function" then
+    if list ~= nil then
+      __animGroupN = __animGroupN + 1
+      local gid = __animGroupN
+      __animGroup[gid] = opts.done
+      o.group = gid
+    else
+      __animDone[tostring(path)] = opts.done
+    end
+  end
+  __animate(kind, list ~= nil and list or tostring(path), tonumber(target) or 0, o)
+end
+
+function animateTo(path, target, opts) __animStart("to", path, target, opts) end
+function animateSpring(path, target, opts) __animStart("spring", path, target, opts) end
+-- envelope(path, points, opts) — drive a value THROUGH a shape rather than between two numbers.
+-- `to` has one destination; an envelope goes up before it comes down, which is the single most
+-- obvious thing a synth panel animates and the one thing `to` cannot express.
+function animateEnvelope(path, points, opts)
+  if type(points) ~= "table" or #points < 2 then
+    log("ce.anim.envelope(path, points): needs at least two points, each { x = , y = } in 0..1 — nothing was started.")
+    return false
+  end
+  local o = {}
+  if opts ~= nil then for k, v in pairs(opts) do o[k] = v end end
+  o.samples = __animSample(points)
+  o.from = tonumber(o.from) or 0
+  local to = tonumber(o.to) or 1
+  o.to = nil
+  __animStart("envelope", path, to, o)
+  return true
+end
 function animateStop(path) __animateStop(path == nil and "" or tostring(path)) end
 function animateRunning(path) return __animateRunning(path == nil and "" or tostring(path)) end
+function animateValue(path) return __animateValue(path == nil and "" or tostring(path)) end
+function animateList() return __animateList() end
+function animatePause(path) return __animatePause(path == nil and "" or tostring(path)) end
+function animateResume(path) return __animateResume(path == nil and "" or tostring(path)) end
+function animateReverse(path) return __animateReverse(path == nil and "" or tostring(path)) end
+function animateFinish(path) return __animateFinish(path == nil and "" or tostring(path)) end
+
+-- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+on("*", "__animDone", function(info)
+  if info == nil then return end
+  if info.group ~= nil then
+    local fn = __animGroup[info.group]
+    __animGroup[info.group] = nil
+    if fn ~= nil then fn({ paths = info.paths, completed = info.completed == true }) end
+    return
+  end
+  local key = tostring(info.path or "")
+  local fn = __animDone[key]
+  __animDone[key] = nil
+  if fn ~= nil then fn({ path = key, completed = info.completed == true }) end
+end)
 
 -- @module ce.device
 -- Device READS. All four are arithmetic-free wrappers over one host primitive, __deviceQuery,
@@ -1698,7 +1789,7 @@ local __CE_MODULES = {
   ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
-  ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
+  ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
   ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
   ["ce.panel"] = { clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", info = "panelInfo", parent = "panelParent", patch = "panelPatch", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
@@ -1740,7 +1831,7 @@ local __CE_META = {
   { id = "ce.math", version = "1.7", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.3", runtime = "any" },
-  { id = "ce.anim", version = "1.0", runtime = "any" },
+  { id = "ce.anim", version = "1.1", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },
   { id = "ce.draw", version = "1.1", runtime = "webview" },
   { id = "ce.panel", version = "1.3", runtime = "any" },
@@ -1930,11 +2021,19 @@ public:
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });
-        g.set_function ("__animate", [this] (std::string kind, std::string path, double target, sol::optional<sol::table> opts)
-            { host->startAnimation (juce::String (kind), juce::String (path), target,
+        // `path` is a string OR a table of strings — one call, one shape, one completion — so the
+        // binding takes an object and lets solToVar decide which it was.
+        g.set_function ("__animate", [this] (std::string kind, sol::object path, double target, sol::optional<sol::table> opts)
+            { host->startAnimation (juce::String (kind), solToVar (path), target,
                                     opts ? solToVar (*opts) : juce::var()); });
         g.set_function ("__animateStop", [this] (std::string path) { host->stopAnimation (juce::String (path)); });
         g.set_function ("__animateRunning", [this] (std::string path) { return host->animationRunning (juce::String (path)); });
+        g.set_function ("__animateValue", [this] (std::string path) { return varToSol (lua, host->animationValue (juce::String (path))); });
+        g.set_function ("__animateList", [this] () { return varToSol (lua, host->animationList()); });
+        g.set_function ("__animatePause", [this] (std::string path) { return host->animationPause (juce::String (path)); });
+        g.set_function ("__animateResume", [this] (std::string path) { return host->animationResume (juce::String (path)); });
+        g.set_function ("__animateReverse", [this] (std::string path) { return host->animationReverse (juce::String (path)); });
+        g.set_function ("__animateFinish", [this] (std::string path) { return host->animationFinish (juce::String (path)); });
         g.set_function ("__transportState", [this] () { return varToSol (lua, host->transportState()); });
         g.set_function ("__nowMs", [this] () { return host->nowMs(); });
         g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)

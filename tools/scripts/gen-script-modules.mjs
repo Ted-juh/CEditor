@@ -33,6 +33,16 @@ const timePath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', '
 const { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, MIN_BPM, MAX_BPM }
   = await import(`file://${timePath}`);
 
+const easingPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'easingTables.js');
+const { EASING_BEZIERS } = await import(`file://${easingPath}`);
+
+// The envelope sample count is the WebView runtime's own constant rather than a second copy: the
+// two sides sampling a different number of points is exactly the divergence sampling exists to
+// avoid. Read from the source text, because importing panelRuntime.js pulls in the whole editor.
+const runtimeSrc = readFileSync(join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'panelRuntime.js'), 'utf8');
+const ANIM_SAMPLES = Number(/export const ANIM_SAMPLES = (\d+);/.exec(runtimeSrc)?.[1]);
+if (!Number.isFinite(ANIM_SAMPLES)) throw new Error('could not read ANIM_SAMPLES from panelRuntime.js');
+
 export const BEGIN = 'BEGIN GENERATED module namespace';
 export const END = 'END GENERATED module namespace';
 
@@ -48,6 +58,13 @@ export const STUBS_END = 'END GENERATED webview-only stubs';
 // editor. Twelve scales and twenty chords across four runtimes is not a thing to hand-copy.
 export const MUSIC_BEGIN = 'BEGIN GENERATED music tables';
 export const MUSIC_END = 'END GENERATED music tables';
+
+// ce.anim's engine lives in ScriptRuntime.cpp as well as in the preludes — it is the host that
+// ticks an animation with the panel shut — so the easing control points have to reach C++ CODE and
+// not only C++ string literals. Same rule, one more target: four control points that are off by a
+// hundredth trace a curve that looks right and is not the Properties panel's.
+export const ANIM_BEGIN = 'BEGIN GENERATED animation tables';
+export const ANIM_END = 'END GENERATED animation tables';
 
 // A short name has to be a legal member name in EVERY language a prelude is generated for. Lua is
 // the strict one: `goto` is a keyword there, so both `{ goto = ... }` and `t.goto(...)` fail to
@@ -661,6 +678,15 @@ const TIME_TABLES = [
   { name: '__CE_TIME', kind: 'map', data: { ppqn: PPQN, minBpm: MIN_BPM, maxBpm: MAX_BPM } },
 ];
 
+// ce.anim's named easings, as cubic-bezier control points. The sharpest version of the reason yet:
+// these four numbers per curve are the PROPERTIES PANEL's, a script animating with
+// curve = "outCubic" has to trace the same path the panel's CSS transition does, and a control
+// point that is off by a hundredth produces a curve that looks right in every runtime and is not
+// the panel's.
+const EASING_TABLES = [
+  { name: '__CE_EASINGS', kind: 'map', data: EASING_BEZIERS },
+];
+
 // Non-ASCII is deliberate and load-bearing: ♭ ♯ ° are the characters the panel PRINTS, so a script
 // naming a chord has to emit the same bytes. JSON.stringify leaves them literal (it only escapes
 // lone surrogates), and all three preludes are UTF-8 raw string literals already.
@@ -700,18 +726,22 @@ export function luaMusicBlock() {
 ${tableRows(MUSIC_TABLES, 'lua').join('\n')}
 -- @module ce.time
 ${tableRows(TIME_TABLES, 'lua').join('\n')}
+-- @module ce.anim
+${tableRows(EASING_TABLES, 'lua').join('\n')}
 -- @module ce.music
 -- ${MUSIC_END}`;
 }
 
 export function jsMusicBlock() {
-  const names = [...MUSIC_TABLES, ...TIME_TABLES].map((t) => t.name).join(', ');
+  const names = [...MUSIC_TABLES, ...TIME_TABLES, ...EASING_TABLES].map((t) => t.name).join(', ');
   return `// ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
 var ${names};
 ${tableRows(MUSIC_TABLES, 'javascript').join('\n')}
 // @module ce.time
 ${tableRows(TIME_TABLES, 'javascript').join('\n')}
+// @module ce.anim
+${tableRows(EASING_TABLES, 'javascript').join('\n')}
 // @module ce.music
 // ${MUSIC_END}`;
 }
@@ -722,8 +752,32 @@ export function pythonMusicBlock() {
 ${tableRows(MUSIC_TABLES, 'python').join('\n')}
 # @module ce.time
 ${tableRows(TIME_TABLES, 'python').join('\n')}
+# @module ce.anim
+${tableRows(EASING_TABLES, 'python').join('\n')}
 # @module ce.music
 # ${MUSIC_END}`;
+}
+
+/* --------------------------------------------------------- ce.anim tables, for C++ CODE */
+
+export function cppAnimBlock() {
+  const rows = Object.entries(EASING_BEZIERS)
+    .map(([k, v]) => `    { "${k}", { ${v.map((n) => n.toFixed(6)).join(', ')} } },`)
+    .join('\n');
+  return `// ${ANIM_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// The Properties panel's named easings, as the cubic-bezier control points it stores. Generated so
+// the host engine, the three preludes and the WebView all animate along ONE set of numbers.
+static const std::map<juce::String, std::array<double, 4>>& animEasings()
+{
+    static const std::map<juce::String, std::array<double, 4>> table = {
+${rows}
+    };
+    return table;
+}
+// An envelope is sampled into this many segments before it is handed to the engine; the same
+// number in every runtime is what makes the sampled shape identical rather than merely similar.
+static constexpr int kAnimSamples = ${ANIM_SAMPLES};
+// ${ANIM_END}`;
 }
 
 /* ------------------------------------------------------------------------------- splicing */
@@ -767,9 +821,28 @@ function splice(source, block, endDelimiter, begin = BEGIN, end = END) {
   return `${source.slice(0, closeAt)}\n${block}\n${source.slice(closeAt)}`;
 }
 
+const ANIM_TARGET = { file: 'CE/src/Scripting/ScriptRuntime.cpp', block: cppAnimBlock };
+
 function run() {
   const mode = process.argv[2] ?? '--print';
   let stale = 0;
+
+  // The host engine's table. Spliced on its own rather than alongside a prelude, because this one
+  // lands in compiled code instead of a string literal.
+  {
+    const path = join(repo, ANIM_TARGET.file);
+    const source = readFileSync(path, 'utf8');
+    const next = splice(source, ANIM_TARGET.block(), null, ANIM_BEGIN, ANIM_END);
+    if (mode === '--write') {
+      if (next !== source) { writeFileSync(path, next); console.log(`wrote ${ANIM_TARGET.file}`); }
+      else console.log(`unchanged ${ANIM_TARGET.file}`);
+    } else if (mode === '--check') {
+      if (next !== source) { console.error(`STALE ${ANIM_TARGET.file} — run: node tools/scripts/gen-script-modules.mjs --write`); stale += 1; }
+      else console.log(`ok ${ANIM_TARGET.file}`);
+    } else {
+      console.log(`\n===== ${ANIM_TARGET.file} =====\n${ANIM_TARGET.block()}`);
+    }
+  }
 
   for (const target of TARGETS) {
     const path = join(repo, target.file);

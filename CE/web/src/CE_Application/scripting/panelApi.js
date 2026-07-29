@@ -614,11 +614,12 @@ export const COMMANDS = [
      runtimes evaluating the same formula at the same elapsed time cannot. */
   {
     id: 'animateTo', category: 'Animation', signature: 'animateTo(path, target [, opts])',
-    summary: 'Move a value to `target` over time. `opts` may carry { duration (ms, default 300), curve ("linear" | "exp" | "log" | "s"), from }. Starting a second animation on the same path replaces the first — a value has one destination.',
+    summary: 'Move a value to `target` over time. `path` may be a LIST, in which case one call moves all of them and `stagger` offsets each in turn. `opts`: { duration (ms, default 300), beats (musical duration instead), sync (follow the transport rather than the wall clock), curve, from, delay, stagger, repeat, pingpong, done }. `curve` is one of "linear" | "exp" | "log" | "s" (ce.math.curve\'s shapes) or "inQuad" | "outQuad" | "inOutQuad" | "outCubic" (the Properties panel\'s, evaluated as the very cubic-beziers the panel stores — not lookalikes); an unknown name says so and animates linear. Starting a second animation on the same path replaces the first — a value has one destination — and the replaced one\'s `done` fires with completed = false.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['duration', 'curve', 'from'] },
+      { name: 'opts', type: 'object', required: false,
+        fields: ['duration', 'beats', 'sync', 'curve', 'from', 'delay', 'stagger', 'repeat', 'pingpong', 'done'] },
     ],
     scopes: 'any',
     snippet: {
@@ -628,11 +629,12 @@ export const COMMANDS = [
   },
   {
     id: 'animateSpring', category: 'Animation', signature: 'animateSpring(path, target [, opts])',
-    summary: 'Move a value to `target` with a damped oscillation — it overshoots and settles. `opts` may carry { duration (ms, default 600), damping (default 6), frequency (default 12), from }.',
+    summary: 'Move a value to `target` with a damped oscillation — it overshoots and settles. `opts`: { duration (ms, default 600), damping (default 6), frequency (default 12), from } plus everything animateTo takes except `curve` — beats, sync, delay, stagger, repeat, pingpong, done, and a list of paths.',
     params: [
       { name: 'path', type: 'path', required: true },
       { name: 'target', type: 'number', required: true },
-      { name: 'opts', type: 'object', required: false, fields: ['duration', 'damping', 'frequency', 'from'] },
+      { name: 'opts', type: 'object', required: false,
+        fields: ['duration', 'damping', 'frequency', 'from', 'beats', 'sync', 'delay', 'stagger', 'repeat', 'pingpong', 'done'] },
     ],
     scopes: 'any',
     snippet: {
@@ -642,7 +644,7 @@ export const COMMANDS = [
   },
   {
     id: 'animateStop', category: 'Animation', signature: 'animateStop([path])',
-    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running.',
+    summary: 'Stop the animation on `path`, leaving the value where it got to. No path stops every animation this panel is running. `done` fires with completed = false, so a "then do X" can tell cancelling from finishing — use finish() to jump to the target instead.',
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.anim.stop("${1:cutoff}")$0', javascript: 'ce.anim.stop("${1:cutoff}");$0' },
@@ -653,6 +655,65 @@ export const COMMANDS = [
     params: [{ name: 'path', type: 'path', required: false }],
     scopes: 'any',
     snippet: { lua: 'if not ce.anim.running("${1:cutoff}") then $0 end', javascript: 'if (!ce.anim.running("${1:cutoff}")) { $0 }' },
+  },
+
+  /* --- Animation, the rest of it (design doc §39) ---
+     `to` and `spring` are both "a value moves from A to B and stops". Everything below is what that
+     leaves out: a shape rather than a destination, a hold that is not a cancel, a way to see how far
+     a move has got, and a way to end one on purpose rather than by abandoning it.
+
+     The Properties panel's Animations section could already say things a script could not — several
+     targets in one declaration, a delay, and its own easing vocabulary. Those are options on `to`
+     now. These seven are the other direction: things a stored property structurally cannot be. */
+  {
+    id: 'animateEnvelope', category: 'Animation', signature: 'animateEnvelope(path, points [, opts])',
+    summary: 'Drive a value THROUGH a shape rather than between two numbers — an attack/decay/sustain/release, a hold-and-fall, any curve you can draw. `points` are the Envelope component\'s own: a list of { x, y } in 0..1, optionally with a per-point `curve`, and the lookup is ce.math.map — which IS the Envelope\'s envValueAt, so a script\'s sweep and the Envelope drawn beside it trace the same line. The shape is SAMPLED to 1024 points when the animation starts and read linearly between them: far finer than the rate the value is written at, identical in every runtime, and an approximation of about 0.1% at a sharp corner rather than an exact re-evaluation. `opts.from`/`opts.to` are the values y=0 and y=1 map to (0 and 1 by default), and everything animateTo takes applies: duration, beats, sync, delay, repeat, pingpong, done. This is the one `to` cannot express at all — `to` has one destination, and an envelope goes up before it comes down.',
+    params: [
+      { name: 'path', type: 'path', required: true },
+      { name: 'points', type: 'list', required: true },
+      { name: 'opts', type: 'object', required: false,
+        fields: ['from', 'to', 'duration', 'beats', 'sync', 'delay', 'repeat', 'pingpong', 'done'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.anim.envelope("${1:cutoff}", { {x=0,y=0}, {x=0.1,y=1}, {x=0.4,y=0.6}, {x=1,y=0} }, { duration = ${2:800}, to = 127 })$0',
+      javascript: 'ce.anim.envelope("${1:cutoff}", [{x:0,y:0},{x:0.1,y:1},{x:0.4,y:0.6},{x:1,y:0}], { duration: ${2:800}, to: 127 });$0',
+    },
+  },
+  {
+    id: 'animateValue', category: 'Animation', signature: 'animateValue(path) -> table',
+    summary: 'Where an animation IS: { path, kind, value, progress, from, to, elapsed, remaining, paused, cycle, sync }, or nothing when the path is not animating. running() says WHETHER; this says how far, which is what a progress ring, a guard on a gesture, or a decision about whether to interrupt actually needs. `elapsed` and `remaining` are nil for a transport-synced animation, because how long it has left depends on a tempo nobody has played yet.',
+    params: [{ name: 'path', type: 'path', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'animateList', category: 'Animation', signature: 'animateList() -> list',
+    summary: 'Every animation running, in path order, each described as animateValue describes it. The read ce.time.timers() and ce.panel.entries() both got — and the one that makes `repeat = -1` safe to offer, because a script can always find what it started and stop it.',
+    scopes: 'any',
+  },
+  {
+    id: 'animatePause', category: 'Animation', signature: 'animatePause(path)',
+    summary: 'Hold an animation where it is, without ending it. stop() is destructive and there was no non-destructive hold, so "freeze the sweep while the user is dragging" meant stopping it and rebuilding the remainder by hand. Returns false when nothing is running on the path, or it is already paused.',
+    params: [{ name: 'path', type: 'path', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'animateResume', category: 'Animation', signature: 'animateResume(path)',
+    summary: 'Carry on from where pause() held it — the animation continues rather than restarting, which is the whole difference from stopping and starting again.',
+    params: [{ name: 'path', type: 'path', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'animateReverse', category: 'Animation', signature: 'animateReverse(path)',
+    summary: 'Turn a running animation around from where it is, travelling back at the SAME RATE — a move that was 80% done takes 80% of its duration to get home. animateTo(path, from) would restart at the FULL duration, so an almost-finished move would take as long coming back as the whole journey took: a bounce rather than a snap back. An envelope reverses its shape as well as its direction.',
+    params: [{ name: 'path', type: 'path', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'animateFinish', category: 'Animation', signature: 'animateFinish(path)',
+    summary: 'Jump to the target and complete: the value lands exactly where the animation was going and `done` fires with completed = true. stop() leaves it stranded halfway, which is right for a cancel and wrong for "skip the animation" — a footswitch that should apply a patch NOW rather than watch it glide.',
+    params: [{ name: 'path', type: 'path', required: true }],
+    scopes: 'any',
   },
 
   /* --- User feedback (design doc §6 phase 6, §18) ---
@@ -2133,8 +2194,10 @@ export const MODULES = [
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key IMPLIES: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain, one-shot or beat-synced — plus the transport\'s own grid: note divisions, bar/beat at any position, the steps between two readings, swing, cycles, loop folding and tempo from taps or clock pulses. And a monotonic clock, because there was none.' },
-  { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
+  // requires ce.math because envelope() drives the value through ce.math.map — one lookup, shared
+  // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
+  { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Move a value over time instead of jumping it: to a destination, with a spring, or through a shape you draw — delayed, staggered, repeating, tempo-synced, and telling you when it is done. Cross-runtime: a sweep has to work with the panel shut too.' },
   { id: 'ce.ui', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Tell the person using the panel something, or ask them. Panel view only — there is nobody to tell with the window shut.' },
   { id: 'ce.draw', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -2239,6 +2302,11 @@ const MODULE_MEMBERS = {
                 octaves: 'expandOctaves', arp: 'arpOrder' },
   'ce.anim': {
     to: 'animateTo', spring: 'animateSpring', stop: 'animateStop', running: 'animateRunning',
+    // `value`, `list`, `pause`, `finish` and `reverse` are all §1 collisions as bare globals —
+    // ordinary words a panel author reaches for — so the flat spellings keep the animate prefix.
+    envelope: 'animateEnvelope', value: 'animateValue', list: 'animateList',
+    pause: 'animatePause', resume: 'animateResume', reverse: 'animateReverse',
+    finish: 'animateFinish',
   },
   'ce.ui': { notify: 'uiNotify', status: 'uiStatus', dialog: 'uiDialog' },
   'ce.draw': {

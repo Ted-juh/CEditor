@@ -127,14 +127,75 @@ void ScriptRuntime::applyModuleGates()
 // in the shipped plugin pass through identical values at identical moments. An incremental
 // integrator would have been easier to write and impossible to hold to that.
 
-double ScriptRuntime::animationEase (double progress, const juce::String& curve)
+// BEGIN GENERATED animation tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
+// The Properties panel's named easings, as the cubic-bezier control points it stores. Generated so
+// the host engine, the three preludes and the WebView all animate along ONE set of numbers.
+static const std::map<juce::String, std::array<double, 4>>& animEasings()
+{
+    static const std::map<juce::String, std::array<double, 4>> table = {
+    { "inQuad", { 0.550000, 0.085000, 0.680000, 0.530000 } },
+    { "outQuad", { 0.250000, 0.460000, 0.450000, 0.940000 } },
+    { "inOutQuad", { 0.455000, 0.030000, 0.515000, 0.955000 } },
+    { "outCubic", { 0.215000, 0.610000, 0.355000, 1.000000 } },
+    };
+    return table;
+}
+// An envelope is sampled into this many segments before it is handed to the engine; the same
+// number in every runtime is what makes the sampled shape identical rather than merely similar.
+static constexpr int kAnimSamples = 1024;
+// END GENERATED animation tables
+
+double ScriptRuntime::cubicBezierEase (double t, double x1, double y1, double x2, double y2)
+{
+    const double x = juce::jlimit (0.0, 1.0, t);
+    if (x1 == y1 && x2 == y2) return x;        // the identity curve is a straight line
+    if (x <= 0.0) return 0.0;
+    if (x >= 1.0) return 1.0;
+
+    auto at = [] (double s, double a, double b)
+    { return (((1.0 - 3.0 * b + 3.0 * a) * s + (3.0 * b - 6.0 * a)) * s + (3.0 * a)) * s; };
+    auto slope = [] (double s, double a, double b)
+    { return 3.0 * (1.0 - 3.0 * b + 3.0 * a) * s * s + 2.0 * (3.0 * b - 6.0 * a) * s + 3.0 * a; };
+
+    // Newton-Raphson on the x polynomial, then bisection to finish. Newton alone wanders where the
+    // slope is near zero (an ease-out's tail); bisection alone is slow. FIXED counts, because four
+    // runtimes have to land on the same double.
+    double s = x;
+    for (int i = 0; i < 8; ++i)
+    {
+        const double d = slope (s, x1, x2);
+        if (d == 0.0) break;
+        s -= (at (s, x1, x2) - x) / d;
+    }
+    if (! (s >= 0.0) || ! (s <= 1.0))
+    {
+        double lo = 0.0, hi = 1.0;
+        s = x;
+        for (int i = 0; i < 24; ++i)
+        {
+            if (at (s, x1, x2) < x) lo = s; else hi = s;
+            s = (lo + hi) / 2.0;
+        }
+    }
+    return at (s, y1, y2);
+}
+
+double ScriptRuntime::animationEase (double progress, const juce::String& curve, bool* known)
 {
     const double v = juce::jlimit (0.0, 1.0, progress);
-    // Deliberately the same four shapes ce.math.curve() offers, computed the same way, so an
-    // author who knows one knows the other.
+    if (known != nullptr) *known = true;
+    // The four shapes ce.math.curve() offers, computed the same way, so an author who knows one
+    // knows the other.
+    if (curve.isEmpty() || curve == "linear") return v;
     if (curve == "exp") return v * v;
     if (curve == "log") return std::sqrt (v);
     if (curve == "s")   return v * v * (3.0 - 2.0 * v);
+    // …and the Properties panel's, as the beziers the panel actually stores. A lookalike formula
+    // would be a second curve wearing the same name, and the author would have no way to tell.
+    const auto& table = animEasings();
+    const auto it = table.find (curve);
+    if (it != table.end()) return cubicBezierEase (v, it->second[0], it->second[1], it->second[2], it->second[3]);
+    if (known != nullptr) *known = false;
     return v;
 }
 
@@ -145,11 +206,109 @@ double ScriptRuntime::animationSpring (double progress, double damping, double f
     return 1.0 - std::exp (-damping * x) * std::cos (frequency * x);
 }
 
-void ScriptRuntime::startAnimation (const juce::String& kind, const juce::String& path,
+double ScriptRuntime::animationBeatsNow()
+{
+    const auto t = host.transportState();
+    if (auto* o = t.getDynamicObject())
+        if (o->hasProperty ("valid") && (bool) o->getProperty ("valid"))
+            return (double) o->getProperty ("beats");
+    return 0.0;
+}
+
+double ScriptRuntime::animationProgressOf (const Animation& a, double nowMs, double beats) const
+{
+    if (a.paused) return a.heldProgress;
+    if (a.sync)
+    {
+        const double span = a.syncBeats > 0.0 ? a.syncBeats : 1.0;
+        return juce::jlimit (0.0, 1.0, (beats - a.startBeats) / span);
+    }
+    return juce::jlimit (0.0, 1.0, (nowMs - a.startMs) / a.duration);
+}
+
+double ScriptRuntime::animationValueOf (const Animation& a, double progress) const
+{
+    if (a.kind == "envelope")
+    {
+        // The shape was SAMPLED by the prelude with ce.math.map — the Envelope component's own
+        // lookup — and is read linearly between samples here. Sampling is what lets this engine run
+        // an envelope at all: map()'s per-point curves live in the preludes, and the alternative
+        // was a fifth implementation of them in this file.
+        if (a.samples.empty()) return a.from;
+        const double x = juce::jlimit (0.0, 1.0, progress) * (double) (a.samples.size() - 1);
+        const auto i = (size_t) std::floor (x);
+        const double shaped = (i >= a.samples.size() - 1)
+            ? a.samples.back()
+            : a.samples[i] + (a.samples[i + 1] - a.samples[i]) * (x - (double) i);
+        return a.from + (a.to - a.from) * shaped;
+    }
+    const double eased = a.kind == "spring" ? animationSpring (progress, a.damping, a.frequency)
+                                            : animationEase (progress, a.curve);
+    return a.from + (a.to - a.from) * eased;
+}
+
+// The completion callback lives in the SCRIPT, so the host cannot call it: it emits, and each
+// prelude routes the emit to the function it stored. Exactly how after()'s one-shot already works,
+// and the reason `done` can be a plain function argument in every language.
+void ScriptRuntime::fireAnimationDone (const Animation& a, bool completed)
+{
+    if (a.groupId != 0)
+    {
+        const auto it = animationGroups.find (a.groupId);
+        if (it == animationGroups.end()) return;
+        it->second.remaining -= 1;
+        if (! completed) it->second.completed = false;
+        if (it->second.remaining > 0) return;
+        auto* obj = new juce::DynamicObject();
+        obj->setProperty ("group", a.groupId);
+        obj->setProperty ("paths", juce::var (juce::Array<juce::var> {}));
+        auto paths = juce::Array<juce::var>();
+        for (const auto& p : it->second.paths) paths.add (p);
+        obj->setProperty ("paths", paths);
+        obj->setProperty ("completed", it->second.completed);
+        animationGroups.erase (it);
+        host.emitEvent ("__animDone", juce::var (obj));
+        return;
+    }
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("path", a.path);
+    obj->setProperty ("completed", completed);
+    host.emitEvent ("__animDone", juce::var (obj));
+}
+
+juce::var ScriptRuntime::animationDescribe (const Animation& a) const
+{
+    auto* obj = new juce::DynamicObject();
+    const double progress = animationProgressOf (a, animationNowMs, 0.0);
+    obj->setProperty ("path", a.path);
+    obj->setProperty ("kind", a.kind);
+    obj->setProperty ("value", animationValueOf (a, progress));
+    obj->setProperty ("progress", progress);
+    obj->setProperty ("from", a.from);
+    obj->setProperty ("to", a.to);
+    // Void for a synced animation: how long it has left depends on a tempo nobody has played yet,
+    // and a number invented from the current one would be wrong the moment the tempo moved.
+    if (! a.sync)
+    {
+        obj->setProperty ("elapsed", a.duration * progress);
+        obj->setProperty ("remaining", juce::jmax (0.0, a.duration * (1.0 - progress)));
+    }
+    obj->setProperty ("paused", a.paused);
+    obj->setProperty ("cycle", a.cycle);
+    obj->setProperty ("sync", a.sync);
+    return juce::var (obj);
+}
+
+ScriptRuntime::Animation* ScriptRuntime::animationFor (const juce::String& path)
+{
+    for (auto& a : animations) if (a.path == path) return &a;
+    return nullptr;
+}
+
+void ScriptRuntime::startAnimation (const juce::String& kind, const juce::var& path,
                                     double target, const juce::var& opts)
 {
     assertMessageThread();
-    if (path.isEmpty()) return;
 
     auto* o = opts.getDynamicObject();
     auto number = [o] (const char* key, double fallback)
@@ -158,37 +317,149 @@ void ScriptRuntime::startAnimation (const juce::String& kind, const juce::String
         const double v = (double) o->getProperty (key);
         return std::isfinite (v) ? v : fallback;
     };
+    auto flag = [o] (const char* key)
+    { return o != nullptr && o->hasProperty (key) && (bool) o->getProperty (key); };
+
+    // A LIST of paths is one call, one shape, one completion — and `stagger` is why the list is
+    // worth having rather than a loop at the call site.
+    if (auto* list = path.getArray())
+    {
+        juce::StringArray paths;
+        for (const auto& p : *list) { const auto str = p.toString(); if (str.isNotEmpty()) paths.add (str); }
+        if (paths.isEmpty()) return;
+
+        const double stagger = number ("stagger", 0.0);
+        const double baseDelay = number ("delay", 0.0);
+        int groupId = 0;
+        if (o != nullptr && o->hasProperty ("group"))
+        {
+            animationGroupSeq += 1;
+            groupId = animationGroupSeq;
+            AnimationGroup g;
+            g.remaining = paths.size();
+            g.paths = paths;
+            animationGroups[groupId] = g;
+        }
+        for (int i = 0; i < paths.size(); ++i)
+        {
+            auto* each = o != nullptr ? new juce::DynamicObject (*o) : new juce::DynamicObject();
+            each->setProperty ("delay", baseDelay + stagger * (double) i);
+            each->removeProperty ("group");
+            each->setProperty ("__group", groupId);
+            startAnimation (kind, juce::var (paths[i]), target, juce::var (each));
+        }
+        return;
+    }
+
+    const auto key = path.toString();
+    if (key.isEmpty()) return;
 
     Animation a;
-    a.kind = kind == "spring" ? "spring" : "to";
-    a.path = path;
-    a.to = target;
-    a.duration = juce::jmax (1.0, number ("duration", a.kind == "spring" ? 600.0 : 300.0));
+    a.kind = kind == "spring" ? "spring" : (kind == "envelope" ? "envelope" : "to");
+    a.path = key;
+    a.groupId = (o != nullptr && o->hasProperty ("__group")) ? (int) o->getProperty ("__group") : 0;
+
+    if (o != nullptr && o->hasProperty ("curve"))
+    {
+        const auto name = o->getProperty ("curve").toString();
+        bool known = true;
+        animationEase (0.5, name, &known);
+        if (! known)
+        {
+            // An unknown curve REPORTS rather than silently animating linear. "outCubic" is a name
+            // the Properties panel offers three feet away, and it was linear here in every runtime.
+            host.log ("[panel] ce.anim: \"" + name + "\" is not a curve this build knows — animating linear.",
+                      juce::var());
+        }
+        else a.curve = name;
+    }
+
+    if (a.kind == "envelope")
+        if (auto* pts = (o != nullptr ? o->getProperty ("samples").getArray() : nullptr))
+            for (const auto& v : *pts) a.samples.push_back ((double) v);
+
+    const double defaultMs = a.kind == "spring" ? 600.0 : 300.0;
+    a.duration = juce::jmax (1.0, number ("duration", defaultMs));
     a.damping = number ("damping", 6.0);
     a.frequency = number ("frequency", 12.0);
-    if (o != nullptr && o->hasProperty ("curve")) a.curve = o->getProperty ("curve").toString();
+    a.delay = juce::jmax (0.0, number ("delay", 0.0));
+    a.pingpong = flag ("pingpong");
+    const int repeat = (int) std::llround (number ("repeat", 0.0));
+    a.repeat = repeat < 0 ? -1 : repeat;
+
+    // `beats` gives the duration a musical length; `sync` is the stronger thing — the position is
+    // derived from the transport's beat count, so the animation FREEZES when the transport stops
+    // and stretches when the tempo drops, which is what every synced component in the panel does.
+    a.sync = flag ("sync");
+    const double beats = number ("beats", 0.0);
+    if (beats > 0.0)
+    {
+        a.syncBeats = beats;
+        if (const auto ms = beatsToMs (beats); ms > 0.0) a.duration = juce::jmax (1.0, ms);
+    }
+    else if (a.sync)
+    {
+        const double bpm = transportBpm();
+        a.syncBeats = bpm > 0.0 ? (a.duration * bpm / 60000.0) : 1.0;
+    }
+
     // Nothing has ticked yet on a freshly constructed runtime, so seed the origin from the same
     // clock the host ticks with — otherwise the first animation measures against zero and is
     // already finished by its first tick. The WebView runtime does exactly this.
     if (! animationTicked) { animationNowMs = (double) juce::Time::getMillisecondCounterHiRes(); animationTicked = true; }
-    a.startMs = animationNowMs;
+    a.startMs = animationNowMs + a.delay;
+    a.startBeats = animationBeatsNow();
+    if (a.sync && a.delay > 0.0)
+    {
+        const double bpm = transportBpm();
+        if (bpm > 0.0) a.startBeats += a.delay * bpm / 60000.0;
+    }
 
     // `from` defaults to where the value IS, so an animation always starts from the truth rather
     // than from wherever the last one happened to end.
     a.from = (o != nullptr && o->hasProperty ("from")) ? (double) o->getProperty ("from")
-                                                       : (double) host.getValue (path, "value");
+                                                       : (double) host.getValue (key, "value");
     if (! std::isfinite (a.from)) a.from = 0.0;
+    a.to = target;
 
-    stopAnimation (path);   // a value has one destination
+    stopAnimation (key);   // a value has one destination, and the replaced one did not finish
     animations.push_back (a);
+}
+
+double ScriptRuntime::transportBpm()
+{
+    const auto t = host.transportState();
+    if (auto* o = t.getDynamicObject())
+    {
+        const double bpm = (double) o->getProperty ("bpm");
+        if (std::isfinite (bpm) && bpm > 0.0) return bpm;
+    }
+    return 0.0;
+}
+
+double ScriptRuntime::beatsToMs (double beats)
+{
+    const double bpm = transportBpm();
+    return bpm > 0.0 ? beats * 60000.0 / bpm : 0.0;
 }
 
 void ScriptRuntime::stopAnimation (const juce::String& path)
 {
-    if (path.isEmpty()) { animations.clear(); return; }
-    animations.erase (std::remove_if (animations.begin(), animations.end(),
-                                      [&path] (const Animation& a) { return a.path == path; }),
-                      animations.end());
+    if (path.isEmpty())
+    {
+        const auto snapshot = animations;
+        animations.clear();
+        for (const auto& a : snapshot) fireAnimationDone (a, false);
+        return;
+    }
+    for (size_t i = 0; i < animations.size(); ++i)
+    {
+        if (animations[i].path != path) continue;
+        const auto copy = animations[i];
+        animations.erase (animations.begin() + (long) i);
+        fireAnimationDone (copy, false);
+        return;
+    }
 }
 
 bool ScriptRuntime::animationRunning (const juce::String& path) const
@@ -198,22 +469,107 @@ bool ScriptRuntime::animationRunning (const juce::String& path) const
     return false;
 }
 
+juce::var ScriptRuntime::animationValue (const juce::String& path) const
+{
+    for (const auto& a : animations) if (a.path == path) return animationDescribe (a);
+    return {};
+}
+
+juce::var ScriptRuntime::animationList() const
+{
+    juce::StringArray order;
+    for (const auto& a : animations) order.add (a.path);
+    order.sort (false);
+    juce::Array<juce::var> out;
+    for (const auto& p : order) out.add (animationValue (p));
+    return juce::var (out);
+}
+
+bool ScriptRuntime::animationPause (const juce::String& path)
+{
+    auto* a = animationFor (path);
+    if (a == nullptr || a->paused) return false;
+    a->heldProgress = animationProgressOf (*a, animationNowMs, animationBeatsNow());
+    a->paused = true;
+    return true;
+}
+
+bool ScriptRuntime::animationResume (const juce::String& path)
+{
+    auto* a = animationFor (path);
+    if (a == nullptr || ! a->paused) return false;
+    // Re-anchor so the held progress reads the same at the moment of resuming: it carries on rather
+    // than restarting, which is the whole difference from stop-and-start-again.
+    a->startMs = animationNowMs - a->heldProgress * a->duration;
+    a->startBeats = animationBeatsNow() - a->heldProgress * (a->syncBeats > 0.0 ? a->syncBeats : 1.0);
+    a->paused = false;
+    return true;
+}
+
+bool ScriptRuntime::animationReverse (const juce::String& path)
+{
+    auto* a = animationFor (path);
+    if (a == nullptr) return false;
+    const double progress = animationProgressOf (*a, animationNowMs, animationBeatsNow());
+    std::swap (a->from, a->to);
+    // An envelope reverses its SHAPE as well as its direction.
+    std::reverse (a->samples.begin(), a->samples.end());
+    a->heldProgress = 1.0 - progress;
+    a->startMs = animationNowMs - (1.0 - progress) * a->duration;
+    a->startBeats = animationBeatsNow() - (1.0 - progress) * (a->syncBeats > 0.0 ? a->syncBeats : 1.0);
+    return true;
+}
+
+bool ScriptRuntime::animationFinish (const juce::String& path)
+{
+    auto* a = animationFor (path);
+    if (a == nullptr) return false;
+    const auto copy = *a;
+    host.setValue (copy.path, juce::var (animationValueOf (copy, 1.0)), juce::var());
+    for (size_t i = 0; i < animations.size(); ++i)
+        if (animations[i].path == path) { animations.erase (animations.begin() + (long) i); break; }
+    fireAnimationDone (copy, true);
+    return true;
+}
+
 void ScriptRuntime::tickAnimations (double nowMs)
 {
     animationNowMs = nowMs;
     animationTicked = true;
     if (animations.empty()) return;
 
+    const double beats = animationBeatsNow();
     // Iterate a copy: a set() can run a script that starts or stops an animation, and mutating the
     // list mid-walk is how that turns into a dangling iterator.
     const auto snapshot = animations;
     for (const auto& a : snapshot)
     {
-        const double progress = juce::jlimit (0.0, 1.0, (nowMs - a.startMs) / a.duration);
-        const double eased = a.kind == "spring" ? animationSpring (progress, a.damping, a.frequency)
-                                                : animationEase (progress, a.curve);
-        host.setValue (a.path, juce::var (a.from + (a.to - a.from) * eased), juce::var());
-        if (progress >= 1.0) stopAnimation (a.path);
+        if (a.paused) continue;
+        auto* live = animationFor (a.path);
+        if (live == nullptr) continue;            // stopped or replaced mid-walk
+
+        const double progress = animationProgressOf (*live, nowMs, beats);
+        host.setValue (a.path, juce::var (animationValueOf (*live, progress)), juce::var());
+        if (progress < 1.0) continue;
+
+        live = animationFor (a.path);
+        if (live == nullptr) continue;            // the set() above removed it
+
+        if (live->repeat != 0)
+        {
+            if (live->repeat > 0) live->repeat -= 1;
+            live->cycle += 1;
+            // ping-pong swaps the ends so the NEXT cycle comes back — the only way to express a
+            // continuous modulator without a second verb that means the same thing.
+            if (live->pingpong) { std::swap (live->from, live->to); }
+            live->startMs = nowMs;
+            live->startBeats = beats;
+            continue;
+        }
+        const auto copy = *live;
+        for (size_t i = 0; i < animations.size(); ++i)
+            if (animations[i].path == copy.path) { animations.erase (animations.begin() + (long) i); break; }
+        fireAnimationDone (copy, true);
     }
 }
 

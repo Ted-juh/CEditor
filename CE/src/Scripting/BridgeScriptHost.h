@@ -280,13 +280,25 @@ public:
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
     // place or two hosts would each run their own copy of the same sweep.
-    void startAnimation (const juce::String& kind, const juce::String& path,
+    void startAnimation (const juce::String& kind, const juce::var& path,
                          double target, const juce::var& opts) override
     { if (runtime) runtime->startAnimation (kind, path, target, opts); }
     void stopAnimation (const juce::String& path) override
     { if (runtime) runtime->stopAnimation (path); }
     bool animationRunning (const juce::String& path) override
     { return runtime && runtime->animationRunning (path); }
+    juce::var animationValue (const juce::String& path) override
+    { return runtime ? runtime->animationValue (path) : juce::var(); }
+    juce::var animationList() override
+    { return runtime ? runtime->animationList() : juce::var(); }
+    bool animationPause (const juce::String& path) override
+    { return runtime && runtime->animationPause (path); }
+    bool animationResume (const juce::String& path) override
+    { return runtime && runtime->animationResume (path); }
+    bool animationReverse (const juce::String& path) override
+    { return runtime && runtime->animationReverse (path); }
+    bool animationFinish (const juce::String& path) override
+    { return runtime && runtime->animationFinish (path); }
     // ce.ui is panel-view only; a host with a surface supplies these, the shipped plugin does not.
     void uiNotify (const juce::String& message, const juce::var& opts) override
     { if (callbacks.uiNotify) callbacks.uiNotify (message, opts); }

@@ -2742,3 +2742,148 @@ own `num`/`clampNum` for the same reason.
   through `ce.components.transport`.
 - **A `snap(beats, division)` verb.** `snap(beats, ce.time.division("1/16"))` is one line, and Q10
   says the module does not own it once the division is convertible.
+
+---
+
+## 39. `ce.anim` — a value that moves, and everything "moves from A to B" leaves out
+
+`ce.anim` was four members: `to`, `spring`, `stop`, `running`. The engine was already the right
+shape — the position is a pure function of elapsed time, evaluated identically in C++ and the
+WebView, so a sweep never drifts between the editor and the export. What was thin was everything
+around it.
+
+This is the first module where the gap was mostly in the **options**, not the verb count. It is also
+the first where the Properties panel could say things a script could not.
+
+### The Properties panel was ahead in three places
+
+The `Animations` section stores this per animation:
+
+```js
+{ trigger: {type, from, to, source},
+  targets: [{path, properties}],     // several paths, one declaration
+  duration, delay,                   // a delay
+  easing: 'outCubic' }               // its own easing vocabulary
+```
+
+Several targets, a delay, and five named easings. A script had one path, no delay, and four
+differently-named curves.
+
+### The bug: the panel's easing names were silently linear
+
+```
+ease(0.5, "outCubic")  = 0.5      ← the name the Properties panel offers, three feet away
+ease(0.5, "outQuad")   = 0.5
+ease(0.5, "typo")      = 0.5
+```
+
+`animationEase` knew `linear|exp|log|s` and fell through to linear for everything else. So an author
+who set `outCubic` in the Animations section and wrote `curve = "outCubic"` in the script beside it
+got a straight line, in every runtime, with nothing said.
+
+**Adopting the names was not the fix.** The panel stores its easings as CSS **cubic-bezier control
+points** — a CSS transition needs no evaluator, so there is no numeric easing function anywhere in
+the app. Defining `outQuad` as `1 - (1-t)²` would have been a *second curve wearing the same name*:
+
+```
+outQuad at t=0.5:   1-(1-t)²  = 0.75
+                    the panel  = 0.7713235622464706
+inQuad  at t=0.5:   t²        = 0.25
+                    the panel  = 0.25599323438193494
+```
+
+Close enough to look right, far enough to be a different motion, and nothing to tell the author
+which one they were getting. So the control points are re-exported from `interactionRuntime.js`,
+generated into the preludes *and into ScriptRuntime.cpp*, and every runtime runs the same
+Newton-Raphson-then-bisection bezier solver with **fixed** iteration counts — a loop that stops "when
+it has converged" stops after a different number of steps the moment one runtime rounds differently.
+
+The two vocabularies are deliberately **not** merged. `exp` is t², `inQuad` is a bezier that looks
+like t²; calling them one thing would be a claim about the numbers that is not true. An unknown name
+now reports and animates linear, the way `ce.math.curve()` has since §30.
+
+### Seven new members: 4 → 11
+
+| namespaced | flat | what |
+|---|---|---|
+| `ce.anim.envelope(path, points [, opts])` | `animateEnvelope` | drive a value **through a shape** |
+| `ce.anim.value(path)` | `animateValue` | where it is, how far, how long left |
+| `ce.anim.list()` | `animateList` | everything running |
+| `ce.anim.pause(path)` | `animatePause` | hold without ending |
+| `ce.anim.resume(path)` | `animateResume` | carry on, not restart |
+| `ce.anim.reverse(path)` | `animateReverse` | turn around at the same rate |
+| `ce.anim.finish(path)` | `animateFinish` | land on the target and complete |
+
+**`envelope` is the one I left out of the first pass and should not have.** `to` and `spring` both
+have one destination; an ADSR goes *up before it comes down*, and it is the single most obvious
+thing a synth panel animates. The points are the Envelope component's own — `{ x, y, curve }` in
+0..1 — and the lookup is `ce.math.map`, which **is** `envValueAt`.
+
+**The four verbs `stop` is not.** `stop` cancels: it leaves the value stranded and reports
+`completed = false`. That is right for a cancel and wrong for holding (`pause`), for resuming
+(`resume`), for turning around (`reverse`) and for "skip the animation, apply it now" (`finish`).
+Four different intentions were all being spelled with the one destructive verb.
+
+`reverse` travels back at the **same rate**: a move that was 80% done takes 80% of its duration to
+get home. `animateTo(path, from)` would restart at the full duration — an almost-finished move
+taking as long coming back as the whole journey took, which reads as a bounce rather than a snap
+back.
+
+### Eight new options
+
+`curve` (the panel's five, as the real beziers) · `delay` · `beats` · `sync` · `path` as a list ·
+`stagger` · `done` · `repeat`/`pingpong`
+
+**`sync` is stronger than `beats`.** `beats` gives the duration a musical length, once. `sync`
+derives the *position* from the transport's beat count, so the animation freezes when the transport
+stops and stretches when the tempo drops — which is what every synced component in the panel does
+and no script could ask for. `value()` returns nil `elapsed`/`remaining` for a synced animation,
+because how long it has left depends on a tempo nobody has played yet.
+
+**`done` is told whether it finished.** "Animate, then do X" used to mean `after(duration, fn)` and
+hoping the numbers matched — wrong if the animation was replaced or stopped early. `done` fires with
+`completed = true` on a natural end or `finish()`, and `false` on `stop()` or on being replaced. With
+a list of paths it fires **once**, when the last one lands: "when the sweep is over" means once, not
+six times.
+
+The callback is a function the script owns, so the host cannot call it. `ScriptRuntime` emits
+`__animDone` and each prelude routes it to the function it stored — exactly how `after()`'s one-shot
+already works, and the reason `done` can be a plain argument in every language.
+
+### The compromise, stated rather than hidden
+
+An envelope's shape is **sampled** to 1024 points when the animation starts, and read linearly
+between them. The alternative was implementing `map()`'s per-point curves — and therefore `shape()`
+and its tension family — a **fifth** time, in `ScriptRuntime.cpp`, because that is where the engine
+runs with the panel shut.
+
+The cost is real and worth naming: at a sharp corner the sampled peak can sit about a thousandth
+below the drawn one. It is far finer than the rate the value is written at, and — the property that
+actually matters — it is the *same* sampling in every runtime, so the four agree exactly with each
+other while approximating the drawn shape identically.
+
+### How it is tested
+
+The layers are different here, because **`ce.anim`'s engine is not in the preludes**. It lives in
+`ScriptRuntime.cpp` and in the WebView runtime; the preludes only forward. So:
+
+1. `scriptPreludeAgreement.test.js` **cannot** see this module, and no fixtures were added there.
+2. `ScriptRuntimeTests.cpp` §39 runs the fixtures on the C++ side — including the four bezier values
+   above, digit for digit.
+3. `scriptAnim.test.js` runs the same fixtures on the WebView side, and pins the thing neither of
+   the others can: that `EASING_BEZIERS` **is** the component table, imported, not a copy — and that
+   `outQuad` is *not* 0.75 and `inQuad` is *not* 0.25.
+
+### What is deliberately still absent
+
+- **`lfo(path, opts)`** — `repeat` + `pingpong` + `curve` already is a continuous modulator. A second
+  verb meaning the same thing makes the module less coherent, not more.
+- **`by(path, delta)` and `chain(...)`** — one line each over `to` and `done`.
+- **`speed`** — `duration / n`.
+- **`ifRunning: "ignore"` / `"queue"`** — `if not running() then` and `done`, respectively.
+- **`curve` accepting a point list** — dropped on purpose after `envelope` landed. A point list now
+  has exactly one meaning: it *is* the value's shape. Two ways to use one table is the incoherence
+  that ruled out `lfo`.
+- **Colour animation** — the Animations section does not do it either; it drives transform, opacity
+  and size as CSS transitions. There is nothing to reach parity with.
+- **Triggers** (`stateChange` / `valueChange`) — `ce.core.watch` plus `to`, already composable.
