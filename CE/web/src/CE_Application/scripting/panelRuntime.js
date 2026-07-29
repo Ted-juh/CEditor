@@ -1140,6 +1140,33 @@ function medianImpl(values) {
  * `hold` is a step, so many inputs give the same output and there is no true inverse. It returns
  * the EARLIEST input that produces the output, which is the only answer that is a function.
  */
+/**
+ * euclid(steps, pulses [, rotation]) — `pulses` hits spread as evenly as possible over `steps`,
+ * as a list of booleans. The Bjorklund rhythm, and the app's own (utils/arpLayout.js `euclid`).
+ *
+ * The Arpeggiator has used this for its rest pattern since it shipped, and a script could set
+ * arpEuclidSteps/Pulses/Rotate but never COMPUTE a pattern — so a sequencer, a gate, an LFO mask or
+ * anything else that wanted one had to reinvent it, and the hand-rolled version is almost never the
+ * stable spread.
+ *
+ * Bresenham rather than the recursive Bjorklund: the same output, and no recursion to port five
+ * times. `rotation` turns the pattern without changing which steps fire relative to each other.
+ */
+function euclidImpl(steps, pulses, rotation) {
+  const n = Math.max(1, Math.min(64, Math.round(num(steps, 1))));
+  const k = Math.max(0, Math.min(n, Math.round(num(pulses, 0))));
+  if (k <= 0) return new Array(n).fill(false);
+  if (k >= n) return new Array(n).fill(true);
+  const out = new Array(n).fill(false);
+  let bucket = 0;
+  for (let i = 0; i < n; i += 1) {
+    bucket += k;
+    if (bucket >= n) { bucket -= n; out[i] = true; }
+  }
+  const rot = ((Math.round(num(rotation, 0)) % n) + n) % n;
+  return out.slice(rot).concat(out.slice(0, rot));
+}
+
 function unshapeImpl(y, curve, tension) {
   const v = normImpl(y, 0, 1);
   // The same k as shape(), including the 1.6 default — an inverse computed against a different
@@ -1189,6 +1216,7 @@ const helpers = {
   hysteresis: (value, on, low, high) => hysteresisImpl(value, on, low, high),
   median: (values) => medianImpl(values),
   unshape: (y, curve, tension) => unshapeImpl(y, curve, tension),
+  euclid: (steps, pulses, rotation) => euclidImpl(steps, pulses, rotation),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   // range and normalisation
   norm: (v, lo, hi) => normImpl(v, lo, hi),

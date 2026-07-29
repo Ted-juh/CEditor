@@ -1799,6 +1799,8 @@ export const HELPERS = [
     summary: 'A Schmitt trigger: turns on at `high`, off at `low`, and HOLDS in between. `on` is the state it is in now, and the return is the state it should be. A plain threshold chatters — a CC hovering on the line flips a switch dozens of times a second, which on a bound control is dozens of MIDI messages a second. Two thresholds plus the current state is the fix, and nothing else in the module composes to it.' },
   { id: 'median', category: 'Value / range', signature: 'median(values)',
     summary: 'The middle value of a list, or the mean of the two middle ones; nil for an empty list. Distinct from mean() and the reason is the point: a mean SMEARS a spike across the result, a median rejects it. On a noisy controller reading that is the difference between a glitch you can hear and one you cannot.' },
+  { id: 'euclid', category: 'Value / range', signature: 'euclid(steps, pulses [, rotation])',
+    summary: 'A Euclidean rhythm: `pulses` hits spread as evenly as possible over `steps`, as a list of booleans. The app\'s own algorithm — the Arpeggiator has used it for its rest pattern since it shipped, and a script could set the Arp\'s euclid settings but never COMPUTE a pattern, so a step sequencer, a gate or an LFO mask had to reinvent it and the hand-rolled version is almost never the stable spread. `rotation` turns the pattern without changing which steps fire relative to each other. It lives in ce.math rather than ce.music because it is an even-distribution algorithm over integers — the same one as the Euclidean GCD — and ce.music is about pitch.' },
   { id: 'unshape', category: 'Value / range', signature: 'unshape(y, curve [, tension])',
     summary: 'The inverse of shape(). Going device → panel THROUGH a taper needs it: a value shaped on the way out has to be un-shaped on the way back, or the control lands somewhere other than where it started. Only map() is invertible by hand — swap x and y — while a named curve is not. `hold` is a step, so many inputs give the same output and there is no true inverse; it returns the earliest input that produces the output, which is the only answer that is a function.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
@@ -1918,7 +1920,7 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.6', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.math', version: '1.7', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
@@ -2021,7 +2023,8 @@ const MODULE_MEMBERS = {
                blendBy: 'blendBy', ticks: 'tickStops', dbPosition: 'dbPosition',
                // All four stay bare flat: unlike `min`/`max`/`sum`/`mean`, none of these is a name
                // a panel author would give their own helper, so a qualifier would only be noise.
-               smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape' },
+               smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape',
+               euclid: 'euclid' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {

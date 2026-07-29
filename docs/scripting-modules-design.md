@@ -2352,3 +2352,57 @@ The web suite pins the cross-script isolation directly — one script drawing mu
 along, and reseeding one must not reseed the other — and the JavaScript and Python preludes were
 executed and compared: identical values, streams independent, and the override restored after a
 throw. The Lua path is syntax- and parse-checked only, as ever.
+
+---
+
+## 36. Is `ce.math` complete? — the sweep, and the one thing it found
+
+"Complete" had been claimed twice and been wrong twice, so this time it was checked rather than
+asserted — and the way it was checked is the point. The earlier passes reviewed the module **as a
+library**: what would a maths library have? That question found real things and missed the one
+below, because the module is not a library. It is the arithmetic a panel needs, and the test for a
+gap is **"does the app compute something a script cannot?"**
+
+Sweeping the app's own `utils/*Layout.js` for pure functions that scripts could not reach turned up
+exactly one:
+
+**`euclid(steps, pulses [, rotation])`** — a Euclidean rhythm, `pulses` hits spread as evenly as
+possible over `steps`. The Arpeggiator has used it for its rest pattern since it shipped, and
+`ce.components.arp` could set `euclidSteps`/`Pulses`/`Rotate` — but no script could **compute** a
+pattern, so a step sequencer, a gate, or an LFO mask had to reinvent it, and the hand-rolled version
+is almost never the stable spread.
+
+It is in `ce.math` rather than `ce.music` because it is an even-distribution algorithm over integers
+— the same one as the Euclidean GCD — and `ce.music` is about pitch. That is a judgement call, and
+a cheap one to reverse: it is one line in `MODULE_MEMBERS`.
+
+Bresenham rather than the recursive Bjorklund, which produces the same output with no recursion to
+port five times.
+
+### And one behaviour that was correct and pinned by nothing
+
+`map()` gained per-point curves in §33 so a Router transfer curve or an Envelope would evaluate in a
+script exactly as the app draws it. It does — 0 mismatches over 40 samples of the Router's own
+default breakpoints and of an envelope with tension on two segments. That was true *by construction*
+and nothing in the suite held it there, so it is now asserted against `envValueAt` directly, the
+same way the other panel transforms are.
+
+### What is deliberately still absent
+
+Saying where it stops is what makes "complete" mean anything:
+
+- **Scalar `min`/`max`/`abs`/`floor`/`ceil`/`sin`, and `sort`/`reverse`/`slice`** — Q10. Every
+  runtime has them. The *list* reductions are in because Lua's varargs make the language version
+  unusable over a table; the scalar ones have no such excuse.
+- **`inRange(v, lo, hi)`** — a plain comparison reads better inline than a call.
+- **Matrix, complex, FFT** — no panel use case.
+- **The Kinetic Modulator's physics step** — a pure function in `kineticLayout.js`, and reachable
+  the same way `euclid` was not. Left out on purpose: it is a ball in a box with walls and
+  restitution, which is a *component*, not arithmetic. A script drives it through
+  `ce.components.kinetic`.
+- **The Constraint modes** (`sum`/`order`/`ratio`/`mirror`) — relationships between controls, and
+  already `ce.components.constraint`.
+
+The honest summary: **`ce.math` is 50 members and the sweep found one gap, which is now closed.**
+That is a much stronger claim than the two before it, because it comes from a different question —
+and if a later component ships a pure transform, this is the sweep that finds it.

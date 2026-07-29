@@ -793,3 +793,67 @@ test('a stream without a block is reported rather than silently doing nothing', 
   s.randomStream('x');
   assert.match(traced(), /needs a block to run/);
 });
+
+/* ==========================================================================================
+   The last two (design doc §36): an algorithm the app had and scripts could not reach, and a
+   behaviour that was correct by construction and pinned by nothing.
+   ========================================================================================== */
+
+import { euclid as appEuclid } from '../src/CE_Application/utils/arpLayout.js';
+import { envValueAt } from '../src/CE_Application/utils/envelopeLayout.js';
+
+test('euclid matches the app\'s own Euclidean rhythm', () => {
+  assert.equal(memberPath('euclid'), 'ce.math.euclid');
+  // Against the app's function rather than against copied output, so the test fails if either
+  // side drifts — the same discipline the panel-transform members follow.
+  for (const steps of [1, 4, 8, 12, 16, 32]) {
+    for (let pulses = 0; pulses <= steps; pulses += 1) {
+      for (const rotation of [0, 1, 3, -2]) {
+        assert.deepEqual(api.euclid(steps, pulses, rotation), appEuclid(steps, pulses, rotation),
+          `euclid(${steps}, ${pulses}, ${rotation}) drifted`);
+      }
+    }
+  }
+});
+
+test('euclid spreads the hits evenly, and rotation only turns the pattern', () => {
+  // The classic tresillo: 3 over 8.
+  assert.deepEqual(api.euclid(8, 3), [false, false, true, false, false, true, false, true]);
+  assert.equal(api.euclid(16, 5).filter(Boolean).length, 5, 'exactly as many hits as asked for');
+  assert.deepEqual(api.euclid(8, 0), new Array(8).fill(false));
+  assert.deepEqual(api.euclid(8, 8), new Array(8).fill(true));
+  // Rotation preserves the hit count and is cyclic.
+  const base = api.euclid(8, 3);
+  assert.equal(api.euclid(8, 3, 3).filter(Boolean).length, 3);
+  assert.deepEqual(api.euclid(8, 3, 8), base, 'a full turn is no turn');
+  assert.deepEqual(api.euclid(8, 3, -1), api.euclid(8, 3, 7), 'negative rotation wraps');
+  // Out-of-range arguments are clamped rather than producing a broken list.
+  assert.equal(api.euclid(0, 5).length, 1);
+  assert.equal(api.euclid(200, 5).length, 64);
+});
+
+test('map reproduces the Envelope/Router sampler over a real transfer curve', () => {
+  // Correct by construction since map gained per-point curves, and pinned by nothing until now.
+  // These are the Router's own default breakpoints, straight out of the section defaults.
+  const pts = [
+    { x: 0, y: 0, curve: 'linear' },
+    { x: 0.5, y: 0.4, curve: 'scurve' },
+    { x: 1, y: 1, curve: 'linear' },
+  ];
+  for (let i = 0; i <= 40; i += 1) {
+    const x = i / 40;
+    assert.ok(Math.abs(api.mapCurve(x, pts) - envValueAt(pts, x)) < 1e-12,
+      `map drifted from envValueAt at ${x}`);
+  }
+  // And an envelope with tension on a segment.
+  const env = [
+    { x: 0, y: 0, curve: 'linear', tension: 0 },
+    { x: 0.25, y: 1, curve: 'exp', tension: 2 },
+    { x: 1, y: 0, curve: 'log', tension: 1 },
+  ];
+  for (let i = 0; i <= 40; i += 1) {
+    const x = i / 40;
+    assert.ok(Math.abs(api.mapCurve(x, env) - envValueAt(env, x)) < 1e-12,
+      `map drifted from envValueAt at ${x} with tension`);
+  }
+});

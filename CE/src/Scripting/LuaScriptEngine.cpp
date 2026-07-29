@@ -494,6 +494,29 @@ function median(values)
 end
 -- The inverse of shape(), for going device -> panel THROUGH a taper. The same k as shape(),
 -- including the 1.6 default: an inverse computed against a different exponent inverts nothing.
+-- A Euclidean rhythm: `pulses` hits spread as evenly as possible over `steps`. The app's own
+-- algorithm (utils/arpLayout.js). The Arpeggiator has used it for its rest pattern since it
+-- shipped, and a script could set the Arp's euclid settings but never COMPUTE a pattern - so a step
+-- sequencer, a gate or an LFO mask had to reinvent it, and the hand-rolled version is almost never
+-- the stable spread. Bresenham rather than recursive Bjorklund: same output, no recursion to port
+-- five times.
+function euclid(steps, pulses, rotation)
+  local n = math.max(1, math.min(64, round(__num(steps, 1))))
+  local k = math.max(0, math.min(n, round(__num(pulses, 0))))
+  local out = {}
+  if k <= 0 then for i = 1, n do out[i] = false end return out end
+  if k >= n then for i = 1, n do out[i] = true end return out end
+  local bucket = 0
+  for i = 1, n do
+    bucket = bucket + k
+    if bucket >= n then bucket = bucket - n out[i] = true else out[i] = false end
+  end
+  local rot = ((round(__num(rotation, 0)) % n) + n) % n
+  if rot == 0 then return out end
+  local turned = {}
+  for i = 1, n do turned[i] = out[((i - 1 + rot) % n) + 1] end
+  return turned
+end
 function unshape(y, curve, tension)
   local v = norm(y, 0, 1)
   local ten = __num(tension, 0)
@@ -1151,7 +1174,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -1193,7 +1216,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.6", runtime = "any" },
+  { id = "ce.math", version = "1.7", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
