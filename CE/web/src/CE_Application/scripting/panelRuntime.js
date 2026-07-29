@@ -564,7 +564,12 @@ function toBreakpoints(points) {
       y = p.y ?? p[2] ?? p[1];
     }
     const nx = Number(x), ny = Number(y);
-    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny]);
+    // A point may also carry the CURVE of the segment ending at it, the way an Envelope point and
+    // a Router breakpoint do. Straight lines are still the default, so a plain pair list is
+    // unchanged.
+    const shape = Array.isArray(p) ? p[2] : p?.curve;
+    const tension = Array.isArray(p) ? p[3] : p?.tension;
+    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny, shape, tension]);
   }
   return out.sort((p, q) => p[0] - q[0]);
 }
@@ -591,7 +596,14 @@ function mapCurveImpl(v, points) {
   for (let i = 1; i < list.length; i += 1) {
     const [x0, y0] = list[i - 1];
     const [x1, y1] = list[i];
-    if (n < x1 && x1 !== x0) return y0 + ((n - x0) * (y1 - y0)) / (x1 - x0);
+    if (n < x1 && x1 !== x0) {
+      const t = (n - x0) / (x1 - x0);
+      // The segment's own shape, taken from the point it ENDS at — the envelope's convention, so a
+      // curve list read out of a control evaluates here exactly as the app draws it.
+      const eased = list[i][2] === undefined || list[i][2] === null
+        ? t : shapeImpl(t, list[i][2], list[i][3]);
+      return y0 + eased * (y1 - y0);
+    }
   }
   return last[1];
 }
@@ -894,6 +906,131 @@ function polarImpl(angle, radius) {
   return { x: Math.sin(a) * r, y: -Math.cos(a) * r };
 }
 
+/* ------------------------------------------ ce.math: the transforms the Properties panel applies */
+// The panel is not only a place to store constants — it CONFIGURES value transforms. A Macro slot
+// has a curve, a Router has a dead zone and a transfer curve, an Envelope segment has a curve and a
+// tension, a Timbre pad blends anchors by a power, a slider generates tick stops, a Meter reads in
+// dB. Every one of those is arithmetic the app performs and a script could not reproduce — so a
+// script could not compute what its own panel was about to display, and anything it worked out
+// alongside a bound control came out subtly different.
+//
+// These are the app's own functions, matched exactly rather than approximated. Where a formula
+// looks odd (the tension default below), it is odd IN THE APP, and matching it is the point.
+
+/**
+ * shape(v, curve [, tension]) — the panel's own curve warp: the one an Envelope segment and a
+ * Router breakpoint use (utils/envelopeLayout.js `envWarp`).
+ *
+ * This is NOT curve(). curve() is the older, simpler family — `exp` is v², `log` is √v, and the
+ * s-curve is spelled `s`. The panel spells it `scurve`, has a `hold`, and computes `exp`/`log`
+ * from a tension exponent. So a script that read a curve name straight out of a control and passed
+ * it to curve() got either "unknown shape" or a different number. Both verbs stay: curve() is what
+ * existing panels are written against, shape() is what the app itself does.
+ *
+ * The tension default is 1.6 rather than 0 — `tension || 1.6` in the app, so an unset tension is
+ * not a straight line. Matched deliberately: a shape() that disagreed with the envelope it is
+ * named after would be worse than not having one.
+ */
+function shapeImpl(v, curve, tension) {
+  const t = normImpl(v, 0, 1);
+  const k = 1 + Math.max(0, num(tension, 0) || 1.6);
+  switch (String(curve)) {
+    case 'exp': return t ** k;
+    case 'log': return 1 - (1 - t) ** k;
+    // Both spellings, because the panel says "scurve" and the script API has always said "s".
+    case 'scurve': case 's': return t * t * (3 - 2 * t);
+    case 'hold': return t >= 1 ? 1 : 0;
+    default: return t;
+  }
+}
+
+/**
+ * deadzone(v, amount [, invert]) — the Router's input shaping (utils/routerLayout.js `shapeInput`).
+ *
+ * Below the threshold the value is zero, and the REMAINING range rescales to fill 0–1, so response
+ * starts right at the edge of the dead zone rather than stepping up from it. That rescale is the
+ * part a hand-rolled version leaves out, and leaving it out loses the top of the range.
+ */
+function deadzoneImpl(v, amount, invert) {
+  let x = normImpl(v, 0, 1);
+  if (invert === true) x = 1 - x;
+  const dz = normImpl(amount, 0, 1);
+  if (dz > 0) x = x <= dz ? 0 : (x - dz) / (1 - dz);
+  return normImpl(x, 0, 1);
+}
+
+/**
+ * weights(points, x, y [, power]) — the inverse-distance blend a Timbre Space and a Preset
+ * Constellation use (utils/timbreLayout.js, utils/constellationLayout.js).
+ *
+ * Normalised, so they sum to 1. `power` is the blend sharpness: higher means the nearest anchor
+ * dominates sooner. Pair it with blendBy() to morph a set of values the way the pad does.
+ */
+function weightsImpl(points, x, y, power) {
+  const list = toList(points).map((p) => ({ x: num(p?.x), y: num(p?.y) }));
+  if (!list.length) return [];
+  const px = normImpl(x, 0, 1);
+  const py = normImpl(y, 0, 1);
+  const p = Math.max(0.5, num(power, 2));
+  const eps = 1e-6;                               // the app's own guard against a zero distance
+  const raw = list.map((pt) => {
+    const d2 = (pt.x - px) ** 2 + (pt.y - py) ** 2;
+    return 1 / (d2 ** (p / 2) + eps);
+  });
+  const total = raw.reduce((a, b) => a + b, 0);
+  return total > 0 ? raw.map((w) => w / total) : raw.map(() => 1 / raw.length);
+}
+
+/** blendBy(values, weights) — a weighted sum. What weights() is for, and what a morph pad IS. */
+function blendByImpl(values, weights) {
+  const v = toNumberList(values);
+  const w = toNumberList(weights);
+  const n = Math.min(v.length, w.length);
+  let total = 0;
+  let sum = 0;
+  for (let i = 0; i < n; i += 1) { sum += v[i] * w[i]; total += w[i]; }
+  return total > 0 ? sum / total : 0;
+}
+
+/**
+ * ticks(major [, minor]) — the stop positions a slider's scale is drawn from
+ * (utils/sliderGeometry.js `buildSliderTickStops`), as 0–1 positions.
+ *
+ * A script drawing its own scale with ce.draw had to reinvent the minor-tick spacing, and getting
+ * it wrong puts the minors visibly out of step with the ones the app draws beside them.
+ */
+function ticksImpl(major, minor) {
+  const majorCount = Math.max(2, Math.round(num(major, 11)));
+  const minorCount = Math.max(0, Math.round(num(minor, 0)));
+  const out = { major: [], minor: [] };
+  for (let index = 0; index < majorCount; index += 1) {
+    const normalized = index / (majorCount - 1);
+    out.major.push(normalized);
+    if (index >= majorCount - 1 || minorCount <= 0) continue;
+    for (let m = 1; m <= minorCount; m += 1) {
+      out.minor.push(normalized + ((m / (minorCount + 1)) * (1 / (majorCount - 1))));
+    }
+  }
+  return out;
+}
+
+/**
+ * dbPosition(fraction [, floorDb, ceilDb]) — where a level sits on a dB meter
+ * (utils/meterLayout.js `meterPosition`), 0–1.
+ *
+ * gainToDb answers "how many dB is this"; this answers "how far up the meter does it go", which is
+ * a different question and the one a script drawing a meter is asking. The 1e-4 clamp is the app's:
+ * without it silence is -inf and the fill position stops being a number.
+ */
+function dbPositionImpl(fraction, floorDb, ceilDb) {
+  const frac = normImpl(fraction, 0, 1);
+  const floor = num(floorDb, -60);
+  const ceil = num(ceilDb, 6);
+  if (ceil === floor) return 0;
+  const db = 20 * Math.log10(Math.max(frac, 1e-4));
+  return normImpl((db - floor) / (ceil - floor), 0, 1);
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -915,6 +1052,13 @@ const helpers = {
   },
   wrap: (v, lo, hi) => wrapImpl(v, lo, hi),
   mapCurve: (v, points) => mapCurveImpl(v, points),
+  // The transforms the Properties panel itself applies, matched exactly rather than approximated.
+  shapeCurve: (v, curve, tension) => shapeImpl(v, curve, tension),
+  deadzone: (v, amount, invert) => deadzoneImpl(v, amount, invert),
+  weightsFor: (points, x, y, power) => weightsImpl(points, x, y, power),
+  blendBy: (values, weights) => blendByImpl(values, weights),
+  tickStops: (major, minor) => ticksImpl(major, minor),
+  dbPosition: (fraction, floorDb, ceilDb) => dbPositionImpl(fraction, floorDb, ceilDb),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   randomChoice: (values, weights) => randomChoiceImpl(values, weights),
   // range and normalisation

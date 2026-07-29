@@ -1768,6 +1768,26 @@ export const HELPERS = [
     summary: 'The angle from one point to another in ce.draw\'s own convention: DEGREES, 0 at twelve o\'clock, increasing clockwise, 0–360. Rebuilding that from atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.' },
   { id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
     summary: 'The inverse: an angle and a radius to { x, y } offsets from a centre, in the same convention. Together with angleOf, what a knob ring, a radial meter or a pan indicator is drawn from.' },
+
+  // --- the transforms the Properties panel itself applies (design doc §33) ---
+  // The panel does not only store constants; it CONFIGURES value transforms — a Macro slot's
+  // curve, a Router's dead zone and transfer curve, an Envelope segment's curve and tension, a
+  // Timbre pad's blend power, a slider's tick stops, a Meter's dB scale. A script could not
+  // reproduce any of them, so it could not compute what its own panel was about to display, and
+  // anything it worked out alongside a bound control came out subtly different. These are the
+  // app's own functions, matched exactly.
+  { id: 'shapeCurve', category: 'Value / range', signature: 'shapeCurve(v, curve [, tension])',
+    summary: 'The panel\'s OWN curve warp — the one an Envelope segment and a Router breakpoint use. Not the same thing as curve(): curve() is the older, simpler family (exp is v², log is √v, and the s-curve is spelled "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension exponent. A script that read a curve name straight out of a control and passed it to curve() therefore got either an unknown-shape notice or a different number. Both spellings of the s-curve are accepted here. `tension` defaults to 1.6, not 0, because that is what the app does — an unset tension is not a straight line.' },
+  { id: 'deadzone', category: 'Value / range', signature: 'deadzone(v, amount [, invert])',
+    summary: 'The Expression Router\'s input shaping: below the threshold the value is zero, and the REMAINING range rescales to fill 0–1 so response starts right at the edge of the dead zone. The rescale is the part a hand-rolled version leaves out, and leaving it out loses the top of the range.' },
+  { id: 'weightsFor', category: 'Value / range', signature: 'weightsFor(points, x, y [, power])',
+    summary: 'The inverse-distance blend weights a Timbre Space and a Preset Constellation use, normalised so they sum to 1. `power` is the blend sharpness — higher means the nearest anchor dominates sooner. Pair with blendBy() to morph a set of values the way the pad does.' },
+  { id: 'blendBy', category: 'Value / range', signature: 'blendBy(values, weights)',
+    summary: 'A weighted average — what weightsFor() is for, and what a morph pad IS. blend() interpolates two lists; this collapses many values by weight.' },
+  { id: 'tickStops', category: 'Value / range', signature: 'tickStops(major [, minor])',
+    summary: 'The 0–1 stop positions a slider\'s scale is drawn from, as { major, minor }. A script drawing its own scale with ce.draw had to reinvent the minor-tick spacing, and getting it wrong puts the minors visibly out of step with the ones the app draws beside them.' },
+  { id: 'dbPosition', category: 'Value / range', signature: 'dbPosition(fraction [, floorDb, ceilDb])',
+    summary: 'Where a level sits on a dB meter, 0–1. gainToDb answers "how many dB is this"; this answers "how far up the meter does it go", which is the question a script drawing a meter is asking. Defaults match the Meter component: floor -60, ceiling +6.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
@@ -1883,7 +1903,7 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.math', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
@@ -1979,7 +1999,11 @@ const MODULE_MEMBERS = {
                randomFloat: 'randomFloat', gaussian: 'randomGaussian', walk: 'randomWalk',
                chance: 'randomBool', shuffle: 'shuffle',
                degrees: 'toDegrees', radians: 'toRadians',
-               distance: 'distance', angle: 'angleOf', polar: 'polar' },
+               distance: 'distance', angle: 'angleOf', polar: 'polar',
+               // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute
+               // different families and collapsing them would change what existing panels sound like.
+               shape: 'shapeCurve', deadzone: 'deadzone', weights: 'weightsFor',
+               blendBy: 'blendBy', ticks: 'tickStops', dbPosition: 'dbPosition' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {

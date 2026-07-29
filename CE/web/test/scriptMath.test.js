@@ -468,3 +468,136 @@ test('polar is angleOf inverted, in the same convention', () => {
     assert.ok(Math.abs(api.distance(0, 0, p.x, p.y) - 7) < 1e-9);
   }
 });
+
+/* ==========================================================================================
+   The transforms the Properties panel itself applies (design doc §33).
+
+   The panel does not only store constants — it CONFIGURES value transforms: a Macro slot's curve,
+   a Router's dead zone and transfer curve, an Envelope segment's curve and tension, a Timbre pad's
+   blend power, a slider's tick stops, a Meter's dB scale. A script could reproduce none of them,
+   so it could not compute what its own panel was about to display.
+
+   These assert against the app's OWN functions rather than against numbers copied out of them, so
+   the test fails if either side drifts — which is the only way "matched exactly" stays true.
+   ========================================================================================== */
+
+import { envWarp } from '../src/CE_Application/utils/envelopeLayout.js';
+import { shapeInput } from '../src/CE_Application/utils/routerLayout.js';
+import { buildSliderTickStops } from '../src/CE_Application/utils/sliderGeometry.js';
+import { meterPosition } from '../src/CE_Application/utils/meterLayout.js';
+
+test('the six panel-transform members are declared and namespaced', () => {
+  for (const [id, path] of [
+    ['shapeCurve', 'ce.math.shape'], ['deadzone', 'ce.math.deadzone'],
+    ['weightsFor', 'ce.math.weights'], ['blendBy', 'ce.math.blendBy'],
+    ['tickStops', 'ce.math.ticks'], ['dbPosition', 'ce.math.dbPosition'],
+  ]) {
+    assert.ok(MEMBER_BY_ID[id], `${id} is not declared`);
+    assert.equal(memberPath(id), path);
+    assert.equal(typeof api[id], 'function', `${id} is not bound`);
+  }
+});
+
+test('curve() and shape() are DIFFERENT families, and that is why both exist', () => {
+  // This is the defect the whole section came from. The panel spells its s-curve "scurve" and
+  // computes exp/log from a tension exponent; curve() spells it "s" and uses v² / √v. So a script
+  // reading a curve name straight out of a control and passing it to curve() got either an
+  // unknown-shape notice or a different number.
+  clearScriptTrace();
+  api.curve(0.5, 'scurve');
+  assert.match(traced(), /unknown shape/, 'curve() does not know the panel\'s spelling');
+  assert.equal(api.shapeCurve(0.5, 'scurve'), 0.5, 'shape() does');
+
+  assert.equal(api.curve(0.25, 'log'), 0.5, 'curve log is sqrt');
+  assert.notEqual(api.shapeCurve(0.25, 'log'), api.curve(0.25, 'log'), 'the panel computes it differently');
+  // hold exists only in the panel's family.
+  assert.equal(api.shapeCurve(0.99, 'hold'), 0);
+  assert.equal(api.shapeCurve(1, 'hold'), 1);
+});
+
+test('shape() matches the Envelope\'s own warp, for every curve and tension', () => {
+  for (const curve of ['linear', 'exp', 'log', 'scurve', 'hold']) {
+    for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+      for (const tension of [0, 1, 3]) {
+        assert.ok(Math.abs(api.shapeCurve(t, curve, tension) - envWarp(t, curve, tension)) < 1e-12,
+          `shape(${t}, ${curve}, ${tension}) drifted from envWarp`);
+      }
+    }
+  }
+  // Including the odd bit: an unset tension is 1.6, not 0, so exp is not v². Matching that is the
+  // point — a shape() that disagreed with the envelope it is named after would be worse than none.
+  assert.ok(Math.abs(api.shapeCurve(0.5, 'exp') - 0.5 ** 2.6) < 1e-12);
+});
+
+test('deadzone matches the Router\'s own input shaping', () => {
+  for (const v of [0, 0.1, 0.2, 0.5, 0.9, 1]) {
+    for (const dz of [0, 0.2, 0.5]) {
+      for (const invert of [false, true]) {
+        assert.ok(Math.abs(api.deadzone(v, dz, invert) - shapeInput(v, { invert, deadzone: dz })) < 1e-12,
+          `deadzone(${v}, ${dz}, ${invert}) drifted`);
+      }
+    }
+  }
+  // The rescale is the part a hand-rolled version leaves out: past the zone the range still fills.
+  assert.equal(api.deadzone(0.2, 0.2), 0);
+  assert.equal(api.deadzone(1, 0.2), 1);
+  assert.ok(Math.abs(api.deadzone(0.6, 0.2) - 0.5) < 1e-12);
+});
+
+test('mapCurve honours a per-point curve, so a breakpoint list evaluates like the panel\'s', () => {
+  // A Router transfer curve and an Envelope both carry the shape on the point the segment ENDS at.
+  const straight = [[0, 0], [1, 1]];
+  const eased = [[0, 0], { x: 1, y: 1, curve: 'scurve' }];
+  assert.equal(api.mapCurve(0.25, straight), 0.25);
+  assert.equal(api.mapCurve(0.25, eased), envWarp(0.25, 'scurve'));
+  // A plain pair list is unchanged — straight lines are still the default.
+  assert.equal(api.mapCurve(0.75, straight), 0.75);
+  // And tension rides along.
+  const tense = [[0, 0], { x: 1, y: 1, curve: 'exp', tension: 3 }];
+  assert.ok(Math.abs(api.mapCurve(0.5, tense) - envWarp(0.5, 'exp', 3)) < 1e-12);
+});
+
+test('tickStops matches the slider\'s own generator', () => {
+  for (const [major, minor] of [[2, 0], [5, 0], [5, 3], [11, 1]]) {
+    const mine = api.tickStops(major, minor);
+    const app = buildSliderTickStops({ majorTickCount: major, minorTickCount: minor });
+    assert.equal(mine.major.length, app.major.length, `major count for ${major}/${minor}`);
+    assert.equal(mine.minor.length, app.minor.length, `minor count for ${major}/${minor}`);
+    app.major.forEach((m, i) => assert.ok(Math.abs(mine.major[i] - m.normalized) < 1e-12));
+    app.minor.forEach((m, i) => assert.ok(Math.abs(mine.minor[i] - m.normalized) < 1e-12));
+  }
+});
+
+test('dbPosition matches the Meter\'s own scale', () => {
+  for (const f of [0, 0.001, 0.1, 0.25, 0.5, 1]) {
+    const app = meterPosition(f, { scale: 'db', valueMin: 0, valueMax: 1 });
+    assert.ok(Math.abs(api.dbPosition(f) - app) < 1e-12, `dbPosition(${f}) drifted`);
+  }
+  // A different question from gainToDb: that one says how many dB, this says how far up the meter.
+  assert.equal(api.gainToDb(0), -144);
+  assert.equal(api.dbPosition(0), 0);
+  // NOT 1: the Meter's ceiling is +6 dB, so full scale (0 dB) sits at 60/66 with headroom above
+  // it. Getting that wrong by hand is a meter that reads pinned when it is not.
+  assert.ok(Math.abs(api.dbPosition(1) - 60 / 66) < 1e-12);
+  assert.equal(api.dbPosition(1, -60, 0), 1, 'with no headroom, 0 dB IS the top');
+});
+
+test('weights and blendBy reproduce a morph pad', () => {
+  const anchors = [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0.5, y: 1 }];
+  const w = api.weightsFor(anchors, 0, 0, 2);
+  assert.equal(w.length, 3);
+  assert.ok(Math.abs(api.sumOf(w) - 1) < 1e-9, 'weights are normalised');
+  assert.ok(w[0] > 0.99, 'sitting on an anchor gives it almost all the weight');
+
+  // Dead centre between two of them is an even split between those two.
+  const mid = api.weightsFor([{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }], 0.5, 0.5, 2);
+  assert.ok(Math.abs(mid[0] - mid[1]) < 1e-9);
+
+  // Higher power = the nearest anchor dominates sooner, which is what "blend sharpness" means.
+  const soft = api.weightsFor(anchors, 0.2, 0.2, 1);
+  const sharp = api.weightsFor(anchors, 0.2, 0.2, 6);
+  assert.ok(sharp[0] > soft[0]);
+
+  assert.ok(Math.abs(api.blendBy([0, 100], [0.25, 0.75]) - 75) < 1e-9);
+  assert.equal(api.blendBy([], []), 0);
+});

@@ -433,6 +433,74 @@ function polar(angle, radius) {
   var a = toRadians(__num(angle)), r = __num(radius);
   return { x: Math.sin(a) * r, y: -Math.cos(a) * r };
 }
+// The transforms the Properties panel itself applies, matched exactly rather than approximated.
+// shape() is NOT curve(): curve() is the older family (exp = v*v, log = sqrt v, s-curve spelled
+// "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension
+// exponent whose default is 1.6 rather than 0. Odd in the app, and matched here on purpose.
+function shapeCurve(v, curve, tension) {
+  var t = norm(v, 0, 1);
+  var ten = __num(tension, 0) || 1.6;
+  var k = 1 + Math.max(0, ten);
+  var name = String(curve);
+  if (name === "exp") return Math.pow(t, k);
+  if (name === "log") return 1 - Math.pow(1 - t, k);
+  if (name === "scurve" || name === "s") return t * t * (3 - 2 * t);
+  if (name === "hold") return t >= 1 ? 1 : 0;
+  return t;
+}
+// The Expression Router's input shaping. Below the threshold the value is zero and the REMAINING
+// range rescales to fill 0-1, so response starts at the edge of the dead zone.
+function deadzone(v, amount, invert) {
+  var x = norm(v, 0, 1);
+  if (invert === true) x = 1 - x;
+  var dz = norm(amount, 0, 1);
+  if (dz > 0) x = x <= dz ? 0 : (x - dz) / (1 - dz);
+  return norm(x, 0, 1);
+}
+// The inverse-distance blend a Timbre Space and a Preset Constellation use, normalised to sum to 1.
+function weightsFor(points, x, y, power) {
+  var raw = [], out = [], total = 0;
+  if (!points || points.length === undefined) return out;
+  var px = norm(x, 0, 1), py = norm(y, 0, 1);
+  var p = Math.max(0.5, __num(power, 2));
+  for (var i = 0; i < points.length; i++) {
+    var dx = __num(points[i].x) - px, dy = __num(points[i].y) - py;
+    var w = 1 / (Math.pow(dx * dx + dy * dy, p / 2) + 1e-6);
+    raw.push(w);
+    total += w;
+  }
+  for (var j = 0; j < raw.length; j++) out.push(total > 0 ? raw[j] / total : 1 / raw.length);
+  return out;
+}
+// A weighted average: what weightsFor is for, and what a morph pad IS.
+function blendBy(values, weights) {
+  var v = __nums(values), w = __nums(weights);
+  var n = Math.min(v.length, w.length), sum = 0, total = 0;
+  for (var i = 0; i < n; i++) { sum += v[i] * w[i]; total += w[i]; }
+  return total > 0 ? sum / total : 0;
+}
+// The 0-1 stop positions a slider's scale is drawn from.
+function tickStops(major, minor) {
+  var majorCount = Math.max(2, Math.round(__num(major, 11)));
+  var minorCount = Math.max(0, Math.round(__num(minor, 0)));
+  var out = { major: [], minor: [] };
+  for (var index = 0; index < majorCount; index++) {
+    var normalized = index / (majorCount - 1);
+    out.major.push(normalized);
+    if (index >= majorCount - 1 || minorCount <= 0) continue;
+    for (var m = 1; m <= minorCount; m++)
+      out.minor.push(normalized + (m / (minorCount + 1)) * (1 / (majorCount - 1)));
+  }
+  return out;
+}
+// Where a level sits on a dB meter, which is a different question from how many dB it is.
+function dbPosition(fraction, floorDb, ceilDb) {
+  var frac = norm(fraction, 0, 1);
+  var floor = __num(floorDb, -60), ceil = __num(ceilDb, 6);
+  if (ceil === floor) return 0;
+  var db = 20 * Math.log(Math.max(frac, 1e-4)) / Math.LN10;
+  return norm((db - floor) / (ceil - floor), 0, 1);
+}
 // @module ce.math
 // A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 // Seeded is the whole point: the language's own Math.random cannot promise the same sequence in
@@ -1052,7 +1120,7 @@ var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-  "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbToGain": "dbToGain", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "unipolar": "unipolar", "walk": "randomWalk", "wrap": "wrap" },
+  "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
   "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1090,7 +1158,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.3","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.4","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

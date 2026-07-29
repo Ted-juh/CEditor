@@ -376,6 +376,89 @@ function polar(angle, radius)
   local a, r = toRadians(__num(angle)), __num(radius)
   return { x = math.sin(a) * r, y = -math.cos(a) * r }
 end
+-- The transforms the Properties panel itself applies, matched exactly rather than approximated.
+-- The panel does not only store constants; it CONFIGURES value transforms, and a script could not
+-- reproduce any of them — so it could not compute what its own panel was about to display.
+-- shape() is NOT curve(): curve() is the older family (exp = v^2, log = sqrt v, s-curve spelled
+-- "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension
+-- exponent whose default is 1.6 rather than 0. Odd in the app, and matched here on purpose.
+function shapeCurve(v, curve, tension)
+  local t = norm(v, 0, 1)
+  local ten = __num(tension, 0)
+  if ten == 0 then ten = 1.6 end
+  local k = 1 + math.max(0, ten)
+  local name = tostring(curve)
+  if name == "exp" then return t ^ k
+  elseif name == "log" then return 1 - (1 - t) ^ k
+  elseif name == "scurve" or name == "s" then return t * t * (3 - 2 * t)
+  elseif name == "hold" then if t >= 1 then return 1 else return 0 end
+  end
+  return t
+end
+-- The Expression Router's input shaping. Below the threshold the value is zero and the REMAINING
+-- range rescales to fill 0..1, so response starts at the edge of the dead zone rather than
+-- stepping up from it — the rescale is the part a hand-rolled version leaves out.
+function deadzone(v, amount, invert)
+  local x = norm(v, 0, 1)
+  if invert == true then x = 1 - x end
+  local dz = norm(amount, 0, 1)
+  if dz > 0 then
+    if x <= dz then x = 0 else x = (x - dz) / (1 - dz) end
+  end
+  return norm(x, 0, 1)
+end
+-- The inverse-distance blend a Timbre Space and a Preset Constellation use, normalised to sum to 1.
+function weightsFor(points, x, y, power)
+  local out, raw, total = {}, {}, 0
+  if type(points) ~= "table" then return out end
+  local px, py = norm(x, 0, 1), norm(y, 0, 1)
+  local p = math.max(0.5, __num(power, 2))
+  for i, pt in ipairs(points) do
+    local dx, dy = __num(pt.x) - px, __num(pt.y) - py
+    local w = 1 / ((dx * dx + dy * dy) ^ (p / 2) + 1e-6)
+    raw[i] = w
+    total = total + w
+  end
+  for i, w in ipairs(raw) do
+    if total > 0 then out[i] = w / total else out[i] = 1 / #raw end
+  end
+  return out
+end
+-- A weighted average: what weightsFor is for, and what a morph pad IS.
+function blendBy(values, weights)
+  local v, w = __nums(values), __nums(weights)
+  local n = math.min(#v, #w)
+  local sum, total = 0, 0
+  for i = 1, n do sum = sum + v[i] * w[i] total = total + w[i] end
+  if total > 0 then return sum / total end
+  return 0
+end
+-- The 0..1 stop positions a slider's scale is drawn from. Reinventing the minor spacing puts the
+-- minors visibly out of step with the ones the app draws beside them.
+function tickStops(major, minor)
+  local majorCount = math.max(2, round(__num(major, 11)))
+  local minorCount = math.max(0, round(__num(minor, 0)))
+  local out = { major = {}, minor = {} }
+  for index = 0, majorCount - 1 do
+    local normalized = index / (majorCount - 1)
+    out.major[#out.major + 1] = normalized
+    if index < majorCount - 1 and minorCount > 0 then
+      for m = 1, minorCount do
+        out.minor[#out.minor + 1] = normalized + (m / (minorCount + 1)) * (1 / (majorCount - 1))
+      end
+    end
+  end
+  return out
+end
+-- Where a level sits on a dB meter. gainToDb says how many dB it is; this says how far up it goes,
+-- which is the question a script drawing a meter is asking.
+function dbPosition(fraction, floorDb, ceilDb)
+  local frac = norm(fraction, 0, 1)
+  local floor, ceil = __num(floorDb, -60), __num(ceilDb, 6)
+  if ceil == floor then return 0 end
+  local db = 20 * math.log(math.max(frac, 1e-4), 10)
+  return norm((db - floor) / (ceil - floor), 0, 1)
+end
 -- @module ce.math
 -- A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 -- Seeded is the whole point: the language's own math.random cannot promise the same sequence in
@@ -990,7 +1073,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbToGain = "dbToGain", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shuffle = "shuffle", snap = "snap", sum = "sumOf", unipolar = "unipolar", walk = "randomWalk", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", snap = "snap", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -1032,7 +1115,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.3", runtime = "any" },
+  { id = "ce.math", version = "1.4", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },

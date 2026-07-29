@@ -996,6 +996,78 @@ def polar(angle, radius):
     import math
     a, r = toRadians(__num(angle)), __num(radius)
     return { "x": math.sin(a) * r, "y": -math.cos(a) * r }
+# The transforms the Properties panel itself applies, matched exactly rather than approximated.
+# shape() is NOT curve(): curve() is the older family (exp = v*v, log = sqrt v, s-curve spelled
+# "s"), while the panel spells it "scurve", has a "hold", and computes exp/log from a tension
+# exponent whose default is 1.6 rather than 0. Odd in the app, and matched here on purpose.
+def shapeCurve(v, curve, tension=None):
+    t = norm(v, 0, 1)
+    ten = __num(tension, 0) or 1.6
+    k = 1 + max(0, ten)
+    name = str(curve)
+    if name == "exp": return t ** k
+    if name == "log": return 1 - (1 - t) ** k
+    if name in ("scurve", "s"): return t * t * (3 - 2 * t)
+    if name == "hold": return 1 if t >= 1 else 0
+    return t
+
+# The Expression Router's input shaping. Below the threshold the value is zero and the REMAINING
+# range rescales to fill 0-1, so response starts at the edge of the dead zone.
+def deadzone(v, amount, invert=False):
+    x = norm(v, 0, 1)
+    if invert is True:
+        x = 1 - x
+    dz = norm(amount, 0, 1)
+    if dz > 0:
+        x = 0 if x <= dz else (x - dz) / (1 - dz)
+    return norm(x, 0, 1)
+
+# The inverse-distance blend a Timbre Space and a Preset Constellation use, normalised to sum to 1.
+def weightsFor(points, x, y, power=2):
+    pts = list(points or [])
+    if not pts:
+        return []
+    px, py = norm(x, 0, 1), norm(y, 0, 1)
+    p = max(0.5, __num(power, 2))
+    raw = []
+    for pt in pts:
+        gx = pt.get("x") if hasattr(pt, "get") else getattr(pt, "x", 0)
+        gy = pt.get("y") if hasattr(pt, "get") else getattr(pt, "y", 0)
+        dx, dy = __num(gx) - px, __num(gy) - py
+        raw.append(1 / ((dx * dx + dy * dy) ** (p / 2) + 1e-6))
+    total = sum(raw)
+    return [w / total if total > 0 else 1 / len(raw) for w in raw]
+
+# A weighted average: what weightsFor is for, and what a morph pad IS.
+def blendBy(values, weights):
+    v, w = __nums(values), __nums(weights)
+    n = min(len(v), len(w))
+    total = sum(w[:n])
+    return sum(v[i] * w[i] for i in range(n)) / total if total > 0 else 0
+
+# The 0-1 stop positions a slider's scale is drawn from.
+def tickStops(major, minor=0):
+    majorCount = max(2, round(__num(major, 11)))
+    minorCount = max(0, round(__num(minor, 0)))
+    out = { "major": [], "minor": [] }
+    for index in range(majorCount):
+        normalized = index / (majorCount - 1)
+        out["major"].append(normalized)
+        if index >= majorCount - 1 or minorCount <= 0:
+            continue
+        for m in range(1, minorCount + 1):
+            out["minor"].append(normalized + (m / (minorCount + 1)) * (1 / (majorCount - 1)))
+    return out
+
+# Where a level sits on a dB meter, which is a different question from how many dB it is.
+def dbPosition(fraction, floorDb=-60, ceilDb=6):
+    import math
+    frac = norm(fraction, 0, 1)
+    floor, ceil = __num(floorDb, -60), __num(ceilDb, 6)
+    if ceil == floor:
+        return 0
+    db = 20 * math.log10(max(frac, 1e-4))
+    return norm((db - floor) / (ceil - floor), 0, 1)
 # @module ce.math
 # A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 # Seeded is the whole point: the language's own random cannot promise the same sequence in five
@@ -1588,7 +1660,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbToGain": "dbToGain", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "unipolar": "unipolar", "walk": "randomWalk", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1630,7 +1702,7 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.3", "runtime": "any" },
+    { "id": "ce.math", "version": "1.4", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },

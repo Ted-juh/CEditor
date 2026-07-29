@@ -2145,3 +2145,79 @@ Fixed on both sides: the helper is `__num` now, and the generator's loop variabl
 with a `del` after it, so it cannot leak into a prelude again. **A generated block is code, and it
 shares a namespace with everything hand-written around it** — which had not been true of any
 generated block until one of them started emitting a loop.
+
+---
+
+## 33. `ce.math` against the Properties panel — the transforms it could not reproduce
+
+§32 completed `ce.math` as a *maths library*. That was not the bar. The bar for this whole exercise
+is **what can a script do that the Properties panel can, and more** — and measured against it, the
+module had a hole that a library-shaped review could not find, because it is not a missing function.
+It is a mismatch.
+
+**The panel does not only store constants. It CONFIGURES value transforms:** a Macro slot's curve, a
+Router's dead zone and transfer curve, an Envelope segment's curve and tension, a Timbre pad's blend
+power, a slider's tick stops, a Meter's dB scale. Every one of those is arithmetic the app performs,
+and a script could reproduce none of it — so a script could not compute what its own panel was about
+to display, and anything it worked out alongside a bound control came out subtly different.
+
+### There are three curve families in this app, and the script API matched none of the panel's
+
+|  | `exp` | `log` | s-curve | `hold` |
+|---|---|---|---|---|
+| `ce.math.curve` (the script API) | `v²` | `√v` | spelled **`s`** | — |
+| `macroWarp` (Macro slots) | `x²` | `1−(1−x)²` | spelled **`scurve`** | — |
+| `envWarp` (Envelope, Router points) | `t^2.6` | `1−(1−t)^2.6` | spelled **`scurve`** | ✓ |
+
+So `curve(v, get("macro.Macro.slots.0.curve"))` — reading a curve name out of the panel and applying
+it, the obvious thing to write — either reported an unknown shape or returned a different number.
+`log` differs in all three. `exp` agrees with the Macro and not the Envelope. The name `scurve` did
+not exist in the script API at all.
+
+**Both stay.** `curve()` is what existing panels are written against and silently changing `log`
+from `√v` to `1−(1−v)²` would change how a shipped panel sounds; `shape()` is what the app itself
+does. The distinction is documented on both, because two nearly-identical functions with no stated
+difference is worse than the mismatch it replaces.
+
+### Six members, all matched to the app rather than approximated
+
+| | |
+|---|---|
+| `ce.math.shape(v, curve [, tension])` | the Envelope/Router warp, incl. `scurve` and `hold` |
+| `ce.math.deadzone(v, amount [, invert])` | the Router's input shaping, rescale and all |
+| `ce.math.weights(points, x, y [, power])` | the Timbre / Constellation inverse-distance blend |
+| `ce.math.blendBy(values, weights)` | and applying them — what a morph pad IS |
+| `ce.math.ticks(major [, minor])` | the slider's own tick-stop generator |
+| `ce.math.dbPosition(fraction [, floor, ceil])` | the Meter's dB scale |
+
+…plus `map()` now honours a **per-point curve and tension**, so a Router transfer curve or an
+Envelope read out of a control evaluates in a script exactly as the app draws it. A plain pair list
+is unchanged; straight lines are still the default.
+
+Two oddities were matched deliberately rather than tidied:
+
+- **`shape`'s tension defaults to 1.6, not 0.** The app computes `1 + (tension || 1.6)`, so an unset
+  tension is not a straight line and `exp` is `v^2.6` rather than `v²`. A `shape()` that disagreed
+  with the envelope it is named after would be worse than not having one.
+- **`dbPosition(1)` is 60/66, not 1.** The Meter's ceiling is +6 dB, so full scale sits below the
+  top with headroom above it. The test asserted 1 on the first run and was wrong; the comparison
+  against `meterPosition` was right all along.
+
+### The tests assert against the app's functions, not against numbers copied out of them
+
+`scriptMath.test.js` imports `envWarp`, `shapeInput`, `buildSliderTickStops` and `meterPosition` and
+compares directly, over 100+ combinations. Copying the expected numbers into the test would pin the
+script API to what the app did *on the day it was written*; importing the real function means the
+test fails if **either** side drifts, which is the only way "matched exactly" stays true.
+
+The three preludes were then executed and compared case by case — 124 of them — so the same holds
+window-closed.
+
+### What this buys beyond parity
+
+Parity was the gap; it is not the payoff. Once a script can compute the panel's transforms it can
+compute them from values decided at runtime: a dead zone matched to the travel an expression pedal
+actually reports, a curve tensioned per performance, a blend over anchors discovered from the device
+rather than placed at design time, a scale drawn with `ce.draw` whose ticks line up with the ones
+beside it. A stored property can hold one setting of each of these. A script can hold the rule that
+chooses it.
