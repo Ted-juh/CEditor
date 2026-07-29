@@ -371,7 +371,48 @@ export const DEVICE_EVENTS = [
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device disconnected.' },
 ];
 
-export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS };
+/* Components (design doc §45).
+ *
+ * The catalogue above is 24 events and not one of them comes from a component. After §44 a script
+ * could drive 302 component members and could not be told anything — an arpeggiator firing a step,
+ * a setlist changing scene, a take finishing, a pad being struck were all invisible, and the only
+ * way to notice was to poll a read() on a timer.
+ *
+ * Grouped by WHAT HAPPENED rather than by family, so one handler serves several components and a
+ * script stays portable: `on("*", "step", …)` is the same handler for an Arpeggiator, a Turing
+ * Machine, a Phrase Sequencer and a Looper.
+ *
+ * Panel view only, and that is not a policy choice — the component engines live in the preview
+ * surface and the C++ engines carry stubs, so window-closed there is nothing running to raise one.
+ * Every payload carries `target`, because `on("*", …)` is a legitimate subscription and the handler
+ * has to know which arpeggiator.
+ */
+export const COMPONENT_EVENTS = [
+  { id: 'step', fn: 'onStep', payload: 'step', runtime: RUNTIME_WEBVIEW,
+    summary: 'A sequencer advanced. step.target, step.index (1-based), step.of, step.notes. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.' },
+  { id: 'cycle', fn: 'onCycle', payload: 'cycle', runtime: RUNTIME_WEBVIEW,
+    summary: 'A sequence or loop came back round. cycle.target, cycle.count (how many times since the panel opened). Arpeggiator, Turing, Looper, Orbit.' },
+  { id: 'hit', fn: 'onHit', payload: 'hit', runtime: RUNTIME_WEBVIEW,
+    summary: 'A pad, key or ribbon was struck. hit.target, hit.id, hit.note, hit.velocity. Chord Pad, Drum Pads, Note Ribbon.' },
+  { id: 'release', fn: 'onRelease', payload: 'release', runtime: RUNTIME_WEBVIEW,
+    summary: '…and let go. release.target, release.id, release.note.' },
+  { id: 'scene', fn: 'onScene', payload: 'scene', runtime: RUNTIME_WEBVIEW,
+    summary: 'The Setlist recalled a scene. scene.target, scene.index (1-based), scene.name. Fires on the recall, so a scripted jump and a footswitch are one event.' },
+  { id: 'stage', fn: 'onStage', payload: 'stage', runtime: RUNTIME_WEBVIEW,
+    summary: 'A component entered a new stage of what it was doing. stage.target, stage.stage, stage.previous. The Recorder ("idle"/"armed"/"recording"/"overdub") and the Envelope ("sustain"/"release"/"end"). NOT onStateChanged, which is a control\'s hover/pressed state.' },
+  { id: 'settled', fn: 'onSettled', payload: 'settled', runtime: RUNTIME_WEBVIEW,
+    summary: 'A spring-return control finished gliding home. settled.target, settled.value. Ribbon, Crossfader, Vector Joystick — the moment the return ENDS, which is not something a value stream tells you.' },
+  { id: 'bounce', fn: 'onBounce', payload: 'bounce', runtime: RUNTIME_WEBVIEW,
+    summary: 'The Kinetic ball hit a wall. bounce.target, bounce.x, bounce.y, bounce.vx, bounce.vy.' },
+  { id: 'recall', fn: 'onRecall', payload: 'recall', runtime: RUNTIME_WEBVIEW,
+    summary: 'The Constellation snapped to a preset. recall.target, recall.id, recall.label. Snap mode only — blending is continuous and has no moment to report.' },
+  { id: 'zone', fn: 'onZone', payload: 'zone', runtime: RUNTIME_WEBVIEW,
+    summary: 'A Meter crossed into a different threshold zone. zone.target, zone.zone, zone.previous, zone.value. What you light an overload LED from, without polling the level.' },
+  { id: 'voiced', fn: 'onVoiced', payload: 'voiced', runtime: RUNTIME_WEBVIEW,
+    summary: 'A component turned a played note into other notes. voiced.target, voiced.note, voiced.velocity, voiced.out (the notes it produced). The Zone Splitter (which zone took it) and the Harmoniser (which voices it added).' },
+];
+
+export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS, component: COMPONENT_EVENTS };
 
 /* ------------------------------------------------------------------ commands */
 // The action verbs (Q1, Q2, Q6, Q9). Picker category "Commands". param.type drives validation.
@@ -3229,10 +3270,12 @@ export function requiresDeviceHost(member) {
 /** Handler names an event source in `runtime` is expected to raise. Lifecycle hooks marked
     RUNTIME_PLAYER (onDaw*) are excluded from the WebView's list: the editor has no DAW. */
 export function handlerNamesForRuntime(runtime) {
-  const hooks = LIFECYCLE_HOOKS
-    .filter((h) => memberRuntime(h) === RUNTIME_ANY || memberRuntime(h) === runtime)
-    .map((h) => h.id);
-  return [...hooks, ...ALL_EVENTS.map((e) => e.fn)];
+  const reaches = (x) => memberRuntime(x) === RUNTIME_ANY || memberRuntime(x) === runtime;
+  const hooks = LIFECYCLE_HOOKS.filter(reaches).map((h) => h.id);
+  // Events are filtered the same way now that some of them have a runtime. The component events
+  // are raised by the preview surface, and the exported player has no component engine at all — so
+  // probing a player script for onStep would be probing for a handler nothing there can ever call.
+  return [...hooks, ...ALL_EVENTS.filter(reaches).map((e) => e.fn)];
 }
 
 /** The names the C++ engines define as "needs the panel window" stubs.
@@ -3263,6 +3306,7 @@ export const ALL_EVENTS = [
   ...PANEL_EVENTS.map((e) => ({ ...e, group: 'panel' })),
   ...TIME_EVENTS.map((e) => ({ ...e, group: 'time' })),
   ...DEVICE_EVENTS.map((e) => ({ ...e, group: 'device' })),
+  ...COMPONENT_EVENTS.map((e) => ({ ...e, group: 'component' })),
 ];
 
 export const EVENT_BY_ID = Object.fromEntries(ALL_EVENTS.map((e) => [e.id, e]));

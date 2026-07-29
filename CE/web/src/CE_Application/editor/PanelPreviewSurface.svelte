@@ -29,10 +29,10 @@
   } from '../utils/listboxLayout.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { visibleChoiceRows, dependsOnId, dependentControl } from '../utils/dependentChoices.js';
-  import { meterPosition, meterPeak } from '../utils/meterLayout.js';
+  import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
-    envDragNode, envAddNode, envRemoveNode,
+    envDragNode, envAddNode, envRemoveNode, normalizePoints,
   } from '../utils/envelopeLayout.js';
   import { controlPortValues } from '../utils/controlPortValues.js';
   import {
@@ -79,7 +79,7 @@
   import {
     constellationConfig, constellationPresets, constellationGeometry,
     constellationHitPreset, constellationFromPx, wanderPos,
-    constellationSynced, constellationWanderBars,
+    constellationSynced, constellationWanderBars, nearestPreset,
   } from '../utils/constellationLayout.js';
   import {
     constraintConfig, constraintMembers, constraintMode, applyConstraint,
@@ -277,6 +277,57 @@
 
   function getControlId(control) {
     return String(control?._children?.Core?.id ?? '');
+  }
+
+  /* --- Component events (design doc §45) ---------------------------------------
+   *
+   * The event catalogue was 24 events and not one of them came from a component. After §44 a
+   * script could drive 302 component members and could not be told anything — a step firing, a
+   * scene changing, a take finishing were all invisible, and the only way to notice was to poll a
+   * read() on a timer.
+   *
+   * One raiser, so every family reports the same way and the "did it change" bookkeeping lives in
+   * one place rather than eleven. dispatchInteraction is the same door the pointer events already
+   * use: it resolves the control name, refuses to re-enter while handlers are running, and hands
+   * back a promise the caller is free to drop.
+   */
+  const componentCycleCount = {};   // id -> loops since the panel opened
+  const componentLastStage = {};    // id -> last stage reported, so a stage fires once
+  const componentLastZone = {};     // id -> last meter zone reported
+  const componentLastPreset = {};   // id -> last Constellation preset reported
+
+  function componentTargetName(control) {
+    return String(control?._children?.Core?.name ?? '');
+  }
+
+  /** Raise one component event. `target` is in the payload as well as on the envelope, because
+   *  on("*", "step", …) is a legitimate subscription and the handler has to know which arp. */
+  function raiseComponent(control, handler, payload) {
+    dispatchInteraction(getControlId(control), handler,
+      { target: componentTargetName(control), ...payload });
+  }
+
+  /** Raise onCycle when a 0..1 phase has just wrapped. The tickers all advance phase with `% 1`,
+   *  so a phase that went DOWN is a wrap — the same test each ticker already makes to decide
+   *  whether to re-baseline. */
+  function raiseComponentCycle(control, phase, previous) {
+    if (!(phase < previous)) return;
+    const id = getControlId(control);
+    const count = (componentCycleCount[id] ?? 0) + 1;
+    componentCycleCount[id] = count;
+    raiseComponent(control, 'onCycle', { count });
+  }
+
+  /** Raise onStage when a component enters a stage it was not in. Fires once per change, and the
+   *  first sighting only BASELINES: reporting "idle" on the frame a panel opens would tell a
+   *  script the recorder had just stopped, which is not what opening a panel means. */
+  function raiseComponentStage(control, stage) {
+    const id = getControlId(control);
+    const previous = componentLastStage[id];
+    if (previous === stage) return;
+    componentLastStage[id] = stage;
+    if (previous === undefined) return;
+    raiseComponent(control, 'onStage', { stage, previous });
   }
 
   function inspectPreviewControl(controlId = '') {
@@ -901,6 +952,20 @@
     const nextMeter = { ...meter, __value: value };
     if (range) { nextMeter.valueMin = range.min; nextMeter.valueMax = range.max; }
 
+    // Crossing into a different threshold band, which is what an overload LED is lit from. The
+    // zones are the meter's OWN, via meterZoneIndexAt, so the band a script hears about is the
+    // band the meter draws. The first sighting baselines: a panel opening at 0 has not "crossed"
+    // into the bottom zone.
+    {
+      const id = getControlId(control);
+      const zone = meterZoneIndexAt(meterPosition(value, nextMeter), nextMeter);
+      const previous = componentLastZone[id];
+      componentLastZone[id] = zone;
+      if (previous !== undefined && previous !== zone) {
+        raiseComponent(control, 'onZone', { zone: zone + 1, previous: previous + 1, value });
+      }
+    }
+
     if (meter.peakHold === true) {
       ensureMeterTicker();
       void meterClock; // re-evaluate as the peak decays
@@ -991,7 +1056,20 @@
     if (!Array.isArray(sessPoints) && phase === undefined) return resolved;
     const nextEnv = { ...env };
     if (Array.isArray(sessPoints)) nextEnv.points = sessPoints;
-    if (phase !== undefined) nextEnv.__phase = Math.max(0, Math.min(1, phase));
+    if (phase !== undefined) {
+      nextEnv.__phase = Math.max(0, Math.min(1, phase));
+      // Where the playhead is, in the envelope's own terms: before the sustain point, past it, or
+      // at the end. Polled, because the phase is driven by whatever value source is bound to it and
+      // there is no envelope ticker to hang a transition off — so raiseComponentStage baselines the
+      // first sighting rather than announcing a stage the panel simply opened in.
+      const pts = normalizePoints(nextEnv.points);
+      const sustainAt = Math.round(numberOr(nextEnv.sustainIndex, -1));
+      const sustainX = sustainAt >= 0 && pts[sustainAt] ? pts[sustainAt].x : null;
+      const at = nextEnv.__phase;
+      const stage = at >= 1 ? 'end'
+        : (sustainX !== null && at >= sustainX ? 'release' : (at <= 0 ? 'start' : 'attack'));
+      raiseComponentStage(control, stage);
+    }
     return { ...resolved, control: { ...base, _children: { ...base._children, Envelope: nextEnv } } };
   }
   // Pointer-down on an envelope: start dragging the node under the cursor.
@@ -1129,7 +1207,12 @@
       const { pos, settled } = joystickGlide(joyWorkingPos(control), { x: 0.5, y: 0.5 }, rate, dt, axes);
       patchControlSession(id, { joyPos: pos, joyTrail: joyTrailNext(control, pos) });
       emitControlPortFanout(joyControlWith(control, pos), settled ? 'commit' : 'continuous');
-      if (settled) { commitJoyPos(control, pos); patchControlSession(id, { joyPos: undefined }); return; }
+      if (settled) {
+        commitJoyPos(control, pos);
+        patchControlSession(id, { joyPos: undefined });
+        raiseComponent(control, 'onSettled', { value: pos.x, x: pos.x, y: pos.y });
+        return;
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -1188,7 +1271,12 @@
       const { mix, settled } = crossfaderGlide(xfadeWorkingMix(control), 0.5, rate, dt);
       patchControlSession(id, { xfadeMix: mix });
       emitControlPortFanout(xfadeControlWith(control, mix), settled ? 'commit' : 'continuous');
-      if (settled) { commitXfadeMix(control, mix); patchControlSession(id, { xfadeMix: undefined }); return; }
+      if (settled) {
+        commitXfadeMix(control, mix);
+        patchControlSession(id, { xfadeMix: undefined });
+        raiseComponent(control, 'onSettled', { value: mix });
+        return;
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -1257,7 +1345,12 @@
       const { value, settled } = ribbonGlide(ribWorkingValue(control), target, rate, dt);
       patchControlSession(id, { ribbonValue: value, ribbonTouch: false });
       emitControlPortFanout(ribControlWith(control, value, false), settled ? 'commit' : 'continuous');
-      if (settled) { commitRibbonValue(control, value); patchControlSession(id, { ribbonValue: undefined }); return; }
+      if (settled) {
+        commitRibbonValue(control, value);
+        patchControlSession(id, { ribbonValue: undefined });
+        raiseComponent(control, 'onSettled', { value });
+        return;
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -1342,11 +1435,14 @@
         if (orbitSynced(c)) {
           // One cycle = N bars. Every satellite's `ratio` is turns per cycle,
           // so the whole constellation inherits the tempo from this one number.
+          const wasSynced = orbitPhaseState[id];
           orbitPhaseState[id] = cyclePhaseAt(transportBeatsNow(), orbitCycleBars(c), transportBeatsPerBar());
+          if (wasSynced !== undefined) raiseComponentCycle(c, orbitPhaseState[id], wasSynced);
         } else {
           const rate = numberOr(orbitConfig(c).rate, 0.25);
           const prev = orbitPhaseState[id] ?? orbitPhaseFor(c);
           orbitPhaseState[id] = (prev + rate * dt) % 1;
+          raiseComponentCycle(c, orbitPhaseState[id], prev);
         }
         emitClockFanout(orbitControlWith(c, orbitPhaseState[id]), now, 'orbit');
       }
@@ -1492,12 +1588,15 @@
           // The loop point is the bar line: phase comes straight from the
           // transport position, so a take recorded over two bars comes back
           // over two bars however long it's been running.
+          const wasSynced = looperPhaseState[id];
           looperPhaseState[id] = cyclePhaseAt(transportBeatsNow(), looperLoopBars(c), transportBeatsPerBar());
+          if (wasSynced !== undefined) raiseComponentCycle(c, looperPhaseState[id], wasSynced);
           if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
           continue;
         }
         const prev = looperPhaseState[id] ?? looperPhaseFor(c);
         looperPhaseState[id] = (prev + dt / looperLoopSeconds(c)) % 1;
+        raiseComponentCycle(c, looperPhaseState[id], prev);
         // Don't fight a recording in progress on this control's lane.
         if (!(looperRec && looperRec.id === id)) emitClockFanout(looperControlWith(c, looperPhaseState[id]), now, 'loop');
       }
@@ -1823,10 +1922,13 @@
           const prev = turingPhaseState[id] ?? turingPhaseFor(c);
           phase = (prev + (turingStepsPerSecond(c) / len) * dt) % 1;
           turingPhaseState[id] = phase;
+          raiseComponentCycle(c, phase, prev);
           idx = Math.max(0, Math.min(len - 1, Math.floor(phase * len)));
         }
         // Mutate when the step index advances (skip while the user is editing it).
         if (turingLastIdx[id] !== idx) {
+          // Synced, the phase belongs to the transport, so the wrap is the index going back.
+          if (turingSynced(c) && turingLastIdx[id] > idx) raiseComponentCycle(c, 0, 1);
           turingLastIdx[id] = idx;
           if (!(turingDrag && turingDrag.id === id)) {
             const randomness = Math.max(0, Math.min(1, numberOr(turingConfig(c).randomness, 0)));
@@ -1836,6 +1938,10 @@
               patchControlSession(id, { turingSteps: mutated });
             }
           }
+          // The step, with the value the register now holds at it — which is the whole point of
+          // this component, and the one number a script would otherwise have to go and fetch.
+          const live = turingLiveSteps(c);
+          raiseComponent(c, 'onStep', { index: idx + 1, of: len, notes: [], value: live[idx] });
         }
         emitClockFanout(turingControlWith(c, phase, turingLiveSteps(c)), now, 'turing');
       }
@@ -1953,6 +2059,10 @@
         }
         kineticStateMap[id] = next;
         pushKineticTrail(id, next);
+        // stepKinetic already reports the wall it hit; nothing was listening.
+        if (next.bounced && !prev.bounced) {
+          raiseComponent(c, 'onBounce', { x: next.x, y: next.y, vx: next.vx, vy: next.vy });
+        }
         emitClockFanout(kineticControlWith(c, next, null, { __bounce: next.bounced }), now, 'kinetic');
       }
       orbitClock = now;
@@ -2081,6 +2191,18 @@
     const next = { ...con, __probeX: probe.x, __probeY: probe.y };
     if (Array.isArray(sess?.constPresets)) next.presets = sess.constPresets;
     if (sess?.constDrag) next.__drag = sess.constDrag;
+
+    // Snap mode recalls the nearest star exactly, so "which star" is a discrete moment. Blend mode
+    // is a continuous morph and has none — nothing is recalled, so nothing is reported.
+    if (String(con.mode ?? 'blend') === 'snap') {
+      const near = nearestPreset(Array.isArray(next.presets) ? next.presets : [], probe.x, probe.y);
+      const previous = componentLastPreset[id];
+      const nowId = String(near?.id ?? '');
+      componentLastPreset[id] = nowId;
+      if (previous !== undefined && previous !== nowId && nowId) {
+        raiseComponent(control, 'onRecall', { id: nowId, label: String(near?.label ?? '') });
+      }
+    }
     return { ...resolved, control: { ...base, _children: { ...base._children, Constellation: next } } };
   }
   // Pointer-down: grab a preset star if under the cursor, else jump + drag probe.
@@ -2252,6 +2374,9 @@
     const vel = chordPadVelocity(control);
     const strum = Math.max(0, numberOr(cfg.strumMs, 0));
     (chordHeld[id] ??= {})[padId] = notes;
+    // The event fires either way, including when the pad is feeding an Arp and stays silent: the
+    // pad WAS struck, and a script lighting it should not care who plays the notes.
+    raiseComponent(control, 'onHit', { id: padId, note: notes[0], notes: [...notes], velocity: vel });
     // Feeding an Arp? Record the held notes (the Arp reads them, the renderer
     // lights up) but stay silent — the Arp does the playing.
     if (chordPadFeedsArp(control)) { syncChordSession(control); return; }
@@ -2277,6 +2402,7 @@
       for (const note of notes) if (!stillHeld.has(note)) sendNoteBytes(noteOffBytes(ch, note), `note_off_${note}`);
     }
     delete map[padId];
+    raiseComponent(control, 'onRelease', { id: padId, note: notes[0], notes: [...notes] });
     syncChordSession(control);
   }
   function chordAllOff(control) {
@@ -2463,8 +2589,13 @@
     const { steps } = crossedSteps(prev, beats, div);
     for (const global of steps) {
       const idx = ((global % seq.length) + seq.length) % seq.length;
+      // A synced Arp has no phase of its own to watch, so the wrap is the step index going back.
+      if (arpLastIdx[id] > idx) raiseComponentCycle(control, 0, 1);
       arpLastIdx[id] = idx;
-      if (stepFires(live, idx)) arpFireStep(control, seq[idx], idx, bpm);
+      if (stepFires(live, idx)) {
+        arpFireStep(control, seq[idx], idx, bpm);
+        raiseComponent(control, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+      }
     }
   }
   function ensureArpTicker() {
@@ -2494,10 +2625,16 @@
         const prev = arpPhaseState[id] ?? arpPhaseFor(c);
         const phase = (prev + (arpRate(c) / seq.length) * dt) % 1;
         arpPhaseState[id] = phase;
+        raiseComponentCycle(c, phase, prev);
         const idx = stepIndexAt(phase, seq.length);
         if (arpLastIdx[id] !== idx) {
           arpLastIdx[id] = idx;
-          if (stepFires(live, idx)) arpFireStep(c, seq[idx], idx);
+          // A muted step is not a step that fired, so it raises nothing — the event follows the
+          // notes, which is what a script lighting an LED off it wants.
+          if (stepFires(live, idx)) {
+            arpFireStep(c, seq[idx], idx);
+            raiseComponent(c, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+          }
         }
       }
       orbitClock = now;
@@ -2579,6 +2716,7 @@
   function ribbonNoteOff(control) {
     if (!ribbonPress || ribbonPress.id !== getControlId(control)) return;
     sendNoteBytes(noteOffBytes(nrChannel(control), ribbonPress.note), `note_off_${ribbonPress.note}`);
+    raiseComponent(control, 'onRelease', { id: '', note: ribbonPress.note, notes: [ribbonPress.note] });
   }
   // Play the pitch at a strip position, reusing the sounding note when it hasn't
   // changed so a slow slide doesn't machine-gun note-ons.
@@ -2598,6 +2736,8 @@
         if (!isNew) ribbonNoteOff(control);
         sendRibbonBend(control, 8192, true);          // centre before the new note
         sendNoteBytes(noteOnBytes(ch, note, nrVelocity(control, across)), `note_on_${note}`);
+        raiseComponent(control, 'onHit',
+          { id: '', note, notes: [note], velocity: nrVelocity(control, across) });
       }
       sendRibbonBend(control, step.bend, step.retrigger);
     } else {
@@ -2607,6 +2747,8 @@
       if (isNew || note !== ribbonPress?.note) {
         if (!isNew) ribbonNoteOff(control);
         sendNoteBytes(noteOnBytes(ch, note, nrVelocity(control, across)), `note_on_${note}`);
+        raiseComponent(control, 'onHit',
+          { id: '', note, notes: [note], velocity: nrVelocity(control, across) });
       }
     }
     sendRibbonMod(control, across);
@@ -2683,6 +2825,7 @@
     if (!held) return;
     sendNoteBytes(noteOffBytes(drumChannel(control), held.note), `note_off_${held.note}`);
     delete drumHits[id][padId];
+    raiseComponent(control, 'onRelease', { id: padId, note: held.note, notes: [held.note] });
   }
   function drumHit(control, pad, strikeY) {
     const id = getControlId(control);
@@ -2700,8 +2843,10 @@
       if (map[other.id]) drumNoteOff(control, other.id);
     }
     if (map[pad.id]) drumNoteOff(control, pad.id);        // restrike cleanly
-    sendNoteBytes(noteOnBytes(ch, pad.note, strikeVelocity(control, strikeY)), `note_on_${pad.note}`);
+    const strikeVel = strikeVelocity(control, strikeY);
+    sendNoteBytes(noteOnBytes(ch, pad.note, strikeVel), `note_on_${pad.note}`);
     map[pad.id] = { note: pad.note, mode };
+    raiseComponent(control, 'onHit', { id: pad.id, note: pad.note, notes: [pad.note], velocity: strikeVel });
     if (mode === 'oneShot') {
       (drumTimers[id] ??= []).push(setTimeout(() => {
         drumNoteOff(control, pad.id);
@@ -2850,6 +2995,9 @@
     setlistIndexSeen[id] = now;
     if (seen === undefined || seen === now || now < 0) return;
     recallScene(control, now);
+    // On the recall, so a scripted jump, a click and a footswitch are one event downstream.
+    const scene = setlistScenes(control)[now];
+    raiseComponent(control, 'onScene', { index: now + 1, name: String(scene?.name ?? '') });
   }
   // The pedal. Read off the router's EVENT store, not the expression state
   // store: a stepper has to see each message once, when it arrives.
@@ -2966,6 +3114,16 @@
     harmKeyPress = harmKeyPress?.id === id ? null : harmKeyPress;
     runHarmSends(control, r.sends);
   }
+  /** The voices a reconcile produced for a played note, if any. Raised from the two places that
+   *  run harmony sends, so a pressed key and a mouse-held one report alike. */
+  function raiseHarmVoiced(control, sends, played) {
+    const ons = sends.filter((m) => m.kind === 'on');
+    if (!ons.length || played === null || played === undefined) return;
+    raiseComponent(control, 'onVoiced', {
+      note: played, velocity: ons[0].velocity, out: ons.map((m) => m.note),
+      channel: ons[0].channel, zones: [],
+    });
+  }
   // Consume the live held-note state, the same reconcile the Zone Splitter does.
   function pumpHarmInput(control) {
     ensureNoteInput();
@@ -2980,6 +3138,9 @@
     const r = reconcileHarmony(harmHeld[id] ?? EMPTY_HELD, control, entries, keep);
     if (r.held !== (harmHeld[id] ?? EMPTY_HELD)) harmHeld[id] = r.held;
     runHarmSends(control, r.sends);
+    // The note that caused it: the newly-held key, or the mouse-held one.
+    const played = keep ?? entries.find((e) => !(harmHeld[id]?.[e.note]))?.note ?? entries[0]?.note;
+    raiseHarmVoiced(control, r.sends, played ?? null);
   }
   function applyHarmoniserValueSource(control, resolved) {
     if (!isHarmoniserControl(control)) return resolved;
@@ -3073,7 +3234,19 @@
     if (!take) return;
     updateControlProperty(id, 'Recorder.take', { events: take.events, pending: {} });
   }
+  // Every path into a state change goes through here — a click, a script verb, the count-in
+  // promotion, the once-through stop — so it is the one place onStage is raised from, and no
+  // caller has to remember to.
   function setRecorderState(control, next) {
+    // Reported here rather than through raiseComponentStage: this is an explicit TRANSITION with a
+    // known previous state, so the first one has to fire. raiseComponentStage baselines its first
+    // sighting, which is right for a stage that is polled and wrong for one that is set.
+    const previous = String(recorderState(control) ?? '');
+    const stage = String(next ?? '');
+    if (stage !== previous) {
+      componentLastStage[getControlId(control)] = stage;
+      raiseComponent(control, 'onStage', { stage, previous });
+    }
     updateControlProperty(getControlId(control), 'Recorder.state', next);
   }
   function recorderAllOff(control) {
@@ -3313,6 +3486,7 @@
   const PHRASE_PAD = 8;
   const phraseSounding = {};      // id -> pure sounding map (see phraseLayout)
   const phraseIndexState = {};    // id -> last fired sequence index
+  const phraseLastIdx = {};       // id -> the index before it, so a wrap can raise onCycle
   const phraseBeatsState = {};    // id -> last transport reading, when synced
   const phraseJumpState = {};     // id -> transport jump counter seen
   const phraseFreeIndex = {};     // id -> free-running index accumulator
@@ -3387,6 +3561,10 @@
     // The playing column lights on the beat even when the note is swung off it:
     // the grid shows where the sequence is, not where the shuffle put it.
     phraseIndexState[id] = index;
+    const of = phraseSteps(control);
+    if (phraseLastIdx[id] > index) raiseComponentCycle(control, 0, 1);
+    phraseLastIdx[id] = index;
+    raiseComponent(control, 'onStep', { index: index + 1, of, notes: [] });
     const delayMs = phraseSwingSeconds(control, index, phraseStepSeconds(control, bpm), transportSwingNow()) * 1000;
     if (delayMs > 0) (phraseTimers[id] ??= []).push(setTimeout(fire, delayMs));
     else fire();
@@ -3559,6 +3737,15 @@
     splitSounding[id] = r.sounding;
     if (r.zoneIds.length) splitLastZones[id] = r.zoneIds;
     runSplitSends(r.sends);
+    // Which zone took it, and what it turned into — a note transposed by a zone is not the note
+    // that was played, and nothing said so.
+    const out = r.sends.filter((m) => m.kind === 'on');
+    if (out.length) {
+      raiseComponent(control, 'onVoiced', {
+        note, velocity, out: out.map((m) => m.note), channel: out[0].channel,
+        zones: [...r.zoneIds],
+      });
+    }
   }
   function splitReleaseKey(control, note) {
     const id = getControlId(control);

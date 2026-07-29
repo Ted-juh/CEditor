@@ -3574,3 +3574,126 @@ verb at a time.
   defining a new modulation source is a document edit, not a performance one.
 - **A verb→field map for the five hand-written families.** Their `read` is by field name and says
   so. Restating 47 mappings by hand is the defect this phase opened by removing.
+
+## 45. `ce.components` — hearing back from one
+
+§44 made the module two-way for **values**: 302 members, every one readable, every one reporting
+what it did. This is the other direction, and it was the last structural gap in it.
+
+The event catalogue was **24 events** — 11 control (mouse, value, state), 2 panel, 3 time, 8 device
+— and **not one came from a component**. A script could drive an arpeggiator and never be told it
+fired a step; a setlist could change scene, a take could finish, a pad could be struck, all
+invisibly. The only way to notice anything was to poll a `read()` on a timer, which is both wasteful
+and late.
+
+Three things confirmed by reading the code rather than assuming it:
+
+- `emitClockFanout` — the one place a running component publishes anything — sends to the **device**.
+  Nothing on that path reaches a script.
+- `dispatchInteraction(controlId, event, payload)` was already public and already used by the
+  surface, for exactly three events: `onWheel`, `onPointerMove`, `onDoubleClick`. The dispatch hook
+  existed; nothing called it for a component.
+- The component engines run **only** in `PanelPreviewSurface.svelte`. The C++ engines carry stubs
+  and no engine, so these events are panel-view only — not a policy choice, an absence of anything
+  that could raise one window-closed.
+
+### Eleven events, grouped by what happened
+
+Not by family. One handler serves several components and a script stays portable: `on("*", "step",
+…)` is the same handler for an Arpeggiator, a Turing Machine and a Phrase Sequencer.
+
+| event | payload | raised by |
+|---|---|---|
+| `onStep` | `index` (1-based), `of`, `notes` | Arp, Turing, Phrase |
+| `onCycle` | `count` | Arp, Turing, Looper, Orbit, Phrase |
+| `onHit` | `id`, `note`, `notes`, `velocity` | Chord Pad, Drum Pads, Note Ribbon |
+| `onRelease` | `id`, `note`, `notes` | the same three |
+| `onScene` | `index` (1-based), `name` | Setlist |
+| `onStage` | `stage`, `previous` | Recorder, Envelope |
+| `onSettled` | `value` | Ribbon, Crossfader, Vector Joystick |
+| `onBounce` | `x`, `y`, `vx`, `vy` | Kinetic |
+| `onRecall` | `id`, `label` | Constellation (snap mode) |
+| `onZone` | `zone`, `previous`, `value` | Meter |
+| `onVoiced` | `note`, `velocity`, `out`, `channel`, `zones` | Zone Splitter, Harmoniser |
+
+`onStage` and not `onState`: `onStateChanged` is already a **control's** hover/pressed state, and
+two events whose names differ by a suffix are two events somebody subscribes to the wrong one of.
+
+Every payload carries `target`, supplied by the raiser rather than by eleven call sites, because
+`on("*", …)` is a legitimate subscription and the handler has to know which arpeggiator. A test
+asserts nothing bypasses the raiser.
+
+### The four that needed new detection
+
+Seven of the eleven hooked into a firing point that already existed — `arpFireStep`, the Turing's
+index-change block, `phraseFireIndex`, `recallScene`, `setRecorderState`, `stepKinetic`'s
+`bounced`, and the three glide loops, which already computed `settled` and threw it away. The other
+four are new:
+
+- **`onCycle`** — a 0..1 phase going *down*. That is the same test each ticker already makes to
+  decide it has come round, so a cycle event and a loop seam cannot disagree. The synced branches
+  have no phase of their own (it belongs to the transport), so there the wrap is the step index
+  going backwards.
+- **`onStage` for the Envelope** — the playhead's position relative to the sustain point:
+  `start`, `attack`, `release`, `end`. Polled, because the phase is driven by whatever value source
+  is bound to it and there is no envelope ticker to hang a transition off.
+- **`onZone`** — `meterZoneIndexAt`, split out of the meter's own `meterZoneColourAt` so `onZone`
+  can name the *band* rather than the paint. A test asserts the two cannot disagree.
+- **`onVoiced`** — the Zone Splitter already returned `zoneIds` and `sends` from its reducer, and
+  the Harmoniser its voices; nothing was listening to either. A note transposed by a zone is not
+  the note that was played, and there was no way to find that out.
+
+### Polled versus set, and why the recorder does not baseline
+
+`raiseComponentStage` reports on change and **baselines its first sighting** — reporting "idle" on
+the frame a panel opens would tell a script the recorder had just stopped, which is not what opening
+a panel means. That is right for a stage that is *polled*.
+
+The Recorder's is not polled: it is an explicit transition with a known previous state, and the
+first arm has to fire. So it reports directly from `setRecorderState` — which every path into a
+state change already goes through (a click, a script verb, the count-in promotion, the once-through
+stop), so no caller has to remember to.
+
+### A trap found on the way, and fixed
+
+`on(target, event, fn)` matched the **handler name** (`onTimer`), because that is what
+`dispatchEvents` carries — while the events list a script author reads names them by **id**
+(`timer`). So `on("*", "timer", fn)` registered a listener that could never fire, silently, and had
+done since the verb existed. It was not §45's bug; it is the bug §45 walked into while writing its
+first test.
+
+Both spellings work now, and `off()` matches the same way — a listener registered under one
+spelling and removed under the other would otherwise stay live. The preludes' own
+`on("*", "onTimer", …)`, which arms `after()` in all three C++ engines, is untouched and pinned by
+a test.
+
+### How it is tested
+
+`panelApiParity.test.js` already refused a declared event with no source — that guard is what held
+this phase to raising all eleven rather than declaring a catalogue and wiring the easy half.
+
+`scriptComponentEvents.test.js` adds the level below it: **every field a summary promises is
+actually supplied at every site that raises the event**. A payload documented as carrying
+`hit.velocity` and never sending one would be `undefined` in every handler, and nothing would say
+so. The test parses each `raiseComponent(…)` call out of the surface, walks to its matching brace,
+splits on top-level commas and reads the keys — shorthand properties included, since `{ stage,
+previous }` names two fields and contains no colon.
+
+Plus: delivery to a named handler and to `on(target, …)` and `on("*", …)`; that a listener on
+another control does not hear it; that all eleven can be delivered rather than the two that would
+otherwise get spot-checked; and that the detection agrees with the app — the meter's own bands, the
+tickers' own wrap test.
+
+### What is deliberately still absent
+
+- **Anything from a continuous component.** The Timbre pad, Router, Macro, Matrix and Constraint
+  have no instant to report; an event for them would be one nothing could raise, which the parity
+  test refuses.
+- **Transport events.** Already `ce.time`'s `onBeat` / `onBar` / `onTransport`. A second spelling
+  would be two ways to hear the same thing.
+- **The LCD's scroll wrap and the Pixel display's animation loop.** Cosmetic — nothing downstream
+  of them is a musical moment.
+- **A per-note event from the Arpeggiator.** `onStep` carries the notes; one event per note would
+  be up to six per step at a rate that already reaches ~27 steps/second at 1/32 and 200bpm.
+- **Component events window-closed.** There is no component engine in the player to raise them.
+  Giving the player one is a different phase with a much larger question behind it.

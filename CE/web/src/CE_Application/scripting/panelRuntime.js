@@ -43,7 +43,7 @@ import {
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
   CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage,
-  allModules, moduleById, memberMapFor, registeredExtensions,
+  allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
 import { panelPreviewSessions, previewModeEnabled } from '../stores/interactionPreview.js';
@@ -2592,16 +2592,28 @@ function clearListeners(scriptId) {
   for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].scriptId === scriptId) listeners.splice(i, 1);
 }
 
+/** The name a listener is stored under: the HANDLER name, which is what every producer dispatches.
+ *
+ *  Both spellings are accepted. Every event in the contract has two — an id (`timer`, `step`) and a
+ *  handler name (`onTimer`, `onStep`) — and `on()` only ever matched the second, because that is
+ *  what dispatchEvents carries. So a script author reading the events list, seeing `step`, and
+ *  writing on("*", "step", …) got a listener that could never fire, silently. The list is the
+ *  vocabulary the API teaches; it should work. */
+function listenerEventName(event) {
+  const name = String(event ?? '');
+  return EVENT_BY_ID[name]?.fn ?? name;
+}
+
 function addListener(scriptId, target, event, fn) {
   if (typeof fn !== 'function') return;
-  listeners.push({ scriptId, target: String(target ?? '*'), event: String(event ?? ''), fn });
+  listeners.push({ scriptId, target: String(target ?? '*'), event: listenerEventName(event), fn });
 }
 
 /** off(target, event) — drop THIS script's listeners for that pair. Scoped to the caller so one
     script cannot silently unsubscribe another's handlers. An unknown pair is a no-op. */
 function removeListener(scriptId, target, event) {
   const t = String(target ?? '*');
-  const e = String(event ?? '');
+  const e = listenerEventName(event);   // either spelling, matching what on() stored
   for (let i = listeners.length - 1; i >= 0; i--) {
     const l = listeners[i];
     if (l.scriptId === scriptId && l.target === t && l.event === e) listeners.splice(i, 1);

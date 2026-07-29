@@ -51,13 +51,22 @@ export function meterZones(cfg = {}) {
   return usable;
 }
 
-// The zone colour that applies at position `pos` (the last zone whose `from` ≤ pos).
-export function meterZoneColourAt(pos, cfg = {}) {
+// Which zone a position falls in — the last one whose `from` ≤ pos. 0-based, and always a real
+// index because meterZones() guarantees a zone starting at 0.
+//
+// Split out of meterZoneColourAt so onZone can say WHICH zone the level crossed into rather than
+// what colour it went: a script lighting an overload LED needs the band, not the paint.
+export function meterZoneIndexAt(pos, cfg = {}) {
   const zones = meterZones(cfg);
   const p = clamp01(num(pos, 0));
-  let colour = zones[0].colour;
-  for (const z of zones) { if (p >= z.from) colour = z.colour; else break; }
-  return colour;
+  let at = 0;
+  for (let i = 0; i < zones.length; i += 1) { if (p >= zones[i].from) at = i; else break; }
+  return at;
+}
+
+// The zone colour that applies at position `pos` (the last zone whose `from` ≤ pos).
+export function meterZoneColourAt(pos, cfg = {}) {
+  return meterZones(cfg)[meterZoneIndexAt(pos, cfg)].colour;
 }
 
 // How many of `n` LED segments are lit at position `pos`. Segments are indexed
