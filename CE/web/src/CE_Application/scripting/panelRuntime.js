@@ -63,6 +63,12 @@ import { harmoniserScriptPatch } from '../utils/harmoniserLayout.js';
 import { setlistScriptPatch } from '../utils/setlistLayout.js';
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { transport as transportStore } from '../stores/transport.js';
+// The arrangement maths — pure, and the SAME functions the canvas context menu runs. Two
+// implementations of "distribute six things evenly" would drift the first time one was touched.
+import {
+  boundsOf, alignPatch, distributePatches, matchPatch, gridPatches, circlePatches, flipPatches,
+} from '../stores/alignment.js';
+import { pushSnapshot } from '../stores/history.js';
 import { createControl, COMPONENT_TYPES } from '../models/componentTypes.js';
 import { setDrawing, clearDrawing } from '../stores/scriptDraw.js';
 import {
@@ -96,7 +102,7 @@ import {
 } from '../stores/scriptUi.js';
 import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
-  insertControlIntoTree, removeControlFromTree, remintControlIds,
+  insertControlIntoTree, removeControlFromTree, remintControlIds, controlPanelOffset,
 } from '../utils/containment.js';
 
 /* --------------------------------------------------------------- path resolution */
@@ -3500,6 +3506,286 @@ function panelInfoImpl(name) {
   return controlSummary(control, activePanel()?.controls ?? []);
 }
 
+/* ------------------------------------------------------ ce.panel: arranging what is there (§42)
+ * stores/alignment.js is twenty-seven operations — align, distribute, match size, order, flip,
+ * tidy into a grid, arrange in a circle — every one of them on the canvas context menu and not one
+ * of them reachable from a script. A script that built sixteen pads computed every coordinate by
+ * hand, and got tidy's reading-order sort or circle's bounding-box centring subtly different.
+ *
+ * They were all written against the editor's SELECTION, which is not a thing a script should touch.
+ * So the maths moved into pure functions there, and these verbs take a list of NAMES and call the
+ * same ones. Six collapsed verbs rather than twenty-seven members: align(names, "left") beats
+ * alignLeft(names), and it is the shape ce.time.division and ce.music.degreeChord already use.
+ *
+ * Transforms are gathered in PANEL space — Transform.x inside a container is container-relative,
+ * and aligning two controls in different containers by their local x is aligning nothing — and
+ * written back through the same offset, which is exactly what the editor does.
+ */
+
+/** Transforms for a list of names, in PANEL space, skipping names that are not controls. */
+function panelTransforms(names, verb) {
+  const list = Array.isArray(names) ? names : (names == null ? [] : Object.values(names));
+  const controls = activePanel()?.controls ?? [];
+  const out = [];
+  for (const raw of list) {
+    const control = controlNamed(raw);
+    if (!control) {
+      addScriptTrace('error', '', `ce.panel.${verb}: no control named "${raw}".`);
+      continue;
+    }
+    const id = control._children?.Core?.id;
+    const t = control._children?.Transform ?? {};
+    const offset = controlPanelOffset(controls, id);
+    out.push({
+      id,
+      name: control._children?.Core?.name ?? '',
+      x: (Number(t.x) || 0) + offset.x,
+      y: (Number(t.y) || 0) + offset.y,
+      width: Number(t.width) || 0,
+      height: Number(t.height) || 0,
+      offsetX: offset.x,
+      offsetY: offset.y,
+    });
+  }
+  return out;
+}
+
+/**
+ * Write a { id: patch } map back, converting panel-space coordinates to each control's own frame —
+ * which is the step that makes aligning two controls in different containers mean anything.
+ *
+ * One tree rewrite rather than a property write per control, and deliberately: an arrangement is
+ * ONE change to the document. Writing forty properties one at a time would be forty store updates,
+ * forty re-renders, and — with the history debounce running underneath — an unpredictable number of
+ * undo steps for a single "tidy these".
+ *
+ * Returns how many controls moved, the same "say what you did" contract set() follows.
+ */
+function panelApplyPatches(transforms, patches) {
+  const byId = new Map(transforms.map((t) => [t.id, t]));
+  const resolved = new Map();
+  for (const [id, patch] of patches) {
+    const t = byId.get(id);
+    if (!t || !patch) continue;
+    const local = {};
+    for (const [path, value] of Object.entries(patch)) {
+      const field = path.replace(/^Transform\./, '');
+      local[field] = (field === 'x' || field === 'y')
+        ? Math.round(value - (field === 'x' ? (t.offsetX ?? 0) : (t.offsetY ?? 0)))
+        : value;
+    }
+    resolved.set(id, local);
+  }
+  if (!resolved.size) return 0;
+
+  const apply = (list) => list.map((c) => {
+    const id = c?._children?.Core?.id;
+    const patch = resolved.get(id);
+    const kids = c?._children?.Children?._children;
+    let next = c;
+    if (patch) {
+      next = { ...next, _children: { ...next._children,
+        Transform: { ...(next._children?.Transform ?? {}), ...patch } } };
+    }
+    if (kids && typeof kids === 'object') {
+      const ordered = apply(Object.values(kids));
+      const rebuilt = {};
+      for (const child of ordered) rebuilt[child._children.Core.name] = child;
+      next = { ...next, _children: { ...next._children,
+        Children: { ...next._children.Children, _children: rebuilt } } };
+    }
+    return next;
+  });
+
+  return updateControls((controls) => apply(controls)) ? resolved.size : 0;
+}
+
+const ALIGN_EDGES = ['left', 'hCenter', 'right', 'top', 'vCenter', 'bottom'];
+
+function panelAlignImpl(names, edge, opts) {
+  const which = String(edge ?? '');
+  if (!ALIGN_EDGES.includes(which)) {
+    addScriptTrace('error', '',
+      `ce.panel.align: "${edge}" is not an edge. One of: ${ALIGN_EDGES.join(', ')}.`);
+    return 0;
+  }
+  const transforms = panelTransforms(names, 'align');
+  if (!transforms.length) return 0;
+  // The reference is the group's own bounds, or one named control — "align these to that one",
+  // which is what the canvas calls a key object.
+  const keyName = opts?.to != null ? String(opts.to) : null;
+  const key = keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null;
+  if (keyName && !key) addScriptTrace('error', '', `ce.panel.align: "${keyName}" is not one of the names given.`);
+  const ref = key ? { x: key.x, y: key.y, width: key.width, height: key.height } : boundsOf(transforms);
+  const patches = new Map();
+  for (const t of transforms) {
+    const patch = alignPatch(t, which, ref);
+    if (patch) patches.set(t.id, patch);
+  }
+  return panelApplyPatches(transforms, patches);
+}
+
+const DISTRIBUTE_WHAT = ['leftEdges', 'hCenters', 'rightEdges', 'topEdges', 'vCenters',
+                         'bottomEdges', 'hSpacing', 'vSpacing'];
+
+function panelDistributeImpl(names, what, opts) {
+  const which = String(what ?? '');
+  if (!DISTRIBUTE_WHAT.includes(which)) {
+    addScriptTrace('error', '',
+      `ce.panel.distribute: "${what}" is not something to spread. One of: ${DISTRIBUTE_WHAT.join(', ')}.`);
+    return 0;
+  }
+  const transforms = panelTransforms(names, 'distribute');
+  if (transforms.length < 2) return 0;
+  const gap = Number(opts?.gap);
+  return panelApplyPatches(transforms, distributePatches(
+    transforms, which, Number.isFinite(gap) ? gap : null, opts?.align === true));
+}
+
+function panelMatchImpl(names, what, opts) {
+  const which = String(what ?? 'both');
+  if (!['width', 'height', 'both'].includes(which)) {
+    addScriptTrace('error', '', `ce.panel.match: "${what}" is not width, height or both.`);
+    return 0;
+  }
+  const transforms = panelTransforms(names, 'match');
+  if (transforms.length < 2) return 0;
+  // The first name is the reference unless one is named, which is the canvas's rule too.
+  const keyName = opts?.to != null ? String(opts.to) : null;
+  const key = (keyName ? transforms.find((t) => t.name === keyName || t.id === keyName) : null) ?? transforms[0];
+  const patches = new Map();
+  for (const t of transforms) {
+    if (t.id === key.id) continue;                       // the reference does not resize itself
+    patches.set(t.id, matchPatch(key, which));
+  }
+  return panelApplyPatches(transforms, patches);
+}
+
+function panelGridImpl(names, opts) {
+  const transforms = panelTransforms(names, 'grid');
+  if (transforms.length < 2) return 0;
+  return panelApplyPatches(transforms, gridPatches(
+    transforms,
+    Number.isFinite(Number(opts?.columns)) ? Number(opts.columns) : 3,
+    Number.isFinite(Number(opts?.gapX)) ? Number(opts.gapX) : 10,
+    Number.isFinite(Number(opts?.gapY)) ? Number(opts.gapY) : 10));
+}
+
+function panelCircleImpl(names, opts) {
+  const transforms = panelTransforms(names, 'circle');
+  if (transforms.length < 2) return 0;
+  return panelApplyPatches(transforms, circlePatches(
+    transforms,
+    Number.isFinite(Number(opts?.radius)) ? Number(opts.radius) : 100,
+    Number.isFinite(Number(opts?.startAngle)) ? Number(opts.startAngle) : 0));
+}
+
+function panelFlipImpl(names, axis) {
+  const which = String(axis ?? 'horizontal');
+  if (!['horizontal', 'vertical'].includes(which)) {
+    addScriptTrace('error', '', `ce.panel.flip: "${axis}" is not horizontal or vertical.`);
+    return 0;
+  }
+  const transforms = panelTransforms(names, 'flip');
+  if (transforms.length < 2) return 0;
+  return panelApplyPatches(transforms, flipPatches(transforms, which));
+}
+
+/**
+ * Where a control IS, in PANEL coordinates — which Transform.x is not, once anything is inside a
+ * container. With several names it is the bounding box of the lot, which is what "how big is this
+ * group" means.
+ */
+function panelRectImpl(names) {
+  const list = Array.isArray(names) ? names : [names];
+  const transforms = panelTransforms(list, 'rect');
+  if (!transforms.length) return undefined;
+  if (transforms.length === 1) {
+    const t = transforms[0];
+    return { x: t.x, y: t.y, width: t.width, height: t.height,
+             right: t.x + t.width, bottom: t.y + t.height };
+  }
+  const b = boundsOf(transforms);
+  return { ...b, right: b.x + b.width, bottom: b.y + b.height };
+}
+
+/**
+ * Z-order. `where` is front | forward | backward | back.
+ *
+ * Order is DOCUMENT order, not a property, so this rewrites the sibling list rather than setting a
+ * value — which is why set() could never do it. Controls are reordered within their own parent:
+ * moving something to the front of a container it is not in is not a thing.
+ */
+function panelOrderImpl(names, where) {
+  const which = String(where ?? '');
+  if (!['front', 'forward', 'backward', 'back'].includes(which)) {
+    addScriptTrace('error', '', `ce.panel.order: "${where}" is not front, forward, backward or back.`);
+    return 0;
+  }
+  const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));
+  if (!wanted.size) return 0;
+
+  const reorder = (siblings) => {
+    const mine = siblings.filter((c) => wanted.has(c?._children?.Core?.id));
+    if (!mine.length) return siblings;
+    const rest = siblings.filter((c) => !wanted.has(c?._children?.Core?.id));
+    // Later in the list paints later, so "front" is the END. Getting this backwards is the classic
+    // way a bring-to-front sends something behind everything.
+    if (which === 'front') return [...rest, ...mine];
+    if (which === 'back') return [...mine, ...rest];
+    const arr = [...siblings];
+    if (which === 'forward') {
+      for (let i = arr.length - 2; i >= 0; i -= 1) {
+        if (wanted.has(arr[i]?._children?.Core?.id) && !wanted.has(arr[i + 1]?._children?.Core?.id)) {
+          [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]];
+        }
+      }
+    } else {
+      for (let i = 1; i < arr.length; i += 1) {
+        if (wanted.has(arr[i]?._children?.Core?.id) && !wanted.has(arr[i - 1]?._children?.Core?.id)) {
+          [arr[i], arr[i - 1]] = [arr[i - 1], arr[i]];
+        }
+      }
+    }
+    return arr;
+  };
+
+  // Every level of the tree, because a selection can span containers and each one's siblings are
+  // its own list.
+  const walk = (list) => reorder(list).map((c) => {
+    const kids = c?._children?.Children?._children;
+    if (!kids || typeof kids !== 'object') return c;
+    const ordered = walk(Object.values(kids));
+    const rebuilt = {};
+    for (const child of ordered) rebuilt[child._children.Core.name] = child;
+    return { ...c, _children: { ...c._children, Children: { ...c._children.Children, _children: rebuilt } } };
+  });
+
+  return updateControls((controls) => walk(controls)) ? wanted.size : 0;
+}
+
+/**
+ * batch(fn) — everything `fn` does is ONE undo step.
+ *
+ * The history store debounces its snapshots, which groups a drag nicely and leaves a script that
+ * creates forty controls landing as an unpredictable number of steps. pushSnapshot() flushes on
+ * demand, so bracketing the work gives exactly one — and a script that builds a page deserves to be
+ * undone as "build the page", not forty times.
+ *
+ * The flush happens whatever the callback does, including throwing: a half-built panel that cannot
+ * be undone is worse than a half-built panel.
+ */
+function panelBatchImpl(scriptId, fn) {
+  if (typeof fn !== 'function') {
+    addScriptTrace('error', scriptId ?? '', 'ce.panel.batch(fn) needs a function to run — nothing was done.');
+    return false;
+  }
+  if (host) { fn(); return true; }        // the player has no history to group
+  pushSnapshot();                          // close whatever came before
+  try { fn(); } finally { pushSnapshot(); }
+  return true;
+}
+
 /* ------------------------------------------------- ce.panel: the collections inside a control */
 // The Properties panel can ADD TO and REMOVE FROM eleven sections of a control. `Children` is one
 // of them and ce.panel.create/destroy already covers it; these four cover the other ten, which
@@ -4604,6 +4890,16 @@ function buildApi(ownerName, scriptId = '') {
     // The two ce.panel verbs that are NOT panel-view only. The C++ preludes build these on a host
     // query for the control names plus get/set; here the panel object is in hand, so the same walk
     // is direct. Same rules either way — see panelSnapshotImpl.
+    // ce.panel — arranging what is there
+    panelAlign: (names, edge, opts) => panelAlignImpl(names, edge, opts),
+    panelDistribute: (names, what, opts) => panelDistributeImpl(names, what, opts),
+    panelMatch: (names, what, opts) => panelMatchImpl(names, what, opts),
+    panelGrid: (names, opts) => panelGridImpl(names, opts),
+    panelCircle: (names, opts) => panelCircleImpl(names, opts),
+    panelFlip: (names, axis) => panelFlipImpl(names, axis),
+    panelRect: (names) => panelRectImpl(names),
+    panelOrder: (names, where) => panelOrderImpl(names, where),
+    panelBatch: (fn) => panelBatchImpl(scriptId, fn),
     panelEach: (fn) => panelEachImpl(scriptId, fn),
     panelSnapshot: () => panelSnapshotImpl(),
     panelRestore: (snap) => panelRestoreImpl(snap),

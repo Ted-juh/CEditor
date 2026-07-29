@@ -1207,6 +1207,120 @@ export const COMMANDS = [
      could previously only reach by writing a whole node as one value and could not remove from at
      all. One verb family rather than ten: the sections differ in what an entry MEANS, not in how it
      is listed, added or dropped. Panel view only, like the rest of ce.panel's structure verbs. */
+  /* --- Panel: arranging what is there (design doc §42) ---
+     stores/alignment.js is twenty-seven operations — align, distribute, match size, order, flip,
+     tidy into a grid, arrange in a circle — every one on the canvas context menu and not one of
+     them reachable from a script. A script that built sixteen pads computed every coordinate by
+     hand, and got tidy's reading-order sort or circle's bounding-box centring subtly different.
+
+     They were written against the editor's SELECTION, which is not a thing a script should touch,
+     so the maths moved into pure functions and these verbs call the same ones with a list of NAMES.
+     Six collapsed verbs rather than twenty-seven members: align(names, "left") beats alignLeft,
+     and it is the shape ce.time.division and ce.music.degreeChord already use.
+
+     Coordinates are PANEL coordinates throughout. Transform.x inside a container is
+     container-relative, and aligning two controls in different containers by their local x is
+     aligning nothing — so transforms are gathered with the container offset applied and written
+     back through it, exactly as the canvas does. */
+  {
+    id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
+    summary: 'Line controls up on one edge: "left" | "hCenter" | "right" | "top" | "vCenter" | "bottom". By default they align to the bounding box of the lot; `opts.to` names one of them to align to instead — what the canvas calls a key object. Returns how many moved. Names that are not controls are reported and skipped rather than silently ignored.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'edge', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['to'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.align({ "${1:knob1}", "${2:knob2}" }, "left")$0',
+      javascript: 'ce.panel.align(["${1:knob1}", "${2:knob2}"], "left");$0',
+    },
+  },
+  {
+    id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
+    summary: 'Spread controls evenly. `what` is "leftEdges" | "hCenters" | "rightEdges" | "topEdges" | "vCenters" | "bottomEdges", which even out the POSITIONS, or "hSpacing" | "vSpacing", which even out the GAPS — differently-sized controls end up evenly spaced rather than evenly placed, and those are different pictures. The first and last stay put, which is what makes this different from laying things out in a row. `opts.gap` forces a gap instead of computing one; `opts.align` also lines up the cross axis. Needs at least two.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'what', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['gap', 'align'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
+    summary: 'Give controls the same size: "width" | "height" | "both". The FIRST name is the reference unless `opts.to` names another, and the reference does not resize itself. Returns how many changed.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'what', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['to'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
+    summary: 'Tidy controls into a grid. `opts` carries { columns (3), gapX (10), gapY (10) }. Cells are uniform, sized by the biggest control, so a grid stays a grid — and the order is READING ORDER, rows quantised to 20px then left to right, which makes "tidy" match what the eye already sees rather than document order. The first control in that order anchors the origin.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['columns', 'gapX', 'gapY'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.grid(pads, { columns = ${1:4}, gapX = 8, gapY = 8 })$0',
+      javascript: 'ce.panel.grid(pads, { columns: ${1:4}, gapX: 8, gapY: 8 });$0',
+    },
+  },
+  {
+    id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
+    summary: 'Arrange controls around a circle centred on their own bounding box. `opts` carries { radius (100), startAngle (0, degrees) }. Order is the order you gave, so the ring reads the way the list does.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['radius', 'startAngle'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'panelFlip', category: 'Panel structure', signature: 'panelFlip(names, axis) -> number',
+    summary: 'Mirror where controls SIT about the centre of their bounding box — "horizontal" or "vertical". It moves them; it does not rotate or mirror the controls themselves, because "flip the layout" and "flip the artwork" are different requests.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'axis', type: 'string', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'panelRect', category: 'Panel structure', signature: 'panelRect(name) -> table',
+    summary: 'Where a control is in PANEL coordinates: { x, y, width, height, right, bottom }. Transform.x is not that once anything is inside a container, so "draw a line between these two controls" or "is this one above that one" had no answer. Given a LIST of names it is the bounding box of the lot, which is what "how big is this group" means. Nothing back when no name resolves.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'name', type: 'value', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'panelOrder', category: 'Panel structure', signature: 'panelOrder(names, where) -> number',
+    summary: 'Z-order: "front" | "forward" | "backward" | "back". Order is DOCUMENT order rather than a property, which is exactly why set() could never do it. Controls move within their own parent — bringing something to the front of a container it is not in is not a thing — and later in the list paints later, so "front" is the end.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'names', type: 'list', required: true },
+      { name: 'where', type: 'string', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
+    summary: 'Everything `fn` does is ONE undo step. The editor debounces its history snapshots, which groups a drag nicely and leaves a script that creates forty controls landing as an unpredictable number of steps; this brackets the work so it undoes as "build the page" rather than forty times. The flush happens whatever the callback does, including throwing — a half-built panel that cannot be undone is worse than a half-built panel. In the player there is no history to group and the callback simply runs.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'fn', type: 'function', required: true }],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.batch(function()\n  $0\nend)',
+      javascript: 'ce.panel.batch(() => {\n  $0\n});',
+    },
+  },
   {
     id: 'panelEntries', category: 'Panel structure', signature: 'panelEntries(control, section)',
     summary: 'The names in one of a control\'s collection sections — States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants — in document order. Any other section name is refused, and the message lists the ones that work.',
@@ -2442,8 +2556,8 @@ export const MODULES = [
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
-  { id: 'ce.panel', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Build the panel from a script: create, clone, parent and find controls — panel view only, each verb says so. snapshot/restore work anywhere.' },
+  { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Build the panel from a script and arrange what is there: create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -2572,6 +2686,11 @@ const MODULE_MEMBERS = {
     // with `destroy`, which takes a whole control away.
     entries: 'panelEntries', entry: 'panelEntry',
     define: 'panelDefine', undefine: 'panelUndefine', patch: 'panelPatch',
+    // Arranging what is there. `align`, `match`, `grid`, `circle`, `flip`, `rect`, `order` and
+    // `batch` are all §1 collisions as bare globals, so the flat spellings keep the panel prefix.
+    align: 'panelAlign', distribute: 'panelDistribute', match: 'panelMatch',
+    grid: 'panelGrid', circle: 'panelCircle', flip: 'panelFlip',
+    rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch',
   },
   'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
                   settings: 'listSettings', forget: 'forgetSetting' },

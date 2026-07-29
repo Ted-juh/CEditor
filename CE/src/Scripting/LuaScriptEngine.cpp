@@ -1179,7 +1179,8 @@ local WEBVIEW_ONLY = {
   "drawText","drawRedraw",
 -- @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
-  "panelEntries","panelEntry","panelDefine","panelUndefine","panelPatch",
+  "panelAlign","panelDistribute","panelMatch","panelGrid","panelCircle","panelFlip","panelRect",
+  "panelOrder","panelBatch","panelEntries","panelEntry","panelDefine","panelUndefine","panelPatch",
 -- @module ce.components.split
   "splitPreset","splitMute","splitChannel","splitTranspose","splitPoint",
 -- @module ce.components.phrase
@@ -1885,7 +1886,7 @@ local __CE_MODULES = {
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
   ["ce.ui"] = { choose = "uiChoose", copy = "uiCopy", dialog = "uiDialog", dismiss = "uiDismiss", notify = "uiNotify", prompt = "uiPrompt", state = "uiState", status = "uiStatus", update = "uiUpdate" },
   ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", ellipse = "drawEllipse", fill = "drawFill", gradient = "drawGradient", line = "drawLine", measure = "drawMeasure", opacity = "drawOpacity", path = "drawPath", pixelText = "drawPixelText", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText", transform = "drawTransform" },
-  ["ce.panel"] = { clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", info = "panelInfo", parent = "panelParent", patch = "panelPatch", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
+  ["ce.panel"] = { align = "panelAlign", batch = "panelBatch", circle = "panelCircle", clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", distribute = "panelDistribute", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", flip = "panelFlip", grid = "panelGrid", info = "panelInfo", match = "panelMatch", order = "panelOrder", parent = "panelParent", patch = "panelPatch", rect = "panelRect", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
   ["ce.storage"] = { forget = "forgetSetting", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -1927,7 +1928,7 @@ local __CE_META = {
   { id = "ce.anim", version = "1.1", runtime = "any" },
   { id = "ce.ui", version = "1.2", runtime = "webview" },
   { id = "ce.draw", version = "1.2", runtime = "webview" },
-  { id = "ce.panel", version = "1.3", runtime = "any" },
+  { id = "ce.panel", version = "1.4", runtime = "any" },
   { id = "ce.storage", version = "1.1", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },

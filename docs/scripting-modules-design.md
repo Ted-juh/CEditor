@@ -3106,3 +3106,119 @@ different packing, gives a different count.
 - **Radial gradients.** The app's gradients are linear; there is nothing to reach parity with.
 - **Hit-testing a drawn shape.** A drawing is decoration and the overlay is `pointer-events: none`
   on purpose; a script that wants a click uses a control that reports one.
+
+---
+
+## 42. `ce.panel` — building a panel was possible, arranging one was not
+
+`ce.panel` was fifteen members: create, clone, destroy, parent, find, info, types, the five
+collection verbs, snapshot, restore and each. Building a control and inspecting it were covered.
+
+**Arranging controls was not covered at all.**
+
+### Twenty-seven operations, none of them reachable
+
+`stores/alignment.js`:
+
+```
+alignLeft / HCenter / Right / Top / VCenter / Bottom            6
+distributeLeftEdges / HCenters / RightEdges / TopEdges /
+  VCenters / BottomEdges                                        6
+distributeHSpacing / distributeVSpacing                         2
+bringToFront / bringForward / sendBackward / sendToBack         4
+matchWidth / matchHeight / matchBoth                            3
+snapSelectionToGrid / snapSelectionToGuides                     2
+flipHorizontal / flipVertical                                   2
+tidyGrid(columns, gapX, gapY) / arrangeCircular(radius, angle)  2
+```
+
+Every one is on the canvas context menu. A script that built sixteen pads computed every coordinate
+by hand — and got `tidyGrid`'s reading-order sort, or `arrangeCircular`'s centring on the bounding
+box, subtly different from the menu item sitting next to it.
+
+They were all written against the editor's **selection**, which is not a thing a script should
+touch. So the maths moved out of the selection plumbing into pure functions — transforms in panel
+space go in, a `{ id: patch }` map comes out, nothing reads a store — the existing exports became
+thin wrappers over them, and the script verbs call the same functions with transforms built from
+**names**.
+
+### Nine new members: 15 → 24
+
+| namespaced | what |
+|---|---|
+| `ce.panel.align(names, edge [, opts])` | the six aligns |
+| `ce.panel.distribute(names, what [, opts])` | the eight distributes |
+| `ce.panel.match(names, what [, opts])` | width / height / both |
+| `ce.panel.order(names, where)` | front / forward / backward / back |
+| `ce.panel.grid(names [, opts])` | `tidyGrid` |
+| `ce.panel.circle(names [, opts])` | `arrangeCircular` |
+| `ce.panel.flip(names, axis)` | mirror positions about the group centre |
+| `ce.panel.rect(name)` | rect in **panel** coordinates; bounds of a set |
+| `ce.panel.batch(fn)` | one undo step for a whole build |
+
+Six collapsed verbs rather than twenty-seven members. `align(names, "left")` beats `alignLeft(names)`,
+and it is the shape `ce.time.division` and `ce.music.degreeChord` already use.
+
+### Panel coordinates are the whole trick
+
+`Transform.x` inside a container is **container-relative**. Aligning two controls in different
+containers by their local `x` aligns nothing. So transforms are gathered with the container offset
+applied (`controlPanelOffset`, which the editor's own alignment uses for exactly this) and written
+back through it.
+
+That is also what `ce.panel.rect` is for on its own. "Draw a line between these two controls", "is
+this one above that one", "how big is this group" — none of them had an answer, because the only
+readable geometry was in whatever frame the control happened to sit in.
+
+### Distinctions worth keeping
+
+- **Distribute leaves the ends where they are.** That is what makes it *distribute* rather than *lay
+  out in a row*, and it is why there are two families: `leftEdges`/`hCenters`/… even out the
+  **positions**, while `hSpacing`/`vSpacing` even out the **gaps**. With differently-sized controls
+  those are different pictures, and the app offers both because both are wanted.
+- **`grid` sorts in reading order** — rows quantised to 20px, then left to right — not document
+  order. "Tidy" should match what the eye already sees.
+- **`flip` moves controls; it does not mirror them.** "Flip the layout" and "flip the artwork" are
+  different requests, and flipping twice is exactly the identity, which the test pins.
+- **`order` rewrites the sibling list**, because z-order is document order rather than a property —
+  precisely why `set()` could never do it. Later paints later, so *front* is the end of the list.
+  Controls reorder within their own parent; bringing something to the front of a container it is
+  not in is not a thing.
+
+### `batch` is the one that is not a port
+
+The history store debounces its snapshots, which groups a drag nicely and leaves a script that
+creates forty controls landing as an unpredictable number of undo steps. `pushSnapshot()` flushes on
+demand, so bracketing the work gives exactly one — and a script that builds a page deserves to be
+undone as "build the page", not forty times.
+
+The flush is in a `finally`: a half-built panel that cannot be undone is worse than a half-built
+panel. The throw still propagates, because swallowing it would hide the reason the panel is half
+built.
+
+One related decision inside the implementation: an arrangement is **one tree rewrite**, not a
+property write per control. Forty individual writes would be forty store updates, forty re-renders,
+and — with the debounce running underneath — an unpredictable number of undo steps for a single
+"tidy these", which is the very thing `batch` exists to fix.
+
+### How it is tested
+
+There is no cross-runtime layer: arranging a document is editing it, and the editor is where a
+document is edited — every verb is `RUNTIME_WEBVIEW`, like `create` and `destroy` already were.
+
+`panelArrange.test.js` asserts against **the app's own functions**, imported: `boundsOf`,
+`alignPatch`, `distributePatches`, `matchPatch`, `gridPatches`, `circlePatches`, `flipPatches`. Not
+"align moves things left" — that would pass against a second implementation that happened to look
+similar — but that the answer *is* the canvas's, including the parts nobody would reinvent the same
+way. Plus the container case end to end, because the offset is where this goes wrong silently.
+
+### What is deliberately still absent
+
+- **Selection.** An editor concept. A script naming controls is the right shape, and these verbs
+  take names.
+- **`snapSelectionToGuides`.** Guides are a store the panel author fills by dragging them onto the
+  canvas. A script inventing guides is a different feature with a different question behind it.
+  (`snapSelectionToGrid` is `ce.math.snap` on two numbers once `rect` can report them.)
+- **Rename.** The name is the address, so renaming is a document migration rather than a layout
+  operation — every script, binding and drawing target that mentions it would have to move too.
+- **Undo and redo themselves.** A script that could undo the user's work is not a panel.
