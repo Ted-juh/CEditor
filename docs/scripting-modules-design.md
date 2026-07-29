@@ -3222,3 +3222,163 @@ way. Plus the container case end to end, because the offset is where this goes w
 - **Rename.** The name is the address, so renaming is a document migration rather than a layout
   operation — every script, binding and drawing target that mentions it would have to move too.
 - **Undo and redo themselves.** A script that could undo the user's work is not a panel.
+
+## 43. `ce.storage` — who a setting belongs to, and turning a structure into a string
+
+`ce.storage` was five members: `state`, `saveSetting`, `loadSetting`, `settings`, `forget`.
+
+Nothing here is a Properties-panel gap. There is no property anywhere that means "keep this between
+sessions", so the whole module is already past that bar. The two gaps are internal, and both are the
+kind that reads as working until it does not.
+
+### Gap one: `state` said who it belonged to. Settings said nothing.
+
+`state` was documented as private to the script. Settings were panel-wide and said **nothing at
+all** — so two scripts on one panel, both saving `"count"`, were writing to the same value and
+neither could tell. No error, no warning, no way to ask.
+
+That asymmetry was never a decision; it was the absence of one. Three scopes now, an option on every
+settings verb:
+
+| scope | who sees it | where it lives |
+|---|---|---|
+| `"panel"` *(default)* | every script on the panel | the document — travels with it |
+| `"script"` | the calling script only | the document, under a key nobody else can spell |
+| `"local"` | this machine | never written into the document |
+
+`"panel"` is the default because it is exactly what settings have always been: nothing that already
+works changes meaning.
+
+`"script"` is a **key prefix on the panel store**, not a second store. A private setting should
+persist, export, travel and migrate exactly like a shared one — only its *visibility* differs — and
+a second store would have been a second thing to save, load, export and migrate. The prefix is
+`U+0001`, and that character is not arbitrary: `U+0000` was the obvious choice and is wrong, because
+a key travels through `juce::String` in the C++ engines, which is NUL-terminated and would truncate
+it. The editor and the export would then disagree about what a private key is even *called*, which
+is a bug that only appears after somebody ships a panel.
+
+`"local"` is the one a panel author will reach for without being told to: a MIDI port choice, a
+window position, a "don't show this again". A panel you send somebody should not carry your port
+choice with it. The editor has `localStorage`; the player writes to a `.scriptlocal` properties file
+beside the application's own preferences, opened lazily on first use and keyed by panel id so two
+panels in one session do not read each other's. Writes go through immediately rather than at "save
+the project", because a machine-local setting has no project-save moment to ride along with and the
+DAW may never close the instance politely.
+
+Wiring that up turned up something the phase had not gone looking for: `BridgeScriptHost::Callbacks`
+carried `saveSetting` and `loadSetting` and **not** `listSettings` or `forgetSetting`, so those two
+had been silently inert in the exported plugin — and `all()`, `clear()` and `info()` are all built on
+`listSettings`, so the whole new surface would have been dead there. Both callbacks now exist and the
+player wires them.
+
+**An unknown scope is refused, not treated as `"panel"`.** Every verb bails and logs. Falling back
+is how a typo in a scope name turns a private setting into a shared one, silently, at the moment it
+is written — and a fallback would make that the *quiet* path.
+
+### Gap two: no way to turn a structure into a string
+
+The Lua engine opens `base`, `math`, `string` and `table`. There is **no `json` module**, and no way
+for a script to write one that is not a parser. JavaScript and Python each have their own, with
+different names and different edge cases. So "use the language's own" — the Q10 rule — was never
+available here, exactly as it was not for `ce.time.now()` in §38.
+
+What that cost: a script could not put a patch into a SysEx payload, could not read a config
+somebody typed into a text control, could not save a structure as one setting, and could not compare
+two structures at all.
+
+`encode` and `decode` live in `ce.storage` rather than `ce.core` because encoding is what you do to
+**put a structure somewhere** — and the somewhere is usually a setting.
+
+### Five new members: 5 → 10
+
+| namespaced | what |
+|---|---|
+| `ce.storage.all([opts])` | every setting in a scope, as a table |
+| `ce.storage.clear([opts])` | forget them all, and say how many went |
+| `ce.storage.info([opts])` | `{ scope, backing, available, count, bytes }` |
+| `ce.storage.encode(value [, opts])` | JSON text; `opts.indent` pretty-prints |
+| `ce.storage.decode(text)` | JSON text back to a value |
+
+`all()` is the read every other module already had — before it, seeing the settings meant
+`settings()` and a loop. `info()` exists because `available` is a thing worth saying **once** rather
+than discovering per key: it is the difference between "nothing saved yet" and "nothing you save
+here will stick", which an empty listing cannot express.
+
+One change to an existing verb: **`saveSetting` returns whether it stored.** It used to return
+nothing, so "saved" and "there was nowhere to put it" were indistinguishable — the worst possible
+answer from something whose whole job is persistence.
+
+### The encoder is written out by hand, twice, on purpose
+
+`json.dumps` and `JSON.stringify` do not agree, and the disagreements are all in the numbers:
+
+| value | JavaScript | Python `repr` | C `%g` |
+|---|---|---|---|
+| `1.0` | `1` | `1.0` | `1` |
+| `1e-5` | `0.00001` | `1e-05` | `1e-05` |
+| `1e-7` | `1e-7` | `1e-07` | `1e-07` |
+| `1/3` | `0.3333333333333333` | same | `0.33333333333333` at `%.14g` |
+| `-0.0` | `0` | `-0.0` | `-0` |
+| `"é"` | `é` | `é` | — |
+
+Any one of those means a patch encoded in the editor does not compare equal to the same patch
+encoded in the plugin. So Python's JSON section does **not** call `json.dumps` for encoding: it
+formats numbers and strings itself, using the same rules the Lua encoder uses, which are
+JavaScript's. Reading is still `json.loads`, because that is the strict grammar `JSON.parse` accepts
+— and the grammar the hand-written Lua reader had to be written to match, down to rejecting `01`
+and `1.`.
+
+Lua carries the whole thing: a `%g` loop that finds the shortest spelling which reads back as the
+same double, the notation band where C and JavaScript disagree, exponent unpadding, string escaping,
+a recursive-descent reader, and UTF-8 encoding by hand because the `utf8` library is not opened
+either. That is why `ce.storage` is now the second-heaviest Lua module — a cost that buys the one
+thing a cross-runtime API may not get wrong.
+
+Three decisions the four runtimes share:
+
+- **Keys come out sorted, at every depth.** Not a style choice. A Lua table has no insertion order
+  to preserve, so sorted is the only ordering all four are *able* to produce — and it is the
+  ordering that makes two encodings of the same structure comparable, which is half of what encode
+  is for.
+- **A JSON `null` reads as nothing** — an absent member, a skipped element. A Lua table cannot hold
+  one, and a value the four runtimes cannot all hold is not a value this API has. So
+  `{"a":1,"b":null}` is one key everywhere and `[1,null,2]` is a two-element list everywhere, rather
+  than three shapes in three engines.
+- **Nothing back beats a wrong string.** A cycle, a function, text that is not JSON — all return
+  nothing, which is the rule every "cannot read that" in this API already follows, and the thing
+  that tells a malformed config from an empty one.
+
+One shape genuinely does not agree, and it is written down rather than hidden: an **empty** Lua table
+is an empty array and an empty object at once, so `{}` encodes as `[]` in Lua and `{}` in the other
+three. The codebase already reads an empty table as the empty list everywhere else.
+
+### How it is tested
+
+`scriptStorage.test.js` covers the scopes against a real document — that a private key really is in
+the panel store, that a panel listing hides other scripts' private keys, that clearing one scope
+leaves the others, that a machine-local write **fails** rather than quietly landing in the document
+when there is no local store.
+
+The JSON half is a shared fixture list, `test/fixtures/jsonCases.js`, and this is the one place in
+the suite that compares **text** rather than canonicalised values — because `encode`'s output *is* a
+string a script puts somewhere. `scriptPreludeAgreement.test.js` replays every fixture through the
+Lua prelude under wasmoon, the JavaScript prelude under `node:vm`, and the Python prelude under
+`python3`, and demands the same characters back from all four. Including the cases a JavaScript
+value cannot express — `1.0`, `NaN`, a function in a list — which are written once per language.
+
+It also pins the private-key derivation across runtimes, because a setting saved in script scope by
+the editor is only readable by the export if all four spell the key identically.
+
+### What is deliberately still absent
+
+- **A file API.** "Persist this" and "write a file the user can find" are different features with
+  different questions behind them — sandboxing, paths, permissions — and the second one is not
+  storage.
+- **Watching a setting.** `watch` is `ce.core`'s and it is about control values. A setting changing
+  under a running script is not a thing the host does.
+- **Import and export of the whole store.** `all()` and `encode()` compose into it in one line, which
+  is the better shape: the script decides what a backup means.
+- **YAML, TOML, MessagePack.** JSON is the one every runtime can already read and the one the panel
+  document itself is written in. A second format would need a second hand-written Lua parser.
+- **Size limits and quotas.** `info().bytes` reports; enforcing a ceiling is the host's business, and
+  the local store already refuses cleanly when a browser's quota is hit.

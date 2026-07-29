@@ -1812,13 +1812,170 @@ on("*", "onDumpReceived", function(info) {
 // live as long as the script is loaded, so it persists between handler calls with no host help.
 // Settings go through the host, because they outlive the session.
 var state = {};
-function saveSetting(key, value) { return __api.saveSetting(String(key), value); }
-// settings() lists every saved key; forget() deletes one and says whether there was one.
-function listSettings() { return __api.listSettings() || []; }
-function forgetSetting(key) { return __api.forgetSetting(String(key)) === true; }
-function loadSetting(key, fallback) {
-  var v = __api.loadSetting(String(key));
+
+/* Three scopes, differing in who sees a value and where it lives (design doc §43):
+ *   panel  — shared by every script on the panel, in the document, travels with it. The default,
+ *            and exactly what settings have always been.
+ *   script — private to the calling script, the way `state` already is.
+ *   local  — THIS MACHINE only, never written into the document.
+ * script scope is a key prefix on the panel store rather than a store of its own: a private setting
+ * should persist and travel exactly like a shared one, and only its visibility differs. */
+var __CE_SCOPES = ["panel", "script", "local"];
+
+/* The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
+ * back to "panel": storing a value in a scope the caller did not ask for is how a private setting
+ * quietly becomes a shared one, and a typo in a scope name would be the way it happened. */
+function __storageScope(opts) {
+  var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
+  if (raw === undefined || raw === null || raw === "") return "panel";
+  var scope = String(raw);
+  if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
+  logError('ce.storage: "' + scope + '" is not a scope. One of: ' + __CE_SCOPES.join(", ") + ".");
+  return undefined;
+}
+// Which of the host's two real stores a scope lives in.
+function __storageStore(scope) { return scope === "local" ? "local" : "panel"; }
+// The key a scope actually stores under. The prefix is chosen to be one a hand-written key could
+// not collide with by accident — U+0001 and not U+0000, because a key travels through
+// juce::String, which is NUL-terminated and would truncate there.
+function __storageKeyFor(scope, key) {
+  var k = String(key === undefined || key === null ? "" : key);
+  return scope === "script" ? "\u0001script:" + String(__scriptId || "") + ":" + k : k;
+}
+// …and back, for listing: nothing when the stored key does not belong to this scope.
+function __storageKeyFrom(scope, stored) {
+  var prefix = "\u0001script:" + String(__scriptId || "") + ":";
+  if (scope === "script")
+    return stored.indexOf(prefix) === 0 ? stored.slice(prefix.length) : undefined;
+  // A panel listing hides other scripts' private keys rather than showing an unusable spelling.
+  return stored.indexOf("\u0001script:") === 0 ? undefined : stored;
+}
+
+function saveSetting(key, value, opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return false;
+  var store = __storageStore(scope);
+  if (__api.settingsAvailable(store) !== true) {
+    logError('saveSetting("' + key + '"): the ' + scope + ' store is unavailable here, so nothing '
+             + "was saved. ce.storage.info() says which stores are available.");
+    return false;
+  }
+  __api.saveSetting(__storageKeyFor(scope, key), value, store);
+  return true;
+}
+function loadSetting(key, fallback, opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return fallback;
+  var v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope));
   return (v === undefined || v === null) ? fallback : v;
+}
+// settings() lists every saved key; forget() deletes one and says whether there was one.
+function listSettings(opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return [];
+  var raw = __api.listSettings(__storageStore(scope)) || [];
+  var out = [];
+  for (var i = 0; i < raw.length; i++) {
+    var k = __storageKeyFrom(scope, String(raw[i]));
+    if (k !== undefined) out.push(k);
+  }
+  return out;
+}
+function forgetSetting(key, opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return false;
+  return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) === true;
+}
+// Every setting as a table — the read every other module got. Listing keys and looping to fetch each
+// one was the only way before.
+function allSettings(opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return {};
+  var keys = listSettings(opts), out = {};
+  for (var i = 0; i < keys.length; i++) out[keys[i]] = loadSetting(keys[i], undefined, opts);
+  return out;
+}
+// Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
+// keys alone: "clear my settings" must not mean "clear everybody's".
+function clearSettings(opts) {
+  var keys = listSettings(opts), gone = 0;
+  for (var i = 0; i < keys.length; i++) if (forgetSetting(keys[i], opts)) gone++;
+  return gone;
+}
+// Which store a scope is talking to, and what is in it. `available` is the honest field: false means
+// writes in this scope will not stick, which is worth saying once rather than per key.
+function storageInfo(opts) {
+  var scope = __storageScope(opts);
+  if (!scope) return undefined;
+  var store = __storageStore(scope);
+  var contents = allSettings(opts);
+  var text = encodeJson(contents);
+  return {
+    scope: scope,
+    // What the store IS, rather than what it is called: in the player, panel-scope settings live in
+    // the DAW project state and machine-local ones do not.
+    backing: scope === "local" ? "machine" : "project",
+    available: __api.settingsAvailable(store) === true,
+    count: Object.keys(contents).length,
+    bytes: text === undefined ? -1 : text.length,
+  };
+}
+
+/* JSON. A Q10 exception, and the same one now() was: the Lua engine opens base, math, string and
+ * table and has no json module, while JavaScript and Python each have their own with different
+ * names and different edge cases. "Use the language's own" was never available to a cross-runtime
+ * script, so all four grow one spelling here.
+ *
+ * Keys come out SORTED, everywhere. Not a stylistic choice: a Lua table has no insertion order to
+ * preserve, so sorted is the only ordering all four runtimes are able to produce — and it is the
+ * ordering that makes two encodings of the same structure comparable. */
+function __jsonKeys(value, out, seen) {
+  if (!value || typeof value !== "object") return out;
+  for (var s = 0; s < seen.length; s++) if (seen[s] === value) return out;  // a cycle: stop here
+  seen.push(value);
+  if (Array.isArray(value)) { for (var i = 0; i < value.length; i++) __jsonKeys(value[i], out, seen); }
+  else {
+    var ks = Object.keys(value);
+    for (var j = 0; j < ks.length; j++) {
+      if (out.indexOf(ks[j]) < 0) out.push(ks[j]);
+      __jsonKeys(value[ks[j]], out, seen);
+    }
+  }
+  return out;
+}
+function encodeJson(value, opts) {
+  try {
+    var indent = opts ? Number(opts.indent) : NaN;
+    var keys = __jsonKeys(value, [], []).sort();
+    return JSON.stringify(value, keys.length ? keys : undefined,
+                          (isFinite(indent) && indent > 0) ? indent : undefined);
+  } catch (e) {
+    // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
+    // value — the same rule every "cannot read that" in this API follows.
+    return undefined;
+  }
+}
+/* JSON null reads as NOTHING: an absent member, a skipped element. Not a preference — a Lua table
+ * cannot hold a null, and a value the four runtimes cannot all hold is not a value this API has. */
+function __jsonStripNulls(v) {
+  if (Array.isArray(v)) {
+    var out = [];
+    for (var i = 0; i < v.length; i++) if (v[i] !== null) out.push(__jsonStripNulls(v[i]));
+    return out;
+  }
+  if (v && typeof v === "object") {
+    var o = {}, ks = Object.keys(v);
+    for (var j = 0; j < ks.length; j++)
+      if (v[ks[j]] !== null) o[ks[j]] = __jsonStripNulls(v[ks[j]]);
+    return o;
+  }
+  return v;
+}
+function decodeJson(text) {
+  try {
+    var v = JSON.parse(String(text === undefined || text === null ? "" : text));
+    return v === null ? undefined : __jsonStripNulls(v);
+  } catch (e) { return undefined; }
 }
 
 // @module -
@@ -1837,7 +1994,7 @@ var __CE_MODULES = {
   "ce.ui": { "choose": "uiChoose", "copy": "uiCopy", "dialog": "uiDialog", "dismiss": "uiDismiss", "notify": "uiNotify", "prompt": "uiPrompt", "state": "uiState", "status": "uiStatus", "update": "uiUpdate" },
   "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "ellipse": "drawEllipse", "fill": "drawFill", "gradient": "drawGradient", "line": "drawLine", "measure": "drawMeasure", "opacity": "drawOpacity", "path": "drawPath", "pixelText": "drawPixelText", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText", "transform": "drawTransform" },
   "ce.panel": { "align": "panelAlign", "batch": "panelBatch", "circle": "panelCircle", "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "distribute": "panelDistribute", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "flip": "panelFlip", "grid": "panelGrid", "info": "panelInfo", "match": "panelMatch", "order": "panelOrder", "parent": "panelParent", "patch": "panelPatch", "rect": "panelRect", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
-  "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
+  "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
   "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
   "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
@@ -1868,7 +2025,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -2016,10 +2173,16 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
         { return host->deviceWrite (arg (a, 0).toString(), arg (a, 1), arg (a, 2).toString()); });
     api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
-    api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var { host->saveSetting (arg (a, 0).toString(), arg (a, 1)); return {}; });
-    api->setMethod ("loadSetting", [host, arg] (const Args& a) -> juce::var { return host->loadSetting (arg (a, 0).toString()); });
-    api->setMethod ("listSettings", [host] (const Args&) -> juce::var { return host->listSettings(); });
-    api->setMethod ("forgetSetting", [host, arg] (const Args& a) -> juce::var { return host->forgetSetting (arg (a, 0).toString()); });
+    api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var
+        { host->saveSetting (arg (a, 0).toString(), arg (a, 1), arg (a, 2).toString()); return {}; });
+    api->setMethod ("loadSetting", [host, arg] (const Args& a) -> juce::var
+        { return host->loadSetting (arg (a, 0).toString(), arg (a, 1).toString()); });
+    api->setMethod ("settingsAvailable", [host, arg] (const Args& a) -> juce::var
+        { return host->settingsAvailable (arg (a, 0).toString()); });
+    api->setMethod ("listSettings", [host, arg] (const Args& a) -> juce::var
+        { return host->listSettings (arg (a, 0).toString()); });
+    api->setMethod ("forgetSetting", [host, arg] (const Args& a) -> juce::var
+        { return host->forgetSetting (arg (a, 0).toString(), arg (a, 1).toString()); });
     api->setMethod ("run", [host, arg] (const Args& a) -> juce::var { return host->runAction (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("emit", [host, arg] (const Args& a) -> juce::var { host->emitEvent (arg (a, 0).toString(), arg (a, 1)); return {}; });
     api->setMethod ("log", [host, arg] (const Args& a) -> juce::var { host->log (arg (a, 0).toString(), arg (a, 1)); return {}; });
@@ -2090,7 +2253,10 @@ public:
 
         // Inject owner + prelude + the user source (or transpiled JS for TypeScript).
         // resolveSelfOwner: a panel script's `self` is the panel, a component script's is its control.
-        juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n";
+        // __scriptId as well as __owner: ce.storage's "script" scope spells a private key with the
+        // owning script's id in it, so the prelude has to be able to read it.
+        juce::String boot = "var __owner = " + resolveSelfOwner (def).quoted() + ";\n"
+                          + "var __scriptId = " + def.id.quoted() + ";\n";
         // …then gate the API down to the panel's declared modules. QuickJS gives every script its
         // own engine, so the gate is applied per script here rather than once for the language.
         auto r1 = eng->execute (boot + juce::String (kJsPrelude) + "\n" + extensionBoot() + moduleGateCall());

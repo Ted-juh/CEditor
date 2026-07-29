@@ -1865,10 +1865,392 @@ end)
 -- as long as the script is loaded, so it persists between handler calls without any host help.
 -- Settings go through the host, because they outlive the session.
 state = {}
-function loadSetting(key, fallback)
-  local v = __loadSetting(key)
+
+-- Three scopes, differing in who sees a value and where it lives (design doc §43):
+--   panel  — shared by every script on the panel, in the document, travels with it. The default,
+--            and exactly what settings have always been.
+--   script — private to the calling script, the way `state` already is.
+--   local  — THIS MACHINE only, never written into the document.
+-- script scope is a key prefix on the panel store rather than a store of its own: a private setting
+-- should persist and travel exactly like a shared one, and only its visibility differs.
+local __CE_SCOPES = { "panel", "script", "local" }
+-- U+0001 and not U+0000: a key travels through juce::String, which is NUL-terminated and would
+-- truncate there, and then the editor and the export would disagree about what a private key is
+-- even called. All four runtimes spell the prefix this way.
+local __CE_SCRIPT_PREFIX = "\001script:"
+
+-- The scope asked for, or nothing when it is not one this build knows. Refusing rather than falling
+-- back to "panel": storing a value in a scope the caller did not ask for is how a private setting
+-- quietly becomes a shared one, and a typo in a scope name would be the way it happened.
+function __storageScope(opts)
+  local raw
+  if type(opts) == "string" then raw = opts
+  elseif type(opts) == "table" then raw = opts.scope end
+  if raw == nil or raw == "" then return "panel" end
+  local scope = tostring(raw)
+  for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
+  logError('ce.storage: "' .. scope .. '" is not a scope. One of: panel, script, local.')
+  return nil
+end
+
+-- Which of the host's two real stores a scope lives in.
+function __storageStore(scope) if scope == "local" then return "local" end return "panel" end
+
+-- The key a scope actually stores under.
+function __storageKeyFor(scope, key)
+  local k = key == nil and "" or tostring(key)
+  if scope == "script" then return __CE_SCRIPT_PREFIX .. tostring(__scriptId or "") .. ":" .. k end
+  return k
+end
+
+-- …and back, for listing: nothing when the stored key does not belong to this scope.
+function __storageKeyFrom(scope, stored)
+  if scope == "script" then
+    local prefix = __CE_SCRIPT_PREFIX .. tostring(__scriptId or "") .. ":"
+    if stored:sub(1, #prefix) == prefix then return stored:sub(#prefix + 1) end
+    return nil
+  end
+  -- A panel listing hides other scripts' private keys rather than showing an unusable spelling.
+  if stored:sub(1, #__CE_SCRIPT_PREFIX) == __CE_SCRIPT_PREFIX then return nil end
+  return stored
+end
+
+function saveSetting(key, value, opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return false end
+  local store = __storageStore(scope)
+  if __settingsAvailable(store) ~= true then
+    logError('saveSetting("' .. tostring(key) .. '"): the ' .. scope .. ' store is unavailable '
+             .. "here, so nothing was saved. ce.storage.info() says which stores are available.")
+    return false
+  end
+  __saveSetting(__storageKeyFor(scope, key), value, store)
+  return true
+end
+
+function loadSetting(key, fallback, opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return fallback end
+  local v = __loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
   if v == nil then return fallback end
   return v
+end
+
+-- settings() lists every saved key; forget() deletes one and says whether there was one.
+function listSettings(opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return {} end
+  local raw = __listSettings(__storageStore(scope)) or {}
+  local out = {}
+  for _, stored in ipairs(raw) do
+    local k = __storageKeyFrom(scope, tostring(stored))
+    if k ~= nil then out[#out + 1] = k end
+  end
+  return out
+end
+
+function forgetSetting(key, opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return false end
+  return __forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) == true
+end
+
+-- Every setting as a table — the read every other module got. Listing keys and looping to fetch each
+-- one was the only way before.
+function allSettings(opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return {} end
+  local out = {}
+  for _, k in ipairs(listSettings(opts)) do out[k] = loadSetting(k, nil, opts) end
+  return out
+end
+
+-- Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
+-- keys alone: "clear my settings" must not mean "clear everybody's".
+function clearSettings(opts)
+  local gone = 0
+  for _, k in ipairs(listSettings(opts)) do if forgetSetting(k, opts) then gone = gone + 1 end end
+  return gone
+end
+
+-- Which store a scope is talking to, and what is in it. `available` is the honest field: false means
+-- writes in this scope will not stick, which is worth saying once rather than per key.
+function storageInfo(opts)
+  local scope = __storageScope(opts)
+  if scope == nil then return nil end
+  local contents = allSettings(opts)
+  local count = 0
+  for _ in pairs(contents) do count = count + 1 end
+  local text = encodeJson(contents)
+  return {
+    scope = scope,
+    -- What the store IS, rather than what it is called: in the player, panel-scope settings live in
+    -- the DAW project state and machine-local ones do not.
+    backing = scope == "local" and "machine" or "project",
+    available = __settingsAvailable(__storageStore(scope)) == true,
+    count = count,
+    bytes = text == nil and -1 or #text,
+  }
+end
+
+-- JSON. A Q10 exception, and the same one now() was: this engine opens base, math, string and table
+-- and there is NO json module, while JavaScript and Python each have their own with different names
+-- and different edge cases. "Use the language's own" was never available to a cross-runtime script,
+-- so all four grow one spelling here — and this one is the reason the module exists.
+
+-- A number the way JavaScript and Python spell it. Lua's own tostring gives "1.0" where both of the
+-- others give "1", and "%.14g" gives 0.33333333333333 where both give 0.3333333333333333, so
+-- neither can be used directly.
+local function __jsonExp(s)
+  -- C pads the exponent to two digits ("1e-07"); JavaScript does not ("1e-7").
+  return (s:gsub("[eE]([-+])0*(%d)", "e%1%2"))
+end
+
+local function __jsonNumber(v)
+  if v ~= v then return "null" end                            -- NaN, as JSON.stringify spells it
+  if v == math.huge or v == -math.huge then return "null" end
+  if v == 0 then return "0" end                               -- and -0, which JavaScript spells "0"
+  local a = v < 0 and -v or v
+  -- An integral value below 1e21 prints as digits in JavaScript, however it is stored here.
+  if v == math.floor(v) and a < 1e21 then return string.format("%.0f", v) end
+  -- The band where C and JavaScript disagree about notation: C goes exponential below 1e-4,
+  -- JavaScript below 1e-6.
+  if a < 1e-4 and a >= 1e-6 then
+    for p = 1, 20 do
+      local s = string.format("%." .. p .. "f", v)
+      if tonumber(s) == v then return s end
+    end
+  end
+  -- Otherwise the shortest spelling that reads back as the same double — which is what JavaScript
+  -- and Python both print, and the only way three languages spell one float alike.
+  for p = 1, 17 do
+    local s = string.format("%." .. p .. "g", v)
+    if tonumber(s) == v then return __jsonExp(s) end
+  end
+  return __jsonExp(string.format("%.17g", v))
+end
+
+local __JSON_ESCAPES = {
+  ['"'] = '\\"', ["\\"] = "\\\\", ["\b"] = "\\b", ["\f"] = "\\f",
+  ["\n"] = "\\n", ["\r"] = "\\r", ["\t"] = "\\t",
+}
+
+local function __jsonString(s)
+  -- Control characters and the two structural ones only. Bytes above 0x7F pass through, so UTF-8
+  -- text stays UTF-8 — which is what JSON.stringify does and what Python does with
+  -- ensure_ascii=False.
+  return '"' .. (s:gsub('[\0-\31\\"]', function(c)
+    return __JSON_ESCAPES[c] or string.format("\\u%04x", c:byte())
+  end)) .. '"'
+end
+
+-- A table with keys exactly 1..n is an array; anything else is an object. An EMPTY table is both at
+-- once in Lua, and the whole API already reads it as the empty list.
+local function __jsonIsArray(t)
+  local n, count = 0, 0
+  for k in pairs(t) do
+    count = count + 1
+    if math.type(k) ~= "integer" or k < 1 then return false, 0 end
+    if k > n then n = k end
+  end
+  return count == n, n
+end
+
+local function __jsonEnc(v, indent, depth, seen)
+  local t = type(v)
+  if v == nil then return "null" end
+  if t == "boolean" then return v and "true" or "false" end
+  if t == "number" then return __jsonNumber(v) end
+  if t == "string" then return __jsonString(v) end
+  if t ~= "table" then return nil end        -- a function, a userdata: no JSON form, as in JS
+  if seen[v] then error("cycle", 0) end       -- the whole encode fails, the way JSON.stringify does
+  seen[v] = true
+
+  local nl, pad, padIn, colon = "", "", "", ":"
+  if indent > 0 then
+    nl = "\n"
+    pad = string.rep(" ", indent * depth)
+    padIn = string.rep(" ", indent * (depth + 1))
+    colon = ": "
+  end
+
+  local isArray, n = __jsonIsArray(v)
+  local parts = {}
+  if isArray then
+    if n == 0 then seen[v] = nil; return "[]" end
+    for i = 1, n do
+      -- An element with no JSON form is null in JavaScript, not a dropped element.
+      parts[#parts + 1] = padIn .. (__jsonEnc(v[i], indent, depth + 1, seen) or "null")
+    end
+    seen[v] = nil
+    return "[" .. nl .. table.concat(parts, "," .. nl) .. nl .. pad .. "]"
+  end
+
+  -- Keys come out SORTED, in every runtime. Not a stylistic choice: a Lua table has no insertion
+  -- order to preserve, so sorted is the only ordering all four runtimes are able to produce — and
+  -- it is the ordering that makes two encodings of the same structure comparable.
+  local keys, byName = {}, {}
+  for k in pairs(v) do
+    local name = tostring(k)
+    keys[#keys + 1] = name
+    byName[name] = v[k]
+  end
+  table.sort(keys)
+  for _, name in ipairs(keys) do
+    -- A member with no JSON form is dropped, the way JSON.stringify drops it.
+    local s = __jsonEnc(byName[name], indent, depth + 1, seen)
+    if s ~= nil then parts[#parts + 1] = padIn .. __jsonString(name) .. colon .. s end
+  end
+  seen[v] = nil
+  if #parts == 0 then return "{}" end
+  return "{" .. nl .. table.concat(parts, "," .. nl) .. nl .. pad .. "}"
+end
+
+function encodeJson(value, opts)
+  if value == nil then return nil end
+  local indent = 0
+  if type(opts) == "table" then
+    local n = tonumber(opts.indent)
+    if n ~= nil and n > 0 then indent = math.floor(n) end
+  end
+  local ok, res = pcall(__jsonEnc, value, indent, 0, {})
+  if not ok then return nil end
+  return res
+end
+
+-- The decoder. `null` reads as NOTHING — an absent member, a skipped element — because a Lua table
+-- cannot hold one, and a value the four runtimes cannot all hold is not a value this API has.
+local __JSON_NULL = {}
+
+local function __utf8Char(cp)
+  if cp < 0x80 then return string.char(cp) end
+  if cp < 0x800 then return string.char(0xC0 | (cp >> 6), 0x80 | (cp & 0x3F)) end
+  if cp < 0x10000 then
+    return string.char(0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F))
+  end
+  return string.char(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F),
+                     0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F))
+end
+
+local function __jsonSpace(s, i)
+  local _, j = s:find("^[ \t\n\r]*", i)
+  return j + 1
+end
+
+local __jsonValue     -- forward declaration: the three parsers below are mutually recursive
+
+local function __jsonParseString(s, i)
+  if s:sub(i, i) ~= '"' then error("string", 0) end
+  i = i + 1
+  local out = {}
+  while true do
+    local c = s:sub(i, i)
+    if c == "" then error("eof", 0) end
+    if c == '"' then return table.concat(out), i + 1 end
+    if c == "\\" then
+      local e = s:sub(i + 1, i + 1)
+      i = i + 2
+      if e == "n" then out[#out + 1] = "\n"
+      elseif e == "t" then out[#out + 1] = "\t"
+      elseif e == "r" then out[#out + 1] = "\r"
+      elseif e == "b" then out[#out + 1] = "\b"
+      elseif e == "f" then out[#out + 1] = "\f"
+      elseif e == "/" or e == "\\" or e == '"' then out[#out + 1] = e
+      elseif e == "u" then
+        local hex = s:sub(i, i + 3)
+        if #hex < 4 then error("escape", 0) end
+        local cp = tonumber(hex, 16)
+        if cp == nil then error("escape", 0) end
+        i = i + 4
+        -- A surrogate pair is one character, not two: 😀 is U+1F600.
+        if cp >= 0xD800 and cp <= 0xDBFF and s:sub(i, i + 1) == "\\u" then
+          local low = tonumber(s:sub(i + 2, i + 5), 16)
+          if low ~= nil and low >= 0xDC00 and low <= 0xDFFF then
+            cp = 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00)
+            i = i + 6
+          end
+        end
+        out[#out + 1] = __utf8Char(cp)
+      else error("escape", 0) end
+    else
+      out[#out + 1] = c
+      i = i + 1
+    end
+  end
+end
+
+local function __jsonParseArray(s, i)
+  i = __jsonSpace(s, i + 1)
+  local out = {}
+  if s:sub(i, i) == "]" then return out, i + 1 end
+  while true do
+    local v
+    v, i = __jsonValue(s, i)
+    -- null is skipped rather than stored: a hole in a Lua array is not a value any runtime can read
+    -- back, so [1, null, 2] is {1, 2} everywhere.
+    if v ~= __JSON_NULL then out[#out + 1] = v end
+    i = __jsonSpace(s, i)
+    local c = s:sub(i, i)
+    if c == "," then i = __jsonSpace(s, i + 1)
+    elseif c == "]" then return out, i + 1
+    else error("array", 0) end
+  end
+end
+
+local function __jsonParseObject(s, i)
+  i = __jsonSpace(s, i + 1)
+  local out = {}
+  if s:sub(i, i) == "}" then return out, i + 1 end
+  while true do
+    local key
+    key, i = __jsonParseString(s, i)
+    i = __jsonSpace(s, i)
+    if s:sub(i, i) ~= ":" then error("object", 0) end
+    local v
+    v, i = __jsonValue(s, __jsonSpace(s, i + 1))
+    if v ~= __JSON_NULL then out[key] = v end
+    i = __jsonSpace(s, i)
+    local c = s:sub(i, i)
+    if c == "," then i = __jsonSpace(s, i + 1)
+    elseif c == "}" then return out, i + 1
+    else error("object", 0) end
+  end
+end
+
+__jsonValue = function(s, i)
+  i = __jsonSpace(s, i)
+  local c = s:sub(i, i)
+  if c == "{" then return __jsonParseObject(s, i) end
+  if c == "[" then return __jsonParseArray(s, i) end
+  if c == '"' then return __jsonParseString(s, i) end
+  if s:sub(i, i + 3) == "true" then return true, i + 4 end
+  if s:sub(i, i + 4) == "false" then return false, i + 5 end
+  if s:sub(i, i + 3) == "null" then return __JSON_NULL, i + 4 end
+  -- JSON's number grammar exactly, so that what this reads and what JSON.parse reads are the same
+  -- set of strings: no "1." and no ".5", and no leading zero (checked below, where the grammar
+  -- cannot say it).
+  local num = s:match("^%-?%d+%.%d+[eE][-+]?%d+", i)
+           or s:match("^%-?%d+%.%d+", i)
+           or s:match("^%-?%d+[eE][-+]?%d+", i)
+           or s:match("^%-?%d+", i)
+  if num ~= nil and num ~= "" then
+    local digits = num:match("^%-?(%d+)")
+    if #digits > 1 and digits:sub(1, 1) == "0" then error("number", 0) end
+    local n = tonumber(num)
+    if n ~= nil then return n, i + #num end
+  end
+  error("value", 0)
+end
+
+function decodeJson(text)
+  local s = text == nil and "" or tostring(text)
+  local ok, value, rest = pcall(__jsonValue, s, 1)
+  if not ok then return nil end
+  -- Trailing junk is malformed, not "the prefix parsed": telling a bad config from an empty one is
+  -- the whole point of returning nothing.
+  if __jsonSpace(s, rest) <= #s then return nil end
+  if value == __JSON_NULL then return nil end
+  return value
 end
 
 -- @module -
@@ -1887,7 +2269,7 @@ local __CE_MODULES = {
   ["ce.ui"] = { choose = "uiChoose", copy = "uiCopy", dialog = "uiDialog", dismiss = "uiDismiss", notify = "uiNotify", prompt = "uiPrompt", state = "uiState", status = "uiStatus", update = "uiUpdate" },
   ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", ellipse = "drawEllipse", fill = "drawFill", gradient = "drawGradient", line = "drawLine", measure = "drawMeasure", opacity = "drawOpacity", path = "drawPath", pixelText = "drawPixelText", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText", transform = "drawTransform" },
   ["ce.panel"] = { align = "panelAlign", batch = "panelBatch", circle = "panelCircle", clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", distribute = "panelDistribute", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", flip = "panelFlip", grid = "panelGrid", info = "panelInfo", match = "panelMatch", order = "panelOrder", parent = "panelParent", patch = "panelPatch", rect = "panelRect", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
-  ["ce.storage"] = { forget = "forgetSetting", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
+  ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
   ["ce.components.recorder"] = { bars = "recorderBars", clear = "recorderClear", countIn = "recorderCountIn", load = "recorderLoad", nudge = "recorderNudge", play = "recorderPlay", quantize = "recorderQuantize", record = "recorderRecord", shift = "recorderShift", source = "recorderSource", stop = "recorderStop", store = "recorderStore", transpose = "recorderTranspose", undo = "recorderUndo" },
@@ -1929,7 +2311,7 @@ local __CE_META = {
   { id = "ce.ui", version = "1.2", runtime = "webview" },
   { id = "ce.draw", version = "1.2", runtime = "webview" },
   { id = "ce.panel", version = "1.4", runtime = "any" },
-  { id = "ce.storage", version = "1.1", runtime = "any" },
+  { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },
   { id = "ce.components.recorder", version = "1.0", runtime = "webview" },
@@ -2144,13 +2526,19 @@ public:
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });
 
-        g.set_function ("saveSetting", [this] (std::string key, sol::object v)
-            { host->saveSetting (juce::String (key), solToVar (v)); });
-        g.set_function ("__loadSetting", [this] (std::string key)
-            { return varToSol (lua, host->loadSetting (juce::String (key))); });
-        g.set_function ("listSettings", [this] () { return varToSol (lua, host->listSettings()); });
-        g.set_function ("forgetSetting", [this] (std::string key)
-            { return host->forgetSetting (juce::String (key)); });
+        // The store argument is "panel" or "local" — the two places a setting can actually live.
+        // ce.storage's third scope, "script", is a key prefix on the panel store, resolved in the
+        // prelude so all four runtimes spell a private key the same way.
+        g.set_function ("__saveSetting", [this] (std::string key, sol::object v, std::string store)
+            { host->saveSetting (juce::String (key), solToVar (v), juce::String (store)); });
+        g.set_function ("__loadSetting", [this] (std::string key, std::string store)
+            { return varToSol (lua, host->loadSetting (juce::String (key), juce::String (store))); });
+        g.set_function ("__listSettings", [this] (std::string store)
+            { return varToSol (lua, host->listSettings (juce::String (store))); });
+        g.set_function ("__forgetSetting", [this] (std::string key, std::string store)
+            { return host->forgetSetting (juce::String (key), juce::String (store)); });
+        g.set_function ("__settingsAvailable", [this] (std::string store)
+            { return host->settingsAvailable (juce::String (store)); });
 
         g.set_function ("run",  [this] (std::string target, sol::optional<sol::object> args)
             { return varToSol (lua, host->runAction (juce::String (target), args ? solToVar (*args) : juce::var())); });

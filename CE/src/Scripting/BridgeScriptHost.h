@@ -68,8 +68,18 @@ public:
         std::function<void (const juce::String& id)> stopTimer;
         // Settings that outlive the session (ce.storage). Optional: unset means the panel simply
         // has nowhere to persist, and loadSetting always returns the fallback.
-        std::function<void (const juce::String& key, const juce::var& value)> saveSetting;
-        std::function<juce::var (const juce::String& key)> loadSetting;
+        // `store` is "panel" or "local" — see ScriptHostApi. A host that only has one of them
+        // ignores the argument, and settingsAvailable reports which is real.
+        std::function<void (const juce::String& key, const juce::var& value, const juce::String& store)> saveSetting;
+        std::function<juce::var (const juce::String& key, const juce::String& store)> loadSetting;
+        // The other two thirds of the interface. Without these, ce.storage.settings() and .forget()
+        // are dead in the player — and so are all(), clear() and info(), which are listSettings on
+        // top of loadSetting.
+        std::function<juce::var (const juce::String& store)> listSettings;
+        std::function<bool (const juce::String& key, const juce::String& store)> forgetSetting;
+        // Optional: unset means "whatever saveSetting being wired implies", which is right for a
+        // host with one store. A host with a panel store but no machine-local one sets this.
+        std::function<bool (const juce::String& store)> settingsAvailable;
     };
 
     explicit BridgeScriptHost (Callbacks cb) : callbacks (std::move (cb)) {}
@@ -320,10 +330,23 @@ public:
     void log (const juce::String& message, const juce::var& value) override { if (callbacks.log) callbacks.log (message, value); }
     void startTimer (const juce::String& id, int intervalMs) override { if (callbacks.startTimer) callbacks.startTimer (id, intervalMs); }
     void stopTimer  (const juce::String& id) override { if (callbacks.stopTimer) callbacks.stopTimer (id); }
-    void saveSetting (const juce::String& key, const juce::var& value) override
-    { if (callbacks.saveSetting) callbacks.saveSetting (key, value); }
-    juce::var loadSetting (const juce::String& key) override
-    { return callbacks.loadSetting ? callbacks.loadSetting (key) : juce::var(); }
+    void saveSetting (const juce::String& key, const juce::var& value,
+                      const juce::String& store) override
+    { if (callbacks.saveSetting) callbacks.saveSetting (key, value, store); }
+    juce::var loadSetting (const juce::String& key, const juce::String& store) override
+    { return callbacks.loadSetting ? callbacks.loadSetting (key, store) : juce::var(); }
+    juce::var listSettings (const juce::String& store) override
+    {
+        if (callbacks.listSettings) return callbacks.listSettings (store);
+        return juce::var (juce::Array<juce::var>());
+    }
+    bool forgetSetting (const juce::String& key, const juce::String& store) override
+    { return callbacks.forgetSetting ? callbacks.forgetSetting (key, store) : false; }
+    bool settingsAvailable (const juce::String& store) override
+    {
+        if (callbacks.settingsAvailable) return callbacks.settingsAvailable (store);
+        return callbacks.saveSetting != nullptr;
+    }
 
 private:
     // The role every device verb means when a script does not name one. Matches DEFAULT_DEVICE_ROLE

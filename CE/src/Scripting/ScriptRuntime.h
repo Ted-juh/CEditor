@@ -243,12 +243,29 @@ public:
         them with the panel so they travel with it, the exported plugin puts them in the DAW project
         state. `state` (a per-script scratchpad) needs no host at all — the script's own environment
         already persists for as long as it is loaded. */
-    virtual void saveSetting (const juce::String& key, const juce::var& value) { juce::ignoreUnused (key, value); }
-    virtual juce::var loadSetting (const juce::String& key) { juce::ignoreUnused (key); return {}; }
+    /** `store` is "panel" (the document, and the DAW project state in the export) or "local" (this
+        machine only, never written into the document — a panel you send somebody should not carry
+        the recipient's MIDI port choice). A host with no local store leaves loadSetting void and
+        saveSetting a no-op, and settingsAvailable() says so once rather than per key.
+
+        ce.storage's third scope, "script", needs nothing here: it is a key prefix the prelude
+        computes, so a private setting persists and travels exactly like a shared one and only its
+        visibility differs. */
+    virtual void saveSetting (const juce::String& key, const juce::var& value,
+                              const juce::String& store = "panel")
+    { juce::ignoreUnused (key, value, store); }
+    virtual juce::var loadSetting (const juce::String& key, const juce::String& store = "panel")
+    { juce::ignoreUnused (key, store); return {}; }
     /** Every saved key, as an array of strings. Empty means nothing written — not unavailable. */
-    virtual juce::var listSettings() { return juce::var (juce::Array<juce::var>()); }
+    virtual juce::var listSettings (const juce::String& store = "panel")
+    { juce::ignoreUnused (store); return juce::var (juce::Array<juce::var>()); }
     /** Delete one. True when there WAS one, so a script can tell "cleaned up" from "nothing there". */
-    virtual bool forgetSetting (const juce::String& key) { juce::ignoreUnused (key); return false; }
+    virtual bool forgetSetting (const juce::String& key, const juce::String& store = "panel")
+    { juce::ignoreUnused (key, store); return false; }
+    /** Whether writes to `store` will stick at all. False is a thing to say once — ce.storage.info()
+        reports it — rather than something to discover a key at a time. */
+    virtual bool settingsAvailable (const juce::String& store = "panel")
+    { juce::ignoreUnused (store); return false; }
 };
 
 // ----------------------------------------------------------------------------------------------

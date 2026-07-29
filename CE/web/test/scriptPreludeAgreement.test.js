@@ -21,6 +21,9 @@ import { dirname, join } from 'node:path';
 import vm from 'node:vm';
 
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import {
+  JSON_CASES, JSON_DECODE_CASES, JSON_REJECTS, NATIVE_ENCODE_CASES,
+} from './fixtures/jsonCases.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const scriptingDir = join(here, '..', '..', 'src', 'Scripting');
@@ -469,4 +472,180 @@ test('the generated namespace block runs in the Lua prelude and reaches the same
   } finally {
     lua.global.close();
   }
+});
+
+/* ------------------------------------------------------------------ ce.storage JSON (§43)
+ *
+ * A stricter bar than everything above, and it has to be. The rest of this file canonicalises both
+ * sides before comparing, so it checks that the runtimes compute the same VALUE. encode() returns a
+ * string a script puts somewhere — into a setting, into a SysEx payload — so here the four have to
+ * produce the same CHARACTERS.
+ *
+ * That is why the encoder is written out by hand in Lua and in Python rather than handed to a
+ * library: json.dumps spells 1e-5 as "1e-05" where JavaScript spells the same double "0.00001", and
+ * a patch encoded in the editor would not compare equal to the same patch encoded in the plugin.
+ * Lua has no json module at all, which is the reason the verbs exist.
+ */
+
+/** A Lua source literal for a JavaScript value — the input side, so the encoder is what is tested. */
+function luaJsonLiteral(v) {
+  if (v === null || v === undefined) return 'nil';
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'number') return String(v);   // JS prints the shortest round-trip; Lua reads it
+  if (typeof v === 'string') {
+    // Lua's own decimal escape, zero-padded so a following digit cannot be swallowed. Bytes above
+    // 0x7F stay in the source as UTF-8, which is how the prelude itself carries them.
+    let out = '"';
+    for (const ch of v) {
+      const code = ch.codePointAt(0);
+      if (ch === '"') out += '\\"';
+      else if (ch === '\\') out += '\\\\';
+      else if (code < 32 || code === 127) out += `\\${String(code).padStart(3, '0')}`;
+      else out += ch;
+    }
+    return `${out}"`;
+  }
+  if (Array.isArray(v)) return `{${v.map(luaJsonLiteral).join(', ')}}`;
+  return `{${Object.entries(v).map(([k, x]) => `[${luaJsonLiteral(k)}] = ${luaJsonLiteral(x)}`).join(', ')}}`;
+}
+
+test('the Lua prelude encodes and decodes JSON byte-for-byte as the WebView does', async () => {
+  const { LuaFactory } = await import('wasmoon');
+  const lua = await new LuaFactory().createEngine();
+  try {
+    for (const binding of ['log', 'logError', 'sendCC', 'on', 'startTimer', 'stopTimer']) {
+      lua.global.set(binding, () => {});
+    }
+    await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+
+    // One crossing, as everywhere else in this file — wasmoon's heap does not survive many. "\\1"
+    // as the separator rather than a newline or a pipe: a fixture contains both of those.
+    const encodes = JSON_CASES.map((c) => `tostring(encodeJson(${luaJsonLiteral(c.value)}))`);
+    const natives = NATIVE_ENCODE_CASES.map((c) => `tostring(encodeJson(${c.lua}))`);
+    const decodes = JSON_DECODE_CASES.map((c) => `tostring(encodeJson(decodeJson(${luaJsonLiteral(c.text)})))`);
+    const rejects = JSON_REJECTS.map((t) => `tostring(decodeJson(${luaJsonLiteral(t)}))`);
+    const indent = ['tostring(encodeJson({ b = 2, a = 1 }, { indent = 2 }))'];
+    const all = [...encodes, ...natives, ...decodes, ...rejects, ...indent];
+    const got = String(await lua.doString(
+      `return table.concat({${all.join(',\n')}}, "\\1")`)).split('\u0001');
+
+    assert.equal(got.length, all.length, 'expected one result per case');
+    let at = 0;
+    for (const c of JSON_CASES) assert.equal(got[at++], c.json, `Lua encode: ${c.name}`);
+    for (const c of NATIVE_ENCODE_CASES) assert.equal(got[at++], c.json, `Lua encode: ${c.name}`);
+    for (const c of JSON_DECODE_CASES) {
+      assert.equal(got[at++], c.json, `Lua decode: ${JSON.stringify(c.text)}`);
+    }
+    for (const t of JSON_REJECTS) {
+      // tostring(nil) is "nil": the text was refused, which is what tells a malformed config from
+      // an empty one.
+      assert.equal(got[at++], 'nil', `Lua should refuse ${JSON.stringify(t)}`);
+    }
+    assert.equal(got[at++], web.encodeJson({ b: 2, a: 1 }, { indent: 2 }), 'Lua indent');
+  } finally {
+    lua.global.close();
+  }
+});
+
+test('the JavaScript prelude encodes and decodes JSON byte-for-byte as the WebView does', () => {
+  const prelude = extractRawString('JsScriptEngine.cpp', 'JS');
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }) };
+  vm.createContext(sandbox);
+  vm.runInContext(prelude, sandbox);
+
+  for (const c of JSON_CASES) {
+    assert.equal(sandbox.encodeJson(c.value), c.json, `JS encode: ${c.name}`);
+    assert.equal(sandbox.encodeJson(c.value), web.encodeJson(c.value),
+      `JS encode disagrees with the WebView: ${c.name}`);
+  }
+  for (const c of NATIVE_ENCODE_CASES) {
+    assert.equal(sandbox.encodeJson(vm.runInContext(`(${c.javascript})`, sandbox)), c.json,
+      `JS encode: ${c.name}`);
+  }
+  for (const c of JSON_DECODE_CASES) {
+    assert.equal(sandbox.encodeJson(sandbox.decodeJson(c.text)), c.json,
+      `JS decode: ${JSON.stringify(c.text)}`);
+  }
+  for (const t of JSON_REJECTS) {
+    assert.equal(sandbox.decodeJson(t), undefined, `JS should refuse ${JSON.stringify(t)}`);
+  }
+  assert.equal(sandbox.encodeJson({ b: 2, a: 1 }, { indent: 2 }),
+    web.encodeJson({ b: 2, a: 1 }, { indent: 2 }));
+});
+
+// Same shape as the helper driver above: the prelude runs, then each case is evaluated in its
+// namespace and the ANSWER comes back as text, so nothing is canonicalised on the way.
+const PY_JSON_DRIVER = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC",
+             "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+out = []
+for value in payload["encode"]:
+    out.append(g["encodeJson"](value))
+for src in payload["native"]:
+    out.append(g["encodeJson"](eval(src, g)))
+for text in payload["decode"]:
+    out.append(g["encodeJson"](g["decodeJson"](text)))
+for text in payload["reject"]:
+    out.append(g["decodeJson"](text))
+out.append(g["encodeJson"]({"b": 2, "a": 1}, {"indent": 2}))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+
+test('the Python prelude encodes and decodes JSON byte-for-byte as the WebView does', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const probe = spawnSync('python3', ['-c', 'pass'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) {
+    t.skip('python3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
+    return;
+  }
+
+  const run = spawnSync('python3', ['-c', PY_JSON_DRIVER], {
+    input: JSON.stringify({
+      prelude: extractRawString('PythonScriptEngine.cpp', 'PY'),
+      encode: JSON_CASES.map((c) => c.value),
+      native: NATIVE_ENCODE_CASES.map((c) => c.python),
+      decode: JSON_DECODE_CASES.map((c) => c.text),
+      reject: JSON_REJECTS,
+    }),
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+
+  const got = JSON.parse(run.stdout);
+  let at = 0;
+  for (const c of JSON_CASES) assert.equal(got[at++], c.json, `Python encode: ${c.name}`);
+  for (const c of NATIVE_ENCODE_CASES) assert.equal(got[at++], c.json, `Python encode: ${c.name}`);
+  for (const c of JSON_DECODE_CASES) {
+    assert.equal(got[at++], c.json, `Python decode: ${JSON.stringify(c.text)}`);
+  }
+  for (const text of JSON_REJECTS) {
+    assert.equal(got[at++], null, `Python should refuse ${JSON.stringify(text)}`);
+  }
+  assert.equal(got[at++], web.encodeJson({ b: 2, a: 1 }, { indent: 2 }), 'Python indent');
+});
+
+test('the three preludes derive the same private key for the same script, or scopes do not survive export', () => {
+  // A setting saved in script scope by the editor has to be readable by the exported plugin, and
+  // that only works if all four spell the key identically. This is the one piece of ce.storage that
+  // is not a pure helper and still has to agree across runtimes.
+  const prelude = extractRawString('JsScriptEngine.cpp', 'JS');
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), __scriptId: 'abc' };
+  vm.createContext(sandbox);
+  vm.runInContext(prelude, sandbox);
+  assert.equal(sandbox.__storageKeyFor('script', 'k'), '\u0001script:abc:k');
+  assert.equal(sandbox.__storageKeyFor('panel', 'k'), 'k');
+  assert.equal(sandbox.__storageKeyFrom('panel', '\u0001script:other:k'), undefined,
+    "a panel listing must not show another script's private key");
+  assert.equal(sandbox.__storageStore('script'), 'panel',
+    'script scope is a prefix on the panel store, not a store of its own');
+  assert.equal(sandbox.__storageStore('local'), 'local');
 });

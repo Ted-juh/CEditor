@@ -4675,6 +4675,63 @@ function stateFor(scriptId) {
   return scriptState.get(scriptId);
 }
 
+/* ------------------------------------------------------------------- storage scopes (§43)
+ * `state` is per-script and says so. Settings were panel-wide and said nothing, so two scripts both
+ * saving "count" clobbered each other in silence — an asymmetry nobody had written down.
+ *
+ * Three scopes now, and they differ in WHO SEES the value and WHERE it lives:
+ *
+ *   panel  — the default, and what settings have always been. Shared by every script on the panel,
+ *            stored in the document, travels with it.
+ *   script — private to the calling script, the way `state` already is. Same store, a key nobody
+ *            else can spell, so nothing about persistence changes.
+ *   local  — THIS MACHINE only, never written into the document. A panel you send somebody should
+ *            not carry your MIDI port choice with it.
+ *
+ * script scope is a key prefix rather than a second store on purpose: a private setting should
+ * persist and travel exactly like a shared one, and only its visibility differs.
+ */
+const STORAGE_SCOPES = ['panel', 'script', 'local'];
+const LOCAL_STORAGE_PREFIX = 'ce.storage:';
+
+/** The scope asked for, or NOTHING when it is not one this build knows.
+ *
+ *  Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
+ *  for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
+ *  the way it happened. Every verb below bails on nothing.
+ */
+function storageScopeOf(opts, scriptId) {
+  const raw = typeof opts === 'string' ? opts : opts?.scope;
+  if (raw == null || raw === '') return 'panel';
+  const scope = String(raw);
+  if (STORAGE_SCOPES.includes(scope)) return scope;
+  addScriptTrace('error', scriptId ?? '',
+    `ce.storage: "${scope}" is not a scope. One of: ${STORAGE_SCOPES.join(', ')}.`);
+  return undefined;
+}
+
+/** The key a scope actually stores under. Script scope carries the owner in the key; the prefix is
+ *  chosen to be one a hand-written key could not collide with by accident.
+ *
+ *  U+0001 rather than U+0000, and the same in all four runtimes: the C++ engines pass a key through
+ *  juce::String, which is NUL-terminated, so a NUL in a key would truncate it there and the editor
+ *  and the export would disagree about what a private key is even called.
+ */
+const SCRIPT_KEY_PREFIX = '\u0001script:';
+
+function storageKeyFor(scope, key, scriptId) {
+  const k = String(key ?? '');
+  return scope === 'script' ? `${SCRIPT_KEY_PREFIX}${scriptId ?? ''}:${k}` : k;
+}
+
+/** …and back, for listing: nil when the stored key does not belong to this scope. */
+function storageKeyFrom(scope, stored, scriptId) {
+  const prefix = `${SCRIPT_KEY_PREFIX}${scriptId ?? ''}:`;
+  if (scope === 'script') return stored.startsWith(prefix) ? stored.slice(prefix.length) : undefined;
+  // A panel listing hides other scripts' private keys rather than showing an unusable spelling.
+  return stored.startsWith(SCRIPT_KEY_PREFIX) ? undefined : stored;
+}
+
 function settingsStore() {
   const panel = activePanel();
   if (!panel) return null;
@@ -4683,30 +4740,205 @@ function settingsStore() {
   return panel.scripting.settings;
 }
 
-function saveSetting(key, value) {
-  const store = settingsStore();
-  if (!store) { addScriptTrace('error', '', `saveSetting("${key}"): no active panel to store it on`); return; }
-  store[String(key)] = value;
+/** The machine-local store. Absent in a test run and in any host without one, which `info()`
+ *  reports rather than leaving a script to guess why nothing persisted. */
+function localStore() {
+  try {
+    return (typeof localStorage !== 'undefined' && localStorage) ? localStorage : null;
+  } catch { return null; }        // a browser with storage disabled throws on access, not on use
 }
 
-function loadSetting(key, fallback) {
+function localRead() {
+  const store = localStore();
+  if (!store) return null;
+  const panel = activePanel();
+  const key = LOCAL_STORAGE_PREFIX + String(panel?.id ?? '');
+  try { return JSON.parse(store.getItem(key) ?? '{}') ?? {}; } catch { return {}; }
+}
+
+function localWrite(map) {
+  const store = localStore();
+  if (!store) return false;
+  const panel = activePanel();
+  try { store.setItem(LOCAL_STORAGE_PREFIX + String(panel?.id ?? ''), JSON.stringify(map)); return true; }
+  catch { return false; }         // quota, private browsing — reported by the caller, never thrown
+}
+
+function saveSetting(key, value, opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return false;
+  const stored = storageKeyFor(scope, key, scriptId);
+  if (scope === 'local') {
+    const map = localRead();
+    if (!map) {
+      addScriptTrace('error', scriptId ?? '',
+        `saveSetting("${key}"): this build has no machine-local store, so nothing was saved. `
+        + 'ce.storage.info() says which stores are available.');
+      return false;
+    }
+    map[stored] = value;
+    if (localWrite(map)) return true;
+    addScriptTrace('error', scriptId ?? '', `saveSetting("${key}"): the local store refused the write.`);
+    return false;
+  }
   const store = settingsStore();
-  const v = store?.[String(key)];
+  if (!store) {
+    addScriptTrace('error', scriptId ?? '', `saveSetting("${key}"): no active panel to store it on`);
+    return false;
+  }
+  store[stored] = value;
+  return true;
+}
+
+function loadSetting(key, fallback, opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return fallback;
+  const stored = storageKeyFor(scope, key, scriptId);
+  const source = scope === 'local' ? localRead() : settingsStore();
+  const v = source?.[stored];
   return v === undefined ? fallback : v;
 }
 
-/** Every key this panel has saved. Empty means nothing written — not "settings unavailable". */
-function listSettings() {
-  return Object.keys(settingsStore() ?? {});
+/** Every key this panel has saved IN THIS SCOPE. Empty means nothing written — not "settings
+ *  unavailable", which is what info() is for. */
+function listSettings(opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return [];
+  const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
+  return Object.keys(source)
+    .map((k) => storageKeyFrom(scope, k, scriptId))
+    .filter((k) => k !== undefined);
 }
 
-/** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing there". */
-function forgetSetting(key) {
+/** Every setting as a table — the read every other module got, instead of listing keys and looping
+ *  to fetch each one. */
+function allSettings(opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return {};
+  const source = (scope === 'local' ? localRead() : settingsStore()) ?? {};
+  const out = {};
+  for (const [stored, value] of Object.entries(source)) {
+    const key = storageKeyFrom(scope, stored, scriptId);
+    if (key !== undefined) out[key] = value;
+  }
+  return out;
+}
+
+/** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing
+ *  there" — the distinction the whole module keeps. */
+function forgetSetting(key, opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return false;
+  const stored = storageKeyFor(scope, key, scriptId);
+  if (scope === 'local') {
+    const map = localRead();
+    if (!map || !(stored in map)) return false;
+    delete map[stored];
+    return localWrite(map);
+  }
   const store = settingsStore();
-  const k = String(key);
-  if (!store || !(k in store)) return false;
-  delete store[k];
+  if (!store || !(stored in store)) return false;
+  delete store[stored];
   return true;
+}
+
+/** Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
+ *  keys alone: "clear my settings" must not mean "clear everybody's". */
+function clearSettings(opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return 0;
+  const keys = listSettings(opts, scriptId);
+  let gone = 0;
+  for (const key of keys) if (forgetSetting(key, opts, scriptId)) gone += 1;
+  return gone;
+}
+
+/**
+ * Which store a scope is talking to, and what is in it.
+ *
+ * The three scopes have genuinely different backing — the panel document, this machine, the DAW
+ * project — and a script that has just failed to persist something deserves to know which one it
+ * was talking to rather than guessing. `available` is the honest field: false means writes in this
+ * scope will not stick, which is a thing to say once rather than discover per key.
+ */
+function storageInfo(opts, scriptId) {
+  const scope = storageScopeOf(opts, scriptId);
+  if (!scope) return undefined;
+  const source = scope === 'local' ? localRead() : settingsStore();
+  const contents = allSettings(opts, scriptId);
+  let bytes = 0;
+  try { bytes = JSON.stringify(contents).length; } catch { bytes = -1; }
+  return {
+    scope,
+    // What the store IS, rather than what it is called: the editor keeps panel-scope settings in
+    // the document, and the exported plugin keeps them in the DAW project state.
+    backing: scope === 'local' ? 'machine' : (host ? 'project' : 'panel'),
+    available: source != null,
+    count: Object.keys(contents).length,
+    bytes,
+  };
+}
+
+/* --------------------------------------------------------------------------- JSON (§43)
+ * A Q10 exception, and the same one now() was. The Lua engine opens base, math, string and table —
+ * there is no json module, and no way to write one that is not a parser. JavaScript and Python each
+ * have their own, with different names and different edge cases. So "use the language's own" was
+ * never available to a cross-runtime script.
+ *
+ * Here rather than in ce.core because encoding is what you do to put a structure somewhere: into a
+ * setting, into a SysEx payload, into a text control somebody typed a config into.
+ */
+/** Every object key anywhere in a value, so the four runtimes can sort them into one order.
+ *
+ *  Keys come out SORTED, everywhere. Not a stylistic choice: a Lua table has no insertion order to
+ *  preserve, so sorted is the only ordering all four runtimes are able to produce — and it is the
+ *  ordering that makes two encodings of the same structure comparable, which is half of what encode
+ *  is for. (Sort order is the language's own string order. Those agree over ASCII, which panel keys
+ *  are; above the BMP JavaScript orders by UTF-16 unit where the others order by code point.)
+ */
+function jsonKeysOf(value, out, seen) {
+  if (!value || typeof value !== 'object') return out;
+  if (seen.has(value)) return out;              // a cycle: stop here, stringify will refuse below
+  seen.add(value);
+  if (Array.isArray(value)) for (const v of value) jsonKeysOf(v, out, seen);
+  else for (const k of Object.keys(value)) { out.add(k); jsonKeysOf(value[k], out, seen); }
+  return out;
+}
+
+function encodeJson(value, opts) {
+  try {
+    const indent = Number(opts?.indent);
+    const keys = [...jsonKeysOf(value, new Set(), new Set())].sort();
+    return JSON.stringify(value, keys.length ? keys : undefined,
+      Number.isFinite(indent) && indent > 0 ? indent : undefined);
+  } catch {
+    // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
+    // value — which is the same rule every "cannot read that" in this API follows.
+    return undefined;
+  }
+}
+
+/** JSON null read as NOTHING: an absent member, a skipped element.
+ *
+ *  Not a preference — a Lua table cannot hold a null, and a value the four runtimes cannot all hold
+ *  is not a value this API has. So `{"a":1,"b":null}` reads as one key everywhere, and
+ *  `[1,null,2]` as a two-element list everywhere, rather than as three shapes in three engines.
+ */
+function stripJsonNulls(v) {
+  if (Array.isArray(v)) return v.filter((x) => x !== null).map(stripJsonNulls);
+  if (v && typeof v === 'object') {
+    const out = {};
+    for (const [k, x] of Object.entries(v)) if (x !== null) out[k] = stripJsonNulls(x);
+    return out;
+  }
+  return v;
+}
+
+function decodeJson(text) {
+  try {
+    const v = JSON.parse(String(text ?? ''));
+    return v === null ? undefined : stripJsonNulls(v);
+  } catch { return undefined; }
 }
 
 // @module -
@@ -4941,10 +5173,15 @@ function buildApi(ownerName, scriptId = '') {
     randomStream: (name, fn) => randomStreamImpl(scriptId, name, fn),
     // ce.storage
     state: stateFor(scriptId),
-    saveSetting: (key, value) => saveSetting(key, value),
-    loadSetting: (key, fallback) => loadSetting(key, fallback),
-    listSettings: () => listSettings(),
-    forgetSetting: (key) => forgetSetting(key),
+    saveSetting: (key, value, opts) => saveSetting(key, value, opts, scriptId),
+    loadSetting: (key, fallback, opts) => loadSetting(key, fallback, opts, scriptId),
+    listSettings: (opts) => listSettings(opts, scriptId),
+    forgetSetting: (key, opts) => forgetSetting(key, opts, scriptId),
+    allSettings: (opts) => allSettings(opts, scriptId),
+    clearSettings: (opts) => clearSettings(opts, scriptId),
+    storageInfo: (opts) => storageInfo(opts, scriptId),
+    encodeJson: (value, opts) => encodeJson(value, opts),
+    decodeJson: (text) => decodeJson(text),
     // The blocks gate set()'s transmission, not the explicit senders — same rule as the C++ host.
     // finally, not catch-and-continue: an exception inside the block must not leave the override
     // stuck on, or every later write in the panel inherits it.

@@ -375,26 +375,40 @@ PyObject* api_sendMidi (PyObject*, PyObject* args)
     if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
     g_host->sendMidi (pyToVar (bytes)); Py_RETURN_NONE;
 }
+// The store argument is "panel" or "local" — the two places a setting can actually live.
+// ce.storage's third scope, "script", is a key prefix on the panel store, resolved in the prelude
+// so all four runtimes spell a private key the same way.
 PyObject* api_saveSetting (PyObject*, PyObject* args)
 {
-    const char* key = nullptr; PyObject* v = nullptr;
-    if (! PyArg_ParseTuple (args, "sO", &key, &v)) return nullptr;
-    g_host->saveSetting (juce::String::fromUTF8 (key), pyToVar (v)); Py_RETURN_NONE;
+    const char* key = nullptr; PyObject* v = nullptr; const char* store = "panel";
+    if (! PyArg_ParseTuple (args, "sO|s", &key, &v, &store)) return nullptr;
+    g_host->saveSetting (juce::String::fromUTF8 (key), pyToVar (v), juce::String::fromUTF8 (store));
+    Py_RETURN_NONE;
 }
-PyObject* api_listSettings (PyObject*, PyObject*)
+PyObject* api_listSettings (PyObject*, PyObject* args)
 {
-    return varToPy (g_host->listSettings());
+    const char* store = "panel";
+    if (! PyArg_ParseTuple (args, "|s", &store)) return nullptr;
+    return varToPy (g_host->listSettings (juce::String::fromUTF8 (store)));
 }
 PyObject* api_forgetSetting (PyObject*, PyObject* args)
 {
-    const char* key = nullptr;
-    if (! PyArg_ParseTuple (args, "s", &key)) return nullptr;
-    return PyBool_FromLong (g_host->forgetSetting (juce::String::fromUTF8 (key)) ? 1 : 0);
+    const char* key = nullptr; const char* store = "panel";
+    if (! PyArg_ParseTuple (args, "s|s", &key, &store)) return nullptr;
+    return PyBool_FromLong (g_host->forgetSetting (juce::String::fromUTF8 (key),
+                                                   juce::String::fromUTF8 (store)) ? 1 : 0);
 }
 PyObject* api_loadSetting (PyObject*, PyObject* args)
 {
-    const char* key = nullptr; if (! PyArg_ParseTuple (args, "s", &key)) return nullptr;
-    return varToPy (g_host->loadSetting (juce::String::fromUTF8 (key)));
+    const char* key = nullptr; const char* store = "panel";
+    if (! PyArg_ParseTuple (args, "s|s", &key, &store)) return nullptr;
+    return varToPy (g_host->loadSetting (juce::String::fromUTF8 (key), juce::String::fromUTF8 (store)));
+}
+PyObject* api_settingsAvailable (PyObject*, PyObject* args)
+{
+    const char* store = "panel";
+    if (! PyArg_ParseTuple (args, "|s", &store)) return nullptr;
+    return PyBool_FromLong (g_host->settingsAvailable (juce::String::fromUTF8 (store)) ? 1 : 0);
 }
 PyObject* api_startTimer (PyObject*, PyObject* args)
 {
@@ -440,8 +454,9 @@ PyMethodDef apiMethods[] = {
     { "sendMidi",      api_sendMidi,      METH_VARARGS, nullptr },
     { "saveSetting",   api_saveSetting,   METH_VARARGS, nullptr },
     { "loadSetting",   api_loadSetting,   METH_VARARGS, nullptr },
-    { "listSettings",  api_listSettings,  METH_NOARGS,  nullptr },
+    { "listSettings",  api_listSettings,  METH_VARARGS, nullptr },
     { "forgetSetting", api_forgetSetting, METH_VARARGS, nullptr },
+    { "settingsAvailable", api_settingsAvailable, METH_VARARGS, nullptr },
     { "requestDump",   api_requestDump,   METH_VARARGS, nullptr },
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
     { "deviceDefine",  api_deviceDefine,  METH_VARARGS, nullptr },
@@ -2402,13 +2417,261 @@ on("*", "onDumpReceived", __dumpTick)
 # Lua table and a JS object, and a dict only offers state["count"].
 import types as __ce_state_types
 state = __ce_state_types.SimpleNamespace()
-def saveSetting(key, value):      return __api.saveSetting(str(key), value)
-# settings() lists every saved key; forget() deletes one and says whether there was one.
-def listSettings():               return __api.listSettings() or []
-def forgetSetting(key):           return __api.forgetSetting(str(key)) is True
-def loadSetting(key, fallback=None):
-    v = __api.loadSetting(str(key))
+
+# Three scopes, differing in who sees a value and where it lives (design doc §43):
+#   panel  — shared by every script on the panel, in the document, travels with it. The default,
+#            and exactly what settings have always been.
+#   script — private to the calling script, the way `state` already is.
+#   local  — THIS MACHINE only, never written into the document.
+# script scope is a key prefix on the panel store rather than a store of its own: a private setting
+# should persist and travel exactly like a shared one, and only its visibility differs.
+__CE_SCOPES = ("panel", "script", "local")
+# U+0001 and not U+0000: a key travels through juce::String, which is NUL-terminated and would
+# truncate there, and then the editor and the export would disagree about what a private key is
+# even called. All four runtimes spell the prefix this way.
+__CE_SCRIPT_PREFIX = "\u0001script:"
+
+def __storageScope(opts):
+    """The scope asked for, or None when it is not one this build knows.
+
+    Refusing rather than falling back to "panel": storing a value in a scope the caller did not ask
+    for is how a private setting quietly becomes a shared one, and a typo in a scope name would be
+    the way it happened."""
+    raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
+    if raw is None or raw == "":
+        return "panel"
+    scope = str(raw)
+    if scope in __CE_SCOPES:
+        return scope
+    logError('ce.storage: "%s" is not a scope. One of: panel, script, local.' % scope)
+    return None
+
+# Which of the host's two real stores a scope lives in.
+def __storageStore(scope):  return "local" if scope == "local" else "panel"
+
+# The key a scope actually stores under.
+def __storageKeyFor(scope, key):
+    k = "" if key is None else str(key)
+    if scope == "script":
+        return __CE_SCRIPT_PREFIX + str(globals().get("__scriptId", "") or "") + ":" + k
+    return k
+
+# …and back, for listing: None when the stored key does not belong to this scope.
+def __storageKeyFrom(scope, stored):
+    if scope == "script":
+        prefix = __CE_SCRIPT_PREFIX + str(globals().get("__scriptId", "") or "") + ":"
+        return stored[len(prefix):] if stored.startswith(prefix) else None
+    # A panel listing hides other scripts' private keys rather than showing an unusable spelling.
+    return None if stored.startswith(__CE_SCRIPT_PREFIX) else stored
+
+def saveSetting(key, value, opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return False
+    store = __storageStore(scope)
+    if __api.settingsAvailable(store) is not True:
+        logError('saveSetting("%s"): the %s store is unavailable here, so nothing was saved. '
+                 'ce.storage.info() says which stores are available.' % (key, scope))
+        return False
+    __api.saveSetting(__storageKeyFor(scope, key), value, store)
+    return True
+
+def loadSetting(key, fallback=None, opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return fallback
+    v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
     return fallback if v is None else v
+
+# settings() lists every saved key; forget() deletes one and says whether there was one.
+def listSettings(opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return []
+    out = []
+    for stored in (__api.listSettings(__storageStore(scope)) or []):
+        k = __storageKeyFrom(scope, str(stored))
+        if k is not None:
+            out.append(k)
+    return out
+
+def forgetSetting(key, opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return False
+    return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) is True
+
+# Every setting as a table — the read every other module got. Listing keys and looping to fetch each
+# one was the only way before.
+def allSettings(opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return {}
+    return { k: loadSetting(k, None, opts) for k in listSettings(opts) }
+
+# Forget everything in one scope, and say how many went. Panel scope leaves other scripts' private
+# keys alone: "clear my settings" must not mean "clear everybody's".
+def clearSettings(opts=None):
+    return sum(1 for k in listSettings(opts) if forgetSetting(k, opts))
+
+# Which store a scope is talking to, and what is in it. `available` is the honest field: false means
+# writes in this scope will not stick, which is worth saying once rather than per key.
+def storageInfo(opts=None):
+    scope = __storageScope(opts)
+    if scope is None:
+        return None
+    contents = allSettings(opts)
+    text = encodeJson(contents)
+    return {
+        "scope": scope,
+        # What the store IS, rather than what it is called: in the player, panel-scope settings live
+        # in the DAW project state and machine-local ones do not.
+        "backing": "machine" if scope == "local" else "project",
+        "available": __api.settingsAvailable(__storageStore(scope)) is True,
+        "count": len(contents),
+        "bytes": -1 if text is None else len(text),
+    }
+
+# JSON. A Q10 exception, and the same one now() was: the Lua engine opens base, math, string and
+# table and has NO json module, while this one and JavaScript each have their own with different
+# names and different edge cases. "Use the language's own" was never available to a cross-runtime
+# script, so all four grow one spelling here.
+#
+# Written out rather than handed to json.dumps, because dumps spells a float with repr() and repr
+# disagrees with JavaScript exactly where it matters: repr(1e-5) is "1e-05" where JavaScript prints
+# "0.00001", and repr pads an exponent to two digits where JavaScript does not. One structure would
+# encode two ways, which is the one thing an encoder in a cross-runtime API may not do.
+import json as __ce_json
+import math as __ce_json_math
+
+__CE_JSON_ESCAPES = {
+    '"': '\\"', "\\": "\\\\", "\b": "\\b", "\f": "\\f",
+    "\n": "\\n", "\r": "\\r", "\t": "\\t",
+}
+
+def __jsonString(s):
+    # Control characters and the two structural ones only. Anything above passes through, so UTF-8
+    # text stays UTF-8 — which is what JSON.stringify does.
+    out = ['"']
+    for ch in s:
+        esc = __CE_JSON_ESCAPES.get(ch)
+        if esc is not None:
+            out.append(esc)
+        elif ch < " ":
+            out.append("\\u%04x" % ord(ch))
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
+
+def __jsonNumber(v):
+    if isinstance(v, int):
+        return "%d" % v
+    if v != v or v in (float("inf"), float("-inf")):
+        return "null"                                  # as JSON.stringify spells them
+    if v == 0:
+        return "0"                                     # and -0.0, which JavaScript spells "0"
+    a = -v if v < 0 else v
+    # An integral value below 1e21 prints as digits in JavaScript, however it is stored here.
+    if v == __ce_json_math.floor(v) and a < 1e21:
+        return "%d" % int(v)
+    # The band where Python and JavaScript disagree about notation: repr goes exponential below
+    # 1e-4, JavaScript below 1e-6.
+    if 1e-6 <= a < 1e-4:
+        for p in range(1, 21):
+            s = "%.*f" % (p, v)
+            if float(s) == v:
+                return s
+    # Otherwise repr is already the shortest spelling that reads back as the same double, which is
+    # what JavaScript prints too — only the exponent is padded where JavaScript's is not.
+    s = repr(v)
+    at = s.find("e")
+    if at >= 0:
+        mantissa, exponent = s[:at], s[at + 1:]
+        sign = exponent[0] if exponent[0] in "+-" else "+"
+        digits = exponent.lstrip("+-").lstrip("0") or "0"
+        s = mantissa + "e" + sign + digits
+    return s
+
+def __jsonEnc(v, indent, depth, seen):
+    if v is None:
+        return "null"
+    if isinstance(v, bool):
+        return "true" if v else "false"                # before int: a bool IS an int in Python
+    if isinstance(v, (int, float)):
+        return __jsonNumber(v)
+    if isinstance(v, str):
+        return __jsonString(v)
+    if not isinstance(v, (list, tuple, dict)):
+        return None                                    # a function, an object: no JSON form
+    if id(v) in seen:
+        raise ValueError("cycle")                      # the whole encode fails, as JSON.stringify does
+    inner = seen | {id(v)}
+
+    nl, pad, pad_in, colon = "", "", "", ":"
+    if indent > 0:
+        nl = "\n"
+        pad = " " * (indent * depth)
+        pad_in = " " * (indent * (depth + 1))
+        colon = ": "
+
+    if isinstance(v, (list, tuple)):
+        if len(v) == 0:
+            return "[]"
+        parts = []
+        for element in v:
+            # An element with no JSON form is null in JavaScript, not a dropped element.
+            s = __jsonEnc(element, indent, depth + 1, inner)
+            parts.append(pad_in + ("null" if s is None else s))
+        return "[" + nl + ("," + nl).join(parts) + nl + pad + "]"
+
+    # Keys come out SORTED, in every runtime. Not a stylistic choice: a Lua table has no insertion
+    # order to preserve, so sorted is the only ordering all four runtimes are able to produce — and
+    # it is the ordering that makes two encodings of the same structure comparable.
+    by_name = { str(k): x for k, x in v.items() }
+    parts = []
+    for name in sorted(by_name):
+        s = __jsonEnc(by_name[name], indent, depth + 1, inner)
+        if s is not None:                              # a member with no JSON form is dropped
+            parts.append(pad_in + __jsonString(name) + colon + s)
+    if not parts:
+        return "{}"
+    return "{" + nl + ("," + nl).join(parts) + nl + pad + "}"
+
+def encodeJson(value, opts=None):
+    indent = 0
+    if isinstance(opts, dict):
+        try:
+            n = int(opts.get("indent") or 0)
+            if n > 0:
+                indent = n
+        except (TypeError, ValueError):
+            indent = 0
+    try:
+        return __jsonEnc(value, indent, 0, frozenset())
+    except (TypeError, ValueError, RecursionError):
+        # A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
+        # value — the same rule every "cannot read that" in this API follows.
+        return None
+
+def __jsonStripNulls(v):
+    """JSON null read as NOTHING: an absent member, a skipped element. Not a preference — a Lua
+    table cannot hold a null, and a value the four runtimes cannot all hold is not a value this API
+    has."""
+    if isinstance(v, list):
+        return [__jsonStripNulls(x) for x in v if x is not None]
+    if isinstance(v, dict):
+        return { k: __jsonStripNulls(x) for k, x in v.items() if x is not None }
+    return v
+
+def decodeJson(text):
+    # json.loads for the reading: it is the same strict grammar JSON.parse accepts, which is what
+    # the hand-written Lua reader had to be written to match.
+    try:
+        v = __ce_json.loads("" if text is None else str(text))
+    except (ValueError, TypeError):
+        return None
+    return None if v is None else __jsonStripNulls(v)
 
 # @module -
 # BEGIN GENERATED module namespace — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
@@ -2427,7 +2690,7 @@ __CE_MODULES = {
     "ce.ui": { "choose": "uiChoose", "copy": "uiCopy", "dialog": "uiDialog", "dismiss": "uiDismiss", "notify": "uiNotify", "prompt": "uiPrompt", "state": "uiState", "status": "uiStatus", "update": "uiUpdate" },
     "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "ellipse": "drawEllipse", "fill": "drawFill", "gradient": "drawGradient", "line": "drawLine", "measure": "drawMeasure", "opacity": "drawOpacity", "path": "drawPath", "pixelText": "drawPixelText", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText", "transform": "drawTransform" },
     "ce.panel": { "align": "panelAlign", "batch": "panelBatch", "circle": "panelCircle", "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "distribute": "panelDistribute", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "flip": "panelFlip", "grid": "panelGrid", "info": "panelInfo", "match": "panelMatch", "order": "panelOrder", "parent": "panelParent", "patch": "panelPatch", "rect": "panelRect", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
-    "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
+    "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
     "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
@@ -2469,7 +2732,7 @@ __CE_META = [
     { "id": "ce.ui", "version": "1.2", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.2", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.4", "runtime": "any" },
-    { "id": "ce.storage", "version": "1.1", "runtime": "any" },
+    { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.recorder", "version": "1.0", "runtime": "webview" },
@@ -2630,6 +2893,11 @@ public:
             PyObject* owner = PyUnicode_FromString (resolveSelfOwner (def).toRawUTF8());
             PyDict_SetItemString (ns, "__owner", owner);
             Py_XDECREF (owner);
+            // ce.storage's "script" scope spells a private key with the owning script's id in it,
+            // so the id has to be readable from the prelude the same way the owner already is.
+            PyObject* sid = PyUnicode_FromString (def.id.toRawUTF8());
+            PyDict_SetItemString (ns, "__scriptId", sid);
+            Py_XDECREF (sid);
         }
 
         const WatchdogScope guard (*this); // module-level statements obey the execution budget too

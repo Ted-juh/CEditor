@@ -1973,21 +1973,23 @@ export const COMMANDS = [
     snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
   },
   {
-    id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value)',
-    summary: 'Persist a value beyond the session. In the editor it is stored with the panel and travels with it; in the exported plugin it goes into the DAW project state.',
+    id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
+    summary: 'Persist a value beyond the session, and say whether it stuck. In the editor a panel-scope setting is stored with the panel and travels with it; in the exported plugin it goes into the DAW project state. `opts.scope` is "panel" (default, shared by every script on the panel), "script" (private to yours, the way `state` is) or "local" (this machine only, never written into the document — a panel you send somebody should not carry your MIDI port choice). Returns false when there was nowhere to put it, which used to be indistinguishable from success.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'value', type: 'value', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
     ],
     scopes: 'any',
     snippet: { lua: 'saveSetting("${1:key}", ${2:value})$0', javascript: 'saveSetting("${1:key}", ${2:value})$0' },
   },
   {
-    id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback])',
-    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written.',
+    id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
+    summary: 'Read back a value saved with saveSetting. Returns `fallback` when the key has never been written — and `opts.scope` has to match the scope it was saved in, because a private setting and a shared one of the same name are two different values.',
     params: [
       { name: 'key', type: 'string', required: true },
       { name: 'fallback', type: 'value', required: false },
+      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
     ],
     scopes: 'any',
     snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
@@ -1996,16 +1998,69 @@ export const COMMANDS = [
   // nothing could list or delete one, so a panel storing per-preset settings could never clean up
   // after itself and could not show somebody what it had kept.
   {
-    id: 'listSettings', category: 'Storage', signature: 'listSettings() -> list',
-    summary: 'Every key this panel has saved, in no particular order. An empty list means nothing has been written — not that settings are unavailable.',
-    params: [], scopes: 'any',
+    id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
+    summary: 'Every key saved in one scope, in no particular order. An empty list means nothing has been written — not that settings are unavailable, which is what ce.storage.info() is for. `opts.scope` as elsewhere; a panel listing hides other scripts\u2019 private keys.',
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
-    id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key) -> boolean',
-    summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there".',
-    params: [{ name: 'key', type: 'string', required: true }], scopes: 'any',
+    id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
+    summary: 'Delete a saved setting. Returns whether there was one to delete, so a script can tell "cleaned up" from "there was nothing there". `opts.scope` as elsewhere.',
+    params: [
+      { name: 'key', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['scope'] },
+    ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
+  },
+  /* --- Storage: scopes, bulk and JSON (design doc §43) ---
+     `state` was per-script and said so. Settings were panel-wide and said NOTHING, so two scripts
+     both saving "count" clobbered each other in silence — an asymmetry nobody had written down.
+
+     Three scopes now, differing in who sees a value and where it lives. `scope` is an option on
+     every settings verb, defaulting to "panel", which is exactly what settings have always been:
+       · "panel"  — shared by every script on the panel, in the document, travels with it.
+       · "script" — private to the calling script, the way `state` already is.
+       · "local"  — THIS MACHINE only, never written into the document. A panel you send somebody
+                    should not carry your MIDI port choice with it.
+     A scope this build does not know is REFUSED rather than quietly treated as "panel": storing a
+     value somewhere the caller did not ask for is how a private setting becomes a shared one. */
+  {
+    id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
+    summary: 'Every setting in one scope, as a table of key to value. The read every other module got — listing keys and looping to fetch each one was the only way before. `opts.scope` is "panel" (default), "script" or "local". A panel-scope listing hides other scripts’ private keys rather than showing an unusable spelling of them.',
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for k, v in pairs(ce.storage.all()) do log(k, v) end$0',
+      javascript: 'for (const [k, v] of Object.entries(ce.storage.all())) log(k, v);$0',
+    },
+  },
+  {
+    id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
+    summary: 'Forget everything in one scope, and say how many went. Panel scope leaves other scripts’ private keys alone: "clear my settings" must not mean "clear everybody’s".',
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
+    summary: 'Which store a scope is talking to and what is in it: { scope, backing, available, count, bytes }. The three scopes have genuinely different backing — the panel document, this machine, the DAW project state — and a script that has just failed to persist something deserves to know which one it was talking to. `available` is the honest field: false means writes in this scope will not stick, which is worth saying once rather than discovering per key.',
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['scope'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'encodeJson', category: 'Storage', signature: 'encodeJson(value [, opts]) -> string',
+    summary: 'A value as JSON text. `opts.indent` pretty-prints with that many spaces. Nothing back for a value with no JSON form — a cycle, a function — rather than a string that is not the value. This is here because the Lua engine opens base, math, string and table and has NO json module, while JavaScript and Python each have their own with different names: "use the language’s own" was never available to a cross-runtime script, the same Q10 exception ce.time.now() is.',
+    params: [
+      { name: 'value', type: 'value', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['indent'] },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'sendSysex(toAscii(ce.storage.encode(patch)))$0', javascript: 'sendSysex(toAscii(ce.storage.encode(patch)));$0' },
+  },
+  {
+    id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
+    summary: 'JSON text back to a value. Nothing back for text that is not JSON, which is what tells a malformed config from an empty one — a config somebody typed into a text control is exactly where that distinction matters.',
+    params: [{ name: 'text', type: 'string', required: true }],
+    scopes: 'any',
   },
 
   /* --- Debug --- */
@@ -2558,8 +2613,8 @@ export const MODULES = [
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Build the panel from a script and arrange what is there: create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
-  { id: 'ce.storage', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Per-script scratch state, and settings that outlive the session.' },
+  { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON, because one of the four runtimes has none.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -2693,7 +2748,11 @@ const MODULE_MEMBERS = {
     rect: 'panelRect', order: 'panelOrder', batch: 'panelBatch',
   },
   'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
-                  settings: 'listSettings', forget: 'forgetSetting' },
+                  settings: 'listSettings', forget: 'forgetSetting',
+                  // `all`, `clear`, `info`, `encode` and `decode` are §1 collisions as bare
+                  // globals, so the flat spellings say what they are about.
+                  all: 'allSettings', clear: 'clearSettings', info: 'storageInfo',
+                  encode: 'encodeJson', decode: 'decodeJson' },
   'ce.time': {
     startTimer: 'startTimer', stopTimer: 'stopTimer', syncTimer: 'syncTimer', after: 'after',
     // The namespaced names read well; the FLAT aliases are deliberately more defensive.
