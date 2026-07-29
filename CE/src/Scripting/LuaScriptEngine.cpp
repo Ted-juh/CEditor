@@ -719,6 +719,43 @@ __CE_MINOR_QUALITIES["m7b5"] = true
 __CE_MINOR_QUALITIES["min"] = true
 __CE_MINOR_QUALITIES["min7"] = true
 __CE_MINOR_QUALITIES["minMaj7"] = true
+-- @module ce.time
+__CE_DIVISIONS = {}
+__CE_DIVISIONS["1/1"] = 4
+__CE_DIVISIONS["1/2"] = 2
+__CE_DIVISIONS["1/4"] = 1
+__CE_DIVISIONS["1/8"] = 0.5
+__CE_DIVISIONS["1/16"] = 0.25
+__CE_DIVISIONS["1/32"] = 0.125
+__CE_DIVISIONS["1/2D"] = 3
+__CE_DIVISIONS["1/4D"] = 1.5
+__CE_DIVISIONS["1/8D"] = 0.75
+__CE_DIVISIONS["1/16D"] = 0.375
+__CE_DIVISIONS["1/2T"] = 1.3333333333333333
+__CE_DIVISIONS["1/4T"] = 0.6666666666666666
+__CE_DIVISIONS["1/8T"] = 0.3333333333333333
+__CE_DIVISIONS["1/16T"] = 0.16666666666666666
+__CE_DIVISION_LABELS = {}
+__CE_DIVISION_LABELS["1/1"] = "Whole"
+__CE_DIVISION_LABELS["1/2"] = "Half"
+__CE_DIVISION_LABELS["1/4"] = "Quarter"
+__CE_DIVISION_LABELS["1/8"] = "8th"
+__CE_DIVISION_LABELS["1/16"] = "16th"
+__CE_DIVISION_LABELS["1/32"] = "32nd"
+__CE_DIVISION_LABELS["1/2D"] = "Half ·"
+__CE_DIVISION_LABELS["1/4D"] = "Quarter ·"
+__CE_DIVISION_LABELS["1/8D"] = "8th ·"
+__CE_DIVISION_LABELS["1/16D"] = "16th ·"
+__CE_DIVISION_LABELS["1/2T"] = "Half T"
+__CE_DIVISION_LABELS["1/4T"] = "Quarter T"
+__CE_DIVISION_LABELS["1/8T"] = "8th T"
+__CE_DIVISION_LABELS["1/16T"] = "16th T"
+__CE_DIVISION_NAMES = {"1/1","1/2","1/4","1/8","1/16","1/32","1/2D","1/4D","1/8D","1/16D","1/2T","1/4T","1/8T","1/16T"}
+__CE_TIME = {}
+__CE_TIME["ppqn"] = 24
+__CE_TIME["minBpm"] = 20
+__CE_TIME["maxBpm"] = 300
+-- @module ce.music
 -- END GENERATED music tables
 
 -- Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
@@ -1245,14 +1282,74 @@ function msToBeats(ms, bpm)
   if bpm == nil or bpm <= 0 then return nil end
   return (tonumber(ms) or 0) * bpm / 60000
 end
-function syncTimer(id, beats)
+
+-- startTimer / stopTimer are HOST bindings; these wrap them so the prelude knows which timers
+-- exist (runningTimers) and which follow the tempo (syncTimer). Captured first, or the wrapper
+-- would call itself.
+local __hostStartTimer, __hostStopTimer = startTimer, stopTimer
+local __timerIds, __syncFollow = {}, {}
+function startTimer(id, ms)
+  local key = tostring(id == nil and "" or id)
+  if key == "" then return end
+  -- An explicit millisecond interval REPLACES a musical one: this is a script asking for
+  -- milliseconds, not beats.
+  __syncFollow[key] = nil
+  __timerIds[key] = true
+  __hostStartTimer(key, math.floor((tonumber(ms) or 0) + 0.5))
+end
+function stopTimer(id)
+  local key = tostring(id == nil and "" or id)
+  __syncFollow[key] = nil
+  __timerIds[key] = nil
+  __hostStopTimer(key)
+end
+-- The ids a script started BY NAME. One-shots are left out, all of them: after() hands back its id
+-- already, and the note-off sendNote schedules is not a script's to cancel.
+function runningTimers()
+  local out = {}
+  for k in pairs(__timerIds) do
+    if string.sub(k, 1, 8) ~= "__after:" then out[#out + 1] = k end
+  end
+  table.sort(out)
+  return out
+end
+
+-- syncTimer(id, beats [, opts]) — a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
+-- The first version computed the interval once and then kept firing at the old rate forever; a verb
+-- called sync that silently desyncs is the wrong default. { follow = false } keeps that behaviour.
+-- Re-arming RESETS THE PHASE, which is a hiccup at the moment of a tempo change and beats a timer
+-- that is permanently at the wrong rate.
+function syncTimer(id, beats, opts)
+  local key = tostring(id == nil and "" or id)
   local ms = beatsToMs(beats)
   if ms == nil then
     log("syncTimer(\"" .. tostring(id) .. "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
     return
   end
-  startTimer(id, math.floor(ms + 0.5))
+  startTimer(key, ms)                                     -- clears any previous follow…
+  if not (opts ~= nil and opts.follow == false) then
+    __syncFollow[key] = tonumber(beats) or 0              -- …and this puts it back on purpose
+  end
 end
+-- Re-time every following sync timer. Armed from the prelude's own onTransport listener below, so
+-- it belongs to no script and survives every reload of them.
+local function __reArmSyncTimers()
+  local pending = {}
+  for k, v in pairs(__syncFollow) do pending[k] = v end
+  for key, beats in pairs(pending) do
+    local ms = beatsToMs(beats)
+    -- No tempo any more: leave it running at the last one rather than stopping the music.
+    if ms ~= nil then startTimer(key, ms) __syncFollow[key] = beats end
+  end
+end
+local __lastSyncBpm = nil
+on("*", "onTransport", function(t)
+  local bpm = t ~= nil and t.bpm or nil
+  if bpm ~= __lastSyncBpm then
+    __lastSyncBpm = bpm
+    if bpm ~= nil then __reArmSyncTimers() end
+  end
+end)
 
 -- after(ms, fn) — run fn ONCE, ms from now. Built on startTimer rather than on anything new: the
 -- one-shot is a normal timer that removes itself, so stopTimer(id) cancels it like anything else.
@@ -1284,6 +1381,157 @@ on("*", "onTimer", function(info)
   stopTimer(id)
   fn()
 end)
+
+-- afterBeats(beats, fn) — after() with a MUSICAL delay. startTimer had syncTimer and the one-shot
+-- had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
+-- fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
+function afterBeats(beats, fn)
+  local ms = beatsToMs(beats)
+  if ms == nil then
+    log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
+    return nil
+  end
+  return after(ms, fn)
+end
+
+-- The grid, the clock and the transport's own arithmetic. Everything above answers "where is the
+-- transport NOW" or "how long is a beat"; none of it answered where an ARBITRARY position falls,
+-- what the grid is, or what the panel's own clock decided. Transliterated from
+-- utils/transportLayout.js, which the WebView calls directly — including its coercions, because a
+-- fallback that differs by one is a sequencer a step out.
+local function __tnum(v, fallback)
+  local n = tonumber(v)
+  if n == nil or n ~= n or n == math.huge or n == -math.huge then return fallback end
+  return n
+end
+local function __tclamp(v, lo, hi) local n = __tnum(v, lo) if n < lo then return lo elseif n > hi then return hi end return n end
+
+-- A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and
+-- only DIFFERENCES mean anything. It exists because this engine opens base, math, string and table
+-- and NOT os, so until now a Lua script could not read a clock at all.
+function nowMs() return __nowMs() end
+
+-- The panel's division vocabulary, in both directions. An unknown name returns nil rather than the
+-- component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
+function beatsPerDivision(name) return __CE_DIVISIONS[tostring(name)] end
+function divisionNames()
+  local out = {}
+  for i = 1, #__CE_DIVISION_NAMES do
+    local id = __CE_DIVISION_NAMES[i]
+    out[i] = { id = id, label = __CE_DIVISION_LABELS[id], beats = __CE_DIVISIONS[id] }
+  end
+  return out
+end
+
+-- Where a beat position falls musically — for ANY position, not only the transport's. Bars and
+-- beats count from 1 as musicians do; `text` is the Transport component's own readout.
+function barBeatAt(beats, beatsPerBar)
+  local perBar = __tnum(beatsPerBar, 4); if perBar < 1 then perBar = 1 end
+  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  local bar = math.floor(b / perBar) + 1
+  local beat = math.floor(b % perBar) + 1
+  local tick = math.floor((b % 1) * __CE_TIME.ppqn)
+  return { bar = bar, beat = beat, tick = tick,
+           text = tostring(bar) .. "." .. tostring(beat) .. "." .. string.format("%02d", tick) }
+end
+
+function stepAt(beats, division)
+  local per = __CE_DIVISIONS[tostring(division)]
+  if per == nil then return nil end
+  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  return math.floor(b / per)
+end
+
+-- The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
+-- through rather than drop them — the difference between a stutter and a hole in the bar. Capped so
+-- returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
+-- an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
+function stepsBetween(fromBeats, toBeats, division, maxSteps)
+  local per = __CE_DIVISIONS[tostring(division)]
+  if per == nil then return nil end
+  local from = __tnum(fromBeats, 0); if from < 0 then from = 0 end
+  local to = __tnum(toBeats, 0); if to < 0 then to = 0 end
+  if to <= from then return { steps = {}, dropped = 0 } end
+  local first = math.floor(from / per) + 1
+  local last = math.floor(to / per)
+  if last < first then return { steps = {}, dropped = 0 } end
+  local total = last - first + 1
+  local cap = math.floor(__tnum(maxSteps, 16) + 0.5); if cap < 1 then cap = 1 end
+  local kept = total < cap and total or cap
+  local steps = {}
+  for i = last - kept + 1, last do steps[#steps + 1] = i end
+  return { steps = steps, dropped = total - kept }
+end
+
+-- The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
+-- same" swing are only the same swing if they compute it the same way.
+function swingOffset(step, amount, division)
+  local per = __CE_DIVISIONS[tostring(division)]
+  if per == nil then return nil end
+  local s = __tclamp(amount, 0, 1)
+  if math.abs(math.floor(__tnum(step, 0) + 0.5)) % 2 == 1 then return s * 0.5 * per end
+  return 0
+end
+
+-- For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
+-- never accumulated, so a cycle running for an hour is still exactly on the bar line.
+local function __cycleBeats(bars, beatsPerBar)
+  local perBar = __tnum(beatsPerBar, 4); if perBar < 1 then perBar = 1 end
+  local len = __tclamp(bars, 0.25, 64) * perBar
+  if len < 0.01 then return 0.01 end
+  return len
+end
+function cycleAt(beats, bars, beatsPerBar)
+  local len = __cycleBeats(bars, beatsPerBar)
+  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  return { phase = ((b / len) % 1 + 1) % 1, count = math.floor(b / len), length = len }
+end
+
+-- Fold a timeline position into a loop. Before the loop start the position is untouched — you can
+-- run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
+-- reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
+function loopedBeats(beats, startBeats, lengthBeats)
+  local b = __tnum(beats, 0); if b < 0 then b = 0 end
+  local st = __tnum(startBeats, 0); if st < 0 then st = 0 end
+  local len = __tnum(lengthBeats, 0.01); if len < 0.01 then len = 0.01 end
+  if b < st then return { beats = b, pass = -1 } end
+  return { beats = st + ((b - st) % len), pass = math.floor((b - st) / len) }
+end
+
+-- Tempo from tap times, in the milliseconds nowMs() reports. Taps more than resetMs apart start a
+-- NEW measurement rather than averaging across the pause — the thing every hand-rolled tap gets
+-- wrong, because the first tap after a break poisons the average.
+function tapTempo(timestamps, resetMs)
+  if type(timestamps) ~= "table" then return nil end
+  local list = {}
+  for i = 1, #timestamps do local v = __tnum(timestamps[i], 0) if v > 0 then list[#list + 1] = v end end
+  if #list < 2 then return nil end
+  local limit = __tnum(resetMs, 2000)
+  local sum, count = 0, 0
+  for i = #list, 2, -1 do
+    local gap = list[i] - list[i - 1]
+    if gap <= 0 or gap > limit then break end
+    sum = sum + gap; count = count + 1
+  end
+  if count == 0 then return nil end
+  return __tclamp(60000 / (sum / count), __CE_TIME.minBpm, __CE_TIME.maxBpm)
+end
+
+-- Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not the
+-- mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
+-- than a slightly stale one.
+function clockTempo(intervalsMs)
+  if type(intervalsMs) ~= "table" then return nil end
+  local list = {}
+  for i = 1, #intervalsMs do local v = __tnum(intervalsMs[i], 0) if v > 0 then list[#list + 1] = v end end
+  if #list == 0 then return nil end
+  table.sort(list)
+  local mid = math.floor(#list / 2)
+  local median
+  if #list % 2 == 1 then median = list[mid + 1] else median = (list[mid] + list[mid + 1]) / 2 end
+  if median <= 0 then return nil end
+  return __tclamp(60000 / (median * __CE_TIME.ppqn), __CE_TIME.minBpm, __CE_TIME.maxBpm)
+end
 
 -- @module ce.anim
 -- Values that move over time. The engine lives in the host (ScriptRuntime) so ONE list exists and
@@ -1449,7 +1697,7 @@ local __CE_MODULES = {
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
-  ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
+  ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
   ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
@@ -1491,7 +1739,7 @@ local __CE_META = {
   { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.7", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
-  { id = "ce.time", version = "1.2", runtime = "any" },
+  { id = "ce.time", version = "1.3", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },
   { id = "ce.draw", version = "1.1", runtime = "webview" },
@@ -1688,6 +1936,7 @@ public:
         g.set_function ("__animateStop", [this] (std::string path) { host->stopAnimation (juce::String (path)); });
         g.set_function ("__animateRunning", [this] (std::string path) { return host->animationRunning (juce::String (path)); });
         g.set_function ("__transportState", [this] () { return varToSol (lua, host->transportState()); });
+        g.set_function ("__nowMs", [this] () { return host->nowMs(); });
         g.set_function ("__deviceQuery", [this] (std::string kind, sol::optional<sol::table> payload)
             { return varToSol (lua, host->deviceQuery (juce::String (kind),
                                                        payload ? solToVar (*payload) : juce::var())); });

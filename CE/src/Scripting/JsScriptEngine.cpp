@@ -164,8 +164,33 @@ function applyDump(bytes) { return __api.applyDump(bytes); }
 function sendDump(kind) { return __api.sendDump(kind); }
 function buildDump(kind) { return __api.buildDump(kind); }
 // @module ce.time
-function startTimer(id, ms) { return __api.startTimer(id, ms || 0); }
-function stopTimer(id) { return __api.stopTimer(id); }
+// The prelude tracks which timers exist (runningTimers) and which follow the tempo (syncTimer), so
+// these are more than a pass-through to the host.
+var __timerIds = {}, __syncFollow = {};
+function startTimer(id, ms) {
+  var key = String(id === undefined || id === null ? "" : id);
+  if (!key) return undefined;
+  // An explicit millisecond interval REPLACES a musical one: this is a script asking for
+  // milliseconds, not beats.
+  delete __syncFollow[key];
+  __timerIds[key] = true;
+  return __api.startTimer(key, Math.round(Number(ms) || 0));
+}
+function stopTimer(id) {
+  var key = String(id === undefined || id === null ? "" : id);
+  delete __syncFollow[key];
+  delete __timerIds[key];
+  return __api.stopTimer(key);
+}
+// The ids a script started BY NAME. One-shots are left out, all of them: after() hands back its id
+// already, and the note-off sendNote schedules is not a script's to cancel.
+function runningTimers() {
+  var out = [];
+  for (var k in __timerIds) {
+    if (Object.prototype.hasOwnProperty.call(__timerIds, k) && k.indexOf("__after:") !== 0) out.push(k);
+  }
+  return out.sort();
+}
 // @module -
 function run(target, args) { return __api.run(target, args || null); }
 function emit(name, data) { return __api.emit(name, data || null); }
@@ -650,7 +675,7 @@ function noteNumber(name) {
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES;
+var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES, __CE_DIVISIONS, __CE_DIVISION_LABELS, __CE_DIVISION_NAMES, __CE_TIME;
 __CE_SCALES = {};
 __CE_SCALES["major"] = [0,2,4,5,7,9,11];
 __CE_SCALES["minor"] = [0,2,3,5,7,8,10];
@@ -723,6 +748,43 @@ __CE_MINOR_QUALITIES["m7b5"] = true;
 __CE_MINOR_QUALITIES["min"] = true;
 __CE_MINOR_QUALITIES["min7"] = true;
 __CE_MINOR_QUALITIES["minMaj7"] = true;
+// @module ce.time
+__CE_DIVISIONS = {};
+__CE_DIVISIONS["1/1"] = 4;
+__CE_DIVISIONS["1/2"] = 2;
+__CE_DIVISIONS["1/4"] = 1;
+__CE_DIVISIONS["1/8"] = 0.5;
+__CE_DIVISIONS["1/16"] = 0.25;
+__CE_DIVISIONS["1/32"] = 0.125;
+__CE_DIVISIONS["1/2D"] = 3;
+__CE_DIVISIONS["1/4D"] = 1.5;
+__CE_DIVISIONS["1/8D"] = 0.75;
+__CE_DIVISIONS["1/16D"] = 0.375;
+__CE_DIVISIONS["1/2T"] = 1.3333333333333333;
+__CE_DIVISIONS["1/4T"] = 0.6666666666666666;
+__CE_DIVISIONS["1/8T"] = 0.3333333333333333;
+__CE_DIVISIONS["1/16T"] = 0.16666666666666666;
+__CE_DIVISION_LABELS = {};
+__CE_DIVISION_LABELS["1/1"] = "Whole";
+__CE_DIVISION_LABELS["1/2"] = "Half";
+__CE_DIVISION_LABELS["1/4"] = "Quarter";
+__CE_DIVISION_LABELS["1/8"] = "8th";
+__CE_DIVISION_LABELS["1/16"] = "16th";
+__CE_DIVISION_LABELS["1/32"] = "32nd";
+__CE_DIVISION_LABELS["1/2D"] = "Half ·";
+__CE_DIVISION_LABELS["1/4D"] = "Quarter ·";
+__CE_DIVISION_LABELS["1/8D"] = "8th ·";
+__CE_DIVISION_LABELS["1/16D"] = "16th ·";
+__CE_DIVISION_LABELS["1/2T"] = "Half T";
+__CE_DIVISION_LABELS["1/4T"] = "Quarter T";
+__CE_DIVISION_LABELS["1/8T"] = "8th T";
+__CE_DIVISION_LABELS["1/16T"] = "16th T";
+__CE_DIVISION_NAMES = ["1/1","1/2","1/4","1/8","1/16","1/32","1/2D","1/4D","1/8D","1/16D","1/2T","1/4T","1/8T","1/16T"];
+__CE_TIME = {};
+__CE_TIME["ppqn"] = 24;
+__CE_TIME["minBpm"] = 20;
+__CE_TIME["maxBpm"] = 300;
+// @module ce.music
 // END GENERATED music tables
 
 // Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
@@ -1220,14 +1282,42 @@ function msToBeats(ms, bpm) {
   if (!bpm || bpm <= 0) return null;
   return (Number(ms) || 0) * bpm / 60000;
 }
-function syncTimer(id, beats) {
+// syncTimer(id, beats [, opts]) — a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
+// The first version computed the interval once and then kept firing at the old rate forever; a verb
+// called sync that silently desyncs is the wrong default. { follow: false } keeps that behaviour.
+// Re-arming RESETS THE PHASE, which is a hiccup at the moment of a tempo change and beats a timer
+// that is permanently at the wrong rate.
+function syncTimer(id, beats, opts) {
+  var key = String(id === undefined || id === null ? "" : id);
   var ms = beatsToMs(beats);
   if (ms === null) {
     log("syncTimer(\"" + id + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.");
     return;
   }
-  startTimer(id, Math.round(ms));
+  startTimer(key, ms);                                    // clears any previous follow…
+  if (!(opts && opts.follow === false)) __syncFollow[key] = Number(beats) || 0;   // …put back on purpose
 }
+// Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
+// belongs to no script and survives every reload of them.
+function __reArmSyncTimers() {
+  var pending = {}, k;
+  for (k in __syncFollow) if (Object.prototype.hasOwnProperty.call(__syncFollow, k)) pending[k] = __syncFollow[k];
+  for (k in pending) {
+    if (!Object.prototype.hasOwnProperty.call(pending, k)) continue;
+    var ms = beatsToMs(pending[k]);
+    // No tempo any more: leave it running at the last one rather than stopping the music.
+    if (ms === null) continue;
+    startTimer(k, ms);
+    __syncFollow[k] = pending[k];
+  }
+}
+var __lastSyncBpm = null;
+on("*", "onTransport", function (t) {
+  var bpm = t && t.bpm !== undefined ? t.bpm : null;
+  if (bpm === __lastSyncBpm) return;
+  __lastSyncBpm = bpm;
+  if (bpm !== null && bpm !== undefined) __reArmSyncTimers();
+});
 
 // after(ms, fn) — run fn ONCE, ms from now. Built on startTimer rather than on anything new (there
 // is no setTimeout in QuickJS): the one-shot is a normal timer that removes itself, so stopTimer(id)
@@ -1260,6 +1350,150 @@ on("*", "onTimer", function (info) {
   stopTimer(id);
   fn();
 });
+
+// afterBeats(beats, fn) — after() with a MUSICAL delay. startTimer had syncTimer and the one-shot
+// had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
+// fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
+function afterBeats(beats, fn) {
+  var ms = beatsToMs(beats);
+  if (ms === null) {
+    log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.");
+    return undefined;
+  }
+  return after(ms, fn);
+}
+
+// The grid, the clock and the transport's own arithmetic. Everything above answers "where is the
+// transport NOW" or "how long is a beat"; none of it answered where an ARBITRARY position falls,
+// what the grid is, or what the panel's own clock decided. Transliterated from
+// utils/transportLayout.js, which the WebView calls directly — including its coercions, because a
+// fallback that differs by one is a sequencer a step out.
+function __tnum(v, fallback) { var n = Number(v); return isFinite(n) ? n : fallback; }
+function __tclamp(v, lo, hi) { var n = __tnum(v, lo); return n < lo ? lo : (n > hi ? hi : n); }
+
+// A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and
+// only DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
+function nowMs() { return __api.nowMs(); }
+
+// The panel's division vocabulary, in both directions. An unknown name returns undefined rather
+// than the component's 1/16 fallback: a component has to keep running, a script that mistyped a
+// division should find out.
+function beatsPerDivision(name) { return __CE_DIVISIONS[String(name)]; }
+function divisionNames() {
+  var out = [];
+  for (var i = 0; i < __CE_DIVISION_NAMES.length; i++) {
+    var id = __CE_DIVISION_NAMES[i];
+    out.push({ id: id, label: __CE_DIVISION_LABELS[id], beats: __CE_DIVISIONS[id] });
+  }
+  return out;
+}
+
+// Where a beat position falls musically — for ANY position, not only the transport's. Bars and
+// beats count from 1 as musicians do; `text` is the Transport component's own readout.
+function barBeatAt(beats, beatsPerBar) {
+  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
+  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var bar = Math.floor(b / perBar) + 1;
+  var beat = Math.floor(b % perBar) + 1;
+  var tick = Math.floor((b % 1) * __CE_TIME.ppqn);
+  var t = String(tick);
+  while (t.length < 2) t = "0" + t;
+  return { bar: bar, beat: beat, tick: tick, text: bar + "." + beat + "." + t };
+}
+
+function stepAt(beats, division) {
+  var per = __CE_DIVISIONS[String(division)];
+  if (per === undefined) return undefined;
+  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  return Math.floor(b / per);
+}
+
+// The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
+// through rather than drop them — the difference between a stutter and a hole in the bar. Capped so
+// returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
+// an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
+function stepsBetween(fromBeats, toBeats, division, maxSteps) {
+  var per = __CE_DIVISIONS[String(division)];
+  if (per === undefined) return undefined;
+  var from = __tnum(fromBeats, 0); if (from < 0) from = 0;
+  var to = __tnum(toBeats, 0); if (to < 0) to = 0;
+  if (to <= from) return { steps: [], dropped: 0 };
+  var first = Math.floor(from / per) + 1;
+  var last = Math.floor(to / per);
+  if (last < first) return { steps: [], dropped: 0 };
+  var total = last - first + 1;
+  var cap = Math.round(__tnum(maxSteps, 16)); if (cap < 1) cap = 1;
+  var kept = total < cap ? total : cap;
+  var steps = [];
+  for (var i = last - kept + 1; i <= last; i++) steps.push(i);
+  return { steps: steps, dropped: total - kept };
+}
+
+// The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
+// same" swing are only the same swing if they compute it the same way.
+function swingOffset(step, amount, division) {
+  var per = __CE_DIVISIONS[String(division)];
+  if (per === undefined) return undefined;
+  var s = __tclamp(amount, 0, 1);
+  return (Math.abs(Math.round(__tnum(step, 0))) % 2 === 1) ? s * 0.5 * per : 0;
+}
+
+// For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
+// never accumulated, so a cycle running for an hour is still exactly on the bar line.
+function __cycleBeats(bars, beatsPerBar) {
+  var perBar = __tnum(beatsPerBar, 4); if (perBar < 1) perBar = 1;
+  var len = __tclamp(bars, 0.25, 64) * perBar;
+  return len < 0.01 ? 0.01 : len;
+}
+function cycleAt(beats, bars, beatsPerBar) {
+  var len = __cycleBeats(bars, beatsPerBar);
+  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  return { phase: (((b / len) % 1) + 1) % 1, count: Math.floor(b / len), length: len };
+}
+
+// Fold a timeline position into a loop. Before the loop start the position is untouched — you can
+// run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
+// reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
+function loopedBeats(beats, startBeats, lengthBeats) {
+  var b = __tnum(beats, 0); if (b < 0) b = 0;
+  var st = __tnum(startBeats, 0); if (st < 0) st = 0;
+  var len = __tnum(lengthBeats, 0.01); if (len < 0.01) len = 0.01;
+  if (b < st) return { beats: b, pass: -1 };
+  return { beats: st + ((b - st) % len), pass: Math.floor((b - st) / len) };
+}
+
+// Tempo from tap times, in the milliseconds now() reports. Taps more than resetMs apart start a NEW
+// measurement rather than averaging across the pause — the thing every hand-rolled tap gets wrong,
+// because the first tap after a break poisons the average.
+function tapTempo(timestamps, resetMs) {
+  if (!timestamps || timestamps.length === undefined) return undefined;
+  var list = [], i;
+  for (i = 0; i < timestamps.length; i++) { var v = __tnum(timestamps[i], 0); if (v > 0) list.push(v); }
+  if (list.length < 2) return undefined;
+  var limit = __tnum(resetMs, 2000), sum = 0, count = 0;
+  for (i = list.length - 1; i > 0; i--) {
+    var gap = list[i] - list[i - 1];
+    if (gap <= 0 || gap > limit) break;
+    sum += gap; count++;
+  }
+  if (!count) return undefined;
+  return __tclamp(60000 / (sum / count), __CE_TIME.minBpm, __CE_TIME.maxBpm);
+}
+
+// Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not the
+// mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
+// than a slightly stale one.
+function clockTempo(intervalsMs) {
+  if (!intervalsMs || intervalsMs.length === undefined) return undefined;
+  var list = [];
+  for (var i = 0; i < intervalsMs.length; i++) { var v = __tnum(intervalsMs[i], 0); if (v > 0) list.push(v); }
+  if (!list.length) return undefined;
+  list.sort(function (a, b) { return a - b; });
+  var mid = Math.floor(list.length / 2);
+  var median = (list.length % 2) ? list[mid] : (list[mid - 1] + list[mid]) / 2;
+  if (median <= 0) return undefined;
+  return __tclamp(60000 / (median * __CE_TIME.ppqn), __CE_TIME.minBpm, __CE_TIME.maxBpm);
+}
 
 // @module ce.anim
 // Values that move over time. The engine lives in the host so ONE list exists and the position is
@@ -1430,7 +1664,7 @@ var __CE_MODULES = {
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
-  "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+  "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
   "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
@@ -1466,7 +1700,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -1592,6 +1826,7 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("animateRunning", [host, arg] (const Args& a) -> juce::var
         { return host->animationRunning (arg (a, 0).toString()); });
     api->setMethod ("transportState", [host] (const Args&) -> juce::var { return host->transportState(); });
+    api->setMethod ("nowMs", [host] (const Args&) -> juce::var { return host->nowMs(); });
     api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var
         { return host->deviceQuery (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("deviceDefine", [host, arg] (const Args& a) -> juce::var

@@ -1037,14 +1037,139 @@ export const COMMANDS = [
     snippet: { lua: 'local beats = msToBeats(${1:500})$0', javascript: 'const beats = msToBeats(${1:500});$0' },
   },
   {
-    id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats)',
-    summary: 'startTimer with a MUSICAL interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo. The interval is computed WHEN YOU CALL IT and does not follow a later tempo change — re-arm it from onTransport if that matters.',
+    id: 'syncTimer', category: 'Time', signature: 'syncTimer(id, beats [, opts])',
+    summary: 'startTimer with a MUSICAL interval: syncTimer("step", 0.25) fires every sixteenth at the current tempo, and FOLLOWS the tempo — change it and the timer re-times itself. Re-arming resets the timer\'s phase, so a tempo change costs one hiccup; that beats a timer permanently at the wrong rate. Pass { follow = false } to freeze the interval at the tempo it was created with. Nothing is started when no tempo is being reported, and it says so.',
     params: [
       { name: 'id', type: 'string', required: true },
       { name: 'beats', type: 'number', required: true },
+      { name: 'opts', type: 'table', required: false },
     ],
     scopes: 'any',
     snippet: { lua: 'syncTimer("${1:step}", 0.25)$0', javascript: 'syncTimer("${1:step}", 0.25);$0' },
+  },
+  {
+    id: 'afterBeats', category: 'Time', signature: 'afterBeats(beats, fn) -> id',
+    summary: 'after() with a MUSICAL delay: afterBeats(2, fn) runs fn in two beats\' time. startTimer had syncTimer and the one-shot had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot fires once, so the delay is computed when you call it and does not follow a later tempo change. Returns the timer id, which stopTimer cancels. Nothing is scheduled when no tempo is being reported — it says so rather than firing immediately.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'fn', type: 'function', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'afterBeats(${1:2}, function()\n  $0\nend)',
+      javascript: 'afterBeats(${1:2}, () => {\n  $0\n});',
+    },
+  },
+  {
+    id: 'runningTimers', category: 'Time', signature: 'runningTimers() -> list',
+    summary: 'The timer ids currently running, sorted — the ones started BY NAME with startTimer or syncTimer. One-shots are not listed, any of them: after() hands you its id already, and the runtime\'s own (sendNote\'s note-off) is not a script\'s to cancel.',
+    scopes: 'any',
+    snippet: { lua: 'for _, id in ipairs(runningTimers()) do log(id) end$0', javascript: 'for (const id of runningTimers()) log(id);$0' },
+  },
+
+  /* --- Time: the grid, the clock and the transport's own arithmetic (design doc §38) ---
+     Everything above answers "where is the transport NOW" or "how long is a beat". None of it
+     answers where an ARBITRARY position falls, what the grid is, or what the panel's own clock
+     decided — all of which utils/transportLayout.js computes and no script could reach.
+
+     The Properties panel lets you set `division`, `swing`, `loopStartBar`, `loopLengthBars` on a
+     Transport and `division`/`swing` on the Arp, Phrase and Turing. A script could SET every one
+     of those and use none of them: set("arp.division", "1/8T") worked, and turning "1/8T" into a
+     third of a beat did not. These are the transport's OWN functions, so a script's grid and the
+     component's grid are the same grid. */
+  {
+    id: 'nowMs', category: 'Time', signature: 'nowMs() -> number',
+    summary: 'A monotonic millisecond reading. NOT a wall clock and NOT a date — the origin is arbitrary and only DIFFERENCES mean anything, which is deliberate: a wall clock jumps when the machine syncs its time and a script measuring across that jump measures the jump. This exists because there was no clock at all: the Lua engine opens base, math, string and table and NOT os, so a Lua script could not read one, and Date/time.time() disagree about epoch and unit anyway.',
+    scopes: 'any',
+    snippet: { lua: 'local t0 = nowMs()$0', javascript: 'const t0 = nowMs();$0' },
+  },
+  {
+    id: 'beatsPerDivision', category: 'Time', signature: 'beatsPerDivision(name) -> number',
+    summary: 'A note division as a fraction of a beat: "1/16" → 0.25, "1/8T" → 0.333…, "1/4D" → 1.5. The vocabulary every sequencer property in the app speaks, and the one conversion a script could not do. Returns nothing for a name this build does not know — a component falls back to 1/16 because it has to keep running, a script that mistyped a division should find out.',
+    params: [{ name: 'name', type: 'string', required: true }],
+    scopes: 'any',
+    snippet: { lua: 'local beats = beatsPerDivision("1/16")$0', javascript: 'const beats = beatsPerDivision("1/16");$0' },
+  },
+  {
+    id: 'divisionNames', category: 'Time', signature: 'divisionNames() -> list',
+    summary: 'Every division this build knows, in picker order: { id, label, beats }. What to build a menu from, rather than hard-coding fourteen strings that go stale the moment one is added.',
+    scopes: 'any',
+    snippet: { lua: 'for _, d in ipairs(divisionNames()) do log(d.label) end$0', javascript: 'for (const d of divisionNames()) log(d.label);$0' },
+  },
+  {
+    id: 'barBeatAt', category: 'Time', signature: 'barBeatAt(beats [, beatsPerBar]) -> table',
+    summary: 'Where a beat position falls musically — for ANY position, not only the one the transport is at. Returns { bar, beat, tick, text, beatsPerBar }, bars and beats counting from 1 as musicians do, ticks at 24 PPQN. `text` is the Transport component\'s own readout ("3.2.00"), so a script\'s label and the component\'s agree character for character.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'beatsPerBar', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: { lua: 'log(barBeatAt(transportInfo().beats).text)$0', javascript: 'log(barBeatAt(transportInfo().beats).text);$0' },
+  },
+  {
+    id: 'stepAt', category: 'Time', signature: 'stepAt(beats, division) -> number',
+    summary: 'Which step of the grid a position is on, counting from 0 at the transport origin. Returns nothing for an unknown division.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'division', type: 'string', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'stepsBetween', category: 'Time', signature: 'stepsBetween(from, to, division [, max]) -> table',
+    summary: 'The step boundaries crossed between two readings: { steps, dropped }. The never-lose-an-event rule every synced follower in the panel runs on — a stalled frame must FIRE the steps it slept through rather than drop them, which is the difference between a stutter and a hole in the bar. `max` caps the catch-up (16 by default) so returning from a backgrounded window does not dump hundreds of notes at once, and what was dropped is REPORTED rather than swallowed. On an overrun the most RECENT steps are kept: catching up to now matters more than replaying where you were. This is the single hardest thing here to get right by hand, and every script driving its own sequence was writing it.',
+    params: [
+      { name: 'from', type: 'number', required: true },
+      { name: 'to', type: 'number', required: true },
+      { name: 'division', type: 'string', required: true },
+      { name: 'max', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'swingOffset', category: 'Time', signature: 'swingOffset(step, amount, division) -> number',
+    summary: 'The panel\'s shuffle: every odd step pushed later by up to half a step, in BEATS, to add to that step\'s position. `amount` is 0..1, the same number the Transport\'s swing property holds. Two sequencers at "the same" swing really are the same swing only if they compute it the same way — which is why this is the transport\'s function and not a second one.',
+    params: [
+      { name: 'step', type: 'number', required: true },
+      { name: 'amount', type: 'number', required: true },
+      { name: 'division', type: 'string', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'cycleAt', category: 'Time', signature: 'cycleAt(beats, bars [, beatsPerBar]) -> table',
+    summary: 'For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep. Returns { phase, count, length }: phase 0–1 through the cycle, how many have completed, and the cycle in beats. Derived from the position and never accumulated, so a cycle running for an hour is still exactly on the bar line.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'bars', type: 'number', required: true },
+      { name: 'beatsPerBar', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'loopedBeats', category: 'Time', signature: 'loopedBeats(beats, startBeats, lengthBeats) -> table',
+    summary: 'Fold a timeline position into a loop: { beats, pass }. Before the loop start the position is untouched — you can run IN to a loop from earlier in the song, which is what every DAW does and what a count-in needs. `pass` is which time round you are, and -1 before the loop has been reached; watching it for CHANGES tells you a wrap happened, without a wrap handler that can miss one. The looped position is a pure FUNCTION of the un-looped one rather than a counter that gets reset, which is what makes it exact after an hour.',
+    params: [
+      { name: 'beats', type: 'number', required: true },
+      { name: 'startBeats', type: 'number', required: true },
+      { name: 'lengthBeats', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'tapTempo', category: 'Time', signature: 'tapTempo(times [, resetMs]) -> number',
+    summary: 'Tempo from tap times, in the milliseconds now() reports. Taps more than `resetMs` apart (2000 by default) start a NEW measurement rather than averaging across the pause — otherwise the first tap after a break poisons it, which is exactly what a hand-rolled tap tempo gets wrong. Returns nothing from fewer than two usable taps, and the result is clamped to 20–300 BPM.',
+    params: [
+      { name: 'times', type: 'list', required: true },
+      { name: 'resetMs', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'clockTempo', category: 'Time', signature: 'clockTempo(intervalsMs) -> number',
+    summary: 'Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note) — what a script filtering 0xF8 with ce.midi.interceptIn is holding and could not turn into a BPM. The MEDIAN, not the mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse than a slightly stale one. Nothing comes back from an empty list.',
+    params: [{ name: 'intervalsMs', type: 'list', required: true }],
+    scopes: 'any',
   },
 
   /* --- Device: reads (design doc §6 phase 2) ---
@@ -2006,8 +2131,8 @@ export const MODULES = [
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key IMPLIES: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
-  { id: 'ce.time', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
+  { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain, one-shot or beat-synced — plus the transport\'s own grid: note divisions, bar/beat at any position, the steps between two readings, swing, cycles, loop folding and tempo from taps or clock pulses. And a monotonic clock, because there was none.' },
   { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Move a value over time instead of jumping it. Cross-runtime: a sweep has to work with the panel shut too.' },
   { id: 'ce.ui', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -2141,6 +2266,13 @@ const MODULE_MEMBERS = {
     // (ce.components.setlist.jump is setlistGoto), so this costs nothing but a line here.
     tempo: 'tempo', playing: 'isPlaying', transport: 'transportInfo',
     beatsToMs: 'beatsToMs', msToBeats: 'msToBeats',
+    // Phase 12b. `now` is the collision §1 warned about all over again — a bare global `now` is
+    // exactly the name a panel author reaches for — so flat it is nowMs. `division`, `step`,
+    // `steps`, `swing`, `cycle`, `looped`, `tap` and `position` are the same story.
+    afterBeats: 'afterBeats', timers: 'runningTimers',
+    now: 'nowMs', division: 'beatsPerDivision', divisions: 'divisionNames',
+    position: 'barBeatAt', step: 'stepAt', steps: 'stepsBetween', swing: 'swingOffset',
+    cycle: 'cycleAt', looped: 'loopedBeats', tap: 'tapTempo', clockTempo: 'clockTempo',
   },
   'ce.components.split': {
     preset: 'splitPreset', mute: 'splitMute', channel: 'splitChannel',

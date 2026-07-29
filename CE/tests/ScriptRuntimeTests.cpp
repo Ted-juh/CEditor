@@ -2492,6 +2492,123 @@ int main()
                tag + ": updown does not repeat the endpoints (got " + line ("ar ") + ")");
     }
 
+    // 38) ce.time's grid: divisions, position, steps, swing, cycles, loops, tap (design doc §38)
+    //
+    // The fixtures CE/web/test/scriptTime.test.js pins against utils/transportLayout.js — the
+    // master clock every synced component runs on. Here they are pinned per engine, because the
+    // failure this guards against is one engine stepping a sequence at a different third of a beat
+    // from the Arpeggiator drawn beside it, which nothing fails on.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("tm", lang, "panel", "onGrid", "*", isLua
+            ? "local function j(t) local s = \"\" for i, v in ipairs(t) do s = s .. (i > 1 and \",\" or \"\") .. tostring(v) end return s end\n"
+              "function onGrid()\n"
+              "  log(\"d \" .. tostring(ce.time.division(\"1/16\")) .. \" \" .. tostring(ce.time.division(\"1/8T\"))\n"
+              "      .. \" \" .. tostring(ce.time.division(\"1/4D\")) .. \" \" .. tostring(ce.time.division(\"1/3\")))\n"
+              "  log(\"dn \" .. tostring(#ce.time.divisions()) .. \" \" .. ce.time.divisions()[1].id .. \" \" .. ce.time.divisions()[1].label)\n"
+              "  log(\"p \" .. ce.time.position(4.5).text .. \" \" .. ce.time.position(4.5, 3).text .. \" \" .. ce.time.position(0).text)\n"
+              "  log(\"s \" .. tostring(ce.time.step(2.5, \"1/16\")) .. \" \" .. tostring(ce.time.step(2.5, \"1/8T\")))\n"
+              "  local a = ce.time.steps(0, 1, \"1/16\")\n"
+              "  local b = ce.time.steps(0, 100, \"1/16\", 4)\n"
+              "  log(\"cs \" .. j(a.steps) .. \" \" .. tostring(a.dropped) .. \" \" .. j(b.steps) .. \" \" .. tostring(b.dropped))\n"
+              "  log(\"sw \" .. tostring(ce.time.swing(0, 1, \"1/16\")) .. \" \" .. tostring(ce.time.swing(1, 1, \"1/16\"))\n"
+              "      .. \" \" .. tostring(ce.time.swing(1, 0.5, \"1/16\")))\n"
+              "  local c = ce.time.cycle(6, 1, 4)\n"
+              "  log(\"cy \" .. tostring(c.phase) .. \" \" .. tostring(c.count) .. \" \" .. tostring(c.length))\n"
+              "  local l1, l2 = ce.time.looped(0, 4, 8), ce.time.looped(13, 4, 8)\n"
+              "  log(\"lp \" .. tostring(l1.beats) .. \" \" .. tostring(l1.pass) .. \" \" .. tostring(l2.beats) .. \" \" .. tostring(l2.pass))\n"
+              "  log(\"tp \" .. tostring(ce.time.tap({1000,1500,2000,2500})) .. \" \" .. tostring(ce.time.tap({1000,1500,6000,6500})))\n"
+              "  log(\"ck \" .. tostring(math.floor(ce.time.clockTempo({20.8333,20.8333,20.8333}) + 0.5)))\n"
+              "  local t0 = ce.time.now()\n"
+              "  log(\"nw \" .. tostring(type(t0) == \"number\" and ce.time.now() >= t0))\n"
+              "  startTimer(\"grid\", 1000) startTimer(\"other\", 1000)\n"
+              "  log(\"tm \" .. j(ce.time.timers()))\n"
+              "  stopTimer(\"grid\") stopTimer(\"other\")\n"
+              "  log(\"tm2 \" .. tostring(#ce.time.timers()))\n"
+              "end\n"
+            : "function onGrid() {\n"
+              "  log(\"d \" + beatsPerDivision(\"1/16\") + \" \" + beatsPerDivision(\"1/8T\")\n"
+              "      + \" \" + beatsPerDivision(\"1/4D\") + \" \" + beatsPerDivision(\"1/3\"));\n"
+              "  log(\"dn \" + divisionNames().length + \" \" + divisionNames()[0].id + \" \" + divisionNames()[0].label);\n"
+              "  log(\"p \" + barBeatAt(4.5).text + \" \" + barBeatAt(4.5, 3).text + \" \" + barBeatAt(0).text);\n"
+              "  log(\"s \" + stepAt(2.5, \"1/16\") + \" \" + stepAt(2.5, \"1/8T\"));\n"
+              "  var a = stepsBetween(0, 1, \"1/16\"), b = stepsBetween(0, 100, \"1/16\", 4);\n"
+              "  log(\"cs \" + a.steps.join(\",\") + \" \" + a.dropped + \" \" + b.steps.join(\",\") + \" \" + b.dropped);\n"
+              "  log(\"sw \" + swingOffset(0, 1, \"1/16\") + \" \" + swingOffset(1, 1, \"1/16\")\n"
+              "      + \" \" + swingOffset(1, 0.5, \"1/16\"));\n"
+              "  var c = cycleAt(6, 1, 4);\n"
+              "  log(\"cy \" + c.phase + \" \" + c.count + \" \" + c.length);\n"
+              "  var l1 = loopedBeats(0, 4, 8), l2 = loopedBeats(13, 4, 8);\n"
+              "  log(\"lp \" + l1.beats + \" \" + l1.pass + \" \" + l2.beats + \" \" + l2.pass);\n"
+              "  log(\"tp \" + tapTempo([1000,1500,2000,2500]) + \" \" + tapTempo([1000,1500,6000,6500]));\n"
+              "  log(\"ck \" + Math.floor(clockTempo([20.8333,20.8333,20.8333]) + 0.5));\n"
+              "  var t0 = nowMs();\n"
+              "  log(\"nw \" + (typeof t0 === \"number\" && nowMs() >= t0));\n"
+              "  startTimer(\"grid\", 1000); startTimer(\"other\", 1000);\n"
+              "  log(\"tm \" + runningTimers().join(\",\"));\n"
+              "  stopTimer(\"grid\"); stopTimer(\"other\");\n"
+              "  log(\"tm2 \" + runningTimers().length);\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        runtime.runAction ("onGrid", juce::var());
+
+        const auto line = [&host] (const juce::String& prefix) -> juce::String
+        {
+            for (const auto& l : host.logs) if (l.startsWith (prefix)) return l;
+            return {};
+        };
+        const auto fields = [&line] (const char* prefix)
+        {
+            const juce::String p (prefix);
+            return juce::StringArray::fromTokens (line (p).fromFirstOccurrenceOf (p, false, false), " ", "");
+        };
+        const juce::String tag (lang);
+        const auto near = [] (const juce::String& s, double want) { return std::abs (s.getDoubleValue() - want) < 1e-9; };
+
+        const auto d = fields ("d ");
+        check (d.size() == 4 && near (d[0], 0.25) && near (d[1], 1.0 / 3.0) && near (d[2], 1.5),
+               tag + ": the division table (got " + line ("d ") + ")");
+        // An unknown division is NOTHING, not the component's 1/16 fallback — "nil" in Lua,
+        // "undefined" in JavaScript, but never 0.25.
+        check (d.size() == 4 && ! near (d[3], 0.25), tag + ": an unknown division must not fall back");
+
+        check (line ("dn ").contains ("14 1/1 Whole"), tag + ": divisions lists them in picker order");
+        check (line ("p ").contains ("2.1.12 2.2.12 1.1.00"),
+               tag + ": the bar.beat.tick readout (got " + line ("p ") + ")");
+        check (line ("s ").contains ("10 7"), tag + ": step index (got " + line ("s ") + ")");
+        check (line ("cs ").contains ("1,2,3,4 0 397,398,399,400 396"),
+               tag + ": crossed steps keep the most RECENT and report the drop (got " + line ("cs ") + ")");
+
+        const auto sw = fields ("sw ");
+        check (sw.size() == 3 && near (sw[0], 0.0), tag + ": the downbeat never swings");
+        check (sw.size() == 3 && near (sw[1], 0.125) && near (sw[2], 0.0625),
+               tag + ": …and an odd step by up to half a step (got " + line ("sw ") + ")");
+
+        const auto cy = fields ("cy ");
+        check (cy.size() == 3 && near (cy[0], 0.5) && near (cy[1], 1.0) && near (cy[2], 4.0),
+               tag + ": cycle phase, count and length (got " + line ("cy ") + ")");
+
+        const auto lp = fields ("lp ");
+        check (lp.size() == 4 && near (lp[0], 0.0) && near (lp[1], -1.0),
+               tag + ": before the loop the position is untouched and the pass is -1");
+        check (lp.size() == 4 && near (lp[2], 5.0) && near (lp[3], 1.0),
+               tag + ": …and inside it folds (got " + line ("lp ") + ")");
+
+        const auto tp = fields ("tp ");
+        check (tp.size() == 2 && near (tp[0], 120.0), tag + ": four taps half a second apart is 120");
+        check (tp.size() == 2 && near (tp[1], 120.0),
+               tag + ": a PAUSE starts a new measurement rather than poisoning the average");
+        check (line ("ck ").contains ("120"), tag + ": clock pulses at 24 PPQN (got " + line ("ck ") + ")");
+        check (line ("nw ").contains ("true"), tag + ": now() is a number and does not go backwards");
+
+        check (line ("tm ").contains ("grid,other"),
+               tag + ": timers lists what was started by name, sorted (got " + line ("tm ") + ")");
+        check (line ("tm2 ").contains ("0"), tag + ": …and forgets them when they are stopped");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

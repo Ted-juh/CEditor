@@ -278,6 +278,10 @@ PyObject* api_transportState (PyObject*, PyObject*)
 {
     return varToPy (g_host->transportState());
 }
+PyObject* api_nowMs (PyObject*, PyObject*)
+{
+    return PyFloat_FromDouble (g_host->nowMs());
+}
 PyObject* api_deviceQuery (PyObject*, PyObject* args)
 {
     const char* kind = nullptr; PyObject* payload = nullptr;
@@ -412,6 +416,7 @@ PyMethodDef apiMethods[] = {
     { "panelQuery",    api_panelQuery,    METH_VARARGS, nullptr },
     { "deviceWrite",   api_deviceWrite,   METH_VARARGS, nullptr },
     { "transportState", api_transportState, METH_NOARGS,  nullptr },
+    { "nowMs",         api_nowMs,         METH_NOARGS,  nullptr },
     { "animate",       api_animate,       METH_VARARGS, nullptr },
     { "animateStop",   api_animateStop,   METH_VARARGS, nullptr },
     { "animateRunning", api_animateRunning, METH_VARARGS, nullptr },
@@ -606,14 +611,39 @@ def msToBeats(ms, bpm=None):
         return None
     return (float(ms) if ms is not None else 0.0) * bpm / 60000.0
 
-def syncTimer(id, beats):
+# syncTimer(id, beats [, opts]) - a timer whose interval is MUSICAL, and which FOLLOWS the tempo.
+# The first version computed the interval once and then kept firing at the old rate forever; a verb
+# called sync that silently desyncs is the wrong default. { "follow": False } keeps that behaviour.
+# Re-arming RESETS THE PHASE, which is a hiccup at the moment of a tempo change and beats a timer
+# that is permanently at the wrong rate.
+def syncTimer(id, beats, opts=None):
+    key = "" if id is None else str(id)
     ms = beatsToMs(beats)
     if ms is None:
         log("syncTimer(\"" + str(id) + "\"): no tempo is being reported, so there is no interval to compute. Use startTimer with a millisecond interval, or wait for onTransport.")
         return
-    # int(ms + 0.5), NOT round(ms): the prelude defines a global `round` (ce.math), which shadows
-    # the builtin here, and syncTimer must not depend on another module for one rounding.
-    startTimer(id, int(ms + 0.5))
+    startTimer(key, ms)                                   # clears any previous follow...
+    follow = True
+    if isinstance(opts, dict) and opts.get("follow") is False:
+        follow = False
+    if follow:
+        __syncFollow[key] = float(beats or 0)             # ...and this puts it back on purpose
+# Re-time every following sync timer. Armed from the prelude's own onTransport listener, so it
+# belongs to no script and survives every reload of them.
+def __reArmSyncTimers():
+    for key, beats in list(__syncFollow.items()):
+        ms = beatsToMs(beats)
+        # No tempo any more: leave it running at the last one rather than stopping the music.
+        if ms is None: continue
+        startTimer(key, ms)
+        __syncFollow[key] = beats
+__lastSyncBpm = [None]
+def __syncOnTransport(t):
+    bpm = t.get("bpm") if hasattr(t, "get") else None
+    if bpm == __lastSyncBpm[0]: return
+    __lastSyncBpm[0] = bpm
+    if bpm is not None: __reArmSyncTimers()
+on("*", "onTransport", __syncOnTransport)
 
 # after(ms, fn) — run fn ONCE, ms from now. Built on startTimer rather than on anything new: the
 # one-shot is a normal timer that removes itself, so stopTimer(id) cancels it like anything else.
@@ -644,6 +674,157 @@ def __afterTick(info):
     fn()
 on("*", "onTimer", __afterTick)
 
+# afterBeats(beats, fn) - after() with a MUSICAL delay. startTimer had syncTimer and the one-shot
+# had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A one-shot
+# fires once, so the delay is computed WHEN YOU CALL IT and does not follow a later tempo change.
+def afterBeats(beats, fn):
+    ms = beatsToMs(beats)
+    if ms is None:
+        log("afterBeats(): no tempo is being reported, so there is no delay to compute. Use after() with milliseconds, or wait for onTransport.")
+        return None
+    return after(ms, fn)
+
+# The grid, the clock and the transport's own arithmetic. Everything above answers "where is the
+# transport NOW" or "how long is a beat"; none of it answered where an ARBITRARY position falls,
+# what the grid is, or what the panel's own clock decided. Transliterated from
+# utils/transportLayout.js, which the WebView calls directly - including its coercions, because a
+# fallback that differs by one is a sequencer a step out.
+def __tnum(v, fallback):
+    import math as __m
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        try: v = float(v)
+        except (TypeError, ValueError): return fallback
+    if v != v or v in (float("inf"), float("-inf")): return fallback
+    return v
+def __tclamp(v, lo, hi):
+    n = __tnum(v, lo)
+    return lo if n < lo else (hi if n > hi else n)
+
+# A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and only
+# DIFFERENCES mean anything, so a machine syncing its clock cannot corrupt an interval.
+def nowMs():
+    return __api.nowMs()
+
+# The panel's division vocabulary, in both directions. An unknown name returns None rather than the
+# component's 1/16 fallback: a component has to keep running, a script that mistyped should find out.
+def beatsPerDivision(name):
+    return __CE_DIVISIONS.get(str(name))
+def divisionNames():
+    return [{ "id": i, "label": __CE_DIVISION_LABELS.get(i), "beats": __CE_DIVISIONS.get(i) }
+            for i in __CE_DIVISION_NAMES]
+
+# Where a beat position falls musically - for ANY position, not only the transport's. Bars and beats
+# count from 1 as musicians do; `text` is the Transport component's own readout.
+def barBeatAt(beats, beatsPerBar=None):
+    import math
+    perBar = __tnum(beatsPerBar, 4)
+    if perBar < 1: perBar = 1
+    b = __tnum(beats, 0)
+    if b < 0: b = 0
+    bar = math.floor(b / perBar) + 1
+    beat = math.floor(b % perBar) + 1
+    tick = math.floor((b % 1) * __CE_TIME["ppqn"])
+    return { "bar": bar, "beat": beat, "tick": tick,
+             "text": str(bar) + "." + str(beat) + "." + str(tick).rjust(2, "0") }
+
+def stepAt(beats, division):
+    import math
+    per = __CE_DIVISIONS.get(str(division))
+    if per is None: return None
+    b = __tnum(beats, 0)
+    if b < 0: b = 0
+    return math.floor(b / per)
+
+# The step boundaries crossed between two readings. A stalled frame must FIRE the steps it slept
+# through rather than drop them - the difference between a stutter and a hole in the bar. Capped so
+# returning from a long stall does not dump hundreds of notes, and what was dropped is REPORTED. On
+# an overrun the most RECENT steps are kept: catching up to now beats replaying where you were.
+def stepsBetween(fromBeats, toBeats, division, maxSteps=None):
+    import math
+    per = __CE_DIVISIONS.get(str(division))
+    if per is None: return None
+    frm = __tnum(fromBeats, 0)
+    if frm < 0: frm = 0
+    to = __tnum(toBeats, 0)
+    if to < 0: to = 0
+    if to <= frm: return { "steps": [], "dropped": 0 }
+    first = math.floor(frm / per) + 1
+    last = math.floor(to / per)
+    if last < first: return { "steps": [], "dropped": 0 }
+    total = last - first + 1
+    cap = int(__tnum(maxSteps, 16) + 0.5)
+    if cap < 1: cap = 1
+    kept = total if total < cap else cap
+    return { "steps": list(range(last - kept + 1, last + 1)), "dropped": total - kept }
+
+# The panel's shuffle: every odd step later by up to half a step, in BEATS. Two sequencers at "the
+# same" swing are only the same swing if they compute it the same way.
+def swingOffset(step, amount, division):
+    import math
+    per = __CE_DIVISIONS.get(str(division))
+    if per is None: return None
+    s = __tclamp(amount, 0, 1)
+    idx = math.floor(__tnum(step, 0) + 0.5)
+    return s * 0.5 * per if abs(idx) % 2 == 1 else 0
+
+# For anything whose rate is a LOOP LENGTH in bars rather than a step. Derived from the position,
+# never accumulated, so a cycle running for an hour is still exactly on the bar line.
+def __cycleBeats(bars, beatsPerBar):
+    perBar = __tnum(beatsPerBar, 4)
+    if perBar < 1: perBar = 1
+    length = __tclamp(bars, 0.25, 64) * perBar
+    return 0.01 if length < 0.01 else length
+def cycleAt(beats, bars, beatsPerBar=None):
+    import math
+    length = __cycleBeats(bars, beatsPerBar)
+    b = __tnum(beats, 0)
+    if b < 0: b = 0
+    return { "phase": ((b / length) % 1 + 1) % 1, "count": math.floor(b / length), "length": length }
+
+# Fold a timeline position into a loop. Before the loop start the position is untouched - you can
+# run IN to a loop from earlier in the song. `pass` is which time round, -1 before the loop is
+# reached; watching it for CHANGES is how you see a wrap without a handler that can miss one.
+def loopedBeats(beats, startBeats, lengthBeats):
+    import math
+    b = __tnum(beats, 0)
+    if b < 0: b = 0
+    st = __tnum(startBeats, 0)
+    if st < 0: st = 0
+    length = __tnum(lengthBeats, 0.01)
+    if length < 0.01: length = 0.01
+    if b < st: return { "beats": b, "pass": -1 }
+    return { "beats": st + ((b - st) % length), "pass": math.floor((b - st) / length) }
+
+# Tempo from tap times, in the milliseconds now() reports. Taps more than resetMs apart start a NEW
+# measurement rather than averaging across the pause - the thing every hand-rolled tap gets wrong,
+# because the first tap after a break poisons the average.
+def tapTempo(timestamps, resetMs=None):
+    if not isinstance(timestamps, (list, tuple)): return None
+    lst = [v for v in (__tnum(x, 0) for x in timestamps) if v > 0]
+    if len(lst) < 2: return None
+    limit = __tnum(resetMs, 2000)
+    total = 0.0
+    count = 0
+    for i in range(len(lst) - 1, 0, -1):
+        gap = lst[i] - lst[i - 1]
+        if gap <= 0 or gap > limit: break
+        total += gap
+        count += 1
+    if count == 0: return None
+    return __tclamp(60000 / (total / count), __CE_TIME["minBpm"], __CE_TIME["maxBpm"])
+
+# Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not the
+# mean: one late pulse from a USB hiccup drags an average around, and a wobbling readout is worse
+# than a slightly stale one.
+def clockTempo(intervalsMs):
+    if not isinstance(intervalsMs, (list, tuple)): return None
+    lst = sorted([v for v in (__tnum(x, 0) for x in intervalsMs) if v > 0])
+    if not lst: return None
+    mid = len(lst) // 2
+    median = lst[mid] if len(lst) % 2 else (lst[mid - 1] + lst[mid]) / 2
+    if median <= 0: return None
+    return __tclamp(60000 / (median * __CE_TIME["ppqn"]), __CE_TIME["minBpm"], __CE_TIME["maxBpm"])
+
 # @module ce.anim
 # Values that move over time. The engine lives in the host so ONE list exists and the position is a
 # pure function of elapsed time — an incremental integrator per runtime would drift.
@@ -666,8 +847,28 @@ def applyDump(b):                 return __api.applyDump(b)
 def sendDump(kind):               return __api.sendDump(kind)
 def buildDump(kind):              return __api.buildDump(kind)
 # @module ce.time
-def startTimer(id, ms=0):         return __api.startTimer(id, ms)
-def stopTimer(id):                return __api.stopTimer(id)
+# The prelude tracks which timers exist (runningTimers) and which follow the tempo (syncTimer), so
+# these are more than a pass-through to the host. int(x + 0.5), NOT round(x): the prelude defines a
+# global round (ce.math) which shadows the builtin for this whole namespace.
+__timerIds = {}
+__syncFollow = {}
+def startTimer(id, ms=0):
+    key = "" if id is None else str(id)
+    if not key: return None
+    # An explicit millisecond interval REPLACES a musical one: this is a script asking for
+    # milliseconds, not beats.
+    __syncFollow.pop(key, None)
+    __timerIds[key] = True
+    return __api.startTimer(key, int((ms or 0) + 0.5))
+def stopTimer(id):
+    key = "" if id is None else str(id)
+    __syncFollow.pop(key, None)
+    __timerIds.pop(key, None)
+    return __api.stopTimer(key)
+# The ids a script started BY NAME. One-shots are left out, all of them: after() hands back its id
+# already, and the note-off sendNote schedules is not a script's to cancel.
+def runningTimers():
+    return sorted([k for k in __timerIds if not k.startswith("__after:")])
 # @module -
 def run(target, args=None):       return __api.run(target, args)
 def emit(name, data=None):        return __api.emit(name, data)
@@ -1307,6 +1508,43 @@ __CE_MINOR_QUALITIES["m7b5"] = True
 __CE_MINOR_QUALITIES["min"] = True
 __CE_MINOR_QUALITIES["min7"] = True
 __CE_MINOR_QUALITIES["minMaj7"] = True
+# @module ce.time
+__CE_DIVISIONS = {}
+__CE_DIVISIONS["1/1"] = 4
+__CE_DIVISIONS["1/2"] = 2
+__CE_DIVISIONS["1/4"] = 1
+__CE_DIVISIONS["1/8"] = 0.5
+__CE_DIVISIONS["1/16"] = 0.25
+__CE_DIVISIONS["1/32"] = 0.125
+__CE_DIVISIONS["1/2D"] = 3
+__CE_DIVISIONS["1/4D"] = 1.5
+__CE_DIVISIONS["1/8D"] = 0.75
+__CE_DIVISIONS["1/16D"] = 0.375
+__CE_DIVISIONS["1/2T"] = 1.3333333333333333
+__CE_DIVISIONS["1/4T"] = 0.6666666666666666
+__CE_DIVISIONS["1/8T"] = 0.3333333333333333
+__CE_DIVISIONS["1/16T"] = 0.16666666666666666
+__CE_DIVISION_LABELS = {}
+__CE_DIVISION_LABELS["1/1"] = "Whole"
+__CE_DIVISION_LABELS["1/2"] = "Half"
+__CE_DIVISION_LABELS["1/4"] = "Quarter"
+__CE_DIVISION_LABELS["1/8"] = "8th"
+__CE_DIVISION_LABELS["1/16"] = "16th"
+__CE_DIVISION_LABELS["1/32"] = "32nd"
+__CE_DIVISION_LABELS["1/2D"] = "Half ·"
+__CE_DIVISION_LABELS["1/4D"] = "Quarter ·"
+__CE_DIVISION_LABELS["1/8D"] = "8th ·"
+__CE_DIVISION_LABELS["1/16D"] = "16th ·"
+__CE_DIVISION_LABELS["1/2T"] = "Half T"
+__CE_DIVISION_LABELS["1/4T"] = "Quarter T"
+__CE_DIVISION_LABELS["1/8T"] = "8th T"
+__CE_DIVISION_LABELS["1/16T"] = "16th T"
+__CE_DIVISION_NAMES = ["1/1","1/2","1/4","1/8","1/16","1/32","1/2D","1/4D","1/8D","1/16D","1/2T","1/4T","1/8T","1/16T"]
+__CE_TIME = {}
+__CE_TIME["ppqn"] = 24
+__CE_TIME["minBpm"] = 20
+__CE_TIME["maxBpm"] = 300
+# @module ce.music
 # END GENERATED music tables
 
 # Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
@@ -1978,7 +2216,7 @@ __CE_MODULES = {
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
-    "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
+    "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
     "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
     "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
@@ -2020,7 +2258,7 @@ __CE_META = [
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
     { "id": "ce.math", "version": "1.7", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
-    { "id": "ce.time", "version": "1.2", "runtime": "any" },
+    { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
     { "id": "ce.ui", "version": "1.1", "runtime": "webview" },
     { "id": "ce.draw", "version": "1.1", "runtime": "webview" },

@@ -29,6 +29,10 @@ const musicPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 
 const { SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
         QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES } = await import(`file://${musicPath}`);
 
+const timePath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'timeTables.js');
+const { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN, MIN_BPM, MAX_BPM }
+  = await import(`file://${timePath}`);
+
 export const BEGIN = 'BEGIN GENERATED module namespace';
 export const END = 'END GENERATED module namespace';
 
@@ -646,6 +650,17 @@ const MUSIC_TABLES = [
   { name: '__CE_MINOR_QUALITIES', kind: 'set', data: MINOR_QUALITY_NAMES },
 ];
 
+// ce.time's division table, emitted the same way and for the same reason: a mistyped fraction is a
+// sequencer running at the wrong rate in one runtime, which nothing fails on. `__CE_TIME` carries
+// the handful of scalar constants (PPQN, the tempo bounds) so they are one number each rather than
+// four copies. The @module marker is emitted with the block, so the cost lands on ce.time.
+const TIME_TABLES = [
+  { name: '__CE_DIVISIONS', kind: 'map', data: DIVISIONS },
+  { name: '__CE_DIVISION_LABELS', kind: 'map', data: DIVISION_LABELS },
+  { name: '__CE_DIVISION_NAMES', kind: 'list', data: DIVISION_NAMES },
+  { name: '__CE_TIME', kind: 'map', data: { ppqn: PPQN, minBpm: MIN_BPM, maxBpm: MAX_BPM } },
+];
+
 // Non-ASCII is deliberate and load-bearing: ♭ ♯ ° are the characters the panel PRINTS, so a script
 // naming a chord has to emit the same bytes. JSON.stringify leaves them literal (it only escapes
 // lone surrogates), and all three preludes are UTF-8 raw string literals already.
@@ -657,12 +672,12 @@ function musicLiteral(value, language) {
   return JSON.stringify(value);
 }
 
-/** Assignment lines for one table, in one language. */
-function musicRows(language) {
+/** Assignment lines for a list of tables, in one language. */
+function tableRows(tables, language) {
   const TRUE = language === 'python' ? 'True' : 'true';
   const semi = language === 'javascript' ? ';' : '';
   const out = [];
-  for (const { name, kind, data } of MUSIC_TABLES) {
+  for (const { name, kind, data } of tables) {
     if (kind === 'list') { out.push(`${name} = ${musicLiteral(data, language)}${semi}`); continue; }
     out.push(language === 'lua' ? `${name} = {}` : `${name} = {}${semi}`);
     const pairs = kind === 'set'
@@ -676,25 +691,38 @@ function musicRows(language) {
   return out;
 }
 
+// The block sits INSIDE each prelude's ce.music region, so it has to leave the cost marker where it
+// found it: the last thing emitted is a `@module ce.music` line, or every verb written after the
+// block would be attributed to ce.time.
 export function luaMusicBlock() {
   return `-- ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- @module ce.music
-${musicRows('lua').join('\n')}
+${tableRows(MUSIC_TABLES, 'lua').join('\n')}
+-- @module ce.time
+${tableRows(TIME_TABLES, 'lua').join('\n')}
+-- @module ce.music
 -- ${MUSIC_END}`;
 }
 
 export function jsMusicBlock() {
+  const names = [...MUSIC_TABLES, ...TIME_TABLES].map((t) => t.name).join(', ');
   return `// ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var ${MUSIC_TABLES.map((t) => t.name).join(', ')};
-${musicRows('javascript').join('\n')}
+var ${names};
+${tableRows(MUSIC_TABLES, 'javascript').join('\n')}
+// @module ce.time
+${tableRows(TIME_TABLES, 'javascript').join('\n')}
+// @module ce.music
 // ${MUSIC_END}`;
 }
 
 export function pythonMusicBlock() {
   return `# ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # @module ce.music
-${musicRows('python').join('\n')}
+${tableRows(MUSIC_TABLES, 'python').join('\n')}
+# @module ce.time
+${tableRows(TIME_TABLES, 'python').join('\n')}
+# @module ce.music
 # ${MUSIC_END}`;
 }
 

@@ -186,6 +186,21 @@ public:
         the panel inventing 120bpm and calling it a measurement. */
     virtual juce::var transportState() { return {}; }
 
+    /** A monotonic millisecond reading, behind ce.time.now(). NOT a wall clock: the origin is
+        arbitrary and only differences mean anything, which is deliberate — a wall clock jumps when
+        the machine syncs its time, and a script measuring an interval across that jump measures the
+        jump instead of the interval.
+
+        Unlike everything else on this interface this has a REAL default rather than a void one,
+        because it is platform code and not app state: there is nothing a host could know about the
+        passage of time that juce::Time does not. A host may still override it (a test that wants a
+        clock it controls), but none has to.
+
+        It exists at all because the Lua engine opens base, math, string and table and NOT os, so a
+        Lua script has no clock whatsoever; and Date/time.time() in the other two disagree about
+        both epoch and unit, so "use the language's own" was never available here either. */
+    virtual double nowMs() { return juce::Time::getMillisecondCounterHiRes(); }
+
     /** Ask the panel document about itself. `kind` "controls" returns an array of control NAMES, in
         document order — what ce.panel.snapshot walks. Kept as one query verb rather than a method
         per question for the same reason deviceQuery is: a host that cannot answer returns nothing,

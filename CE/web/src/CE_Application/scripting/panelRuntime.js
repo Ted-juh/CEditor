@@ -74,6 +74,19 @@ import {
   SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
   QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
 } from './musicTheory.js';
+import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
+// ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
+// beat falls and the Transport drawing that beat have to agree, and one implementation is the only
+// way to promise it. The C++ preludes cannot import, so they transliterate — and
+// scriptPreludeAgreement.test.js runs the same fixtures through all four.
+import {
+  barBeat as panelBarBeat, formatBarBeat as panelFormatBarBeat, stepAtBeat as panelStepAtBeat,
+  crossedSteps as panelCrossedSteps, swungBeatOffset as panelSwungBeatOffset,
+  cyclePhaseAt as panelCyclePhaseAt, cycleCountAt as panelCycleCountAt,
+  cycleBeats as panelCycleBeats, loopedBeats as panelLoopedBeats,
+  loopCycleIndex as panelLoopCycleIndex, tapTempo as panelTapTempo,
+  estimateTempoFromPulses as panelClockTempo,
+} from '../utils/transportLayout.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
 } from '../stores/scriptUi.js';
@@ -561,6 +574,23 @@ const musicRoman = (rootSemitone, quality) => {
   if (quality === 'aug') r += '+';
   return acc + r;
 };
+// @module ce.time
+// A monotonic millisecond reading. NOT a wall clock and NOT a date: the origin is arbitrary and
+// only DIFFERENCES mean anything. That is deliberate — a wall clock jumps when the machine syncs
+// its time, and a script measuring an interval across that jump measures the jump.
+//
+// This is a Q10 exception, and a sharp one. The Lua engine opens base, math, string and table and
+// NOT os, so a Lua script has no clock at all; QuickJS has Date and Python has time, and the three
+// disagree about epoch and unit. So "use the language's own" was never available here.
+const NOW_EPOCH = (typeof performance !== 'undefined' && typeof performance.now === 'function')
+  ? null : Date.now();
+const nowMsRead = () => (NOW_EPOCH === null ? performance.now() : Date.now() - NOW_EPOCH);
+
+// A division is the panel's own vocabulary — "1/16", "1/8T", "1/4D" — and every sequencer property
+// speaks it. An unknown name returns nothing rather than the component's 1/16 fallback: a component
+// must keep running, a script that mistyped one should find out.
+const timeDivision = (name) => DIVISIONS[String(name)];
+
 // @module ce.math
 // A seeded xorshift32, written the same way in every prelude and masked to 32 bits at every step.
 // Seeded is the whole point: the language's own math.random cannot promise the same sequence in
@@ -1483,6 +1513,68 @@ const helpers = {
     }
     return n;
   },
+
+// @module ce.time
+  // The clock. See NOW_EPOCH: monotonic, arbitrary origin, differences only.
+  nowMs: () => nowMsRead(),
+  // The panel's division vocabulary, in both directions. Every sequencer property in the app is
+  // one of these strings, and a script could set one and never convert it.
+  beatsPerDivision: (name) => timeDivision(name),
+  divisionNames: () => DIVISION_NAMES.map((id) => ({ id, label: DIVISION_LABELS[id], beats: DIVISIONS[id] })),
+  // Where a beat position falls, musically — for ANY position, not only the one the transport is
+  // at. `text` is the Transport's own readout ("3.2.00"), so a script's label and the component's
+  // agree character for character. Ticks are 24 PPQN, the MIDI clock resolution.
+  barBeatAt: (beats, beatsPerBar) => {
+    const signature = { beats: beatsPerBar == null ? 4 : beatsPerBar, unit: 4 };
+    return { ...panelBarBeat(beats, signature), text: panelFormatBarBeat(beats, signature) };
+  },
+  // Which step of the grid a position is on, counting from 0 at the transport origin.
+  stepAt: (beats, division) => (timeDivision(division) === undefined
+    ? undefined
+    : panelStepAtBeat(beats, division)),
+  // The step boundaries crossed between two readings — the never-lose-an-event rule every synced
+  // follower in the panel runs on. A stalled frame must FIRE the steps it slept through rather than
+  // drop them: that is the difference between a stutter and a hole in the bar. `max` caps the
+  // catch-up (default 16) and what was dropped is REPORTED rather than swallowed, so a script can
+  // say it happened. On an overrun the most RECENT steps are kept — catching up to now matters
+  // more than replaying where you were.
+  stepsBetween: (fromBeats, toBeats, division, max) => (timeDivision(division) === undefined
+    ? undefined
+    : panelCrossedSteps(fromBeats, toBeats, division, max == null ? 16 : max)),
+  // The panel's shuffle: every odd step pushed later by up to half a step. In BEATS, to add to a
+  // step's position. Two sequencers at "the same" swing really are the same swing only if they
+  // compute it the same way, which is why this is the transport's function and not a second one.
+  swingOffset: (step, amount, division) => (timeDivision(division) === undefined
+    ? undefined
+    : panelSwungBeatOffset(step, amount, division)),
+  // For anything whose rate is a LOOP LENGTH in bars rather than a step — a take, a slow sweep.
+  // Derived from the position, never accumulated, so a cycle running for an hour is still exactly
+  // on the bar line. `length` is the cycle in beats; `count` is how many have completed.
+  cycleAt: (beats, bars, beatsPerBar) => {
+    const perBar = beatsPerBar == null ? 4 : beatsPerBar;
+    return {
+      phase: panelCyclePhaseAt(beats, bars, perBar),
+      count: panelCycleCountAt(beats, bars, perBar),
+      length: panelCycleBeats(bars, perBar),
+    };
+  },
+  // Fold a timeline position into a loop. Before the loop start the position is untouched — you can
+  // run IN to a loop from earlier in the song, which is what every DAW does and what a count-in
+  // needs. `pass` is which time round you are, and -1 before the loop has been reached; a script
+  // watching it for CHANGES knows a wrap happened without a wrap handler that can miss one.
+  loopedBeats: (beats, startBeats, lengthBeats) => ({
+    beats: panelLoopedBeats(beats, startBeats, lengthBeats),
+    pass: panelLoopCycleIndex(beats, startBeats, lengthBeats),
+  }),
+  // Tempo from tap times, in the milliseconds nowMs() reports. Taps more than `resetMs` apart start
+  // a NEW measurement rather than averaging across the pause — otherwise the first tap after a
+  // break poisons it, which is what every hand-rolled tap tempo gets wrong. Nothing comes back from
+  // fewer than two usable taps.
+  tapTempo: (times, resetMs) => panelTapTempo(times, resetMs == null ? 2000 : resetMs) ?? undefined,
+  // Tempo from the gaps between incoming MIDI clock pulses (24 per quarter note). The MEDIAN, not
+  // the mean: one late pulse from a USB hiccup drags an average around, and a wobbling BPM readout
+  // is worse than a slightly stale one.
+  clockTempo: (intervalsMs) => panelClockTempo(intervalsMs) ?? undefined,
 
 // @module ce.midi
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
@@ -3013,11 +3105,28 @@ export function isGeneratedControl(control) {
 // @module ce.time
 const timers = new Map();   // id -> interval handle
 
+// Sync timers that FOLLOW the tempo: id -> beats. See syncTimerRead — a verb called sync that
+// silently desyncs on the first tempo change was the wrong default, so following is the default and
+// the freeze is the opt-in.
+const syncFollowers = new Map();
+
+/** Drop the interval without touching what the id means. startTimer and stopTimer differ in exactly
+    that: stopping a timer forgets it was ever a sync timer, re-timing it does not. */
+function clearTimerHandle(key) {
+  const handle = timers.get(key);
+  if (handle === undefined) return;
+  clearInterval(handle);
+  timers.delete(key);
+}
+
 function startTimer(id, ms) {
   const key = String(id ?? '');
   if (!key) return;
   const period = Math.max(1, Math.round(Number(ms) || 0));
-  stopTimer(key);
+  clearTimerHandle(key);
+  // An explicit millisecond interval REPLACES a musical one — startTimer over a sync timer is a
+  // script saying it wants this many milliseconds, not this many beats.
+  syncFollowers.delete(key);
   timers.set(key, setInterval(() => {
     // A one-shot is not a timer the panel declared, so it must NOT surface as onTimer — every
     // script with an onTimer handler would have to learn to filter ids it never created.
@@ -3028,10 +3137,8 @@ function startTimer(id, ms) {
 
 function stopTimer(id) {
   const key = String(id ?? '');
-  const handle = timers.get(key);
-  if (handle === undefined) return;
-  clearInterval(handle);
-  timers.delete(key);
+  syncFollowers.delete(key);
+  clearTimerHandle(key);
 }
 
 /**
@@ -3132,7 +3239,20 @@ function msToBeatsRead(ms, bpm) {
   return (Number(ms) || 0) * rate / 60000;
 }
 
-function syncTimerRead(id, beats) {
+/**
+ * syncTimer(id, beats [, opts]) — a timer whose interval is MUSICAL.
+ *
+ * It follows the tempo. That is a change from the first version, which computed the interval once
+ * and then kept firing at the old rate for the rest of the session: a verb called sync that
+ * silently desyncs is the wrong default, and nobody deliberately relies on a sixteenth that stops
+ * being a sixteenth. `{ follow = false }` keeps the old behaviour for anyone who wants it.
+ *
+ * Re-arming RESETS THE PHASE — the timer restarts from the moment the tempo changed rather than
+ * continuing on the old grid. Said out loud rather than hidden: a one-off hiccup at the moment of a
+ * tempo change beats a timer that is permanently at the wrong rate, but it is a hiccup.
+ */
+function syncTimerRead(id, beats, opts) {
+  const key = String(id ?? '');
   const ms = beatsToMsRead(beats);
   if (ms == null) {
     addScriptTrace('log', '',
@@ -3140,7 +3260,73 @@ function syncTimerRead(id, beats) {
       + 'Use startTimer with a millisecond interval, or wait for onTransport.');
     return;
   }
-  startTimer(id, Math.round(ms));
+  startTimer(key, Math.round(ms));            // clears any previous follow…
+  const follow = !(opts && opts.follow === false);
+  if (!follow) return;
+  syncFollowers.set(key, Number(beats) || 0);  // …and this puts it back on purpose
+  watchTempoForSyncTimers();
+}
+
+/** Re-time every following sync timer at the new tempo. Only when the tempo ACTUALLY changes, not
+    on every transport publish — the store ticks at ~30Hz and re-arming that often would mean a
+    timer that never fires.
+
+    This rides its own subscription rather than the live event dispatch, and deliberately: the timer
+    is already running, and it should stay in time whether or not the editor's Live toggle is on and
+    whether or not any script is listening. Armed lazily, so a panel with no sync timers subscribes
+    to nothing. */
+let syncTempoUnsub = null;
+let syncLastBpm = null;
+
+function reArmSyncTimers() {
+  for (const [key, beats] of [...syncFollowers]) {
+    const ms = beatsToMsRead(beats);
+    if (ms == null) continue;                 // no tempo any more: leave it running at the last one
+    startTimer(key, Math.round(ms));
+    syncFollowers.set(key, beats);
+  }
+}
+
+function watchTempoForSyncTimers() {
+  if (syncTempoUnsub) return;
+  syncLastBpm = transportSnapshot().bpm;
+  syncTempoUnsub = transportStore.subscribe((state) => {
+    const raw = Number(state?.bpm);
+    const bpm = Number.isFinite(raw) && raw > 0 ? raw : null;
+    if (bpm === syncLastBpm) return;
+    syncLastBpm = bpm;
+    if (bpm !== null) reArmSyncTimers();
+  });
+}
+
+/**
+ * afterBeats(beats, fn) — after() with a MUSICAL delay. The pair syncTimer/startTimer already had;
+ * the one-shot did not, so "play this in half a bar" meant computing the milliseconds by hand.
+ *
+ * A one-shot fires once, so it does not follow the tempo: the delay is computed when you call it,
+ * the same as beatsToMs would. Nothing is scheduled when there is no tempo to work from, and it
+ * says so rather than firing immediately.
+ */
+function afterBeatsFor(scriptId, beats, fn) {
+  const ms = beatsToMsRead(beats);
+  if (ms == null) {
+    addScriptTrace('log', scriptId ?? '',
+      'afterBeats(): no tempo is being reported, so there is no delay to compute. '
+      + 'Use after() with milliseconds, or wait for onTransport.');
+    return undefined;
+  }
+  return afterFor(scriptId, Math.round(ms), fn);
+}
+
+/** The timer ids currently running, sorted — the ones a script started BY NAME.
+ *
+ * One-shots are left out, all of them. They are anonymous machinery: after() hands back its id, so
+ * listing it adds nothing, and the runtime's own (sendNote's note-off) must not be cancellable by a
+ * script at all. Excluding the whole class rather than only the runtime's is also what keeps the
+ * answer the same in every runtime — the C++ preludes build sendNote's note-off on after(), so a
+ * rule that depended on who owned a one-shot would report differently there. */
+function runningTimersRead() {
+  return [...timers.keys()].filter((id) => !id.startsWith('__after:')).sort();
 }
 
 // @module ce.device
@@ -3728,7 +3914,9 @@ function buildApi(ownerName, scriptId = '') {
     transportInfo: () => transportInfoRead(),
     beatsToMs: (beats, bpm) => beatsToMsRead(beats, bpm),
     msToBeats: (ms, bpm) => msToBeatsRead(ms, bpm),
-    syncTimer: (id, beats) => syncTimerRead(id, beats),
+    syncTimer: (id, beats, opts) => syncTimerRead(id, beats, opts),
+    afterBeats: (beats, fn) => afterBeatsFor(scriptId, beats, fn),
+    runningTimers: () => runningTimersRead(),
     // ce.device — reads
     deviceProfile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
     deviceParameters: (opts) => deviceParametersRead(opts ?? {}),

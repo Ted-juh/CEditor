@@ -2579,3 +2579,166 @@ Three layers, and only the first two existed for `ce.music` before:
   a second opinion in the module rather than the panel's.
 - **The Chord Pad's `voicing` (close/spread/drop2) and the wheel geometry.** Component behaviour
   reached through `ce.components.chordPad`, not pitch arithmetic.
+
+---
+
+## 38. `ce.time` and the grid — the clock the panel runs on, and the one scripts did not have
+
+`ce.time` was nine members: four timers, three transport reads, two conversions. Between them they
+answer *where is the transport now* and *how long is a beat*. Neither of those is what a script
+driving a sequence actually needs to know.
+
+`utils/transportLayout.js` is the master clock — every synced component in the app runs on it, and
+**none of its four hundred lines were reachable**. Meanwhile the Properties panel lets you set
+`division`, `swing`, `loopStartBar`, `loopLengthBars` and `countInBars` on a Transport, and
+`division` and `swing` on the Arpeggiator, the Phrase and the Turing. A script could **set** every
+one of those and **use** none of them:
+
+```lua
+set("arp.division", "1/8T")      -- worked from the start
+-- and turning "1/8T" into a third of a beat did not exist
+```
+
+That is the Properties-panel bar in its purest form: the property was writable, and the arithmetic
+that gives it meaning belonged to the component.
+
+### The gap that was not a gap in the panel at all
+
+There was **no clock**. Not a limited one — none.
+
+```cpp
+LuaScriptEngine() { lua.open_libraries (sol::lib::base, sol::lib::math, sol::lib::string, sol::lib::table); }
+```
+
+No `os`. A Lua script could not read the time, full stop. QuickJS has `Date` and Python has `time`,
+and the two disagree about epoch *and* unit, so a cross-runtime script could not measure an elapsed
+interval either. Q10 says never duplicate the language's own maths — but "use the language's own"
+was never available here, exactly as it was not for `wrap` and `%`.
+
+`ce.time.now()` is a monotonic millisecond reading with an arbitrary origin. Not a wall clock and
+not a date, deliberately: a wall clock jumps when the machine syncs its time, and a script measuring
+an interval across that jump measures the jump. It is the one member with a *real* default on
+`ScriptHost` rather than a void one — `juce::Time::getMillisecondCounterHiRes()` is platform code,
+not app state, so no host has to implement anything.
+
+### The thirteen
+
+| namespaced | flat | what it answers |
+|---|---|---|
+| `ce.time.now()` | `nowMs` | monotonic ms — differences only |
+| `ce.time.division(name)` | `beatsPerDivision` | `"1/8T"` → ⅓ of a beat |
+| `ce.time.divisions()` | `divisionNames` | all fourteen: id, label, beats |
+| `ce.time.position(beats [, perBar])` | `barBeatAt` | `{ bar, beat, tick, text }` at *any* position |
+| `ce.time.step(beats, division)` | `stepAt` | which step of the grid |
+| `ce.time.steps(from, to, div [, max])` | `stepsBetween` | `{ steps, dropped }` |
+| `ce.time.swing(step, amount, div)` | `swingOffset` | the panel's shuffle, in beats |
+| `ce.time.cycle(beats, bars [, perBar])` | `cycleAt` | `{ phase, count, length }` |
+| `ce.time.looped(beats, start, length)` | `loopedBeats` | `{ beats, pass }` |
+| `ce.time.tap(times [, resetMs])` | `tapTempo` | BPM from taps |
+| `ce.time.clockTempo(intervalsMs)` | `clockTempo` | BPM from clock gaps |
+| `ce.time.afterBeats(beats, fn)` | `afterBeats` | the musical one-shot |
+| `ce.time.timers()` | `runningTimers` | what is running, by name |
+
+The flat aliases follow §1 all over again. `now`, `step`, `steps`, `swing`, `position`, `division`,
+`cycle`, `looped` and `tap` are precisely the words a panel author reaches for, so as bare globals
+they are `nowMs`, `stepAt`, `stepsBetween`, `swingOffset`, `barBeatAt`, `beatsPerDivision`,
+`cycleAt`, `loopedBeats` and `tapTempo`.
+
+**`steps` is the one worth reading the source for.** It is the transport's `crossedSteps` — the
+never-lose-an-event rule every synced follower runs on. A stalled frame must *fire* the steps it
+slept through rather than drop them: that is the difference between a stutter and a hole in the bar.
+It is capped, so returning from a backgrounded window does not dump three hundred notes at once; the
+cap keeps the **most recent** steps, because catching up to now matters more than replaying where
+you were; and what was dropped is **reported** rather than swallowed, so a script can say it
+happened. Every script driving its own sequence was writing a worse version of this.
+
+**`looped` is a function, not a counter.** The folded position is derived from the un-looped one, so
+a loop that has been running for an hour is still exactly on the bar line, and `pass` changing is
+how you see a wrap — there is no wrap handler that can be missed by a long frame. Before the loop
+start the position is untouched, so you can run *in* to a loop from earlier in the song, which is
+what every DAW does and what a count-in needs.
+
+**`division` is the one place a verb deliberately disagrees with the component.** `beatsPerStep`
+falls back to 1/16 for a name it does not know, because a component with a bad property still has to
+keep running. A script has no such obligation, and a sequencer silently running at a sixteenth
+because the division was mistyped is worse than one that stops. It returns nothing, and the test
+pins both halves of that difference.
+
+### The behaviour change: `syncTimer` follows the tempo
+
+This is a change to a shipped verb, so it is stated plainly rather than buried.
+
+`syncTimer("step", 0.25)` computed its interval **once**. Armed at 120 BPM it stayed a 500ms timer
+at 60 BPM — which is not a sixteenth of anything. The doc said so and told you to re-arm from
+`onTransport`, and that was an apology, not a design: a verb called *sync* that silently desyncs is
+the wrong default, and nobody deliberately relies on a sixteenth that stops being a sixteenth.
+
+It now follows. `{ follow = false }` freezes the interval for anyone who wants the old behaviour, and
+`startTimer(id, ms)` over a sync timer stops the following — asking for milliseconds is not asking
+for beats. Re-arming **resets the timer's phase**: a tempo change costs one hiccup, which is said
+out loud rather than hidden, and beats a timer permanently at the wrong rate.
+
+The re-arm rides its own subscription rather than the live event dispatch, and deliberately: the
+timer is already running, and it should stay in time whether or not the editor's Live toggle is on
+and whether or not any script is listening. It fires on a tempo *change*, not on every transport
+publish — the store ticks at ~30Hz, and re-arming that often is a timer that never reaches its
+period. Both halves are pinned by recording the intervals the runtime actually arms.
+
+`afterBeats` closes the other half of the same asymmetry: `startTimer` had `syncTimer` and the
+one-shot had nothing, so "play this in half a bar" meant working the milliseconds out by hand. A
+one-shot fires once, so it does not follow — the delay is computed when you call it.
+
+### One sharp edge, pinned rather than papered over
+
+`tap()` discards timestamps that are not `> 0`, because the transport's own filter treats 0 as "no
+reading". `now()` is monotonic from an arbitrary origin, and in the WebView that origin is close to
+zero — so the very first tap of a session can be dropped. It costs one tap; changing the filter
+would change the Transport component's behaviour too, which is a worse trade. The test says so.
+
+### Where the table comes from
+
+`DIVISIONS`, `DIVISION_LABELS`, `PPQN` and the tempo bounds moved into `scripting/timeTables.js` —
+re-exported from `transportLayout.js`, never restated — and are **generated** into all three C++
+preludes beside the music tables. Same rule as phase 7: fourteen fractions across four runtimes is
+fifty-six chances to mistype one, and a mistyped division is silent. Nothing fails to load; a
+sequencer just runs at the wrong rate, in one runtime, for one division.
+
+The generated block sits *inside* each prelude's `ce.music` region, so it now restores the cost
+marker on the way out — without that trailing `@module ce.music` line, every verb written after the
+block was billed to `ce.time`. The dependency test caught it immediately, which is what that test is
+for.
+
+### How it is tested
+
+The same three layers as §37, and the third is again the one that matters:
+
+1. **Cross-runtime** — `scriptPreludeAgreement.test.js` runs ~70 new fixtures through the Lua, JS
+   and Python preludes and compares against the WebView.
+2. **Per engine** — `ScriptRuntimeTests.cpp` §38 drives the verbs through the real engines.
+3. **Against the transport itself** — `scriptTime.test.js` imports `beatsPerStep`, `barBeat`,
+   `formatBarBeat`, `stepAtBeat`, `crossedSteps`, `swungBeatOffset`, `cyclePhaseAt`, `cycleCountAt`,
+   `cycleBeats`, `loopedBeats`, `loopCycleIndex`, `tapTempo` and `estimateTempoFromPulses`, and
+   asserts the verbs equal **them** over every division, several time signatures and several hundred
+   positions each. Layers 1 and 2 prove the runtimes agree with each other; four runtimes can be
+   consistently wrong together, and a script stepping at a different third of a beat from the
+   Arpeggiator beside it is exactly what that would look like.
+
+The WebView does not transliterate at all — it **calls** `transportLayout.js`. That is why the
+wrappers are thin to the point of looking lazy: coercing an argument before handing it over would be
+a second opinion about what a missing `beatsPerBar` means, and the preludes mirror the transport's
+own `num`/`clampNum` for the same reason.
+
+### What is deliberately still absent
+
+- **Starting or stopping the transport.** A panel does not own the DAW's playhead, and a script that
+  could start it would be fighting whatever else is driving the panel. Unchanged policy since §2.
+- **`songPositionBytes` / `clockPulsesBetween` / `transportEvent`.** `ce.midi` already has
+  `sendClock`, `sendTransport` and `sendSongPosition`; classifying an inbound realtime byte is a
+  four-line `if` on a byte a script already has.
+- **`parseHostPosition` / `hostJumped` / `estimateTempoFromPulses`'s caller.** Clock plumbing the
+  runtime owns. `clockTempo` is in because a script filtering 0xF8 with `interceptIn` holds the gaps
+  and could not turn them into a BPM; deciding whether the host *jumped* is not a panel's question.
+- **Count-in formatting, loop-range labels, transport geometry.** Component presentation, reached
+  through `ce.components.transport`.
+- **A `snap(beats, division)` verb.** `snap(beats, ce.time.division("1/16"))` is one line, and Q10
+  says the module does not own it once the division is convertible.

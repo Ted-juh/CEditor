@@ -4,12 +4,14 @@
 // Name parity (panelApiParity.test.js) would still pass if to7bit packed msb-first in one runtime
 // and lsb-first in another, or if checksum used a different polynomial — and a script that packs a
 // SysEx value in the editor and unpacks it in the shipped plugin would quietly corrupt the patch.
-// So this extracts the Lua and JavaScript preludes from the .cpp sources and RUNS them: Lua under
-// wasmoon (the same Lua 5.4 the runtime already embeds), JavaScript under node:vm.
+// So this extracts each prelude from its .cpp source and RUNS it: Lua under wasmoon (the same Lua
+// 5.4 the runtime embeds), JavaScript under node:vm, Python under python3 when the machine has one.
 //
-// Python is checked by name only — CPython is not available to a node test run. Its prelude is a
-// line-by-line transliteration of the same maths, and PythonScriptEngineTests.cpp covers it where
-// CPython does exist.
+// Python was checked by NAME only until phase 12, on the grounds that CPython is not guaranteed in
+// a node test run. The grounds were real; the conclusion was too weak. Where python3 IS present the
+// prelude runs for free, and the first run of it found quantizeNote raising TypeError on every
+// call. So it runs when it can and skips with a reason when it cannot, and
+// PythonScriptEngineTests.cpp still covers the engine where CPython definitely exists.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -69,6 +71,20 @@ const CASES = [
   // Inverted and out of order — the quality is read from the LOWEST note, so both must still name
   // a chord rather than depending on how the caller happened to build the list.
   ['chordQuality', [[67, 60, 64]]], ['chordQuality', [[]]],
+  // ce.time's grid. Divisions first, because every other verb here takes one and a fraction that
+  // differs by a runtime is a sequencer running at the wrong rate with nothing failing.
+  ['beatsPerDivision', ['1/16']], ['beatsPerDivision', ['1/8T']], ['beatsPerDivision', ['1/4D']],
+  ['beatsPerDivision', ['1/1']], ['beatsPerDivision', ['1/32']], ['beatsPerDivision', ['1/3']],
+  ['stepAt', [2.5, '1/16']], ['stepAt', [0, '1/16']], ['stepAt', [-1, '1/16']],
+  ['stepAt', [2.5, '1/8T']], ['stepAt', [2.5, 'nope']],
+  ['swingOffset', [0, 0.5, '1/16']], ['swingOffset', [1, 0.5, '1/16']],
+  ['swingOffset', [3, 1, '1/8']], ['swingOffset', [-1, 0.5, '1/16']],
+  ['swingOffset', [1, 2, '1/16']], ['swingOffset', [1, 0.5, 'nope']],
+  ['tapTempo', [[0, 500, 1000, 1500]]], ['tapTempo', [[0, 500, 5000, 5500]]],
+  ['tapTempo', [[1000]]], ['tapTempo', [[]]], ['tapTempo', [[0, 500, 1000], 100]],
+  ['tapTempo', [[0, 10]]], ['tapTempo', [[0, 100000]]],
+  ['clockTempo', [[20.8, 20.8, 20.8]]], ['clockTempo', [[20, 21, 100, 20]]],
+  ['clockTempo', [[]]], ['clockTempo', [[0, -1]]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
   ['from7bit', [[1, 0], 'msb']], ['from7bit', [[1, 0], 'lsb']], ['from7bit', [[1, 0]]],
   ['fromNibbles', [0xA, 0xB]],
@@ -119,6 +135,17 @@ const STRUCT_CASES = [
   ['arpOrder', [[60, 64, 67], 'chord']], ['arpOrder', [[60, 64, 67], 'random']],
   ['arpOrder', [[60, 64, 67], 'asPlayed']], ['arpOrder', [[60, 64], 'updown']],
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
+  ['divisionNames', []],
+  ['barBeatAt', [0]], ['barBeatAt', [4.5]], ['barBeatAt', [4.5, 3]], ['barBeatAt', [-1]],
+  ['barBeatAt', [0.999]], ['barBeatAt', [12.25, 7]],
+  ['stepsBetween', [0, 1, '1/16']], ['stepsBetween', [1, 1, '1/16']],
+  ['stepsBetween', [0.9, 1.1, '1/4']], ['stepsBetween', [0, 100, '1/16']],
+  ['stepsBetween', [0, 100, '1/16', 4]], ['stepsBetween', [0, 100, '1/16', 0]],
+  ['stepsBetween', [5, 1, '1/16']], ['stepsBetween', [0, 1, 'nope']],
+  ['cycleAt', [0, 1]], ['cycleAt', [6, 1]], ['cycleAt', [6, 1, 3]],
+  ['cycleAt', [6, 0]], ['cycleAt', [6, 1000]], ['cycleAt', [-3, 2]],
+  ['loopedBeats', [0, 4, 8]], ['loopedBeats', [4, 4, 8]], ['loopedBeats', [13, 4, 8]],
+  ['loopedBeats', [20, 4, 8]], ['loopedBeats', [20, 4, 0]],
 ];
 
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number'
@@ -185,6 +212,10 @@ local function __ser(v)
   elseif t == "string" then return string.format("%q", v)
   elseif t == "boolean" then return tostring(v)
   elseif t == "table" then
+    -- An empty Lua table IS an empty list and an empty map at the same time; the language has no
+    -- way to tell them apart. Both sides collapse the empty case to "[]" so a real value never
+    -- fails on a distinction Lua cannot express.
+    if next(v) == nil then return "[]" end
     if #v > 0 then
       local parts = {}
       for i = 1, #v do parts[i] = __ser(v[i]) end
@@ -224,10 +255,6 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
     assert.equal(got.length, all.length, 'expected one serialised result per case');
     all.forEach(([fn, args], i) => {
       const want = canonical(web[fn](...args));
-      // An empty Lua table IS an empty map and an empty list at the same time — the language has no
-      // way to tell them apart, so the serialiser prints "{}" for both. That is a fact about Lua,
-      // not a disagreement about the value, and it is the only allowance made here.
-      if (want === '[]' && got[i] === '{}') return;
       assert.equal(got[i], want,
         `Lua prelude ${fn}(${JSON.stringify(args)}) = ${got[i]}, WebView = ${want}`);
     });
@@ -306,6 +333,8 @@ function canonical(v) {
   }
   if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`;
   const keys = Object.keys(v).sort();
+  // See __ser: an empty table is both shapes in Lua, so the empty case collapses on both sides.
+  if (!keys.length) return '[]';
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
 }
 
