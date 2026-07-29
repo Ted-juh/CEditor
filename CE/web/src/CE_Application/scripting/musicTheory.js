@@ -14,9 +14,22 @@
 // "dorian" and a Chord Pad set to "dorian" have to mean the same seven notes, and the only way to
 // guarantee that is for there to be one table.
 
-import { SCALES } from '../utils/chordPadLayout.js';
+import {
+  SCALES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_ISH, QUALITY_SUFFIX, ROMAN, MINOR_QUALITIES,
+} from '../utils/chordPadLayout.js';
 
-export { SCALES };
+export { SCALES, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, QUALITY_SUFFIX, ROMAN };
+
+/**
+ * The tables the Chord Pad and the Harmoniser SPELL and NAME with, re-exported for the same reason
+ * SCALES is: a script asking "how does this key spell its third" and the panel printing that third
+ * have to agree, and the only way to guarantee agreement is one table.
+ *
+ * Sets do not survive the trip into a Lua/JS/Python prelude, so the two membership tests are
+ * emitted as sorted name LISTS. They stay Sets here because that is what the app uses them as.
+ */
+export const MINOR_SCALE_NAMES = [...MINOR_ISH].sort();
+export const MINOR_QUALITY_NAMES = [...MINOR_QUALITIES].sort();
 
 /**
  * Chord intervals in semitones above the root.

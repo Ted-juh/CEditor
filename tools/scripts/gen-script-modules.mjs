@@ -26,7 +26,8 @@ const { MODULES, moduleMemberMap, MODULE_BY_ID, MODULE_CORE, MODULE_GATE_MESSAGE
   = await import(`file://${apiPath}`);
 
 const musicPath = join(repo, 'CE', 'web', 'src', 'CE_Application', 'scripting', 'musicTheory.js');
-const { SCALES, CHORDS } = await import(`file://${musicPath}`);
+const { SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+        QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES } = await import(`file://${musicPath}`);
 
 export const BEGIN = 'BEGIN GENERATED module namespace';
 export const END = 'END GENERATED module namespace';
@@ -624,42 +625,76 @@ del __stubName
 }
 
 /* --------------------------------------------------------------- ce.music interval tables */
-// Emitted as a plain map from name to an ascending list of semitone offsets. The three verbs built
-// on top (scaleNotes / chordNotes / quantizeNote) are hand-written per prelude — they are six lines
-// each, and their ANSWERS are pinned by tests that run the same fixtures through every engine.
+// Emitted as plain maps and lists. The verbs built on top (scaleNotes / chordNotes / quantizeNote /
+// degreeChord …) are hand-written per prelude — they are a handful of lines each, and their ANSWERS
+// are pinned by tests that run the same fixtures through every engine.
+//
+// The SPELLING tables joined the interval ones at phase 12, for a milder version of the same
+// reason: a mistyped semitone is a wrong note, and a mistyped note NAME is a label that disagrees
+// with the Chord Pad drawn next to it. Both are silent, and both are copies of a table the app
+// already has — so neither is copied.
 
-const musicRows = (fmt) => [
-  ...Object.entries(SCALES).map(([k, v]) => fmt('__CE_SCALES', k, v)),
-  ...Object.entries(CHORDS).map(([k, v]) => fmt('__CE_CHORDS', k, v)),
+const MUSIC_TABLES = [
+  { name: '__CE_SCALES', kind: 'map', data: SCALES },
+  { name: '__CE_CHORDS', kind: 'map', data: CHORDS },
+  { name: '__CE_NOTE_SHARP', kind: 'list', data: NOTE_SHARP },
+  { name: '__CE_NOTE_FLAT', kind: 'list', data: NOTE_FLAT },
+  { name: '__CE_FLAT_KEYS', kind: 'set', data: FLAT_KEY_PCS },
+  { name: '__CE_MINOR_SCALES', kind: 'set', data: MINOR_SCALE_NAMES },
+  { name: '__CE_QUALITY_SUFFIX', kind: 'map', data: QUALITY_SUFFIX },
+  { name: '__CE_ROMAN', kind: 'list', data: ROMAN },
+  { name: '__CE_MINOR_QUALITIES', kind: 'set', data: MINOR_QUALITY_NAMES },
 ];
 
+// Non-ASCII is deliberate and load-bearing: ♭ ♯ ° are the characters the panel PRINTS, so a script
+// naming a chord has to emit the same bytes. JSON.stringify leaves them literal (it only escapes
+// lone surrogates), and all three preludes are UTF-8 raw string literals already.
+function musicLiteral(value, language) {
+  if (Array.isArray(value)) {
+    const items = value.map((v) => musicLiteral(v, language)).join(',');
+    return language === 'lua' ? `{${items}}` : `[${items}]`;
+  }
+  return JSON.stringify(value);
+}
+
+/** Assignment lines for one table, in one language. */
+function musicRows(language) {
+  const TRUE = language === 'python' ? 'True' : 'true';
+  const semi = language === 'javascript' ? ';' : '';
+  const out = [];
+  for (const { name, kind, data } of MUSIC_TABLES) {
+    if (kind === 'list') { out.push(`${name} = ${musicLiteral(data, language)}${semi}`); continue; }
+    out.push(language === 'lua' ? `${name} = {}` : `${name} = {}${semi}`);
+    const pairs = kind === 'set'
+      ? data.map((k) => [k, true])
+      : Object.entries(data);
+    for (const [k, v] of pairs) {
+      const key = `[${JSON.stringify(k)}]`;
+      out.push(`${name}${key} = ${kind === 'set' ? TRUE : musicLiteral(v, language)}${semi}`);
+    }
+  }
+  return out;
+}
+
 export function luaMusicBlock() {
-  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = {${v.join(',')}}`);
   return `-- ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- @module ce.music
-__CE_SCALES = {}
-__CE_CHORDS = {}
-${rows.join('\n')}
+${musicRows('lua').join('\n')}
 -- ${MUSIC_END}`;
 }
 
 export function jsMusicBlock() {
-  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = [${v.join(',')}];`);
   return `// ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES = {};
-var __CE_CHORDS = {};
-${rows.join('\n')}
+var ${MUSIC_TABLES.map((t) => t.name).join(', ')};
+${musicRows('javascript').join('\n')}
 // ${MUSIC_END}`;
 }
 
 export function pythonMusicBlock() {
-  const rows = musicRows((tbl, k, v) => `${tbl}["${k}"] = [${v.join(',')}]`);
   return `# ${MUSIC_BEGIN} — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # @module ce.music
-__CE_SCALES = {}
-__CE_CHORDS = {}
-${rows.join('\n')}
+${musicRows('python').join('\n')}
 # ${MUSIC_END}`;
 }
 

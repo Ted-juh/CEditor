@@ -2396,6 +2396,102 @@ int main()
         check (d.size() == 4 && near (d[3], 5.0), tag + ": distance is a plain hypotenuse");
     }
 
+    // 37) ce.music in a key: spelling, degree, diatonic chords, voicing, arp walk (design doc §37)
+    //
+    // The fixtures CE/web/test/scriptMusic.test.js pins against the Chord Pad's, the Harmoniser's
+    // and the Arpeggiator's OWN functions. Here they are pinned per engine, because the failure
+    // this guards against is not "the maths is wrong" — the web suite catches that — but "one
+    // engine spells it differently", which produces a panel that labels a pad E♭m in the editor
+    // and D♯m in the shipped plugin.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("mk", lang, "panel", "onKey", "*", isLua
+            ? "local function j(t) local s = \"\" for i, v in ipairs(t) do s = s .. (i > 1 and \",\" or \"\") .. tostring(v) end return s end\n"
+              "function onKey()\n"
+              "  log(\"n \" .. tostring(ce.music.number(\"Eb4\")) .. \" \" .. tostring(ce.music.number(\"E\\u{266D}4\"))\n"
+              "      .. \" \" .. tostring(ce.music.number(\"Cb4\")) .. \" \" .. tostring(ce.music.number(\"nonsense\")))\n"
+              "  log(\"sp \" .. ce.music.name(63, true) .. \" \" .. ce.music.name(61, false) .. \" \" .. ce.music.name(61)\n"
+              "      .. \" \" .. tostring(ce.music.spelling(60, \"minor\")) .. \" \" .. tostring(ce.music.spelling(60, \"major\")))\n"
+              "  log(\"dg \" .. tostring(ce.music.inScale(62, 60, \"major\")) .. \" \" .. tostring(ce.music.degree(67, 60, \"major\"))\n"
+              "      .. \" \" .. tostring(ce.music.degree(61, 60, \"major\")))\n"
+              "  local v = ce.music.degreeChord(60, \"major\", 5)\n"
+              "  log(\"dc \" .. v.name .. \" \" .. v.roman .. \" \" .. j(v.notes))\n"
+              "  local b = ce.music.degreeChord(60, \"minor\", 3)\n"
+              "  log(\"db \" .. b.name .. \" \" .. b.roman .. \" \" .. j(b.notes))\n"
+              "  local t = ce.music.degreeChord(60, \"major\", 2, 4)\n"
+              "  log(\"dt \" .. t.name .. \" \" .. t.roman .. \" \" .. j(t.notes))\n"
+              "  log(\"q \" .. ce.music.quality({60,63,70}) .. \" \" .. ce.music.quality({60,63,66,69}))\n"
+              "  log(\"vl \" .. j(ce.music.lead({65,69,72}, {60,64,67})))\n"
+              "  log(\"oc \" .. j(ce.music.octaves({60,64,67}, 2)))\n"
+              "  local a = ce.music.arp({60,64,67}, \"updown\")\n"
+              "  local flat = {} for i = 1, #a do flat[i] = a[i][1] end\n"
+              "  log(\"ar \" .. tostring(#a) .. \" \" .. j(flat))\n"
+              "end\n"
+            : "function onKey() {\n"
+              "  log(\"n \" + noteNumber(\"Eb4\") + \" \" + noteNumber(\"E\\u266D4\")\n"
+              "      + \" \" + noteNumber(\"Cb4\") + \" \" + noteNumber(\"nonsense\"));\n"
+              "  log(\"sp \" + noteName(63, true) + \" \" + noteName(61, false) + \" \" + noteName(61)\n"
+              "      + \" \" + noteSpelling(60, \"minor\") + \" \" + noteSpelling(60, \"major\"));\n"
+              "  log(\"dg \" + inScale(62, 60, \"major\") + \" \" + scaleDegree(67, 60, \"major\")\n"
+              "      + \" \" + scaleDegree(61, 60, \"major\"));\n"
+              "  var v = degreeChord(60, \"major\", 5);\n"
+              "  log(\"dc \" + v.name + \" \" + v.roman + \" \" + v.notes.join(\",\"));\n"
+              "  var b = degreeChord(60, \"minor\", 3);\n"
+              "  log(\"db \" + b.name + \" \" + b.roman + \" \" + b.notes.join(\",\"));\n"
+              "  var t = degreeChord(60, \"major\", 2, 4);\n"
+              "  log(\"dt \" + t.name + \" \" + t.roman + \" \" + t.notes.join(\",\"));\n"
+              "  log(\"q \" + chordQuality([60,63,70]) + \" \" + chordQuality([60,63,66,69]));\n"
+              "  log(\"vl \" + voiceLead([65,69,72], [60,64,67]).join(\",\"));\n"
+              "  log(\"oc \" + expandOctaves([60,64,67], 2).join(\",\"));\n"
+              "  var a = arpOrder([60,64,67], \"updown\");\n"
+              "  log(\"ar \" + a.length + \" \" + a.map(function (s) { return s[0]; }).join(\",\"));\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        runtime.runAction ("onKey", juce::var());
+
+        const auto line = [&host] (const juce::String& prefix) -> juce::String
+        {
+            for (const auto& l : host.logs) if (l.startsWith (prefix)) return l;
+            return {};
+        };
+        const juce::String tag (lang);
+
+        // Both accidental spellings read back to the same note, and a name the parser cannot read
+        // is NOTHING rather than 0 — "nil" in Lua, "undefined" in JavaScript, but never "0".
+        const auto n = line ("n ");
+        check (n.contains ("63 63 59"), tag + ": Eb4, E♭4 and Cb4 (got " + n + ")");
+        check (! n.fromFirstOccurrenceOf ("59 ", false, false).startsWith ("0"),
+               tag + ": an unreadable name must not read as note 0 (got " + n + ")");
+
+        // The spelling tables are the panel's, so these are the exact characters a Chord Pad draws.
+        const auto sp = line ("sp ");
+        check (sp.contains ("E♭4"), tag + ": the flat spelling is the panel's ♭ (got " + sp + ")");
+        check (sp.contains ("C♯4"), tag + ": …and the sharp spelling its ♯");
+        check (sp.contains ("C#4"), tag + ": while the no-argument form stays plain ASCII");
+        check (sp.contains ("true") && sp.contains ("false"),
+               tag + ": C minor spells flats, C major does not");
+
+        const auto dg = line ("dg ");
+        check (dg.contains ("true 5"), tag + ": degrees are 1-based, so the dominant is 5 (got " + dg + ")");
+        check (! dg.fromFirstOccurrenceOf ("true 5 ", false, false).startsWith ("0"),
+               tag + ": a note outside the key has NO degree, not degree 0");
+
+        check (line ("dc ").contains ("G V 67,71,74"), tag + ": the V of C major (got " + line ("dc ") + ")");
+        check (line ("db ").contains ("E♭ ♭III 63,67,70"),
+               tag + ": a borrowed degree reads ♭III and spells E♭ (got " + line ("db ") + ")");
+        check (line ("dt ").contains ("Dm7 ii 62,65,69,72"),
+               tag + ": a seventh on the second degree (got " + line ("dt ") + ")");
+        check (line ("q ").contains ("min7 dim7"), tag + ": quality names a chord from its notes");
+        check (line ("vl ").contains ("60,65,69"),
+               tag + ": voice leading picks the inversion that moves least (got " + line ("vl ") + ")");
+        check (line ("oc ").contains ("60,64,67,72,76,79"), tag + ": the octave expansion");
+        check (line ("ar ").contains ("4 60,64,67,64"),
+               tag + ": updown does not repeat the endpoints (got " + line ("ar ") + ")");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

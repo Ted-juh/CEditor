@@ -70,7 +70,10 @@ import {
 } from './midiFilters.js';
 import { COMPONENT_VERBS, componentScriptPatch } from './componentVerbs.js';
 import { typeOfControl, familiesForType } from './componentSchema.js';
-import { SCALES, CHORDS } from './musicTheory.js';
+import {
+  SCALES, CHORDS, NOTE_SHARP, NOTE_FLAT, FLAT_KEY_PCS, MINOR_SCALE_NAMES,
+  QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
+} from './musicTheory.js';
 import {
   notify as uiNotifyStore, setStatus as uiStatusStore, openDialog as uiDialogStore, clearScriptUi,
 } from '../stores/scriptUi.js';
@@ -486,10 +489,17 @@ export function readWatch(path) {
 
 // @module ce.music
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
+// The panel writes accidentals as ♯ and ♭; a script types # and b. Both are the same note, so both
+// spellings are folded to the ASCII pair before anything tries to read a name.
+const musicAscii = (s) => String(s).replace(/♯/g, '#').replace(/♭/g, 'b');
+const FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 
-// A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is.
+// A pitch argument is a MIDI number or a name ("C4"), the way sendNote's already is. An unreadable
+// name is 0 HERE — musicPitch feeds scaleNotes and friends, and a nil root would turn one bad
+// string into an unexplained nil list. noteNumber itself is honest about it.
 const musicPitch = (v) => (typeof v === 'string'
-  ? helpers.noteNumber(v)
+  ? (helpers.noteNumber(v) ?? 0)
   : Math.floor(Number(v) || 0));
 const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
 const musicNotes = (table, root, name) => {
@@ -497,6 +507,59 @@ const musicNotes = (table, root, name) => {
   if (!steps) return undefined;
   const base = musicPitch(root);
   return steps.map((x) => base + x);
+};
+// Sorted ascending, which is what every voicing rule below assumes.
+const musicSorted = (list) => (Array.isArray(list) ? list.slice() : []).map(Number)
+  .filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
+// A count argument that is not a finite number falls back to its default. Written out rather than
+// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
+// or a size differing by one between runtimes is a chord differing by a third.
+const musicCount = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Number(v)) : fallback);
+
+// Stack scale thirds from a 0-based degree — the Chord Pad's `stackedChord`, offsets from the
+// TONIC. Wrapping past the top of the scale adds an octave, so degree 8 of a seven-note scale is
+// the I chord one octave up rather than an error.
+const musicStack = (steps, degree, size) => {
+  const n = steps.length;
+  const out = [];
+  for (let k = 0; k < Math.max(2, musicCount(size, 3)); k += 1) {
+    const idx = degree + k * 2;
+    out.push(steps[((idx % n) + n) % n] + Math.floor(idx / n) * 12);
+  }
+  return out;
+};
+// Every octave-rotation of a chord, up and down — the candidates a voice-leading rule picks from.
+const musicInversions = (notes, spread = 2) => {
+  const base = notes.slice();
+  const out = [base];
+  const span = Math.max(1, base.length - 1) * spread;
+  let cur = base;
+  for (let i = 0; i < span; i += 1) { cur = [...cur.slice(1), cur[0] + 12].sort((a, b) => a - b); out.push(cur); }
+  cur = base;
+  for (let i = 0; i < span; i += 1) { cur = [cur[cur.length - 1] - 12, ...cur.slice(0, -1)].sort((a, b) => a - b); out.push(cur); }
+  return out;
+};
+// Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
+// seventh), so pairing by index would compare nonsense.
+const musicMotion = (a, b) => a.reduce((sum, n) => sum + Math.min(...b.map((m) => Math.abs(n - m))), 0);
+
+// A roman numeral for a chord root, spelled against the MAJOR scale so borrowed degrees read as
+// ♭III / ♭VI / ♭VII the way the Chord Pad's wheel labels them. Minor-ish qualities go lowercase.
+const musicRoman = (rootSemitone, quality) => {
+  const semi = musicMod12(rootSemitone);
+  let best = 0;
+  let acc = '';
+  for (let d = 0; d < 7; d += 1) {
+    const diff = musicMod12(semi - SCALES.major[d]);
+    if (diff === 0) { best = d; acc = ''; break; }
+    if (diff === 11) { best = d; acc = '♭'; }              // a semitone below degree d
+    else if (diff === 1 && acc === '') { best = d; acc = '♯'; }
+  }
+  let r = ROMAN[best];
+  if (MINOR_QUALITY_NAMES.includes(quality)) r = r.toLowerCase();
+  if (quality === 'dim' || quality === 'dim7' || quality === 'm7b5') r += '°';
+  if (quality === 'aug') r += '+';
+  return acc + r;
 };
 // @module ce.math
 // A seeded xorshift32, written the same way in every prelude and masked to 32 bits at every step.
@@ -1252,8 +1315,154 @@ const helpers = {
     return db < MIN_DB ? MIN_DB : db;
   },
   // @module ce.music
-  noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
-  noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
+  // Two spellings, chosen by whether the second argument is there at all. Omitted, you get this
+  // module's own plain-ASCII names (C#4) — what every script written so far compares against, and
+  // what noteNumber has always round-tripped. Given, you get the PANEL's names (C♯4 / E♭4): the
+  // same table the Chord Pad, the Harmoniser and the Arpeggiator print from, so a script can label
+  // a control with the spelling the component beside it is using.
+  noteName: (n, flats) => {
+    n = Math.floor(n);
+    const table = flats === undefined || flats === null ? NOTE_NAMES : (flats ? NOTE_FLAT : NOTE_SHARP);
+    return table[musicMod12(n)] + (Math.floor(n / 12) - 1);
+  },
+  // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a
+  // perfectly good MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in
+  // silence rather than showing up.
+  noteNumber: (name) => {
+    const m = /^([A-G])([#b]?)(-?\d+)$/.exec(musicAscii(name));
+    if (!m) return undefined;
+    const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
+    if (pc < 0) return undefined;
+    // A flat lowers below the letter, so Cb3 is the B under C3 — one octave down, not up.
+    const oct = parseInt(m[3], 10) + (m[2] === 'b' && m[1] === 'C' ? 0 : 1);
+    return oct * 12 + pc;
+  },
+  // Does this key write its accidentals as flats? The Chord Pad's rule, exactly: judged by the
+  // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
+  // noteName and a script's labels match the panel's without deciding anything itself.
+  noteSpelling: (root, scale) => {
+    const steps = musicSteps(SCALES, scale);
+    if (!steps) return undefined;
+    const name = scale == null ? 'major' : String(scale);
+    const pc = musicMod12(musicPitch(root));
+    return FLAT_KEY_PCS.includes(MINOR_SCALE_NAMES.includes(name) ? musicMod12(pc + 3) : pc);
+  },
+  inScale: (note, root, scale) => {
+    const steps = musicSteps(SCALES, scale);
+    if (!steps) return undefined;
+    const base = musicMod12(musicPitch(root));
+    return steps.some((x) => musicMod12(base + x) === musicMod12(musicPitch(note)));
+  },
+  // Which degree of the key a note is — 1 for the tonic, 5 for the dominant. A note OUTSIDE the key
+  // has NO degree and gets nil rather than the nearest one: rounding here is what turns a wrong
+  // note into a plausible chord, and quantizeNote is the verb that rounds on purpose.
+  scaleDegree: (note, root, scale) => {
+    const steps = musicSteps(SCALES, scale);
+    if (!steps) return undefined;
+    const base = musicMod12(musicPitch(root));
+    const pc = musicMod12(musicPitch(note));
+    const i = steps.findIndex((x) => musicMod12(base + x) === pc);
+    return i < 0 ? undefined : i + 1;
+  },
+  // The chord the key builds on a degree — the Chord Pad's own answer, named and numbered. Degrees
+  // are 1-based, like scaleDegree's, so degreeChord(60, 'major', 5) is the V. `size` is how many
+  // thirds to stack: 3 a triad, 4 a seventh. Past the top of the scale it keeps going an octave up.
+  degreeChord: (root, scale, degree, size) => {
+    const steps = musicSteps(SCALES, scale);
+    if (!steps || !steps.length) return undefined;
+    const name = scale == null ? 'major' : String(scale);
+    const d = musicCount(degree, 1) - 1;
+    const offsets = musicStack(steps, d, size);
+    const base = musicPitch(root);
+    const quality = helpers.chordQuality(offsets);
+    const flats = helpers.noteSpelling(root, name);
+    const spell = (n) => (flats ? NOTE_FLAT : NOTE_SHARP)[musicMod12(n)];
+    return {
+      degree: d + 1,
+      rootNote: base + offsets[0],
+      quality,
+      name: spell(base + offsets[0]) + (QUALITY_SUFFIX[quality] ?? ''),
+      roman: musicRoman(offsets[0], quality),
+      offsets,
+      notes: offsets.map((o) => base + o),
+      names: offsets.map((o) => spell(base + o)),
+    };
+  },
+  // Name a chord from the notes in it: [60,63,70] -> "min7". Reads intervals above the LOWEST
+  // given note, so it takes a chord from chordNotes, from degreeChord or from whatever a script
+  // built by hand. The vocabulary is the panel's, so a chord this names and a chord the Chord Pad
+  // labels agree.
+  chordQuality: (notes) => {
+    const list = musicSorted(notes);
+    if (!list.length) return undefined;
+    const iv = list.map((x) => musicMod12(x - list[0]));
+    const has = (a) => iv.includes(a);
+    const third = has(3) ? 'min' : has(4) ? 'maj' : has(2) ? 'sus2' : has(5) ? 'sus4' : '';
+    const fifth = has(7) ? 'p5' : has(6) ? 'd5' : has(8) ? 'a5' : '';
+    const seventh = has(10) ? 'm7' : has(11) ? 'M7' : (has(9) && fifth === 'd5') ? 'd7' : '';
+    if (third === 'min' && fifth === 'd5') return seventh === 'm7' ? 'm7b5' : seventh === 'd7' ? 'dim7' : 'dim';
+    if (third === 'maj' && fifth === 'a5') return 'aug';
+    if (third === 'min') return seventh === 'm7' ? 'min7' : seventh === 'M7' ? 'minMaj7' : 'min';
+    if (third === 'maj') return seventh === 'm7' ? 'dom7' : seventh === 'M7' ? 'maj7' : 'maj';
+    if (third === 'sus2') return 'sus2';
+    if (third === 'sus4') return 'sus4';
+    return 'maj';
+  },
+  // Re-voice a chord so it moves as little as possible from the one before it — the Harmoniser's
+  // voice leading, available to any script that sends chords. 'closest' minimises the total
+  // movement of all voices; 'smooth' minimises the TOP voice only, which holds a melody still and
+  // lets the inner voices jump; 'off' returns the chord in root position. With no previous chord
+  // there is nothing to lead from, so the chord comes back untouched.
+  voiceLead: (notes, previous, mode) => {
+    const chord = musicSorted(notes);
+    const prev = musicSorted(previous);
+    const how = mode == null ? 'closest' : String(mode);
+    if (!chord.length || !prev.length || how === 'off') return chord;
+    let best = chord;
+    let bestScore = Infinity;
+    for (const cand of musicInversions(chord)) {
+      if (cand.some((n) => n < 0 || n > 127)) continue;
+      const score = how === 'smooth'
+        ? Math.abs(cand[cand.length - 1] - prev[prev.length - 1])
+        : musicMotion(cand, prev);
+      // Strictly less, so a tie keeps the earlier (lower) candidate and the same input always
+      // gives the same answer in every runtime.
+      if (score < bestScore) { bestScore = score; best = cand; }
+    }
+    return best;
+  },
+  // The same note set spread up over `octaves` octaves, the Arpeggiator's own expansion. Sorted
+  // ascending and clamped into MIDI range; anything that would land above 127 is DROPPED rather
+  // than clamped, because clamping stacks strays on one pitch and that sounds like a stuck key.
+  expandOctaves: (notes, octaves) => {
+    const base = musicSorted(notes).map((n) => Math.min(127, Math.max(0, Math.floor(n))));
+    const oc = Math.min(4, Math.max(1, musicCount(octaves, 1)));
+    const out = [];
+    for (let o = 0; o < oc; o += 1) for (const n of base) { const v = n + o * 12; if (v <= 127) out.push(v); }
+    return out;
+  },
+  // The walk an arpeggiator pattern describes, as a list of STEPS — each step a list of notes, so
+  // 'chord' (one step, everything at once) has the same shape as the rest. The notes are taken in
+  // the order given, which is what makes 'asPlayed' mean anything; sort or expandOctaves first if
+  // you want a rising walk. 'updown' and 'downup' do not repeat the endpoints.
+  //
+  // 'random' returns the input order, exactly as the panel's own arpeggiator does — it draws its
+  // step at play time rather than shuffling the walk. A script that wants a shuffled WALK has
+  // ce.math.shuffle, which is seeded and therefore repeatable.
+  arpOrder: (notes, pattern) => {
+    const asc = (Array.isArray(notes) ? notes : []).slice();
+    if (!asc.length) return [];
+    switch (String(pattern)) {
+      case 'down': return asc.slice().reverse().map((n) => [n]);
+      case 'updown': return [...asc, ...asc.slice(1, -1).reverse()].map((n) => [n]);
+      case 'downup': {
+        const desc = asc.slice().reverse();
+        return [...desc, ...desc.slice(1, -1).reverse()].map((n) => [n]);
+      }
+      case 'chord': return [asc.slice()];
+      default: return asc.map((n) => [n]);
+    }
+  },
   // Scales, chords and snap-to-key. Same tables the C++ preludes are generated from, so a script
   // that quantises to dorian gets the same note whether the window is open or shut. An unknown
   // name returns undefined rather than guessing "major" — asking for something this build does not
@@ -1383,7 +1592,9 @@ function sendRawMidi(bytes, actionId) {
 // is what makes them identical in every runtime and every exported language. `note` accepts a MIDI
 // number or a name ("C3"), because a script that reads musically should be allowed to say so.
 const midiCh = (c) => midiInt(c, 1, 16) - 1;
-const midiNote = (n) => (typeof n === 'string' ? helpers.noteNumber(n) : midiInt(n, 0, 127));
+// noteNumber returns nil for a name it cannot read; sendNote still has to put a BYTE on the wire,
+// so an unreadable name becomes 0 here rather than an undefined slipping into a MIDI message.
+const midiNote = (n) => (typeof n === 'string' ? (helpers.noteNumber(n) ?? 0) : midiInt(n, 0, 127));
 
 /* --- the wire filters: interceptIn / interceptOut / feed --------------------------------------
  * ce.core.intercept filters a MODEL PATH. These filter the WIRE, and they are a different thing:

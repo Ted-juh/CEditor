@@ -2406,3 +2406,176 @@ Saying where it stops is what makes "complete" mean anything:
 The honest summary: **`ce.math` is 50 members and the sweep found one gap, which is now closed.**
 That is a much stronger claim than the two before it, because it comes from a different question —
 and if a later component ships a pure transform, this is the sweep that finds it.
+
+---
+
+## 37. `ce.music` in a key — the questions the Properties panel answers on your behalf
+
+`ce.music` was five verbs: `name`, `number`, `scale`, `chord`, `quantize`. Every one of them
+answers a question about a note or a shape **on its own**. What a note *is* — what chord the key
+implies, which degree you played, how the key spells its own accidentals — was never askable.
+
+That is exactly the Properties-panel bar this march is measured against. Set a Chord Pad's key to
+F minor and it draws `B♭m` on the fourth pad and labels it `iv`. Set a Harmoniser's voice leading
+to *closest* and it picks an inversion from what you played last. Set an Arpeggiator to *updown*
+and it walks the notes without repeating the endpoints. Each of those is a **stored property**
+computed by a component that keeps the answer to itself. A script sitting next to that component
+could not ask any of them, and — this is the part that matters — could not even *print the same
+label*, because it had one spelling table and the panel had two.
+
+**No audio is involved and none is assumed.** Everything below is integer pitch arithmetic and
+strings: MIDI note numbers in, MIDI note numbers and labels out. Note↔Hz, tuning, cents,
+temperament and microtuning are deliberately absent — they are the shape this module would take in
+a program that made sound, and this one does not.
+
+### The bug the sweep found first
+
+`number()` could not read a flat.
+
+```
+noteNumber("C4")  = 60      noteNumber("C#4") = 61
+noteNumber("Eb4") = 0       noteNumber("E♭4") = 0       noteNumber("Bb2") = 0
+```
+
+The regex was `^([A-G]#?)(-?\d+)$` — sharps only, ASCII only — and the failure branch returned
+**0**. 0 is a real MIDI note (C-1). So a panel that *printed* `E♭4` and a script that read it back
+disagreed by three octaves and a tone, and nothing anywhere said so: `sendNote(1, "Eb4", 100)`
+played the bottom of the keyboard, silently, in every runtime.
+
+It is now four spellings in and nothing out:
+
+- `Eb4`, `E♭4`, `D#4`, `D♯4` all read 63.
+- A flat lowers below the **letter**, so `Cb4` is 59 — the B underneath — not 61.
+- An unreadable name returns **nothing**. `sendNote` still has to put a byte on the wire, so the
+  MIDI path substitutes 0 there and only there; the verb itself stays honest.
+
+`name()` gained the other half. With no second argument it keeps this module's plain-ASCII
+spelling (`C#4`) — what every script written so far compares against, and what `number()` has
+always round-tripped. **Given** a second argument it switches to the *panel's* table:
+`name(63, true)` is `E♭4` and `name(61, false)` is `C♯4`, from the same `NOTE_FLAT`/`NOTE_SHARP`
+the Chord Pad and Harmoniser print from. The test that pins this walks all 128 notes through both
+tables and asserts each one reads back — the check that would have caught the original bug on the
+day it shipped.
+
+### The eight new verbs
+
+| namespaced | flat | what it answers |
+|---|---|---|
+| `ce.music.spelling(root [, scale])` | `noteSpelling` | does this key write flats? |
+| `ce.music.inScale(note, root [, scale])` | `inScale` | is this note in the key? |
+| `ce.music.degree(note, root [, scale])` | `scaleDegree` | which degree is it — 1 for the tonic |
+| `ce.music.degreeChord(root, scale, degree [, size])` | `degreeChord` | the chord the key builds there |
+| `ce.music.quality(notes)` | `chordQuality` | name a chord from its notes |
+| `ce.music.lead(notes, previous [, mode])` | `voiceLead` | re-voice for least movement |
+| `ce.music.octaves(notes [, octaves])` | `expandOctaves` | spread a set up N octaves |
+| `ce.music.arp(notes, pattern)` | `arpOrder` | the walk a pattern describes |
+
+**`spelling` is the one that makes the rest agree with the screen.** It is the Chord Pad's
+`useFlats`: judged by the **relative major**, so C minor spells E♭/A♭ rather than D♯/G♯. Composed
+with `name` it is what a script does with it:
+
+```lua
+local flats = ce.music.spelling(60, "minor")
+ce.ui.label("pad1", ce.music.name(63, flats))       -- "E♭4", the same characters the pad draws
+```
+
+**`degree` is 1-based, and a note outside the key has none.** The Harmoniser numbers its degrees
+from 0 internally; the API does not, because a musician counting degrees starts at I. The refusal
+matters more than the offset: rounding an out-of-key note to "the nearest degree" is how a wrong
+note becomes a plausible chord. `quantize` is the verb that rounds, on purpose, and it is one call
+away.
+
+**`degreeChord` is the one `chord` cannot be.** `chord(62, "major")` is D major wherever you build
+it — an absolute shape you name. `degreeChord(60, "major", 2)` is D **minor**, because in C the key
+decides the third. It stacks scale thirds the way the Chord Pad does and returns the whole record:
+
+```lua
+local v = ce.music.degreeChord(60, "major", 5)
+-- v.notes = {67,71,74}   v.name = "G"   v.roman = "V"   v.quality = "maj"
+-- v.offsets = {7,11,14}  v.names = {"G","B","D"}  v.rootNote = 67  v.degree = 5
+ce.music.degreeChord(60, "minor", 3).roman   --> "♭III", the wheel's own convention
+ce.music.degreeChord("F4", "minor", 4).name  --> "B♭m", not "A♯m"
+```
+
+`size` is how many thirds to stack — 3 a triad, 4 a seventh — and a degree past the top of the
+scale keeps going an octave up rather than failing, so degree 8 is the I above.
+
+**`quality` is the inverse of `chord`**, in the panel's vocabulary (`maj`, `min`, `dim`, `aug`,
+`sus2`, `sus4`, `maj7`, `dom7`, `min7`, `minMaj7`, `dim7`, `m7b5`). It reads intervals above the
+**lowest** note, so it takes a chord from `chord`, from `degreeChord`, or one built by hand. An
+inversion honestly gets a different name — `[64,67,72]` read from E is a minor sixth, not a C
+major — and that is pinned, so nobody "fixes" it into root detection.
+
+**`lead` is the Harmoniser's voice leading.** `closest` minimises the total movement of every
+voice; `smooth` minimises the **top** voice only, holding a melody still while the inner voices
+jump; `off` returns root position. With no previous chord there is nothing to lead from and the
+chord comes back untouched, which is what makes the first chord of a phrase predictable. A tie
+keeps the lower candidate, so five runtimes cannot pick five different inversions.
+
+**`octaves` and `arp` are the Arpeggiator's two halves.** `octaves` drops anything that would land
+above 127 rather than clamping — clamping stacks strays on one pitch, which sounds like a stuck key
+rather than like nothing. `arp` returns a list of **steps**, each a list of notes, so `chord` (one
+step, everything at once) has the same shape as the rest. Notes are taken in the order given, which
+is what makes `asPlayed` mean anything. `random` returns the input order, exactly as the panel's
+arpeggiator does — it draws its step at play time — and that is pinned rather than left implicit,
+because a script expecting a shuffled *walk* would otherwise get a rising one and blame the seed.
+`ce.math.shuffle` is the verb that shuffles, and it is seeded and therefore repeatable.
+
+### Where the tables come from
+
+`QUALITY_SUFFIX`, `ROMAN`, the minor-quality and minor-scale sets, both spelling tables and the
+flat-key list moved into `scripting/musicTheory.js` and are now **generated** into all three C++
+preludes alongside `__CE_SCALES`/`__CE_CHORDS`. Same rule as phase 7, one notch milder: a mistyped
+semitone is a wrong note, and a mistyped note *name* is a label that disagrees with the Chord Pad
+drawn beside it. Both are silent, and both are copies of a table the app already has — so neither
+is copied.
+
+### What executing the preludes found
+
+Cross-runtime agreement was extended to 100+ music fixtures, and Python stopped being checked by
+name alone: `scriptPreludeAgreement.test.js` now **executes** the Python prelude when `python3` is
+on the machine. The first run of it found a shipped defect:
+
+```python
+def set(path, value, opts=None):        # ce.core's write verb...
+    ...
+inKey = set((base + x) % 12 for x in s)  # ...shadows the builtin for the whole namespace
+```
+
+`quantizeNote` raised `TypeError: set() missing 1 required positional argument` on **every call**
+in the Python engine. Invisible to name parity, invisible to reading the code, and only findable by
+running it. Fixed, and the reason is written at the site so the next generator expression does not
+reach for `set()` either.
+
+A second divergence was caught before it shipped: `0 || 3` is 3 in JavaScript and Python and **0**
+in Lua, so neither `degree` nor `size` may lean on falsiness. All four runtimes now route those
+through an explicit `__count(value, fallback)`, and `degreeChord(60, "major", 3, 0)` is a two-note
+stack in every one of them.
+
+### How it is tested
+
+Three layers, and only the first two existed for `ce.music` before:
+
+1. **Cross-runtime** — `scriptPreludeAgreement.test.js` runs every fixture through the Lua, JS and
+   Python preludes and compares against the WebView. Proves the five runtimes agree.
+2. **Per engine** — `ScriptRuntimeTests.cpp` §37 pins the labels through the real engines, because
+   a panel that reads `E♭m` in the editor and `D♯m` in the export is the failure mode.
+3. **Against the components themselves** — `scriptMusic.test.js` imports `useFlats`,
+   `stackedChord`, `degreeChord`, `chordQuality`, `romanNumeral`, `scalePitchClasses`, `inScale`,
+   `leadVoicing`, `orderNotes` and `expandOctaves` and asserts the verbs equal **them**, over every
+   scale × every key × every degree × both chord sizes. Layers 1 and 2 prove the runtimes agree
+   with each other; only this one proves they agree with the *panel*. Five runtimes can be
+   consistently wrong together, and against a spelling table that is precisely what would happen.
+
+### What is deliberately still absent
+
+- **Note↔Hz, tuning, cents, temperament, microtuning.** There is no audio in the program. These
+  are the shape this module would take in one that made sound.
+- **Chord *inversion* as a verb.** `lead` picks an inversion for a musical reason. "Give me the
+  second inversion" is a rotation a script can write in a line, and Q10 says the module does not
+  own it.
+- **Chord progressions, cadence detection, key detection from played notes.** Not something any
+  component computes, so there is no panel answer to agree with — and inventing one here would put
+  a second opinion in the module rather than the panel's.
+- **The Chord Pad's `voicing` (close/spread/drop2) and the wheel geometry.** Component behaviour
+  reached through `ce.components.chordPad`, not pitch arithmetic.

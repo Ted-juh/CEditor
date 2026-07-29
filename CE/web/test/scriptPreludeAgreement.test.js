@@ -45,7 +45,30 @@ const CASES = [
   ['lerp', [0, 10, 0.25]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
+  // The panel's spelling, selected by the second argument being PRESENT — so all three states
+  // (absent, true, false) are cases, not just the two values.
+  ['noteName', [63, true]], ['noteName', [61, false]], ['noteName', [63, false]], ['noteName', [-1, true]],
   ['noteNumber', ['C3']], ['noteNumber', ['A#4']], ['noteNumber', ['nonsense']],
+  // Every accidental spelling the panel can print, plus the two that must be REFUSED. "Eb4"
+  // returning 0 rather than nothing is how a misspelling used to play C-1 in silence.
+  ['noteNumber', ['C♯4']], ['noteNumber', ['Eb4']], ['noteNumber', ['E♭4']],
+  ['noteNumber', ['Db-1']], ['noteNumber', ['Cb3']], ['noteNumber', ['Fb4']],
+  ['noteNumber', ['B#3']], ['noteNumber', ['H4']], ['noteNumber', ['C']],
+  ['noteNumber', [60]],
+  ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
+  ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
+  ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
+  ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],
+  ['scaleDegree', [60, 60, 'major']], ['scaleDegree', [67, 60, 'major']],
+  ['scaleDegree', [61, 60, 'major']], ['scaleDegree', [70, 60, 'minor']],
+  ['scaleDegree', [67, 60, 'bogus']],
+  ['chordQuality', [[60, 64, 67]]], ['chordQuality', [[60, 63, 67]]], ['chordQuality', [[60, 63, 70]]],
+  ['chordQuality', [[60, 63, 66]]], ['chordQuality', [[60, 63, 66, 69]]], ['chordQuality', [[60, 63, 66, 70]]],
+  ['chordQuality', [[60, 64, 68]]], ['chordQuality', [[60, 62, 67]]], ['chordQuality', [[60, 65, 67]]],
+  ['chordQuality', [[60, 64, 67, 71]]], ['chordQuality', [[60, 64, 67, 70]]], ['chordQuality', [[60, 63, 67, 71]]],
+  // Inverted and out of order — the quality is read from the LOWEST note, so both must still name
+  // a chord rather than depending on how the caller happened to build the list.
+  ['chordQuality', [[67, 60, 64]]], ['chordQuality', [[]]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
   ['from7bit', [[1, 0], 'msb']], ['from7bit', [[1, 0], 'lsb']], ['from7bit', [[1, 0]]],
   ['fromNibbles', [0xA, 0xB]],
@@ -69,6 +92,33 @@ const STRUCT_CASES = [
   ['toNibbles', [0xAB]],
   ['nibblize', [[0xAB, 0xCD]]], ['denibblize', [[0xA, 0xB, 0xC, 0xD]]],
   ['toAscii', ['Hi', 4]],
+  ['scaleNotes', [60, 'dorian']], ['scaleNotes', [60]], ['scaleNotes', [60, 'bogus']],
+  ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
+  ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
+  // degreeChord returns a whole record — name, roman numeral, spelling and notes — so every field
+  // is compared, which is where a per-runtime table lookup would show up.
+  ['degreeChord', [60, 'major', 1]], ['degreeChord', [60, 'major', 5]],
+  ['degreeChord', [60, 'major', 7]], ['degreeChord', [60, 'major', 5, 4]],
+  ['degreeChord', [60, 'minor', 2]], ['degreeChord', [60, 'minor', 6, 4]],
+  ['degreeChord', ['F4', 'minor', 4]], ['degreeChord', [60, 'harmonicMinor', 5, 4]],
+  ['degreeChord', [60, 'pentatonicMin', 2]],
+  // Past the end of the scale, and the argument defaults — 0 and a missing size are where
+  // `0 || 3` (3 in JS and Python, 0 in Lua) would have silently disagreed.
+  ['degreeChord', [60, 'major', 8]], ['degreeChord', [60, 'major', 0]],
+  ['degreeChord', [60, 'major', 3, 0]], ['degreeChord', [60, 'bogus', 1]],
+  ['voiceLead', [[60, 64, 67], [59, 62, 67]]],
+  ['voiceLead', [[60, 64, 67], [59, 62, 67], 'smooth']],
+  ['voiceLead', [[60, 64, 67], [59, 62, 67], 'off']],
+  ['voiceLead', [[60, 64, 67], []]],
+  ['voiceLead', [[65, 69, 72], [60, 64, 67]]],
+  ['voiceLead', [[62, 65, 69, 72], [60, 64, 67]]],
+  ['expandOctaves', [[60, 64, 67], 2]], ['expandOctaves', [[67, 60, 64]]],
+  ['expandOctaves', [[120, 124], 2]], ['expandOctaves', [[60], 9]],
+  ['arpOrder', [[60, 64, 67], 'up']], ['arpOrder', [[60, 64, 67], 'down']],
+  ['arpOrder', [[60, 64, 67], 'updown']], ['arpOrder', [[60, 64, 67], 'downup']],
+  ['arpOrder', [[60, 64, 67], 'chord']], ['arpOrder', [[60, 64, 67], 'random']],
+  ['arpOrder', [[60, 64, 67], 'asPlayed']], ['arpOrder', [[60, 64], 'updown']],
+  ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
 ];
 
 const near = (a, b) => (typeof a === 'number' && typeof b === 'number'
@@ -174,6 +224,10 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
     assert.equal(got.length, all.length, 'expected one serialised result per case');
     all.forEach(([fn, args], i) => {
       const want = canonical(web[fn](...args));
+      // An empty Lua table IS an empty map and an empty list at the same time — the language has no
+      // way to tell them apart, so the serialiser prints "{}" for both. That is a fact about Lua,
+      // not a disagreement about the value, and it is the only allowance made here.
+      if (want === '[]' && got[i] === '{}') return;
       assert.equal(got[i], want,
         `Lua prelude ${fn}(${JSON.stringify(args)}) = ${got[i]}, WebView = ${want}`);
     });
@@ -254,6 +308,70 @@ function canonical(v) {
   const keys = Object.keys(v).sort();
   return `{${keys.map((k) => `${JSON.stringify(k)}:${canonical(v[k])}`).join(',')}}`;
 }
+
+/* --------------------------------------------------------------------------- Python prelude */
+
+// Python used to be checked by NAME only, on the grounds that CPython is not guaranteed in a node
+// test run. That grounds is real but the conclusion was too weak: where python3 IS on the box, the
+// prelude can be executed for free, and the first run of it found quantizeNote raising TypeError on
+// every call — because the prelude defines its own `set(path, value)`, which shadows the builtin
+// `set` for the whole namespace, and quantizeNote was calling `set(<generator>)`. That is invisible
+// to name parity, invisible to a reading of the code, and shipped.
+//
+// So: run it when python3 is there, skip with a reason when it is not. PythonScriptEngineTests.cpp
+// still covers the engine itself where CPython definitely exists.
+const PY_DRIVER = `
+import sys, json
+# The prelude opens with "import ceditor as __api" — the native bridge. Any object may stand in
+# for a module in sys.modules, and none of the pure helpers touch it.
+class _Bridge:
+    def __getattr__(self, name): return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+# The host binds these before the prelude runs; the prelude CALLS on() at load time to arm after(),
+# so leaving them out fails the whole prelude rather than the helper under test.
+for name in ["log", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+out = []
+for fn, args in payload["cases"]:
+    if fn not in g:
+        out.append({"missing": fn})
+    else:
+        try: out.append({"value": g[fn](*args)})
+        except Exception as err: out.append({"error": type(err).__name__ + ": " + str(err)})
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+
+test('the Python engine prelude computes what the WebView runtime computes', async (t) => {
+  const { spawnSync } = await import('node:child_process');
+  const probe = spawnSync('python3', ['-c', 'pass'], { encoding: 'utf8' });
+  if (probe.error || probe.status !== 0) {
+    t.skip('python3 is not on this machine — PythonScriptEngineTests.cpp covers the prelude there');
+    return;
+  }
+
+  const all = [...CASES, ...STRUCT_CASES];
+  const run = spawnSync('python3', ['-c', PY_DRIVER], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), cases: all }),
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+
+  const got = JSON.parse(run.stdout);
+  assert.equal(got.length, all.length, 'expected one result per case');
+  all.forEach(([fn, args], i) => {
+    assert.equal(got[i].missing, undefined, `${fn} missing from the Python prelude`);
+    assert.equal(got[i].error, undefined,
+      `Python prelude ${fn}(${JSON.stringify(args)}) raised ${got[i].error}`);
+    // Canonicalise both sides the same way, so this compares VALUES rather than how each language
+    // happens to print a float or order a dict's keys.
+    assert.equal(canonical(got[i].value ?? null), canonical(web[fn](...args) ?? null),
+      `Python prelude ${fn}(${JSON.stringify(args)}) disagrees with the WebView runtime`);
+  });
+});
 
 /* -------------------------------------------------------------- the generated ce.* namespace */
 

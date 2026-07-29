@@ -614,18 +614,40 @@ end
 
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
-function noteName(n) n = math.floor(n) return NOTE_NAMES[(n % 12) + 1] .. tostring(math.floor(n / 12) - 1) end
+local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
+-- A flat lowers below the LETTER, so Cb is the B under C — one octave down, not up.
+local __FLAT_LETTER = { C = 11, D = 1, E = 3, F = 4, G = 6, A = 8, B = 10 }
+-- Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
+-- plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
+-- the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+function noteName(n, flats)
+  n = math.floor(n)
+  local tbl = NOTE_NAMES
+  if flats ~= nil then if flats then tbl = __CE_NOTE_FLAT else tbl = __CE_NOTE_SHARP end end
+  return tbl[__m12(n) + 1] .. tostring(math.floor(n / 12) - 1)
+end
+-- Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a real
+-- MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
 function noteNumber(name)
-  local note, oct = string.match(name, "^([A-G]#?)(-?%d+)$")
-  if not note then return 0 end
-  for i, nm in ipairs(NOTE_NAMES) do if nm == note then return (tonumber(oct) + 1) * 12 + (i - 1) end end
-  return 0
+  local s = string.gsub(tostring(name), "♯", "#")
+  s = string.gsub(s, "♭", "b")
+  local letter, acc, oct = string.match(s, "^([A-G])([#b]?)(-?%d+)$")
+  if not letter then return nil end
+  local pc = nil
+  if acc == "b" then
+    pc = __FLAT_LETTER[letter]
+  else
+    for i, nm in ipairs(NOTE_NAMES) do if nm == (letter .. acc) then pc = i - 1 break end end
+  end
+  if pc == nil then return nil end
+  local o = tonumber(oct) + 1
+  if acc == "b" and letter == "C" then o = o - 1 end
+  return o * 12 + pc
 end
 
 -- BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 -- @module ce.music
 __CE_SCALES = {}
-__CE_CHORDS = {}
 __CE_SCALES["major"] = {0,2,4,5,7,9,11}
 __CE_SCALES["minor"] = {0,2,3,5,7,8,10}
 __CE_SCALES["harmonicMinor"] = {0,2,3,5,7,8,11}
@@ -638,6 +660,7 @@ __CE_SCALES["locrian"] = {0,1,3,5,6,8,10}
 __CE_SCALES["pentatonicMaj"] = {0,2,4,7,9}
 __CE_SCALES["pentatonicMin"] = {0,3,5,7,10}
 __CE_SCALES["blues"] = {0,3,5,6,7,10}
+__CE_CHORDS = {}
 __CE_CHORDS["major"] = {0,4,7}
 __CE_CHORDS["minor"] = {0,3,7}
 __CE_CHORDS["dim"] = {0,3,6}
@@ -658,12 +681,52 @@ __CE_CHORDS["add9"] = {0,4,7,14}
 __CE_CHORDS["dom9"] = {0,4,7,10,14}
 __CE_CHORDS["maj9"] = {0,4,7,11,14}
 __CE_CHORDS["min9"] = {0,3,7,10,14}
+__CE_NOTE_SHARP = {"C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"}
+__CE_NOTE_FLAT = {"C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"}
+__CE_FLAT_KEYS = {}
+__CE_FLAT_KEYS[5] = true
+__CE_FLAT_KEYS[10] = true
+__CE_FLAT_KEYS[3] = true
+__CE_FLAT_KEYS[8] = true
+__CE_FLAT_KEYS[1] = true
+__CE_FLAT_KEYS[6] = true
+__CE_MINOR_SCALES = {}
+__CE_MINOR_SCALES["dorian"] = true
+__CE_MINOR_SCALES["harmonicMinor"] = true
+__CE_MINOR_SCALES["locrian"] = true
+__CE_MINOR_SCALES["melodicMinor"] = true
+__CE_MINOR_SCALES["minor"] = true
+__CE_MINOR_SCALES["pentatonicMin"] = true
+__CE_MINOR_SCALES["phrygian"] = true
+__CE_QUALITY_SUFFIX = {}
+__CE_QUALITY_SUFFIX["maj"] = ""
+__CE_QUALITY_SUFFIX["min"] = "m"
+__CE_QUALITY_SUFFIX["dim"] = "°"
+__CE_QUALITY_SUFFIX["aug"] = "+"
+__CE_QUALITY_SUFFIX["sus2"] = "sus2"
+__CE_QUALITY_SUFFIX["sus4"] = "sus4"
+__CE_QUALITY_SUFFIX["maj7"] = "maj7"
+__CE_QUALITY_SUFFIX["dom7"] = "7"
+__CE_QUALITY_SUFFIX["min7"] = "m7"
+__CE_QUALITY_SUFFIX["m7b5"] = "m7♭5"
+__CE_QUALITY_SUFFIX["dim7"] = "°7"
+__CE_QUALITY_SUFFIX["minMaj7"] = "mMaj7"
+__CE_ROMAN = {"I","II","III","IV","V","VI","VII"}
+__CE_MINOR_QUALITIES = {}
+__CE_MINOR_QUALITIES["dim"] = true
+__CE_MINOR_QUALITIES["dim7"] = true
+__CE_MINOR_QUALITIES["m7b5"] = true
+__CE_MINOR_QUALITIES["min"] = true
+__CE_MINOR_QUALITIES["min7"] = true
+__CE_MINOR_QUALITIES["minMaj7"] = true
 -- END GENERATED music tables
 
 -- Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 -- or a name ("C4"), the way sendNote does. An unknown scale or chord name returns nil rather than
 -- guessing "major" — a script that asked for something this build does not know should find out.
-local function __pitch(v) if type(v) == "string" then return noteNumber(v) end return math.floor(tonumber(v) or 0) end
+-- noteNumber is nil for a name it cannot read; __pitch feeds scaleNotes and friends, where a nil
+-- root would turn one bad string into an unexplained nil list. noteNumber itself stays honest.
+local function __pitch(v) if type(v) == "string" then return noteNumber(v) or 0 end return math.floor(tonumber(v) or 0) end
 local function __steps(tbl, name, fallback)
   local s = tbl[name == nil and fallback or tostring(name)]
   return s
@@ -695,6 +758,214 @@ function quantizeNote(note, root, scale)
     if inKey[(n - d) % 12] then return n - d end
   end
   return n
+end
+
+-- Key, degree and voicing. Everything above answers a question about a note or a shape on its own;
+-- these answer questions about a note IN A KEY, which is what the Chord Pad, the Harmoniser and the
+-- Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
+-- chord and the panel labelling the same chord have to agree or the panel contradicts itself.
+-- A count argument that is not a finite number falls back to its default. Written out rather than
+-- leaning on falsiness, because `0 or 3` is 3 in JavaScript and Python and 0 in Lua.
+local function __count(v, fallback)
+  local n = tonumber(v)
+  if n == nil or n ~= n or n == math.huge or n == -math.huge then return fallback end
+  return math.floor(n)
+end
+local function __sortedNotes(list)
+  local out = {}
+  if type(list) == "table" then
+    for i = 1, #list do local v = tonumber(list[i]) if v then out[#out + 1] = v end end
+  end
+  table.sort(out)
+  return out
+end
+function noteSpelling(root, scale)
+  local nm = (scale == nil) and "major" or tostring(scale)
+  if __CE_SCALES[nm] == nil then return nil end
+  local pc = __m12(__pitch(root))
+  -- Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
+  if __CE_MINOR_SCALES[nm] then pc = __m12(pc + 3) end
+  return __CE_FLAT_KEYS[pc] == true
+end
+function inScale(note, root, scale)
+  local s = __steps(__CE_SCALES, scale, "major")
+  if s == nil then return nil end
+  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  for i = 1, #s do if __m12(base + s[i]) == pc then return true end end
+  return false
+end
+-- 1 for the tonic, 5 for the dominant. A note OUTSIDE the key has NO degree and gets nil rather
+-- than the nearest one — rounding here turns a wrong note into a plausible chord, and quantizeNote
+-- is the verb that rounds on purpose.
+function scaleDegree(note, root, scale)
+  local s = __steps(__CE_SCALES, scale, "major")
+  if s == nil then return nil end
+  local base, pc = __m12(__pitch(root)), __m12(__pitch(note))
+  for i = 1, #s do if __m12(base + s[i]) == pc then return i end end
+  return nil
+end
+-- Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
+-- chordNotes, in the vocabulary the Chord Pad labels with.
+function chordQuality(notes)
+  if type(notes) ~= "table" or #notes == 0 then return nil end
+  local list = {}
+  for i = 1, #notes do local v = tonumber(notes[i]) if v then list[#list + 1] = v end end
+  if #list == 0 then return nil end
+  table.sort(list)
+  local iv = {}
+  for i = 1, #list do iv[__m12(list[i] - list[1])] = true end
+  local third = iv[3] and "min" or iv[4] and "maj" or iv[2] and "sus2" or iv[5] and "sus4" or ""
+  local fifth = iv[7] and "p5" or iv[6] and "d5" or iv[8] and "a5" or ""
+  local seventh = iv[10] and "m7" or iv[11] and "M7" or ((iv[9] and fifth == "d5") and "d7") or ""
+  if third == "min" and fifth == "d5" then
+    if seventh == "m7" then return "m7b5" elseif seventh == "d7" then return "dim7" else return "dim" end
+  end
+  if third == "maj" and fifth == "a5" then return "aug" end
+  if third == "min" then
+    if seventh == "m7" then return "min7" elseif seventh == "M7" then return "minMaj7" else return "min" end
+  end
+  if third == "maj" then
+    if seventh == "m7" then return "dom7" elseif seventh == "M7" then return "maj7" else return "maj" end
+  end
+  if third == "sus2" then return "sus2" end
+  if third == "sus4" then return "sus4" end
+  return "maj"
+end
+-- A roman numeral for a chord root, spelled against the MAJOR scale so borrowed degrees read as
+-- ♭III / ♭VI / ♭VII the way the Chord Pad's wheel labels them.
+local function __roman(rootSemitone, quality)
+  local semi = __m12(rootSemitone)
+  local best, acc = 1, ""
+  for d = 1, 7 do
+    local diff = __m12(semi - __CE_SCALES["major"][d])
+    if diff == 0 then best = d acc = "" break end
+    if diff == 11 then best = d acc = "♭"
+    elseif diff == 1 and acc == "" then best = d acc = "♯" end
+  end
+  local r = __CE_ROMAN[best]
+  if __CE_MINOR_QUALITIES[quality] then r = string.lower(r) end
+  if quality == "dim" or quality == "dim7" or quality == "m7b5" then r = r .. "°" end
+  if quality == "aug" then r = r .. "+" end
+  return acc .. r
+end
+-- The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
+-- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
+function degreeChord(root, scale, degree, size)
+  local nm = (scale == nil) and "major" or tostring(scale)
+  local s = __CE_SCALES[nm]
+  if s == nil or #s == 0 then return nil end
+  local n = #s
+  local d = __count(degree, 1) - 1
+  local sz = math.max(2, __count(size, 3))
+  local offsets = {}
+  for k = 0, sz - 1 do
+    local idx = d + k * 2
+    offsets[k + 1] = s[(idx % n) + 1] + math.floor(idx / n) * 12
+  end
+  local base = __pitch(root)
+  local quality = chordQuality(offsets)
+  local tbl = noteSpelling(root, nm) and __CE_NOTE_FLAT or __CE_NOTE_SHARP
+  local notes, names = {}, {}
+  for i = 1, #offsets do
+    notes[i] = base + offsets[i]
+    names[i] = tbl[__m12(notes[i]) + 1]
+  end
+  return {
+    degree = d + 1, rootNote = notes[1], quality = quality,
+    name = names[1] .. (__CE_QUALITY_SUFFIX[quality] or ""),
+    roman = __roman(offsets[1], quality),
+    offsets = offsets, notes = notes, names = names,
+  }
+end
+-- Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
+-- seventh), so pairing by index would compare nonsense.
+local function __motion(a, b)
+  local sum = 0
+  for i = 1, #a do
+    local best = math.huge
+    for j = 1, #b do local d = math.abs(a[i] - b[j]) if d < best then best = d end end
+    sum = sum + best
+  end
+  return sum
+end
+-- Re-voice a chord so it moves as little as possible from the one before it — the Harmoniser's
+-- voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
+-- melody still), "off" returns root position. No previous chord means nothing to lead from.
+function voiceLead(notes, previous, mode)
+  local chord, prev = __sortedNotes(notes), __sortedNotes(previous)
+  local how = (mode == nil) and "closest" or tostring(mode)
+  if #chord == 0 or #prev == 0 or how == "off" then return chord end
+  local cands = { chord }
+  local span = math.max(1, #chord - 1) * 2
+  local cur = chord
+  for _ = 1, span do
+    local nx = {}
+    for i = 2, #cur do nx[#nx + 1] = cur[i] end
+    nx[#nx + 1] = cur[1] + 12
+    table.sort(nx) cands[#cands + 1] = nx cur = nx
+  end
+  cur = chord
+  for _ = 1, span do
+    local nx = { cur[#cur] - 12 }
+    for i = 1, #cur - 1 do nx[#nx + 1] = cur[i] end
+    table.sort(nx) cands[#cands + 1] = nx cur = nx
+  end
+  local best, bestScore = chord, math.huge
+  for c = 1, #cands do
+    local cand = cands[c]
+    local ok = true
+    for i = 1, #cand do if cand[i] < 0 or cand[i] > 127 then ok = false break end end
+    if ok then
+      local score
+      if how == "smooth" then score = math.abs(cand[#cand] - prev[#prev]) else score = __motion(cand, prev) end
+      -- Strictly less, so a tie keeps the earlier (lower) candidate in every runtime.
+      if score < bestScore then bestScore = score best = cand end
+    end
+  end
+  return best
+end
+-- The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
+-- clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
+function expandOctaves(notes, octaves)
+  local base = __sortedNotes(notes)
+  local oc = math.max(1, math.min(4, __count(octaves, 1)))
+  local out = {}
+  for o = 0, oc - 1 do
+    for i = 1, #base do
+      local v = math.floor(base[i])
+      if v < 0 then v = 0 elseif v > 127 then v = 127 end
+      v = v + o * 12
+      if v <= 127 then out[#out + 1] = v end
+    end
+  end
+  return out
+end
+-- The walk a pattern describes, as a list of STEPS — each step a list of notes, so "chord" (one
+-- step, everything at once) has the same shape as the rest. Notes are taken in the order given,
+-- which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
+-- panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
+function arpOrder(notes, pattern)
+  local asc = {}
+  if type(notes) == "table" then for i = 1, #notes do asc[i] = notes[i] end end
+  local n = #asc
+  if n == 0 then return {} end
+  local p = tostring(pattern)
+  if p == "chord" then return { asc } end
+  local seq = {}
+  if p == "down" then
+    for i = n, 1, -1 do seq[#seq + 1] = asc[i] end
+  elseif p == "updown" then
+    for i = 1, n do seq[#seq + 1] = asc[i] end
+    for i = n - 1, 2, -1 do seq[#seq + 1] = asc[i] end       -- no repeated endpoints
+  elseif p == "downup" then
+    for i = n, 1, -1 do seq[#seq + 1] = asc[i] end
+    for i = 2, n - 1 do seq[#seq + 1] = asc[i] end
+  else
+    for i = 1, n do seq[#seq + 1] = asc[i] end
+  end
+  local out = {}
+  for i = 1, #seq do out[i] = { seq[i] } end
+  return out
 end
 -- @module ce.midi
 function to14bit(v) v = math.floor(v) return { msb = math.floor(v / 128) % 128, lsb = v % 128 } end
@@ -886,7 +1157,9 @@ end
 -- allowed to say so.
 local function __ch(c) c = math.floor(tonumber(c) or 1); if c < 1 then c = 1 elseif c > 16 then c = 16 end return c - 1 end
 local function __7(v) v = math.floor(tonumber(v) or 0); if v < 0 then v = 0 elseif v > 127 then v = 127 end return v end
-local function __note(n) if type(n) == "string" then return noteNumber(n) end return __7(n) end
+-- noteNumber is nil for an unreadable name; a MIDI message still needs a BYTE, so it becomes 0
+-- here rather than a nil slipping into a message.
+local function __note(n) if type(n) == "string" then return noteNumber(n) or 0 end return __7(n) end
 
 -- A duration schedules the note off. Every script that plays a note was otherwise hand-rolling a
 -- timer for it, and getting that wrong means a hung voice — the one MIDI mistake you hear rather
@@ -1175,7 +1448,7 @@ local __CE_MODULES = {
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
-  ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
+  ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
   ["ce.ui"] = { dialog = "uiDialog", notify = "uiNotify", status = "uiStatus" },
@@ -1217,7 +1490,7 @@ local __CE_META = {
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.7", runtime = "any" },
-  { id = "ce.music", version = "1.1", runtime = "any" },
+  { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
   { id = "ce.ui", version = "1.1", runtime = "webview" },

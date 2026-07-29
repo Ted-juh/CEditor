@@ -37,7 +37,7 @@ export const SCALE_LABELS = {
   locrian: 'Locrian', pentatonicMaj: 'Major pentatonic', pentatonicMin: 'Minor pentatonic', blues: 'Blues',
 };
 // Scales whose tonic triad is minor (used for spelling + the wheel's relative major).
-const MINOR_ISH = new Set(['minor', 'harmonicMinor', 'melodicMinor', 'dorian', 'phrygian', 'locrian', 'pentatonicMin']);
+export const MINOR_ISH = new Set(['minor', 'harmonicMinor', 'melodicMinor', 'dorian', 'phrygian', 'locrian', 'pentatonicMin']);
 
 export function chordPadConfig(control) {
   return control?._children?.ChordPad ?? {};
@@ -54,9 +54,11 @@ export function chordPadLayout(control) {
 
 // Flat vs sharp spelling: flat keys read better with flats. Keyed off the
 // RELATIVE MAJOR so C minor spells E♭/A♭ rather than D♯/G♯.
+// The major keys that are written with flats: F B♭ E♭ A♭ D♭ G♭.
+export const FLAT_KEY_PCS = [5, 10, 3, 8, 1, 6];
 export function useFlats(keyPc, scaleName) {
   const relMajor = MINOR_ISH.has(String(scaleName)) ? mod12(keyPc + 3) : mod12(keyPc);
-  return [5, 10, 3, 8, 1, 6].includes(relMajor);   // F B♭ E♭ A♭ D♭ G♭
+  return FLAT_KEY_PCS.includes(relMajor);
 }
 export function noteName(pc, flats = true) {
   return (flats ? NOTE_FLAT : NOTE_SHARP)[mod12(pc)];
@@ -105,8 +107,8 @@ export const QUALITY_SUFFIX = {
   maj: '', min: 'm', dim: '°', aug: '+', sus2: 'sus2', sus4: 'sus4',
   maj7: 'maj7', dom7: '7', min7: 'm7', m7b5: 'm7♭5', dim7: '°7', minMaj7: 'mMaj7',
 };
-const MINOR_QUALITIES = new Set(['min', 'min7', 'dim', 'dim7', 'm7b5', 'minMaj7']);
-const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+export const MINOR_QUALITIES = new Set(['min', 'min7', 'dim', 'dim7', 'm7b5', 'minMaj7']);
+export const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
 // A roman numeral for a chord root, spelled relative to the MAJOR scale so
 // borrowed degrees read as ♭III / ♭VI / ♭VII.
 export function romanNumeral(rootSemitone, quality) {

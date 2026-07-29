@@ -626,13 +626,32 @@ function randomChoice(values, weights) {
 
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
-function noteName(n) { n = Math.floor(n); return __NOTES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); }
-function noteNumber(name) { var m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; var i = __NOTES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; }
+function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
+// A flat lowers below the LETTER, so Cb is the B under C — one octave down, not up.
+var __FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
+// Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
+// plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
+// the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+function noteName(n, flats) {
+  n = Math.floor(n);
+  var tbl = (flats === undefined || flats === null) ? __NOTES : (flats ? __CE_NOTE_FLAT : __CE_NOTE_SHARP);
+  return tbl[__m12(n)] + (Math.floor(n / 12) - 1);
+}
+// Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is UNDEFINED, not 0 — 0 is a
+// real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
+function noteNumber(name) {
+  var m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b"));
+  if (!m) return undefined;
+  var pc = m[2] === "b" ? __FLAT_LETTER[m[1]] : __NOTES.indexOf(m[1] + m[2]);
+  if (pc === undefined || pc < 0) return undefined;
+  var oct = parseInt(m[3], 10) + ((m[2] === "b" && m[1] === "C") ? 0 : 1);
+  return oct * 12 + pc;
+}
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 // @module ce.music
-var __CE_SCALES = {};
-var __CE_CHORDS = {};
+var __CE_SCALES, __CE_CHORDS, __CE_NOTE_SHARP, __CE_NOTE_FLAT, __CE_FLAT_KEYS, __CE_MINOR_SCALES, __CE_QUALITY_SUFFIX, __CE_ROMAN, __CE_MINOR_QUALITIES;
+__CE_SCALES = {};
 __CE_SCALES["major"] = [0,2,4,5,7,9,11];
 __CE_SCALES["minor"] = [0,2,3,5,7,8,10];
 __CE_SCALES["harmonicMinor"] = [0,2,3,5,7,8,11];
@@ -645,6 +664,7 @@ __CE_SCALES["locrian"] = [0,1,3,5,6,8,10];
 __CE_SCALES["pentatonicMaj"] = [0,2,4,7,9];
 __CE_SCALES["pentatonicMin"] = [0,3,5,7,10];
 __CE_SCALES["blues"] = [0,3,5,6,7,10];
+__CE_CHORDS = {};
 __CE_CHORDS["major"] = [0,4,7];
 __CE_CHORDS["minor"] = [0,3,7];
 __CE_CHORDS["dim"] = [0,3,6];
@@ -665,12 +685,52 @@ __CE_CHORDS["add9"] = [0,4,7,14];
 __CE_CHORDS["dom9"] = [0,4,7,10,14];
 __CE_CHORDS["maj9"] = [0,4,7,11,14];
 __CE_CHORDS["min9"] = [0,3,7,10,14];
+__CE_NOTE_SHARP = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯","B"];
+__CE_NOTE_FLAT = ["C","D♭","D","E♭","E","F","G♭","G","A♭","A","B♭","B"];
+__CE_FLAT_KEYS = {};
+__CE_FLAT_KEYS[5] = true;
+__CE_FLAT_KEYS[10] = true;
+__CE_FLAT_KEYS[3] = true;
+__CE_FLAT_KEYS[8] = true;
+__CE_FLAT_KEYS[1] = true;
+__CE_FLAT_KEYS[6] = true;
+__CE_MINOR_SCALES = {};
+__CE_MINOR_SCALES["dorian"] = true;
+__CE_MINOR_SCALES["harmonicMinor"] = true;
+__CE_MINOR_SCALES["locrian"] = true;
+__CE_MINOR_SCALES["melodicMinor"] = true;
+__CE_MINOR_SCALES["minor"] = true;
+__CE_MINOR_SCALES["pentatonicMin"] = true;
+__CE_MINOR_SCALES["phrygian"] = true;
+__CE_QUALITY_SUFFIX = {};
+__CE_QUALITY_SUFFIX["maj"] = "";
+__CE_QUALITY_SUFFIX["min"] = "m";
+__CE_QUALITY_SUFFIX["dim"] = "°";
+__CE_QUALITY_SUFFIX["aug"] = "+";
+__CE_QUALITY_SUFFIX["sus2"] = "sus2";
+__CE_QUALITY_SUFFIX["sus4"] = "sus4";
+__CE_QUALITY_SUFFIX["maj7"] = "maj7";
+__CE_QUALITY_SUFFIX["dom7"] = "7";
+__CE_QUALITY_SUFFIX["min7"] = "m7";
+__CE_QUALITY_SUFFIX["m7b5"] = "m7♭5";
+__CE_QUALITY_SUFFIX["dim7"] = "°7";
+__CE_QUALITY_SUFFIX["minMaj7"] = "mMaj7";
+__CE_ROMAN = ["I","II","III","IV","V","VI","VII"];
+__CE_MINOR_QUALITIES = {};
+__CE_MINOR_QUALITIES["dim"] = true;
+__CE_MINOR_QUALITIES["dim7"] = true;
+__CE_MINOR_QUALITIES["m7b5"] = true;
+__CE_MINOR_QUALITIES["min"] = true;
+__CE_MINOR_QUALITIES["min7"] = true;
+__CE_MINOR_QUALITIES["minMaj7"] = true;
 // END GENERATED music tables
 
 // Scales, chords and snap-to-key, over the generated tables above. `root`/`note` take a MIDI number
 // or a name ("C4"), the way sendNote does. An unknown scale or chord name returns undefined rather
 // than guessing "major" — a script that asked for something this build does not know should find out.
-function __pitch(v) { return typeof v === "string" ? noteNumber(v) : Math.floor(Number(v) || 0); }
+// noteNumber is undefined for a name it cannot read; __pitch feeds scaleNotes and friends, where an
+// undefined root would turn one bad string into an unexplained undefined list.
+function __pitch(v) { if (typeof v !== "string") return Math.floor(Number(v) || 0); var n = noteNumber(v); return n === undefined ? 0 : n; }
 function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
 function scaleNotes(root, scale) {
   var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
@@ -691,6 +751,179 @@ function quantizeNote(note, root, scale) {
     if (inKey[(((n - d) % 12) + 12) % 12]) return n - d;
   }
   return n;
+}
+
+// Key, degree and voicing. Everything above answers a question about a note or a shape on its own;
+// these answer questions about a note IN A KEY, which is what the Chord Pad, the Harmoniser and the
+// Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
+// chord and the panel labelling the same chord have to agree or the panel contradicts itself.
+function noteSpelling(root, scale) {
+  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  if (!__CE_SCALES[nm]) return undefined;
+  var pc = __m12(__pitch(root));
+  // Judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯.
+  if (__CE_MINOR_SCALES[nm] === true) pc = __m12(pc + 3);
+  return __CE_FLAT_KEYS[pc] === true;
+}
+function inScale(note, root, scale) {
+  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
+  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return true;
+  return false;
+}
+// 1 for the tonic, 5 for the dominant. A note OUTSIDE the key has NO degree and gets undefined
+// rather than the nearest one — rounding here turns a wrong note into a plausible chord, and
+// quantizeNote is the verb that rounds on purpose.
+function scaleDegree(note, root, scale) {
+  var s = __steps(__CE_SCALES, scale, "major"); if (!s) return undefined;
+  var base = __m12(__pitch(root)), pc = __m12(__pitch(note));
+  for (var i = 0; i < s.length; i++) if (__m12(base + s[i]) === pc) return i + 1;
+  return undefined;
+}
+// Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
+// chordNotes, in the vocabulary the Chord Pad labels with.
+function chordQuality(notes) {
+  var list = __sortedNotes(notes);
+  if (!list.length) return undefined;
+  var iv = {};
+  for (var i = 0; i < list.length; i++) iv[__m12(list[i] - list[0])] = true;
+  var has = function (a) { return iv[a] === true; };
+  var third = has(3) ? "min" : has(4) ? "maj" : has(2) ? "sus2" : has(5) ? "sus4" : "";
+  var fifth = has(7) ? "p5" : has(6) ? "d5" : has(8) ? "a5" : "";
+  var seventh = has(10) ? "m7" : has(11) ? "M7" : (has(9) && fifth === "d5") ? "d7" : "";
+  if (third === "min" && fifth === "d5") return seventh === "m7" ? "m7b5" : seventh === "d7" ? "dim7" : "dim";
+  if (third === "maj" && fifth === "a5") return "aug";
+  if (third === "min") return seventh === "m7" ? "min7" : seventh === "M7" ? "minMaj7" : "min";
+  if (third === "maj") return seventh === "m7" ? "dom7" : seventh === "M7" ? "maj7" : "maj";
+  if (third === "sus2") return "sus2";
+  if (third === "sus4") return "sus4";
+  return "maj";
+}
+// A roman numeral for a chord root, spelled against the MAJOR scale so borrowed degrees read as
+// ♭III / ♭VI / ♭VII the way the Chord Pad's wheel labels them.
+function __roman(rootSemitone, quality) {
+  var semi = __m12(rootSemitone), best = 0, acc = "";
+  for (var d = 0; d < 7; d++) {
+    var diff = __m12(semi - __CE_SCALES["major"][d]);
+    if (diff === 0) { best = d; acc = ""; break; }
+    if (diff === 11) { best = d; acc = "♭"; }
+    else if (diff === 1 && acc === "") { best = d; acc = "♯"; }
+  }
+  var r = __CE_ROMAN[best];
+  if (__CE_MINOR_QUALITIES[quality] === true) r = r.toLowerCase();
+  if (quality === "dim" || quality === "dim7" || quality === "m7b5") r += "°";
+  if (quality === "aug") r += "+";
+  return acc + r;
+}
+// The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
+// scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
+function degreeChord(root, scale, degree, size) {
+  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var s = __CE_SCALES[nm];
+  if (!s || !s.length) return undefined;
+  var n = s.length;
+  var d = __count(degree, 1) - 1;
+  var sz = Math.max(2, __count(size, 3));
+  var offsets = [];
+  for (var k = 0; k < sz; k++) {
+    var idx = d + k * 2;
+    offsets.push(s[(((idx % n) + n) % n)] + Math.floor(idx / n) * 12);
+  }
+  var base = __pitch(root);
+  var quality = chordQuality(offsets);
+  var tbl = noteSpelling(root, nm) ? __CE_NOTE_FLAT : __CE_NOTE_SHARP;
+  var notes = [], names = [];
+  for (var i = 0; i < offsets.length; i++) { notes.push(base + offsets[i]); names.push(tbl[__m12(base + offsets[i])]); }
+  return {
+    degree: d + 1, rootNote: notes[0], quality: quality,
+    name: names[0] + (__CE_QUALITY_SUFFIX[quality] || ""),
+    roman: __roman(offsets[0], quality),
+    offsets: offsets, notes: notes, names: names
+  };
+}
+// A count argument that is not a finite number falls back to its default. Written out rather than
+// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
+function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
+function __sortedNotes(list) {
+  var out = [];
+  if (list && list.length !== undefined) {
+    for (var i = 0; i < list.length; i++) { var v = Number(list[i]); if (isFinite(v)) out.push(v); }
+  }
+  return out.sort(function (a, b) { return a - b; });
+}
+// Each voice to its NEAREST note in the other chord — voice counts differ (a triad following a
+// seventh), so pairing by index would compare nonsense.
+function __motion(a, b) {
+  var sum = 0;
+  for (var i = 0; i < a.length; i++) {
+    var best = Infinity;
+    for (var j = 0; j < b.length; j++) { var d = Math.abs(a[i] - b[j]); if (d < best) best = d; }
+    sum += best;
+  }
+  return sum;
+}
+// Re-voice a chord so it moves as little as possible from the one before it — the Harmoniser's
+// voice leading. "closest" minimises total movement, "smooth" the TOP voice only (which holds a
+// melody still), "off" returns root position. No previous chord means nothing to lead from.
+function voiceLead(notes, previous, mode) {
+  var chord = __sortedNotes(notes), prev = __sortedNotes(previous);
+  var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  if (!chord.length || !prev.length || how === "off") return chord;
+  var cands = [chord], span = Math.max(1, chord.length - 1) * 2, cur = chord, i, nx;
+  for (i = 0; i < span; i++) {
+    nx = cur.slice(1); nx.push(cur[0] + 12); nx.sort(function (a, b) { return a - b; });
+    cands.push(nx); cur = nx;
+  }
+  cur = chord;
+  for (i = 0; i < span; i++) {
+    nx = [cur[cur.length - 1] - 12].concat(cur.slice(0, -1)); nx.sort(function (a, b) { return a - b; });
+    cands.push(nx); cur = nx;
+  }
+  var best = chord, bestScore = Infinity;
+  for (var c = 0; c < cands.length; c++) {
+    var cand = cands[c], ok = true;
+    for (i = 0; i < cand.length; i++) if (cand[i] < 0 || cand[i] > 127) { ok = false; break; }
+    if (!ok) continue;
+    var score = how === "smooth"
+      ? Math.abs(cand[cand.length - 1] - prev[prev.length - 1])
+      : __motion(cand, prev);
+    // Strictly less, so a tie keeps the earlier (lower) candidate in every runtime.
+    if (score < bestScore) { bestScore = score; best = cand; }
+  }
+  return best;
+}
+// The Arpeggiator's octave expansion. Anything landing above 127 is DROPPED rather than clamped:
+// clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.
+function expandOctaves(notes, octaves) {
+  var base = __sortedNotes(notes);
+  var oc = Math.max(1, Math.min(4, __count(octaves, 1)));
+  var out = [];
+  for (var o = 0; o < oc; o++) {
+    for (var i = 0; i < base.length; i++) {
+      var v = Math.floor(base[i]);
+      v = v < 0 ? 0 : (v > 127 ? 127 : v);
+      v += o * 12;
+      if (v <= 127) out.push(v);
+    }
+  }
+  return out;
+}
+// The walk a pattern describes, as a list of STEPS — each step a list of notes, so "chord" (one
+// step, everything at once) has the same shape as the rest. Notes are taken in the order given,
+// which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
+// panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
+function arpOrder(notes, pattern) {
+  var asc = (notes && notes.length !== undefined) ? Array.prototype.slice.call(notes) : [];
+  if (!asc.length) return [];
+  var p = String(pattern), seq, i;
+  if (p === "chord") return [asc];
+  if (p === "down") { seq = asc.slice().reverse(); }
+  else if (p === "updown") { seq = asc.concat(asc.slice(1, -1).reverse()); }   // no repeated endpoints
+  else if (p === "downup") { var desc = asc.slice().reverse(); seq = desc.concat(desc.slice(1, -1).reverse()); }
+  else { seq = asc.slice(); }
+  var out = [];
+  for (i = 0; i < seq.length; i++) out.push([seq[i]]);
+  return out;
 }
 // @module ce.midi
 function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
@@ -883,7 +1116,9 @@ function logError(message, value) { return __api.logAt("error", String(message),
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
 function __ch(c) { c = Math.floor(Number(c) || 1); return (c < 1 ? 1 : (c > 16 ? 16 : c)) - 1; }
 function __7(v) { v = Math.floor(Number(v) || 0); return v < 0 ? 0 : (v > 127 ? 127 : v); }
-function __note(n) { return typeof n === "string" ? noteNumber(n) : __7(n); }
+// noteNumber is undefined for an unreadable name; a MIDI message still needs a BYTE, so it becomes
+// 0 here rather than an undefined slipping into a message.
+function __note(n) { return typeof n === "string" ? (noteNumber(n) === undefined ? 0 : noteNumber(n)) : __7(n); }
 
 // A duration schedules the note off — otherwise every script that plays a note hand-rolls a timer,
 // and getting that wrong means a hung voice, the one MIDI mistake you hear rather than read.
@@ -1194,7 +1429,7 @@ var __CE_MODULES = {
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
-  "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
+  "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
   "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
   "ce.ui": { "dialog": "uiDialog", "notify": "uiNotify", "status": "uiStatus" },
@@ -1231,7 +1466,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.7","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.3","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

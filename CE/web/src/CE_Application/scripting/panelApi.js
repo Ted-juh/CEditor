@@ -1817,8 +1817,19 @@ export const HELPERS = [
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
   // disagreed by an octave: a script written from the manual transposed everything twelve
   // semitones. The code is right and stays; the wording is what was wrong.
-  { id: 'noteName', category: 'Music', signature: 'noteName(n)', summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C).' },
-  { id: 'noteNumber', category: 'Music', signature: 'noteNumber(name)', summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4.' },
+  {
+    id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
+    summary: 'MIDI note number → name, e.g. 60 → "C4" (middle C). With `flats` omitted you get this module\'s plain-ASCII spelling ("C#4") — what noteNumber has always round-tripped. Pass `flats` and you get the PANEL\'s spelling instead, from the same table the Chord Pad, Harmoniser and Arpeggiator print from: true → "E♭4", false → "C♯4". `ce.music.spelling` answers which one a key wants.',
+    params: [
+      { name: 'n', type: 'number', required: true },
+      { name: 'flats', type: 'boolean', required: false },
+    ],
+  },
+  {
+    id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
+    summary: 'Note name → MIDI number, e.g. "C4" → 60. Middle C is C4. Reads all four spellings — "C#4", "C♯4", "Db4", "D♭4" — so a name the panel PRINTED can be read back. A name it cannot read returns nothing: 0 is a real note (C-1), so returning it for a misspelling meant a typo played a wrong note in silence.',
+    params: [{ name: 'name', type: 'string', required: true }],
+  },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
   // tables are the panel's OWN: a script asking for "dorian" and a Chord Pad set to "dorian" mean
   // the same seven notes, because there is one table (scripting/musicTheory.js) generated into
@@ -1846,6 +1857,77 @@ export const HELPERS = [
       { name: 'note', type: 'value', required: true },
       { name: 'root', type: 'value', required: true },
       { name: 'scale', type: 'string', required: false },
+    ],
+  },
+  // Key, degree and voicing — phase 12. The three verbs above answer questions about a note or a
+  // shape in isolation; these answer questions about a note IN A KEY, which is what the Chord Pad,
+  // the Harmoniser and the Arpeggiator each compute for themselves and no script could reach. Every
+  // one is the panel's own algorithm rather than a second opinion: a script naming a chord and the
+  // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
+  {
+    id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
+    summary: 'Does this key write its accidentals as flats? F, B♭, E♭, A♭, D♭ and G♭ do — judged by the RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯, exactly as the Chord Pad does. Pass the answer to noteName and a script\'s labels match the panel\'s without having to decide anything. An unknown scale returns nothing.',
+    params: [
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
+    summary: 'Is this note in the key? Octave-blind, like every key question — C2 and C5 are both the tonic of C. `scale` defaults to "major"; an unknown name returns nothing.',
+    params: [
+      { name: 'note', type: 'value', required: true },
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
+    summary: 'Which degree of the key a note is: 1 for the tonic, 5 for the dominant. A note OUTSIDE the key has no degree and returns nothing rather than the nearest one — rounding here is what turns a wrong note into a plausible chord, and quantizeNote is the verb that rounds on purpose.',
+    params: [
+      { name: 'note', type: 'value', required: true },
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
+    summary: 'The chord the key builds ON a degree, by stacking scale thirds — the Chord Pad\'s own construction. Degrees are 1-based like scaleDegree\'s, so degreeChord(60, "major", 5) is the V. `size` is how many thirds to stack: 3 a triad (default), 4 a seventh. Past the top of the scale it keeps going an octave up. Returns { degree, rootNote, quality, name, roman, offsets, notes, names } — `notes` the MIDI notes, `offsets` semitones from `root`, `name` the chord spelled in the key ("E♭m7"), `roman` its numeral with borrowed degrees written ♭III / ♭VI / ♭VII. This is the one chordNotes cannot answer: chordNotes builds an absolute shape you name, this one derives which shape the key implies.',
+    params: [
+      { name: 'root', type: 'value', required: true },
+      { name: 'scale', type: 'string', required: true },
+      { name: 'degree', type: 'number', required: true },
+      { name: 'size', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
+    summary: 'Name a chord from the notes in it: [60, 63, 70] → "min7". Reads intervals above the lowest note, so it takes a chord from chordNotes, from degreeChord, or one a script built by hand — the inverse of chordNotes. The vocabulary is the panel\'s (maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7, m7b5), so a chord this names and a chord the Chord Pad labels agree.',
+    params: [{ name: 'notes', type: 'list', required: true }],
+  },
+  {
+    id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
+    summary: 'Re-voice a chord so it moves as little as possible from the one before it — the Harmoniser\'s voice leading, for any script that sends chords. "closest" (default) minimises the total movement of all voices; "smooth" minimises the TOP voice only, holding a melody still while the inner voices jump; "off" returns root position. With no previous chord there is nothing to lead from, so the chord comes back untouched — which is also what makes the first chord of a phrase predictable. Candidates that leave 0..127 are skipped, and a tie keeps the lower one so the answer is the same in every runtime.',
+    params: [
+      { name: 'notes', type: 'list', required: true },
+      { name: 'previous', type: 'list', required: true },
+      { name: 'mode', type: 'string', required: false },
+    ],
+  },
+  {
+    id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
+    summary: 'The same note set repeated up over `octaves` octaves (1..4), ascending — the Arpeggiator\'s own expansion, the step before arpOrder. Anything that would land above 127 is DROPPED rather than clamped: clamping stacks strays on one pitch, which sounds like a stuck key rather than like nothing.',
+    params: [
+      { name: 'notes', type: 'list', required: true },
+      { name: 'octaves', type: 'number', required: false },
+    ],
+  },
+  {
+    id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
+    summary: 'The walk an arpeggiator pattern describes, as a list of STEPS — each step a list of notes, so "chord" (one step, everything at once) has the same shape as the rest. Patterns: up, down, updown, downup, asPlayed, random, chord. Notes are taken in the order given, which is what makes "asPlayed" mean anything — call expandOctaves or sort first for a rising walk. "updown" and "downup" do not repeat the endpoints. "random" returns the input order, exactly as the panel\'s arpeggiator does (it draws its step at play time); for a shuffled walk use ce.math.shuffle, which is seeded and therefore repeatable.',
+    params: [
+      { name: 'notes', type: 'list', required: true },
+      { name: 'pattern', type: 'string', required: true },
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
@@ -1922,8 +2004,8 @@ export const MODULES = [
   // is right to want it declared.
   { id: 'ce.math', version: '1.7', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
-  { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
+  { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
+    summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key IMPLIES: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
   { id: 'ce.time', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Musical time: tempo, transport position, beat/bar events, and timers — plain or beat-synced.' },
   { id: 'ce.anim', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -2026,7 +2108,10 @@ const MODULE_MEMBERS = {
                smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape',
                euclid: 'euclid' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
-                scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
+                scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote',
+                spelling: 'noteSpelling', inScale: 'inScale', degree: 'scaleDegree',
+                degreeChord: 'degreeChord', quality: 'chordQuality', lead: 'voiceLead',
+                octaves: 'expandOctaves', arp: 'arpOrder' },
   'ce.anim': {
     to: 'animateTo', spring: 'animateSpring', stop: 'animateStop', running: 'animateRunning',
   },
