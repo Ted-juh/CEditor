@@ -318,6 +318,31 @@ the editor the parameter table arrives over the async bridge and is cached, so a
 returns `[]`, requests the load, and says which of those two things happened. See §11 of
 `docs/scripting-modules-design.md` for why that asymmetry is preferred to making the verbs async.
 
+### Device writes — a synth the app has no profile for
+
+`ce.device.defineParameter(id, spec)` and `.defineDump(kind, spec)` declare structure at runtime.
+The spec carries its own wire format (a CC number, an NRPN pair, a SysEx template, a dump layout),
+so nothing in the path needs a profile: a declared parameter is compiled and sent as raw bytes, and
+a declared layout is matched against arriving SysEx. That is what lets a panel drive hardware the
+app has never heard of.
+
+The declarations live in `ScriptRuntime` (not in a host), reached through one host primitive,
+`deviceDefine(what, id, spec)`, with the role carried inside the spec — the same way `deviceQuery`
+carries it in its payload. `BridgeScriptHost` folds them into `deviceQuery("parameters")` and checks
+them first in `deviceWrite` and `requestDump`, so all three engines get the merge from one place.
+They are cleared by `loadScripts`, which is what stops a torn-down panel's declarations answering
+for the panel replacing it.
+
+`ce.device.ports()` is a sixth `deviceQuery` kind. `ce.device.bind` / `.unbind` are **panel-view
+only** — the binding lives on the control model — and are stubbed in the C++ engines like every
+other webview-only verb.
+
+`requestDump(kind, fn)` is assembled in each prelude over `__requestDump`, because the callback is a
+language value the host has no per-engine way to call back. The waiter is removed before the
+callback runs, and a waiter that hears nothing is resolved with `ok = false` via `after()` rather
+than left hanging — which is why `ce.device` now requires `ce.time`. See §29 of
+`docs/scripting-modules-design.md`.
+
 ### Modules, and what a panel opts into
 
 Every member above belongs to a module (`ce.midi`, `ce.math`, …) and is reachable both flat and

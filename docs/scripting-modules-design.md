@@ -1750,3 +1750,120 @@ The wiring itself:
 The general rule this earns: **a verb is not done when its runtime implements it, only when every
 host that claims it invokes it.** The parity suite checks that a name exists in each engine. Nothing
 checked that the app calls the engine, and for one commit that gap was the whole feature.
+
+---
+
+## 29. `ce.device` writes structure — the profile stops being read-only
+
+Ten verbs, all of them reads. The profile is a fixed thing the app was shipped with; a panel binds
+to parameters it already knows, at design time. Nothing could write structure — so a panel could
+only address a synth somebody had already written a profile for, which excludes most of what is
+actually in people's racks.
+
+```lua
+function onPanelBuild()
+  ce.device.defineParameter("cutoff", { name = "Cutoff", group = "Filter", min = 0, max = 127, cc = 74 })
+  ce.panel.create("Knob", { name = "cutoffKnob", x = 20, y = 40 })
+  ce.device.bind("cutoffKnob", "cutoff")
+end
+```
+
+| | |
+|---|---|
+| `ce.device.defineParameter(id, spec [, role])` | teach the app a parameter at runtime |
+| `ce.device.defineDump(kind, spec [, role])` | describe a SysEx layout at runtime |
+| `ce.device.bind(control, parameterId [, opts])` | wire a control to a parameter at runtime |
+| `ce.device.unbind(control [, port])` | and take it off again |
+| `ce.device.ports([opts])` | what is actually plugged in |
+| `ce.device.requestDump(kind [, fn [, opts]])` | the reply comes back to the caller |
+
+### A declaration is self-encoding, and that is the whole design
+
+`spec` carries its own wire format — `{ cc = 74 }`, `{ nrpn = { msb, lsb } }` or a SysEx template —
+so **nothing in the path needs a profile to exist**. A declared parameter is compiled and sent as
+raw bytes; a declared layout is matched against arriving SysEx and decoded by the same rules. That
+is what makes "a panel that wires itself to a synth nobody wrote a profile for" a real sentence
+rather than a slogan: discover, declare, create, bind, drive.
+
+`defineParameter` and `bind` are the pair that matter, and they only work as a pair. `ce.panel.create`
+could already make a control and nothing could connect it to anything, so a self-building panel built
+**dead controls** — and the tempting half-fix is worse than none, because a bound control that moves
+the picture and sends nothing looks wired. So `set()` on a control bound to a declared parameter
+compiles the declaration and sends it, on both runtimes, and both suites assert the bytes.
+
+### Refusing is a feature, twice
+
+- **A parameter with no wire format is refused.** A descriptor with no wire enumerates perfectly and
+  sends nothing, so the panel *looks* built; the failure surfaces later and somewhere else. An error
+  at declaration time is strictly better than a control that is quietly ornamental.
+- **A dump field naming an undeclared parameter is refused.** Deferring that to decode time means a
+  dump that decodes to fewer values than the author thinks — months later, in front of an audience.
+  The cost is a declaration order the script has to get right, which is a one-line fix.
+
+Both refusals are stated with the call that would fix them, because "invalid spec" is the message
+that teaches nothing.
+
+### What is reused, and the one thing deliberately not
+
+Decoding a dump reuses the local engine (`localParseDumpMessage`) verbatim, by handing it a
+synthetic profile built from the declarations: u7/u14/nibbled/ASCII values and roland-7bit/sum-7bit
+checksums are all already there, and a second decoder would drift from the first.
+
+Encoding is **not** reused. `localCompileParameter`'s `$checksum` token is a plain clamped sum,
+which is fine for an editor preview and wrong on the wire. A script-defined parameter is the real
+send, and this verb exists for old and obscure hardware — which is exactly the hardware that
+checksums. So the registry computes the checksum the device documents, and the SysEx template gained
+`$checksumStart`: a Roland checksum covers the **address and data**, not the manufacturer header,
+and no rule inferred from a template can know where the header stops. Marking it is learnable;
+guessing it is a message the synth rejects in silence.
+
+### `requestDump` closes the loop
+
+Fire-and-forget was the odd one out — `deviceRead` already answers where it is called, and a dump's
+answer turned up at `onDumpReceived` with nothing tying it to the request, so a panel that asked for
+two dumps in a row could not tell which reply was which. Three rules, each protecting against a
+specific way this shape goes wrong:
+
+1. The waiter is removed **before** the callback runs, so a throw inside it cannot leave one armed
+   for the next dump. Same rule `after()` follows, for the same reason.
+2. A waiter that never hears back is resolved with `ok = false` rather than left hanging. A synth
+   that is off, or that does not answer this request, is the common case.
+3. The callback runs **after** `onDumpReceived`, so "the dump arrived" and "the dump I asked for
+   arrived" cannot observe the panel in two different states.
+
+It is assembled in each prelude over `__requestDump`, not in the host: the callback is a language
+value, and a host holding one would need a per-engine way to call it back. That is also what makes
+`ce.device` require `ce.time` now — the timeout is `after()`, and the prelude-dependency test failed
+the moment the call appeared, which is the drift that rule exists to stop.
+
+### The runtime boundary
+
+`defineParameter`, `defineDump`, `ports` and the callback are **cross-runtime**: declaring is data
+plus a codec, and a synth with no profile is driven from a DAW with the window shut at least as
+often as from the editor. The declarations live in `ScriptRuntime` rather than in a host, for the
+reason `ce.anim` does: the same bytes have to leave from a scripted write and from a bound control's
+write, and the same layout has to decode an arriving dump. One owner, one answer.
+
+`bind` and `unbind` are **panel-view only** and say so individually — the binding lives on the
+control model, and there is none with the window shut. Same boundary `ce.panel.create` sits behind,
+which is the right place for it: the two verbs are used together or not at all.
+
+Declarations are script-lifetime. They are dropped before every `onPanelBuild` and on every
+`loadScripts`, which is what makes a build idempotent and what stops a declaration half-saving into
+the author's document — the same three-part rule generated controls follow in §13.
+
+### Three things this turned up
+
+- **`memberRuntime` takes a member, not an id.** A test asserting `memberRuntime('deviceBind')`
+  passed `'webview'`… no, it got `'any'` for every member, because the string has no `.runtime`. It
+  failed loudly here; the same mistake inside the generator would have silently declared every
+  webview-only verb cross-runtime and stubbed nothing.
+- **A panel-view-only verb still has a host.** `bind` first wrote through `updateControlProperty`,
+  which addresses the editor's control store — correct in the editor and a no-op in the exported
+  plugin's *open* window, which runs this same runtime with a host installed. `updateControls`
+  already had that split for `ce.panel`; the structure verbs need it too. "Panel view only" is not
+  "editor only", and the two have been confused before.
+- **The native ABI had no `device_write`.** It was never appended when §23 added the verb, so a
+  C++/C#/Java handler could read a parameter and not set one. `device_write` and `device_define`
+  were appended together rather than the new one alone: a handler that could declare a parameter and
+  not send one would build exactly the dead panel the whole section is about.

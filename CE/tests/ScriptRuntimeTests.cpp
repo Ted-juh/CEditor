@@ -86,7 +86,33 @@ public:
     juce::var loadSetting (const juce::String& key) override
     { auto it = settings.find (key); return it != settings.end() ? it->second : juce::var(); }
     void sendSysex (const juce::var&) override {}
-    void requestDump (const juce::String&) override {}
+
+    // requestDump / deviceDefine mirror what BridgeScriptHost does, because that is the behaviour a
+    // script sees: a layout the SCRIPT declared is asked for with its own request bytes and never
+    // reaches the profile path at all. (PlayerScriptIntegrationTests pins the real BridgeScriptHost
+    // doing this; here it keeps the prelude-level tests honest.)
+    juce::StringArray dumpRequests;
+    void requestDump (const juce::String& kind) override
+    {
+        if (runtime != nullptr && runtime->hasDeviceDump ("mainSynth", kind))
+        {
+            const auto bytes = runtime->deviceDumpRequest ("mainSynth", kind);
+            if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty()) { sendMidi (bytes); return; }
+        }
+        dumpRequests.add (kind);
+    }
+
+    bool deviceDefine (const juce::String& what, const juce::String& id, const juce::var& spec) override
+    {
+        if (runtime == nullptr) return false;
+        juce::String role = "mainSynth";
+        if (auto* o = spec.getDynamicObject())
+            if (o->getProperty ("role").toString().isNotEmpty()) role = o->getProperty ("role").toString();
+        if (what == "parameter") return runtime->defineDeviceParameter (role, id, spec);
+        if (what == "dump")      return runtime->defineDeviceDump (role, id, spec);
+        return false;
+    }
+
     void applyDump (const juce::var&) override {}
     void sendDump (const juce::String&) override {}
     juce::var buildDump (const juce::String&) override { return {}; }
@@ -102,6 +128,14 @@ public:
 
     bool deviceWrite (const juce::String& id, const juce::var& value, const juce::String& role) override
     {
+        // A parameter the script DECLARED carries its own wire format, so it is compiled and sent
+        // raw — the path that needs no profile, which is the whole point of defineParameter.
+        if (runtime != nullptr)
+        {
+            const auto bytes = runtime->encodeDeviceParameter (role.isEmpty() ? juce::String ("mainSynth") : role,
+                                                               id, value);
+            if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty()) { sendMidi (bytes); return true; }
+        }
         if (! deviceHost || id.isEmpty()) return false;
         deviceWrites.add (role + "/" + id + "=" + value.toString());
         deviceValues[role + "/" + id] = value;   // the real service updates runtime state on send
@@ -2002,6 +2036,161 @@ int main()
         runtime.runAction ("onSendNote", juce::var());
         check (host.rawSends.size() == 1, "sendNote without a duration sends one message");
         check (host.rawSends[0] == "90 3C 14", "…and it is the note on, unfiltered at this level");
+    }
+
+    // 34) ce.device declared: parameters, dump layouts, ports and the dump callback (design doc §29)
+    //
+    // The point of the whole section is a synth the app has NO profile for, so every check below is
+    // written against a parameter or a layout that exists nowhere but in the script.
+    {
+        // -- the registry, directly. Encoding is where a wrong answer is invisible until a synth
+        // ignores a message, so the bytes are asserted rather than the return value.
+        auto spec = [] (const char* json) { return juce::JSON::parse (json); };
+
+        check (runtime.defineDeviceParameter ("mainSynth", "cutoff",
+                   spec (R"({ "name": "Cutoff", "group": "Filter", "min": 0, "max": 100, "cc": 74, "channel": 3 })")),
+               "defineParameter accepts a CC parameter");
+        const auto ccBytes = runtime.encodeDeviceParameter ("mainSynth", "cutoff", 900);
+        check (ccBytes.getArray() != nullptr && ccBytes.getArray()->size() == 3
+                   && (int) (*ccBytes.getArray())[0] == 0xB2
+                   && (int) (*ccBytes.getArray())[1] == 74
+                   && (int) (*ccBytes.getArray())[2] == 100,
+               "…on its own channel, clamped to the parameter's own maximum, not the encoding's");
+
+        // A descriptor with no wire enumerates fine and sends nothing, so the panel LOOKS built.
+        // Refusing is the point.
+        check (! runtime.defineDeviceParameter ("mainSynth", "dead", spec (R"({ "name": "Dead", "max": 127 })")),
+               "a parameter with no wire format is refused");
+        check (! runtime.hasDeviceParameter ("mainSynth", "dead"), "…and is not registered");
+
+        // The Roland case: the checksum covers the ADDRESS AND DATA, and $checksumStart is what
+        // says where that starts. Summing the manufacturer header too is the classic silent failure.
+        check (runtime.defineDeviceParameter ("mainSynth", "sy", spec (
+                   R"({ "sysex": ["41","$deviceId","42","12","$checksumStart","03","00","01","00","$value","$checksum"],)"
+                   R"( "variables": { "deviceId": 16 }, "min": 0, "max": 127 })")),
+               "defineParameter accepts a sysex template");
+        const auto sy = runtime.encodeDeviceParameter ("mainSynth", "sy", 0x20);
+        const int sum = (0x03 + 0x00 + 0x01 + 0x00 + 0x20) % 128;
+        check (sy.getArray() != nullptr && sy.getArray()->size() == 12
+                   && (int) (*sy.getArray())[0] == 0xF0
+                   && (int) (*sy.getArray())[10] == (128 - sum) % 128
+                   && (int) (*sy.getArray())[11] == 0xF7,
+               "$checksumStart makes the Roland checksum right rather than nearly right");
+
+        check (! runtime.encodeDeviceParameter ("mainSynth", "notMine", 1).isArray(),
+               "encoding an undeclared parameter is void, so the caller falls through to the profile");
+
+        // -- dump layouts.
+        check (! runtime.defineDeviceDump ("mainSynth", "patch", spec (R"({ "fields": [{ "parameter": "nope" }] })")),
+               "a layout naming an undefined parameter is refused");
+        check (runtime.defineDeviceDump ("mainSynth", "patch", spec (
+                   R"({ "request": "f0 7d 00 f7", "match": { "prefix": ["f0","7d","01"], "suffix": ["f7"] },)"
+                   R"( "offset": 3, "fields": [{ "parameter": "cutoff", "offset": 0 }] })")),
+               "…and one naming a declared parameter is accepted");
+
+        const juce::var arriving (juce::Array<juce::var> { 0xF0, 0x7D, 0x01, 0x40, 0xF7 });
+        const auto decoded = runtime.matchDeviceDump ("mainSynth", arriving);
+        auto* decodedObj = decoded.getDynamicObject();
+        check (decodedObj != nullptr && decodedObj->getProperty ("kind").toString() == "patch",
+               "a declared layout matches an arriving dump");
+        if (decodedObj != nullptr)
+            if (auto* vals = decodedObj->getProperty ("values").getDynamicObject())
+                check ((int) vals->getProperty ("cutoff") == 0x40, "…and decodes the value at its offset");
+
+        const juce::var other (juce::Array<juce::var> { 0xF0, 0x7D, 0x02, 0x40, 0xF7 });
+        check (! runtime.matchDeviceDump ("mainSynth", other).isObject(),
+               "a message matching no declared layout is left alone");
+        check (! runtime.matchDeviceDump ("secondSynth", arriving).isObject(),
+               "declarations are per role — another role has none, so nothing matches");
+
+        // -- the same, driven from a script, in both always-on engines.
+        for (const char* lang : { "lua", "javascript" })
+        {
+            const bool isLua = juce::String (lang) == "lua";
+            juce::Array<juce::var> scripts;
+            scripts.add (makeScript ("dev", lang, "panel", "onBuild", "*", isLua
+                ? "function onBuild()\n"
+                  "  ce.device.defineParameter(\"vcf\", { name = \"VCF\", min = 0, max = 127, cc = 74 })\n"
+                  "  ce.device.defineDump(\"patch\", { request = { \"f0\", \"7d\", \"00\", \"f7\" },\n"
+                  "    match = { prefix = { \"f0\", \"7d\" } },\n"
+                  "    offset = 2, fields = { { parameter = \"vcf\", offset = 0 } } })\n"
+                  "end\n"
+                  "function onDrive() ce.device.write(\"vcf\", 64) end\n"
+                  "function onAsk() requestDump(\"patch\") end\n"
+                  "function onPorts() log(\"ports \" .. tostring(#ce.device.ports())) end\n"
+                  "function onWait()\n"
+                  "  requestDump(\"patch\", function(values, info)\n"
+                  "    log(\"back \" .. tostring(info.ok) .. \" \" .. tostring(values.vcf))\n"
+                  "  end)\n"
+                  "end\n"
+                : "function onBuild() {\n"
+                  "  ce.device.defineParameter(\"vcf\", { name: \"VCF\", min: 0, max: 127, cc: 74 });\n"
+                  "  ce.device.defineDump(\"patch\", { request: [\"f0\", \"7d\", \"00\", \"f7\"],\n"
+                  "    match: { prefix: [\"f0\", \"7d\"] },\n"
+                  "    offset: 2, fields: [{ parameter: \"vcf\", offset: 0 }] });\n"
+                  "}\n"
+                  "function onDrive() { ce.device.write(\"vcf\", 64); }\n"
+                  "function onAsk() { requestDump(\"patch\"); }\n"
+                  "function onPorts() { log(\"ports \" + ce.device.ports().length); }\n"
+                  "function onWait() {\n"
+                  "  requestDump(\"patch\", function(values, info) {\n"
+                  "    log(\"back \" + info.ok + \" \" + values.vcf);\n"
+                  "  });\n"
+                  "}\n"));
+            runtime.loadScripts (juce::var (scripts));      // also clears the declarations above
+            runtime.runAction ("onBuild", juce::var());
+            check (runtime.hasDeviceParameter ("mainSynth", "vcf"),
+                   juce::String (lang) + ": a script declared a parameter");
+            check (runtime.hasDeviceDump ("mainSynth", "patch"),
+                   juce::String (lang) + ": …and a dump layout");
+
+            // write() on a declared parameter goes out as raw bytes — no profile involved.
+            host.rawSends.clear();
+            host.deviceWrites.clear();
+            runtime.runAction ("onDrive", juce::var());
+            check (host.rawSends.size() == 1 && host.rawSends[0] == "B0 4A 40",
+                   juce::String (lang) + ": writing a declared parameter sends its own bytes");
+            check (host.deviceWrites.isEmpty(),
+                   juce::String (lang) + ": …and never reaches the profile's encoder");
+
+            // requestDump on a declared layout sends the layout's own request bytes.
+            host.rawSends.clear();
+            host.dumpRequests.clear();
+            runtime.runAction ("onAsk", juce::var());
+            check (host.rawSends.size() == 1 && host.rawSends[0] == "F0 7D 00 F7",
+                   juce::String (lang) + ": requestDump sends the declared request");
+            check (host.dumpRequests.isEmpty(),
+                   juce::String (lang) + ": …rather than falling through to the profile's sync");
+
+            // ports() reaches the host as a query kind, so one primitive still backs every read.
+            host.deviceQueries.clear();
+            runtime.runAction ("onPorts", juce::var());
+            check (host.deviceQueries.contains ("ports:"), juce::String (lang) + ": ports() is a deviceQuery kind");
+
+            // The callback: fire-and-forget was the odd one out, and this is the loop closing.
+            host.logs.clear();
+            runtime.runAction ("onWait", juce::var());
+            auto* values = new juce::DynamicObject();
+            values->setProperty ("vcf", 42);
+            auto* payload = new juce::DynamicObject();
+            payload->setProperty ("values", juce::var (values));
+            payload->setProperty ("kind", "patch");
+            payload->setProperty ("role", "mainSynth");
+            runtime.dispatchEvent ("onDumpReceived", "", juce::var (payload));
+            check (host.logs.contains ("back true 42"),
+                   juce::String (lang) + ": requestDump's callback got the dump it asked for");
+
+            // …once. A waiter that fired again on the next dump is the failure this ordering rule
+            // exists to prevent, and it only shows up on the SECOND dump.
+            host.logs.clear();
+            runtime.dispatchEvent ("onDumpReceived", "", juce::var (payload));
+            check (host.logs.isEmpty(), juce::String (lang) + ": …and is not armed for the next one");
+        }
+
+        // Reloading the script set drops the declarations with it: a parameter declared by the
+        // panel being torn down must not answer for the panel replacing it.
+        check (! runtime.hasDeviceParameter ("mainSynth", "cutoff"),
+               "loadScripts cleared the declarations the previous set made");
     }
 
     // extensionsFromPanel: the panel document is where the copies come from.

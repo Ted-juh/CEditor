@@ -567,11 +567,18 @@ export const COMMANDS = [
 
   /* --- Device / MIDI: bulk (Q9) --- */
   {
-    id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind)',
-    summary: 'Ask the synth to send a dump. kind ("patch"/"tone"/"global"…) is defined by the DPD.',
-    params: [{ name: 'kind', type: 'dumpKind', required: true }],
+    id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
+    summary: 'Ask the synth to send a dump. `kind` is defined by the DPD ("patch"/"tone"/"global"…) or declared by defineDump. With `fn`, the reply comes back to it — fn(values, info) — instead of only reaching onDumpReceived with nothing tying it to the request. `info.ok` is false when nothing arrived in time (`opts.timeout`, 3000ms by default), so a callback is never left hanging. fn runs AFTER onDumpReceived, so both see the same panel.',
+    params: [
+      { name: 'kind', type: 'dumpKind', required: true },
+      { name: 'fn', type: 'function', required: false },
+      { name: 'opts', type: 'object', required: false, fields: ['timeout'] },
+    ],
     scopes: 'any',
-    snippet: { lua: 'requestDump("${1:patch}")$0', javascript: 'requestDump("${1:patch}")$0' },
+    snippet: {
+      lua: 'requestDump("${1:patch}", function(values, info)\n  if info.ok then $0 end\nend)',
+      javascript: 'requestDump("${1:patch}", (values, info) => {\n  if (info.ok) { $0 }\n});',
+    },
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
@@ -1042,6 +1049,92 @@ export const COMMANDS = [
     snippet: {
       lua: 'if deviceConnected() then requestDump("patch") end$0',
       javascript: 'if (deviceConnected()) requestDump("patch");$0',
+    },
+  },
+
+  /* --- Device: declaring what the app was not shipped knowing (design doc §29) ---
+     Everything above READS a profile the app ships with. That is a hard ceiling: a panel can only
+     address a synth somebody already wrote a profile for, which excludes most of what is in
+     people's racks. These write the structure instead.
+
+     A declaration is SELF-ENCODING — the spec carries its own wire format — so nothing in the path
+     needs a profile to exist. defineParameter plus onPanelBuild plus bind is a panel that wires
+     itself to a synth nobody wrote a profile for.
+
+     Declarations are script-lifetime and are dropped before every onPanelBuild, which is what
+     makes a build idempotent and what stops one half-saving into the author's document. */
+  {
+    id: 'deviceDefineParameter', category: 'Device / MIDI',
+    signature: 'defineParameter(id, spec [, role]) -> boolean',
+    summary: 'Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
+    params: [
+      { name: 'id', type: 'string', required: true },
+      { name: 'spec', type: 'object', required: true, fields: ['name', 'group', 'type', 'min', 'max', 'access', 'cc', 'channel', 'nrpn', 'sysex', 'encoding', 'checksum', 'choices', 'variables'] },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.defineParameter("${1:cutoff}", { name = "Cutoff", group = "Filter", min = 0, max = 127, cc = ${2:74} })$0',
+      javascript: 'ce.device.defineParameter("${1:cutoff}", { name: "Cutoff", group: "Filter", min: 0, max: 127, cc: ${2:74} });$0',
+    },
+  },
+  {
+    id: 'deviceDefineDump', category: 'Device / MIDI',
+    signature: 'defineDump(kind, spec [, role]) -> boolean',
+    summary: 'Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
+    params: [
+      { name: 'kind', type: 'string', required: true },
+      { name: 'spec', type: 'object', required: true, fields: ['name', 'request', 'match', 'offset', 'size', 'checksum', 'fields'] },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.defineDump("${1:patch}", {\n  request = "f0 7d 00 f7",\n  match = { prefix = { "f0", "7d", "01" }, suffix = { "f7" } },\n  offset = 3,\n  fields = { { parameter = "${2:cutoff}", offset = 0 } },\n})$0',
+      javascript: 'ce.device.defineDump("${1:patch}", {\n  request: "f0 7d 00 f7",\n  match: { prefix: ["f0", "7d", "01"], suffix: ["f7"] },\n  offset: 3,\n  fields: [{ parameter: "${2:cutoff}", offset: 0 }],\n});$0',
+    },
+  },
+  {
+    id: 'deviceBind', category: 'Device / MIDI',
+    signature: 'bind(control, parameterId [, opts]) -> boolean',
+    // Panel view only for the same reason ce.panel.create is: the binding lives on the control
+    // model, and there is no control model with the window shut.
+    runtime: RUNTIME_WEBVIEW,
+    summary: 'Wire a control to a device parameter at runtime. ce.panel.create could already make a control and nothing could connect it to anything, so a self-building panel built dead controls; this is the other half of that pair. Replaces whatever was bound to the same port rather than adding a second binding, and switches DeviceBindings back on if the control had it off. `opts` takes { role, port }; port defaults to "value".',
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'parameterId', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['role', 'port'] },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.bind("${1:cutoffKnob}", "${2:cutoff}")$0',
+      javascript: 'ce.device.bind("${1:cutoffKnob}", "${2:cutoff}");$0',
+    },
+  },
+  {
+    id: 'deviceUnbind', category: 'Device / MIDI',
+    signature: 'unbind(control [, port]) -> boolean',
+    runtime: RUNTIME_WEBVIEW,
+    summary: 'Remove a control\'s device binding. Returns whether there was one to remove, so "already clean" reads differently from "cleaned up".',
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'port', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.unbind("${1:cutoffKnob}")$0',
+      javascript: 'ce.device.unbind("${1:cutoffKnob}");$0',
+    },
+  },
+  {
+    id: 'devicePorts', category: 'Device / MIDI', signature: 'ports([opts]) -> list',
+    summary: 'What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
+    requiresDeviceHost: true,
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['direction'] }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, p in ipairs(ce.device.ports({ direction = "out" })) do\n  if p.hardware then log(p.name) end\nend$0',
+      javascript: 'for (const p of ce.device.ports({ direction: "out" })) if (p.hardware) log(p.name);$0',
     },
   },
 
@@ -1622,8 +1715,15 @@ export const MODULES = [
   { id: 'ce.midi', version: '1.3', requires: ['ce.core', 'ce.music', 'ce.time'], runtime: RUNTIME_ANY,
     summary: 'MIDI in and out — notes (with an optional duration), programs, bend, aftertouch, clock, '
       + 'CC/NRPN/Sysex — plus wire filters, injection, routing, panic, checksums and the 7-bit/nibble/ASCII encoders.' },
-  { id: 'ce.device', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps. Needs the device host.' },
+  // MIXED, and for the same honest reason ce.panel is: declaring a parameter or a dump layout is
+  // data plus a codec and works window-closed, but binding a control to one needs a control model
+  // and there is none with the window shut. The two verbs say so individually.
+  // requires ce.time because requestDump's optional callback needs a timeout, and the timeout is
+  // after() — a ce.time member. Gating ce.time away would leave a callback that never resolves,
+  // which is precisely the hanging this closed. The prelude-dependency test caught it the moment
+  // the call appeared, which is the drift that rule exists to stop.
+  { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps — plus declaring a parameter, a dump layout or a binding for a synth the app has no profile for, and enumerating the ports that are really there. Needs the device host.' },
   { id: 'ce.math', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic, plus a seeded random. Pure — no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
@@ -1691,6 +1791,11 @@ const MODULE_MEMBERS = {
   'ce.device': {
     requestDump: 'requestDump', applyDump: 'applyDump', sendDump: 'sendDump', buildDump: 'buildDump',
     read: 'deviceRead', write: 'deviceWrite',
+    // The structure verbs. Namespaced they are plain words — ce.device.defineParameter reads as
+    // what it is — and flat they keep the `device` prefix, the same rule the reads follow: a bare
+    // global `bind` or `ports` is exactly the collision §1 warned about.
+    defineParameter: 'deviceDefineParameter', defineDump: 'deviceDefineDump',
+    bind: 'deviceBind', unbind: 'deviceUnbind', ports: 'devicePorts',
     // The reads drop the `device` prefix inside the namespace — ce.device.deviceProfile() stutters,
     // ce.device.profile() reads like what it is. The flat alias keeps the prefix because there it
     // is the only thing distinguishing it from a panel property.

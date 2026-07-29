@@ -605,46 +605,64 @@ private:
                 if (o == nullptr) return;
                 const auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
                 scriptRuntime->dispatchEvent ("onSysexIn", "", juce::var (bytes));  // bare byte array
+
+                // …and then the layouts the SCRIPT declared (ce.device.defineDump). onSysexIn fires
+                // either way: a declared layout ADDS a decoded reading, it does not take the raw one
+                // away, and a panel that handles both must see both. matchDeviceDump returns void
+                // when nothing is declared, so a panel that never called defineDump is untouched.
+                juce::String role = o->getProperty ("deviceRole").toString();
+                if (role.isEmpty()) role = "mainSynth";
+                const auto declared = scriptRuntime->matchDeviceDump (role, juce::var (bytes));
+                if (auto* d = declared.getDynamicObject())
+                    dispatchDumpReceived (d->getProperty ("values"), d->getProperty ("kind").toString(), role);
                 return;
             }
 
             if (name != "dumpMessageParsed") return;
             if (o == nullptr) return;
 
-            const auto values = o->getProperty ("values");
             juce::String role = o->getProperty ("deviceRole").toString();
             if (role.isEmpty()) role = "mainSynth";
             juce::String kind = o->getProperty ("dumpId").toString();
             if (kind.isEmpty()) kind = o->getProperty ("dumpName").toString();
-
-            // Fill the mirror: decoded { deviceParameterId: value } -> control path -> value.
-            if (auto* vobj = values.getDynamicObject())
-                for (const auto& prop : vobj->getProperties())
-                {
-                    const auto it = scriptDumpParamPaths.find (prop.name.toString());
-                    if (it != scriptDumpParamPaths.end()) scriptValues.setValue (it->second, prop.value);
-                }
-
-            // Inbound: set()s inside these handlers are silent by default.
-            ceditor::scripting::InboundScope inbound (*scriptRuntime);
-
-            // onDumpReceived({ values, kind, role }).
-            auto* sp = new juce::DynamicObject();
-            sp->setProperty ("values", values);
-            sp->setProperty ("kind", kind);
-            sp->setProperty ("role", role);
-            scriptRuntime->dispatchEvent ("onDumpReceived", "", juce::var (sp));
-
-            // onParameterReceived({ parameter, value }) — one per decoded parameter (the DPD payoff).
-            if (auto* vobj = values.getDynamicObject())
-                for (const auto& prop : vobj->getProperties())
-                {
-                    auto* pp = new juce::DynamicObject();
-                    pp->setProperty ("parameter", prop.name.toString());
-                    pp->setProperty ("value", prop.value);
-                    scriptRuntime->dispatchEvent ("onParameterReceived", "", juce::var (pp));
-                }
+            dispatchDumpReceived (o->getProperty ("values"), kind, role);
         });
+    }
+
+    /** One decoded dump, however it was decoded: by the device profile's codec, or by a layout the
+        script declared. Shared so the two cannot fill the panel or raise events differently — the
+        second decoder is the point at which "nearly the same" becomes a bug nobody can reproduce. */
+    void dispatchDumpReceived (const juce::var& values, const juce::String& kind, const juce::String& role)
+    {
+        if (scriptRuntime == nullptr) return;
+
+        // Fill the mirror: decoded { deviceParameterId: value } -> control path -> value.
+        if (auto* vobj = values.getDynamicObject())
+            for (const auto& prop : vobj->getProperties())
+            {
+                const auto it = scriptDumpParamPaths.find (prop.name.toString());
+                if (it != scriptDumpParamPaths.end()) scriptValues.setValue (it->second, prop.value);
+            }
+
+        // Inbound: set()s inside these handlers are silent by default.
+        ceditor::scripting::InboundScope inbound (*scriptRuntime);
+
+        // onDumpReceived({ values, kind, role }).
+        auto* sp = new juce::DynamicObject();
+        sp->setProperty ("values", values);
+        sp->setProperty ("kind", kind);
+        sp->setProperty ("role", role);
+        scriptRuntime->dispatchEvent ("onDumpReceived", "", juce::var (sp));
+
+        // onParameterReceived({ parameter, value }) — one per decoded parameter (the DPD payoff).
+        if (auto* vobj = values.getDynamicObject())
+            for (const auto& prop : vobj->getProperties())
+            {
+                auto* pp = new juce::DynamicObject();
+                pp->setProperty ("parameter", prop.name.toString());
+                pp->setProperty ("value", prop.value);
+                scriptRuntime->dispatchEvent ("onParameterReceived", "", juce::var (pp));
+            }
     }
 
     // Parse a hex string (spaced or unspaced, e.g. "B0 4A 64") into an array of byte values.
@@ -824,6 +842,60 @@ private:
 
             if (kind == "connected")
                 return juce::var (ready);
+
+            // ports() — what is actually plugged in. connected(role) only answers yes/no for a role
+            // somebody configured in advance; this enumerates the real ports, so a panel can offer
+            // a choice or notice a device that showed up. Both directions come back as one flat
+            // list with a `direction` field, because "everything I could reach" is the question,
+            // and `opts.direction` narrows it.
+            if (kind == "ports")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("direction").toString().toLowerCase()
+                                                 : juce::String();
+                juce::Array<juce::var> out;
+
+                const auto addAll = [&] (const juce::var& list, const char* dir, const char* mappingKey)
+                {
+                    auto* arr = list.getArray();
+                    if (arr == nullptr) return;
+                    for (const auto& item : *arr)
+                    {
+                        auto* src = item.getDynamicObject();
+                        if (src == nullptr) continue;
+                        const auto id = src->getProperty ("id").toString();
+                        const auto type = src->getProperty ("type").toString();
+
+                        // Which role is currently using this port, or "". A field rather than a
+                        // cross-reference the script has to build for itself.
+                        juce::String usedBy;
+                        if (auto* sessionRoles = session.getDynamicObject())
+                            for (const auto& entry : sessionRoles->getProperties())
+                                if (auto* rec = entry.value.getDynamicObject())
+                                    if (auto* port = rec->getProperty (mappingKey).getDynamicObject())
+                                        if (port->getProperty ("id").toString() == id)
+                                        { usedBy = entry.name.toString(); break; }
+
+                        auto* o = new juce::DynamicObject();
+                        o->setProperty ("id", id);
+                        o->setProperty ("name", src->getProperty ("name").toString());
+                        o->setProperty ("direction", dir);
+                        o->setProperty ("type", type);
+                        // The placeholder rows the service always lists are choices, not hardware.
+                        // Both are reported — they are what a mapping can be set to — but a script
+                        // asking "did a device show up" wants this flag, not a list of magic
+                        // type strings to compare against.
+                        o->setProperty ("hardware", type != "none" && type != "previewOnly");
+                        o->setProperty ("role", usedBy);
+                        out.add (juce::var (o));
+                    }
+                };
+
+                if (wanted != "out" && wanted != "output")
+                    addAll (deviceService.listMidiInputs(), "in", "midiInput");
+                if (wanted != "in" && wanted != "input")
+                    addAll (deviceService.listMidiDestinations(), "out", "midiDestination");
+                return juce::var (out);
+            }
 
             // The LAST KNOWN value — what the synth most recently told us, from a dump or a
             // parameter message. Not a live query: asking the synth is asynchronous and this verb

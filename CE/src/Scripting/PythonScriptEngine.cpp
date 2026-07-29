@@ -237,6 +237,14 @@ PyObject* api_applyDump (PyObject*, PyObject* args)
     PyObject* bytes = nullptr; if (! PyArg_ParseTuple (args, "O", &bytes)) return nullptr;
     g_host->applyDump (pyToVar (bytes)); Py_RETURN_NONE;
 }
+PyObject* api_deviceDefine (PyObject*, PyObject* args)
+{
+    const char* what = nullptr; const char* id = nullptr; PyObject* spec = nullptr;
+    if (! PyArg_ParseTuple (args, "ssO", &what, &id, &spec)) return nullptr;
+    const bool ok = g_host->deviceDefine (juce::String::fromUTF8 (what), juce::String::fromUTF8 (id),
+                                          pyToVar (spec));
+    return PyBool_FromLong (ok ? 1 : 0);
+}
 PyObject* api_sendDump (PyObject*, PyObject* args)
 {
     const char* kind = nullptr; if (! PyArg_ParseTuple (args, "s", &kind)) return nullptr;
@@ -397,6 +405,7 @@ PyMethodDef apiMethods[] = {
     { "forgetSetting", api_forgetSetting, METH_VARARGS, nullptr },
     { "requestDump",   api_requestDump,   METH_VARARGS, nullptr },
     { "applyDump",     api_applyDump,     METH_VARARGS, nullptr },
+    { "deviceDefine",  api_deviceDefine,  METH_VARARGS, nullptr },
     { "sendDump",      api_sendDump,      METH_VARARGS, nullptr },
     { "buildDump",     api_buildDump,     METH_VARARGS, nullptr },
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
@@ -651,7 +660,8 @@ def animateRunning(path=None):
     return __api.animateRunning("" if path is None else str(path))
 
 # @module ce.device
-def requestDump(kind):            return __api.requestDump(kind)
+# requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
+# which is a language value the host has no per-engine way to call back.
 def applyDump(b):                 return __api.applyDump(b)
 def sendDump(kind):               return __api.sendDump(kind)
 def buildDump(kind):              return __api.buildDump(kind)
@@ -886,6 +896,8 @@ def panic(opts=None):
 # mistype one, and a mistyped stub is a missing name in exactly one engine.
 # BEGIN GENERATED webview-only stubs — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 __WEBVIEW_ONLY = [
+# @module ce.device
+  "deviceBind","deviceUnbind",
 # @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 # @module ce.draw
@@ -1168,6 +1180,74 @@ def deviceParameters(opts=None):
 def deviceParameter(id, role=None):
     return __deviceQuery("parameter", { "role": __role(role), "id": str(id) })
 
+# ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
+# configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
+# device that showed up.
+def devicePorts(opts=None):
+    opts = opts or {}
+    r = __deviceQuery("ports", { "direction": opts.get("direction") })
+    return r if r is not None else []
+
+# defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
+# rides inside the spec rather than as a fourth host argument, the way it rides inside
+# __deviceQuery's payload: one ABI slot, and adding a field later changes no engine's signature.
+def __define(what, id, spec, role):
+    spec = dict(spec or {})
+    if role is not None and role != "":
+        spec["role"] = str(role)
+    return __api.deviceDefine(what, str(id), spec) is True
+
+def deviceDefineParameter(id, spec=None, role=None):
+    return __define("parameter", id, spec, role)
+
+def deviceDefineDump(kind, spec=None, role=None):
+    return __define("dump", kind, spec, role)
+
+# requestDump(kind [, fn [, opts]]) — closing the loop. Fire-and-forget was the odd one out:
+# deviceRead answers where it is called, and a dump's answer turned up at onDumpReceived with
+# nothing tying it to the request.
+#
+# The waiter is removed BEFORE the callback runs, so a throw inside it cannot leave one armed for
+# the next dump — the same rule after() follows, for the same reason.
+__dumpWaiters = []
+def __resolveDumps(kind, role, values, err):
+    i = 0
+    while i < len(__dumpWaiters):
+        w = __dumpWaiters[i]
+        if not w["done"] and (w["kind"] == "" or w["kind"] == kind):
+            w["done"] = True
+            __dumpWaiters.pop(i)
+            try:
+                w["fn"](values, { "ok": err is None, "kind": kind, "role": role or "", "error": err or "" })
+            except Exception as e:
+                log("requestDump callback failed: " + str(e))
+        else:
+            i += 1
+
+def requestDump(kind, fn=None, opts=None):
+    kind = str(kind if kind is not None else "")
+    if callable(fn):
+        ms = 3000
+        if opts is not None and opts.get("timeout") is not None and float(opts.get("timeout")) > 0:
+            ms = float(opts.get("timeout"))
+        waiter = { "kind": kind, "fn": fn, "done": False }
+        __dumpWaiters.append(waiter)
+        # Resolved rather than left hanging: a synth that is off, or that does not answer this
+        # request, is the common case and not the exotic one.
+        def __timeout():
+            if waiter["done"]: return
+            __resolveDumps(kind, "", None, "no dump arrived within " + str(int(ms)) + "ms")
+        after(ms, __timeout)
+    return __api.requestDump(kind)
+
+# Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+# AFTER the declared events, so "the dump arrived" and "the dump I asked for arrived" cannot
+# observe the panel in two different states.
+def __dumpTick(info):
+    get = info.get if hasattr(info, "get") else (lambda k, d=None: d)
+    __resolveDumps(str(get("kind") or ""), str(get("role") or ""), get("values") or {}, None)
+on("*", "onDumpReceived", __dumpTick)
+
 # @module ce.storage
 # ce.storage. `state` is a plain dict-like namespace: each script is exec'd into its OWN module
 # namespace, which lives as long as the script is loaded, so it persists between handler calls with
@@ -1193,7 +1273,7 @@ import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-    "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
+    "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
     "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
@@ -1235,7 +1315,7 @@ __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
-    { "id": "ce.device", "version": "1.2", "runtime": "any" },
+    { "id": "ce.device", "version": "1.3", "runtime": "any" },
     { "id": "ce.math", "version": "1.1", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },

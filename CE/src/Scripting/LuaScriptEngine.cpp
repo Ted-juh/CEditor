@@ -290,6 +290,8 @@ end
 -- three files is 744 chances to mistype one, and a mistyped stub is a missing name in one engine.
 -- BEGIN GENERATED webview-only stubs — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 local WEBVIEW_ONLY = {
+-- @module ce.device
+  "deviceBind","deviceUnbind",
 -- @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 -- @module ce.draw
@@ -611,6 +613,72 @@ end
 function deviceParameter(id, role)
   return __deviceQuery("parameter", { role = __role(role), id = tostring(id) })
 end
+-- ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
+-- configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
+-- device that showed up.
+function devicePorts(opts)
+  opts = opts or {}
+  local r = __deviceQuery("ports", { direction = opts.direction })
+  if r == nil then return {} end
+  return r
+end
+-- defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
+-- rides inside the spec rather than as a fourth host argument, the way it rides inside
+-- __deviceQuery's payload: one ABI slot, and adding a field later changes no engine's signature.
+local function __define(what, id, spec, role)
+  spec = spec or {}
+  if role ~= nil and role ~= "" then spec.role = tostring(role) end
+  return __deviceDefine(what, tostring(id), spec) == true
+end
+function deviceDefineParameter(id, spec, role) return __define("parameter", id, spec, role) end
+function deviceDefineDump(kind, spec, role) return __define("dump", kind, spec, role) end
+
+-- requestDump(kind [, fn [, opts]]) — closing the loop. Fire-and-forget was the odd one out:
+-- deviceRead answers where it is called, and a dump's answer turned up at onDumpReceived with
+-- nothing tying it to the request.
+--
+-- Assembled here rather than in the host for the same reason after() is: the callback is a language
+-- value, and a host holding one would need a per-engine way to call it back. The waiter is removed
+-- BEFORE the callback runs, so a throw inside it cannot leave one armed for the next dump.
+local __dumpWaiters = {}
+local function __resolveDumps(kind, role, values, err)
+  local i = 1
+  while i <= #__dumpWaiters do
+    local w = __dumpWaiters[i]
+    if not w.done and (w.kind == "" or w.kind == kind) then
+      w.done = true
+      table.remove(__dumpWaiters, i)
+      local ok, e = pcall(w.fn, values, { ok = err == nil, kind = kind, role = role or "", error = err or "" })
+      if not ok then log("requestDump callback failed: " .. tostring(e)) end
+    else
+      i = i + 1
+    end
+  end
+end
+function requestDump(kind, fn, opts)
+  kind = tostring(kind or "")
+  if type(fn) == "function" then
+    local ms = 3000
+    if opts ~= nil and tonumber(opts.timeout) ~= nil and tonumber(opts.timeout) > 0 then ms = tonumber(opts.timeout) end
+    local waiter = { kind = kind, fn = fn, done = false }
+    table.insert(__dumpWaiters, waiter)
+    -- Resolved rather than left hanging: a synth that is off, or that does not answer this
+    -- request, is the common case and not the exotic one.
+    after(ms, function()
+      if waiter.done then return end
+      __resolveDumps(kind, "", nil, "no dump arrived within " .. tostring(math.floor(ms)) .. "ms")
+    end)
+  end
+  __requestDump(kind)
+end
+-- Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+-- AFTER the declared events, so "the dump arrived" and "the dump I asked for arrived" cannot
+-- observe the panel in two different states.
+on("*", "onDumpReceived", function(info)
+  __resolveDumps(info ~= nil and tostring(info.kind or "") or "",
+                 info ~= nil and tostring(info.role or "") or "",
+                 info ~= nil and info.values or {}, nil)
+end)
 
 -- @module ce.storage
 -- ce.storage. `state` is a plain table: each script runs in its own sol::environment, which lives
@@ -631,7 +699,7 @@ end
 local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
-  ["ce.device"] = { applyDump = "applyDump", buildDump = "buildDump", connected = "deviceConnected", parameter = "deviceParameter", parameters = "deviceParameters", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", write = "deviceWrite" },
+  ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
   ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
@@ -673,7 +741,7 @@ local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
-  { id = "ce.device", version = "1.2", runtime = "any" },
+  { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.1", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
@@ -858,7 +926,12 @@ public:
         g.set_function ("sendNRPN", [this] (int ch, int msb, int lsb, sol::object v) { host->sendNRPN (ch, msb, lsb, solToVar (v)); });
         g.set_function ("sendSysex", [this] (sol::object bytes) { host->sendSysex (solToVar (bytes)); });
         g.set_function ("sendMidi",  [this] (sol::object bytes) { host->sendMidi (solToVar (bytes)); });
-        g.set_function ("requestDump", [this] (std::string kind) { host->requestDump (juce::String (kind)); });
+        // __requestDump, not requestDump: the script-facing verb takes an optional callback and is
+        // therefore assembled in the prelude, over this.
+        g.set_function ("__requestDump", [this] (std::string kind) { host->requestDump (juce::String (kind)); });
+        g.set_function ("__deviceDefine", [this] (std::string what, std::string id, sol::optional<sol::table> spec)
+            { return host->deviceDefine (juce::String (what), juce::String (id),
+                                         spec ? solToVar (*spec) : juce::var()); });
         g.set_function ("applyDump",  [this] (sol::object bytes) { host->applyDump (solToVar (bytes)); });
         g.set_function ("sendDump",   [this] (std::string kind) { host->sendDump (juce::String (kind)); });
         g.set_function ("buildDump",  [this] (std::string kind) { return varToSol (lua, host->buildDump (juce::String (kind))); });

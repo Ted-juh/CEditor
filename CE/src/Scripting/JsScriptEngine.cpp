@@ -158,7 +158,8 @@ function sendCC(ch, cc, v) { return __api.sendCC(ch, cc, v); }
 function sendNRPN(ch, msb, lsb, v) { return __api.sendNRPN(ch, msb, lsb, v); }
 function sendSysex(bytes) { return __api.sendSysex(bytes); }
 // @module ce.device
-function requestDump(kind) { return __api.requestDump(kind); }
+// requestDump is assembled further down, over __api.requestDump: it takes an optional callback,
+// which is a language value the host has no per-engine way to call back.
 function applyDump(bytes) { return __api.applyDump(bytes); }
 function sendDump(kind) { return __api.sendDump(kind); }
 function buildDump(kind) { return __api.buildDump(kind); }
@@ -330,6 +331,8 @@ function panic(opts) {
 // mistype one, and a mistyped stub is a missing name in exactly one engine.
 // BEGIN GENERATED webview-only stubs — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 var __WEBVIEW_ONLY = [
+// @module ce.device
+  "deviceBind","deviceUnbind",
 // @module ce.ui
   "uiNotify","uiStatus","uiDialog",
 // @module ce.draw
@@ -688,6 +691,66 @@ function deviceParameters(opts) {
 function deviceParameter(id, role) {
   return __deviceQuery("parameter", { role: __role(role), id: String(id) });
 }
+// ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
+// configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
+// device that showed up.
+function devicePorts(opts) {
+  opts = opts || {};
+  var q = {};
+  if (opts.direction !== undefined && opts.direction !== null) q.direction = opts.direction;
+  return __deviceQuery("ports", q) || [];
+}
+// defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
+// rides inside the spec rather than as a fourth host argument, the way it rides inside
+// __deviceQuery's payload: one ABI slot, and adding a field later changes no engine's signature.
+function __define(what, id, spec, role) {
+  spec = spec || {};
+  if (role !== undefined && role !== null && role !== "") spec.role = String(role);
+  return __api.deviceDefine(what, String(id), spec) === true;
+}
+function deviceDefineParameter(id, spec, role) { return __define("parameter", id, spec, role); }
+function deviceDefineDump(kind, spec, role) { return __define("dump", kind, spec, role); }
+
+// requestDump(kind [, fn [, opts]]) — closing the loop. Fire-and-forget was the odd one out:
+// deviceRead answers where it is called, and a dump's answer turned up at onDumpReceived with
+// nothing tying it to the request.
+//
+// The waiter is removed BEFORE the callback runs, so a throw inside it cannot leave one armed for
+// the next dump — the same rule after() follows, for the same reason.
+var __dumpWaiters = [];
+function __resolveDumps(kind, role, values, err) {
+  for (var i = 0; i < __dumpWaiters.length;) {
+    var w = __dumpWaiters[i];
+    if (!w.done && (w.kind === "" || w.kind === kind)) {
+      w.done = true;
+      __dumpWaiters.splice(i, 1);
+      try { w.fn(values, { ok: !err, kind: kind, role: role || "", error: err || "" }); }
+      catch (e) { log("requestDump callback failed: " + e); }
+    } else i++;
+  }
+}
+function requestDump(kind, fn, opts) {
+  kind = String(kind === undefined || kind === null ? "" : kind);
+  if (typeof fn === "function") {
+    var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
+    var waiter = { kind: kind, fn: fn, done: false };
+    __dumpWaiters.push(waiter);
+    // Resolved rather than left hanging: a synth that is off, or that does not answer this
+    // request, is the common case and not the exotic one.
+    after(ms, function() {
+      if (waiter.done) return;
+      __resolveDumps(kind, "", undefined, "no dump arrived within " + Math.floor(ms) + "ms");
+    });
+  }
+  return __api.requestDump(kind);
+}
+// Registered once, from the prelude, so it belongs to no script and outlives every reload of them.
+// AFTER the declared events, so "the dump arrived" and "the dump I asked for arrived" cannot
+// observe the panel in two different states.
+on("*", "onDumpReceived", function(info) {
+  __resolveDumps(info ? String(info.kind || "") : "", info ? String(info.role || "") : "",
+                 info ? info.values : {}, null);
+});
 
 // @module ce.storage
 // ce.storage. `state` is a plain object: QuickJS gives each script its own engine, whose globals
@@ -711,7 +774,7 @@ function loadSetting(key, fallback) {
 var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-  "ce.device": { "applyDump": "applyDump", "buildDump": "buildDump", "connected": "deviceConnected", "parameter": "deviceParameter", "parameters": "deviceParameters", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "write": "deviceWrite" },
+  "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
   "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
   "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
   "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
@@ -750,7 +813,7 @@ var __CE_MODULES = {
   "ce.components.pixel": { "anim": "pixelAnim", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "brightness": "pixelBrightness", "contrast": "pixelContrast", "gamma": "pixelGamma", "glow": "pixelGlow" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.2","runtime":"any"},{"id":"ce.math","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.2","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.1","runtime":"any"},{"id":"ce.time","version":"1.2","runtime":"any"},{"id":"ce.anim","version":"1.0","runtime":"any"},{"id":"ce.ui","version":"1.1","runtime":"webview"},{"id":"ce.draw","version":"1.1","runtime":"webview"},{"id":"ce.panel","version":"1.2","runtime":"any"},{"id":"ce.storage","version":"1.1","runtime":"any"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module
@@ -878,6 +941,8 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
     api->setMethod ("transportState", [host] (const Args&) -> juce::var { return host->transportState(); });
     api->setMethod ("deviceQuery", [host, arg] (const Args& a) -> juce::var
         { return host->deviceQuery (arg (a, 0).toString(), arg (a, 1)); });
+    api->setMethod ("deviceDefine", [host, arg] (const Args& a) -> juce::var
+        { return host->deviceDefine (arg (a, 0).toString(), arg (a, 1).toString(), arg (a, 2)); });
     api->setMethod ("panelQuery", [host, arg] (const Args& a) -> juce::var
         { return host->panelQuery (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("deviceWrite", [host, arg] (const Args& a) -> juce::var

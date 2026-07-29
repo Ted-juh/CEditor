@@ -174,19 +174,108 @@ public:
         if (callbacks.feedMidi) { callbacks.feedMidi (bytes); return; }
         logAt ("error", "feedMidi(): this host has no MIDI input to inject into — nothing was fed.", juce::var());
     }
-    void requestDump (const juce::String& kind) override             { if (callbacks.requestDump) callbacks.requestDump (kind); }
+    // A layout the SCRIPT declared carries its own request bytes, so asking for it is a raw send
+    // and needs no profile at all — which is the case defineDump exists for. Checked BEFORE the
+    // host callback, so a declaration can also stand in for a profile request the host gets wrong.
+    void requestDump (const juce::String& kind) override
+    {
+        if (runtime != nullptr && runtime->hasDeviceDump (defaultDeviceRole, kind))
+        {
+            const auto bytes = runtime->deviceDumpRequest (defaultDeviceRole, kind);
+            if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty())
+            {
+                sendMidi (bytes);
+                return;
+            }
+            logAt ("error", "requestDump(\"" + kind + "\"): the declared layout has no request bytes, so there "
+                            "is nothing to send. Add `request` to defineDump, or wait for the synth to send it "
+                            "unasked.", juce::var());
+            return;
+        }
+        if (callbacks.requestDump) callbacks.requestDump (kind);
+    }
     void applyDump (const juce::var& bytes) override                 { if (callbacks.applyDump) callbacks.applyDump (bytes); }
     void sendDump (const juce::String& kind) override                { if (callbacks.sendDump) callbacks.sendDump (kind); }
     juce::var buildDump (const juce::String& kind) override          { return callbacks.buildDump ? callbacks.buildDump (kind) : juce::var(); }
+
+    /**
+     * The reads, with the script's own declarations folded in.
+     *
+     * The merge lives here rather than in each prelude for the reason the preludes exist at all:
+     * three copies of "profile first, declarations last" is three chances for one engine to answer
+     * a different question. Declarations come LAST so a declared id overrides a profile one, which
+     * is what lets a script correct a single wrong parameter without redeclaring the rest.
+     */
     juce::var deviceQuery (const juce::String& kind, const juce::var& payload) override
-    { return callbacks.deviceQuery ? callbacks.deviceQuery (kind, payload) : juce::var(); }
+    {
+        const auto fromHost = callbacks.deviceQuery ? callbacks.deviceQuery (kind, payload) : juce::var();
+        if (runtime == nullptr || (kind != "parameters" && kind != "parameter")) return fromHost;
+
+        auto* p = payload.getDynamicObject();
+        auto role = p != nullptr ? p->getProperty ("role").toString() : juce::String();
+        if (role.isEmpty()) role = defaultDeviceRole;
+
+        if (kind == "parameter")
+        {
+            const auto id = p != nullptr ? p->getProperty ("id").toString() : juce::String();
+            const auto declared = runtime->declaredDeviceParameter (role, id);
+            return declared.isVoid() ? fromHost : declared;
+        }
+
+        const auto declared = runtime->declaredDeviceParameters (role);
+        auto* declaredArr = declared.getArray();
+        if (declaredArr == nullptr || declaredArr->isEmpty()) return fromHost;
+
+        juce::Array<juce::var> merged;
+        if (auto* hostArr = fromHost.getArray())
+            for (const auto& item : *hostArr)
+            {
+                bool overridden = false;
+                if (auto* o = item.getDynamicObject())
+                    for (const auto& d : *declaredArr)
+                        if (auto* dObj = d.getDynamicObject())
+                            if (dObj->getProperty ("id").toString() == o->getProperty ("id").toString())
+                            { overridden = true; break; }
+                if (! overridden) merged.add (item);
+            }
+        merged.addArray (*declaredArr);
+        return juce::var (merged);
+    }
+
+    /** The role rides INSIDE the spec, the way it rides inside deviceQuery's payload — so adding a
+        role did not add a fourth argument to an ABI slot every engine has to match. */
+    bool deviceDefine (const juce::String& what, const juce::String& id, const juce::var& spec) override
+    {
+        if (runtime == nullptr) return false;
+        juce::String role = defaultDeviceRole;
+        if (auto* o = spec.getDynamicObject())
+            if (o->getProperty ("role").toString().isNotEmpty()) role = o->getProperty ("role").toString();
+        if (what == "parameter") return runtime->defineDeviceParameter (role, id, spec);
+        if (what == "dump")      return runtime->defineDeviceDump (role, id, spec);
+        return false;
+    }
 
     juce::var panelQuery (const juce::String& kind, const juce::var& payload) override
     { return callbacks.panelQuery ? callbacks.panelQuery (kind, payload) : juce::var(); }
 
+    /** A parameter the SCRIPT declared carries its own wire format, so it is compiled here and sent
+        as raw bytes. That is the whole reason defineParameter exists: this path needs no profile,
+        and so it works on a synth the app has never heard of. */
     bool deviceWrite (const juce::String& parameterId, const juce::var& value,
                       const juce::String& role) override
-    { return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role); }
+    {
+        if (runtime != nullptr)
+        {
+            const auto bytes = runtime->encodeDeviceParameter (role.isEmpty() ? defaultDeviceRole : role,
+                                                               parameterId, value);
+            if (auto* arr = bytes.getArray(); arr != nullptr && ! arr->isEmpty())
+            {
+                sendMidi (bytes);
+                return true;
+            }
+        }
+        return callbacks.deviceWrite && callbacks.deviceWrite (parameterId, value, role);
+    }
     juce::var transportState() override
     { return callbacks.transportState ? callbacks.transportState() : juce::var(); }
     // ce.anim routes to the runtime, never to a callback: the animation list has to live in ONE
@@ -225,6 +314,10 @@ public:
     { return callbacks.loadSetting ? callbacks.loadSetting (key) : juce::var(); }
 
 private:
+    // The role every device verb means when a script does not name one. Matches DEFAULT_DEVICE_ROLE
+    // in the web runtime; panelApiParity keeps the spelling honest.
+    static constexpr const char* defaultDeviceRole = "mainSynth";
+
     // Whether the host actually wired routing, so endRouteOverride does not unbalance a host
     // that never began one.
     bool routeWired = false;

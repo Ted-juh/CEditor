@@ -23,6 +23,7 @@
 
 #include <juce_core/juce_core.h>
 #include <functional>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -152,6 +153,15 @@ public:
     virtual bool deviceWrite (const juce::String& parameterId, const juce::var& value,
                               const juce::String& role)
     { juce::ignoreUnused (parameterId, value, role); return false; }
+
+    /** DECLARE structure the app was not shipped knowing: `what` is "parameter" or "dump", `id` is
+        the parameter id or the dump kind, `spec` carries the wire format. Routes to ScriptRuntime,
+        which owns the declarations, for the same reason ce.anim does — two hosts each keeping their
+        own copy of the same declaration is two synths' worth of drift waiting to happen.
+
+        Returns whether it was accepted. A refusal has already been reported by then. */
+    virtual bool deviceDefine (const juce::String& what, const juce::String& id, const juce::var& spec)
+    { juce::ignoreUnused (what, id, spec); return false; }
 
     /** ce.anim — start/stop/query. These route to ScriptRuntime, which owns the animation list;
         a host does not implement them itself. */
@@ -448,6 +458,44 @@ public:
     static double animationEase (double progress, const juce::String& curve);
     static double animationSpring (double progress, double damping, double frequency);
 
+    // --- ce.device: declaring what the app was not shipped knowing (design doc §29) -----------
+    /** A parameter or a dump layout a SCRIPT declared, for a synth the app has no profile for.
+        Held here rather than in the host because the declaration IS the codec: the same bytes have
+        to go out from a scripted write and from a bound control's write, and the same layout has to
+        decode an arriving dump. One owner, one answer.
+
+        Declarations are script-lifetime — clearDeviceDefinitions() runs before every onPanelBuild,
+        which is what makes a build idempotent and what stops one leaking into the saved document.
+
+        `spec` is the same shape the WebView runtime accepts (deviceDefinitions.js); the two are
+        pinned against each other by CE/tests/ScriptRuntimeTests.cpp and deviceDefinitions.test.js. */
+    bool defineDeviceParameter (const juce::String& role, const juce::String& id, const juce::var& spec);
+    bool defineDeviceDump      (const juce::String& role, const juce::String& kind, const juce::var& spec);
+
+    bool hasDeviceParameter (const juce::String& role, const juce::String& id) const;
+    bool hasDeviceDump      (const juce::String& role, const juce::String& kind) const;
+
+    /** The declared descriptors, in the shape a profile-backed one has plus `defined = true`. */
+    juce::var declaredDeviceParameters (const juce::String& role) const;
+    juce::var declaredDeviceParameter  (const juce::String& role, const juce::String& id) const;
+
+    /** The bytes that SET a declared parameter, or void when the parameter is not declared here —
+        which is how the caller knows to fall through to the device profile. */
+    juce::var encodeDeviceParameter (const juce::String& role, const juce::String& id,
+                                     const juce::var& value) const;
+
+    /** The bytes that ASK for a declared dump. Empty when the layout declared no request. */
+    juce::var deviceDumpRequest (const juce::String& role, const juce::String& kind) const;
+
+    /** Try every declared layout against a message that just arrived. Returns
+        { kind, name, values } on a match, and void when nothing matched OR nothing is declared —
+        the caller leaves the message alone either way, which is what keeps a panel that never
+        called defineDump behaving exactly as it did. */
+    juce::var matchDeviceDump (const juce::String& role, const juce::var& bytes) const;
+
+    /** Drop every declaration. Called wherever generated controls are cleared, for the same reason. */
+    void clearDeviceDefinitions();
+
     /** run("target.action" [, args]) — call a named function defined by another script.
         `ref` is "owner.action" (the action on the script attached to `owner`) or a bare "action"
         (the first script that defines it, whatever it is attached to). Returns the handler's
@@ -514,6 +562,48 @@ private:
     // good tick time when the caller drives the clock, which is the only way to test an animation
     // without waiting on a real one.
     bool animationTicked = false;
+
+    // ce.device declarations. Two flat vectors per role rather than maps: a panel declares tens of
+    // parameters, not thousands, and keeping declaration ORDER is what makes parameters() list them
+    // the way the script wrote them.
+    struct DeclaredParameter
+    {
+        juce::String id, name, group, type { "number" }, access { "readWrite" };
+        juce::String wireKind, encoding { "u7" }, checksumKind { "roland" };
+        double min = 0.0, max = 127.0;
+        int cc = 0, channel = 1, msb = 0, lsb = 0;
+        int nibbles = 2, length = 0, pad = 32, trueValue = 1, falseValue = 0;
+        juce::StringArray tmpl;                       // sysex template tokens
+        juce::NamedValueSet variables;
+        juce::Array<juce::var> choices;               // { id, value } pairs
+        juce::var descriptor() const;
+    };
+
+    struct DeclaredDump
+    {
+        juce::String id, name, checksumType;
+        juce::Array<int> prefix, suffix, request;
+        int offset = 0, size = 0;
+        int checksumFrom = -1, checksumTo = -1, checksumAt = -1;
+        juce::StringArray fieldParameters;
+        juce::Array<int> fieldOffsets;
+    };
+
+    struct DeviceDeclarations
+    {
+        std::vector<DeclaredParameter> parameters;
+        std::vector<DeclaredDump> dumps;
+    };
+
+    std::map<juce::String, DeviceDeclarations> deviceDeclarations;
+
+    const DeclaredParameter* findDeclaredParameter (const juce::String& role, const juce::String& id) const;
+    const DeclaredDump*      findDeclaredDump      (const juce::String& role, const juce::String& kind) const;
+    /** The number a value becomes on the wire — the parameter's own units, clamped to what fits. */
+    static int declaredParameterNumber (const DeclaredParameter& p, const juce::var& value);
+    /** Decode one declared layout against one message. Void unless it matched cleanly. */
+    juce::var decodeDeclaredDump (const juce::String& role, const DeclaredDump& dump,
+                                  const juce::Array<int>& bytes) const;
 
     int inboundDepth = 0;      // >0 while reacting to inbound MIDI/dump → setValue is silent by default
     int transmitOverride = -1; // -1 none, 0 force-silent (noTransmit), 1 force-loud (transmit)

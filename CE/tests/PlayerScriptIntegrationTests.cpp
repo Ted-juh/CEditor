@@ -299,6 +299,86 @@ int main()
         check ((int) (*inNote.getArray())[1] == 72, "player path: transposed before any handler ran");
     }
 
+    // ce.device declared, through the REAL BridgeScriptHost (design doc §29).
+    //
+    // ScriptRuntimeTests pins the registry and the preludes; what only shows up here is the
+    // host's own behaviour: a declared parameter overriding a profile one in parameters(), a
+    // write falling through to the profile when the parameter is NOT declared, and requestDump
+    // choosing between the declared request and the profile's sync.
+    {
+        static constexpr const char* kDevPanel = R"JSON({
+          "id": "dev", "name": "Dev",
+          "scripting": { "modules": ["ce.core", "ce.device", "ce.time"] },
+          "scripts": [
+            { "id": "d1", "name": "dev", "language": "lua", "scope": "panel", "event": "onPanelLoad", "target": "*", "enabled": true,
+              "source": "function onPanelLoad()\n  ce.device.defineParameter(\"cutoff\", { name = \"Mine\", min = 0, max = 127, cc = 74 })\nend\nfunction onList()\n  for _, p in ipairs(ce.device.parameters()) do log(\"p \" .. p.id .. \" \" .. p.name) end\nend\nfunction onMine() ce.device.write(\"cutoff\", 9) end\nfunction onTheirs() ce.device.write(\"reso\", 9) end\nfunction onAsk() requestDump(\"patch\") end" }
+          ],
+          "controls": []
+        })JSON";
+
+        PanelValueModel devModel;
+        devModel.loadFromJson (kDevPanel);
+
+        juce::StringArray devLogs, devMidi, devWrites, devRequests;
+        BridgeScriptHost::Callbacks dcb;
+        dcb.getValue = [] (const juce::String&, const juce::String&) { return juce::var(); };
+        dcb.setValue = [] (const juce::String&, const juce::var&, bool, const juce::String&) {};
+        dcb.log      = [&devLogs] (const juce::String& m, const juce::var&) { devLogs.add (m); };
+        dcb.sendCC   = [] (int, int, const juce::var&) {};
+        dcb.sendNRPN = [] (int, int, int, const juce::var&) {};
+        dcb.sendSysex = [] (const juce::var&) {};
+        dcb.sendMidi = [&devMidi] (const juce::var& bytes)
+        {
+            juce::Array<int> b;
+            if (auto* arr = bytes.getArray()) for (const auto& x : *arr) b.add ((int) x);
+            devMidi.add (hex (b));
+        };
+        dcb.requestDump = [&devRequests] (const juce::String& kind) { devRequests.add (kind); };
+        dcb.applyDump = [] (const juce::var&) {};
+        dcb.sendDump = [] (const juce::String&) {};
+        dcb.buildDump = [] (const juce::String&) { return juce::var(); };
+        dcb.deviceWrite = [&devWrites] (const juce::String& id, const juce::var& v, const juce::String&)
+        { devWrites.add (id + "=" + v.toString()); return true; };
+        // A two-parameter profile, one of whose ids the script also declares.
+        dcb.deviceQuery = [] (const juce::String& kind, const juce::var&) -> juce::var
+        {
+            if (kind != "parameters") return {};
+            auto make = [] (const char* id, const char* name)
+            {
+                auto* o = new juce::DynamicObject();
+                o->setProperty ("id", id);
+                o->setProperty ("name", name);
+                return juce::var (o);
+            };
+            return juce::var (juce::Array<juce::var> { make ("cutoff", "Profile Cutoff"), make ("reso", "Profile Reso") });
+        };
+
+        BridgeScriptHost devHost (std::move (dcb));
+        ScriptRuntime devRuntime (devHost);
+        devHost.attachRuntime (&devRuntime);
+        devRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        devRuntime.loadScripts (gatherPanelScripts (devModel.panel()));
+        devRuntime.dispatchEvent ("onPanelLoad", "*", juce::var());
+
+        // parameters() answers from BOTH sources, and a declared id wins — which is what lets a
+        // script correct one wrong parameter without redeclaring the rest.
+        devRuntime.runAction ("onList", juce::var());
+        check (devLogs.contains ("p reso Profile Reso"), "parameters(): the profile's own entries are still there");
+        check (devLogs.contains ("p cutoff Mine"), "parameters(): a declared id overrides the profile's");
+        check (! devLogs.contains ("p cutoff Profile Cutoff"), "…and the overridden one is not listed twice");
+
+        // write() splits on where the parameter came from.
+        devRuntime.runAction ("onMine", juce::var());
+        check (devMidi.contains ("B0 4A 09"), "writing a declared parameter sends its own bytes");
+        check (devWrites.isEmpty(), "…and never reaches the profile's encoder");
+        devRuntime.runAction ("onTheirs", juce::var());
+        check (devWrites.contains ("reso=9"), "writing a profile parameter still goes through the profile");
+
+        // requestDump with nothing declared for that kind falls through to the profile's sync.
+        devRuntime.runAction ("onAsk", juce::var());
+        check (devRequests.contains ("patch"), "requestDump falls through when no layout is declared");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;

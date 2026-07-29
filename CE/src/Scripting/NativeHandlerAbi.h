@@ -142,6 +142,20 @@ typedef struct CeHostVtable {
     /* The transport snapshot: { playing, bpm, beats, beatsPerBar, source, valid }. One primitive
      * behind tempo(), isPlaying() and transportInfo() in the scripted engines. */
     int  (CE_CALL *transport_state)(void* host_ctx, CeValue* out /*host-owned, free_value*/);
+    /* SET a device parameter by id, whether or not a control is bound to it. Separate from
+     * device_query because it is not a query: the device profile (or a runtime declaration)
+     * encodes the value and the message goes out. Returns 1 when it was DISPATCHED — not when the
+     * synth accepted it, which nothing can know synchronously. */
+    int  (CE_CALL *device_write)  (void* host_ctx, const CeStr* parameter_id, const CeValue* value,
+                                   const CeStr* role /*nullable*/);
+    /* DECLARE a parameter or a dump layout at runtime: what = "parameter" | "dump", id = the
+     * parameter id or the dump kind, spec = the wire format. This is what lets a handler drive a
+     * synth the app has no profile for. Returns 1 when the declaration was accepted.
+     *
+     * device_write and device_define were appended together on purpose: a handler that could
+     * declare a parameter and not send one would build a panel that looks wired and is not. */
+    int  (CE_CALL *device_define) (void* host_ctx, const CeStr* what, const CeStr* id,
+                                   const CeValue* spec /*nullable*/);
     /* NOTE on module opt-in (design doc §5): a panel declares the modules its scripts may use, and
      * the scripted engines enforce it by swapping the prelude's members for explaining stubs. A
      * native handler has no prelude — it calls these function pointers directly — so there is

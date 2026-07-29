@@ -22,12 +22,22 @@ import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js'
 import { updateControlProperty } from '../stores/controls.js';
 import { valueAtPath } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
-import { isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed } from '../bridge/bridge.js';
+import {
+  isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
+  listMidiInputs, listMidiDestinations,
+} from '../bridge/bridge.js';
 import {
   startDeviceSync, startBulkDumpSend, commitDeviceParameter,
   latestMidiInputMessage, latestSysexInputMessage, deviceSessionState, deviceRuntimeState,
   deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
+  midiInputs, midiDestinations,
 } from '../stores/deviceProfiles.js';
+import {
+  defineParameter as defineRuntimeParameter, defineDump as defineRuntimeDump,
+  definedParameters, definedParameter, encodeParameter as encodeRuntimeParameter,
+  dumpRequestBytes, decodeDump as decodeRuntimeDump, clearDeviceDefinitions,
+  hasDefinedParameter, hasDefinedDump,
+} from './deviceDefinitions.js';
 import {
   handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
@@ -389,8 +399,19 @@ function setValue(path, value, formOrOpts = '') {
   if (String(modelPath).toLowerCase() !== 'value' && !String(modelPath).toLowerCase().endsWith('.value')) return;
   const binding = valueBindingFor(control);
   if (!binding) return;
+  const bindingRole = binding.deviceRole ?? DEFAULT_ROLE;
+  // A binding made by bind() onto a parameter the script declared has no profile behind it, so it
+  // is compiled from the declaration and sent raw. Without this the control moved and nothing left
+  // the machine, which is exactly the "self-building panel builds dead controls" this pair exists
+  // to fix — half-fixed would have been worse than not fixed, because the wiring would look done.
+  if (hasDefinedParameter(bindingRole, binding.parameterId)) {
+    const encoded = encodeRuntimeParameter(bindingRole, binding.parameterId, value);
+    if (encoded.ok) sendRawMidi(encoded.bytes, `param_${binding.parameterId}`);
+    else addScriptTrace('error', '', `set("${path}"): ${encoded.error}`);
+    return;
+  }
   commitDeviceParameter({
-    deviceRole: binding.deviceRole ?? DEFAULT_ROLE,
+    deviceRole: bindingRole,
     parameterId: binding.parameterId,
     value,
     interactionPhase: 'commit',
@@ -763,14 +784,8 @@ const midiApi = {
   },
   // Read the synth: routes through the app's device-sync path (resolves the profile on the role).
   // The parameter is `kind`, the name the contract and every other runtime use for it.
-  requestDump: (kind) => {
-    if (isJuceAvailable()) {
-      startDeviceSync({ deviceRole: DEFAULT_ROLE, request: String(kind ?? '') });
-      addScriptTrace('midi', '', `requestDump(${JSON.stringify(kind ?? '')}) → device sync requested`);
-    } else {
-      addScriptTrace('midi', '', `requestDump(${JSON.stringify(kind ?? '')}) — no device host`);
-    }
-  },
+  // requestDump is bound in buildApi, not here: its optional callback belongs to a script, and a
+  // throw inside it has to be reported against that script. Same reason the wire filters are.
   checksum: (type, bytes) =>
     (bytes === undefined || bytes === null
       ? checksumOf('roland', toByteArray(type))     // one-arg form: checksum(bytes)
@@ -2080,6 +2095,15 @@ function deviceValueWrite(id, value, role) {
     addScriptTrace('error', '', 'deviceWrite(id, value): a parameter id is required');
     return false;
   }
+  // A parameter the SCRIPT declared carries its own wire format, so it is compiled here and sent
+  // as raw bytes. That is the whole reason defineParameter exists: this path needs no profile, and
+  // so it works on a synth the app has never heard of.
+  if (hasDefinedParameter(role, key)) {
+    const encoded = encodeRuntimeParameter(role, key, value);
+    if (!encoded.ok) { addScriptTrace('error', '', `deviceWrite(${JSON.stringify(key)}): ${encoded.error}`); return false; }
+    sendRawMidi(encoded.bytes, `param_${key}`);
+    return true;
+  }
   if (!isJuceAvailable()) {
     addScriptTrace('error', '',
       `deviceWrite(${JSON.stringify(key)}) needs the device host — encoding a parameter is the device `
@@ -2093,32 +2117,50 @@ function deviceValueWrite(id, value, role) {
   return true;
 }
 
+/**
+ * The parameters this role has, from BOTH sources: the shipped profile, and whatever the script
+ * declared with defineParameter. Declared ones come last, so a declaration that reuses a profile
+ * id overrides it — which is what lets a script correct one wrong parameter in an otherwise good
+ * profile without having to redeclare the rest.
+ */
 function deviceParametersRead(opts = {}) {
   const role = opts.role || DEFAULT_ROLE;
+  const declared = definedParameters(role);
   const profileId = roleMapping(role)?.profileId;
-  if (!profileId) {
-    addScriptTrace('error', '', `deviceParameters(): no device profile is mapped to the "${role}" role.`);
+
+  let fromProfile = [];
+  if (profileId) {
+    const cached = (get(profileParameters) ?? {})[profileId];
+    if (Array.isArray(cached) && cached.length) {
+      fromProfile = cached;
+    } else {
+      // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
+      // different thing from "this synth has no parameters", and a script that cannot tell them
+      // apart will draw the wrong conclusion silently.
+      if (!parameterRequests.has(profileId)) {
+        parameterRequests.add(profileId);
+        try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
+      }
+      addScriptTrace('log', '',
+        `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
+        + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
+        + 'In the exported plugin this read is synchronous and complete on the first call.');
+    }
+  } else if (!declared.length) {
+    // No profile AND nothing declared is the only case that is genuinely an error now. With
+    // declarations in hand there is nothing wrong with having no profile — that is the case
+    // defineParameter was built for.
+    addScriptTrace('error', '',
+      `deviceParameters(): no device profile is mapped to the "${role}" role, and this panel has `
+      + 'declared no parameters. Map a profile, or declare what the synth has with defineParameter().');
     return [];
   }
 
-  const cached = (get(profileParameters) ?? {})[profileId];
-  if (!Array.isArray(cached) || !cached.length) {
-    // Cold cache. Ask for it, and SAY so — an empty list here means "not loaded", which is a very
-    // different thing from "this synth has no parameters", and a script that cannot tell them
-    // apart will draw the wrong conclusion silently.
-    if (!parameterRequests.has(profileId)) {
-      parameterRequests.add(profileId);
-      try { refreshProfileParameters({ profileId, deviceRole: role }); } catch { /* no bridge */ }
-    }
-    addScriptTrace('log', '',
-      `deviceParameters(): the parameter table for "${profileId}" has not been loaded yet — `
-      + 'requesting it now. Call again from a later handler (onTimer is the usual place). '
-      + 'In the exported plugin this read is synchronous and complete on the first call.');
-    return [];
-  }
+  const byId = new Map();
+  for (const p of [...fromProfile, ...declared]) byId.set(String(p?.id ?? ''), p);
 
   const wanted = (field, value) => !value || String(field ?? '').toLowerCase().includes(String(value).toLowerCase());
-  let out = cached.filter((p) => wanted(p?.group, opts.group)
+  let out = [...byId.values()].filter((p) => wanted(p?.group, opts.group)
     && wanted(p?.type, opts.type)
     && wanted(p?.access, opts.access)
     && (!opts.query
@@ -2132,12 +2174,268 @@ function deviceParametersRead(opts = {}) {
 function deviceParameterRead(id, role = DEFAULT_ROLE) {
   const wanted = String(id ?? '');
   if (!wanted) return null;
+  // A declared parameter answers without touching the profile cache, so `parameter()` on a synth
+  // with no profile is a plain lookup rather than a cold-cache notice about a table that will
+  // never arrive.
+  const own = definedParameter(role, wanted);
+  if (own) return own;
   const all = deviceParametersRead({ role });
   return all.find((p) => String(p?.id) === wanted) ?? null;
 }
 
 /** Forget which profiles we have asked for — used when the device session is torn down. */
 export function resetDeviceReadCache() { parameterRequests.clear(); }
+
+/* ------------------------------------------------- ce.device: declaring what the app does not know */
+// Everything above READS a device profile the app was shipped with. That is a hard ceiling: a panel
+// can only address a synth somebody already wrote a profile for, which excludes most of what is
+// actually in people's racks. These four verbs write the structure instead of reading it.
+//
+// The codec lives in deviceDefinitions.js; what is here is the script-facing shape and the
+// reporting. Declarations are script-lifetime and are dropped when the panel is rebuilt, which is
+// what keeps a build idempotent (§13) and what stops a declaration half-saving into the author's
+// document.
+
+function deviceDefineParameterImpl(id, spec, role) {
+  const result = defineRuntimeParameter(role, id, spec ?? {});
+  if (!result.ok) { addScriptTrace('error', '', result.error); return false; }
+  const p = result.parameter;
+  addScriptTrace('log', '', `defineParameter ${p.id} — ${p.name} (${p.type}, ${p.min}..${p.max})`);
+  return true;
+}
+
+function deviceDefineDumpImpl(kind, spec, role) {
+  const result = defineRuntimeDump(role, kind, spec ?? {});
+  if (!result.ok) { addScriptTrace('error', '', result.error); return false; }
+  const d = result.dump;
+  addScriptTrace('log', '',
+    `defineDump ${d.kind} — ${d.fields} field(s)`
+    + (d.requestBytes ? '' : ', no request declared (nothing to send when requestDump asks for it)'));
+  return true;
+}
+
+/**
+ * bind(control, parameterId) — connect a control to a parameter at RUNTIME.
+ *
+ * ce.panel.create could already make a control and there was then no way to connect it to
+ * anything: DeviceBindings is declared at design time and nothing wrote it, so a self-building
+ * panel built dead controls. This is the other half of that pair.
+ *
+ * Panel view only, for the same reason ce.panel.create is: the binding lives on the control model,
+ * and there is no control model with the window shut.
+ */
+/**
+ * Write a control property through whichever door owns the document: the editor's control store, or
+ * the player host. The same split updateControls makes, and for the same reason — the exported
+ * plugin runs this runtime in its OPEN window, so a panel-view-only verb still has a host.
+ */
+function writeControlProperty(control, path, value) {
+  if (host) { host.writeValue(control, path, value); return; }
+  updateControlProperty(control?._children?.Core?.id, path, value);
+}
+
+function deviceBindImpl(controlName, parameterId, opts = {}) {
+  const name = String(controlName ?? '');
+  const key = String(parameterId ?? '');
+  if (!name || !key) {
+    addScriptTrace('error', '', 'bind(control, parameterId): both a control and a parameter id are required');
+    return false;
+  }
+  const control = findControlByName(name);
+  if (!control) { addScriptTrace('error', '', `bind: control "${name}" not found on the active panel`); return false; }
+
+  const role = String(opts?.role ?? '') || DEFAULT_ROLE;
+  // Say so rather than refusing: a script may bind before it declares, and a profile-backed
+  // parameter table can still be loading. A binding to a parameter that turns up later works;
+  // one to a parameter that never turns up is silent, and silence is what the notice buys back.
+  //
+  // The profile is only consulted when there IS one. Asking otherwise would emit "no profile is
+  // mapped" from the read — true, and completely beside the point when the panel is deliberately
+  // driving a synth that has none.
+  const known = hasDefinedParameter(role, key)
+    || (roleMapping(role)?.profileId ? deviceParameterRead(key, role) != null : false);
+  if (!known) {
+    addScriptTrace('log', '',
+      `bind("${name}", "${key}"): neither the profile nor this panel's declarations know "${key}" yet. `
+      + 'The binding is made anyway — it works if the parameter arrives — but check the id if the control stays dead.');
+  }
+
+  const port = String(opts?.port ?? 'value');
+  const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
+    ? control._children.DeviceBindings.bindings : [];
+  // Replace the binding on this port rather than appending: two bindings on one port is a control
+  // that sends two different parameters from one gesture, which is never what bind() was asked for.
+  const kept = existing.filter((b) => !(b?.kind === 'deviceParameter' && String(b?.port ?? 'value') === port));
+  const next = [...kept, { kind: 'deviceParameter', port, parameterId: key, deviceRole: role }];
+
+  writeControlProperty(control, 'DeviceBindings.bindings', next);
+  // A control whose DeviceBindings section was switched off would take the binding and ignore it.
+  if (control?._children?.DeviceBindings?.enabled === false) writeControlProperty(control, 'DeviceBindings.enabled', true);
+  addScriptTrace('log', '', `bind ${name}.${port} → ${key}${role === DEFAULT_ROLE ? '' : ` [${role}]`}`);
+  return true;
+}
+
+/** unbind(control [, port]) — returns whether there was a binding to remove, so "already clean"
+    reads differently from "cleaned up". */
+function deviceUnbindImpl(controlName, port = 'value') {
+  const name = String(controlName ?? '');
+  const control = findControlByName(name);
+  if (!control) { addScriptTrace('error', '', `unbind: control "${name}" not found on the active panel`); return false; }
+  const wanted = String(port ?? 'value') || 'value';
+  const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
+    ? control._children.DeviceBindings.bindings : [];
+  const next = existing.filter((b) => !(b?.kind === 'deviceParameter' && String(b?.port ?? 'value') === wanted));
+  if (next.length === existing.length) return false;
+  writeControlProperty(control, 'DeviceBindings.bindings', next);
+  addScriptTrace('log', '', `unbind ${name}.${wanted}`);
+  return true;
+}
+
+/**
+ * ports() — what is actually plugged in.
+ *
+ * connected(role) answers yes/no for a role somebody configured in advance. Nothing enumerated the
+ * real ports, so a panel could not offer the user a choice or notice a device that showed up.
+ *
+ * `role` on a port is the role currently using it, or "" — which is what makes "is anything using
+ * this?" a field rather than a cross-reference the script has to build itself.
+ */
+function devicePortsRead(opts = {}) {
+  const direction = String(opts?.direction ?? '').toLowerCase();
+  const mappings = get(deviceRoleMappings) ?? {};
+
+  const roleUsing = (portId, which) => {
+    for (const [role, mapping] of Object.entries(mappings)) {
+      if (String(mapping?.[which]?.id ?? '') === String(portId)) return role;
+    }
+    return '';
+  };
+
+  const inputs = get(midiInputs) ?? [];
+  const outputs = get(midiDestinations) ?? [];
+  // Nothing but the placeholder rows means the host has never been asked. Request the enumeration
+  // and say so — the same asymmetry deviceParameters() states, for the same reason: an empty list
+  // from a cold cache and an empty list from a machine with no MIDI interface look identical.
+  if (isJuceAvailable() && !portsRequested && inputs.length + outputs.length <= 2) {
+    portsRequested = true;
+    try { listMidiInputs(); listMidiDestinations(); } catch { /* no bridge */ }
+    addScriptTrace('log', '',
+      'ports(): the port list has not been enumerated yet — requesting it now. Call again from a '
+      + 'later handler. In the exported plugin this read is synchronous and complete on the first call.');
+  }
+
+  const out = [];
+  const add = (port, dir, which) => {
+    const type = String(port?.type ?? '');
+    out.push({
+      id: String(port?.id ?? ''),
+      name: String(port?.name ?? port?.id ?? ''),
+      direction: dir,
+      type,
+      // The two placeholder rows the app always lists are choices, not hardware. Both are reported
+      // — they are what a mapping can be set to — but a script asking "did a device show up" wants
+      // this flag, not a list of magic type strings to compare against.
+      hardware: type !== 'none' && type !== 'previewOnly',
+      role: roleUsing(port?.id, which),
+    });
+  };
+  if (direction !== 'out' && direction !== 'output') for (const p of inputs) add(p, 'in', 'midiInput');
+  if (direction !== 'in' && direction !== 'input') for (const p of outputs) add(p, 'out', 'midiDestination');
+  return out;
+}
+
+let portsRequested = false;
+
+/**
+ * requestDump(kind [, fn [, opts]]) — closing the loop.
+ *
+ * Fire-and-forget was the odd one out: deviceRead already answers where it is called, and a dump's
+ * answer turned up at onDumpReceived with nothing tying it to the request. A panel that asked for
+ * two dumps in a row could not tell which reply was which.
+ *
+ * Three rules, and each of them is protecting against a specific way this shape goes wrong:
+ *   1. The waiter is removed BEFORE the callback runs, so a throw inside it cannot leave a waiter
+ *      that fires again on the next dump — the same rule after() follows for the same reason.
+ *   2. A waiter that never hears back is resolved with `ok = false` rather than left hanging. A
+ *      synth that is off, or does not answer this request, is the common case, not the exotic one.
+ *   3. The callback is OPTIONAL and the old spelling is untouched: requestDump("patch") still
+ *      means what it always meant, and still reaches onDumpReceived.
+ */
+// Matched on KIND alone, never on role. requestDump's host primitive is requestDump(kind) in every
+// C++ engine, so a role argument here would be an option the panel view honoured and the shipped
+// plugin quietly ignored — the exact asymmetry this API spent two rounds removing. A script that
+// needs another device sends inside routeMidi(role, fn).
+const dumpWaiters = [];        // { kind, fn, scriptId, timerId, done }
+
+function resolveDumpWaiters(kind, role, values, error = '') {
+  if (!dumpWaiters.length) return;
+  const matched = dumpWaiters.filter((w) => !w.done && (w.kind === '' || w.kind === String(kind ?? '')));
+  for (const waiter of matched) {
+    // Removed first: a throw inside the callback must not leave it armed for the next dump.
+    waiter.done = true;
+    const at = dumpWaiters.indexOf(waiter);
+    if (at >= 0) dumpWaiters.splice(at, 1);
+    if (waiter.timerId) stopTimer(waiter.timerId);
+    try {
+      waiter.fn(error ? undefined : values, { ok: !error, kind: String(kind ?? ''), role: String(role ?? ''), error });
+    } catch (e) {
+      reportScriptError(waiter.scriptId, e);
+    }
+  }
+}
+
+function requestDumpImpl(kind, fn, opts, scriptId = '') {
+  const key = String(kind ?? '');
+  const role = DEFAULT_ROLE;
+
+  if (typeof fn === 'function') {
+    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
+    const waiter = { kind: key, fn, scriptId, timerId: null, done: false };
+    dumpWaiters.push(waiter);
+    // A one-shot the RUNTIME owns rather than one the script asked for, so a script cannot cancel
+    // somebody else's timeout by id, and stopAllTimers on panel close takes it with the panel.
+    waiter.timerId = scheduleOneShot(ms, () => {
+      if (waiter.done) return;
+      resolveDumpWaiters(key, role, undefined, `no dump arrived within ${ms}ms`);
+    });
+  }
+
+  // A layout the SCRIPT declared carries its own request bytes, so asking for it is a raw send and
+  // needs no profile at all — which is the case defineDump exists for.
+  if (hasDefinedDump(role, key)) {
+    const bytes = dumpRequestBytes(role, key);
+    if (!bytes.length) {
+      addScriptTrace('error', '',
+        `requestDump(${JSON.stringify(key)}): the declared layout has no request bytes, so there is `
+        + 'nothing to send. Add `request` to defineDump, or wait for the synth to send it unasked.');
+      return false;
+    }
+    sendRawMidi(bytes, `dump_${key}`);
+    return true;
+  }
+
+  if (isJuceAvailable()) {
+    startDeviceSync({ deviceRole: role, request: key });
+    addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) → device sync requested`);
+    return true;
+  }
+  addScriptTrace('midi', '', `requestDump(${JSON.stringify(key)}) — no device host`);
+  return false;
+}
+
+/** Drop every runtime declaration. Called wherever generated controls are cleared, for the same
+    reason: a build starts from what the author drew, plus what this run of the script declares. */
+export function clearDeviceRuntimeDefinitions() {
+  clearDeviceDefinitions();
+  portsRequested = false;
+  // A waiter outliving its panel would call back into a script that is gone, so it is dropped
+  // rather than resolved — the timeout notice is worth having while the panel is live and is
+  // noise once it is not.
+  for (const waiter of dumpWaiters.splice(0, dumpWaiters.length)) {
+    waiter.done = true;
+    if (waiter.timerId) stopTimer(waiter.timerId);
+  }
+}
 
 // @module ce.storage
 /* ------------------------------------------------------------------------------ ce.storage */
@@ -2313,6 +2611,15 @@ function buildApi(ownerName, scriptId = '') {
     deviceConnected: (role) => deviceConnectedRead(role || DEFAULT_ROLE),
     deviceRead: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
     deviceWrite: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    // ce.device — declaring what the app was not shipped knowing
+    deviceDefineParameter: (id, spec, role) => deviceDefineParameterImpl(id, spec, role || DEFAULT_ROLE),
+    deviceDefineDump: (kind, spec, role) => deviceDefineDumpImpl(kind, spec, role || DEFAULT_ROLE),
+    deviceBind: (control, parameterId, opts) => deviceBindImpl(control, parameterId, opts ?? {}),
+    deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
+    devicePorts: (opts) => devicePortsRead(opts ?? {}),
+    // The callback belongs to the calling script, so this is bound here rather than in midiApi —
+    // a throw inside it is reported against the script that scheduled it.
+    requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
     // ce.storage
     state: stateFor(scriptId),
     saveSetting: (key, value) => saveSetting(key, value),
@@ -3215,8 +3522,11 @@ function onPreviewModeChanged(on) {
     const firstTime = !live.readyFired.has(key);
     live.readyFired.add(key);
     // Phase 1b sits between load and ready, and the clear is what makes it idempotent: a build
-    // always starts from the authored panel, so running it twice cannot double the layout.
+    // always starts from the authored panel, so running it twice cannot double the layout. Runtime
+    // device declarations go with it, for the same reason and with the same effect — a build
+    // declares what it declares, rather than accumulating a second copy on every run.
     clearGeneratedControls();
+    clearDeviceRuntimeDefinitions();
     dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
       { event: 'onPanelBuild', controlName: null, payload: undefined },
@@ -3227,6 +3537,7 @@ function onPreviewModeChanged(on) {
     live.sessionLast.clear();
     stopAllTimers();   // a timer outliving the panel it belongs to keeps firing into nothing
     clearGeneratedControls();   // …and a generated control outliving its build is just litter
+    clearDeviceRuntimeDefinitions();  // …and a declared parameter outliving its panel binds nothing
     clearAllDrawings();         // …and a drawing outliving its panel is painted onto nothing
     stopAllAnimations();        // …and an animation writing into a panel that is gone is noise
     clearScriptUi();            // …and a message about a panel nobody is looking at is worse
@@ -3259,7 +3570,16 @@ function onDumpParsed(payload) {
   // Inbound origin: set()s inside these handlers are silent by default, or filling the panel from a
   // dump echoes the entire dump straight back at the synth.
   dispatchEvents(events, { inbound: true });
+  // …and only then the callbacks requestDump(kind, fn) registered. AFTER the declared events, so
+  // "the dump arrived" and "the dump I asked for arrived" cannot observe the panel in two different
+  // states — the same ordering rule after() follows inside a timer tick.
+  resolveDumpWaiters(payload?.dumpId ?? payload?.dumpName ?? '', role, values ?? {});
 }
+
+/** The two inbound doors, exposed so tests can knock on them directly. Both are wired to bridge
+    listeners in initPanelRuntime, which a test has no host to stand up. */
+export function onDumpParsedForTesting(payload) { onDumpParsed(payload); }
+export function deliverSysexForTesting(payload) { onSysexInputMessage(payload); }
 
 /* --- source 5: raw MIDI in (device host) --- */
 // Payload shapes are copied from the C++ player's own dispatch so a handler reads identically
@@ -3322,6 +3642,22 @@ function onSysexInputMessage(payload) {
   const bytes = hexToBytes(payload.hex);
   if (!bytes.length) return;
   dispatchEvents([{ event: 'onSysexIn', controlName: null, payload: bytes }], { inbound: true });  // bare byte array
+
+  // …and then the layouts the SCRIPT declared. onSysexIn fires either way: a declared layout adds
+  // a decoded reading of the message, it does not take the raw one away, and a panel that handles
+  // both must see both. Nothing happens at all when nothing is declared, which is what keeps every
+  // existing panel behaving exactly as it did.
+  const role = String(payload.deviceRole ?? '') || DEFAULT_ROLE;
+  const decoded = decodeRuntimeDump(role, payload.hex);
+  if (decoded == null) return;
+  if (!decoded.ok) {
+    // Reported, not silent: a sysex message arriving while layouts are declared and matching none
+    // of them is the single most likely thing to be wrong with a hand-written layout, and it is
+    // invisible otherwise. Traced rather than raised — a synth is entitled to send other messages.
+    addScriptTrace('log', '', `dump: ${decoded.error}`);
+    return;
+  }
+  onDumpParsed({ deviceRole: role, dumpId: decoded.kind, dumpName: decoded.name, values: decoded.values });
 }
 
 /* --- source 6: device connection state --- */

@@ -223,6 +223,22 @@ int CE_CALL host_device_query (void* ctx, const CeStr* kind, const CeValue* payl
     return 0;
 }
 
+int CE_CALL host_device_write (void* ctx, const CeStr* parameterId, const CeValue* value, const CeStr* role)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    return h->deviceWrite (parameterId ? fromCeStr (*parameterId) : juce::String(),
+                           value ? ceToVar (value) : juce::var(),
+                           role ? fromCeStr (*role) : juce::String()) ? 1 : 0;
+}
+
+int CE_CALL host_device_define (void* ctx, const CeStr* what, const CeStr* id, const CeValue* spec)
+{
+    auto* h = static_cast<HostCtx*> (ctx)->host;
+    return h->deviceDefine (what ? fromCeStr (*what) : juce::String(),
+                            id ? fromCeStr (*id) : juce::String(),
+                            spec ? ceToVar (spec) : juce::var()) ? 1 : 0;
+}
+
 int CE_CALL host_transport_state (void* ctx, CeValue* out)
 {
     auto* h = static_cast<HostCtx*> (ctx)->host;
@@ -453,6 +469,8 @@ private:
         m.vtable.send_midi = host_send_midi;
         m.vtable.save_setting = host_save_setting; m.vtable.load_setting = host_load_setting;
         m.vtable.device_query = host_device_query;
+        m.vtable.device_write = host_device_write;
+        m.vtable.device_define = host_device_define;
         m.vtable.transport_state = host_transport_state;
 
         if (ini (&m.vtable, &m.state) != 0 || m.state == nullptr)
