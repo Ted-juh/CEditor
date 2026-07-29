@@ -821,6 +821,181 @@ def gainToDb(gain):
         return __MIN_DB
     db = 20.0 * math.log10(g)
     return __MIN_DB if db < __MIN_DB else db
+
+# The rest of the arithmetic a synth panel actually does. Nothing here duplicates the language's
+# own scalar maths (min/max/abs/floor all exist); what IS here is domain-specific, list-shaped, or
+# has to be identical in five runtimes to be worth anything.
+def __num(v, fallback=0.0):
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return fallback
+    return x if x == x and x not in (float('inf'), float('-inf')) else fallback
+
+# norm/denorm CLAMP. scale(v, lo, hi, 0, 1) is the hand-rolled version and does not, so a value
+# past the end came out past 1 and stayed wrong all the way down the chain.
+def norm(v, lo, hi):
+    a, b = __num(lo), __num(hi)
+    if a == b:
+        return 0.0
+    t = (__num(v) - a) / (b - a)
+    return 0.0 if t < 0 else (1.0 if t > 1 else t)
+
+def denorm(t, lo, hi):
+    a, b, x = __num(lo), __num(hi), __num(t)
+    x = 0.0 if x < 0 else (1.0 if x > 1 else x)
+    return a + x * (b - a)
+
+def bipolar(t): return __num(t) * 2 - 1
+def unipolar(v): return (__num(v) + 1) / 2
+
+# fold comes back OFF the end instead of round it. wrap() jumps top to bottom, which is right for a
+# pitch class and wrong for a modulation depth — a fold reflects, so movement stays continuous.
+def fold(v, lo, hi):
+    a, b = __num(lo), __num(hi)
+    span = b - a
+    if not span > 0:
+        return a
+    t = abs(__num(v) - a) % (span * 2)
+    return a + (span * 2 - t if t > span else t)
+
+# 0..1 to one of `count`, zero-based. The hand-rolled floor(t * count) returns `count` itself at
+# exactly 1.0 — one past the end of the list it addresses, and only when a knob is fully up.
+def indexOfRange(t, count):
+    import math
+    n = math.floor(__num(count))
+    if n <= 0:
+        return 0
+    i = math.floor(norm(t, 0, 1) * n)
+    return n - 1 if i >= n else i
+
+# The Crossfader component's three laws, which a script could not compute. equalPower is the one
+# that matters: a linear fade between two sounds dips in the middle, audibly.
+def crossfade(a, b, t, law=None):
+    import math
+    x, frm, to = norm(t, 0, 1), __num(a), __num(b)
+    law = str(law if law is not None else "linear").lower()
+    if law == "equalpower":
+        angle = x * math.pi / 2
+        return frm * math.cos(angle) + to * math.sin(angle)
+    if law == "sharp":
+        g = x * x * (3 - 2 * x)
+        return frm * (1 - g) + to * g
+    return frm + (to - frm) * x
+
+# A rate limit with no state of its own, so it works from any handler without a timer. ce.anim owns
+# motion the RUNTIME drives; this is the one a script drives itself, per incoming message.
+def approach(current, target, maxStep):
+    frm, to, step = __num(current), __num(target), abs(__num(maxStep))
+    if not step > 0:
+        return to
+    delta = to - frm
+    if abs(delta) <= step:
+        return to
+    return frm + (step if delta > 0 else -step)
+
+def roundTo(v, decimals):
+    import math
+    d = math.floor(__num(decimals))
+    f = 10.0 ** (0 if d < 0 else d)
+    return round(__num(v) * f) / f
+
+def almost(a, b, epsilon=None):
+    tol = abs(__num(epsilon, 1e-9)) or 1e-9
+    return abs(__num(a) - __num(b)) <= tol
+
+def __nums(values):
+    out = []
+    for x in (values or []):
+        try:
+            out.append(float(x))
+        except (TypeError, ValueError):
+            pass
+    return out
+
+def minOf(values):
+    l = __nums(values)
+    return min(l) if l else None
+
+def maxOf(values):
+    l = __nums(values)
+    return max(l) if l else None
+
+def sumOf(values):
+    return sum(__nums(values))
+
+def meanOf(values):
+    l = __nums(values)
+    return sum(l) / len(l) if l else None
+
+# Morph one list into another, which is what a snapshot morph IS. The SHORTER list decides the
+# length: padding with zeros would drag the missing entries to nothing, and on a patch that is a
+# set of parameters slammed to their minimum.
+def blend(a, b, t):
+    frm, to, x = __nums(a), __nums(b), __num(t)
+    return [frm[i] + (to[i] - frm[i]) * x for i in range(min(len(frm), len(to)))]
+
+# Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
+# them a panel used.
+def randomFloat(lo, hi):
+    a, b = __num(lo), __num(hi, 1)
+    return a + random() * (b - a)
+
+# A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
+# Box-Muller, always two draws — it deliberately does NOT cache the second value the way the
+# textbook version does, because a varying draw count would break seed replay.
+def randomGaussian(mean=0, sd=1):
+    import math
+    u1 = random()
+    if u1 < 1e-12:
+        u1 = 1e-12
+    u2 = random()
+    z = math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
+    return __num(mean) + z * __num(sd, 1)
+
+# Folded rather than clamped: a walk that clamps sticks to the end it hit and stops moving.
+def randomWalk(current, step, lo=None, hi=None):
+    nextValue = __num(current) + (random() * 2 - 1) * abs(__num(step))
+    if lo is None or hi is None:
+        return nextValue
+    return fold(nextValue, __num(lo), __num(hi))
+
+def randomBool(chance=0.5):
+    return random() < __num(chance, 0.5)
+
+def shuffle(values):
+    import math
+    out = list(values or [])
+    for i in range(len(out) - 1, 0, -1):
+        j = math.floor(random() * (i + 1))
+        out[i], out[j] = out[j], out[i]
+    return out
+
+# Geometry, in ce.draw's convention: DEGREES, 0 at twelve o'clock, clockwise. Rebuilding that from
+# atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.
+def toDegrees(radians):
+    import math
+    return __num(radians) * 180 / math.pi
+
+def toRadians(degrees):
+    import math
+    return __num(degrees) * math.pi / 180
+
+def distance(x1, y1, x2, y2):
+    import math
+    dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+    return math.sqrt(dx * dx + dy * dy)
+
+def angleOf(x1, y1, x2, y2):
+    import math
+    dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+    a = toDegrees(math.atan2(dx, -dy))
+    return a + 360 if a < 0 else a
+
+def polar(angle, radius):
+    import math
+    a, r = toRadians(__num(angle)), __num(radius)
+    return { "x": math.sin(a) * r, "y": -math.cos(a) * r }
 # @module ce.math
 # A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 # Seeded is the whole point: the language's own random cannot promise the same sequence in five
@@ -1128,8 +1303,12 @@ def __webviewOnly(name):
         log("[panel] " + name + "() needs the panel window open — that component is drawn and modelled in the panel view, so there is nothing to drive while the window is closed.")
         return None
     return stub
-for __n in __WEBVIEW_ONLY:
-    globals()[__n] = __webviewOnly(__n)
+for __stubName in __WEBVIEW_ONLY:
+    globals()[__stubName] = __webviewOnly(__stubName)
+# del, because a module-level loop variable OUTLIVES the loop in Python: this one was called __n
+# and shadowed a prelude helper of the same name with the last stub's NAME - a string where a
+# function belonged, which fails only when the helper is called, and only in this one engine.
+del __stubName
 # END GENERATED webview-only stubs
 
 # @module ce.ui
@@ -1409,7 +1588,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "choice": "randomChoice", "clamp": "clamp", "curve": "curve", "dbToGain": "dbToGain", "gainToDb": "gainToDb", "lerp": "lerp", "map": "mapCurve", "quantize": "quantizeTo", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbToGain": "dbToGain", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shuffle": "shuffle", "snap": "snap", "sum": "sumOf", "unipolar": "unipolar", "walk": "randomWalk", "wrap": "wrap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1451,7 +1630,7 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.2", "runtime": "any" },
+    { "id": "ce.math", "version": "1.3", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },

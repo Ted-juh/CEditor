@@ -614,8 +614,12 @@ def __webviewOnly(name):
         log("[panel] " + name + "${STUB_MESSAGE}")
         return None
     return stub
-for __n in __WEBVIEW_ONLY:
-    globals()[__n] = __webviewOnly(__n)
+for __stubName in __WEBVIEW_ONLY:
+    globals()[__stubName] = __webviewOnly(__stubName)
+# del, because a module-level loop variable OUTLIVES the loop in Python: this one was called __n
+# and shadowed a prelude helper of the same name with the last stub's NAME - a string where a
+# function belonged, which fails only when the helper is called, and only in this one engine.
+del __stubName
 # ${STUBS_END}`;
 }
 

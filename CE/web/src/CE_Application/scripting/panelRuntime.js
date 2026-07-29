@@ -647,6 +647,253 @@ function randomChoiceImpl(values, weights) {
 // a number half the runtimes cannot carry through a value and none of them can put on a label.
 const MIN_DB = -144;
 
+/* ------------------------------------------------------- ce.math: the rest of the arithmetic */
+// Everything below is what a synth panel actually computes and had to hand-roll. The rule from Q10
+// still holds and is what keeps the list finite: nothing here duplicates the language's own scalar
+// maths (min/max/abs/floor/ceil/sin all already exist in every runtime). What IS here is either
+// domain-specific, list-shaped (where Lua's varargs make the language version unusable), or must
+// be identical in five runtimes to be worth anything at all.
+
+const num = (v, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
+
+/** A list however the language spelled it — a JS array, or a Lua table over the wasmoon bridge. */
+function toList(values) {
+  if (Array.isArray(values)) return values;
+  if (values && typeof values === 'object') return Object.values(values);
+  return [];
+}
+
+// --- range and normalisation -------------------------------------------------------------
+// The value model already has three faces (.value / .normalizedValue / .midiValue). A script
+// converting between them by hand was writing scale() with the same two arguments every time —
+// and scale() does NOT clamp, so a value past the end came out past 0..1 and stayed wrong.
+
+function normImpl(v, lo, hi) {
+  const a = num(lo), b = num(hi);
+  if (a === b) return 0;
+  const t = (num(v) - a) / (b - a);
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+function denormImpl(t, lo, hi) {
+  const a = num(lo), b = num(hi);
+  const x = num(t);
+  return a + (x < 0 ? 0 : x > 1 ? 1 : x) * (b - a);
+}
+/** 0..1 -> -1..1 and back: the two shapes a modulation source is ever in. */
+const bipolarImpl = (t) => num(t) * 2 - 1;
+const unipolarImpl = (v) => (num(v) + 1) / 2;
+
+/**
+ * fold(v, lo, hi) — come back off the end instead of round it.
+ *
+ * wrap() jumps from the top to the bottom, which is right for a pitch class and wrong for a
+ * modulation depth: a fold reflects, so the movement stays continuous. Wave folding is the audible
+ * version of the same idea, and neither is expressible with the language's %.
+ */
+function foldImpl(v, lo, hi) {
+  const a = num(lo), b = num(hi);
+  const span = b - a;
+  if (!(span > 0)) return a;
+  const t = Math.abs(num(v) - a) % (span * 2);
+  return a + (t > span ? span * 2 - t : t);
+}
+
+/**
+ * index(t, count) — 0..1 to one of `count`, zero-based.
+ *
+ * The hand-rolled floor(t * count) returns `count` itself at exactly 1.0, which is one past the
+ * end of every list it is used to address. That off-by-one only shows up when a knob is turned
+ * fully up, which is exactly when somebody is watching.
+ */
+function indexImpl(t, count) {
+  const n = Math.floor(num(count));
+  if (n <= 0) return 0;
+  const i = Math.floor(normImpl(t, 0, 1) * n);
+  return i >= n ? n - 1 : i;
+}
+
+// --- shaping -------------------------------------------------------------------------------
+
+/**
+ * crossfade(a, b, t [, law]) — the laws the Crossfader component already has, which a script
+ * could not compute. "equalPower" is the one that matters: a linear fade between two sounds dips
+ * in the middle, which is audible and is why the component defaults away from it.
+ */
+function crossfadeImpl(a, b, t, law) {
+  const x = normImpl(t, 0, 1);
+  const from = num(a), to = num(b);
+  const kind = String(law ?? 'linear').toLowerCase();
+  if (kind === 'equalpower') {
+    const angle = (x * Math.PI) / 2;
+    return from * Math.cos(angle) + to * Math.sin(angle);
+  }
+  if (kind === 'sharp') {
+    // The component's steep law: constant power squared, so the middle passes quickly.
+    const g = x * x * (3 - 2 * x);
+    return from * (1 - g) + to * g;
+  }
+  return from + (to - from) * x;
+}
+
+/**
+ * approach(current, target, maxStep) — move, but no further than this in one go.
+ *
+ * A rate limit with no state of its own, so it works from any handler without the script keeping
+ * a timer. ce.anim owns motion the RUNTIME drives; this is the one a script drives itself, per
+ * incoming message — which is how you smooth a jumpy expression pedal.
+ */
+function approachImpl(current, target, maxStep) {
+  const from = num(current), to = num(target);
+  const step = Math.abs(num(maxStep));
+  if (!(step > 0)) return to;
+  const delta = to - from;
+  if (Math.abs(delta) <= step) return to;
+  return from + (delta > 0 ? step : -step);
+}
+
+// --- rounding and comparison ---------------------------------------------------------------
+
+/** roundTo(v, decimals) — for a readout. JS's toFixed returns a STRING and Lua has no equivalent. */
+function roundToImpl(v, decimals) {
+  const d = Math.floor(num(decimals));
+  const f = 10 ** (d < 0 ? 0 : d);
+  return Math.round(num(v) * f) / f;
+}
+
+/**
+ * almost(a, b [, epsilon]) — float comparison that means what == is assumed to mean.
+ *
+ * A panel compares values constantly (has this reached its target, is this at the detent) and
+ * every one of those comparisons is on a float that arrived through a scale() or a curve().
+ */
+function almostImpl(a, b, epsilon) {
+  const tol = Math.abs(num(epsilon, 1e-9));
+  return Math.abs(num(a) - num(b)) <= (tol || 1e-9);
+}
+
+// --- lists ---------------------------------------------------------------------------------
+// Lua's math.min/max take VARARGS, so over a table they need table.unpack and fall over on a long
+// one; JavaScript needs a spread with the same limit. Over a list these are genuinely missing in
+// both, and a panel deals in lists constantly — macro slots, matrix rows, envelope points, the
+// values out of a dump.
+
+function minOfImpl(values) {
+  const list = toNumberList(values);
+  if (!list.length) return undefined;
+  let best = list[0];
+  for (const n of list) if (n < best) best = n;
+  return best;
+}
+function maxOfImpl(values) {
+  const list = toNumberList(values);
+  if (!list.length) return undefined;
+  let best = list[0];
+  for (const n of list) if (n > best) best = n;
+  return best;
+}
+function sumImpl(values) {
+  let total = 0;
+  for (const n of toNumberList(values)) total += n;
+  return total;
+}
+function meanImpl(values) {
+  const list = toNumberList(values);
+  return list.length ? sumImpl(list) / list.length : undefined;
+}
+
+/**
+ * blend(a, b, t) — morph one set of values into another, element by element.
+ *
+ * This is what a snapshot morph IS, and a script could only do it a value at a time. The shorter
+ * list decides the length: padding with zeros would silently drag the missing entries to nothing,
+ * which on a patch is a set of parameters slammed to their minimum.
+ */
+function blendImpl(a, b, t) {
+  const from = toNumberList(a);
+  const to = toNumberList(b);
+  const x = num(t);
+  const n = Math.min(from.length, to.length);
+  const out = [];
+  for (let i = 0; i < n; i += 1) out.push(from[i] + (to[i] - from[i]) * x);
+  return out;
+}
+
+// --- randomness ----------------------------------------------------------------------------
+// All of these draw from the SEEDED generator, and each one draws a FIXED number of times, so a
+// seed replays the whole sequence regardless of which of them a panel used. That rule is why
+// randomGaussian does not cache Box-Muller's second value the way the textbook version does.
+
+/** The seeded float in a range — random(lo, hi) returns whole numbers, so this did not exist. */
+function randomFloatImpl(lo, hi) {
+  const a = num(lo), b = num(hi, 1);
+  return a + randomNext() * (b - a);
+}
+
+/**
+ * randomGaussian([mean, sd]) — a bell rather than a slab. Humanising velocity or timing with a
+ * uniform random is the thing that sounds mechanical; most of the values should be near the middle.
+ * Box-Muller, always consuming exactly two draws.
+ */
+function randomGaussianImpl(mean, sd) {
+  const u1 = Math.max(randomNext(), 1e-12);   // ln(0) is not a number anyone wants downstream
+  const u2 = randomNext();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return num(mean) + z * num(sd, 1);
+}
+
+/** randomWalk(current, step, lo, hi) — drift, not jump. A generative line that stays musical. */
+function randomWalkImpl(current, step, lo, hi) {
+  const move = (randomNext() * 2 - 1) * Math.abs(num(step));
+  const next = num(current) + move;
+  if (lo === undefined || lo === null || hi === undefined || hi === null) return next;
+  // Folded rather than clamped: a walk that clamps sticks to the end it hit and stops moving.
+  return foldImpl(next, num(lo), num(hi));
+}
+
+/** randomBool([chance]) — a weighted coin. The probability gate every step sequencer wants. */
+function randomBoolImpl(chance) {
+  return randomNext() < num(chance, 0.5);
+}
+
+/** shuffle(values) — seeded Fisher-Yates, returning a NEW list. Draws exactly n-1 times. */
+function shuffleImpl(values) {
+  const out = [...toList(values)];
+  for (let i = out.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(randomNext() * (i + 1));
+    const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
+  }
+  return out;
+}
+
+// --- geometry ------------------------------------------------------------------------------
+// For XY pads, joysticks, the Orbit and Ribbon, and above all ce.draw — whose arcs are DEGREES
+// with 0 at twelve o'clock, clockwise. A script drawing a knob ring had to know that convention
+// and rebuild atan2 against it; getting the quadrant wrong is a pointer that runs backwards.
+
+const degImpl = (radians) => (num(radians) * 180) / Math.PI;
+const radImpl = (degrees) => (num(degrees) * Math.PI) / 180;
+
+function distanceImpl(x1, y1, x2, y2) {
+  const dx = num(x2) - num(x1);
+  const dy = num(y2) - num(y1);
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+/** The angle from (x1,y1) to (x2,y2), in ce.draw's convention: degrees, 0 up, clockwise, 0..360. */
+function angleOfImpl(x1, y1, x2, y2) {
+  const dx = num(x2) - num(x1);
+  const dy = num(y2) - num(y1);
+  const a = degImpl(Math.atan2(dx, -dy));
+  return a < 0 ? a + 360 : a;
+}
+
+/** polar(angle, radius) — the inverse, in the same convention. { x, y } offsets from the centre. */
+function polarImpl(angle, radius) {
+  const a = radImpl(num(angle));
+  const r = num(radius);
+  return { x: Math.sin(a) * r, y: -Math.cos(a) * r };
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -670,6 +917,37 @@ const helpers = {
   mapCurve: (v, points) => mapCurveImpl(v, points),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   randomChoice: (values, weights) => randomChoiceImpl(values, weights),
+  // range and normalisation
+  norm: (v, lo, hi) => normImpl(v, lo, hi),
+  denorm: (t, lo, hi) => denormImpl(t, lo, hi),
+  bipolar: (t) => bipolarImpl(t),
+  unipolar: (v) => unipolarImpl(v),
+  fold: (v, lo, hi) => foldImpl(v, lo, hi),
+  indexOfRange: (t, count) => indexImpl(t, count),
+  // shaping
+  crossfade: (a, b, t, law) => crossfadeImpl(a, b, t, law),
+  approach: (current, target, maxStep) => approachImpl(current, target, maxStep),
+  // rounding and comparison
+  roundTo: (v, decimals) => roundToImpl(v, decimals),
+  almost: (a, b, epsilon) => almostImpl(a, b, epsilon),
+  // lists
+  minOf: (values) => minOfImpl(values),
+  maxOf: (values) => maxOfImpl(values),
+  sumOf: (values) => sumImpl(values),
+  meanOf: (values) => meanImpl(values),
+  blend: (a, b, t) => blendImpl(a, b, t),
+  // randomness — every one draws a FIXED number of times, so a seed replays whatever was used
+  randomFloat: (lo, hi) => randomFloatImpl(lo, hi),
+  randomGaussian: (mean, sd) => randomGaussianImpl(mean, sd),
+  randomWalk: (current, step, lo, hi) => randomWalkImpl(current, step, lo, hi),
+  randomBool: (chance) => randomBoolImpl(chance),
+  shuffle: (values) => shuffleImpl(values),
+  // geometry
+  toDegrees: (radians) => degImpl(radians),
+  toRadians: (degrees) => radImpl(degrees),
+  distance: (x1, y1, x2, y2) => distanceImpl(x1, y1, x2, y2),
+  angleOf: (x1, y1, x2, y2) => angleOfImpl(x1, y1, x2, y2),
+  polar: (angle, radius) => polarImpl(angle, radius),
   dbToGain: (db) => (Number.isFinite(Number(db)) ? 10 ** (Number(db) / 20) : 0),
   gainToDb: (gain) => {
     const g = Number(gain);

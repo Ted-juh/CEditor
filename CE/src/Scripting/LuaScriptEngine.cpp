@@ -205,6 +205,177 @@ function gainToDb(gain)
   if db < __MIN_DB then return __MIN_DB end
   return db
 end
+-- The rest of the arithmetic a synth panel actually does. Nothing here duplicates the language's
+-- own scalar maths (math.min/max/abs/floor all exist); what IS here is domain-specific,
+-- list-shaped (math.min takes varargs, which is unusable over a long table), or has to be
+-- identical in five runtimes to be worth anything.
+local function __num(v, fallback) local x = tonumber(v) if x == nil then return fallback or 0 end return x end
+-- norm/denorm CLAMP. scale(v, lo, hi, 0, 1) is the hand-rolled version and does not, so a value
+-- past the end came out past 1 and stayed wrong all the way down the chain.
+function norm(v, lo, hi)
+  local a, b = __num(lo), __num(hi)
+  if a == b then return 0 end
+  local t = (__num(v) - a) / (b - a)
+  if t < 0 then return 0 elseif t > 1 then return 1 end
+  return t
+end
+function denorm(t, lo, hi)
+  local a, b, x = __num(lo), __num(hi), __num(t)
+  if x < 0 then x = 0 elseif x > 1 then x = 1 end
+  return a + x * (b - a)
+end
+function bipolar(t) return __num(t) * 2 - 1 end
+function unipolar(v) return (__num(v) + 1) / 2 end
+-- fold comes back OFF the end instead of round it. wrap() jumps top to bottom, which is right for
+-- a pitch class and wrong for a modulation depth — a fold reflects, so movement stays continuous.
+function fold(v, lo, hi)
+  local a, b = __num(lo), __num(hi)
+  local span = b - a
+  if not (span > 0) then return a end
+  local t = math.abs(__num(v) - a) % (span * 2)
+  if t > span then return a + span * 2 - t end
+  return a + t
+end
+-- 0..1 to one of `count`, zero-based. The hand-rolled floor(t * count) returns `count` itself at
+-- exactly 1.0 — one past the end of the list it addresses, and only when a knob is fully up.
+function indexOfRange(t, count)
+  local n = math.floor(__num(count))
+  if n <= 0 then return 0 end
+  local i = math.floor(norm(t, 0, 1) * n)
+  if i >= n then return n - 1 end
+  return i
+end
+-- The Crossfader component's three laws, which a script could not compute. equalPower is the one
+-- that matters: a linear fade between two sounds dips in the middle, audibly.
+function crossfade(a, b, t, law)
+  local x, from, to = norm(t, 0, 1), __num(a), __num(b)
+  law = tostring(law or "linear"):lower()
+  if law == "equalpower" then
+    local angle = x * math.pi / 2
+    return from * math.cos(angle) + to * math.sin(angle)
+  elseif law == "sharp" then
+    local g = x * x * (3 - 2 * x)
+    return from * (1 - g) + to * g
+  end
+  return from + (to - from) * x
+end
+-- A rate limit with no state of its own, so it works from any handler without a timer. ce.anim owns
+-- motion the RUNTIME drives; this is the one a script drives itself, per incoming message.
+function approach(current, target, maxStep)
+  local from, to, step = __num(current), __num(target), math.abs(__num(maxStep))
+  if not (step > 0) then return to end
+  local delta = to - from
+  if math.abs(delta) <= step then return to end
+  if delta > 0 then return from + step end
+  return from - step
+end
+function roundTo(v, decimals)
+  local d = math.floor(__num(decimals))
+  if d < 0 then d = 0 end
+  local f = 10 ^ d
+  return round(__num(v) * f) / f
+end
+function almost(a, b, epsilon)
+  local tol = math.abs(__num(epsilon, 1e-9))
+  if tol == 0 then tol = 1e-9 end
+  return math.abs(__num(a) - __num(b)) <= tol
+end
+local function __nums(values)
+  local out = {}
+  if type(values) == "table" then
+    for _, x in ipairs(values) do
+      local n = tonumber(x)
+      if n ~= nil then out[#out + 1] = n end
+    end
+  end
+  return out
+end
+function minOf(values)
+  local l = __nums(values)
+  if #l == 0 then return nil end
+  local best = l[1]
+  for _, n in ipairs(l) do if n < best then best = n end end
+  return best
+end
+function maxOf(values)
+  local l = __nums(values)
+  if #l == 0 then return nil end
+  local best = l[1]
+  for _, n in ipairs(l) do if n > best then best = n end end
+  return best
+end
+function sumOf(values)
+  local total = 0
+  for _, n in ipairs(__nums(values)) do total = total + n end
+  return total
+end
+function meanOf(values)
+  local l = __nums(values)
+  if #l == 0 then return nil end
+  return sumOf(l) / #l
+end
+-- Morph one list into another, which is what a snapshot morph IS. The SHORTER list decides the
+-- length: padding with zeros would drag the missing entries to nothing, and on a patch that is a
+-- set of parameters slammed to their minimum.
+function blend(a, b, t)
+  local from, to, x = __nums(a), __nums(b), __num(t)
+  local n = math.min(#from, #to)
+  local out = {}
+  for i = 1, n do out[i] = from[i] + (to[i] - from[i]) * x end
+  return out
+end
+-- Every random below draws a FIXED number of times, so a seed replays the sequence whichever of
+-- them a panel used.
+function randomFloat(lo, hi)
+  local a, b = __num(lo), __num(hi, 1)
+  return a + random() * (b - a)
+end
+-- A bell rather than a slab: humanising velocity with a uniform random is what sounds mechanical.
+-- Box-Muller, always two draws — it deliberately does NOT cache the second value the way the
+-- textbook version does, because a varying draw count would break seed replay.
+function randomGaussian(mean, sd)
+  local u1 = random()
+  if u1 < 1e-12 then u1 = 1e-12 end
+  local u2 = random()
+  local z = math.sqrt(-2 * math.log(u1)) * math.cos(2 * math.pi * u2)
+  return __num(mean) + z * __num(sd, 1)
+end
+-- Folded rather than clamped: a walk that clamps sticks to the end it hit and stops moving.
+function randomWalk(current, step, lo, hi)
+  -- nextValue, not next: shadowing Lua's builtin `next` inside the function is legal and reads
+  -- like a bug to anyone who scans past it.
+  local nextValue = __num(current) + (random() * 2 - 1) * math.abs(__num(step))
+  if lo == nil or hi == nil then return nextValue end
+  return fold(nextValue, __num(lo), __num(hi))
+end
+function randomBool(chance) return random() < __num(chance, 0.5) end
+function shuffle(values)
+  local out = {}
+  if type(values) == "table" then for i, x in ipairs(values) do out[i] = x end end
+  for i = #out, 2, -1 do
+    local j = math.floor(random() * i) + 1
+    out[i], out[j] = out[j], out[i]
+  end
+  return out
+end
+-- Geometry, in ce.draw's convention: DEGREES, 0 at twelve o'clock, clockwise. Rebuilding that from
+-- atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.
+function toDegrees(radians) return __num(radians) * 180 / math.pi end
+function toRadians(degrees) return __num(degrees) * math.pi / 180 end
+function distance(x1, y1, x2, y2)
+  local dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+  return math.sqrt(dx * dx + dy * dy)
+end
+function angleOf(x1, y1, x2, y2)
+  local dx, dy = __num(x2) - __num(x1), __num(y2) - __num(y1)
+  local a = toDegrees(math.atan(dx, -dy))
+  if a < 0 then return a + 360 end
+  return a
+end
+function polar(angle, radius)
+  local a, r = toRadians(__num(angle)), __num(radius)
+  return { x = math.sin(a) * r, y = -math.cos(a) * r }
+end
 -- @module ce.math
 -- A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 -- Seeded is the whole point: the language's own math.random cannot promise the same sequence in
@@ -819,7 +990,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { choice = "randomChoice", clamp = "clamp", curve = "curve", dbToGain = "dbToGain", gainToDb = "gainToDb", lerp = "lerp", map = "mapCurve", quantize = "quantizeTo", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbToGain = "dbToGain", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shuffle = "shuffle", snap = "snap", sum = "sumOf", unipolar = "unipolar", walk = "randomWalk", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -861,7 +1032,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.2", runtime = "any" },
+  { id = "ce.math", version = "1.3", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },

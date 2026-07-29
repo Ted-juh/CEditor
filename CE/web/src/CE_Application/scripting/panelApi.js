@@ -1717,6 +1717,57 @@ export const HELPERS = [
     summary: 'Decibels to a linear gain: 0 dB is 1, -6 dB is about 0.5. Neither Lua nor JavaScript has it, and a level control that reads in dB and sends a linear value needs it on every move.' },
   { id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
     summary: 'The inverse. A gain of zero or less returns -144 dB — the 24-bit noise floor — rather than negative infinity, which is a number half the runtimes cannot carry through a value and none can display.' },
+
+  // --- the rest of the arithmetic a synth panel actually does (design doc §32) ---
+  // Nothing here duplicates the language's own scalar maths — min/max/abs/floor/ceil/sin all exist
+  // in every runtime already, and that rule is what keeps the list finite. What IS here is either
+  // domain-specific, list-shaped (Lua's varargs make the language version unusable over a table),
+  // or has to be identical in five runtimes to be worth anything.
+  { id: 'norm', category: 'Value / range', signature: 'norm(v, lo, hi)',
+    summary: 'A value to its 0–1 position in a range, CLAMPED. scale(v, lo, hi, 0, 1) is the hand-rolled version and it does not clamp, so a value past the end came out past 1 and stayed wrong all the way down the chain. The value model already has a .normalizedValue face; this is that conversion for numbers a script is holding itself.' },
+  { id: 'denorm', category: 'Value / range', signature: 'denorm(t, lo, hi)',
+    summary: 'The inverse: a 0–1 position back into a range, clamped at both ends.' },
+  { id: 'bipolar', category: 'Value / range', signature: 'bipolar(t)',
+    summary: '0–1 to -1..+1. The two shapes a modulation source is ever in, and the conversion sits in the middle of every modulation script.' },
+  { id: 'unipolar', category: 'Value / range', signature: 'unipolar(v)',
+    summary: '-1..+1 back to 0–1.' },
+  { id: 'fold', category: 'Value / range', signature: 'fold(v, lo, hi)',
+    summary: 'Come back OFF the end of a range instead of round it. wrap() jumps from the top to the bottom, which is right for a pitch class and wrong for a modulation depth — a fold reflects, so the movement stays continuous. Wave folding is the audible version of the same idea, and neither is expressible with the language\'s %.' },
+  { id: 'indexOfRange', category: 'Value / range', signature: 'indexOfRange(t, count)',
+    summary: 'A 0–1 position to one of `count` slots, zero-based — which preset, which step, which pad. The hand-rolled floor(t * count) returns `count` itself at exactly 1.0, one past the end of the list it is addressing, and that off-by-one only appears when a knob is turned fully up.' },
+  { id: 'crossfade', category: 'Value / range', signature: 'crossfade(a, b, t [, law])',
+    summary: 'Blend a to b with a fade law: "linear", "equalPower" or "sharp" — the same three the Crossfader component has, which a script could not compute. equalPower is the one that matters: a linear fade between two sounds dips in the middle, audibly, which is why the component defaults away from it.' },
+  { id: 'approach', category: 'Value / range', signature: 'approach(current, target, maxStep)',
+    summary: 'Move toward a target, no further than maxStep in one call. A rate limit with no state of its own, so it works from any handler without the script keeping a timer — ce.anim owns motion the RUNTIME drives, this is the one a script drives itself, per incoming message. How you smooth a jumpy expression pedal.' },
+  { id: 'roundTo', category: 'Value / range', signature: 'roundTo(v, decimals)',
+    summary: 'Round to a number of decimal places, for a readout. JavaScript\'s toFixed returns a STRING and Lua has no equivalent at all, so every panel showing a tidy number wrote this itself.' },
+  { id: 'almost', category: 'Value / range', signature: 'almost(a, b [, epsilon])',
+    summary: 'Float comparison that means what == is assumed to mean. A panel compares values constantly — has this reached its target, is this at the detent — and every one of those values arrived through a scale() or a curve().' },
+  { id: 'minOf', category: 'Value / range', signature: 'minOf(values)',
+    summary: 'The smallest in a LIST, or nil for an empty one. Lua\'s math.min takes varargs, so over a table it needs table.unpack and falls over on a long one; JavaScript needs a spread with the same limit. A panel deals in lists constantly — macro slots, matrix rows, envelope points, the values out of a dump.' },
+  { id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)', summary: 'The largest in a list, or nil for an empty one.' },
+  { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list. Zero for an empty one — a sum of nothing is nothing, not an absence.' },
+  { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one — unlike a sum, an average of nothing does not exist.' },
+  { id: 'blend', category: 'Value / range', signature: 'blend(a, b, t)',
+    summary: 'Morph one list of values into another, element by element — which is what a snapshot morph IS, and a script could only do it one value at a time. The SHORTER list decides the length: padding with zeros would drag the missing entries to nothing, and on a patch that is a set of parameters slammed to their minimum.' },
+  { id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
+    summary: 'A seeded random FLOAT in a range. random(lo, hi) returns whole numbers — the form a note or a step wants — so until now there was no seeded way to get a fractional one without doing the arithmetic by hand.' },
+  { id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
+    summary: 'A bell rather than a slab: most values near the middle. Humanising velocity or timing with a uniform random is the thing that sounds mechanical. Box-Muller, always consuming exactly two draws — it deliberately does NOT cache the second value the way the textbook version does, because a varying draw count would break seed replay.' },
+  { id: 'randomWalk', category: 'Value / range', signature: 'randomWalk(current, step, lo, hi)',
+    summary: 'Drift rather than jump — a generative line that stays musical. Folded at the ends rather than clamped, because a walk that clamps sticks to the end it hit and stops moving.' },
+  { id: 'randomBool', category: 'Value / range', signature: 'randomBool([chance])',
+    summary: 'A weighted coin — the probability gate every step sequencer wants. `chance` is the odds of true, 0.5 by default.' },
+  { id: 'shuffle', category: 'Value / range', signature: 'shuffle(values)',
+    summary: 'A NEW list in seeded random order (Fisher-Yates, exactly one draw per element after the first). The same seed shuffles the same way, which is what makes a shuffled pattern something you can get back.' },
+  { id: 'toDegrees', category: 'Value / range', signature: 'toDegrees(radians)', summary: 'Radians to degrees — the unit ce.draw\'s arcs are in.' },
+  { id: 'toRadians', category: 'Value / range', signature: 'toRadians(degrees)', summary: 'Degrees to radians — the unit the language\'s trigonometry is in.' },
+  { id: 'distance', category: 'Value / range', signature: 'distance(x1, y1, x2, y2)',
+    summary: 'The distance between two points. For XY pads, joysticks, the Orbit and hit testing in ce.draw.' },
+  { id: 'angleOf', category: 'Value / range', signature: 'angleOf(x1, y1, x2, y2)',
+    summary: 'The angle from one point to another in ce.draw\'s own convention: DEGREES, 0 at twelve o\'clock, increasing clockwise, 0–360. Rebuilding that from atan2 by hand is where a knob pointer ends up running backwards or a quadrant out.' },
+  { id: 'polar', category: 'Value / range', signature: 'polar(angle, radius)',
+    summary: 'The inverse: an angle and a radius to { x, y } offsets from a centre, in the same convention. Together with angleOf, what a knob ring, a radial meter or a pan indicator is drawn from.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
@@ -1832,7 +1883,7 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.math', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
@@ -1917,7 +1968,18 @@ const MODULE_MEMBERS = {
   'ce.math': { scale: 'scale', clamp: 'clamp', round: 'round', snap: 'snap', curve: 'curve',
                lerp: 'lerp', random: 'random', seed: 'randomSeed',
                wrap: 'wrap', map: 'mapCurve', quantize: 'quantizeTo', choice: 'randomChoice',
-               dbToGain: 'dbToGain', gainToDb: 'gainToDb' },
+               dbToGain: 'dbToGain', gainToDb: 'gainToDb',
+               // Namespaced these read as plain words; flat they keep a qualifier wherever a bare
+               // global would be a name a panel author reaches for first — `index`, `min`, `max`,
+               // `sum`, `mean` and `degrees` are exactly that, and `almost`/`fold`/`blend` are not.
+               norm: 'norm', denorm: 'denorm', bipolar: 'bipolar', unipolar: 'unipolar',
+               fold: 'fold', index: 'indexOfRange', crossfade: 'crossfade', approach: 'approach',
+               roundTo: 'roundTo', almost: 'almost',
+               min: 'minOf', max: 'maxOf', sum: 'sumOf', mean: 'meanOf', blend: 'blend',
+               randomFloat: 'randomFloat', gaussian: 'randomGaussian', walk: 'randomWalk',
+               chance: 'randomBool', shuffle: 'shuffle',
+               degrees: 'toDegrees', radians: 'toRadians',
+               distance: 'distance', angle: 'angleOf', polar: 'polar' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {

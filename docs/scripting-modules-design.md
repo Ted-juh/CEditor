@@ -2060,3 +2060,88 @@ whole-map write always worked. That was found by probing the live runtime rather
 and the corrected finding is sharper than the original — the problem is not access, it is
 *granularity*, and it comes from the key/path collision rather than from a missing feature. Reading
 the code produced a plausible answer; running it produced the true one.
+
+---
+
+## 32. `ce.math` completed — the arithmetic a panel actually does
+
+§30 added six members and closed a real cross-runtime defect, but it was not a *complete* pass: what
+was left was still only the scalar half. This is the rest of it, arrived at by working through what
+a synth panel actually computes rather than by looking for small additions.
+
+The rule from Q10 is what keeps the list finite and is worth restating, because it is the reason
+this is twenty-five members and not eighty: **nothing here duplicates the language's own scalar
+maths.** `min`, `max`, `abs`, `floor`, `ceil`, `sin` all exist in every runtime already. What is
+here is domain-specific, list-shaped (Lua's varargs make the language version unusable over a
+table), or has to be identical in five runtimes to be worth anything at all.
+
+| | |
+|---|---|
+| `norm` / `denorm` | a value to its 0–1 position and back, **clamped** |
+| `bipolar` / `unipolar` | the two shapes a modulation source is in |
+| `fold` | come back *off* the end instead of round it |
+| `index` | 0–1 to one of N, without the off-by-one |
+| `crossfade` | the Crossfader component's three laws |
+| `approach` | a rate limit with no state of its own |
+| `roundTo` / `almost` | a tidy number, and float comparison that means what `==` is assumed to |
+| `min` / `max` / `sum` / `mean` | over a **list** |
+| `blend` | morph one list of values into another |
+| `randomFloat` / `gaussian` / `walk` / `chance` / `shuffle` | the seeded generator, for generative panels |
+| `degrees` / `radians` / `distance` / `angle` / `polar` | geometry, in `ce.draw`'s own convention |
+
+### Four of these are bug-shaped, not feature-shaped
+
+- **`norm` clamps and `scale` does not.** `scale(v, lo, hi, 0, 1)` is the hand-rolled version, and
+  `scale(150, 0, 100, 0, 1)` is `1.5` — past the end, and still wrong everywhere it is used after.
+- **`index(1, 8)` is 7.** The hand-rolled `floor(t * count)` returns `8` at exactly 1.0, one past
+  the end of the list it is addressing, and that shows up only when a knob is turned fully up.
+- **`almost` exists because `0.1 + 0.2 ~= 0.3`.** A panel compares values constantly and every one
+  of those values arrived through a `scale()` or a `curve()`.
+- **`randomFloat` exists because `random(lo, hi)` returns whole numbers.** That is the right form
+  for a note or a step, and it meant there was no seeded way to get a fractional one at all.
+
+### The draw-count rule, and what it costs
+
+Every random member draws a **fixed** number of times, so a seed replays the sequence whichever of
+them a panel used. That is why `randomGaussian` does **not** cache Box-Muller's second value the way
+the textbook version does: caching makes it alternate between two draws and none, and everything
+downstream of a gaussian would land differently depending on how many had been taken before it. The
+test asserts the *draw count* — that what follows a gaussian equals what follows two plain draws —
+because the distribution is the part that would look fine either way.
+
+`randomWalk` **folds** at the ends rather than clamping, for a related reason: a walk that clamps
+piles up on whichever end it reached and stops being a walk. The test runs 300 steps and asserts it
+sits at an end fewer than 15 times.
+
+### `angle` and `polar` are `ce.draw`'s convention or they are nothing
+
+`ce.draw`'s arcs are **degrees, 0 at twelve o'clock, increasing clockwise**, matching the Meter's
+`arcStart`/`arcSweep`. A script drawing a knob ring had to rebuild `atan2` against that by hand, and
+getting the quadrant wrong is a pointer that runs backwards. So `angleOf` returns 0 for up, 90 for
+right, 270 for left — not −90 — and `polar` is its exact inverse. The round trip is asserted at five
+angles.
+
+### Running the preludes found a bug that parsing could not
+
+The three preludes were **executed** and compared case by case — 35 of them, including the seeded
+shuffle, which came out `3,2,4,5,1` from both the JavaScript and the Python generator after the same
+seed. That is the check that proves the two generators have not diverged.
+
+It also failed on the first run, in Python only, with `'str' object is not callable`. The generated
+webview-only stub block ends with:
+
+```python
+for __n in __WEBVIEW_ONLY:
+    globals()[__n] = __webviewOnly(__n)
+```
+
+and **a module-level loop variable outlives its loop in Python**. `__n` was left bound to the last
+stub's *name* — a string — and the new helper of the same name defined 500 lines earlier was gone.
+Every one of the twenty-five members would have failed at runtime, in the exported plugin, in one
+engine only, and nothing in the parity suite could have seen it: the names were all present, the
+file parsed, and the members existed. Only calling one found it.
+
+Fixed on both sides: the helper is `__num` now, and the generator's loop variable is `__stubName`
+with a `del` after it, so it cannot leak into a prelude again. **A generated block is code, and it
+shares a namespace with everything hand-written around it** — which had not been true of any
+generated block until one of them started emitting a loop.

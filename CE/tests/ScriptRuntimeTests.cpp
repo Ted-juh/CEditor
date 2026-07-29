@@ -2288,6 +2288,114 @@ int main()
         check (reported, tag + ": curve reports a shape it does not know");
     }
 
+    // 36) ce.math completed: range, shaping, lists, randomness, geometry (design doc §32) --------
+    //
+    // The numbers are the ones CE/web/test/scriptMath.test.js asserts, and they were produced by
+    // executing the JS and Python prelude sources side by side. A panel doing this arithmetic in
+    // the editor has to get the same answer in the shipped plugin — including the seeded shuffle,
+    // which is the check that proves the generator has not diverged.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("m2", lang, "panel", "onMath2", "*", isLua
+            ? "function onMath2()\n"
+              "  log(\"r \" .. tostring(norm(150, 0, 100)) .. \" \" .. tostring(denorm(0.25, 0, 200))\n"
+              "      .. \" \" .. tostring(bipolar(0.5)) .. \" \" .. tostring(unipolar(-1)))\n"
+              "  log(\"f \" .. tostring(fold(13, 0, 12)) .. \" \" .. tostring(fold(-1, 0, 12))\n"
+              "      .. \" \" .. tostring(indexOfRange(1, 8)))\n"
+              "  log(\"x \" .. tostring(crossfade(0, 1, 0.5, \"equalPower\"))\n"
+              "      .. \" \" .. tostring(approach(0, 10, 3)) .. \" \" .. tostring(roundTo(1.23456, 2)))\n"
+              "  log(\"a \" .. tostring(almost(0.1 + 0.2, 0.3)))\n"
+              "  log(\"l \" .. tostring(minOf({3,1,2})) .. \" \" .. tostring(maxOf({3,1,2}))\n"
+              "      .. \" \" .. tostring(sumOf({1,2,3})) .. \" \" .. tostring(meanOf({1,2,3})))\n"
+              "  local bl = blend({0,10}, {10,20,30}, 0.5)\n"
+              "  log(\"b \" .. tostring(#bl) .. \" \" .. tostring(bl[1]) .. \" \" .. tostring(bl[2]))\n"
+              "  randomSeed(9)\n"
+              "  local sh = shuffle({1,2,3,4,5})\n"
+              "  log(\"s \" .. table.concat(sh, \",\"))\n"
+              "  randomSeed(21) randomGaussian()\n"
+              "  local afterG = random()\n"
+              "  randomSeed(21) random() random()\n"
+              "  log(\"g \" .. tostring(random() == afterG))\n"
+              "  log(\"d \" .. tostring(angleOf(0,0,0,-1)) .. \" \" .. tostring(angleOf(0,0,1,0))\n"
+              "      .. \" \" .. tostring(angleOf(0,0,-1,0)) .. \" \" .. tostring(distance(0,0,3,4)))\n"
+              "end\n"
+            : "function onMath2() {\n"
+              "  log(\"r \" + norm(150, 0, 100) + \" \" + denorm(0.25, 0, 200)\n"
+              "      + \" \" + bipolar(0.5) + \" \" + unipolar(-1));\n"
+              "  log(\"f \" + fold(13, 0, 12) + \" \" + fold(-1, 0, 12) + \" \" + indexOfRange(1, 8));\n"
+              "  log(\"x \" + crossfade(0, 1, 0.5, \"equalPower\")\n"
+              "      + \" \" + approach(0, 10, 3) + \" \" + roundTo(1.23456, 2));\n"
+              "  log(\"a \" + almost(0.1 + 0.2, 0.3));\n"
+              "  log(\"l \" + minOf([3,1,2]) + \" \" + maxOf([3,1,2])\n"
+              "      + \" \" + sumOf([1,2,3]) + \" \" + meanOf([1,2,3]));\n"
+              "  var bl = blend([0,10], [10,20,30], 0.5);\n"
+              "  log(\"b \" + bl.length + \" \" + bl[0] + \" \" + bl[1]);\n"
+              "  randomSeed(9);\n"
+              "  log(\"s \" + shuffle([1,2,3,4,5]).join(\",\"));\n"
+              "  randomSeed(21); randomGaussian();\n"
+              "  var afterG = random();\n"
+              "  randomSeed(21); random(); random();\n"
+              "  log(\"g \" + (random() === afterG));\n"
+              "  log(\"d \" + angleOf(0,0,0,-1) + \" \" + angleOf(0,0,1,0)\n"
+              "      + \" \" + angleOf(0,0,-1,0) + \" \" + distance(0,0,3,4));\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        runtime.runAction ("onMath2", juce::var());
+
+        const auto line = [&host] (const juce::String& prefix) -> juce::String
+        {
+            for (const auto& l : host.logs) if (l.startsWith (prefix)) return l;
+            return {};
+        };
+        const auto fields = [&line] (const char* prefix)
+        {
+            const juce::String p (prefix);
+            return juce::StringArray::fromTokens (line (p).fromFirstOccurrenceOf (p, false, false), " ", "");
+        };
+        const juce::String tag (lang);
+        const auto near = [] (const juce::String& s, double want) { return std::abs (s.getDoubleValue() - want) < 1e-9; };
+
+        const auto r = fields ("r ");
+        check (r.size() == 4 && near (r[0], 1.0), tag + ": norm CLAMPS, which scale does not");
+        check (r.size() == 4 && near (r[1], 50.0), tag + ": denorm maps a 0-1 position back");
+        check (r.size() == 4 && near (r[2], 0.0) && near (r[3], 0.0), tag + ": bipolar / unipolar are inverses");
+
+        const auto f = fields ("f ");
+        check (f.size() == 3 && near (f[0], 11.0), tag + ": fold reflects where wrap jumps");
+        check (f.size() == 3 && near (f[1], 1.0), tag + ": …below the range too");
+        check (f.size() == 3 && near (f[2], 7.0), tag + ": index never returns one past the end");
+
+        const auto x = fields ("x ");
+        check (x.size() == 3 && near (x[0], 0.7071067811865475), tag + ": the equal-power law does not dip");
+        check (x.size() == 3 && near (x[1], 3.0), tag + ": approach moves by one step");
+        check (x.size() == 3 && near (x[2], 1.23), tag + ": roundTo returns a NUMBER");
+        check (line ("a ").contains ("true"), tag + ": almost is what == is assumed to mean");
+
+        const auto l = fields ("l ");
+        check (l.size() == 4 && near (l[0], 1.0) && near (l[1], 3.0), tag + ": min/max over a LIST");
+        check (l.size() == 4 && near (l[2], 6.0) && near (l[3], 2.0), tag + ": sum/mean over a list");
+
+        const auto b = fields ("b ");
+        check (b.size() == 3 && b[0].getIntValue() == 2, tag + ": blend takes the SHORTER length");
+        check (b.size() == 3 && near (b[1], 5.0) && near (b[2], 15.0), tag + ": …and interpolates each element");
+
+        // The seeded permutation, byte for byte. If a generator or a Fisher-Yates index ever
+        // diverges, a shuffled pattern stops replaying and nothing else would notice.
+        check (line ("s ").contains ("3,2,4,5,1"), tag + ": the same seed shuffles the same way (got " + line ("s ") + ")");
+        // Box-Muller must consume exactly two draws — caching the second value, as the textbook
+        // version does, would make what follows a gaussian alternate.
+        check (line ("g ").contains ("true"), tag + ": a gaussian draws exactly twice");
+
+        const auto d = fields ("d ");
+        // ce.draw's convention: degrees, 0 at twelve o'clock, clockwise. Left is 270, not -90.
+        check (d.size() == 4 && near (d[0], 0.0) && near (d[1], 90.0), tag + ": angleOf puts 0 at twelve o'clock");
+        check (d.size() == 4 && near (d[2], 270.0), tag + ": …and wraps left to 270 rather than -90");
+        check (d.size() == 4 && near (d[3], 5.0), tag + ": distance is a plain hypotenuse");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

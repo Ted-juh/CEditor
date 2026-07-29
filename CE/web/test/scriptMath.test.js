@@ -206,3 +206,265 @@ test('a shape curve does not know is reported rather than silently linear', () =
   api.curve(0.5);
   assert.equal(traced(), '', 'the names it knows stay quiet');
 });
+
+/* ==========================================================================================
+   The rest of the arithmetic a synth panel does (design doc §32).
+
+   ce.math was still only the scalar half. Everything below had to be hand-rolled per panel in
+   five languages, and the hand-rolled version is where the runtimes drift. The values are pinned
+   against the C++ preludes, which were executed side by side to produce them.
+   ========================================================================================== */
+
+test('the new members are declared, bound and namespaced', () => {
+  for (const [id, path] of [
+    ['norm', 'ce.math.norm'], ['denorm', 'ce.math.denorm'],
+    ['bipolar', 'ce.math.bipolar'], ['unipolar', 'ce.math.unipolar'],
+    ['fold', 'ce.math.fold'], ['indexOfRange', 'ce.math.index'],
+    ['crossfade', 'ce.math.crossfade'], ['approach', 'ce.math.approach'],
+    ['roundTo', 'ce.math.roundTo'], ['almost', 'ce.math.almost'],
+    ['minOf', 'ce.math.min'], ['maxOf', 'ce.math.max'],
+    ['sumOf', 'ce.math.sum'], ['meanOf', 'ce.math.mean'], ['blend', 'ce.math.blend'],
+    ['randomFloat', 'ce.math.randomFloat'], ['randomGaussian', 'ce.math.gaussian'],
+    ['randomWalk', 'ce.math.walk'], ['randomBool', 'ce.math.chance'], ['shuffle', 'ce.math.shuffle'],
+    ['toDegrees', 'ce.math.degrees'], ['toRadians', 'ce.math.radians'],
+    ['distance', 'ce.math.distance'], ['angleOf', 'ce.math.angle'], ['polar', 'ce.math.polar'],
+  ]) {
+    assert.ok(MEMBER_BY_ID[id], `${id} is not declared`);
+    assert.equal(memberPath(id), path);
+    assert.equal(typeof api[id], 'function', `${id} is not bound`);
+  }
+  // Flat spellings keep a qualifier wherever a bare global is a name a panel author reaches for
+  // first — `index`, `min`, `max`, `sum`, `mean`, `degrees` — and drop it where none would.
+  assert.equal(api.ce.math.index, api.indexOfRange);
+  assert.equal(api.ce.math.min, api.minOf);
+  assert.equal(api.ce.math.fold, api.fold);
+});
+
+/* ------------------------------------------------------------------ range and normalisation */
+
+test('norm and denorm CLAMP, which is the whole reason they exist beside scale', () => {
+  assert.equal(api.norm(50, 0, 100), 0.5);
+  // scale() does not clamp, so this is what a panel was getting instead — past the end and
+  // still wrong all the way down the chain.
+  assert.equal(api.scale(150, 0, 100, 0, 1), 1.5);
+  assert.equal(api.norm(150, 0, 100), 1);
+  assert.equal(api.norm(-50, 0, 100), 0);
+  assert.equal(api.denorm(0.25, 0, 200), 50);
+  assert.equal(api.denorm(2, 0, 200), 200, 'clamped at the top too');
+  for (const v of [0, 33, 100]) assert.ok(Math.abs(api.denorm(api.norm(v, 0, 100), 0, 100) - v) < 1e-9);
+  // A zero-width range has one answer rather than a division by zero.
+  assert.equal(api.norm(5, 3, 3), 0);
+});
+
+test('bipolar and unipolar are the two shapes a modulation source is in', () => {
+  assert.equal(api.bipolar(0), -1);
+  assert.equal(api.bipolar(0.5), 0);
+  assert.equal(api.bipolar(1), 1);
+  assert.equal(api.unipolar(-1), 0);
+  assert.equal(api.unipolar(0), 0.5);
+  for (const t of [0, 0.25, 1]) assert.ok(Math.abs(api.unipolar(api.bipolar(t)) - t) < 1e-9);
+});
+
+test('fold reflects where wrap jumps', () => {
+  // wrap is right for a pitch class; fold is right for a depth, because the movement stays
+  // continuous instead of snapping from the top to the bottom.
+  assert.equal(api.wrap(13, 0, 12), 1);
+  assert.equal(api.fold(13, 0, 12), 11);
+  assert.equal(api.fold(-1, 0, 12), 1);
+  assert.equal(api.fold(25, 0, 12), 1, 'and keeps reflecting past the second bounce');
+  assert.equal(api.fold(6, 0, 12), 6, 'inside the range it is the identity');
+  assert.equal(api.fold(5, 3, 3), 3, 'an empty range has one answer, not NaN');
+});
+
+test('index never returns one past the end, which is the bug it exists to stop', () => {
+  assert.equal(api.indexOfRange(0, 8), 0);
+  assert.equal(api.indexOfRange(0.99, 8), 7);
+  // The hand-rolled floor(t * count) returns 8 here — one past the end of an eight-item list,
+  // and only when the knob is turned fully up.
+  assert.equal(Math.floor(1 * 8), 8);
+  assert.equal(api.indexOfRange(1, 8), 7);
+  assert.equal(api.indexOfRange(0.5, 4), 2);
+  assert.equal(api.indexOfRange(0.5, 0), 0, 'an empty range addresses nothing');
+});
+
+/* -------------------------------------------------------------------------------- shaping */
+
+test('crossfade offers the laws the Crossfader component has', () => {
+  assert.equal(api.crossfade(0, 1, 0.5, 'linear'), 0.5);
+  // equalPower is the one that matters: a linear fade between two sounds dips in the middle.
+  assert.ok(Math.abs(api.crossfade(0, 1, 0.5, 'equalPower') - Math.SQRT1_2) < 1e-9);
+  assert.equal(api.crossfade(0, 1, 0.5, 'sharp'), 0.5);
+  // Every law still lands exactly on the ends.
+  for (const law of ['linear', 'equalPower', 'sharp']) {
+    assert.ok(Math.abs(api.crossfade(10, 20, 0, law) - 10) < 1e-9, law);
+    assert.ok(Math.abs(api.crossfade(10, 20, 1, law) - 20) < 1e-9, law);
+  }
+  assert.equal(api.crossfade(0, 1, 2, 'linear'), 1, 't is clamped');
+});
+
+test('approach is a rate limit with no state of its own', () => {
+  assert.equal(api.approach(0, 10, 3), 3);
+  assert.equal(api.approach(10, 0, 3), 7);
+  // Never overshoots: within one step it arrives exactly.
+  assert.equal(api.approach(0, 1, 3), 1);
+  assert.equal(api.approach(5, 5, 3), 5);
+  // Repeated application converges rather than oscillating around the target.
+  let v = 0;
+  for (let i = 0; i < 20; i += 1) v = api.approach(v, 10, 3);
+  assert.equal(v, 10);
+});
+
+/* ------------------------------------------------------------------ rounding and comparison */
+
+test('roundTo gives a number, not a string', () => {
+  assert.equal(api.roundTo(1.23456, 2), 1.23);
+  assert.equal(api.roundTo(1.23456, 0), 1);
+  assert.equal(api.roundTo(-1.236, 2), -1.24);
+  assert.equal(api.roundTo(2.5, 0), 3, 'half rounds up, matching round()');
+  // Deliberately NOT asserted: an exact .5 tie after scaling. -1.235 * 100 is -123.50000000000001
+  // in binary floating point, so it rounds away from zero — in every one of the five runtimes,
+  // identically, because they all scale and round the same way. Pinning it would be pinning IEEE
+  // 754, not this function.
+  assert.equal(api.roundTo(1.005, 2), api.roundTo(1.005, 2));
+  // toFixed returns a string, which is why every panel wrote this itself.
+  assert.equal(typeof (1.23456).toFixed(2), 'string');
+  assert.equal(typeof api.roundTo(1.23456, 2), 'number');
+});
+
+test('almost is what == is assumed to mean', () => {
+  assert.equal(0.1 + 0.2 === 0.3, false, 'the language still does the wrong thing');
+  assert.equal(api.almost(0.1 + 0.2, 0.3), true);
+  assert.equal(api.almost(1, 1.5), false);
+  assert.equal(api.almost(1, 1.4, 0.5), true, 'the tolerance is honoured');
+});
+
+/* ---------------------------------------------------------------------------------- lists */
+
+test('the list reductions answer over a table, which the language cannot', () => {
+  assert.equal(api.minOf([3, 1, 2]), 1);
+  assert.equal(api.maxOf([3, 1, 2]), 3);
+  assert.equal(api.sumOf([1, 2, 3]), 6);
+  assert.equal(api.meanOf([1, 2, 3]), 2);
+  // A sum of nothing is nothing; an average of nothing does not exist. The two empties differ.
+  assert.equal(api.sumOf([]), 0);
+  assert.equal(api.meanOf([]), undefined);
+  assert.equal(api.minOf([]), undefined);
+  assert.equal(api.maxOf([]), undefined);
+  // Non-numbers are skipped rather than poisoning the result with NaN.
+  assert.equal(api.sumOf([1, 'x', 2]), 3);
+});
+
+test('blend morphs two value sets, and the shorter one decides the length', () => {
+  assert.deepEqual(api.blend([0, 10], [10, 20], 0.5), [5, 15]);
+  assert.deepEqual(api.blend([0, 10], [10, 20], 0), [0, 10]);
+  assert.deepEqual(api.blend([0, 10], [10, 20], 1), [10, 20]);
+  // Padding with zeros would drag the missing entries to nothing — on a patch, a set of
+  // parameters slammed to their minimum.
+  assert.deepEqual(api.blend([0, 10], [10, 20, 30], 0.5), [5, 15]);
+});
+
+/* ----------------------------------------------------------------------------- randomness */
+
+test('randomFloat is the seeded float that did not exist', () => {
+  // random(lo, hi) returns whole numbers — the form a note or a step wants.
+  api.randomSeed(4);
+  assert.ok(Number.isInteger(api.random(0, 10)));
+  api.randomSeed(4);
+  const f = api.randomFloat(0, 10);
+  assert.ok(f >= 0 && f < 10);
+  assert.ok(!Number.isInteger(f * 1000) || f !== Math.floor(f), 'a float, not a rounded one');
+  // …and it replays.
+  api.randomSeed(4);
+  assert.equal(api.randomFloat(0, 10), f);
+});
+
+test('gaussian clusters near the mean and always draws exactly twice', () => {
+  api.randomSeed(21);
+  const values = Array.from({ length: 400 }, () => api.randomGaussian(0, 1));
+  const mean = api.meanOf(values);
+  assert.ok(Math.abs(mean) < 0.2, `mean drifted: ${mean}`);
+  const near = values.filter((v) => Math.abs(v) <= 1).length / values.length;
+  // ~68% inside one standard deviation is the whole point — a uniform random would give ~50%.
+  assert.ok(near > 0.6 && near < 0.76, `inside 1sd: ${near}`);
+
+  // The draw count is fixed, so what comes AFTER a gaussian is the same as after two plain draws.
+  // Caching Box-Muller's second value — the textbook version — would make it alternate.
+  api.randomSeed(21); api.randomGaussian(); const afterG = api.random();
+  api.randomSeed(21); api.random(); api.random(); const afterTwo = api.random();
+  assert.equal(afterG, afterTwo);
+});
+
+test('a walk drifts and folds rather than sticking to an end', () => {
+  api.randomSeed(2);
+  let v = 5;
+  for (let i = 0; i < 200; i += 1) {
+    v = api.randomWalk(v, 2, 0, 10);
+    assert.ok(v >= 0 && v <= 10, `left the range: ${v}`);
+  }
+  // Unbounded when no range is given.
+  api.randomSeed(2);
+  assert.equal(typeof api.randomWalk(5, 2), 'number');
+  // A walk that CLAMPED would pile up on the ends; folding keeps it moving.
+  api.randomSeed(7);
+  let atEnd = 0;
+  let w = 0;
+  for (let i = 0; i < 300; i += 1) { w = api.randomWalk(w, 3, 0, 10); if (w === 0 || w === 10) atEnd += 1; }
+  assert.ok(atEnd < 15, `stuck at an end ${atEnd} times`);
+});
+
+test('chance is a weighted coin', () => {
+  api.randomSeed(5);
+  assert.equal(api.randomBool(1), true);
+  assert.equal(api.randomBool(0), false);
+  api.randomSeed(5);
+  const hits = Array.from({ length: 400 }, () => api.randomBool(0.25)).filter(Boolean).length / 400;
+  assert.ok(hits > 0.18 && hits < 0.32, `chance drifted: ${hits}`);
+});
+
+test('shuffle is seeded, returns a new list, and keeps every element', () => {
+  const source = [1, 2, 3, 4, 5];
+  api.randomSeed(9);
+  const a = api.shuffle(source);
+  api.randomSeed(9);
+  const b = api.shuffle(source);
+  assert.deepEqual(a, b, 'the same seed shuffles the same way');
+  assert.deepEqual(source, [1, 2, 3, 4, 5], 'the original is untouched');
+  assert.deepEqual([...a].sort(), [1, 2, 3, 4, 5], 'every element survived');
+  // Pinned against the C++ preludes, which were executed side by side to produce this.
+  assert.deepEqual(a, [3, 2, 4, 5, 1]);
+  assert.deepEqual(api.shuffle([]), []);
+});
+
+/* ------------------------------------------------------------------------------ geometry */
+
+test('degrees and radians convert both ways', () => {
+  assert.ok(Math.abs(api.toDegrees(Math.PI) - 180) < 1e-9);
+  assert.ok(Math.abs(api.toRadians(180) - Math.PI) < 1e-9);
+  for (const d of [0, 45, 270]) assert.ok(Math.abs(api.toDegrees(api.toRadians(d)) - d) < 1e-9);
+});
+
+test('distance is a plain hypotenuse', () => {
+  assert.equal(api.distance(0, 0, 3, 4), 5);
+  assert.equal(api.distance(1, 1, 1, 1), 0);
+});
+
+test('angleOf uses ce.draw\'s convention, which is the point of having it', () => {
+  // DEGREES, 0 at twelve o'clock, increasing clockwise — the same convention drawArc documents.
+  // Rebuilding this from atan2 is where a knob pointer ends up a quadrant out.
+  assert.equal(api.angleOf(0, 0, 0, -1), 0, 'up is 0');
+  assert.equal(api.angleOf(0, 0, 1, 0), 90, 'right is 90');
+  assert.equal(api.angleOf(0, 0, 0, 1), 180, 'down is 180');
+  assert.equal(api.angleOf(0, 0, -1, 0), 270, 'left is 270, not -90');
+});
+
+test('polar is angleOf inverted, in the same convention', () => {
+  const up = api.polar(0, 10);
+  assert.ok(Math.abs(up.x) < 1e-9 && Math.abs(up.y + 10) < 1e-9, 'up is negative y');
+  const right = api.polar(90, 10);
+  assert.ok(Math.abs(right.x - 10) < 1e-9 && Math.abs(right.y) < 1e-9);
+  for (const deg of [0, 45, 90, 200, 359]) {
+    const p = api.polar(deg, 7);
+    assert.ok(Math.abs(api.angleOf(0, 0, p.x, p.y) - deg) < 1e-9, `round-trip failed at ${deg}`);
+    assert.ok(Math.abs(api.distance(0, 0, p.x, p.y) - 7) < 1e-9);
+  }
+});
