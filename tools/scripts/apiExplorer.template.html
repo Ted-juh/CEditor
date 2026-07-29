@@ -1,0 +1,1234 @@
+<style>
+/* CEditor scripting — a manual with a datasheet bolted to the back of it.
+   ------------------------------------------------------------------------------------------------
+   The palette is the application's own, and that is the point: #5B9BD5 is the blue every arc,
+   selection ring and focus outline in CEditor is drawn in; the green, amber and red are the
+   component defaults for running / playhead / panic. Neutrals lean toward that blue rather than
+   being pure grey, so the page and the app look like the same object.
+
+   Monospace is the DISPLAY face here, uppercase and letterspaced. Panel silkscreen and API
+   identifiers are the same visual language, and this page is a legend for both. The sans carries
+   prose only. */
+
+:root {
+  --ground:     #FAFAFB;
+  --raised:     #FFFFFF;
+  --sunken:     #F0F1F5;
+  --ink:        #16171C;
+  --ink-2:      #4A4D58;
+  --ink-3:      #797D8B;
+  --rule:       #D6D9E2;
+  --rule-soft:  #E6E8EF;
+  --accent:     #2E6FA8;
+  --accent-2:   #E3EDF6;
+  --signal:     #17805A;
+  --amber:      #8A6A0F;
+  --alert:      #B03A3A;
+  --code-bg:    #F4F5F8;
+  --shadow:     0 1px 2px rgba(20, 25, 45, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground:    #0E0F14;
+    --raised:    #15171F;
+    --sunken:    #11131A;
+    --ink:       #E6E8F0;
+    --ink-2:     #A8ACBB;
+    --ink-3:     #747989;
+    --rule:      #282B38;
+    --rule-soft: #1E212C;
+    --accent:    #5B9BD5;
+    --accent-2:  #162634;
+    --signal:    #39D98A;
+    --amber:     #F2C94C;
+    --alert:     #E05C5C;
+    --code-bg:   #0A0B0F;
+    --shadow:    none;
+  }
+}
+:root[data-theme="dark"] {
+  --ground:#0E0F14; --raised:#15171F; --sunken:#11131A;
+  --ink:#E6E8F0; --ink-2:#A8ACBB; --ink-3:#747989;
+  --rule:#282B38; --rule-soft:#1E212C;
+  --accent:#5B9BD5; --accent-2:#162634;
+  --signal:#39D98A; --amber:#F2C94C; --alert:#E05C5C;
+  --code-bg:#0A0B0F; --shadow:none;
+}
+:root[data-theme="light"] {
+  --ground:#FAFAFB; --raised:#FFFFFF; --sunken:#F0F1F5;
+  --ink:#16171C; --ink-2:#4A4D58; --ink-3:#797D8B;
+  --rule:#D6D9E2; --rule-soft:#E6E8EF;
+  --accent:#2E6FA8; --accent-2:#E3EDF6;
+  --signal:#17805A; --amber:#8A6A0F; --alert:#B03A3A;
+  --code-bg:#F4F5F8; --shadow:0 1px 2px rgba(20,25,45,.06);
+}
+
+:root {
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, "JetBrains Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: "Inter Tight", Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  --pad: clamp(20px, 4vw, 40px);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15.5px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+code, kbd, pre { font-family: var(--mono); }
+a { color: var(--accent); }
+.sr {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+:where(a, button, input, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------- shell */
+.shell { display: grid; grid-template-columns: 232px minmax(0, 1fr); align-items: start; }
+
+.rail {
+  position: sticky; top: 0;
+  height: 100vh; overflow-y: auto;
+  border-right: 1px solid var(--rule);
+  background: var(--sunken);
+  padding: 26px 0 40px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.rail-brand { padding: 0 20px; }
+.rail-mark { display: block; width: 34px; height: 3px; background: var(--accent); margin-bottom: 12px; }
+.rail-brand strong {
+  display: block;
+  font-family: var(--mono); font-size: 11.5px; font-weight: 600;
+  letter-spacing: .13em; text-transform: uppercase;
+}
+/* Direct child only: the version number is a nested span, and a blanket rule made it a block —
+   which is what split "API 1.0" across two lines. */
+.rail-brand > span { display: block; font-size: 11.5px; color: var(--ink-3); margin-top: 3px; white-space: nowrap; }
+.rail nav { display: flex; flex-direction: column; }
+.rail h2 {
+  font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+  margin: 16px 0 5px; padding: 0 20px;
+}
+.rail a {
+  display: block; padding: 5px 20px;
+  font-size: 13px; color: var(--ink-2); text-decoration: none;
+  border-left: 2px solid transparent;
+}
+.rail a:hover { color: var(--ink); background: var(--rule-soft); }
+.rail a.here { color: var(--accent); border-left-color: var(--accent); background: var(--accent-2); }
+.rail a code { font-size: 12px; }
+
+.page { min-width: 0; padding: 0 var(--pad) 90px; }
+.band { max-width: 1120px; margin-inline: auto; }
+.prose { max-width: 68ch; }
+
+/* ---------------------------------------------------------------------------- masthead */
+.top { padding: 64px 0 8px; }
+.eyebrow {
+  font-family: var(--mono); font-size: 10.5px;
+  letter-spacing: .16em; text-transform: uppercase; color: var(--ink-3);
+  margin: 0 0 14px;
+}
+h1 {
+  font-size: clamp(32px, 5vw, 52px); line-height: 1.04;
+  letter-spacing: -.028em; font-weight: 660;
+  margin: 0 0 20px; max-width: 17ch; text-wrap: balance;
+}
+.lede { margin: 0; font-size: 17px; line-height: 1.62; color: var(--ink-2); max-width: 62ch; }
+
+.tally {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  margin: 38px 0 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule);
+}
+.tally div { padding: 15px 20px 15px 0; border-right: 1px solid var(--rule-soft); }
+.tally div:last-child { border-right: 0; }
+.tally dt {
+  font-family: var(--mono); font-size: 9.5px;
+  letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
+}
+.tally dd {
+  margin: 3px 0 0; font-size: 29px; font-weight: 620;
+  font-variant-numeric: tabular-nums; letter-spacing: -.025em;
+}
+
+/* ---------------------------------------------------------------------------- sections */
+section { scroll-margin-top: 12px; padding-top: 58px; }
+.rule-head { border-bottom: 2px solid var(--ink); padding-bottom: 9px; margin-bottom: 26px; display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+.rule-head h2 {
+  font-family: var(--mono); font-size: 12.5px; font-weight: 600;
+  letter-spacing: .14em; text-transform: uppercase; margin: 0;
+}
+.rule-head p { margin: 0; font-size: 13px; color: var(--ink-3); }
+h3 { font-size: 21px; letter-spacing: -.014em; font-weight: 620; margin: 0 0 10px; text-wrap: balance; }
+p { margin: 0 0 14px; }
+.prose ul { margin: 0 0 14px; padding-left: 20px; }
+.prose li { margin-bottom: 7px; }
+.note {
+  border-left: 2px solid var(--rule); padding-left: 14px;
+  color: var(--ink-3); font-size: 14px; margin: 0 0 14px;
+}
+.warn { border-left-color: var(--amber); }
+
+/* ---------------------------------------------------------------------------- lessons */
+.lesson { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 40px; padding: 34px 0; border-top: 1px solid var(--rule-soft); align-items: start; }
+.lesson:first-of-type { border-top: 0; }
+.lesson-n {
+  grid-column: 1 / -1;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent);
+}
+.lesson-text { min-width: 0; }
+.lesson-text > :last-child { margin-bottom: 0; }
+.lesson-code { min-width: 0; position: sticky; top: 16px; }
+
+pre {
+  margin: 0 0 12px; padding: 15px 16px;
+  background: var(--code-bg); border: 1px solid var(--rule);
+  overflow-x: auto; font-size: 12.9px; line-height: 1.62;
+  tab-size: 2;
+}
+pre:last-child { margin-bottom: 0; }
+pre code { font-size: inherit; }
+.cap {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 6px;
+}
+.t-key { color: var(--accent); }
+.t-str { color: var(--signal); }
+.t-num { color: var(--amber); }
+.t-com { color: var(--ink-3); font-style: italic; }
+.t-fn  { color: var(--ink); font-weight: 600; }
+
+/* ---------------------------------------------------------------------------- controls */
+.lang-pick { display: inline-flex; border: 1px solid var(--rule); background: var(--raised); }
+.lang-pick button, .seg button {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--ink-2); background: none; border: 0; border-right: 1px solid var(--rule);
+  padding: 7px 13px; cursor: pointer;
+}
+.lang-pick button:last-child, .seg button:last-child { border-right: 0; }
+.lang-pick button[aria-pressed="true"], .seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+.finder {
+  position: sticky; top: 0; z-index: 30;
+  background: color-mix(in srgb, var(--ground) 93%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--rule);
+  padding: 13px 0; margin-bottom: 4px;
+  display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center;
+}
+#q {
+  flex: 1 1 280px; min-width: 0;
+  font-family: var(--mono); font-size: 13px; color: var(--ink);
+  background: var(--raised); border: 1px solid var(--rule); padding: 9px 12px;
+}
+#q::placeholder { color: var(--ink-3); }
+.seg { display: flex; border: 1px solid var(--rule); background: var(--raised); }
+.hits { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex-basis: 100%; margin: 0; }
+
+/* ---------------------------------------------------------------------------- modules */
+.mod { border-bottom: 1px solid var(--rule-soft); }
+.mod[hidden] { display: none; }
+.mod > summary {
+  display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) auto;
+  gap: 4px 26px; align-items: start;
+  padding: 15px 0; cursor: pointer; list-style: none;
+}
+.mod > summary::-webkit-details-marker { display: none; }
+.mod > summary:hover .mod-id { text-decoration: underline; text-underline-offset: 3px; }
+.mod-id { font-family: var(--mono); font-size: 13.5px; font-weight: 600; color: var(--accent); word-break: break-word; }
+.mod-tags {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .07em;
+  color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 9px; margin-top: 3px;
+}
+.rt-any { color: var(--signal); text-transform: uppercase; }
+.rt-webview { color: var(--amber); text-transform: uppercase; }
+.mod-sum { grid-column: 2; grid-row: 1 / span 2; margin: 0; font-size: 14px; color: var(--ink-2); max-width: 64ch; }
+.mod-n {
+  grid-column: 3; grid-row: 1 / span 2;
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px;
+}
+
+.members { overflow-x: auto; padding: 0 0 20px; }
+table.mem { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.mem th {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-3); text-align: left; font-weight: 600;
+  padding: 7px 14px 7px 0; border-bottom: 1px solid var(--rule); white-space: nowrap;
+}
+table.mem td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+table.mem tr[hidden] { display: none; }
+table.mem tr.mark td { background: var(--accent-2); }
+.m-path { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+.m-flat { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
+.m-sig { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
+/* …and the summaries carry `code spans` written in the contract itself. */
+.m-doc code { background: var(--code-bg); border: 1px solid var(--rule-soft); padding: 0 3px; font-size: 11.5px; }
+.m-doc { color: var(--ink-2); min-width: 26ch; }
+.m-badge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--amber); border: 1px solid currentColor; padding: 0 4px; white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------- weight */
+.weigh { display: grid; grid-template-columns: minmax(0, 1fr) minmax(240px, 320px); gap: 32px; align-items: start; }
+.picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.pick {
+  font-family: var(--mono); font-size: 11.5px;
+  border: 1px solid var(--rule); background: var(--raised); color: var(--ink-2);
+  padding: 4px 9px; cursor: pointer;
+}
+.pick[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-2); color: var(--accent); }
+.readout { border: 1px solid var(--rule); background: var(--raised); box-shadow: var(--shadow); position: sticky; top: 74px; }
+.readout h3 {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0; padding: 13px 16px; border-bottom: 1px solid var(--rule);
+}
+.readout table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.readout td { padding: 9px 16px; border-bottom: 1px solid var(--rule-soft); }
+.readout tr:last-child td { border-bottom: 0; }
+.readout td:first-child { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); }
+.readout td:last-child { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.readout tr.sum td { border-top: 1px solid var(--rule); font-size: 14px; }
+.bar { height: 3px; background: var(--rule-soft); margin-top: 5px; }
+.bar i { display: block; height: 100%; background: var(--accent); }
+
+/* ---------------------------------------------------------------------------- history */
+.ships { list-style: none; margin: 0; padding: 0; }
+.ship { display: grid; grid-template-columns: minmax(150px, 200px) minmax(0, 1fr); gap: 8px 28px; padding: 20px 0; border-top: 1px solid var(--rule-soft); }
+.ship-id { font-family: var(--mono); font-size: 12.5px; color: var(--accent); }
+.ship-id b { display: block; color: var(--ink-3); font-weight: 400; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 4px; }
+.ship-body > :last-child { margin-bottom: 0; }
+.ship-body p { max-width: 66ch; }
+
+/* ---------------------------------------------------------------------------- foot */
+.foot { margin-top: 70px; padding-top: 26px; border-top: 2px solid var(--ink); font-size: 13px; color: var(--ink-3); }
+.foot p { max-width: 74ch; }
+
+@media (max-width: 1000px) {
+  .lesson { grid-template-columns: 1fr; gap: 10px; }
+  .lesson-code { position: static; }
+  .weigh { grid-template-columns: 1fr; }
+  .readout { position: static; }
+}
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  /* The rail becomes a contents list above the page. Tighter than the sidebar version, so the
+     headline is not a full screen down on a phone. */
+  .rail {
+    position: static; height: auto; border-right: 0;
+    border-bottom: 1px solid var(--rule);
+    padding: 18px 0 14px; gap: 12px;
+  }
+  .rail nav { flex-direction: row; flex-wrap: wrap; gap: 0 2px; }
+  .rail h2 { flex-basis: 100%; margin: 8px 0 2px; }
+  .rail a { padding: 3px 10px; border-left: 0; border-bottom: 2px solid transparent; }
+  .rail a.here { border-left: 0; border-bottom-color: var(--accent); }
+  .top { padding-top: 34px; }
+  .mod > summary { grid-template-columns: 1fr; }
+  .mod-sum, .mod-n { grid-column: 1; grid-row: auto; }
+}
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<title>CEditor Panel Scripting — the manual and the whole surface</title>
+
+<div class="shell">
+<aside class="rail">
+  <div class="rail-brand">
+    <span class="rail-mark"></span>
+    <strong>CEditor Scripting</strong>
+    <span>API <span id="apiver">1.0</span></span>
+  </div>
+  <nav id="nav" aria-label="Sections">
+    <h2>Learn</h2>
+    <a href="#start">What a script is</a>
+    <a href="#paths">Addressing</a>
+    <a href="#transmit">Writing &amp; the synth</a>
+    <a href="#events">Reacting</a>
+    <a href="#modules">Modules</a>
+    <a href="#timing">Musical time</a>
+    <a href="#components">Components</a>
+    <a href="#keeping">Keeping things</a>
+    <a href="#debug">When it breaks</a>
+    <h2>Reference</h2>
+    <a href="#surface">Every module</a>
+    <a href="#hooks">Lifecycle hooks</a>
+    <a href="#eventlist">Events</a>
+    <a href="#weight">What it weighs</a>
+    <h2>Recent</h2>
+    <a href="#changes">What changed</a>
+  </nav>
+</aside>
+
+<main class="page">
+<div class="band">
+
+<header class="top">
+  <p class="eyebrow">Panel scripting</p>
+  <h1>Write a script once. It runs in five places.</h1>
+  <p class="lede">
+    A CEditor panel can carry scripts in Lua, JavaScript, TypeScript, Python or C&#8209;family
+    source. They call one API. The editor runs it in a WebView while you design; the exported plugin
+    runs the same script in an embedded engine with the window shut. The rule the whole contract is
+    built around is that those must not differ &mdash; <b>if it behaves one way while you are testing
+    it, it behaves that way in the export.</b>
+  </p>
+  <dl class="tally">
+    <div><dt>Modules</dt><dd id="t-mod">&ndash;</dd></div>
+    <div><dt>Members</dt><dd id="t-mem">&ndash;</dd></div>
+    <div><dt>Events</dt><dd id="t-ev">&ndash;</dd></div>
+    <div><dt>Lifecycle hooks</dt><dd id="t-hook">&ndash;</dd></div>
+    <div><dt>Cross&#8209;runtime</dt><dd id="t-any">&ndash;</dd></div>
+  </dl>
+</header>
+
+<!-- ============================================================== LEARN -->
+<section id="start">
+  <div class="rule-head">
+    <h2>Part one &middot; the manual</h2>
+    <p>Nine things, in the order you need them</p>
+    <span style="flex:1"></span>
+    <div class="lang-pick" role="group" aria-label="Sample language">
+      <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
+      <button type="button" data-lang="javascript" aria-pressed="false">JavaScript</button>
+    </div>
+  </div>
+
+  <div class="lesson">
+    <p class="lesson-n">01 &middot; What a script is</p>
+    <div class="lesson-text prose">
+      <h3>A file of named functions</h3>
+      <p>
+        You do not call into CEditor and wait. You define functions with particular names, and the
+        panel calls them when something happens. A script attached to a knob and named for
+        <code>onValueChanged</code> runs every time that knob settles.
+      </p>
+      <p>
+        Everything in the API is a plain global function. <code>set</code>, <code>get</code> and
+        <code>log</code> are always there. Everything else lives in a module you switch on &mdash;
+        see <a href="#modules">Modules</a> &mdash; and each module member has two spellings: a
+        readable namespaced one (<code>ce.midi.sendCC</code>) and a flat global
+        (<code>sendCC</code>). They are the same function.
+      </p>
+      <p class="note">
+        There is no <code>import</code>, no <code>require</code>, no build step. A panel declares its
+        modules and the runtime injects them before your first line runs.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">A knob that sends a CC</p>
+      <pre data-lua><code>function onValueChanged(value)
+  sendCC(1, 74, value)
+  log("cutoff", value)
+end</code></pre>
+      <pre data-js hidden><code>function onValueChanged(value) {
+  sendCC(1, 74, value);
+  log("cutoff", value);
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="paths">
+    <p class="lesson-n">02 &middot; Addressing</p>
+    <div class="lesson-text prose">
+      <h3>Everything has a dot&#8209;path, rooted on a name</h3>
+      <p>
+        A control is addressed by the <b>name you gave it</b>, not by an id you never see. From
+        there the path walks into whatever you want: its value, its colour, a section property.
+      </p>
+      <p>
+        A bare control name means its value, so <code>get("cutoff")</code> and
+        <code>get("cutoff.value")</code> are the same question. Rename a control in the editor and
+        every script that mentions it is updated with it.
+      </p>
+      <p>
+        A value has three faces. <code>.value</code> is the real one, <code>.normalizedValue</code>
+        is its 0&ndash;1 position, and <code>.midiValue</code> is what goes on the wire. Suffix the
+        path, or pass the form as a second argument.
+      </p>
+      <p class="note warn">
+        <code>set</code> returns whether it wrote. A path that resolves to nothing is a typo, and it
+        used to fail in complete silence.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Reading and writing</p>
+      <pre data-lua><code>local hz = get("cutoff")
+local pos = get("cutoff", "normalizedValue")
+
+set("cutoff.value", 8000)
+set("cutoff.normalizedValue", 0.5)
+set("led.background.fill.colour", "#39D98A")
+
+if not set("cutof.value", 1) then
+  logError("no control called that")
+end</code></pre>
+      <pre data-js hidden><code>const hz = get("cutoff");
+const pos = get("cutoff", "normalizedValue");
+
+set("cutoff.value", 8000);
+set("cutoff.normalizedValue", 0.5);
+set("led.background.fill.colour", "#39D98A");
+
+if (!set("cutof.value", 1)) {
+  logError("no control called that");
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="transmit">
+    <p class="lesson-n">03 &middot; Writing and the synth</p>
+    <div class="lesson-text prose">
+      <h3>A write usually transmits. It knows when not to.</h3>
+      <p>
+        Setting a control normally behaves as if somebody moved it: the panel updates <i>and</i> the
+        synth is told. That is what you want almost always.
+      </p>
+      <p>
+        The exception is when you are reacting to something the synth just sent. Echoing it back is
+        a feedback loop, so a write made <b>inside an inbound handler is silent automatically</b>.
+        You do not set a flag; the runtime tracks where the write came from.
+      </p>
+      <p>
+        Override it with a block when you need to. An init&#8209;patch button writes forty controls
+        and should send none of them until it is done; a MIDI&#8209;learn confirmation needs to send
+        from inside an inbound handler. Both auto&#8209;reset at the end of the block, so they cannot
+        leak even if something throws.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Scoped, not per&#8209;line</p>
+      <pre data-lua><code>noTransmit(function()
+  set("cutoff.value", 8000)
+  set("reso.value", 40)
+end)
+
+transmit(function()
+  sendCC(1, 74, 64)
+end)</code></pre>
+      <pre data-js hidden><code>noTransmit(() =&gt; {
+  set("cutoff.value", 8000);
+  set("reso.value", 40);
+});
+
+transmit(() =&gt; {
+  sendCC(1, 74, 64);
+});</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="events">
+    <p class="lesson-n">04 &middot; Reacting</p>
+    <div class="lesson-text prose">
+      <h3>Name a function, or subscribe to anything</h3>
+      <p>
+        For a control's <b>own</b> events, define the handler by name: <code>onValueChanged</code>,
+        <code>onClick</code>, <code>onNoteIn</code>. For anything else &mdash; another control, the
+        transport, a component &mdash; use <code>on(target, event, fn)</code>. <code>"*"</code>
+        subscribes to every target, which is why every payload carries the one it came from.
+      </p>
+      <p>
+        There are two flavours of value change and the difference matters:
+        <code>onValueChange</code> fires continuously while a knob is moving (use it for the GUI),
+        <code>onValueChanged</code> fires once when it settles (use it to transmit).
+      </p>
+      <p>
+        <code>watch</code> is the third way, and it is not an event at all: it re-runs when a
+        <i>path</i> changes, including nested properties no event covers.
+      </p>
+      <p class="note">
+        Either spelling works in <code>on</code> &mdash; the event's id (<code>"step"</code>) or its
+        handler name (<code>"onStep"</code>). Only the second used to.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Three ways to be told</p>
+      <pre data-lua><code>function onValueChanged(value)
+  sendCC(1, 74, value)
+end
+
+on("*", "onStep", function(step)
+  set(step.target .. ".led", true)
+end)
+
+watch("cutoff.background.fill.colour", function(c)
+  log("colour is now", c)
+end)</code></pre>
+      <pre data-js hidden><code>function onValueChanged(value) {
+  sendCC(1, 74, value);
+}
+
+on("*", "onStep", (step) =&gt; {
+  set(step.target + ".led", true);
+});
+
+watch("cutoff.background.fill.colour", (c) =&gt; {
+  log("colour is now", c);
+});</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="modules">
+    <p class="lesson-n">05 &middot; Modules</p>
+    <div class="lesson-text prose">
+      <h3>You pay for what you switch on</h3>
+      <p>
+        The surface is <b id="i-mem">529</b> members across <b id="i-mod">39</b> modules. Injecting
+        all of it into every panel would be wasteful, so a panel <b>declares</b> the modules it
+        uses and the export carries only those. The weights in
+        <a href="#weight">What it weighs</a> are measured from the real preludes, not estimated.
+      </p>
+      <p>
+        <code>ce.core</code> is always on and never namespaced &mdash; <code>set</code> and
+        <code>get</code> have no prefix. Every other module gives you both spellings.
+      </p>
+      <p>
+        A member from a module you did not declare returns nothing and says so in the console. It
+        does not throw, and it does not silently do nothing.
+      </p>
+      <p class="note">
+        Nine modules are <b class="rt-any" style="font-family:var(--mono);font-size:11px">cross-runtime</b>;
+        the rest are <b class="rt-webview" style="font-family:var(--mono);font-size:11px">panel view only</b>,
+        which means they need the window open. Drawing, dialogs and the component families are in the
+        second group because with the window shut there is no surface, nobody to ask, and no
+        component engine running.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Two spellings, one function</p>
+      <pre data-lua><code>-- ce.core is global
+set("cutoff.value", 8000)
+
+-- everything else, either way
+ce.midi.sendCC(1, 74, 64)
+sendCC(1, 74, 64)
+
+local n = ce.music.quantize(63, 60, "minor")
+local m = quantizeNote(63, 60, "minor")</code></pre>
+      <pre data-js hidden><code>// ce.core is global
+set("cutoff.value", 8000);
+
+// everything else, either way
+ce.midi.sendCC(1, 74, 64);
+sendCC(1, 74, 64);
+
+const n = ce.music.quantize(63, 60, "minor");
+const m = quantizeNote(63, 60, "minor");</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="timing">
+    <p class="lesson-n">06 &middot; Musical time</p>
+    <div class="lesson-text prose">
+      <h3>Beats, not milliseconds</h3>
+      <p>
+        <code>ce.time</code> reads the transport &mdash; the editor's clock, or the DAW playhead when
+        the window is shut &mdash; and converts between beats and milliseconds at the current tempo.
+        The delay&#8209;time calculation every synth panel needs is one call.
+      </p>
+      <p>
+        Timers come in three shapes: <code>startTimer</code> repeats,
+        <code>after</code> fires once, and <code>syncTimer</code> repeats on a musical interval and
+        follows the tempo when it changes.
+      </p>
+      <p class="note warn">
+        <code>onBeat</code> and <code>onBar</code> are watched on the message thread at about 30&nbsp;Hz.
+        That lands within a frame of the beat &mdash; right for lighting an LED or stepping a
+        sequencer, wrong for anything that has to be sample&#8209;accurate.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Settle, then send</p>
+      <pre data-lua><code>sendProgramChange(1, 12)
+ce.time.after(40, function()
+  sendDump("patch")
+end)
+
+local ms = ce.time.beatsToMs(0.75)
+set("delayTime.value", ms)
+
+ce.time.syncTimer("step", 0.25)
+function onTimer(info)
+  if info.id == "step" then step() end
+end</code></pre>
+      <pre data-js hidden><code>sendProgramChange(1, 12);
+ce.time.after(40, () =&gt; {
+  sendDump("patch");
+});
+
+const ms = ce.time.beatsToMs(0.75);
+set("delayTime.value", ms);
+
+ce.time.syncTimer("step", 0.25);
+function onTimer(info) {
+  if (info.id === "step") step();
+}</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="components">
+    <p class="lesson-n">07 &middot; Components</p>
+    <div class="lesson-text prose">
+      <h3>Drive the arpeggiator, and hear back from it</h3>
+      <p>
+        The interactive components &mdash; arpeggiator, chord pad, sequencers, matrix, envelope,
+        displays &mdash; each get a module of verbs. Every verb takes the control's name first, and
+        <b>every one returns whether the component now holds what you asked for</b>. A value it does
+        not have is refused, not stored.
+      </p>
+      <p>
+        <code>read</code> asks what a component is set to, in the same words the verbs use.
+        <code>size</code>, <code>fill</code>, <code>insert</code> and <code>remove</code> work on
+        the lists a component carries &mdash; steps, nodes, breakpoints, destinations.
+      </p>
+      <p>
+        And they raise events: a step firing, a scene changing, a pad struck, a take finishing. Those
+        are panel&#8209;view only, because the component engines run in the editor's surface.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Ask, set, react</p>
+      <pre data-lua><code>if not ce.components.arp.pattern(a, "chord") then
+  logError("that pattern does not exist")
+end
+
+local now = ce.components.arp.read(a, "pattern")
+local n = ce.components.turing.size(t, "step")
+ce.components.turing.fill(t, "step", {0, 0.5, 1, 0.25})
+
+on(a, "onStep", function(step)
+  log("step " .. step.index .. " of " .. step.of)
+end)</code></pre>
+      <pre data-js hidden><code>if (!ce.components.arp.pattern(a, "chord")) {
+  logError("that pattern does not exist");
+}
+
+const now = ce.components.arp.read(a, "pattern");
+const n = ce.components.turing.size(t, "step");
+ce.components.turing.fill(t, "step", [0, 0.5, 1, 0.25]);
+
+on(a, "onStep", (step) =&gt; {
+  log(`step ${step.index} of ${step.of}`);
+});</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="keeping">
+    <p class="lesson-n">08 &middot; Keeping things</p>
+    <div class="lesson-text prose">
+      <h3>Three lifespans, and you pick</h3>
+      <p>
+        <code>state</code> is a plain table of your own that survives between handler calls and dies
+        when the script reloads. Use it for anything you are counting.
+      </p>
+      <p>
+        Settings outlive the session, and they have three <b>scopes</b>. <code>"panel"</code> is
+        shared by every script on the panel and travels with the document. <code>"script"</code> is
+        private to yours. <code>"local"</code> never enters the document at all &mdash; a panel you
+        send somebody should not carry your MIDI port choice.
+      </p>
+      <p>
+        <code>encode</code> and <code>decode</code> are JSON, and they are here rather than in your
+        language because one of the five runtimes has none: the Lua engine opens
+        <code>base</code>, <code>math</code>, <code>string</code> and <code>table</code>. All five
+        produce identical text for identical values, keys sorted, so two structures can be compared
+        by comparing their encodings.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Scratch, saved, shipped</p>
+      <pre data-lua><code>state.hits = (state.hits or 0) + 1
+
+ce.storage.saveSetting("bank", 3)
+ce.storage.saveSetting("port", "IAC",
+                       { scope = "local" })
+
+local patch = { name = "Lead", cutoff = 0.75 }
+sendSysex(toAscii(ce.storage.encode(patch)))
+
+local back = ce.storage.decode(text)
+if back == nil then logError("bad config") end</code></pre>
+      <pre data-js hidden><code>state.hits = (state.hits ?? 0) + 1;
+
+ce.storage.saveSetting("bank", 3);
+ce.storage.saveSetting("port", "IAC",
+                       { scope: "local" });
+
+const patch = { name: "Lead", cutoff: 0.75 };
+sendSysex(toAscii(ce.storage.encode(patch)));
+
+const back = ce.storage.decode(text);
+if (back === undefined) logError("bad config");</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson" id="debug">
+    <p class="lesson-n">09 &middot; When it breaks</p>
+    <div class="lesson-text prose">
+      <h3>Three levels, and a handler for the rest</h3>
+      <p>
+        <code>log</code>, <code>ce.core.warn</code> and <code>ce.core.error</code> land at different
+        levels in the script console, so a real failure does not read like a debug print. Note the
+        flat spellings are <code>logWarn</code> and <code>logError</code>: a global called
+        <code>error</code> would shadow Lua's builtin and turn the standard way to raise into a
+        print.
+      </p>
+      <p>
+        Reporting an error does not stop the handler. To actually stop, raise with your own
+        language's <code>error</code> / <code>throw</code>.
+      </p>
+      <p>
+        <code>onError</code> catches what a script did not: the failure is always logged as well, so
+        a panel whose own error handler is broken does not go quiet.
+      </p>
+      <p class="note">
+        Verbs that can fail say so in their return value rather than throwing &mdash;
+        <code>set</code>, <code>saveSetting</code>, and every component verb. Checking one is
+        usually cheaper than a handler.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Levels and the backstop</p>
+      <pre data-lua><code>log("normal")
+logWarn("odd, but carrying on")
+logError("could not do that")
+
+function onError(info)
+  log(info.scriptId .. " failed in " .. info.phase)
+end</code></pre>
+      <pre data-js hidden><code>log("normal");
+logWarn("odd, but carrying on");
+logError("could not do that");
+
+function onError(info) {
+  log(`${info.scriptId} failed in ${info.phase}`);
+}</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== REFERENCE -->
+<section id="surface">
+  <div class="rule-head">
+    <h2>Part two &middot; the surface</h2>
+    <p>Every module, every member, straight out of <code>panelApi.js</code></p>
+  </div>
+
+  <div class="finder">
+    <label class="sr" for="q">Find a verb or module</label>
+    <input id="q" type="search" placeholder="Find a verb — sendNote, quantize, fill, probe…" autocomplete="off" spellcheck="false">
+    <div class="seg" role="group" aria-label="Runtime">
+      <button type="button" data-rt="all" aria-pressed="true">All</button>
+      <button type="button" data-rt="any" aria-pressed="false">Cross-runtime</button>
+      <button type="button" data-rt="webview" aria-pressed="false">Panel view</button>
+    </div>
+    <div class="seg" role="group" aria-label="Detail">
+      <button type="button" id="expand" aria-pressed="false">Expand all</button>
+    </div>
+    <p class="hits" id="hits"></p>
+  </div>
+
+  <div id="mods"></div>
+</section>
+
+<section id="hooks">
+  <div class="rule-head">
+    <h2>Lifecycle hooks</h2>
+    <p>Define one by name; the panel calls it</p>
+  </div>
+  <div class="members"><table class="mem" id="hooktable"></table></div>
+</section>
+
+<section id="eventlist">
+  <div class="rule-head">
+    <h2>Events</h2>
+    <p>Named handler, or <code>on(target, event, fn)</code></p>
+  </div>
+  <div class="members"><table class="mem" id="evtable"></table></div>
+</section>
+
+<section id="weight">
+  <div class="rule-head">
+    <h2>What it weighs</h2>
+    <p>Measured from the preludes, not estimated</p>
+  </div>
+  <div class="weigh">
+    <div>
+      <p class="prose">
+        Pick the modules a panel declares and the readout gives you what its scripting surface costs
+        in each engine. Every panel also carries a shared baseline &mdash; the host bindings, the
+        event registry, the generated namespace block &mdash; whatever it declares.
+      </p>
+      <div class="picks" id="picks"></div>
+    </div>
+    <div class="readout">
+      <h3>Prelude size</h3>
+      <table id="costtable"></table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================== HISTORY -->
+<section id="changes">
+  <div class="rule-head">
+    <h2>What changed</h2>
+    <p>The last nine phases, newest first</p>
+  </div>
+  <p class="prose">
+    The surface roughly tripled over these. Two of them were not additions at all &mdash; they were
+    the API telling the truth about things it had been quietly getting wrong.
+  </p>
+  <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§45</b>ce.components events</div>
+      <div class="ship-body">
+        <p>
+          Eleven events, so a script can hear back: <code>onStep</code>, <code>onCycle</code>,
+          <code>onHit</code>, <code>onRelease</code>, <code>onScene</code>, <code>onStage</code>,
+          <code>onSettled</code>, <code>onBounce</code>, <code>onRecall</code>, <code>onZone</code>,
+          <code>onVoiced</code>. Before this a script could drive 302 component members and never be
+          told anything.
+        </p>
+        <p class="note">
+          Found on the way: <code>on(target, event, fn)</code> only ever matched the handler name,
+          while the events list names events by id &mdash; so <code>on("*", "timer", fn)</code>
+          registered a listener that could never fire, silently, since the verb existed. Both
+          spellings work now.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§44</b>ce.components</div>
+      <div class="ship-body">
+        <p>
+          229 &rarr; 302 members. Every family gained <code>read</code>; the ones with lists gained
+          <code>size</code>, <code>fill</code>, and where an element has a template,
+          <code>insert</code> and <code>remove</code>. Every verb now reports whether it applied.
+        </p>
+        <p class="note warn">
+          And a real bug: <b>24 of the 28 enum verbs offered values no component has and refused
+          values it does.</b> <code>arp.pattern</code> accepted <code>"converge"</code>, which the
+          arpeggiator has never had, and refused <code>"chord"</code>, which it does.
+          <code>arp.division</code> offered eight of the transport's fourteen note values while
+          <code>ce.time.divisions()</code> &mdash; same panel, same script &mdash; already answered
+          from all fourteen. The values now come from the table each component's own code reads.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§43</b>ce.storage</div>
+      <div class="ship-body">
+        <p>
+          5 &rarr; 10 members. Three scopes, so two scripts saving <code>"count"</code> no longer
+          clobber each other in silence, plus JSON &mdash; which exists because the Lua engine has
+          none and all five runtimes must produce identical text.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§42</b>ce.panel</div>
+      <div class="ship-body">
+        <p>
+          15 &rarr; 24. Twenty-seven alignment operations sat on the canvas context menu and were
+          reachable from nothing else; they are pure functions now, and the menu and the script call
+          the same ones.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§41</b>ce.draw &amp; colour</div>
+      <div class="ship-body">
+        <p>
+          Gradients, dashes, opacity, transforms, the panel's own LCD font, text measurement &mdash;
+          and eight colour verbs in <code>ce.math</code>, ported from the app's own so a
+          script-lightened colour matches the border beside it.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§40</b>ce.ui</div>
+      <div class="ship-body">
+        <p>
+          3 &rarr; 9. Ask a question rather than only make a statement: a choice, a line of text, a
+          pick from a list &mdash; as dialog <i>shapes</i>, not three more modals.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§39</b>ce.anim</div>
+      <div class="ship-body">
+        <p>
+          4 &rarr; 11. A real cubic-bezier solver in all four runtimes rather than four lookalike
+          formulas: the panel stores CSS control points, and <code>1-(1-t)²</code> is not
+          <code>cubic-bezier(.25,.46,.45,.94)</code>.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§38</b>ce.time</div>
+      <div class="ship-body">
+        <p>
+          9 &rarr; 22. The transport's own grid &mdash; divisions, bar/beat, swing, loop folding,
+          tempo from taps. Lua had no clock at all: it opens <code>base</code>, <code>math</code>,
+          <code>string</code> and <code>table</code>, so there was no <code>os.clock</code> to call.
+        </p>
+      </div>
+    </li>
+    <li class="ship">
+      <div class="ship-id"><b>§37</b>ce.music</div>
+      <div class="ship-body">
+        <p>
+          5 &rarr; 13. Scales, chords, voice leading, arp order &mdash; the maths the Chord Pad and
+          Harmoniser already did internally, which a script could not reach.
+          <code>noteNumber</code> could not read a flat and returned 0 for anything it failed on,
+          which is a real note.
+        </p>
+      </div>
+    </li>
+  </ol>
+</section>
+
+<footer class="foot">
+  <p>
+    Generated by <code>tools/scripts/gen-api-explorer.mjs</code> from
+    <code>CE/web/src/CE_Application/scripting/panelApi.js</code> — the same module the five runtimes
+    are tested against, so the tables on this page cannot drift from the API. Weights are measured
+    from the language preludes by <code>tools/scripts/gen-script-modules.mjs</code>. The prose is
+    hand-written; the data is not.
+  </p>
+</footer>
+
+</div>
+</main>
+</div>
+
+<script type="application/json" id="contract">/*__CONTRACT__*/</script>
+<script>
+(() => {
+  "use strict";
+  const DATA = JSON.parse(document.getElementById("contract").textContent);
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  // Summaries in panelApi.js are written with `backtick code spans`, because they are read in the
+  // editor's own hint panel as well as here. Escape first, then promote — so a summary cannot
+  // inject markup, and the one thing it can do is what its author meant.
+  const doc = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
+  const num = (n) => n.toLocaleString("en-US");
+
+  /* ---------------------------------------------------------------- totals */
+  $("#apiver").textContent = DATA.apiVersion;
+  $("#t-mod").textContent = DATA.totals.modules;
+  $("#t-mem").textContent = num(DATA.totals.members);
+  $("#t-ev").textContent = DATA.totals.events;
+  $("#t-hook").textContent = DATA.totals.hooks;
+  $("#t-any").textContent = DATA.totals.crossRuntime;
+  $("#i-mem").textContent = num(DATA.totals.members);
+  $("#i-mod").textContent = DATA.totals.modules;
+
+  /* ------------------------------------------------------- language toggle */
+  // One preference for the whole page. A per-block toggle makes you re-pick your own language nine
+  // times on the way down.
+  const setLang = (lang) => {
+    $$(".lang-pick button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));
+    $$("pre[data-lua]").forEach((p) => { p.hidden = lang !== "lua"; });
+    $$("pre[data-js]").forEach((p) => { p.hidden = lang !== "javascript"; });
+  };
+  $$(".lang-pick button").forEach((b) => b.addEventListener("click", () => setLang(b.dataset.lang)));
+
+  /* ------------------------------------------------------ syntax colouring */
+  // Small on purpose: strings, comments, numbers, keywords and the leading identifier of a call.
+  // Anything cleverer than this on a page of twenty samples is a parser nobody asked for.
+  const KEY = /\b(function|end|local|if|then|else|elseif|for|in|do|while|return|not|and|or|nil|true|false|const|let|var|=>|new|typeof|undefined|null)\b/g;
+  const paint = (pre) => {
+    const code = pre.firstElementChild;
+    const src = code.textContent;
+    const out = [];
+    // One pass, so a keyword inside a string cannot be recoloured afterwards.
+    const re = /(--\[\[[\s\S]*?\]\]|--[^\n]*|\/\/[^\n]*|\/\*[\s\S]*?\*\/)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)/g;
+    let at = 0;
+    for (let m = re.exec(src); m; m = re.exec(src)) {
+      out.push(plain(src.slice(at, m.index)));
+      const cls = m[1] ? "t-com" : m[2] ? "t-str" : "t-num";
+      out.push(`<span class="${cls}">${esc(m[0])}</span>`);
+      at = m.index + m[0].length;
+    }
+    out.push(plain(src.slice(at)));
+    code.innerHTML = out.join("");
+  };
+  const plain = (s) => esc(s)
+    .replace(KEY, '<span class="t-key">$1</span>')
+    .replace(/\b([a-zA-Z_][\w.]*)(\s*\()/g, '<span class="t-fn">$1</span>$2');
+  $$("pre").forEach(paint);
+  setLang("lua");
+
+  /* ------------------------------------------------------------- the sheet */
+  const rtLabel = (rt) => (rt === "any" ? "cross-runtime" : "panel view");
+  const modsEl = $("#mods");
+  modsEl.innerHTML = DATA.modules.map((m) => `
+    <details class="mod" data-id="${esc(m.id)}" data-rt="${esc(m.runtime)}">
+      <summary>
+        <span>
+          <span class="mod-id">${esc(m.id)}</span>
+          <span class="mod-tags">
+            <span class="rt-${esc(m.runtime)}">${rtLabel(m.runtime)}</span>
+            <span>v${esc(m.version)}</span>
+            ${m.global ? "<span>global</span>" : ""}
+            ${m.requires.length ? `<span>needs ${m.requires.map(esc).join(", ")}</span>` : ""}
+          </span>
+        </span>
+        <p class="mod-sum">${doc(m.summary)}</p>
+        <span class="mod-n"><span data-count>${m.members.length}</span> members</span>
+      </summary>
+      <div class="members">
+        <table class="mem">
+          <thead><tr><th>Namespaced</th><th>Flat</th><th>Signature</th><th>What it does</th></tr></thead>
+          <tbody>
+            ${m.members.map((v) => `
+              <tr data-hay="${esc((v.path + " " + v.flat + " " + v.sig + " " + v.doc).toLowerCase())}">
+                <td class="m-path">${esc(v.path)}</td>
+                <td class="m-flat">${esc(v.flat)}</td>
+                <td class="m-sig">${v.value ? "&mdash;" : esc(v.sig)}
+                  ${v.rt === "webview" && m.runtime === "any" ? '<span class="m-badge">panel view</span>' : ""}</td>
+                <td class="m-doc">${doc(v.doc)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </details>`).join("");
+
+  /* ----------------------------------------------------- hooks and events */
+  $("#hooktable").innerHTML = `
+    <thead><tr><th>Hook</th><th>Signature</th><th>When</th></tr></thead>
+    <tbody>${DATA.hooks.map((h) => `
+      <tr><td class="m-path">${esc(h.id)}</td><td class="m-sig">${esc(h.sig)}</td>
+      <td class="m-doc">${doc(h.doc)}</td></tr>`).join("")}</tbody>`;
+
+  $("#evtable").innerHTML = `
+    <thead><tr><th>Event</th><th>Handler</th><th>Group</th><th>Payload</th><th>What it means</th></tr></thead>
+    <tbody>${DATA.events.map((e) => `
+      <tr><td class="m-path">${esc(e.id)}</td><td class="m-flat">${esc(e.fn)}</td>
+      <td class="m-flat">${esc(e.group)}${e.rt === "webview" ? ' <span class="m-badge">panel view</span>' : ""}</td>
+      <td class="m-flat">${e.payload ? esc(e.payload) : "&mdash;"}</td>
+      <td class="m-doc">${doc(e.doc)}</td></tr>`).join("")}</tbody>`;
+
+  /* ------------------------------------------------------------- find/filter */
+  const q = $("#q");
+  const hits = $("#hits");
+  let runtime = "all";
+
+  const apply = () => {
+    const term = q.value.trim().toLowerCase();
+    let shownMods = 0;
+    let shownMembers = 0;
+
+    for (const el of $$(".mod")) {
+      const mod = DATA.modules.find((m) => m.id === el.dataset.id);
+      const rtOk = runtime === "all" || el.dataset.rt === runtime;
+      if (!rtOk) { el.hidden = true; continue; }
+
+      if (!term) {
+        el.hidden = false;
+        shownMods += 1;
+        shownMembers += mod.members.length;
+        $$("tr", el).forEach((r) => { r.hidden = false; r.classList.remove("mark"); });
+        $("[data-count]", el).textContent = mod.members.length;
+        continue;
+      }
+
+      const rows = $$("tbody tr", el);
+      let n = 0;
+      for (const r of rows) {
+        const hit = r.dataset.hay.includes(term);
+        r.hidden = !hit;
+        r.classList.toggle("mark", hit);
+        if (hit) n += 1;
+      }
+      // A module whose own id matches keeps all of its members: searching "storage" should show
+      // what the module contains, not nothing.
+      const idHit = mod.id.toLowerCase().includes(term);
+      if (idHit && !n) { rows.forEach((r) => { r.hidden = false; }); n = rows.length; }
+      el.hidden = !(n || idHit);
+      if (!el.hidden) {
+        el.open = true;
+        shownMods += 1;
+        shownMembers += n;
+        $("[data-count]", el).textContent = n;
+      }
+    }
+
+    hits.textContent = term || runtime !== "all"
+      ? `${num(shownMembers)} member${shownMembers === 1 ? "" : "s"} in ${shownMods} module${shownMods === 1 ? "" : "s"}`
+      : `${num(DATA.totals.members)} members in ${DATA.totals.modules} modules`;
+  };
+
+  q.addEventListener("input", apply);
+  $$(".seg [data-rt]").forEach((b) => b.addEventListener("click", () => {
+    runtime = b.dataset.rt;
+    $$(".seg [data-rt]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    apply();
+  }));
+  $("#expand").addEventListener("click", (e) => {
+    const open = e.currentTarget.getAttribute("aria-pressed") !== "true";
+    e.currentTarget.setAttribute("aria-pressed", String(open));
+    e.currentTarget.textContent = open ? "Collapse all" : "Expand all";
+    $$(".mod").forEach((d) => { d.open = open; });
+  });
+  apply();
+
+  /* ------------------------------------------------------------------ weight */
+  const chosen = new Set(["ce.core", "ce.midi", "ce.time"]);
+  const picks = $("#picks");
+  picks.innerHTML = DATA.modules.map((m) => `
+    <button type="button" class="pick" data-id="${esc(m.id)}"
+      aria-pressed="${chosen.has(m.id)}">${esc(m.id)}</button>`).join("");
+
+  const LABEL = { javascript: "JavaScript", lua: "Lua", python: "Python", webview: "Editor" };
+  const cost = () => {
+    const rows = DATA.languages.map((lang) => {
+      const base = DATA.shared[lang] ?? 0;
+      const own = [...chosen].reduce((sum, id) =>
+        sum + (DATA.modules.find((m) => m.id === id)?.cost[lang] ?? 0), 0);
+      return { lang, base, own, total: base + own };
+    });
+    const peak = Math.max(1, ...rows.map((r) => r.total));
+    $("#costtable").innerHTML = rows.map((r) => `
+      <tr>
+        <td>${LABEL[r.lang] ?? r.lang}<div class="bar"><i style="width:${(r.total / peak) * 100}%"></i></div></td>
+        <td>${Math.round(r.total / 1024)} KB</td>
+      </tr>`).join("")
+      + `<tr class="sum"><td>${chosen.size} module${chosen.size === 1 ? "" : "s"} chosen</td>
+         <td>${num([...chosen].reduce((s, id) =>
+           s + (DATA.modules.find((m) => m.id === id)?.members.length ?? 0), 0))} members</td></tr>`;
+  };
+  picks.addEventListener("click", (e) => {
+    const b = e.target.closest(".pick");
+    if (!b) return;
+    if (chosen.has(b.dataset.id)) chosen.delete(b.dataset.id); else chosen.add(b.dataset.id);
+    b.setAttribute("aria-pressed", String(chosen.has(b.dataset.id)));
+    cost();
+  });
+  cost();
+
+  /* -------------------------------------------------------------- rail state */
+  const links = $$("#nav a");
+  const spy = new IntersectionObserver((entries) => {
+    for (const en of entries) {
+      if (!en.isIntersecting) continue;
+      const id = en.target.id;
+      links.forEach((a) => a.classList.toggle("here", a.getAttribute("href") === `#${id}`));
+    }
+  }, { rootMargin: "-10% 0px -80% 0px" });
+  $$("section[id], .lesson[id]").forEach((s) => spy.observe(s));
+})();
+</script>

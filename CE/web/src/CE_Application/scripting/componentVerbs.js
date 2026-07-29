@@ -772,18 +772,25 @@ export function verbArgs(verb) {
 
 export function verbSignature(verb) {
   const args = verbArgs(verb);
-  // A boolean with no argument toggles, so its argument is shown as optional.
-  if (verb.k === BOOL && verb.toggle) return `${verb.id}(target [, ${args[0]}])`;
-  // An index set toggles when the second argument is left off, the same way a bool does.
-  if (verb.k === INDEXSET) return `${verb.id}(target, index [, on])`;
   switch (verb.k) {
-    case READ: return `${verb.id}(target [, name [, index]])`;
+    case READ: return `${verb.id}(target [, name [, index]]) -> value`;
     case SIZE: return `${verb.id}(target [, name]) -> number|table`;
     case FILL: return `${verb.id}(target, name, values) -> boolean`;
     case INSERT: return `${verb.id}(target, name [, index]) -> boolean`;
     case REMOVE: return `${verb.id}(target, name [, index]) -> boolean`;
-    default: return `${verb.id}(${['target', ...args].join(', ')})`;
+    default: break;
   }
+  // Every WRITE verb reports whether the component now holds what was asked (§44), so the signature
+  // has to say so — a reference generated from these would otherwise tell a script author the call
+  // answers nothing, which is what they all used to do.
+  //
+  // A boolean with no argument toggles, and an index set does the same with its second, so both
+  // show that argument as optional.
+  let call;
+  if (verb.k === BOOL && verb.toggle) call = `${verb.id}(target [, ${args[0]}])`;
+  else if (verb.k === INDEXSET) call = `${verb.id}(target, index [, on])`;
+  else call = `${verb.id}(${['target', ...args].join(', ')})`;
+  return `${call} -> boolean`;
 }
 
 export function verbSummary(verb) {
