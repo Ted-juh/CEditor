@@ -612,6 +612,98 @@ function randomChoice(values, weights)
   return values[#values]
 end
 
+-- @module ce.math
+-- Colour arithmetic. The app's own (utils/colorHelpers.js, utils/colorMath.js), ported for the same
+-- reason every table here is: a script lightening a colour and the border renderer lightening the
+-- same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
+--
+-- In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
+-- "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
+-- returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round, and that is
+-- a trap worth one asymmetry to avoid.
+local function __cchan(hex)
+  local h = string.gsub(tostring(hex == nil and "" or hex), "#", "")
+  h = string.sub(h, -6)
+  if #h ~= 6 or string.match(h, "^%x%x%x%x%x%x$") == nil then return nil end
+  return tonumber(string.sub(h, 1, 2), 16), tonumber(string.sub(h, 3, 4), 16), tonumber(string.sub(h, 5, 6), 16)
+end
+local function __cbyte(v)
+  local n = math.floor((tonumber(v) or 0) + 0.5)
+  if n < 0 then return 0 elseif n > 255 then return 255 end
+  return n
+end
+function rgbToHex(r, g, b)
+  return string.upper(string.format("#%02x%02x%02x", __cbyte(r), __cbyte(g), __cbyte(b)))
+end
+function hexToRgb(hex)
+  local r, g, b = __cchan(hex)
+  if r == nil then return nil end
+  return { r = r, g = g, b = b }
+end
+function lighten(hex, amount)
+  local r, g, b = __cchan(hex)
+  if r == nil then return nil end
+  local f = tonumber(amount)
+  if f == nil then f = 0.4 end
+  return rgbToHex(r + (255 - r) * f, g + (255 - g) * f, b + (255 - b) * f)
+end
+function darken(hex, amount)
+  local r, g, b = __cchan(hex)
+  if r == nil then return nil end
+  local f = tonumber(amount)
+  if f == nil then f = 0.55 end
+  return rgbToHex(r * f, g * f, b * f)
+end
+-- NOT an app algorithm, and said so: lerp() per channel in plain RGB.
+function mixColour(a, b, t)
+  local r1, g1, b1 = __cchan(a)
+  local r2, g2, b2 = __cchan(b)
+  if r1 == nil or r2 == nil then return nil end
+  local f = tonumber(t) or 0
+  if f < 0 then f = 0 elseif f > 1 then f = 1 end
+  return rgbToHex(r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f)
+end
+-- The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
+function colourAlpha(hex, a)
+  local r, g, b = __cchan(hex)
+  if r == nil then return nil end
+  local f = tonumber(a)
+  if f == nil then f = 1 end
+  if f < 0 then f = 0 elseif f > 1 then f = 1 end
+  return string.upper(string.format("%02x", math.floor(f * 255 + 0.5)) .. string.sub(rgbToHex(r, g, b), 2))
+end
+function hexToHsl(hex)
+  local r, g, b = __cchan(hex)
+  if r == nil then return nil end
+  r = r / 255; g = g / 255; b = b / 255
+  local mx = math.max(r, g, b)
+  local mn = math.min(r, g, b)
+  local h, s = 0, 0
+  local l = (mx + mn) / 2
+  if mx ~= mn then
+    local d = mx - mn
+    if l > 0.5 then s = d / (2 - mx - mn) else s = d / (mx + mn) end
+    if mx == r then
+      local off = 0
+      if g < b then off = 6 end
+      h = ((g - b) / d + off) * 60
+    elseif mx == g then h = ((b - r) / d + 2) * 60
+    else h = ((r - g) / d + 4) * 60 end
+  end
+  return { h = h, s = s * 100, l = l * 100 }
+end
+function hslToHex(hue, sat, light)
+  local h = tonumber(hue) or 0
+  local s = (tonumber(sat) or 0) / 100
+  local l = (tonumber(light) or 0) / 100
+  local a = s * math.min(l, 1 - l)
+  local function f(n)
+    local k = (n + h / 30) % 12
+    return l - a * math.max(-1, math.min(k - 3, 9 - k, 1))
+  end
+  return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -1083,6 +1175,7 @@ local WEBVIEW_ONLY = {
   "uiNotify","uiStatus","uiDialog","uiPrompt","uiChoose","uiDismiss","uiUpdate","uiState","uiCopy",
 -- @module ce.draw
   "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
+  "drawGradient","drawOpacity","drawTransform","drawEllipse","drawPixelText","drawMeasure",
   "drawText","drawRedraw",
 -- @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
@@ -1786,12 +1879,12 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromHsl = "hslToHex", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
   ["ce.ui"] = { choose = "uiChoose", copy = "uiCopy", dialog = "uiDialog", dismiss = "uiDismiss", notify = "uiNotify", prompt = "uiPrompt", state = "uiState", status = "uiStatus", update = "uiUpdate" },
-  ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", fill = "drawFill", line = "drawLine", path = "drawPath", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText" },
+  ["ce.draw"] = { arc = "drawArc", circle = "drawCircle", clear = "drawClear", ellipse = "drawEllipse", fill = "drawFill", gradient = "drawGradient", line = "drawLine", measure = "drawMeasure", opacity = "drawOpacity", path = "drawPath", pixelText = "drawPixelText", rect = "drawRect", redraw = "drawRedraw", stroke = "drawStroke", text = "drawText", transform = "drawTransform" },
   ["ce.panel"] = { clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", info = "panelInfo", parent = "panelParent", patch = "panelPatch", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
   ["ce.storage"] = { forget = "forgetSetting", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", transpose = "splitTranspose" },
@@ -1828,12 +1921,12 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.7", runtime = "any" },
+  { id = "ce.math", version = "1.8", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.3", runtime = "any" },
   { id = "ce.anim", version = "1.1", runtime = "any" },
   { id = "ce.ui", version = "1.2", runtime = "webview" },
-  { id = "ce.draw", version = "1.1", runtime = "webview" },
+  { id = "ce.draw", version = "1.2", runtime = "webview" },
   { id = "ce.panel", version = "1.3", runtime = "any" },
   { id = "ce.storage", version = "1.1", runtime = "any" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },

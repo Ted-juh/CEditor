@@ -85,6 +85,18 @@ const CASES = [
   ['tapTempo', [[0, 10]]], ['tapTempo', [[0, 100000]]],
   ['clockTempo', [[20.8, 20.8, 20.8]]], ['clockTempo', [[20, 21, 100, 20]]],
   ['clockTempo', [[]]], ['clockTempo', [[0, -1]]],
+  // Colour. Hex formatting is where four runtimes drift silently: a missing zero-pad, a rounding
+  // that goes the other way at .5, a case that differs. Every one produces a colour that is nearly
+  // right in one engine, and nothing fails.
+  ['lighten', ['336699']], ['lighten', ['#336699', 0.75]], ['lighten', ['66336699']],
+  ['lighten', ['000000', 0]], ['lighten', ['nope']], ['lighten', ['']],
+  ['darken', ['336699']], ['darken', ['FFFFFF', 0.1]], ['darken', ['010101', 0.5]],
+  ['mixColour', ['000000', 'FFFFFF', 0.5]], ['mixColour', ['FF0000', '00FF00', 0.25]],
+  ['mixColour', ['000000', 'FFFFFF', 5]], ['mixColour', ['000000', 'zz', 0.5]],
+  ['colourAlpha', ['336699', 0.4]], ['colourAlpha', ['336699', 0]], ['colourAlpha', ['336699', 1]],
+  ['colourAlpha', ['336699', 2]],
+  ['rgbToHex', [51, 102, 153]], ['rgbToHex', [0, 0, 0]], ['rgbToHex', [300, -5, 127.5]],
+  ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
   ['from7bit', [[1, 0], 'msb']], ['from7bit', [[1, 0], 'lsb']], ['from7bit', [[1, 0]]],
   ['fromNibbles', [0xA, 0xB]],
@@ -136,6 +148,8 @@ const STRUCT_CASES = [
   ['arpOrder', [[60, 64, 67], 'asPlayed']], ['arpOrder', [[60, 64], 'updown']],
   ['arpOrder', [[60], 'downup']], ['arpOrder', [[], 'up']],
   ['divisionNames', []],
+  ['hexToRgb', ['336699']], ['hexToRgb', ['#0A0B0C']], ['hexToRgb', ['bad']],
+  ['hexToHsl', ['336699']], ['hexToHsl', ['808080']], ['hexToHsl', ['FF0000']],
   ['barBeatAt', [0]], ['barBeatAt', [4.5]], ['barBeatAt', [4.5, 3]], ['barBeatAt', [-1]],
   ['barBeatAt', [0.999]], ['barBeatAt', [12.25, 7]],
   ['stepsBetween', [0, 1, '1/16']], ['stepsBetween', [1, 1, '1/16']],

@@ -603,6 +603,91 @@ export const COMMANDS = [
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
 
+  /* --- Colour arithmetic (design doc §41) ---
+     In ce.math rather than ce.draw because it is PURE and cross-runtime: setting a control's colour
+     from a value works with the panel shut, and the exported plugin does it.
+
+     §36's sweep swept utils/*Layout.js and declared ce.math complete. colorMath.js and
+     colorHelpers.js do not match that glob — the sweep had a blind spot exactly the shape of its
+     own search pattern, which is worth writing down because it is the failure mode of any sweep.
+
+     ONE input form, and a trap worth naming. Every verb here accepts "RRGGBB", "AARRGGBB" or
+     "#RRGGBB" — the app's own parser reads the last six characters — and returns "#RRGGBB", which
+     CSS, SVG and a panel property all accept. The app STORES colours as AARRGGBB (JUCE's order:
+     "66FFFFFF" is a 40%-opaque white in every panel document) while CSS wants #RRGGBBAA — the same
+     four bytes the other way round. So exactly one verb, `alpha`, returns the panel's form, and
+     making a DRAWING translucent is ce.draw.opacity(), a different question with a different
+     answer. Case is normalised to upper; hex is case-insensitive everywhere it is read. */
+  {
+    id: 'lighten', category: 'Value / range', signature: 'lighten(colour [, amount]) -> string',
+    summary: 'Scale each channel toward white. `amount` 0..1, default 0.4 — the border renderer\'s own highlight, so a script-drawn bevel matches the one the panel draws beside it. Nothing back for a colour it cannot read.',
+    params: [
+      { name: 'colour', type: 'string', required: true },
+      { name: 'amount', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'darken', category: 'Value / range', signature: 'darken(colour [, amount]) -> string',
+    summary: 'Scale each channel toward black. `amount` 0..1, default 0.55 — the border groove shading, for the same reason lighten\'s default is what it is.',
+    params: [
+      { name: 'colour', type: 'string', required: true },
+      { name: 'amount', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mixColour', category: 'Value / range', signature: 'mixColour(a, b, t) -> string',
+    summary: 'Blend two colours, `t` 0..1. NOT an app algorithm, and said so rather than implied: it is lerp() per channel in plain RGB, which is the blend a meter fading from green to red actually wants.',
+    params: [
+      { name: 'a', type: 'string', required: true },
+      { name: 'b', type: 'string', required: true },
+      { name: 't', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'colourAlpha', category: 'Value / range', signature: 'colourAlpha(colour, a) -> string',
+    summary: 'A colour with an alpha, in the PANEL\'s form: AARRGGBB, no leading #, which is what a stored colour property holds. The one verb here that does not return #RRGGBB, because it is the only form a stored colour can carry an alpha in — CSS\'s #RRGGBBAA is the same bytes the other way round, and mixing them up is silent. To make a DRAWING translucent use ce.draw.opacity().',
+    params: [
+      { name: 'colour', type: 'string', required: true },
+      { name: 'a', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'hexToRgb', category: 'Value / range', signature: 'hexToRgb(colour) -> table',
+    summary: 'A colour as { r, g, b }, each 0..255. Nothing back for a colour it cannot read, which is what tells a typo from black.',
+    params: [{ name: 'colour', type: 'string', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'rgbToHex', category: 'Value / range', signature: 'rgbToHex(r, g, b) -> string',
+    summary: 'Channels 0..255 back to "#RRGGBB". Out-of-range channels are clamped rather than wrapped — 300 is white, not 44.',
+    params: [
+      { name: 'r', type: 'number', required: true },
+      { name: 'g', type: 'number', required: true },
+      { name: 'b', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'hexToHsl', category: 'Value / range', signature: 'hexToHsl(colour) -> table',
+    summary: 'A colour as { h, s, l } — hue 0..360, saturation and lightness 0..100, the colour editor\'s own ranges. Grey has hue and saturation 0, which is a fact about grey rather than a lost hue: guard on it if you meant to keep one.',
+    params: [{ name: 'colour', type: 'string', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'hslToHex', category: 'Value / range', signature: 'hslToHex(h, s, l) -> string',
+    summary: 'The inverse: hue 0..360, saturation and lightness 0..100, back to "#RRGGBB". Rotating a hue and going back is how a script builds a palette from one colour.',
+    params: [
+      { name: 'h', type: 'number', required: true },
+      { name: 's', type: 'number', required: true },
+      { name: 'l', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+
   /* --- Animation (design doc §6 phase 6) ---
      Move a value over time instead of jumping it. CROSS-RUNTIME, and deliberately so: a filter
      sweep triggered by a note has to work in a DAW with the panel shut, which is what §2 meant by
@@ -856,19 +941,20 @@ export const COMMANDS = [
   },
   {
     id: 'drawFill', category: 'Drawing', signature: 'drawFill(colour)',
-    summary: 'The fill colour for the shapes that follow — a hex string such as "#5B9BD5", or nil for no fill.',
+    summary: 'The fill colour for the shapes that follow — a hex string such as "#5B9BD5", or nil for no fill. May be a gradient from ce.draw.gradient() rather than a flat colour.',
     runtime: RUNTIME_WEBVIEW,
     params: [{ name: 'colour', type: 'string', required: false }],
     scopes: 'any',
     snippet: { lua: 'ce.draw.fill("${1:#5B9BD5}")$0', javascript: 'ce.draw.fill("${1:#5B9BD5}");$0' },
   },
   {
-    id: 'drawStroke', category: 'Drawing', signature: 'drawStroke(colour [, width])',
-    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke.',
+    id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it \u2014 the panel\u2019s own beat marks are { 3, 3 }), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }; path() used to hardcode round on both and now takes yours.',
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'colour', type: 'string', required: false },
+      { name: 'colour', type: 'value', required: false },
       { name: 'width', type: 'number', required: false },
+      { name: 'opts', type: 'object', required: false, fields: ['dash', 'cap', 'join'] },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2})$0', javascript: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2});$0' },
@@ -935,6 +1021,75 @@ export const COMMANDS = [
       lua: 'ce.draw.arc(${1:30}, ${2:30}, ${3:24}, 135, 135 + 270 * ${4:value})$0',
       javascript: 'ce.draw.arc(${1:30}, ${2:30}, ${3:24}, 135, 135 + 270 * ${4:value});$0',
     },
+  },
+  /* --- Drawing, the rest of it (design doc §41) ---
+     fill and stroke took a flat colour and a width, and that was the whole style vocabulary. The
+     app's own renderers draw gradients (gradientCoords() is documented as being FOR this renderer:
+     "intended for use with SVG gradientUnits=userSpaceOnUse"), dashed strokes (the Transport's beat
+     marks, the Constellation's probe link), translucent overlays, and text in a 5x7 LCD font. A
+     script could do none of it. */
+  {
+    id: 'drawGradient', category: 'Drawing', signature: 'drawGradient(stops [, angle]) -> value',
+    summary: 'A gradient, to hand to fill() or stroke() in place of a colour. `stops` is either a list of colours ("space these evenly") or a list of { at (0..1), colour, opacity }; mixing the two positions some and lets the rest fall where they may. `angle` follows the PANEL’s convention — 0 up, 90 right, the same one the Background section’s gradients use — and is resolved with the app’s own gradientCoords(), which paints correctly even on a zero-area path like a horizontal line. Fewer than two usable stops returns nothing: a gradient between one colour and nothing is a colour.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'stops', type: 'list', required: true },
+      { name: 'angle', type: 'number', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.draw.fill(ce.draw.gradient({ "#2A6BD4", "#0A1830" }, 180))$0',
+      javascript: 'ce.draw.fill(ce.draw.gradient(["#2A6BD4", "#0A1830"], 180));$0',
+    },
+  },
+  {
+    id: 'drawOpacity', category: 'Drawing', signature: 'drawOpacity(a)',
+    summary: 'How opaque everything drawn AFTER this is, 0..1. Applies like fill and stroke do — to what follows, not to one shape — because the whole style model here is "what was in force when the command was issued". A value that is not a number clears it. This makes a DRAWING translucent; ce.math.alpha() makes a stored colour translucent, and they are different questions with different answers.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'a', type: 'number', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'drawTransform', category: 'Drawing', signature: 'drawTransform([opts])',
+    summary: 'Rotate, move or scale everything drawn after this. `opts` carries { rotate (degrees, clockwise), cx, cy (the centre to rotate about), x, y (a shift), scale }. No opts clears it. Without this a knob pointer means computing every corner with sin and cos by hand, and getting the centre wrong is the classic way a pointer ends up orbiting the wrong point.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['rotate', 'cx', 'cy', 'x', 'y', 'scale'] }],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.draw.transform({ rotate = ${1:135}, cx = w / 2, cy = h / 2 })$0',
+      javascript: 'ce.draw.transform({ rotate: ${1:135}, cx: w / 2, cy: h / 2 });$0',
+    },
+  },
+  {
+    id: 'drawEllipse', category: 'Drawing', signature: 'drawEllipse(cx, cy, rx, ry)',
+    summary: 'An ellipse. circle() only does round, and a meter cap, an XY cursor or a squashed glow is not round.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'cx', type: 'number', required: true }, { name: 'cy', type: 'number', required: true },
+      { name: 'rx', type: 'number', required: true }, { name: 'ry', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawPixelText', category: 'Drawing', signature: 'drawPixelText(text, x, y [, scale])',
+    summary: 'Text in the app’s own 5x7 LCD font — the one the LCD components print with — so a readout a script draws and a readout the panel draws are the same letters. `scale` is a whole-number pixel size, 1 by default. Drawn literally, one square per lit pixel: it IS a bitmap font, and rendering it smoothly would stop it being that font. (x, y) is the TOP-LEFT, unlike text() whose y is the baseline — a grid font has no baseline to speak of.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'text', type: 'string', required: true },
+      { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
+      { name: 'scale', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawMeasure', category: 'Drawing', signature: 'drawMeasure(text [, opts]) -> table',
+    summary: 'How wide a string will be: { width, height, exact }. Nothing could ask before, so a box behind a label, a column of right-aligned numbers or a truncation had no way to be worked out. `opts` carries { size, family } for ordinary text, or { pixel = true, scale } for the LCD font. `exact` is the honest part: the pixel font is a grid and its answer is arithmetic, while a proportional font has to be MEASURED — and with no surface to measure on this falls back to an estimate and says so, rather than returning a guess as though it were a fact.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'text', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['size', 'family', 'pixel', 'scale'] },
+    ],
+    scopes: 'any',
   },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
@@ -2269,8 +2424,8 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.7', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
+  { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels, colour — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key — plus what a key IMPLIES: which degree a note is, the chord built on a degree and its numeral, how a key spells its accidentals, and the Harmoniser\'s and Arpeggiator\'s own voicing and walk.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -2281,8 +2436,8 @@ export const MODULES = [
     summary: 'Move a value over time instead of jumping it: to a destination, with a spring, or through a shape you draw — delayed, staggered, repeating, tempo-synced, and telling you when it is done. Cross-runtime: a sweep has to work with the panel shut too.' },
   { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Tell the person using the panel something, take it back, or replace it; ask them a question — a choice, a line of text, or a pick from a list; and put something on their clipboard. Panel view only — there is nobody to tell, ask or copy for with the window shut.' },
-  { id: 'ce.draw', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Panel view only — there is no surface with the window shut.' },
+  { id: 'ce.draw', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Draw on top of any control: scope traces, envelope shapes, XY pads, readouts. Gradients, dashes, opacity and transforms as well as flat shapes, plus the panel\'s own LCD font and a way to measure text. Panel view only — there is no surface with the window shut.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
@@ -2366,6 +2521,10 @@ const MODULE_MEMBERS = {
                min: 'minOf', max: 'maxOf', sum: 'sumOf', mean: 'meanOf', blend: 'blend',
                randomFloat: 'randomFloat', gaussian: 'randomGaussian', walk: 'randomWalk',
                chance: 'randomBool', shuffle: 'shuffle', stream: 'randomStream',
+               // Colour. `mix`, `alpha`, `rgb`, `hex` and `hsl` are all §1 collisions as bare
+               // globals, so the flat spellings say what they convert.
+               lighten: 'lighten', darken: 'darken', mix: 'mixColour', alpha: 'colourAlpha',
+               rgb: 'hexToRgb', hex: 'rgbToHex', hsl: 'hexToHsl', fromHsl: 'hslToHex',
                degrees: 'toDegrees', radians: 'toRadians',
                distance: 'distance', angle: 'angleOf', polar: 'polar',
                // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute
@@ -2400,6 +2559,10 @@ const MODULE_MEMBERS = {
     clear: 'drawClear', fill: 'drawFill', stroke: 'drawStroke', rect: 'drawRect',
     circle: 'drawCircle', arc: 'drawArc', line: 'drawLine', path: 'drawPath', text: 'drawText',
     redraw: 'drawRedraw',
+    // §1 again: `gradient`, `opacity`, `transform`, `ellipse` and `measure` are all words a panel
+    // author reaches for, so the flat spellings keep the draw prefix.
+    gradient: 'drawGradient', opacity: 'drawOpacity', transform: 'drawTransform',
+    ellipse: 'drawEllipse', pixelText: 'drawPixelText', measure: 'drawMeasure',
   },
   'ce.panel': {
     snapshot: 'panelSnapshot', restore: 'panelRestore', each: 'panelEach',

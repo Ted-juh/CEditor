@@ -10,16 +10,77 @@
   // with whatever it is drawn on. Nothing here is ever persisted: a drawing is a product of the
   // script, and lives only in the scriptDrawings store.
   import { scriptDrawings } from '../stores/scriptDraw.js';
+  import { gradientCoords } from '../utils/gradientGeometry.js';
+  import { glyphRows, FONT_W, FONT_H, FONT_ADVANCE } from '../utils/pixelFont.js';
 
   let { controlId = '', width = 0, height = 0 } = $props();
 
   let commands = $derived($scriptDrawings[String(controlId)]?.commands ?? []);
 
+  // Every gradient a command referred to, defined once in <defs>. The runtime hands them over
+  // already resolved — angle, stops — and the geometry is the app's own gradientCoords, which is
+  // written for exactly this: gradientUnits="userSpaceOnUse", so a gradient still paints on a
+  // zero-area path like a horizontal line.
+  let gradients = $derived((() => {
+    const seen = new Map();
+    for (const c of commands) {
+      for (const paintValue of [c.fill, c.stroke]) {
+        if (paintValue && typeof paintValue === 'object' && paintValue.gradient) {
+          seen.set(paintValue.id, paintValue);
+        }
+      }
+    }
+    return [...seen.values()];
+  })());
+
   /** A polyline/polygon "x,y x,y …" point list. */
   const pointsAttr = (points) => (points ?? []).map(([x, y]) => `${x},${y}`).join(' ');
 
-  // SVG needs "none" rather than an absent attribute to mean "do not paint this".
-  const paint = (colour) => (colour == null || colour === '' ? 'none' : colour);
+  // SVG needs "none" rather than an absent attribute to mean "do not paint this". A gradient is an
+  // object rather than a string, and becomes a url(#…) reference to the <defs> entry above.
+  const paint = (colour) => {
+    if (colour == null || colour === '') return 'none';
+    if (typeof colour === 'object') return colour.gradient ? `url(#${colour.id})` : 'none';
+    return colour;
+  };
+
+  /** The style every shape shares. Held in one place so a new attribute cannot reach five of the
+   *  six shapes and get missed on the seventh. */
+  const style = (c) => ({
+    fill: paint(c.fill),
+    stroke: paint(c.stroke),
+    'stroke-width': c.strokeWidth,
+    'stroke-dasharray': c.dash || undefined,
+    'stroke-linecap': c.cap || undefined,
+    'stroke-linejoin': c.join || undefined,
+    opacity: c.opacity == null ? undefined : c.opacity,
+    transform: c.transform || undefined,
+  });
+
+  /** The 5x7 pixel font, as one rect per lit pixel. The app's own glyphs — an LCD readout a script
+   *  draws and one an LCD component prints are the same letters, which a second font would not be. */
+  function pixelRects(c) {
+    const out = [];
+    const scale = Math.max(1, Math.round(c.scale || 1));
+    let x = c.x;
+    for (const ch of String(c.text ?? '')) {
+      // glyphRows gives FONT_H strings of FONT_W characters, a lit pixel being '#'. An unknown
+      // character comes back as the font's own block glyph rather than a hole, which is what the
+      // LCD components show too.
+      const rows = glyphRows(ch);
+      if (rows) {
+        for (let row = 0; row < FONT_H; row += 1) {
+          const line = rows[row] ?? '';
+          for (let col = 0; col < FONT_W; col += 1) {
+            if (line[col] !== '#') continue;
+            out.push({ x: x + col * scale, y: c.y + row * scale, s: scale });
+          }
+        }
+      }
+      x += FONT_ADVANCE * scale;
+    }
+    return out;
+  }
 
   // Arc geometry. Angles arrive in DEGREES with 0 at twelve o'clock, increasing clockwise — the
   // convention a knob's arc is described in. SVG measures from three o'clock, hence the -90.
@@ -61,6 +122,18 @@
       <clipPath id="ce-draw-clip-{controlId}">
         <rect x="0" y="0" width={Math.max(0, width)} height={Math.max(0, height)} />
       </clipPath>
+      {#each gradients as g (g.id)}
+        {@const co = gradientCoords(g.angle, Math.max(1, width), Math.max(1, height))}
+        <linearGradient
+          id={g.id}
+          gradientUnits="userSpaceOnUse"
+          x1={co.x1} y1={co.y1} x2={co.x2} y2={co.y2}
+        >
+          {#each g.stops as st, si (si)}
+            <stop offset="{st.at * 100}%" stop-color={st.colour} stop-opacity={st.opacity ?? 1} />
+          {/each}
+        </linearGradient>
+      {/each}
     </defs>
     <g clip-path="url(#ce-draw-clip-{controlId})">
       {#each commands as c, i (i)}
@@ -68,36 +141,39 @@
           <rect
             x={c.x} y={c.y} width={Math.max(0, c.w)} height={Math.max(0, c.h)}
             rx={c.radius || 0} ry={c.radius || 0}
-            fill={paint(c.fill)} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+            {...style(c)} />
         {:else if c.op === 'circle'}
-          <circle
-            cx={c.cx} cy={c.cy} r={Math.max(0, c.r)}
-            fill={paint(c.fill)} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+          <circle cx={c.cx} cy={c.cy} r={Math.max(0, c.r)} {...style(c)} />
+        {:else if c.op === 'ellipse'}
+          <ellipse cx={c.cx} cy={c.cy} rx={Math.max(0, c.rx)} ry={Math.max(0, c.ry)} {...style(c)} />
         {:else if c.op === 'arc'}
           <!-- Stroked as an open arc; filled as a pie slice, because a filled arc with no centre
                would be a shape nobody asked for. -->
-          <path d={arcPath(c)}
-            fill={c.fill ? paint(c.fill) : 'none'} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+          <path d={arcPath(c)} {...style(c)} fill={c.fill ? paint(c.fill) : 'none'} />
         {:else if c.op === 'line'}
           <!-- A line has no inside, so it is stroke-only whatever fill was set. -->
-          <line
-            x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2}
-            stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+          <line x1={c.x1} y1={c.y1} x2={c.x2} y2={c.y2} {...style(c)} fill="none" />
         {:else if c.op === 'path'}
           {#if c.closed}
-            <polygon points={pointsAttr(c.points)}
-              fill={paint(c.fill)} stroke={paint(c.stroke)} stroke-width={c.strokeWidth} />
+            <polygon points={pointsAttr(c.points)} {...style(c)} />
           {:else}
-            <polyline points={pointsAttr(c.points)}
-              fill={paint(c.fill)} stroke={paint(c.stroke)} stroke-width={c.strokeWidth}
-              stroke-linejoin="round" stroke-linecap="round" />
+            <polyline points={pointsAttr(c.points)} {...style(c)}
+              stroke-linejoin={c.join || 'round'} stroke-linecap={c.cap || 'round'} />
           {/if}
         {:else if c.op === 'text'}
           <text
             x={c.x} y={c.y} font-size={c.size}
             font-family={c.family || 'inherit'}
             text-anchor={c.align === 'middle' ? 'middle' : c.align === 'right' ? 'end' : 'start'}
-            fill={paint(c.fill ?? c.stroke)}>{c.text}</text>
+            {...style(c)} stroke="none" fill={paint(c.fill ?? c.stroke)}>{c.text}</text>
+        {:else if c.op === 'pixelText'}
+          <!-- One rect per lit pixel. Deliberately literal: it IS a bitmap font, and rendering it
+               as anything smoother would stop being the font the LCD components print. -->
+          <g {...style(c)} stroke="none" fill={paint(c.fill ?? c.stroke)}>
+            {#each pixelRects(c) as p, pi (pi)}
+              <rect x={p.x} y={p.y} width={p.s} height={p.s} />
+            {/each}
+          </g>
         {/if}
       {/each}
     </g>

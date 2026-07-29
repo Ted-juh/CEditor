@@ -2994,3 +2994,115 @@ API cannot afford.
   drives the panel, not the application around it.
 - **A message attached to a CONTROL** rather than to the window. There is no per-control run-time
   message in the app to reach parity with; when there is one, this is the sweep that finds it.
+
+---
+
+## 41. `ce.draw` and the colour gap — the style the panel draws with
+
+`ce.draw` was ten members and an SVG overlay. The shapes were fine. What was thin was the **style**:
+`fill` and `stroke` took a flat colour and a width, and that was the entire vocabulary.
+
+### The comparison, again, is what the app draws
+
+| the app does this | where |
+|---|---|
+| **gradients** | `gradientCoords()` — whose own doc comment says *"intended for use with SVG `gradientUnits="userSpaceOnUse"`"*, i.e. it was written for this exact renderer and had never been called from it |
+| **dashed strokes** | `TransportRenderer` (beat marks, `3 3`), `ConstellationRenderer` (probe link, `2 3`), `CanvasControl` (text outlines) |
+| **opacity** | both renderers above, alongside their dashes |
+| a **5×7 pixel font** | `pixelFont.js` — `glyphRows`, `ICON_GLYPHS`, what every LCD component prints with |
+| **lighten / darken / hex↔rgb↔hsl** | `colorHelpers.js`, `colorMath.js` |
+
+### The finding that was not in `ce.draw` at all
+
+§36 swept `utils/*Layout.js` for pure functions a script could not reach, found `euclid`, and
+concluded `ce.math` was complete.
+
+`colorMath.js` and `colorHelpers.js` **do not match that glob.** The sweep had a blind spot exactly
+the shape of its own search pattern — which is the failure mode of any sweep, and is why the answer
+to "is this module complete?" is never better than the question that was asked.
+
+Colour arithmetic is pure, cross-runtime, and useful with the window shut —
+`set("knob.Background.color", darken(c))` runs in the exported plugin — so it belongs in `ce.math`,
+not in the drawing module. Eight members, `RUNTIME_ANY`, in all four runtimes:
+
+`lighten` · `darken` · `mix` · `alpha` · `rgb` · `hex` · `hsl` · `fromHsl`
+
+**One input form, and a trap worth naming.** Every verb accepts `"RRGGBB"`, `"AARRGGBB"` or
+`"#RRGGBB"` — the app's own parser reads the last six characters, so a stored colour goes straight
+in — and returns `"#RRGGBB"`, which CSS, SVG and a panel property all accept. The app **stores**
+colours as `AARRGGBB` (JUCE's order: `"66FFFFFF"` is a 40%-opaque white in every panel document)
+while CSS wants `#RRGGBBAA` — *the same four bytes the other way round*. So exactly one verb,
+`alpha`, returns the panel's form, and making a **drawing** translucent is `ce.draw.opacity()`. Two
+questions, two answers, no ambiguity about which byte is which.
+
+`mix` is the one thing here that is **not** an app algorithm, and the doc says so rather than
+implying otherwise: it is `lerp()` per channel in plain RGB, which is the blend a meter fading from
+green to red actually wants.
+
+### `ce.draw` — six new members (10 → 16) and three new stroke options
+
+| namespaced | what |
+|---|---|
+| `ce.draw.gradient(stops [, angle])` | a gradient as a fill or a stroke |
+| `ce.draw.opacity(a)` | how opaque what follows is |
+| `ce.draw.transform(opts)` | rotate / move / scale what follows |
+| `ce.draw.ellipse(cx, cy, rx, ry)` | `circle` only does round |
+| `ce.draw.pixelText(text, x, y [, scale])` | the app's own LCD font |
+| `ce.draw.measure(text [, opts])` | how wide a string will be |
+
+`stroke(colour, width, opts)` gained `dash`, `cap` and `join` — `path` used to hardcode round on
+both and now takes yours.
+
+**`gradient` uses the panel's angle convention and the panel's geometry.** 0 up, 90 right, the same
+as the Background section's gradients, resolved by `gradientCoords()`. A gradient built in a script
+and a gradient set in the Properties panel run the same way, which two conventions would not. Stops
+take either shape — a list of colours ("space these evenly") or `{ at, colour, opacity }` — and
+mixing them positions some and lets the rest fall where they may. Fewer than two usable stops
+returns nothing, because a gradient between one colour and nothing is a colour.
+
+**`transform` is why a knob pointer stops being trigonometry.** Rotating a shape about a centre
+meant computing every corner with sin and cos, and getting the centre wrong is the classic way a
+pointer ends up orbiting the wrong point.
+
+**`pixelText` is drawn literally**, one square per lit pixel, because it *is* a bitmap font and
+rendering it smoothly would stop it being the font the LCD components print. Its `(x, y)` is the
+top-left rather than a baseline: a grid font has no baseline to speak of.
+
+**`measure` is honest about which of its two answers is exact.** The pixel font is a grid, so its
+width is arithmetic and exact everywhere. A proportional font has to be *measured*, which needs a
+canvas — so with no surface to measure on it falls back to an estimate and **says so** in the
+result, rather than handing back a guess dressed as a measurement.
+
+Every new style field is cleared by the per-pass reset alongside `fill` and `stroke`. A dash or a
+transform left set by the last pass is exactly the "a drawing depends on what ran before it"
+dependency the reset exists to prevent, and the test asserts all five together rather than the two
+it started with.
+
+### How it is tested
+
+`ce.math`'s colour is cross-runtime, so it goes through the usual three layers — 25 new fixtures in
+`scriptPreludeAgreement.test.js` (hex formatting is where four runtimes drift silently: a missing
+zero-pad, a rounding that goes the other way at `.5`, a case that differs), and `scriptMath.test.js`
+asserts `lighten`/`darken`/the conversions against **the app's own functions**, imported, over a
+sampled sweep of the whole RGB cube.
+
+`ce.draw` is panel-view only, so there is no cross-runtime layer — but there **is** a renderer, and
+that is where the interesting assertions are. `scriptDraw.test.js` server-renders the overlay and
+checks the emitted SVG: that a gradient's `x1`/`x2` are `gradientCoords()`'s own numbers, that
+`gradientUnits="userSpaceOnUse"` is what makes it paint on a zero-area path, and that the number of
+squares `pixelText` emits **is** the number of lit pixels in the app's glyph. A different font, or a
+different packing, gives a different count.
+
+### What is deliberately still absent
+
+- **Bezier segments in `path`.** The app's own envelope renderer *samples* its curves into a
+  polyline (`envSegmentSample`, 16 steps a segment), so a polyline **is** parity — and
+  `ce.math.map` plus points gets a script exactly there.
+- **`drawImage`.** Image sources are document properties (`Background.Fill.imageSrc`) reached with
+  `set()`. A script inventing its own asset references is a different feature with a different
+  question behind it.
+- **Rounded-corner polygons** (`cornerPaths.js`) and **border segments** — component chrome, not
+  drawing primitives.
+- **Radial gradients.** The app's gradients are linear; there is nothing to reach parity with.
+- **Hit-testing a drawn shape.** A drawing is decoration and the overlay is `pointer-events: none`
+  on purpose; a script that wants a click uses a control that reports one.

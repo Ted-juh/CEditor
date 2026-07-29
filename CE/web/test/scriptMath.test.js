@@ -15,7 +15,7 @@ import { get } from 'svelte/store';
 
 import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
-import { MEMBER_BY_ID, memberPath } from '../src/CE_Application/scripting/panelApi.js';
+import { MEMBER_BY_ID, memberPath, memberRuntime, RUNTIME_ANY } from '../src/CE_Application/scripting/panelApi.js';
 
 const api = scriptApiForTesting();
 const traced = () => get(scriptTrace).map((t) => String(t.message ?? '')).join('\n');
@@ -855,5 +855,119 @@ test('map reproduces the Envelope/Router sampler over a real transfer curve', ()
     const x = i / 40;
     assert.ok(Math.abs(api.mapCurve(x, env) - envValueAt(env, x)) < 1e-12,
       `map drifted from envValueAt at ${x} with tension`);
+  }
+});
+
+/* ============================================================= §41: colour arithmetic */
+// In ce.math rather than ce.draw because it is PURE and cross-runtime: a script setting a control's
+// colour from a value works with the panel shut, and the exported plugin does it.
+//
+// Worth writing down how this got missed. §36 swept utils/*Layout.js and concluded ce.math was
+// complete. colorMath.js and colorHelpers.js do not match that glob — the sweep had a blind spot
+// exactly the shape of its own search pattern, which is the failure mode of any sweep.
+
+import {
+  lighten as panelLighten, darken as panelDarken,
+} from '../src/CE_Application/utils/colorHelpers.js';
+import {
+  hexToRgb as panelHexToRgb, rgbToHex as panelRgbToHex, rgbToHsl as panelRgbToHsl,
+  hslToHex as panelHslToHex,
+} from '../src/CE_Application/utils/colorMath.js';
+
+/** Hex is case-insensitive everywhere it is read; the API normalises to upper and the app's two
+ *  colour modules disagree with each other about case. Compare the COLOUR, not the spelling. */
+const sameColour = (a, b) => String(a).replace('#', '').toUpperCase() === String(b).replace('#', '').toUpperCase();
+
+test('lighten and darken ARE the border renderer\'s, over the whole cube', () => {
+  for (let r = 0; r < 256; r += 37) {
+    for (let g = 0; g < 256; g += 41) {
+      for (let b = 0; b < 256; b += 43) {
+        const hex = panelRgbToHex(r, g, b);
+        for (const f of [0, 0.25, 0.4, 0.55, 1]) {
+          assert.ok(sameColour(api.lighten(hex, f), panelLighten(hex, f)), `lighten ${hex} ${f}`);
+          assert.ok(sameColour(api.darken(hex, f), panelDarken(hex, f)), `darken ${hex} ${f}`);
+        }
+        // The defaults matter as much as the maths: 0.4 and 0.55 ARE the groove highlight and
+        // shading, so a script-drawn bevel matches the one the panel draws beside it.
+        assert.ok(sameColour(api.lighten(hex), panelLighten(hex)), `lighten default ${hex}`);
+        assert.ok(sameColour(api.darken(hex), panelDarken(hex)), `darken default ${hex}`);
+      }
+    }
+  }
+});
+
+test('the conversions are the colour editor\'s, in both directions', () => {
+  for (let r = 0; r < 256; r += 29) {
+    for (let g = 0; g < 256; g += 31) {
+      for (let b = 0; b < 256; b += 37) {
+        const hex = panelRgbToHex(r, g, b);
+        assert.deepEqual(api.hexToRgb(hex), { r, g, b }, `rgb ${hex}`);
+        assert.ok(sameColour(api.rgbToHex(r, g, b), panelRgbToHex(r, g, b)), `hex ${r},${g},${b}`);
+        const mine = api.hexToHsl(hex);
+        const theirs = panelRgbToHsl(...panelHexToRgb(hex));
+        assert.ok(Math.abs(mine.h - theirs[0]) < 1e-9, `hue ${hex}`);
+        assert.ok(Math.abs(mine.s - theirs[1]) < 1e-9, `sat ${hex}`);
+        assert.ok(Math.abs(mine.l - theirs[2]) < 1e-9, `light ${hex}`);
+        assert.ok(sameColour(api.hslToHex(mine.h, mine.s, mine.l), panelHslToHex(...theirs)),
+          `round trip ${hex}`);
+      }
+    }
+  }
+});
+
+test('every input form the app accepts, because a stored colour is AARRGGBB', () => {
+  // "66FFFFFF" is a 40%-opaque white in every panel document. The parser reads the last six
+  // characters, so a stored colour goes straight in without being unpacked first.
+  assert.equal(api.lighten('336699'), api.lighten('#336699'));
+  assert.equal(api.lighten('66336699'), api.lighten('336699'));
+  assert.deepEqual(api.hexToRgb('FF336699'), { r: 51, g: 102, b: 153 });
+});
+
+test('a colour it cannot read is NOTHING, which is what tells a typo from black', () => {
+  for (const bad of ['nope', '', '#12345', 'GGHHII', null, undefined]) {
+    assert.equal(api.lighten(bad), undefined, `lighten ${bad}`);
+    assert.equal(api.darken(bad), undefined);
+    assert.equal(api.hexToRgb(bad), undefined);
+    assert.equal(api.hexToHsl(bad), undefined);
+    assert.equal(api.colourAlpha(bad, 0.5), undefined);
+  }
+  assert.equal(api.mixColour('000000', 'nope', 0.5), undefined, 'and a mix needs both ends');
+});
+
+test('mix is lerp per channel — not an app algorithm, and not pretending to be', () => {
+  assert.equal(api.mixColour('000000', 'FFFFFF', 0), '#000000');
+  assert.equal(api.mixColour('000000', 'FFFFFF', 1), '#FFFFFF');
+  assert.equal(api.mixColour('000000', 'FFFFFF', 0.5), '#808080');
+  // The same thing lerp() does, one channel at a time, which is what makes it predictable.
+  const t = 0.25;
+  assert.equal(api.mixColour('000000', 'FF0000', t),
+    api.rgbToHex(api.lerp(0, 255, t), 0, 0));
+  assert.equal(api.mixColour('000000', 'FFFFFF', 5), '#FFFFFF', 'and it clamps rather than extrapolating');
+});
+
+test('alpha returns the PANEL\'s form, which is the one asymmetry here', () => {
+  // AARRGGBB, no leading #, because that is the only form a STORED colour can carry an alpha in.
+  // CSS's #RRGGBBAA is the same four bytes the other way round, and mixing them up is silent.
+  assert.equal(api.colourAlpha('336699', 0.4), '66336699');
+  assert.equal(api.colourAlpha('336699', 0), '00336699');
+  assert.equal(api.colourAlpha('336699', 1), 'FF336699');
+  assert.equal(api.colourAlpha('336699', 5), 'FF336699', 'clamped, not wrapped');
+  // …and it round-trips back through the same parser, which is what makes the pair usable.
+  assert.deepEqual(api.hexToRgb(api.colourAlpha('336699', 0.4)), { r: 51, g: 102, b: 153 });
+});
+
+test('rgbToHex clamps out-of-range channels rather than wrapping them', () => {
+  assert.equal(api.rgbToHex(300, -5, 128), '#FF0080', '300 is white, not 44');
+});
+
+test('the colour verbs are cross-runtime, because setting a colour works with the window shut', () => {
+  for (const [id, path] of [
+    ['lighten', 'ce.math.lighten'], ['darken', 'ce.math.darken'], ['mixColour', 'ce.math.mix'],
+    ['colourAlpha', 'ce.math.alpha'], ['hexToRgb', 'ce.math.rgb'], ['rgbToHex', 'ce.math.hex'],
+    ['hexToHsl', 'ce.math.hsl'], ['hslToHex', 'ce.math.fromHsl'],
+  ]) {
+    assert.ok(MEMBER_BY_ID[id], `${id} is not declared`);
+    assert.equal(memberPath(id), path);
+    assert.equal(memberRuntime(MEMBER_BY_ID[id]), RUNTIME_ANY);
   }
 });

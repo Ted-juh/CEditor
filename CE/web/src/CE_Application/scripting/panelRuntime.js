@@ -75,6 +75,7 @@ import {
   QUALITY_SUFFIX, ROMAN, MINOR_QUALITY_NAMES,
 } from './musicTheory.js';
 import { DIVISIONS, DIVISION_LABELS, DIVISION_NAMES, PPQN } from './timeTables.js';
+import { FONT_ADVANCE as PIXEL_ADVANCE, FONT_H as PIXEL_FONT_H } from '../utils/pixelFont.js';
 import { EASING_BEZIERS, ANIM_CURVE_NAMES } from './easingTables.js';
 // ce.time's arithmetic IS the transport's, called rather than restated: a script asking where a
 // beat falls and the Transport drawing that beat have to agree, and one implementation is the only
@@ -502,6 +503,106 @@ export function readWatch(path) {
 }
 
 /* ------------------------------------------------------------------ helpers (pure) */
+
+// @module ce.math
+/* ------------------------------------------------------------------------ colour arithmetic */
+// The app's own, ported rather than restated for the reason every table in this file is: a script
+// lightening a colour and the border renderer lightening the same colour have to agree, or a
+// script-drawn highlight sits a shade off the one beside it.
+//
+// One accepted input, three forms out, and the difference matters. The app STORES colours as
+// AARRGGBB (JUCE's order — '66FFFFFF' is a 40%-opaque white in every panel document). CSS and SVG
+// want #RRGGBB or #RRGGBBAA — the SAME four bytes in a DIFFERENT order, which is the trap this
+// pair of formats sets. So: everything takes "RRGGBB", "AARRGGBB" or "#RRGGBB" (the app's own
+// parser, which reads the last six characters), everything returns "#RRGGBB" which both CSS and a
+// panel property accept, and ONE verb — alpha() — returns the panel's AARRGGBB, because that is
+// the only form a stored colour can carry an alpha in. Making a DRAWING translucent is
+// ce.draw.opacity(), which is a different question with a different answer.
+
+const colourClampByte = (v) => (v < 0 ? 0 : v > 255 ? 255 : Math.round(v));
+
+/** "RRGGBB" | "AARRGGBB" | "#RRGGBB" -> [r, g, b]. The app's parseHexRGB: the last six characters
+ *  are the colour, whatever came before them. Nothing readable gives black rather than NaN. */
+function colourChannels(hex) {
+  const h = String(hex ?? '').replace(/#/g, '').slice(-6);
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function colourFromRgb(r, g, b) {
+  const c = (v) => colourClampByte(Number(v) || 0).toString(16).padStart(2, '0');
+  return `#${c(r)}${c(g)}${c(b)}`.toUpperCase();
+}
+
+function colourToRgb(hex) {
+  const rgb = colourChannels(hex);
+  return rgb ? { r: rgb[0], g: rgb[1], b: rgb[2] } : undefined;
+}
+
+/** Scale each channel toward 255. The border renderer's `lighten`, default and all. */
+function colourLighten(hex, amount) {
+  const rgb = colourChannels(hex);
+  if (!rgb) return undefined;
+  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.4;
+  return colourFromRgb(rgb[0] + (255 - rgb[0]) * f, rgb[1] + (255 - rgb[1]) * f, rgb[2] + (255 - rgb[2]) * f);
+}
+
+/** Scale each channel toward 0. The border renderer's `darken`, whose 0.55 default is the groove
+ *  shading — so a script drawing a bevel matches the one the panel draws. */
+function colourDarken(hex, amount) {
+  const rgb = colourChannels(hex);
+  if (!rgb) return undefined;
+  const f = Number.isFinite(Number(amount)) ? Number(amount) : 0.55;
+  return colourFromRgb(rgb[0] * f, rgb[1] * f, rgb[2] * f);
+}
+
+/** Blend two colours. NOT an app algorithm and said so: it is lerp() per channel, in plain RGB,
+ *  which is the blend a meter fading from green to red actually wants. */
+function colourMix(a, b, t) {
+  const x = colourChannels(a);
+  const y = colourChannels(b);
+  if (!x || !y) return undefined;
+  const f = Math.min(1, Math.max(0, Number(t) || 0));
+  return colourFromRgb(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f);
+}
+
+/** The PANEL's form: AARRGGBB, which is what a stored colour property holds. See the note above —
+ *  CSS's #RRGGBBAA is the same bytes the other way round, and mixing them up is silent. */
+function colourWithAlpha(hex, a) {
+  const rgb = colourChannels(hex);
+  if (!rgb) return undefined;
+  const f = Math.min(1, Math.max(0, Number.isFinite(Number(a)) ? Number(a) : 1));
+  const aa = Math.round(f * 255).toString(16).padStart(2, '0');
+  return (aa + colourFromRgb(rgb[0], rgb[1], rgb[2]).slice(1)).toUpperCase();
+}
+
+/** Hue 0-360, saturation and lightness 0-100 — the colour editor's own ranges. */
+function colourToHsl(hex) {
+  const rgb = colourChannels(hex);
+  if (!rgb) return undefined;
+  const r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, sat = 0;
+  const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+    else if (max === g) h = ((b - r) / d + 2) * 60;
+    else h = ((r - g) / d + 4) * 60;
+  }
+  return { h, s: sat * 100, l: l * 100 };
+}
+
+function colourFromHsl(hue, sat, light) {
+  const h = Number(hue) || 0;
+  const s = (Number(sat) || 0) / 100;
+  const l = (Number(light) || 0) / 100;
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+  return colourFromRgb(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
+}
 
 // @module ce.music
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -1313,6 +1414,20 @@ const helpers = {
   median: (values) => medianImpl(values),
   unshape: (y, curve, tension) => unshapeImpl(y, curve, tension),
   euclid: (steps, pulses, rotation) => euclidImpl(steps, pulses, rotation),
+  // Colour arithmetic. Here rather than in ce.draw because it is PURE and cross-runtime: setting a
+  // control's colour from a value works with the panel shut, and the exported plugin does it.
+  //
+  // §36's sweep swept utils/*Layout.js and declared ce.math complete. colorMath.js and
+  // colorHelpers.js do not match that glob — the sweep had a blind spot exactly the shape of its
+  // own search pattern, which is the failure mode of any sweep and worth writing down.
+  lighten: (hex, amount) => colourLighten(hex, amount),
+  darken: (hex, amount) => colourDarken(hex, amount),
+  mixColour: (a, b, t) => colourMix(a, b, t),
+  colourAlpha: (hex, a) => colourWithAlpha(hex, a),
+  hexToRgb: (hex) => colourToRgb(hex),
+  rgbToHex: (r, g, b) => colourFromRgb(r, g, b),
+  hexToHsl: (hex) => colourToHsl(hex),
+  hslToHex: (h, sat, l) => colourFromHsl(h, sat, l),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
   // range and normalisation
   norm: (v, lo, hi) => normImpl(v, lo, hi),
@@ -2984,7 +3099,49 @@ function uiDialogImpl(scriptId, opts, onChoice) {
 
 // The style in force, and which control is being drawn on. Draws are not re-entrant — dispatch is
 // already guarded by live.dispatching — so one set of style state is enough.
-const drawState = { target: null, fill: null, stroke: null, strokeWidth: 1 };
+const drawState = {
+  target: null, fill: null, stroke: null, strokeWidth: 1,
+  dash: null, cap: null, join: null, opacity: null, transform: null,
+};
+
+// Gradients get an id because SVG paints them by reference: the overlay defines each one once in
+// <defs> and every shape using it points at that. Per panel rather than per draw pass, so a
+// gradient reused across a redraw does not churn the defs list.
+let gradientSeq = 0;
+
+/** A gradient value, for fill() or stroke(). Stops are { at 0..1, colour, opacity }.
+ *
+ *  The ANGLE is the panel's own convention — 0 up, 90 right, the same one the Background section's
+ *  gradients use — and the overlay resolves it with the app's gradientCoords(), which exists for
+ *  exactly this and is documented as being for SVG userSpaceOnUse. A gradient built here and a
+ *  gradient set in the Properties panel run in the same direction, which two conventions would not.
+ */
+function drawGradientImpl(stops, angle) {
+  const raw = Array.isArray(stops) ? stops : Object.values(stops ?? {});
+  const list = [];
+  for (const stop of raw) {
+    // Two spellings, because two shapes are natural: { at, colour } for a positioned stop, and a
+    // bare colour string for "space these evenly", which is what a two-colour fade actually is.
+    const colour = typeof stop === 'string' ? stop : String(stop?.colour ?? stop?.color ?? '');
+    if (!colour) continue;
+    const at = typeof stop === 'string' ? null : Number(stop?.at);
+    list.push({
+      colour,
+      at: Number.isFinite(at) ? Math.min(1, Math.max(0, at)) : null,
+      opacity: Number.isFinite(Number(stop?.opacity)) ? Math.min(1, Math.max(0, Number(stop.opacity))) : 1,
+    });
+  }
+  if (list.length < 2) return undefined;   // a gradient between one colour and nothing is a colour
+  // Unpositioned stops spread evenly across whatever room the positioned ones left them.
+  list.forEach((st, i) => { if (st.at == null) st.at = list.length === 1 ? 0 : i / (list.length - 1); });
+  gradientSeq += 1;
+  return {
+    gradient: true,
+    id: `ce-draw-grad-${gradientSeq}`,
+    angle: Number.isFinite(Number(angle)) ? Number(angle) : 180,
+    stops: list,
+  };
+}
 
 // controlId -> the commands drawn on it so far. Commands are appended and published as they
 // arrive rather than buffered and published at the end of a draw pass: dispatchEvents is async
@@ -3012,10 +3169,45 @@ function pushCommand(explicit, ownerName, command) {
   }
   const id = control._children.Core.id;
   const list = drawCommands.get(id) ?? [];
-  list.push({ ...command, fill: drawState.fill, stroke: drawState.stroke, strokeWidth: drawState.strokeWidth });
+  list.push({
+    ...command,
+    fill: drawState.fill, stroke: drawState.stroke, strokeWidth: drawState.strokeWidth,
+    dash: drawState.dash, cap: drawState.cap, join: drawState.join,
+    opacity: drawState.opacity, transform: drawState.transform,
+  });
   drawCommands.set(id, list);
   setDrawing(id, [...list]);
   return true;
+}
+
+/**
+ * How wide a string will be, which nothing could ask before — so a box behind a label, a column of
+ * right-aligned numbers or a truncation had no way to be worked out.
+ *
+ * Two fonts, two answers, and only one of them is exact. The PIXEL font is a grid: the width is
+ * arithmetic and the answer is exact everywhere. A proportional font has to be MEASURED, which
+ * means a canvas and therefore a browser — so with no measuring surface this reports and falls back
+ * to an estimate rather than pretending. Panel view only either way, like everything in ce.draw.
+ */
+function drawMeasureImpl(text, opts) {
+  const str = String(text ?? '');
+  const size = Number(opts?.size) > 0 ? Number(opts.size) : 12;
+  if (opts?.pixel === true) {
+    const scale = Math.max(1, Math.round(Number(opts?.scale) || 1));
+    // FONT_ADVANCE per character, minus the trailing gap: a string ends at its last lit column.
+    return { width: str.length ? str.length * PIXEL_ADVANCE * scale - scale : 0,
+             height: PIXEL_FONT_H * scale, exact: true };
+  }
+  const canvas = typeof document !== 'undefined' && typeof document.createElement === 'function'
+    ? document.createElement('canvas') : null;
+  const ctx = canvas?.getContext?.('2d');
+  if (!ctx) {
+    // 0.6em per character is the usual rule of thumb for a proportional face. Said to be an
+    // estimate rather than returned as though it were a measurement.
+    return { width: str.length * size * 0.6, height: size, exact: false };
+  }
+  ctx.font = `${size}px ${opts?.family || 'sans-serif'}`;
+  return { width: ctx.measureText(str).width, height: size, exact: true };
 }
 
 function drawClearImpl(explicit, ownerName) {
@@ -3054,6 +3246,14 @@ function runDrawPass(control) {
   drawState.fill = null;
   drawState.stroke = null;
   drawState.strokeWidth = 1;
+  // …and everything the style grew in §41. A draw that inherited the dash or the transform the last
+  // one happened to leave set would look different depending on what ran before it, which is the
+  // whole reason this reset exists.
+  drawState.dash = null;
+  drawState.cap = null;
+  drawState.join = null;
+  drawState.opacity = null;
+  drawState.transform = null;
 
   dispatchEvents([{
     event: 'onDraw',
@@ -3090,6 +3290,14 @@ export function clearAllDrawings() {
   drawState.fill = null;
   drawState.stroke = null;
   drawState.strokeWidth = 1;
+  // …and everything the style grew in §41. A draw that inherited the dash or the transform the last
+  // one happened to leave set would look different depending on what ran before it, which is the
+  // whole reason this reset exists.
+  drawState.dash = null;
+  drawState.cap = null;
+  drawState.join = null;
+  drawState.opacity = null;
+  drawState.transform = null;
 }
 
 // @module ce.panel
@@ -4301,11 +4509,63 @@ function buildApi(ownerName, scriptId = '') {
     uiChoose: (opts, onAnswer) => uiDialogImpl(scriptId, { ...(opts ?? {}), ask: 'list' }, onAnswer),
     // ce.draw — immediate-mode drawing on top of a control
     drawClear: (target) => drawClearImpl(target, ownerName),
-    drawFill: (colour) => { drawState.fill = colour == null ? null : String(colour); },
-    drawStroke: (colour, width) => {
-      drawState.stroke = colour == null ? null : String(colour);
-      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+    // A gradient is an OBJECT, so fill/stroke pass it through rather than stringifying it — the
+    // overlay turns it into the url(#…) reference SVG needs.
+    drawFill: (colour) => {
+      drawState.fill = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
     },
+    drawStroke: (colour, width, opts) => {
+      drawState.stroke = colour == null ? null : (typeof colour === 'object' ? colour : String(colour));
+      drawState.strokeWidth = Number(width) > 0 ? Number(width) : 1;
+      // A dash is a list of on/off lengths, the way SVG and every drawing API since PostScript
+      // spells it. The panel's own dashed lines (the Transport's beat marks, the Constellation's
+      // probe link) are "3 3" and "2 3".
+      const dash = opts?.dash;
+      const dashList = Array.isArray(dash) ? dash : (dash == null ? null : Object.values(dash));
+      drawState.dash = dashList && dashList.length
+        ? dashList.map((n) => Math.max(0, Number(n) || 0)).join(' ')
+        : (typeof dash === 'string' && dash ? dash : null);
+      drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
+      drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
+    },
+    drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
+    // Applies to everything drawn after it, like fill and stroke — not to one shape, because the
+    // whole style model here is "what is in force when the command is issued".
+    drawOpacity: (a) => {
+      const v = Number(a);
+      drawState.opacity = Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : null;
+    },
+    // rotate/move/scale for what follows. Without it a knob pointer means computing every corner
+    // with sin and cos by hand — and getting the centre of rotation wrong is the classic way a
+    // pointer ends up orbiting the wrong point.
+    drawTransform: (opts) => {
+      if (opts == null) { drawState.transform = null; return; }
+      const parts = [];
+      const x = Number(opts.x) || 0;
+      const y = Number(opts.y) || 0;
+      if (x || y) parts.push(`translate(${x} ${y})`);
+      const rotate = Number(opts.rotate);
+      if (Number.isFinite(rotate) && rotate !== 0) {
+        // Around a named centre, or the origin. A rotation with no centre is almost never what a
+        // pointer wants, so the centre is the argument people reach for first.
+        const cx = Number(opts.cx);
+        const cy = Number(opts.cy);
+        parts.push(Number.isFinite(cx) && Number.isFinite(cy)
+          ? `rotate(${rotate} ${cx} ${cy})` : `rotate(${rotate})`);
+      }
+      const scale = Number(opts.scale);
+      if (Number.isFinite(scale) && scale !== 1) parts.push(`scale(${scale})`);
+      drawState.transform = parts.length ? parts.join(' ') : null;
+    },
+    drawEllipse: (cx, cy, rx, ry) => pushCommand(null, ownerName,
+      { op: 'ellipse', cx: Number(cx) || 0, cy: Number(cy) || 0,
+        rx: Number(rx) || 0, ry: Number(ry) || 0 }),
+    // The app's own 5x7 LCD font, one rect per lit pixel. An LCD readout a script draws and one an
+    // LCD component prints are then the same letters, which a second font would not be.
+    drawPixelText: (text, x, y, scale) => pushCommand(null, ownerName,
+      { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
+        scale: Math.max(1, Math.round(Number(scale) || 1)) }),
+    drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
     drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
       { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
         radius: Number(radius) > 0 ? Number(radius) : 0 }),

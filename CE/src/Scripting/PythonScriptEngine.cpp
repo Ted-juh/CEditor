@@ -1532,6 +1532,78 @@ def randomChoice(values, weights=None):
             return items[i]
     return items[-1]
 
+# @module ce.math
+# Colour arithmetic. The app's own (utils/colorHelpers.js, utils/colorMath.js), ported for the same
+# reason every table here is: a script lightening a colour and the border renderer lightening the
+# same colour have to agree, or a script-drawn highlight sits a shade off the one beside it.
+#
+# In takes "RRGGBB", "AARRGGBB" or "#RRGGBB" - the last six characters are the colour. Out is
+# "#RRGGBB", which CSS, SVG and a panel property all accept. The ONE exception is alpha(), which
+# returns the panel's AARRGGBB: CSS's #RRGGBBAA is the same bytes the other way round.
+def __cchan(hex_):
+    import re as __re
+    h = str("" if hex_ is None else hex_).replace("#", "")[-6:]
+    if len(h) != 6 or not __re.match(r"^[0-9a-fA-F]{6}$", h): return None
+    return [int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)]
+def __cbyte(v):
+    import math
+    n = math.floor((float(v) if isinstance(v, (int, float)) else 0) + 0.5)
+    return 0 if n < 0 else (255 if n > 255 else n)
+def rgbToHex(r, g, b):
+    return ("#%02x%02x%02x" % (__cbyte(r), __cbyte(g), __cbyte(b))).upper()
+def hexToRgb(hex_):
+    c = __cchan(hex_)
+    return None if c is None else { "r": c[0], "g": c[1], "b": c[2] }
+def lighten(hex_, amount=None):
+    c = __cchan(hex_)
+    if c is None: return None
+    f = 0.4 if not isinstance(amount, (int, float)) else float(amount)
+    return rgbToHex(c[0] + (255 - c[0]) * f, c[1] + (255 - c[1]) * f, c[2] + (255 - c[2]) * f)
+def darken(hex_, amount=None):
+    c = __cchan(hex_)
+    if c is None: return None
+    f = 0.55 if not isinstance(amount, (int, float)) else float(amount)
+    return rgbToHex(c[0] * f, c[1] * f, c[2] * f)
+# NOT an app algorithm, and said so: lerp() per channel in plain RGB.
+def mixColour(a, b, t):
+    x = __cchan(a); y = __cchan(b)
+    if x is None or y is None: return None
+    f = float(t) if isinstance(t, (int, float)) else 0.0
+    f = 0.0 if f < 0 else (1.0 if f > 1 else f)
+    return rgbToHex(x[0] + (y[0] - x[0]) * f, x[1] + (y[1] - x[1]) * f, x[2] + (y[2] - x[2]) * f)
+# The PANEL's form: AARRGGBB, no leading #, which is what a stored colour property holds.
+def colourAlpha(hex_, a):
+    import math
+    c = __cchan(hex_)
+    if c is None: return None
+    f = float(a) if isinstance(a, (int, float)) else 1.0
+    f = 0.0 if f < 0 else (1.0 if f > 1 else f)
+    return ("%02x" % math.floor(f * 255 + 0.5) + rgbToHex(c[0], c[1], c[2])[1:]).upper()
+def hexToHsl(hex_):
+    c = __cchan(hex_)
+    if c is None: return None
+    r = c[0] / 255.0; g = c[1] / 255.0; b = c[2] / 255.0
+    mx = max(r, g, b); mn = min(r, g, b)
+    h = 0.0; s = 0.0
+    l = (mx + mn) / 2
+    if mx != mn:
+        d = mx - mn
+        s = d / (2 - mx - mn) if l > 0.5 else d / (mx + mn)
+        if mx == r: h = ((g - b) / d + (6 if g < b else 0)) * 60
+        elif mx == g: h = ((b - r) / d + 2) * 60
+        else: h = ((r - g) / d + 4) * 60
+    return { "h": h, "s": s * 100, "l": l * 100 }
+def hslToHex(hue, sat, light):
+    h = float(hue) if isinstance(hue, (int, float)) else 0.0
+    s = (float(sat) if isinstance(sat, (int, float)) else 0.0) / 100
+    l = (float(light) if isinstance(light, (int, float)) else 0.0) / 100
+    a = s * min(l, 1 - l)
+    def f(n):
+        k = (n + h / 30) % 12
+        return l - a * max(-1, min(k - 3, 9 - k, 1))
+    import math
+    return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -1965,6 +2037,7 @@ __WEBVIEW_ONLY = [
   "uiNotify","uiStatus","uiDialog","uiPrompt","uiChoose","uiDismiss","uiUpdate","uiState","uiCopy",
 # @module ce.draw
   "drawClear","drawFill","drawStroke","drawRect","drawCircle","drawLine","drawPath","drawArc",
+  "drawGradient","drawOpacity","drawTransform","drawEllipse","drawPixelText","drawMeasure",
   "drawText","drawRedraw",
 # @module ce.panel
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
@@ -2346,12 +2419,12 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
     "ce.ui": { "choose": "uiChoose", "copy": "uiCopy", "dialog": "uiDialog", "dismiss": "uiDismiss", "notify": "uiNotify", "prompt": "uiPrompt", "state": "uiState", "status": "uiStatus", "update": "uiUpdate" },
-    "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "fill": "drawFill", "line": "drawLine", "path": "drawPath", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText" },
+    "ce.draw": { "arc": "drawArc", "circle": "drawCircle", "clear": "drawClear", "ellipse": "drawEllipse", "fill": "drawFill", "gradient": "drawGradient", "line": "drawLine", "measure": "drawMeasure", "opacity": "drawOpacity", "path": "drawPath", "pixelText": "drawPixelText", "rect": "drawRect", "redraw": "drawRedraw", "stroke": "drawStroke", "text": "drawText", "transform": "drawTransform" },
     "ce.panel": { "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "info": "panelInfo", "parent": "panelParent", "patch": "panelPatch", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
     "ce.storage": { "forget": "forgetSetting", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "transpose": "splitTranspose" },
@@ -2388,12 +2461,12 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.7", "runtime": "any" },
+    { "id": "ce.math", "version": "1.8", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.1", "runtime": "any" },
     { "id": "ce.ui", "version": "1.2", "runtime": "webview" },
-    { "id": "ce.draw", "version": "1.1", "runtime": "webview" },
+    { "id": "ce.draw", "version": "1.2", "runtime": "webview" },
     { "id": "ce.panel", "version": "1.3", "runtime": "any" },
     { "id": "ce.storage", "version": "1.1", "runtime": "any" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
