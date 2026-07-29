@@ -2193,6 +2193,101 @@ int main()
                "loadScripts cleared the declarations the previous set made");
     }
 
+    // 35) ce.math expanded: wrap, map, quantize, choice, decibels (design doc §30) ---------------
+    //
+    // Every value here is also asserted by CE/web/test/scriptMath.test.js. That is the whole point
+    // of the section: these are the numbers a panel gets in the editor, and they have to be the
+    // numbers it gets in the shipped plugin.
+    for (const char* lang : { "lua", "javascript" })
+    {
+        const bool isLua = juce::String (lang) == "lua";
+        juce::Array<juce::var> scripts;
+        scripts.add (makeScript ("m", lang, "panel", "onMath", "*", isLua
+            ? "function onMath()\n"
+              // wrap: the reason the verb exists. Lua's % is FLOORED and JavaScript's is TRUNCATED,
+              // so (-1) % 12 already differs between these two engines. wrap() must not.
+              "  log(\"w \" .. tostring(wrap(-1, 0, 12)) .. \" \" .. tostring(wrap(12, 0, 12))\n"
+              "      .. \" \" .. tostring(wrap(-65, -64, 64)) .. \" \" .. tostring(wrap(5, 3, 3)))\n"
+              "  local knee = { {0, 0}, {0.5, 0.9}, {1, 1} }\n"
+              "  log(\"m \" .. tostring(mapCurve(0.25, knee)) .. \" \" .. tostring(mapCurve(5, knee)))\n"
+              "  local step = { {0, 0}, {0.5, 0.2}, {0.5, 0.8}, {1, 1} }\n"
+              "  log(\"s \" .. tostring(mapCurve(0.5, step)))\n"
+              "  log(\"q \" .. tostring(quantizeTo(9, {0, 8, 16})) .. \" \" .. tostring(quantizeTo(4, {0, 8})))\n"
+              "  log(\"d \" .. tostring(dbToGain(0)) .. \" \" .. tostring(gainToDb(0)))\n"
+              "  randomSeed(11)\n"
+              "  randomChoice({\"a\", \"b\"}, {1, 3})\n"
+              "  local afterWeighted = random()\n"
+              "  randomSeed(11)\n"
+              "  randomChoice({\"a\", \"b\"})\n"
+              "  log(\"draws \" .. tostring(random() == afterWeighted))\n"
+              "  randomSeed(3)\n"
+              "  log(\"zero \" .. tostring(randomChoice({\"never\", \"always\"}, {0, 1})))\n"
+              "  curve(0.5, \"sine\")\n"
+              "end\n"
+            : "function onMath() {\n"
+              "  log(\"w \" + wrap(-1, 0, 12) + \" \" + wrap(12, 0, 12)\n"
+              "      + \" \" + wrap(-65, -64, 64) + \" \" + wrap(5, 3, 3));\n"
+              "  var knee = [[0, 0], [0.5, 0.9], [1, 1]];\n"
+              "  log(\"m \" + mapCurve(0.25, knee) + \" \" + mapCurve(5, knee));\n"
+              "  var step = [[0, 0], [0.5, 0.2], [0.5, 0.8], [1, 1]];\n"
+              "  log(\"s \" + mapCurve(0.5, step));\n"
+              "  log(\"q \" + quantizeTo(9, [0, 8, 16]) + \" \" + quantizeTo(4, [0, 8]));\n"
+              "  log(\"d \" + dbToGain(0) + \" \" + gainToDb(0));\n"
+              "  randomSeed(11);\n"
+              "  randomChoice([\"a\", \"b\"], [1, 3]);\n"
+              "  var afterWeighted = random();\n"
+              "  randomSeed(11);\n"
+              "  randomChoice([\"a\", \"b\"]);\n"
+              "  log(\"draws \" + (random() === afterWeighted));\n"
+              "  randomSeed(3);\n"
+              "  log(\"zero \" + randomChoice([\"never\", \"always\"], [0, 1]));\n"
+              "  curve(0.5, \"sine\");\n"
+              "}\n"));
+        runtime.loadScripts (juce::var (scripts));
+        host.logs.clear();
+        runtime.runAction ("onMath", juce::var());
+
+        const auto line = [&host] (const juce::String& prefix) -> juce::String
+        {
+            for (const auto& l : host.logs) if (l.startsWith (prefix)) return l;
+            return {};
+        };
+        const juce::String tag (lang);
+
+        // The numbers, not "it returned something". Lua prints 11.0 for a float-valued 11, so each
+        // check compares the leading number rather than the whole spelling.
+        const auto w = juce::StringArray::fromTokens (line ("w ").fromFirstOccurrenceOf ("w ", false, false), " ", "");
+        check (w.size() == 4 && w[0].getDoubleValue() == 11.0, tag + ": wrap(-1, 0, 12) is 11, not the language's -1");
+        check (w.size() == 4 && w[1].getDoubleValue() == 0.0, tag + ": wrap is half-open, so wrap(12, 0, 12) is 0");
+        check (w.size() == 4 && w[2].getDoubleValue() == 63.0, tag + ": wrap works off a range that does not start at zero");
+        check (w.size() == 4 && w[3].getDoubleValue() == 3.0, tag + ": an empty range has one answer, not NaN");
+
+        const auto m = juce::StringArray::fromTokens (line ("m ").fromFirstOccurrenceOf ("m ", false, false), " ", "");
+        check (m.size() == 2 && std::abs (m[0].getDoubleValue() - 0.45) < 1e-9, tag + ": map interpolates within a segment");
+        check (m.size() == 2 && std::abs (m[1].getDoubleValue() - 1.0) < 1e-9, tag + ": …and holds past the last point rather than extrapolating");
+        check (std::abs (line ("s ").fromFirstOccurrenceOf ("s ", false, false).getDoubleValue() - 0.8) < 1e-9,
+               tag + ": a step's breakpoint belongs to the value it steps to");
+
+        const auto q = juce::StringArray::fromTokens (line ("q ").fromFirstOccurrenceOf ("q ", false, false), " ", "");
+        check (q.size() == 2 && q[0].getDoubleValue() == 8.0, tag + ": quantizeTo picks the nearest of a list");
+        check (q.size() == 2 && q[1].getDoubleValue() == 0.0, tag + ": …and a tie goes to the lower value");
+
+        const auto d = juce::StringArray::fromTokens (line ("d ").fromFirstOccurrenceOf ("d ", false, false), " ", "");
+        check (d.size() == 2 && std::abs (d[0].getDoubleValue() - 1.0) < 1e-9, tag + ": 0 dB is a gain of 1");
+        check (d.size() == 2 && d[1].getDoubleValue() == -144.0, tag + ": silence is the noise floor, not -inf");
+
+        // The draw count, not the distribution: a weighted pick consuming a different amount of the
+        // sequence would change everything after it, and only this notices.
+        check (line ("draws ").contains ("true"), tag + ": a weighted choice draws exactly one number, as an even one does");
+        check (line ("zero ").contains ("always"), tag + ": a weight of zero is never picked");
+
+        // curve() used to return the input in silence for a name it did not know, which reads as a
+        // curve that does nothing rather than as a name that was never applied.
+        bool reported = false;
+        for (const auto& l : host.logs) if (l.contains ("unknown shape")) reported = true;
+        check (reported, tag + ": curve reports a shape it does not know");
+    }
+
     // extensionsFromPanel: the panel document is where the copies come from.
     {
         auto panel = juce::JSON::parse (R"JSON({ "scripting": { "extensions": [ { "id": "ce.ext.x" } ] } })JSON");

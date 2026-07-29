@@ -1611,8 +1611,29 @@ export const HELPERS = [
   { id: 'clamp', category: 'Value / range', signature: 'clamp(v, lo, hi)', summary: 'Keep a value inside a range.' },
   { id: 'round', category: 'Value / range', signature: 'round(v)', summary: 'Nearest whole number.' },
   { id: 'snap', category: 'Value / range', signature: 'snap(v, step)', summary: 'Snap to the nearest step.' },
-  { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)', summary: 'Apply a named response curve ("log","exp","s"…).' },
+  { id: 'curve', category: 'Value / range', signature: 'curve(v, shape)',
+    summary: 'Apply a named response curve: "linear", "exp", "log" or "s". A name it does not know is reported and treated as linear — it used to be treated as linear in silence, which reads as a curve that does nothing. For a shape this list does not have, use map().' },
   { id: 'lerp', category: 'Value / range', signature: 'lerp(a, b, t)', summary: 'Blend between a and b by t (0–1).' },
+  // wrap, and why it is not `%`. The five runtimes DISAGREE about the sign of a modulo: (-1) % 12
+  // is 11 in Lua and Python and -1 in JavaScript, C++, C# and Java. So the ordinary way to write a
+  // pitch class — (note + transpose) % 12 — already gives two different answers depending on which
+  // engine the panel is running in, and nothing said so. This is the one arithmetic a synth panel
+  // does constantly, which is why it belongs to the module rather than to each panel.
+  { id: 'wrap', category: 'Value / range', signature: 'wrap(v, lo, hi)',
+    summary: 'Bring a value round into a range, half-open: wrap(12, 0, 12) is 0, and wrap(-1, 0, 12) is 11. Use it for pitch classes, LFO phase and step indices instead of the language\'s %, whose sign differs between the runtimes — the same expression gives 11 in Lua and -1 in JavaScript.' },
+  // map, and why `curve` was not enough. curve() is a CLOSED set of four names, so a taper it does
+  // not have could not be expressed at all — and a properties panel cannot hold an arbitrary curve
+  // either, since a property stores a constant. Breakpoints are the smallest thing that can.
+  { id: 'mapCurve', category: 'Value / range', signature: 'mapCurve(v, points)',
+    summary: 'A response curve of your own: straight lines through breakpoints, given as {{x, y}, …} — map(v, {{0,0},{0.5,0.9},{1,1}}) is a knob that opens fast and finishes slowly. Points are sorted by x, so the order you write them in does not matter; outside the outermost points the value is held rather than extrapolated. Two points with the same x is a step, and the later one wins.' },
+  { id: 'quantizeTo', category: 'Value / range', signature: 'quantizeTo(v, values)',
+    summary: 'Snap to the nearest value in a LIST, rather than to a regular step: quantizeTo(9, {0, 8, 16}) is 8. snap() covers evenly spaced settings; this covers the ones a synth actually has. A tie goes to the lower value, so the result never depends on rounding.' },
+  { id: 'randomChoice', category: 'Value / range', signature: 'randomChoice(values [, weights])',
+    summary: 'Pick one of a list, using the seeded generator — so a "random" patch replays. With `weights`, the chance of each is its weight over the total; a missing or negative weight counts as zero, and all-zero weights fall back to an even pick. Exactly one number is drawn from the generator either way, so adding weights does not change what everything AFTER it picks.' },
+  { id: 'dbToGain', category: 'Value / range', signature: 'dbToGain(db)',
+    summary: 'Decibels to a linear gain: 0 dB is 1, -6 dB is about 0.5. Neither Lua nor JavaScript has it, and a level control that reads in dB and sends a linear value needs it on every move.' },
+  { id: 'gainToDb', category: 'Value / range', signature: 'gainToDb(gain)',
+    summary: 'The inverse. A gain of zero or less returns -144 dB — the 24-bit noise floor — rather than negative infinity, which is a number half the runtimes cannot carry through a value and none can display.' },
   // Seeded, and seeded is the point: the language's own math.random cannot promise the same
   // sequence in five runtimes, so a randomised patch could not be reproduced and a generative
   // sequence would sound different in the editor and in the exported plugin.
@@ -1724,8 +1745,12 @@ export const MODULES = [
   // the call appeared, which is the drift that rule exists to stop.
   { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
     summary: 'The connected synth: what it is, what parameters it has, reading and setting one, and bulk dumps — plus declaring a parameter, a dump layout or a binding for a synth the app has no profile for, and enumerating the ports that are really there. Needs the device host.' },
-  { id: 'ce.math', version: '1.1', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic, plus a seeded random. Pure — no host involved.' },
+  // requires ce.core because curve() now REPORTS a shape it does not know instead of silently
+  // returning the input, and reporting is log(). ce.core is global and never gated, so the
+  // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
+  // is right to want it declared.
+  { id: 'ce.math', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
   { id: 'ce.time', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -1803,9 +1828,13 @@ const MODULE_MEMBERS = {
     parameter: 'deviceParameter', connected: 'deviceConnected',
   },
   // `random` and `seed` read better namespaced; flat they keep the randomSeed spelling, because
-  // a bare global called `seed` is exactly the collision §1 warned about.
+  // a bare global called `seed` is exactly the collision §1 warned about. `map` and `choice` are
+  // the same case and worse — `map` is the single most common name a panel author gives their own
+  // helper — so flat they are mapCurve and randomChoice.
   'ce.math': { scale: 'scale', clamp: 'clamp', round: 'round', snap: 'snap', curve: 'curve',
-               lerp: 'lerp', random: 'random', seed: 'randomSeed' },
+               lerp: 'lerp', random: 'random', seed: 'randomSeed',
+               wrap: 'wrap', map: 'mapCurve', quantize: 'quantizeTo', choice: 'randomChoice',
+               dbToGain: 'dbToGain', gainToDb: 'gainToDb' },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote' },
   'ce.anim': {

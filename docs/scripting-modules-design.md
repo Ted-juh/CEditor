@@ -1867,3 +1867,98 @@ the author's document — the same three-part rule generated controls follow in 
   C++/C#/Java handler could read a parameter and not set one. `device_write` and `device_define`
   were appended together rather than the new one alone: a handler that could declare a parameter and
   not send one would build exactly the dead panel the whole section is about.
+
+---
+
+## 30. `ce.math` expanded — the arithmetic a panel actually does
+
+Eight verbs, and every one of them scalar and stateless: one number in, one number out. `random`
+and `seed` are the only state. Everything a panel actually wrangles — a range that comes back round,
+a taper of its own shape, a set of settings rather than a step, a weighted pick — had to be
+hand-rolled per panel, in five languages.
+
+The criterion is different for this module, and worth stating rather than fudging: `ce.math` never
+touches the panel, so "beyond what a property can hold" is not the test. The test is **what must a
+panel hand-roll, where the hand-rolled version drifts between the runtimes?**
+
+| | |
+|---|---|
+| `ce.math.wrap(v, lo, hi)` | bring a value round into a half-open range |
+| `ce.math.map(v, points)` | a response curve of your own shape, as breakpoints |
+| `ce.math.quantize(v, values)` | snap to the nearest of a LIST, not to a regular step |
+| `ce.math.choice(values [, weights])` | a seeded pick, optionally weighted |
+| `ce.math.dbToGain(db)` / `.gainToDb(gain)` | decibels, which no language provides |
+
+### `wrap` is a bug fix wearing a feature's clothes
+
+The five runtimes **disagree about `%`**. `(-1) % 12` is `11` in Lua and Python and `-1` in
+JavaScript, C++, C# and Java. So the ordinary way to write a pitch class —
+`(note + transpose) % 12` — has been giving two different answers depending on which engine the
+panel is running in, and nothing said so: the editor preview and the exported plugin would simply
+disagree by an octave and a semitone on any negative transpose.
+
+`wrap` is the floored form, written identically in every prelude, and it is half-open so
+`wrap(12, 0, 12)` is `0` — which is what makes it a pitch class rather than a clamp. It is the
+smallest verb in the section and the only one that closes something that was already broken.
+
+### `map` is the one that goes past a closed set
+
+`curve(v, shape)` is four names. It is the module's only shape-of-response verb, and a taper it does
+not have could not be expressed at all — not in a script, and not in a property either, since a
+property stores a constant. Breakpoints are the smallest thing that can hold an arbitrary curve:
+
+```lua
+set("cutoff.value", ce.math.map(pedal, { {0, 0}, {0.5, 0.9}, {1, 1} }))   -- opens fast, finishes slow
+```
+
+Three rules, each of which is a decision rather than an accident:
+
+- **Points are sorted by x**, so the order they are written in does not matter.
+- **Outside the outermost points the value is held, not extrapolated.** A curve drawn between 0 and
+  1 that suddenly runs away past 1 is never what the author drew.
+- **Two points sharing an x are a step, and the breakpoint belongs to the value it steps *to*.**
+  The alternative is a divide by zero — a NaN travelling into a control's value — and the choice of
+  side matters: the first attempt returned the *old* value at exactly 0.5 and the new one a
+  millionth above it, which is a step in the wrong place by a hair. The web suite caught it, and the
+  fix was to the code rather than to the expectation.
+
+`curve` itself gained nothing except honesty: a name it does not know used to return the input **in
+silence**, which reads as a curve that does nothing rather than as a name that was never applied.
+It now says so and points at `map`. That is why `ce.math` requires `ce.core` — reporting is `log()`.
+`ce.core` is `global` and never gated, so the dependency costs nothing at runtime, but it is a real
+call and the prelude-dependency test is right to want it declared.
+
+### `choice` draws exactly one number, weighted or not
+
+The seeded generator is the whole reason `random` exists here: the same seed has to replay the same
+sequence in every runtime, or a "random" patch is not something you can get back. A weighted pick
+that consumed a different amount of the sequence than an even one would break that promise
+*downstream* — everything picked after it would differ — so both paths draw exactly one number and
+divide it up differently. The test asserts the **draw count**, not the distribution, because the
+distribution is the part that would look fine.
+
+A missing or negative weight counts as zero; all-zero weights fall back to an even pick rather than
+to nothing.
+
+### Small decisions worth stating
+
+- **A tie in `quantize` goes to the lower value**, so the answer never depends on how the two
+  distances happened to round, or on the order the list was written in.
+- **`gainToDb(0)` is -144 dB**, the 24-bit noise floor, not negative infinity: `-inf` is a number
+  half the runtimes cannot carry through a value and none of them can put on a label.
+- **Flat aliases keep a prefix where a bare word would collide.** `map` is the single most common
+  name a panel author gives their own helper, and `choice` is not far behind, so flat they are
+  `mapCurve` and `randomChoice` — the same rule `randomSeed` follows for `seed`.
+
+### What running the preludes caught that parsing did not
+
+The C++ engines cannot be built in every environment, so this section was checked by **executing
+the Lua, JavaScript and Python prelude sources directly** against the same table of values the web
+suite asserts. Every number matched, including the seeded draw — `0.1720386769156903` out of both
+the JS and Python generators after the same seed and the same weighted pick, which is the check that
+actually proves the sequence has not diverged.
+
+It also surfaced the picker's rule the hard way: a `HELPERS` entry's `signature` must use the
+member's **flat id**, because `namespacedSnippet` rewrites the flat spelling into the namespaced
+path and cannot find a spelling that was never there. `signature: 'map(v, points)'` on a member
+called `mapCurve` produced a snippet the picker silently failed to namespace.

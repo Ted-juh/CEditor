@@ -109,7 +109,101 @@ function curve(v, shape)
   if shape == "exp" then return v * v
   elseif shape == "log" then return math.sqrt(math.max(0, v))
   elseif shape == "s" then return v * v * (3 - 2 * v)
-  else return v end
+  else
+    -- A shape the list does not have used to return v in SILENCE, which reads as a curve that does
+    -- nothing rather than as a name that was never applied.
+    if shape ~= "linear" and shape ~= "" then
+      log("curve(v, \"" .. tostring(shape) .. "\"): unknown shape — using linear. The names are "
+          .. "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
+    end
+    return v
+  end
+end
+-- wrap(v, lo, hi) — bring a value round into a HALF-OPEN range, so wrap(12, 0, 12) is 0.
+--
+-- This exists because the five runtimes disagree about `%`. (-1) % 12 is 11 here and in Python, and
+-- -1 in JavaScript, C++, C# and Java — so the ordinary way to write a pitch class already gives two
+-- different answers depending on which engine the panel is running in. The floored form below is
+-- written identically in every prelude, which is the only thing that stops that being true.
+function wrap(v, lo, hi)
+  local a, b, n = tonumber(lo) or 0, tonumber(hi) or 0, tonumber(v) or 0
+  local span = b - a
+  -- An empty or inverted range has exactly one answer.
+  if not (span > 0) then return a end
+  return a + (((n - a) % span) + span) % span
+end
+-- {{x, y}, …} sorted by x. Accepts pairs and {x=, y=} tables, so a panel can write either.
+local function __points(points)
+  local out = {}
+  if type(points) == "table" then
+    for _, p in ipairs(points) do
+      local x, y
+      if type(p) == "table" then x = p.x or p[1] y = p.y or p[2] end
+      x, y = tonumber(x), tonumber(y)
+      if x ~= nil and y ~= nil then out[#out + 1] = { x, y } end
+    end
+  end
+  table.sort(out, function(p, q) return p[1] < q[1] end)
+  return out
+end
+-- map(v, points) — straight lines through breakpoints: a response curve of the panel's own shape,
+-- which is what curve()'s closed set of four names cannot express. Outside the outermost points the
+-- value is HELD rather than extrapolated, because a curve drawn between 0 and 1 that runs away past
+-- 1 is never what the author drew.
+function mapCurve(v, points)
+  local list = __points(points)
+  if #list == 0 then return tonumber(v) or 0 end
+  local n = tonumber(v)
+  if n == nil then return list[1][2] end
+  -- An exact hit on a breakpoint takes the LAST point with that x. That is what makes two points
+  -- sharing an x a STEP rather than a divide by zero, and it settles which side of the step the
+  -- breakpoint itself belongs to — the value it steps TO.
+  for i = #list, 1, -1 do if list[i][1] == n then return list[i][2] end end
+  if n < list[1][1] then return list[1][2] end
+  local last = list[#list]
+  if n > last[1] then return last[2] end
+  for i = 2, #list do
+    local x0, y0 = list[i - 1][1], list[i - 1][2]
+    local x1, y1 = list[i][1], list[i][2]
+    if n < x1 and x1 ~= x0 then return y0 + (n - x0) * (y1 - y0) / (x1 - x0) end
+  end
+  return last[2]
+end
+local function __numbers(values)
+  local out = {}
+  if type(values) == "table" then
+    for _, x in ipairs(values) do
+      local n = tonumber(x)
+      if n ~= nil then out[#out + 1] = n end
+    end
+  end
+  return out
+end
+-- quantizeTo(v, values) — nearest entry in a LIST rather than a regular step. A tie goes to the
+-- LOWER value, so the answer never depends on how the two distances happened to round.
+function quantizeTo(v, values)
+  local list = __numbers(values)
+  if #list == 0 then return tonumber(v) or 0 end
+  local n = tonumber(v)
+  if n == nil then return list[1] end
+  local best, bestD = list[1], math.abs(n - list[1])
+  for _, c in ipairs(list) do
+    local d = math.abs(n - c)
+    if d < bestD or (d == bestD and c < best) then best, bestD = c, d end
+  end
+  return best
+end
+-- dbToGain / gainToDb. Neither Lua nor JavaScript has them, and a level control that reads in dB
+-- and sends a linear value needs them on every move. A gain of zero or less is the 24-bit noise
+-- floor rather than negative infinity, which is a number nothing here can put on a label.
+local __MIN_DB = -144
+function dbToGain(db) return 10 ^ ((tonumber(db) or 0) / 20) end
+function gainToDb(gain)
+  local g = tonumber(gain) or 0
+  if g <= 0 then return __MIN_DB end
+  local db = 20 * math.log(g, 10)
+  if db < __MIN_DB then return __MIN_DB end
+  return db
 end
 -- @module ce.math
 -- A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
@@ -137,6 +231,30 @@ function random(lo, hi)
   local low, high = math.min(a, b), math.max(a, b)
   -- Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
   return low + math.floor(r * (high - low + 1))
+end
+-- randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
+-- replays. Exactly ONE number is drawn in every branch, weighted or not: a weighted pick consuming
+-- a different amount of the sequence would change what everything after it picked, and "the same
+-- seed replays the same sequence" would quietly stop being true.
+function randomChoice(values, weights)
+  if type(values) ~= "table" or #values == 0 then return nil end
+  local r = random()
+  local total, w = 0, {}
+  if type(weights) == "table" then
+    for i, x in ipairs(weights) do
+      local n = tonumber(x) or 0
+      if n < 0 then n = 0 end
+      w[i] = n
+      total = total + n
+    end
+  end
+  if not (total > 0) then return values[math.floor(r * #values) + 1] end
+  local ticket = r * total
+  for i = 1, #values do
+    ticket = ticket - (w[i] or 0)
+    if ticket < 0 then return values[i] end
+  end
+  return values[#values]
 end
 
 -- @module ce.music
@@ -700,7 +818,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { clamp = "clamp", curve = "curve", lerp = "lerp", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap" },
+  ["ce.math"] = { choice = "randomChoice", clamp = "clamp", curve = "curve", dbToGain = "dbToGain", gainToDb = "gainToDb", lerp = "lerp", map = "mapCurve", quantize = "quantizeTo", random = "random", round = "round", scale = "scale", seed = "randomSeed", snap = "snap", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -742,7 +860,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.1", runtime = "any" },
+  { id = "ce.math", version = "1.2", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },

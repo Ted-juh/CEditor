@@ -497,13 +497,151 @@ function randomImpl(lo, hi) {
   return low + Math.floor(r * (high - low + 1));
 }
 
+/**
+ * wrap(v, lo, hi) — bring a value round into a HALF-OPEN range, so wrap(12, 0, 12) is 0.
+ *
+ * This exists because the five runtimes disagree about `%`. (-1) % 12 is 11 in Lua and Python and
+ * -1 in JavaScript, C++, C# and Java — so the ordinary way to write a pitch class already gives two
+ * different answers depending on which engine the panel is running in. The floored form below is
+ * written identically in every prelude, which is the only way that stops being true.
+ */
+function wrapImpl(v, lo, hi) {
+  const a = Number(lo), b = Number(hi), n = Number(v);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(n)) return Number.isFinite(a) ? a : 0;
+  const span = b - a;
+  // An empty or inverted range has exactly one answer, and it is not NaN.
+  if (!(span > 0)) return a;
+  return a + ((((n - a) % span) + span) % span);
+}
+
+/** {{x, y}, …} however the language spelled it, sorted by x. Accepts pairs and {x=, y=} tables. */
+function toBreakpoints(points) {
+  const raw = Array.isArray(points) ? points
+    : points && typeof points === 'object' ? Object.values(points)
+    : [];
+  const out = [];
+  for (const p of raw) {
+    let x, y;
+    if (Array.isArray(p)) { [x, y] = p; }
+    else if (p && typeof p === 'object') {
+      // A wasmoon array-of-pairs arrives as an object of objects, so try {x,y} then 1/2 then 0/1.
+      x = p.x ?? p[1] ?? p[0];
+      y = p.y ?? p[2] ?? p[1];
+    }
+    const nx = Number(x), ny = Number(y);
+    if (Number.isFinite(nx) && Number.isFinite(ny)) out.push([nx, ny]);
+  }
+  return out.sort((p, q) => p[0] - q[0]);
+}
+
+/**
+ * map(v, points) — straight lines through breakpoints: a response curve of the panel's own shape,
+ * which is the thing curve()'s closed set of four names cannot express and a property cannot hold.
+ *
+ * Outside the outermost points the value is HELD rather than extrapolated: a curve drawn between
+ * 0 and 1 that suddenly runs away past 1 is never what the author drew.
+ */
+function mapCurveImpl(v, points) {
+  const list = toBreakpoints(points);
+  if (!list.length) return Number(v);
+  const n = Number(v);
+  if (!Number.isFinite(n)) return list[0][1];
+  // An exact hit on a breakpoint takes the LAST point with that x. That is what makes two points
+  // sharing an x a STEP rather than a divide by zero, and it settles which side of the step the
+  // breakpoint itself belongs to — the value it steps TO.
+  for (let i = list.length - 1; i >= 0; i -= 1) if (list[i][0] === n) return list[i][1];
+  if (n < list[0][0]) return list[0][1];
+  const last = list[list.length - 1];
+  if (n > last[0]) return last[1];
+  for (let i = 1; i < list.length; i += 1) {
+    const [x0, y0] = list[i - 1];
+    const [x1, y1] = list[i];
+    if (n < x1 && x1 !== x0) return y0 + ((n - x0) * (y1 - y0)) / (x1 - x0);
+  }
+  return last[1];
+}
+
+function toNumberList(values) {
+  const raw = Array.isArray(values) ? values
+    : values && typeof values === 'object' ? Object.values(values)
+    : [];
+  return raw.map(Number).filter(Number.isFinite);
+}
+
+/** quantizeTo(v, values) — nearest entry in a LIST. A tie goes to the LOWER value, so the answer
+    never depends on how the two distances happened to round. */
+function quantizeToImpl(v, values) {
+  const list = toNumberList(values);
+  if (!list.length) return Number(v);
+  const n = Number(v);
+  if (!Number.isFinite(n)) return list[0];
+  let best = list[0];
+  let bestDistance = Math.abs(n - best);
+  for (const candidate of list) {
+    const d = Math.abs(n - candidate);
+    if (d < bestDistance || (d === bestDistance && candidate < best)) { best = candidate; bestDistance = d; }
+  }
+  return best;
+}
+
+/**
+ * random.choice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
+ * replays. Exactly one number is drawn in every branch, weighted or not: a weighted pick that
+ * consumed a different amount of the sequence would change what everything after it picked, and
+ * "the same seed replays the same sequence" would quietly stop being true.
+ */
+function randomChoiceImpl(values, weights) {
+  const raw = Array.isArray(values) ? values
+    : values && typeof values === 'object' ? Object.values(values)
+    : [];
+  if (!raw.length) return undefined;
+  const r = randomNext();
+  const w = toNumberList(weights).map((n) => (n > 0 ? n : 0));
+  let total = 0;
+  for (let i = 0; i < raw.length; i += 1) total += w[i] ?? 0;
+  if (!(total > 0)) return raw[Math.floor(r * raw.length)];
+  let ticket = r * total;
+  for (let i = 0; i < raw.length; i += 1) {
+    ticket -= w[i] ?? 0;
+    if (ticket < 0) return raw[i];
+  }
+  return raw[raw.length - 1];
+}
+
+// A gain of zero or less is -144 dB, the 24-bit noise floor, rather than negative infinity: -inf is
+// a number half the runtimes cannot carry through a value and none of them can put on a label.
+const MIN_DB = -144;
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
   scale: (v, inLo, inHi, outLo, outHi) => (inHi === inLo ? outLo : outLo + (v - inLo) * (outHi - outLo) / (inHi - inLo)),
   snap: (v, step) => (step === 0 ? v : Math.round(v / step) * step),
   lerp: (a, b, t) => a + (b - a) * t,
-  curve: (v, shape) => (shape === 'exp' ? v * v : shape === 'log' ? Math.sqrt(Math.max(0, v)) : shape === 's' ? v * v * (3 - 2 * v) : v),
+  // A shape the list does not have used to return v in silence, which reads as a curve that does
+  // nothing rather than as a name that was never applied.
+  curve: (v, shape) => {
+    if (shape === 'exp') return v * v;
+    if (shape === 'log') return Math.sqrt(Math.max(0, v));
+    if (shape === 's') return v * v * (3 - 2 * v);
+    if (shape !== undefined && shape !== null && shape !== '' && shape !== 'linear') {
+      addScriptTrace('log', '',
+        `curve(v, ${JSON.stringify(String(shape))}): unknown shape — using linear. `
+        + 'The names are "linear", "exp", "log" and "s"; for any other shape use map(v, points).');
+    }
+    return v;
+  },
+  wrap: (v, lo, hi) => wrapImpl(v, lo, hi),
+  mapCurve: (v, points) => mapCurveImpl(v, points),
+  quantizeTo: (v, values) => quantizeToImpl(v, values),
+  randomChoice: (values, weights) => randomChoiceImpl(values, weights),
+  dbToGain: (db) => (Number.isFinite(Number(db)) ? 10 ** (Number(db) / 20) : 0),
+  gainToDb: (gain) => {
+    const g = Number(gain);
+    if (!Number.isFinite(g) || g <= 0) return MIN_DB;
+    const db = 20 * Math.log10(g);
+    return db < MIN_DB ? MIN_DB : db;
+  },
   // @module ce.music
   random: (lo, hi) => randomImpl(lo, hi),
   randomSeed: (n) => randomSeedImpl(n),

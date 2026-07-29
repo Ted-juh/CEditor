@@ -715,7 +715,112 @@ def curve(v, shape="linear"):
     if shape == "exp": return v * v
     if shape == "log": return math.sqrt(max(0, v))
     if shape == "s":   return v * v * (3 - 2 * v)
+    # A shape the list does not have used to return v in SILENCE, which reads as a curve that does
+    # nothing rather than as a name that was never applied.
+    if shape not in ("linear", "", None):
+        log("curve(v, \"" + str(shape) + "\"): unknown shape — using linear. The names are "
+            "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     return v
+
+# wrap(v, lo, hi) — bring a value round into a HALF-OPEN range, so wrap(12, 0, 12) is 0.
+#
+# This exists because the five runtimes disagree about `%`. (-1) % 12 is 11 here and in Lua, and -1
+# in JavaScript, C++, C# and Java — so the ordinary way to write a pitch class already gives two
+# different answers depending on which engine the panel is running in. The floored form below is
+# written identically in every prelude, which is the only thing that stops that being true.
+def wrap(v, lo, hi):
+    a, b, n = float(lo or 0), float(hi or 0), float(v or 0)
+    span = b - a
+    # An empty or inverted range has exactly one answer.
+    if not span > 0:
+        return a
+    return a + (((n - a) % span) + span) % span
+
+# [[x, y], …] sorted by x. Accepts pairs and { "x": , "y": } mappings, so a panel can write either.
+def __points(points):
+    out = []
+    for p in (points or []):
+        x = y = None
+        if isinstance(p, (list, tuple)) and len(p) >= 2:
+            x, y = p[0], p[1]
+        elif hasattr(p, "get"):
+            x, y = p.get("x"), p.get("y")
+        try:
+            x, y = float(x), float(y)
+        except (TypeError, ValueError):
+            continue
+        out.append((x, y))
+    out.sort(key=lambda p: p[0])
+    return out
+
+# map(v, points) — straight lines through breakpoints: a response curve of the panel's own shape,
+# which is what curve()'s closed set of four names cannot express. Outside the outermost points the
+# value is HELD rather than extrapolated, because a curve drawn between 0 and 1 that runs away past
+# 1 is never what the author drew.
+def mapCurve(v, points):
+    lst = __points(points)
+    if not lst:
+        return float(v or 0)
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return lst[0][1]
+    # An exact hit on a breakpoint takes the LAST point with that x. That is what makes two points
+    # sharing an x a STEP rather than a divide by zero, and it settles which side of the step the
+    # breakpoint itself belongs to — the value it steps TO.
+    for i in range(len(lst) - 1, -1, -1):
+        if lst[i][0] == n:
+            return lst[i][1]
+    if n < lst[0][0]:
+        return lst[0][1]
+    if n > lst[-1][0]:
+        return lst[-1][1]
+    for i in range(1, len(lst)):
+        x0, y0 = lst[i - 1]
+        x1, y1 = lst[i]
+        if n < x1 and x1 != x0:
+            return y0 + (n - x0) * (y1 - y0) / (x1 - x0)
+    return lst[-1][1]
+
+def __numbers(values):
+    out = []
+    for x in (values or []):
+        try:
+            out.append(float(x))
+        except (TypeError, ValueError):
+            pass
+    return out
+
+# quantizeTo(v, values) — nearest entry in a LIST rather than a regular step. A tie goes to the
+# LOWER value, so the answer never depends on how the two distances happened to round.
+def quantizeTo(v, values):
+    lst = __numbers(values)
+    if not lst:
+        return float(v or 0)
+    try:
+        n = float(v)
+    except (TypeError, ValueError):
+        return lst[0]
+    best, bestD = lst[0], abs(n - lst[0])
+    for c in lst:
+        d = abs(n - c)
+        if d < bestD or (d == bestD and c < best):
+            best, bestD = c, d
+    return best
+
+# dbToGain / gainToDb. Neither Lua nor JavaScript has them, and a level control that reads in dB and
+# sends a linear value needs them on every move. A gain of zero or less is the 24-bit noise floor
+# rather than negative infinity, which is a number nothing here can put on a label.
+__MIN_DB = -144
+def dbToGain(db):
+    return 10.0 ** (float(db or 0) / 20.0)
+def gainToDb(gain):
+    import math
+    g = float(gain or 0)
+    if g <= 0:
+        return __MIN_DB
+    db = 20.0 * math.log10(g)
+    return __MIN_DB if db < __MIN_DB else db
 # @module ce.math
 # A seeded xorshift32, masked to 32 bits at every step and written identically in every prelude.
 # Seeded is the whole point: the language's own random cannot promise the same sequence in five
@@ -742,6 +847,35 @@ def random(lo=None, hi=None):
     low, high = min(a, b), max(a, b)
     # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
     return low + math.floor(r * (high - low + 1))
+
+# randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
+# replays. Exactly ONE number is drawn in every branch, weighted or not: a weighted pick consuming a
+# different amount of the sequence would change what everything after it picked, and "the same seed
+# replays the same sequence" would quietly stop being true.
+def randomChoice(values, weights=None):
+    import math
+    items = list(values or [])
+    if not items:
+        return None
+    r = random()
+    w, total = [], 0.0
+    for x in (weights or []):
+        try:
+            n = float(x)
+        except (TypeError, ValueError):
+            n = 0.0
+        if n < 0:
+            n = 0.0
+        w.append(n)
+        total += n
+    if not total > 0:
+        return items[math.floor(r * len(items))]
+    ticket = r * total
+    for i in range(len(items)):
+        ticket -= w[i] if i < len(w) else 0.0
+        if ticket < 0:
+            return items[i]
+    return items[-1]
 
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
@@ -1274,7 +1408,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "clamp": "clamp", "curve": "curve", "lerp": "lerp", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap" },
+    "ce.math": { "choice": "randomChoice", "clamp": "clamp", "curve": "curve", "dbToGain": "dbToGain", "gainToDb": "gainToDb", "lerp": "lerp", "map": "mapCurve", "quantize": "quantizeTo", "random": "random", "round": "round", "scale": "scale", "seed": "randomSeed", "snap": "snap", "wrap": "wrap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1316,7 +1450,7 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.1", "runtime": "any" },
+    { "id": "ce.math", "version": "1.2", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
