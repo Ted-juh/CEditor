@@ -45,25 +45,36 @@ function getDefaultChildTemplate(typeName, childName) {
   return sectionDefaults?._children?.[childName];
 }
 
-export function setNestedValue(control, path, value) {
+/**
+ * Walk a path down to the node that owns its last segment.
+ *
+ * `create` decides whether a missing child with a section template is materialised on the way (a
+ * real write) or merely stepped through (a probe). Both callers share this ONE walk, because the
+ * question "would this write land?" and the write itself have to agree — two walks that could
+ * drift is exactly how a check ends up disagreeing with the thing it checks.
+ *
+ * Returns null when the path does not lead anywhere, which is the case that used to be a silent
+ * no-op: `set("knob.States.Hover.patches.component.Background.Fill.colour", …)` walks off the end
+ * because the last three segments are ONE map key, not three path steps.
+ */
+function resolveWriteTarget(control, path, create) {
   const parts = String(path).split('.');
-  if (parts.length === 0) return;
+  if (parts.length === 0) return null;
 
   if (parts.length === 1) {
-    if (!control._children) return;
-    control._children[parts[0]] = value;
-    return;
+    if (!control?._children) return null;
+    return { node: control, key: parts[0], root: true };
   }
 
-  let current = control._children?.[parts[0]];
-  if (!current) return;
+  let current = control?._children?.[parts[0]];
+  if (!current) return null;
 
   for (let index = 1; index < parts.length - 1; index += 1) {
     const key = parts[index];
 
     if (Array.isArray(current) && isArrayIndexSegment(key)) {
       const nextIndex = Number(key);
-      if (current[nextIndex] === undefined) return;
+      if (current[nextIndex] === undefined) return null;
       current = current[nextIndex];
       continue;
     }
@@ -76,6 +87,8 @@ export function setNestedValue(control, path, value) {
     if (current._children && current._children[key] === undefined) {
       const defaultChild = getDefaultChildTemplate(current._type, key);
       if (defaultChild !== undefined) {
+        // A probe must not leave the section behind it, so it walks a copy of the template.
+        if (!create) { current = deepClone(defaultChild); continue; }
         current._children[key] = deepClone(defaultChild);
         current = current._children[key];
         continue;
@@ -87,13 +100,27 @@ export function setNestedValue(control, path, value) {
       continue;
     }
 
-    return;
+    return null;
   }
 
-  const propName = parts[parts.length - 1];
+  return { node: current, key: parts[parts.length - 1], root: false };
+}
+
+/** @returns {boolean} whether the write landed. False means nothing changed. */
+export function setNestedValue(control, path, value) {
+  const target = resolveWriteTarget(control, path, true);
+  if (!target) return false;
+
+  if (target.root) {
+    target.node._children[target.key] = value;
+    return true;
+  }
+
+  const current = target.node;
+  const propName = target.key;
   if (Array.isArray(current) && isArrayIndexSegment(propName)) {
     current[Number(propName)] = value;
-    return;
+    return true;
   }
 
   const treeValue = value != null
@@ -107,6 +134,38 @@ export function setNestedValue(control, path, value) {
   } else {
     current[propName] = value;
   }
+  return true;
+}
+
+/**
+ * Would `setNestedValue` land, and is the last segment a property this node already has?
+ *
+ * `{ writes: false }` means the write goes nowhere — the caller should say so rather than let it
+ * vanish. `{ writes: true, fresh: true }` means it lands but CREATES a key the node did not have;
+ * on a typed section node that is almost always a typo, and on an untyped free-form map (a state's
+ * `when`, a patch map) it is perfectly ordinary — so the two are reported differently.
+ */
+export function probeNestedWrite(control, path, value) {
+  const target = resolveWriteTarget(control, path, false);
+  if (!target) return { writes: false, fresh: false, typed: false };
+  if (target.root) return { writes: true, fresh: false, typed: false };
+
+  const current = target.node;
+  const propName = target.key;
+  if (Array.isArray(current) && isArrayIndexSegment(propName)) {
+    return { writes: true, fresh: current[Number(propName)] === undefined, typed: false };
+  }
+  const treeValue = value != null
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && (value._type !== undefined || value._children !== undefined);
+  const defaultChild = current?._children ? getDefaultChildTemplate(current._type, propName) : undefined;
+  const intoChildren = !!current?._children
+    && (current._children[propName] !== undefined || treeValue || defaultChild !== undefined);
+  const fresh = intoChildren
+    ? current._children[propName] === undefined
+    : current?.[propName] === undefined;
+  return { writes: true, fresh, typed: typeof current?._type === 'string' };
 }
 
 export function deleteNestedValue(control, path) {

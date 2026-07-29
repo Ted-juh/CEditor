@@ -697,7 +697,14 @@ private:
            #else
             juce::ignoreUnused (transmit);
            #endif
-            scriptValues.setValue (path, value, form);   // mirror always (immediate read-back, drives unbound)
+            // mirror always (immediate read-back, drives unbound) — and SAY so when the path led
+            // nowhere. A write that vanishes is the defect the panel-view runtime spent a round
+            // removing, and it read exactly the same here: the contract's headline is that coverage
+            // is total, so a path that resolves to nothing has to report rather than disappear.
+            if (! scriptValues.setValue (path, value, form))
+                scriptLogLine ("[script] set(\"" + path + "\"): nothing was written — that path does "
+                               "not lead anywhere on this panel. A state patch key like "
+                               "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
         };
        #if CEDITOR_VALUE_LAYER
         // Raw CC/NRPN/Sysex mirror the byte construction in panelRuntime.js so a script transmits

@@ -1962,3 +1962,101 @@ It also surfaced the picker's rule the hard way: a `HELPERS` entry's `signature`
 member's **flat id**, because `namespacedSnippet` rewrites the flat spelling into the namespaced
 path and cannot find a spelling that was never there. `signature: 'map(v, points)'` on a member
 called `mapCurve` produced a snippet the picker silently failed to namespace.
+
+---
+
+## 31. The Properties panel gap — what a script still could not do
+
+The module march (§27–§30) was expanding one module at a time. Partway through it stopped being
+the right question, because the bar the whole exercise is measured against is not "is this module
+small" but **"can a script do what the Properties panel can, and more?"** So this section is an
+audit against the panel rather than against a module, and what it found is not where the module
+list was heading.
+
+**For values, scripting already equals the panel.** `set`/`get` reach every leaf of every section;
+that was Q1's promise and it holds.
+
+**For structure, the panel was ahead in four places** — and every one of them failed *silently*,
+which is why none of it had ever been noticed:
+
+| The Properties panel | A script, before this |
+|---|---|
+| Writes a state's patch — "when hovered, this looks like that" | Could replace the whole map, could not touch one key of it |
+| Adds an entry to any of eleven collection sections | Only by hand-writing the entire node as one value |
+| Removes one | **Nothing.** `set(path, nil)` leaves the entry exactly where it was |
+| — | A path that led nowhere wrote nothing and said nothing |
+
+### The silent write was the one to fix first
+
+It is not a missing feature; it is the contract breaking its own headline. Q1 says *coverage is
+total, you can never pick "wrong"* — and a missing **control** was reported while a wrong **path
+inside a found control** vanished. Every gap in the table above was invisible behind it, including
+one that was not in the plan at all: **a Knob and a Slider ship no `Value` section**, so
+`set("knob.value", 8000)` — the most ordinary line in any panel script — writes nothing in the
+editor. It works in the player only because the host routes a live value through the preview
+session instead of the document.
+
+So `setNestedValue` now answers whether it wrote, and the runtime reports a write that went
+nowhere, naming the missing section when that is what it was. Two rules make that safe:
+
+- **The probe and the write share one walk.** `resolveWriteTarget(control, path, create)` is used
+  by both, because "would this land?" and the landing itself disagreeing is exactly how a check
+  becomes a lie. A probe walks a *copy* of a section template rather than materialising it.
+- **The host is asked, not second-guessed.** The player has its own write semantics, and a host
+  that returns nothing is not making a claim — it is taken at its word rather than reported on.
+  Without that rule the fix would have reported a false failure on every live value write in the
+  exported plugin.
+
+There is a third, quieter case: a path that lands but *creates* a key the node did not have. On a
+typed section (`Transform`) that is a typo writing a property nothing reads, so it warns and still
+writes. On a free-form map — a state's `when`, a patch map — new keys are the design, so it stays
+quiet. The distinction is `_type`: a node that declares one has a shape.
+
+### `ce.panel` gained the collections
+
+```lua
+ce.panel.entries(control, section)                -- the names in a collection
+ce.panel.entry(control, section, name)            -- one of them
+ce.panel.define(control, section, name, spec)     -- create, or replace
+ce.panel.undefine(control, section, name)         -- remove; returns whether there was one
+ce.panel.patch(control, state, patch [, part])    -- merge keys into a state's patch map
+```
+
+One verb family rather than ten, for the reason `deviceQuery` is one primitive rather than four:
+`States`, `Bindings`, `Animations`, `Parts`, `ValueChannels`, `Behaviors`, `HitZones`,
+`Generators`, `Links` and `Variants` differ in what an entry *means*, not in how it is listed,
+added or dropped. (`Children` is the eleventh and `create`/`destroy` already owned it — which is
+the proof the shape works.)
+
+`define` **merges the spec over the section's template**, so declaring a state is one line instead
+of a hand-written node carrying `_type` and both patch maps. A verb that demands the full shape
+every time is a verb nobody uses. `undefine` routes to `removeControlNode`, which has existed the
+whole time and which nothing script-facing had ever called.
+
+### `patch` exists because the addressing model cannot address it
+
+A state's patch is a map whose **keys are themselves dotted paths**:
+`{ "Background.Fill.colour": "FFFF0000" }`. So
+`set("k.States.Hover.patches.component.Background.Fill.colour", …)` walks off the end of the model
+looking for three sections that are one key — the single place in the document where the path
+grammar collides with itself. `set` can only replace the whole map, which means "make this one
+thing red when hovered" requires knowing everything else the state already changes.
+
+`patch` merges, and there is deliberately **no way to spell "remove this key"**: a nil-valued key is
+simply absent from a Lua table, so a delete-by-nil convention would be unwritable in one of the five
+languages. Dropping keys is `set()` on the whole map, which already worked.
+
+### And what this buys that the panel cannot
+
+The point was never parity. A property is chosen at design time; these verbs run while the panel
+does. A state whose patch is *computed*, states attached to controls a script generated, a control
+greyed out because the synth that actually answered does not have that parameter — none of it is
+expressible as a stored constant, and all of it is now one line.
+
+### The analysis was wrong once, and running it is what caught that
+
+The first pass of this audit reported that a state's patch was unreachable. It is not: a
+whole-map write always worked. That was found by probing the live runtime rather than reading it,
+and the corrected finding is sharper than the original — the problem is not access, it is
+*granularity*, and it comes from the key/path collision rather than from a missing feature. Reading
+the code produced a plausible answer; running it produced the true one.

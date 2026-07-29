@@ -41,7 +41,11 @@ function hostFor(panel) {
     panel,
     scripts: [],
     readValue: (control, path) => valueAtPath(control, path),
-    writeValue: (control, path, value) => setNestedValue(control, path, value),
+    // Mirrors playerScriptHost: a LIVE value moves through the preview session and needs no Value
+    // section, so it always lands. Anything else is a plain model write and reports whether it did.
+    writeValue: (control, path, value) => (String(path).toLowerCase() === 'value.value'
+      ? (setNestedValue(control, path, value), true)
+      : setNestedValue(control, path, value)),
   };
 }
 

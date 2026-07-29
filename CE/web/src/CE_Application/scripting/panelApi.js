@@ -904,6 +904,89 @@ export const COMMANDS = [
     snippet: { lua: 'log(table.concat(ce.panel.types(), ", "))$0', javascript: 'log(ce.panel.types().join(", "));$0' },
   },
 
+  /* --- Panel structure: the collections INSIDE a control (design doc §31) ---
+     The Properties panel can add to and remove from eleven sections of a control. `Children` is one
+     of them and create/destroy already covers it; these four cover the other ten, which a script
+     could previously only reach by writing a whole node as one value and could not remove from at
+     all. One verb family rather than ten: the sections differ in what an entry MEANS, not in how it
+     is listed, added or dropped. Panel view only, like the rest of ce.panel's structure verbs. */
+  {
+    id: 'panelEntries', category: 'Panel structure', signature: 'panelEntries(control, section)',
+    summary: 'The names in one of a control\'s collection sections — States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants — in document order. Any other section name is refused, and the message lists the ones that work.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'section', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, s in ipairs(ce.panel.entries("${1:knob}", "States")) do log(s) end$0',
+      javascript: 'for (const s of ce.panel.entries("${1:knob}", "States")) log(s);$0',
+    },
+  },
+  {
+    id: 'panelEntry', category: 'Panel structure', signature: 'panelEntry(control, section, name)',
+    summary: 'One entry out of a collection section, or nil. Matched case-insensitively, the way a path is.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'section', type: 'string', required: true },
+      { name: 'name', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'local st = ce.panel.entry("${1:knob}", "States", "${2:Hover}")$0',
+      javascript: 'const st = ce.panel.entry("${1:knob}", "States", "${2:Hover}");$0',
+    },
+  },
+  {
+    id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
+    summary: 'Create an entry in a collection section, or replace one that is there. The spec is MERGED over the section\'s own template, so declaring a state is one line rather than a hand-written node — hand-writing _type and both patch maps every time is how a verb like this ends up unused. Returns whether it landed.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'section', type: 'string', required: true },
+      { name: 'name', type: 'string', required: true },
+      { name: 'spec', type: 'object', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when = { valueGreaterThan = 0.9 } })$0',
+      javascript: 'ce.panel.define("${1:knob}", "States", "${2:Warn}", { when: { valueGreaterThan: 0.9 } });$0',
+    },
+  },
+  {
+    id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
+    summary: 'Remove an entry from a collection section. Returns whether there was one, so "already gone" reads differently from "removed". Nothing script-facing could remove one of these before — set(path, nil) leaves the entry exactly where it was.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'section', type: 'string', required: true },
+      { name: 'name', type: 'string', required: true },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.undefine("${1:knob}", "States", "${2:Disabled}")$0',
+      javascript: 'ce.panel.undefine("${1:knob}", "States", "${2:Disabled}");$0',
+    },
+  },
+  {
+    id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
+    summary: 'Merge entries into a state\'s patch map — what the control LOOKS LIKE in that state. This verb exists because the addressing model cannot express what it addresses: a patch map\'s keys are themselves dotted paths, so set("k.States.Hover.patches.component.Background.Fill.colour", …) walks off the end of the model looking for three sections that are one key, and set() can only replace the whole map. Merges rather than replaces, and returns how many keys were applied. With `part`, patches one part of a custom component instead of the component itself.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'control', type: 'string', required: true },
+      { name: 'state', type: 'string', required: true },
+      { name: 'patch', type: 'object', required: true },
+      { name: 'part', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.panel.patch("${1:knob}", "${2:Hover}", { ["Background.Fill.colour"] = "FFFF0000" })$0',
+      javascript: 'ce.panel.patch("${1:knob}", "${2:Hover}", { "Background.Fill.colour": "FFFF0000" });$0',
+    },
+  },
+
   /* --- Time: tempo, transport and musical timers (design doc §6 phase 3) ---
      Cross-runtime: the editor follows its own master clock (which follows the DAW when the panel's
      transport source is "host"), the exported plugin follows the DAW playhead directly. Both can
@@ -1765,7 +1848,7 @@ export const MODULES = [
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
-  { id: 'ce.panel', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.panel', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Build the panel from a script: create, clone, parent and find controls — panel view only, each verb says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session.' },
@@ -1850,6 +1933,10 @@ const MODULE_MEMBERS = {
     snapshot: 'panelSnapshot', restore: 'panelRestore', each: 'panelEach',
     create: 'panelCreate', clone: 'panelClone', destroy: 'panelDestroy',
     parent: 'panelParent', find: 'panelFind', info: 'panelInfo', types: 'panelTypes',
+    // The collections INSIDE a control. `undefine` rather than `remove`, so it cannot be confused
+    // with `destroy`, which takes a whole control away.
+    entries: 'panelEntries', entry: 'panelEntry',
+    define: 'panelDefine', undefine: 'panelUndefine', patch: 'panelPatch',
   },
   'ce.storage': { state: 'state', saveSetting: 'saveSetting', loadSetting: 'loadSetting',
                   settings: 'listSettings', forget: 'forgetSetting' },

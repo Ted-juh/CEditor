@@ -66,9 +66,11 @@ export function createPlayerHost(panel) {
       return valueAtPath(control, modelPath);
     },
 
+    /** @returns {boolean} whether the write landed — the runtime reports a set() that went
+        nowhere, and only the host knows that a live value needs no Value section to move. */
     writeValue(control, modelPath, value) {
       const id = controlId(control);
-      if (!id) return;
+      if (!id) return false;
       if (isLiveValuePath(modelPath)) {
         // Same path the player uses for incoming MIDI: move the on-screen control AND let the
         // host-parameter sync pick it up (panelPreviewSessions subscriber in Player.svelte).
@@ -78,9 +80,9 @@ export function createPlayerHost(panel) {
           currentValueOverrideEnabled: true,
           currentValueOverride: value,
         });
-      } else {
-        setValueAtPath(control, modelPath, value);
+        return true;
       }
+      return setValueAtPath(control, modelPath, value) !== false;
     },
   };
 }

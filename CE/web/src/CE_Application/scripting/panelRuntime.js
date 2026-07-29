@@ -19,8 +19,8 @@
 
 import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js';
-import { updateControlProperty } from '../stores/controls.js';
-import { valueAtPath } from '../stores/controlTreeUtils.js';
+import { updateControlProperty, removeControlNode } from '../stores/controls.js';
+import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import {
   isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
@@ -387,8 +387,43 @@ function setValue(path, value, formOrOpts = '') {
     value = decided;
   }
 
-  if (host) host.writeValue(control, modelPath, value);
-  else updateControlProperty(control?._children?.Core?.id, modelPath, value);
+  // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
+  // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
+  // it every structural gap behind it is invisible.
+  //
+  // Who answers depends on who owns the document. The player host has its own write semantics (a
+  // live value goes through the preview session, which needs no Value section at all), so it is
+  // asked rather than second-guessed; a host that returns nothing is not making a claim, and is
+  // taken at its word rather than reported on.
+  let wrote = true;
+  if (host) {
+    wrote = host.writeValue(control, modelPath, value) !== false;
+  } else {
+    const probe = probeNestedWrite(control, modelPath, value);
+    wrote = probe.writes;
+    if (wrote) updateControlProperty(control?._children?.Core?.id, modelPath, value);
+    // Landing but CREATING a key on a typed section node is almost always a typo: Transform has a
+    // fixed shape, so `Transform.wdith` writes a property nothing reads. Free-form maps (a state's
+    // `when`, a patch map) are untyped and take new keys by design, so they stay quiet.
+    else if (probe.fresh && probe.typed) {
+      addScriptTrace('warn', '',
+        `set("${path}"): "${modelPath}" is a new property on a section with a fixed shape. `
+        + 'It was written, but nothing reads it — check the spelling.');
+    }
+  }
+
+  if (!wrote) {
+    const section = String(modelPath).split('.')[0];
+    const hasSection = control?._children?.[section] !== undefined;
+    addScriptTrace('error', '',
+      `set("${path}"): nothing was written — "${modelPath}" does not lead anywhere on "${name}". `
+      + (hasSection
+        ? 'A child in the middle of the path is missing. A state patch key like '
+          + '"Background.Fill.colour" is ONE map key rather than three path steps, and is reached '
+          + 'with ce.panel.patch() instead.'
+        : `"${section}" is not a section this control has. Add it in the Properties panel, or `
+          + 'address a section it does have — ce.panel.info() lists them.'));
+  }
 
   // Transmit-by-default: a bound control's value write also goes to the synth, which is what the
   // C++ runtime does. Without this the same script moved the knob window-closed and only moved
@@ -1958,6 +1993,168 @@ function panelInfoImpl(name) {
   return controlSummary(control, activePanel()?.controls ?? []);
 }
 
+/* ------------------------------------------------- ce.panel: the collections inside a control */
+// The Properties panel can ADD TO and REMOVE FROM eleven sections of a control. `Children` is one
+// of them and ce.panel.create/destroy already covers it; these four cover the other ten, which
+// until now a script could only reach by writing a whole node as one value and could not remove
+// from at all — removeControlNode has existed the whole time and nothing script-facing called it.
+//
+// One verb family rather than ten, for the reason deviceQuery is one primitive rather than four:
+// the sections differ in what an entry MEANS, not in how it is added, listed or dropped.
+const COLLECTION_SECTIONS = [
+  'States', 'Bindings', 'Animations', 'Parts',
+  'ValueChannels', 'Behaviors', 'HitZones', 'Generators', 'Links', 'Variants',
+];
+
+// A partial spec is completed from these, so declaring a state is one line rather than a
+// hand-written node. Only shapes the app itself defines are here; a section without one takes the
+// spec as given, with `_type` filled in.
+const COLLECTION_TEMPLATES = {
+  States: (name) => ({
+    _type: 'State', name, group: 'interaction', description: '', enabled: true,
+    when: {}, patches: { component: {}, parts: {} },
+  }),
+};
+
+/** Resolve (control, section) with the section name matched case-insensitively, as paths are. */
+function collectionNode(controlName, section, verb) {
+  const control = controlNamed(controlName);
+  if (!control) { addScriptTrace('error', '', `ce.panel.${verb}: no control named "${controlName}".`); return null; }
+  const wanted = String(section ?? '').toLowerCase();
+  const key = COLLECTION_SECTIONS.find((s) => s.toLowerCase() === wanted);
+  if (!key) {
+    addScriptTrace('error', '',
+      `ce.panel.${verb}: "${section}" is not a collection section. The ones a script can add to are `
+      + `${COLLECTION_SECTIONS.join(', ')} — a control is added with ce.panel.create instead.`);
+    return null;
+  }
+  return { control, key, node: control._children?.[key] ?? null };
+}
+
+/** entries(control, section) — the names in a collection, in document order. */
+function panelEntriesImpl(controlName, section) {
+  const found = collectionNode(controlName, section, 'entries');
+  if (!found) return [];
+  return Object.keys(found.node?._children ?? {});
+}
+
+/** entry(control, section, name) — one entry, or nil. Matched case-insensitively, as paths are. */
+function panelEntryImpl(controlName, section, name) {
+  const found = collectionNode(controlName, section, 'entry');
+  if (!found) return null;
+  const kids = found.node?._children ?? {};
+  const wanted = String(name ?? '').toLowerCase();
+  const key = Object.keys(kids).find((k) => k.toLowerCase() === wanted);
+  return key == null ? null : kids[key];
+}
+
+/**
+ * define(control, section, name, spec) — create an entry, or replace one that is there.
+ *
+ * The spec is MERGED over the section's template rather than used as-is, so
+ * `define("k", "States", "Warn", { when = { valueGreaterThan = 0.9 } })` produces a state that
+ * actually works. Hand-writing `_type`, `patches.component` and `patches.parts` every time is how
+ * a verb like this ends up unused.
+ */
+function panelDefineImpl(controlName, section, name, spec) {
+  const found = collectionNode(controlName, section, 'define');
+  if (!found) return false;
+  const key = String(name ?? '').trim();
+  if (!key) { addScriptTrace('error', '', 'ce.panel.define(control, section, name, spec): a name is required'); return false; }
+  if (!found.node) {
+    addScriptTrace('error', '', `ce.panel.define: "${controlName}" has no ${found.key} section.`);
+    return false;
+  }
+
+  const template = COLLECTION_TEMPLATES[found.key]?.(key) ?? { _type: found.key.replace(/s$/, '') };
+  const given = spec && typeof spec === 'object' && !Array.isArray(spec) ? spec : {};
+  const entry = { ...template, ...given, name: given.name ?? key };
+  // One level of merge for the nested shapes a template carries, so a spec that names only
+  // `patches.component` does not drop `patches.parts`.
+  for (const field of Object.keys(template)) {
+    const t = template[field];
+    const g = given[field];
+    if (t && typeof t === 'object' && !Array.isArray(t) && g && typeof g === 'object' && !Array.isArray(g)) {
+      entry[field] = { ...t, ...g };
+    }
+  }
+
+  writeControlProperty(found.control, `${found.key}.${key}`, entry);
+  addScriptTrace('log', '', `ce.panel.define ${controlName}.${found.key}.${key}`);
+  return true;
+}
+
+/** undefine(control, section, name) — returns whether there was one, so "already gone" reads
+    differently from "removed". */
+function panelUndefineImpl(controlName, section, name) {
+  const found = collectionNode(controlName, section, 'undefine');
+  if (!found) return false;
+  const kids = found.node?._children ?? {};
+  const wanted = String(name ?? '').toLowerCase();
+  const key = Object.keys(kids).find((k) => k.toLowerCase() === wanted);
+  if (key == null) return false;
+
+  if (host) delete kids[key];                                        // player: the host owns the document
+  else removeControlNode(found.control._children.Core.id, `${found.key}.${key}`);
+  addScriptTrace('log', '', `ce.panel.undefine ${controlName}.${found.key}.${key}`);
+  return true;
+}
+
+/**
+ * patch(control, state, patch [, part]) — merge entries into a state's patch map.
+ *
+ * This verb exists because the addressing model cannot express what it addresses. A patch map's
+ * KEYS are themselves dotted paths — `{ "Background.Fill.colour": "FFFF0000" }` — so
+ * `set("k.States.Hover.patches.component.Background.Fill.colour", …)` walks off the end of the
+ * model looking for three sections that are one key. `set` can only replace the whole map, which
+ * means "make this one thing red when hovered" requires knowing everything else the state already
+ * changes.
+ *
+ * MERGE, never replace, and no way to spell "remove this key": a nil-valued key is simply absent
+ * from a Lua table, so a delete-by-nil convention would be unwritable in one of the five languages.
+ * Dropping keys is `set()` on the whole map, which already works.
+ */
+function panelPatchImpl(controlName, stateName, patch, part) {
+  const found = collectionNode(controlName, 'States', 'patch');
+  if (!found) return 0;
+  const kids = found.node?._children ?? {};
+  const wanted = String(stateName ?? '').toLowerCase();
+  const key = Object.keys(kids).find((k) => k.toLowerCase() === wanted);
+  if (key == null) {
+    addScriptTrace('error', '',
+      `ce.panel.patch: "${controlName}" has no state called "${stateName}". `
+      + `It has ${Object.keys(kids).join(', ') || 'none'} — ce.panel.define creates one.`);
+    return 0;
+  }
+  const entries = patch && typeof patch === 'object' && !Array.isArray(patch) ? patch : null;
+  if (!entries) { addScriptTrace('error', '', 'ce.panel.patch(control, state, patch): patch must be a table of path -> value'); return 0; }
+
+  const state = kids[key];
+  const target = String(part ?? '');
+  const base = state.patches ?? (state.patches = { component: {}, parts: {} });
+  let map;
+  if (target) {
+    base.parts ??= {};
+    base.parts[target] ??= {};
+    map = base.parts[target];
+  } else {
+    base.component ??= {};
+    map = base.component;
+  }
+
+  let n = 0;
+  for (const [path, value] of Object.entries(entries)) {
+    map[String(path)] = value;
+    n += 1;
+  }
+  // Written back through the same door every structure write uses, so the editor store and the
+  // player host both see it — mutating the node in place would move the object and not the panel.
+  writeControlProperty(found.control, `States.${key}.patches`, base);
+  addScriptTrace('log', '',
+    `ce.panel.patch ${controlName}.${key}${target ? `.parts.${target}` : ''}: ${n} key(s)`);
+  return n;
+}
+
 /**
  * snapshot() / restore() — every control's value, captured and put back.
  *
@@ -2729,6 +2926,13 @@ function buildApi(ownerName, scriptId = '') {
     panelFind: (query) => panelFindImpl(query),
     panelInfo: (name) => panelInfoImpl(name),
     panelTypes: () => Object.keys(COMPONENT_TYPES),
+    // ce.panel — the collections inside a control, which the Properties panel can add to and
+    // remove from and a script could only overwrite whole.
+    panelEntries: (control, section) => panelEntriesImpl(control, section),
+    panelEntry: (control, section, name) => panelEntryImpl(control, section, name),
+    panelDefine: (control, section, name, spec) => panelDefineImpl(control, section, name, spec),
+    panelUndefine: (control, section, name) => panelUndefineImpl(control, section, name),
+    panelPatch: (control, stateName, patch, part) => panelPatchImpl(control, stateName, patch, part),
     // The two ce.panel verbs that are NOT panel-view only. The C++ preludes build these on a host
     // query for the control names plus get/set; here the panel object is in hand, so the same walk
     // is direct. Same rules either way — see panelSnapshotImpl.

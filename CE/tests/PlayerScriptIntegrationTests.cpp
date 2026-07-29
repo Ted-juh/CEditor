@@ -379,6 +379,23 @@ int main()
         check (devRequests.contains ("patch"), "requestDump falls through when no layout is declared");
     }
 
+    // A set() that writes nothing has to be observable window-closed too (design doc §31).
+    //
+    // PluginProcessor's cb.setValue logs when this returns false. What is pinned here is the
+    // primitive that reporting rests on: PanelValueModel has to be able to SAY a path led nowhere,
+    // or the player is back to the silent write the panel view just stopped doing.
+    {
+        check (model.setValue ("cutoff.value", 64), "a real path reports that it wrote");
+        check (! model.setValue ("cutoff.NoSuchSection.whatever", 1),
+               "a path that leads nowhere reports that it did NOT write");
+        check (! model.setValue ("noSuchControl.value", 1),
+               "…and so does a control the panel does not have");
+        // The exact shape that fooled the analysis in the panel view: the last three segments of a
+        // state patch are ONE map key, not three path steps.
+        check (! model.setValue ("cutoff.States.Hover.patches.component.Background.Fill.colour", 1),
+               "a state patch key is not a path, and saying so is the point");
+    }
+
     std::cout << "--------------------------------------------\n"
               << (failures == 0 ? "ALL PASS" : juce::String (failures) + " FAILURE(S)").toStdString() << "\n";
     return failures == 0 ? 0 : 1;
