@@ -2279,3 +2279,76 @@ and `log` into `1 − (1 − x)²`, and the s-curve is the same formula in both.
 So all three families were covered by the second commit and nothing said so. `shape`'s summary now
 names it. That is worth recording as its own kind of gap: **a capability nobody can find is not a
 capability**, and the fix was a sentence rather than a function.
+
+---
+
+## 35. One generator per (script, stream)
+
+The shared RNG was raised as a coupling problem: `shuffle()` advances the state `gaussian()` reads,
+so two generative elements interfere. Looking at it properly found something worse underneath.
+
+### It was a cross-runtime divergence, not just coupling
+
+Where the generator's state lives was never decided — it fell out of how each engine happens to load
+its prelude:
+
+| runtime | prelude runs | generator state |
+|---|---|---|
+| **Lua** | once, into shared globals | **shared by every script** |
+| **JavaScript** (C++) | per script — one QuickJS engine each | per script |
+| **Python** (C++) | per script — its own namespace | per script |
+| **WebView** | module-level `let` | **shared by every script** |
+
+So a panel with two generative scripts produced different output in the editor than in the export,
+and different again depending on which language its scripts were written in. `randomSeed(42)` in one
+script silently reset another's sequence in Lua and in the editor, and did not in the shipped plugin.
+That is precisely the rule Model 2 exists to guarantee — *test live = behaves the same in export* —
+and nothing was watching it, because every engine was individually self-consistent.
+
+### The fix: per script, and per named stream inside it
+
+`randomStates` is now keyed by `(script, stream)` in all four runtimes. **Per script** rather than
+per panel, for four reasons: two of the three C++ engines already were, it matches
+`ce.storage.state`'s existing "the script's own scratch" scoping, it is the isolation a panel
+actually wants, and it was safe to change because anything relying on the shared behaviour was
+already broken in the export.
+
+Lua needed the most work, because its prelude runs once into shared globals and a global function
+cannot see its caller's environment. The engine already tracked `currentScriptId` in C++, so it now
+mirrors that into a Lua global around every load and dispatch — which is what lets one global
+`random()` tell the scripts apart without moving the function into each environment and breaking the
+`ce` namespace, which is built from `_G`.
+
+### `stream` is a block, not a handle
+
+```lua
+ce.math.stream("lfo", function()
+  ce.math.seed(4)                 -- this stream's seed, nobody else's
+  set("rate.value", ce.math.random(1, 16))
+end)
+```
+
+The alternative was a stream *object* with its own `random`/`shuffle`/`choice` methods. A block wins
+for the reason the design doc already gives for `routeMidi`: **the stream is a decision about a RUN
+of draws, not about one of them**, and a name argument would have been nine signature changes.
+A block also needs no new value shape — an object of functions would have to work identically as a
+Lua table, a JavaScript object, a Python object and a gated stub, which is real cost for no gain.
+
+It restores in a `finally` (a `pcall` in Lua), so a throw inside cannot leave every later draw in the
+session pointed at the wrong stream — the same rule, and the same reason, as `routeMidi` and
+`noTransmit`.
+
+### One defect this turned up
+
+Lua's `deliverEvent` — the path an `on(target, event, fn)` listener fires down — **never set
+`currentScriptId` at all**, while a load and a dispatch both did. Anything script-scoped read inside
+an `on()` handler therefore fell into a shared bucket. Nothing depended on that until now; the
+per-script generator would have inherited it on day one, and a listener's draws would have come out
+of a nameless generator shared with every other listener in the panel.
+
+### What is verified
+
+The web suite pins the cross-script isolation directly — one script drawing must not move another
+along, and reseeding one must not reseed the other — and the JavaScript and Python preludes were
+executed and compared: identical values, streams independent, and the override restored after a
+throw. The Lua path is syntax- and parse-checked only, as ever.

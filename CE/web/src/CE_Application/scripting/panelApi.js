@@ -1807,7 +1807,9 @@ export const HELPERS = [
   { id: 'random', category: 'Value / range', signature: 'random([lo, hi])',
     summary: 'A random number. With no arguments, a float in [0, 1). With two, a whole number from lo to hi INCLUSIVE — the form a script actually wants for a note or a step. Seeded, so the same seed replays the same sequence in every runtime.' },
   { id: 'randomSeed', category: 'Value / range', signature: 'randomSeed(n)',
-    summary: 'Set the seed. The same seed replays the same sequence — which is what makes a "random" patch something you can get back. Reseeding with 0 is treated as the default seed rather than as a dead generator.' },
+    summary: 'Set the seed of the generator this script is drawing from. The same seed replays the same sequence — which is what makes a "random" patch something you can get back. Reseeding with 0 is treated as the default seed rather than as a dead generator. Seeds ONE generator: every script has its own, and inside a script every named stream has its own, so this cannot reach into somebody else\'s sequence.' },
+  { id: 'randomStream', category: 'Value / range', signature: 'randomStream(name, fn)',
+    summary: 'Draws inside the block come from a generator of their own, so two generative elements in one script stop interfering — shuffle() in one no longer changes what gaussian() gives the other, and seeding one leaves the other alone. A block rather than a name argument on nine verbs, for the reason routeMidi is a block: the stream is a decision about a RUN of draws, not about one of them. Restored in a finally, so a throw inside cannot leave every later draw pointed at the wrong stream. Streams are per script as well, so two scripts using the same stream name still do not share one.' },
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -1916,7 +1918,7 @@ export const MODULES = [
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
-  { id: 'ce.math', version: '1.5', requires: ['ce.core'], runtime: RUNTIME_ANY,
+  { id: 'ce.math', version: '1.6', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Value and range arithmetic — ranges that wrap, curves of your own shape, snapping to a list, decibels — plus a seeded random you can pick from. Pure: no host involved.' },
   { id: 'ce.music', version: '1.1', requires: [], runtime: RUNTIME_ANY,
     summary: 'Note names and numbers, scales, chords, and snapping a note to a key.' },
@@ -2010,7 +2012,7 @@ const MODULE_MEMBERS = {
                roundTo: 'roundTo', almost: 'almost',
                min: 'minOf', max: 'maxOf', sum: 'sumOf', mean: 'meanOf', blend: 'blend',
                randomFloat: 'randomFloat', gaussian: 'randomGaussian', walk: 'randomWalk',
-               chance: 'randomBool', shuffle: 'shuffle',
+               chance: 'randomBool', shuffle: 'shuffle', stream: 'randomStream',
                degrees: 'toDegrees', radians: 'toRadians',
                distance: 'distance', angle: 'angleOf', polar: 'polar',
                // The panel's own transforms. `shape` is deliberately NOT `curve` — the two compute

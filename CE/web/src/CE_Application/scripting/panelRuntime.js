@@ -504,26 +504,71 @@ const musicNotes = (table, root, name) => {
 // five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
 // different in the editor and in the export.
 const DEFAULT_SEED = 0x9E3779B9;
-let randomState = DEFAULT_SEED;
 
-function randomNext() {
-  let x = randomState;
+// ONE GENERATOR PER (SCRIPT, STREAM), not one for the whole runtime.
+//
+// It used to be a single module-level state, and that was wrong in two directions at once. Across
+// scripts it was a cross-runtime DIVERGENCE: the C++ JavaScript and Python engines give each script
+// its own engine or namespace, so the generator was already per script there, while Lua's prelude
+// runs once into shared globals and this runtime kept one variable — so a panel with two generative
+// scripts produced different output in the editor than in the export, and different again depending
+// on which language the scripts were written in. That breaks the one rule Model 2 exists for.
+//
+// Within a script it was coupling: shuffle() advanced the same state gaussian() read, so two
+// generative elements interfered and reseeding one reset the other.
+//
+// Keyed by script AND stream fixes both. A fresh key starts from the same default seed, so an
+// untouched stream is still deterministic.
+const randomStates = new Map();
+
+// The stream in force, set by randomStream(name, fn) for the duration of the block. Module-level
+// rather than threaded through nine signatures, for the reason routeMidi is a block: the stream is
+// a decision about a RUN of draws, not about one of them.
+let streamOverride = null;
+
+function randomKey(scriptId) {
+  return `${scriptId ?? ''}\u0000${streamOverride ?? ''}`;
+}
+
+function randomNext(scriptId) {
+  const key = randomKey(scriptId);
+  let x = randomStates.get(key) ?? DEFAULT_SEED;
   x = (x ^ (x << 13)) >>> 0;
   x = (x ^ (x >>> 17)) >>> 0;
   x = (x ^ (x << 5)) >>> 0;
-  randomState = x;
+  randomStates.set(key, x);
   return x / 4294967296;      // [0, 1)
 }
 
-function randomSeedImpl(n) {
+function randomSeedImpl(scriptId, n) {
   const v = Math.floor(Number(n) || 0) >>> 0;
   // 0 is a dead state for xorshift — it would return zero forever — so it means "the default"
   // rather than "a generator that never moves".
-  randomState = v === 0 ? DEFAULT_SEED : v;
+  randomStates.set(randomKey(scriptId), v === 0 ? DEFAULT_SEED : v);
 }
 
-function randomImpl(lo, hi) {
-  const r = randomNext();
+/**
+ * randomStream(name, fn) — draws inside the block come from a generator of their own.
+ *
+ * A block rather than a name argument on nine verbs, which is the shape routeMidi already uses and
+ * for the same stated reason. Restored in a `finally`, so a throw inside cannot leave every later
+ * draw in the session pointed at the wrong stream.
+ */
+function randomStreamImpl(scriptId, name, fn) {
+  if (typeof fn !== 'function') {
+    addScriptTrace('error', scriptId ?? '', 'stream(name, fn) needs a block to run — nothing was drawn');
+    return;
+  }
+  const previous = streamOverride;
+  streamOverride = String(name ?? '');
+  try { fn(); } finally { streamOverride = previous; }
+}
+
+/** Drop every generator. Used when a panel is torn down, so a reload starts from the seed again. */
+export function resetRandomStreams() { randomStates.clear(); streamOverride = null; }
+
+function randomImpl(scriptId, lo, hi) {
+  const r = randomNext(scriptId);
   if (lo === undefined || lo === null || hi === undefined || hi === null) return r;
   const a = Math.floor(Number(lo)), b = Math.floor(Number(hi));
   if (!Number.isFinite(a) || !Number.isFinite(b)) return r;
@@ -637,12 +682,12 @@ function quantizeToImpl(v, values) {
  * consumed a different amount of the sequence would change what everything after it picked, and
  * "the same seed replays the same sequence" would quietly stop being true.
  */
-function randomChoiceImpl(values, weights) {
+function randomChoiceImpl(scriptId, values, weights) {
   const raw = Array.isArray(values) ? values
     : values && typeof values === 'object' ? Object.values(values)
     : [];
   if (!raw.length) return undefined;
-  const r = randomNext();
+  const r = randomNext(scriptId);
   const w = toNumberList(weights).map((n) => (n > 0 ? n : 0));
   let total = 0;
   for (let i = 0; i < raw.length; i += 1) total += w[i] ?? 0;
@@ -836,9 +881,9 @@ function blendImpl(a, b, t) {
 // randomGaussian does not cache Box-Muller's second value the way the textbook version does.
 
 /** The seeded float in a range — random(lo, hi) returns whole numbers, so this did not exist. */
-function randomFloatImpl(lo, hi) {
+function randomFloatImpl(scriptId, lo, hi) {
   const a = num(lo), b = num(hi, 1);
-  return a + randomNext() * (b - a);
+  return a + randomNext(scriptId) * (b - a);
 }
 
 /**
@@ -846,16 +891,16 @@ function randomFloatImpl(lo, hi) {
  * uniform random is the thing that sounds mechanical; most of the values should be near the middle.
  * Box-Muller, always consuming exactly two draws.
  */
-function randomGaussianImpl(mean, sd) {
-  const u1 = Math.max(randomNext(), 1e-12);   // ln(0) is not a number anyone wants downstream
-  const u2 = randomNext();
+function randomGaussianImpl(scriptId, mean, sd) {
+  const u1 = Math.max(randomNext(scriptId), 1e-12);   // ln(0) is not a number anyone wants downstream
+  const u2 = randomNext(scriptId);
   const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
   return num(mean) + z * num(sd, 1);
 }
 
 /** randomWalk(current, step, lo, hi) — drift, not jump. A generative line that stays musical. */
-function randomWalkImpl(current, step, lo, hi) {
-  const move = (randomNext() * 2 - 1) * Math.abs(num(step));
+function randomWalkImpl(scriptId, current, step, lo, hi) {
+  const move = (randomNext(scriptId) * 2 - 1) * Math.abs(num(step));
   const next = num(current) + move;
   if (lo === undefined || lo === null || hi === undefined || hi === null) return next;
   // Folded rather than clamped: a walk that clamps sticks to the end it hit and stops moving.
@@ -863,15 +908,15 @@ function randomWalkImpl(current, step, lo, hi) {
 }
 
 /** randomBool([chance]) — a weighted coin. The probability gate every step sequencer wants. */
-function randomBoolImpl(chance) {
-  return randomNext() < num(chance, 0.5);
+function randomBoolImpl(scriptId, chance) {
+  return randomNext(scriptId) < num(chance, 0.5);
 }
 
 /** shuffle(values) — seeded Fisher-Yates, returning a NEW list. Draws exactly n-1 times. */
-function shuffleImpl(values) {
+function shuffleImpl(scriptId, values) {
   const out = [...toList(values)];
   for (let i = out.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(randomNext() * (i + 1));
+    const j = Math.floor(randomNext(scriptId) * (i + 1));
     const tmp = out[i]; out[i] = out[j]; out[j] = tmp;
   }
   return out;
@@ -1145,7 +1190,6 @@ const helpers = {
   median: (values) => medianImpl(values),
   unshape: (y, curve, tension) => unshapeImpl(y, curve, tension),
   quantizeTo: (v, values) => quantizeToImpl(v, values),
-  randomChoice: (values, weights) => randomChoiceImpl(values, weights),
   // range and normalisation
   norm: (v, lo, hi) => normImpl(v, lo, hi),
   denorm: (t, lo, hi) => denormImpl(t, lo, hi),
@@ -1166,11 +1210,6 @@ const helpers = {
   meanOf: (values) => meanImpl(values),
   blend: (a, b, t) => blendImpl(a, b, t),
   // randomness — every one draws a FIXED number of times, so a seed replays whatever was used
-  randomFloat: (lo, hi) => randomFloatImpl(lo, hi),
-  randomGaussian: (mean, sd) => randomGaussianImpl(mean, sd),
-  randomWalk: (current, step, lo, hi) => randomWalkImpl(current, step, lo, hi),
-  randomBool: (chance) => randomBoolImpl(chance),
-  shuffle: (values) => shuffleImpl(values),
   // geometry
   toDegrees: (radians) => degImpl(radians),
   toRadians: (degrees) => radImpl(degrees),
@@ -1185,8 +1224,6 @@ const helpers = {
     return db < MIN_DB ? MIN_DB : db;
   },
   // @module ce.music
-  random: (lo, hi) => randomImpl(lo, hi),
-  randomSeed: (n) => randomSeedImpl(n),
   noteName: (n) => { n = Math.floor(n); return NOTE_NAMES[((n % 12) + 12) % 12] + (Math.floor(n / 12) - 1); },
   noteNumber: (name) => { const m = /^([A-G]#?)(-?\d+)$/.exec(name); if (!m) return 0; const i = NOTE_NAMES.indexOf(m[1]); return i < 0 ? 0 : (parseInt(m[2], 10) + 1) * 12 + i; },
   // Scales, chords and snap-to-key. Same tables the C++ preludes are generated from, so a script
@@ -3469,6 +3506,17 @@ function buildApi(ownerName, scriptId = '') {
     // The callback belongs to the calling script, so this is bound here rather than in midiApi —
     // a throw inside it is reported against the script that scheduled it.
     requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
+    // ce.math — the seeded generator. Bound here rather than in the shared helpers object because
+    // it is the only place that knows WHICH SCRIPT is drawing, and the generator is per script.
+    random: (lo, hi) => randomImpl(scriptId, lo, hi),
+    randomSeed: (n) => randomSeedImpl(scriptId, n),
+    randomChoice: (values, weights) => randomChoiceImpl(scriptId, values, weights),
+    randomFloat: (lo, hi) => randomFloatImpl(scriptId, lo, hi),
+    randomGaussian: (mean, sd) => randomGaussianImpl(scriptId, mean, sd),
+    randomWalk: (current, step, lo, hi) => randomWalkImpl(scriptId, current, step, lo, hi),
+    randomBool: (chance) => randomBoolImpl(scriptId, chance),
+    shuffle: (values) => shuffleImpl(scriptId, values),
+    randomStream: (name, fn) => randomStreamImpl(scriptId, name, fn),
     // ce.storage
     state: stateFor(scriptId),
     saveSetting: (key, value) => saveSetting(key, value),

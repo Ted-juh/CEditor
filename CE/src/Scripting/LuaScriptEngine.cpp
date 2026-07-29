@@ -517,20 +517,46 @@ end
 -- five runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
 -- different in the editor and in the export.
 local __RND_DEFAULT = 0x9E3779B9
-local __rnd = __RND_DEFAULT
+-- ONE GENERATOR PER (SCRIPT, STREAM). This prelude runs ONCE into shared globals, so a single
+-- upvalue here was one generator for every Lua script in the panel — while the JS and Python
+-- engines give each script its own engine or namespace and were already per script. A panel with
+-- two generative scripts therefore behaved differently depending on the language it was written
+-- in, and differently again between the editor and the export. `__scriptId` is set by the engine
+-- around every load and dispatch, which is what lets a global function tell the scripts apart.
+local __rndStates = {}
+local __streamOverride = nil
+local function __rndKey()
+  return tostring(__scriptId or "") .. "\0" .. (__streamOverride or "")
+end
 function randomSeed(n)
   local v = math.floor(tonumber(n) or 0) & 0xFFFFFFFF
   -- 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
   -- rather than "a generator that never moves".
   if v == 0 then v = __RND_DEFAULT end
-  __rnd = v
+  __rndStates[__rndKey()] = v
+end
+-- Draws inside the block come from a generator of their own, so two generative elements in one
+-- script stop interfering. A block rather than a name argument on nine verbs, the shape routeMidi
+-- already uses: the stream is a decision about a RUN of draws. Restored in a pcall-guarded finally
+-- so a throw inside cannot leave every later draw pointed at the wrong stream.
+function randomStream(name, fn)
+  if type(fn) ~= "function" then
+    log("stream(name, fn) needs a block to run — nothing was drawn")
+    return
+  end
+  local previous = __streamOverride
+  __streamOverride = tostring(name or "")
+  local ok, err = pcall(fn)
+  __streamOverride = previous
+  if not ok then error(err, 0) end
 end
 function random(lo, hi)
-  local x = __rnd
+  local key = __rndKey()
+  local x = __rndStates[key] or __RND_DEFAULT
   x = (x ~ (x << 13)) & 0xFFFFFFFF
   x = x ~ (x >> 17)
   x = (x ~ (x << 5)) & 0xFFFFFFFF
-  __rnd = x
+  __rndStates[key] = x
   local r = x / 4294967296.0
   if lo == nil or hi == nil then return r end
   local a, b = math.floor(tonumber(lo) or 0), math.floor(tonumber(hi) or 0)
@@ -1125,7 +1151,7 @@ local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
-  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.math"] = { almost = "almost", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", fold = "fold", gainToDb = "gainToDb", gaussian = "randomGaussian", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { chord = "chordNotes", name = "noteName", number = "noteNumber", quantize = "quantizeNote", scale = "scaleNotes" },
   ["ce.time"] = { after = "after", beatsToMs = "beatsToMs", msToBeats = "msToBeats", playing = "isPlaying", startTimer = "startTimer", stopTimer = "stopTimer", syncTimer = "syncTimer", tempo = "tempo", transport = "transportInfo" },
   ["ce.anim"] = { running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo" },
@@ -1167,7 +1193,7 @@ local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
-  { id = "ce.math", version = "1.5", runtime = "any" },
+  { id = "ce.math", version = "1.6", runtime = "any" },
   { id = "ce.music", version = "1.1", runtime = "any" },
   { id = "ce.time", version = "1.2", runtime = "any" },
   { id = "ce.anim", version = "1.0", runtime = "any" },
@@ -1534,8 +1560,10 @@ public:
 
         const Watchdog guard (*this); // top-level statements obey the instruction budget too
         currentScriptId = def.id;
+        lua["__scriptId"] = def.id.toStdString();   // the seeded generator is per script
         auto result = lua.safe_script (def.source.toStdString(), env, sol::script_pass_on_error);
         currentScriptId = {};
+        lua["__scriptId"] = "";
         if (! result.valid())
         {
             sol::error err = result;
@@ -1563,8 +1591,10 @@ public:
         if (! f.valid()) return {};
         const Watchdog guard (*this);
         currentScriptId = scriptId;
+        lua["__scriptId"] = scriptId.toStdString();
         auto r = f (varToSol (lua, payload));
         currentScriptId = {};
+        lua["__scriptId"] = "";
         if (! r.valid()) { sol::error e = r; onError (scriptId, juce::String (e.what())); return {}; }
         return r.return_count() > 0 ? solToVar (r) : juce::var();
     }
@@ -1577,7 +1607,15 @@ public:
         {
             if (l.event != event) continue;
             if (l.target != target && l.target != "*" && ! (l.target == "self")) continue;
+            // The listener belongs to the script that REGISTERED it, and until now nothing said so
+            // during the call: currentScriptId was left empty here while it is set around a load and
+            // a dispatch. Anything script-scoped read inside an on() handler therefore fell into a
+            // shared bucket — which the per-script generator would have inherited on day one.
+            currentScriptId = l.scriptId;
+            lua["__scriptId"] = l.scriptId.toStdString();
             auto r = l.fn (varToSol (lua, payload));
+            currentScriptId = {};
+            lua["__scriptId"] = "";
             if (! r.valid()) { sol::error e = r; onError ("on:" + event, juce::String (e.what())); }
         }
     }

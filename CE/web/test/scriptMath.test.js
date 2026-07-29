@@ -702,3 +702,94 @@ test('shape() reproduces the Macro family too, at tension 1', () => {
   assert.match(MEMBER_BY_ID.shapeCurve.summary, /MACRO FAMILY/);
   assert.match(MEMBER_BY_ID.shapeCurve.summary, /shape\(v, curve, 1\)/);
 });
+
+/* ==========================================================================================
+   One generator per (script, stream) (design doc §35).
+
+   A single runtime-wide state was wrong in two directions. ACROSS scripts it was a cross-runtime
+   divergence — the C++ JavaScript and Python engines give each script its own engine or namespace,
+   so they were already per script, while Lua's prelude runs once into shared globals and the web
+   runtime kept one module variable. A panel with two generative scripts therefore behaved
+   differently in the editor than in the export, and differently again by language. WITHIN a script
+   it was coupling: shuffle() advanced the state gaussian() read.
+   ========================================================================================== */
+
+test('two scripts no longer share a generator', () => {
+  const a = scriptApiForTesting('', 'scriptA');
+  const b = scriptApiForTesting('', 'scriptB');
+
+  a.randomSeed(42);
+  const first = a.random();
+  a.randomSeed(42);
+  b.random();                       // a DIFFERENT script draws in between
+  assert.equal(a.random(), first, 'another script drawing must not move this one along');
+
+  // …and reseeding one must not reseed the other.
+  a.randomSeed(7);
+  b.randomSeed(999);
+  const aNext = a.random();
+  a.randomSeed(7);
+  assert.equal(a.random(), aNext);
+});
+
+test('the same seed still means the same sequence within a script', () => {
+  const a = scriptApiForTesting('', 'seedCheck');
+  a.randomSeed(3);
+  const run1 = [a.random(), a.random(), a.random()];
+  a.randomSeed(3);
+  assert.deepEqual([a.random(), a.random(), a.random()], run1);
+});
+
+test('a stream is independent of the script default, and of other streams', () => {
+  const s = scriptApiForTesting('', 'streams');
+  s.randomSeed(5);
+  const plain = [s.random(), s.random()];
+
+  s.randomSeed(5);
+  const first = s.random();
+  // The coupling this closes: drawing inside a stream must not move the default along.
+  s.randomStream('lfo', () => { s.random(); s.shuffle([1, 2, 3, 4]); s.randomGaussian(); });
+  assert.equal(s.random(), plain[1], 'the default sequence carried on untouched');
+  assert.equal(first, plain[0]);
+
+  // Two streams do not share either.
+  let inA;
+  let inB;
+  s.randomStream('a', () => { s.randomSeed(9); inA = s.random(); });
+  s.randomStream('b', () => { s.randomSeed(9); s.random(); });
+  s.randomStream('a', () => { inB = s.random(); });
+  s.randomStream('a', () => { s.randomSeed(9); assert.equal(s.random(), inA, 'stream a replays its own seed'); });
+  assert.ok(inB !== undefined);
+});
+
+test('a stream is per script too, so the same name in two scripts is two generators', () => {
+  const a = scriptApiForTesting('', 'one');
+  const b = scriptApiForTesting('', 'two');
+  a.randomStream('shared', () => a.randomSeed(11));
+  let fromA;
+  let fromB;
+  a.randomStream('shared', () => { fromA = a.random(); });
+  b.randomStream('shared', () => { b.randomSeed(11); fromB = b.random(); });
+  // Same name, same seed, but they are still separate generators — so B drawing cannot disturb A.
+  assert.equal(fromA, fromB, 'the same seed in the same-named stream still replays the same');
+  a.randomStream('shared', () => { a.randomSeed(11); });
+  b.randomStream('shared', () => { b.random(); b.random(); });
+  a.randomStream('shared', () => { assert.equal(a.random(), fromA, 'B running ahead did not move A'); });
+});
+
+test('the stream is restored even when the block throws', () => {
+  const s = scriptApiForTesting('', 'thrower');
+  s.randomSeed(4);
+  const expected = s.random();
+  s.randomSeed(4);
+  assert.throws(() => s.randomStream('boom', () => { throw new Error('nope'); }));
+  // A throw inside must not leave every later draw in the session pointed at the wrong stream.
+  assert.equal(s.random(), expected);
+});
+
+test('a stream without a block is reported rather than silently doing nothing', () => {
+  const s = scriptApiForTesting('', 'nofn');
+  clearScriptTrace();
+  s.randomStream('x');
+  assert.match(traced(), /needs a block to run/);
+});

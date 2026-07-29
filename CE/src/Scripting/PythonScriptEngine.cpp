@@ -1116,26 +1116,44 @@ def unshape(y, curve, tension=None):
 # runtimes, so a "random" patch could not be reproduced and a generative sequence would sound
 # different in the editor and in the export.
 __RND_DEFAULT = 0x9E3779B9
-__rnd = [__RND_DEFAULT]
+# ONE GENERATOR PER STREAM. Each script is exec'd into its OWN namespace, so this dict is already
+# per script and the key only has to separate streams within one — where a single state meant
+# shuffle() advanced what gaussian() read, and seeding one element reset the other.
+__rndStates = {}
+__streamOverride = [""]
 def randomSeed(n):
     import math
     v = math.floor(n or 0) & 0xFFFFFFFF
     # 0 is a DEAD state for xorshift — it would return zero forever — so it means "the default"
     # rather than "a generator that never moves".
-    __rnd[0] = __RND_DEFAULT if v == 0 else v
+    __rndStates[__streamOverride[0]] = __RND_DEFAULT if v == 0 else v
 def random(lo=None, hi=None):
     import math
-    x = __rnd[0]
+    x = __rndStates.get(__streamOverride[0], __RND_DEFAULT)
     x = (x ^ (x << 13)) & 0xFFFFFFFF
     x = x ^ (x >> 17)
     x = (x ^ (x << 5)) & 0xFFFFFFFF
-    __rnd[0] = x
+    __rndStates[__streamOverride[0]] = x
     r = x / 4294967296.0
     if lo is None or hi is None: return r
     a, b = math.floor(lo or 0), math.floor(hi or 0)
     low, high = min(a, b), max(a, b)
     # Whole numbers, INCLUSIVE at both ends — the form a script wants for a note or a step.
     return low + math.floor(r * (high - low + 1))
+
+# Draws inside the block come from a generator of their own. A block rather than a name argument on
+# nine verbs, the shape routeMidi already uses: the stream is a decision about a RUN of draws.
+# Restored in a finally, so a throw inside cannot leave every later draw on the wrong stream.
+def randomStream(name, fn):
+    if not callable(fn):
+        log("stream(name, fn) needs a block to run — nothing was drawn")
+        return
+    previous = __streamOverride[0]
+    __streamOverride[0] = str(name if name is not None else "")
+    try:
+        fn()
+    finally:
+        __streamOverride[0] = previous
 
 # randomChoice(values [, weights]) — a pick from the SEEDED generator, so a randomised patch
 # replays. Exactly ONE number is drawn in every branch, weighted or not: a weighted pick consuming a
@@ -1702,7 +1720,7 @@ __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
-    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.math": { "almost": "almost", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "fold": "fold", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "chord": "chordNotes", "name": "noteName", "number": "noteNumber", "quantize": "quantizeNote", "scale": "scaleNotes" },
     "ce.time": { "after": "after", "beatsToMs": "beatsToMs", "msToBeats": "msToBeats", "playing": "isPlaying", "startTimer": "startTimer", "stopTimer": "stopTimer", "syncTimer": "syncTimer", "tempo": "tempo", "transport": "transportInfo" },
     "ce.anim": { "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo" },
@@ -1744,7 +1762,7 @@ __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
-    { "id": "ce.math", "version": "1.5", "runtime": "any" },
+    { "id": "ce.math", "version": "1.6", "runtime": "any" },
     { "id": "ce.music", "version": "1.1", "runtime": "any" },
     { "id": "ce.time", "version": "1.2", "runtime": "any" },
     { "id": "ce.anim", "version": "1.0", "runtime": "any" },
