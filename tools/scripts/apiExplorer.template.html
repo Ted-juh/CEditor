@@ -188,6 +188,12 @@ p { margin: 0 0 14px; }
 .lesson-text { min-width: 0; }
 .lesson-text > :last-child { margin-bottom: 0; }
 .lesson-code { min-width: 0; position: sticky; top: 16px; }
+/* A walkthrough is one long listing rather than a claim beside its illustration, so it drops the
+   two columns and reads top to bottom: prose, then the code it is about. */
+.lesson.wide { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.lesson.wide .lesson-code { position: static; margin-top: 6px; }
+.lesson.wide .lesson-text { max-width: 82ch; }
+.lesson.wide .cap { margin-top: 18px; }
 
 pre {
   margin: 0 0 12px; padding: 15px 16px;
@@ -420,6 +426,8 @@ pre code { font-size: inherit; }
     <a href="#typography">Typography</a>
     <a href="#keeping">Keeping things</a>
     <a href="#debug">When it breaks</a>
+    <a href="#walkthrough">A button, from nothing</a>
+    <a href="#from-data">Eight, from a table</a>
     <h2>Reference</h2>
     <a href="#surface">Every module</a>
     <a href="#hooks">Lifecycle hooks</a>
@@ -959,6 +967,446 @@ logError("could not do that");
 function onError(info) {
   log(`${info.scriptId} failed in ${info.phase}`);
 }</code></pre>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="walkthrough">
+    <p class="lesson-n">11 &middot; A button, from nothing</p>
+    <div class="lesson-text prose">
+      <h3>The vocabulary, in one go</h3>
+      <p>
+        Ten lessons of verbs, on one control. Every line below runs &mdash; the numbers in the
+        comments are what the calls returned, and the test suite re&#8209;runs the whole thing.
+      </p>
+      <p>
+        It is a <b>panel</b> script on <code>onPanelBuild</code>: the phase that exists to build.
+        Controls a script creates are cleared before it fires, so running it twice cannot double
+        the layout.
+      </p>
+      <p>
+        Three of these steps look like a colour and are not. <code>create()</code> returns the name
+        it <i>settled on</i> &mdash; a clash gets a suffix, so keep what it hands back rather than
+        the name you asked for. The fill is a <b>composite</b>: solid, gradient, image and overlay
+        all stack and <code>layerOrder</code> decides who is on top, which is why the state patches
+        move <code>gradientOpacity</code> and not <code>colour</code> &mdash; a gradient at full
+        opacity covers the solid layer completely, and patching underneath it stores a colour
+        nobody ever sees. And the gradient's stops spell it <code>color</code> while the fill spells
+        it <code>colour</code>: the gradient editor is older than the section model and kept its
+        own spelling. Write <code>colour</code> in a stop and the browser is handed
+        <code>#undefined</code>.
+      </p>
+      <p class="note">
+        <code>bind()</code> answers <code>true</code> for a parameter nothing has declared yet, on
+        purpose &mdash; a script may declare it later. So the guard is yours to write.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">One button, by hand</p>
+      <pre data-lua><code>local BAY, NAME, LABEL = "Bay", "Engage", "ENGAGE"
+
+function onPanelBuild()
+  -- One batch = one undo step and one re-render, however many writes are inside.
+  ce.panel.batch(function()
+
+    -- The shell. Parenting is a separate verb; the button then moves with the group.
+    ce.panel.create("Group",  { name = BAY,  x = 24, y = 24, width = 320, height = 140 })
+    ce.panel.create("Button", { name = NAME, x = 40, y = 52, width = 120, height = 44 })
+    ce.panel.parent(NAME, BAY)
+
+    -- Type. Ask the catalogue first: a family nobody has is REFUSED (style returns
+    -- false and says why), and a non-portable face renders here but falls back
+    -- after export.
+    local face = ce.text.font("Segoe UI") or ce.text.font("Arial")
+    ce.text.style(NAME, {
+      family = face.family, size = 13, bold = true,
+      letterSpacing = 0.6, justification = "centred",
+    })
+    set(NAME .. ".Text.content", LABEL)
+
+    -- Size the button to its own text, through the same layout that paints it.
+    local m = ce.text.measure(NAME)     -- { width = 49.8, height = 15.6, lines = 1 }
+    set(NAME .. ".Transform.width", math.max(96, math.ceil(m.width) + 48))
+
+    -- The background.
+    local fill = NAME .. ".Background.Fill"
+    set(fill .. ".colour", "FF1B2233")         -- `colour`: British, 8 digits AARRGGBB
+    set(fill .. ".gradientEnabled", true)
+    set(fill .. ".gradient", {
+      type = "linear", angle = 90, edge = 0,   -- edge 0 = smooth, 100 = hard bands
+      stops = {                                -- `color`: US, 6 digits RRGGBB
+        { color = "2B3550", position = 0 },
+        { color = "161E33", position = 100 },
+      },
+    })
+    set(fill .. ".layerOrder", { "solid", "gradient", "image", "overlay" })
+
+    -- The icon. The library belongs to the EDITOR, not the panel, so an icon is
+    -- never portable — guard it, and let an install without it still build.
+    local ico = ce.image.asset("power")
+    if ico then
+      ce.image.icon(NAME, ico.id, { size = 16, tint = "#E8ECF8" })
+    else
+      logWarn("no 'power' icon in this install — built without one")
+    end
+
+    -- The states. Patch what is actually ON TOP. patch() returns how many keys it
+    -- merged, so a silent 0 is a spelling mistake you can see.
+    ce.panel.patch(NAME, "Hover",    { ["Background.Fill.gradientOpacity"] = 55 })
+    ce.panel.patch(NAME, "Pressed",  { ["Background.Fill.gradientOpacity"] = 20,
+                                       ["Transform.scale"] = 0.94 })
+    ce.panel.patch(NAME, "Disabled", { ["Transform.opacity"] = 0.4 })
+
+    -- The synth.
+    if ce.device.parameter("filter.cutoff") then
+      ce.device.bind(NAME, "filter.cutoff")
+    else
+      logWarn("no filter.cutoff in this profile — the button is decorative")
+    end
+  end)
+end
+
+-- Motion. A spring for the press, because it should settle rather than snap;
+-- a tween for the glow, because it has a length you want to name.
+on(NAME, "pointerDown", function()
+  ce.anim.spring(NAME .. ".Transform.scale", 0.94, { damping = 8, frequency = 14 })
+end)
+
+on(NAME, "pointerUp", function()
+  ce.anim.spring(NAME .. ".Transform.scale", 1.0, { damping = 8, frequency = 14 })
+end)
+
+on(NAME, "valueChanged", function(v)
+  ce.anim.to(NAME .. ".Background.Fill.gradientOpacity", v &gt; 0.5 and 100 or 40,
+             { duration = 180, curve = "outCubic" })
+end)</code></pre>
+      <pre data-js hidden><code>const BAY = "Bay", NAME = "Engage", LABEL = "ENGAGE";
+
+function onPanelBuild() {
+  // One batch = one undo step and one re-render, however many writes are inside.
+  ce.panel.batch(() =&gt; {
+
+    // The shell. Parenting is a separate verb; the button then moves with the group.
+    ce.panel.create("Group",  { name: BAY,  x: 24, y: 24, width: 320, height: 140 });
+    ce.panel.create("Button", { name: NAME, x: 40, y: 52, width: 120, height: 44 });
+    ce.panel.parent(NAME, BAY);
+
+    // Type. Ask the catalogue first: a family nobody has is REFUSED (style returns
+    // false and says why), and a non-portable face renders here but falls back
+    // after export.
+    const face = ce.text.font("Segoe UI") ?? ce.text.font("Arial");
+    ce.text.style(NAME, {
+      family: face.family, size: 13, bold: true,
+      letterSpacing: 0.6, justification: "centred",
+    });
+    set(`${NAME}.Text.content`, LABEL);
+
+    // Size the button to its own text, through the same layout that paints it.
+    const m = ce.text.measure(NAME);    // { width: 49.8, height: 15.6, lines: 1 }
+    set(`${NAME}.Transform.width`, Math.max(96, Math.ceil(m.width) + 48));
+
+    // The background.
+    const fill = `${NAME}.Background.Fill`;
+    set(`${fill}.colour`, "FF1B2233");         // `colour`: British, 8 digits AARRGGBB
+    set(`${fill}.gradientEnabled`, true);
+    set(`${fill}.gradient`, {
+      type: "linear", angle: 90, edge: 0,      // edge 0 = smooth, 100 = hard bands
+      stops: [                                 // `color`: US, 6 digits RRGGBB
+        { color: "2B3550", position: 0 },
+        { color: "161E33", position: 100 },
+      ],
+    });
+    set(`${fill}.layerOrder`, ["solid", "gradient", "image", "overlay"]);
+
+    // The icon. The library belongs to the EDITOR, not the panel, so an icon is
+    // never portable — guard it, and let an install without it still build.
+    const ico = ce.image.asset("power");
+    if (ico) {
+      ce.image.icon(NAME, ico.id, { size: 16, tint: "#E8ECF8" });
+    } else {
+      logWarn("no 'power' icon in this install — built without one");
+    }
+
+    // The states. Patch what is actually ON TOP. patch() returns how many keys it
+    // merged, so a silent 0 is a spelling mistake you can see.
+    ce.panel.patch(NAME, "Hover",    { "Background.Fill.gradientOpacity": 55 });
+    ce.panel.patch(NAME, "Pressed",  { "Background.Fill.gradientOpacity": 20,
+                                       "Transform.scale": 0.94 });
+    ce.panel.patch(NAME, "Disabled", { "Transform.opacity": 0.4 });
+
+    // The synth.
+    if (ce.device.parameter("filter.cutoff")) {
+      ce.device.bind(NAME, "filter.cutoff");
+    } else {
+      logWarn("no filter.cutoff in this profile — the button is decorative");
+    }
+  });
+}
+
+// Motion. A spring for the press, because it should settle rather than snap;
+// a tween for the glow, because it has a length you want to name.
+on(NAME, "pointerDown", () =&gt; {
+  ce.anim.spring(`${NAME}.Transform.scale`, 0.94, { damping: 8, frequency: 14 });
+});
+
+on(NAME, "pointerUp", () =&gt; {
+  ce.anim.spring(`${NAME}.Transform.scale`, 1.0, { damping: 8, frequency: 14 });
+});
+
+on(NAME, "valueChanged", (v) =&gt; {
+  ce.anim.to(`${NAME}.Background.Fill.gradientOpacity`, v &gt; 0.5 ? 100 : 40,
+             { duration: 180, curve: "outCubic" });
+});</code></pre>
+      <p class="note">
+        Every line of that could have been done in the Properties panel, one field at a time. Here
+        is what could not.
+      </p>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="from-data">
+    <p class="lesson-n">12 &middot; Eight, from a table</p>
+    <div class="lesson-text prose">
+      <h3>A panel is data plus a rule</h3>
+      <p>
+        The same panel, built eight times from eight rows. The point is not that it is shorter
+        &mdash; it is that the <b>rule</b> is now the thing you keep. Change <code>COLS</code> to 2
+        and the grid reflows and the group resizes with it. Add a ninth row and there is a ninth
+        pad, coloured, labelled, wired and playing, with no other edit. A stored property can hold
+        the <i>result</i> of that; nothing can store the rule.
+      </p>
+      <p>
+        Each piece is the language doing a different job. A <b>table</b> is the drum kit, kept
+        apart from the panel. A <b>function</b> means eight pads that cannot drift apart the way
+        eight copy&#8209;pasted blocks would. <b>Arithmetic</b> places them and sizes the group to
+        fit, and <code>shade()</code> derives every gradient's dark stop instead of you typing
+        sixteen hex values &mdash; the API should not grow a verb for arithmetic, because every
+        language the player embeds already has it. The <b>label is computed</b> from the same row
+        that sets the rate, so the two cannot disagree.
+      </p>
+      <p>
+        <b>The roll is a property, not a script.</b> <code>momentary/repeating</code> is a button
+        behaviour with a Delay and an Interval, and a script that reimplemented it with a timer
+        would be writing a worse copy of something the control already does. What the script adds
+        is the part a stored number cannot: the interval is derived from
+        <code>ce.time.division()</code> and <code>beatsToMs()</code>, so the roll follows the host
+        tempo instead of being frozen at whatever the author typed.
+      </p>
+      <p>
+        And the <b>closure</b> is the one with no property equivalent at all. Eight handlers, each
+        holding its own row. A <code>Value</code> section can store <i>a</i> note; it cannot store
+        "this button, that note, that velocity" eight times over.
+      </p>
+      <p class="note">
+        A plain pad fires <code>onClick</code> once, on release. A repeating pad fires it at its
+        own rate for as long as it is held &mdash; and <i>not</i> again on the way up, because the
+        firing already happened. One handler covers both.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">The data</p>
+      <pre data-lua><code>local PARTS = {
+  { name = "Kick",  note = 36, tint = "3B5BA5" },
+  { name = "Snare", note = 38, tint = "A5563B", roll = { rate = "1/16", velocity = 96 } },
+  { name = "Hat C", note = 42, tint = "3B8FA5", roll = { rate = "1/32", velocity = 72 } },
+  { name = "Hat O", note = 46, tint = "3BA57E" },
+  { name = "Tom L", note = 45, tint = "8F3BA5" },
+  { name = "Tom H", note = 50, tint = "A53B7E" },
+  { name = "Clap",  note = 39, tint = "A5A03B" },
+  { name = "Ride",  note = 51, tint = "5B3BA5" },
+}
+
+local BAY, COLS, W, H, GAP, PAD = "Pads", 4, 84, 44, 10, 16
+local CH = 10                                   -- GM drums</code></pre>
+      <pre data-js hidden><code>const PARTS = [
+  { name: "Kick",  note: 36, tint: "3B5BA5" },
+  { name: "Snare", note: 38, tint: "A5563B", roll: { rate: "1/16", velocity: 96 } },
+  { name: "Hat C", note: 42, tint: "3B8FA5", roll: { rate: "1/32", velocity: 72 } },
+  { name: "Hat O", note: 46, tint: "3BA57E" },
+  { name: "Tom L", note: 45, tint: "8F3BA5" },
+  { name: "Tom H", note: 50, tint: "A53B7E" },
+  { name: "Clap",  note: 39, tint: "A5A03B" },
+  { name: "Ride",  note: 51, tint: "5B3BA5" },
+];
+
+const BAY = "Pads", COLS = 4, W = 84, H = 44, GAP = 10, PAD = 16;
+const CH = 10;                                  // GM drums</code></pre>
+
+      <p class="cap">The rule</p>
+      <pre data-lua><code>-- Darken a 6-digit hex. Plain Lua: this is arithmetic.
+local function shade(hex, f)
+  local out = ""
+  for i = 0, 2 do
+    local byte = tonumber(hex:sub(i * 2 + 1, i * 2 + 2), 16)
+    out = out .. string.format("%02X", math.floor(byte * f))
+  end
+  return out
+end
+
+-- One pad, from one row of the table.
+local function buildPad(part, index)
+  local col = (index - 1) % COLS
+  local row = math.floor((index - 1) / COLS)
+
+  local name = ce.panel.create("Button", {
+    name = "pad" .. part.note,
+    x = PAD + col * (W + GAP),
+    y = PAD + row * (H + GAP),
+    width = W, height = H,
+  })
+
+  -- The label is COMPUTED, so a roll pad says so without anyone typing it twice.
+  local label = string.upper(part.name)
+  if part.roll then label = label .. "  " .. part.roll.rate end
+
+  ce.text.style(name, { family = "Arial", size = 11, bold = true, letterSpacing = 0.4 })
+  set(name .. ".Text.content", label)
+
+  local fill = name .. ".Background.Fill"
+  set(fill .. ".colour", "FF" .. shade(part.tint, 0.45))
+  set(fill .. ".gradientEnabled", true)
+  set(fill .. ".gradient", {
+    type = "linear", angle = 90, edge = 0,
+    stops = {
+      { color = part.tint,             position = 0 },
+      { color = shade(part.tint, 0.5), position = 100 },   -- derived, not typed
+    },
+  })
+  set(fill .. ".layerOrder", { "solid", "gradient", "image", "overlay" })
+
+  ce.panel.patch(name, "Hover",   { ["Background.Fill.gradientOpacity"] = 55 })
+  ce.panel.patch(name, "Pressed", { ["Background.Fill.gradientOpacity"] = 20,
+                                    ["Transform.scale"] = 0.94 })
+
+  -- Only the rows that asked for it repeat. The BUTTON does the rolling; the
+  -- script sets the property and gets out of the way. The interval comes from
+  -- the HOST TEMPO, which is the part a stored property cannot do.
+  if part.roll then
+    set(name .. ".Behavior.subtype", "repeating")
+    set(name .. ".Behavior.repeatEnabled", true)
+    set(name .. ".Behavior.repeatDelay", 0)
+    set(name .. ".Behavior.repeatInterval",
+        math.floor(ce.time.beatsToMs(ce.time.division(part.roll.rate))))
+  end
+
+  -- ONE handler, whatever the pad is. A closure over `part` is what makes eight
+  -- of these eight DIFFERENT handlers.
+  on(name, "click", function()
+    sendNote(CH, part.note, part.roll and part.roll.velocity or 100, 60)
+  end)
+
+  return name
+end
+
+function onPanelBuild()
+  ce.panel.batch(function()
+    local rows = math.ceil(#PARTS / COLS)
+    ce.panel.create("Group", {
+      name = BAY, x = 24, y = 24,
+      width  = PAD * 2 + COLS * W + (COLS - 1) * GAP,   -- the box fits the grid
+      height = PAD * 2 + rows * H + (rows - 1) * GAP,   -- because it is computed from it
+    })
+
+    local made, rolling = {}, 0
+    for i, part in ipairs(PARTS) do
+      made[#made + 1] = buildPad(part, i)
+      ce.panel.parent(made[#made], BAY)
+      if part.roll then rolling = rolling + 1 end
+    end
+
+    ce.panel.match(made, "both")   -- a bulk verb over the list the loop just built
+
+    log(string.format("built %d pads (%d rolling) at %d BPM",
+                      #made, rolling, ce.time.tempo()))
+  end)
+end</code></pre>
+      <pre data-js hidden><code>// Darken a 6-digit hex. Plain JavaScript: this is arithmetic.
+const shade = (hex, f) =&gt; [0, 2, 4]
+  .map((i) =&gt; Math.floor(parseInt(hex.slice(i, i + 2), 16) * f)
+    .toString(16).padStart(2, "0").toUpperCase())
+  .join("");
+
+// One pad, from one row of the table.
+function buildPad(part, index) {
+  const col = index % COLS;
+  const row = Math.floor(index / COLS);
+
+  const name = ce.panel.create("Button", {
+    name: `pad${part.note}`,
+    x: PAD + col * (W + GAP),
+    y: PAD + row * (H + GAP),
+    width: W, height: H,
+  });
+
+  // The label is COMPUTED, so a roll pad says so without anyone typing it twice.
+  let label = part.name.toUpperCase();
+  if (part.roll) label += `  ${part.roll.rate}`;
+
+  ce.text.style(name, { family: "Arial", size: 11, bold: true, letterSpacing: 0.4 });
+  set(`${name}.Text.content`, label);
+
+  const fill = `${name}.Background.Fill`;
+  set(`${fill}.colour`, `FF${shade(part.tint, 0.45)}`);
+  set(`${fill}.gradientEnabled`, true);
+  set(`${fill}.gradient`, {
+    type: "linear", angle: 90, edge: 0,
+    stops: [
+      { color: part.tint,             position: 0 },
+      { color: shade(part.tint, 0.5), position: 100 },     // derived, not typed
+    ],
+  });
+  set(`${fill}.layerOrder`, ["solid", "gradient", "image", "overlay"]);
+
+  ce.panel.patch(name, "Hover",   { "Background.Fill.gradientOpacity": 55 });
+  ce.panel.patch(name, "Pressed", { "Background.Fill.gradientOpacity": 20,
+                                    "Transform.scale": 0.94 });
+
+  // Only the rows that asked for it repeat. The BUTTON does the rolling; the
+  // script sets the property and gets out of the way. The interval comes from
+  // the HOST TEMPO, which is the part a stored property cannot do.
+  if (part.roll) {
+    set(`${name}.Behavior.subtype`, "repeating");
+    set(`${name}.Behavior.repeatEnabled`, true);
+    set(`${name}.Behavior.repeatDelay`, 0);
+    set(`${name}.Behavior.repeatInterval`,
+        Math.floor(ce.time.beatsToMs(ce.time.division(part.roll.rate))));
+  }
+
+  // ONE handler, whatever the pad is. A closure over `part` is what makes eight
+  // of these eight DIFFERENT handlers.
+  on(name, "click", () =&gt; {
+    sendNote(CH, part.note, part.roll ? part.roll.velocity : 100, 60);
+  });
+
+  return name;
+}
+
+function onPanelBuild() {
+  ce.panel.batch(() =&gt; {
+    const rows = Math.ceil(PARTS.length / COLS);
+    ce.panel.create("Group", {
+      name: BAY, x: 24, y: 24,
+      width:  PAD * 2 + COLS * W + (COLS - 1) * GAP,      // the box fits the grid
+      height: PAD * 2 + rows * H + (rows - 1) * GAP,      // because it is computed from it
+    });
+
+    let rolling = 0;
+    const made = PARTS.map((part, i) =&gt; {
+      const name = buildPad(part, i);
+      ce.panel.parent(name, BAY);
+      if (part.roll) rolling += 1;
+      return name;
+    });
+
+    ce.panel.match(made, "both");   // a bulk verb over the list the loop just built
+
+    log(`built ${made.length} pads (${rolling} rolling) at ${ce.time.tempo()} BPM`);
+  });
+}</code></pre>
+      <p class="note">
+        Both languages build the identical panel &mdash; same positions, same derived colours, down
+        to <code>A5563B</code>&#8202;&rarr;&#8202;<code>522B1D</code>. The test suite runs both and
+        compares.
+      </p>
     </div>
   </div>
 </section>
