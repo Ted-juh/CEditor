@@ -1043,13 +1043,37 @@ function onError(info) {
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>The last thirteen phases, newest first</p>
+    <p>The last fourteen phases, newest first</p>
   </div>
   <p class="prose">
     The surface roughly tripled over these. Six of them were not additions at all &mdash; they were
     the API telling the truth about things it had been quietly getting wrong.
   </p>
   <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§50</b>ce.image</div>
+      <div class="ship-body">
+        <p>
+          Eight verbs for the image layers a control carries &mdash; background image and overlay,
+          text image and texture, and the <code>Icon</code> section &mdash; plus the icon library they
+          draw from. Like <code>ce.text</code>, this adds no reach: a Label has 102 image&#8209;related
+          fields and a Knob 864, and every one was already writable by path while nothing in the API
+          named a single one.
+        </p>
+        <p class="note">
+          What it adds is three things reading the renderer turned up. There are <b>two activation
+          models</b>: background layers composite through <code>layerOrder</code>, while text layers
+          are exclusive and the renderer switches on <code>mode</code> rather than on
+          <code>Enabled</code> &mdash; so a layer can be fully configured and invisible. There are
+          <b>two <code>fit</code> vocabularies under one name</b>, and <code>fill</code> means
+          <i>cover</i> on a background and <i>stretch</i> on text. And there are <b>three source
+          models</b> with different portability: a data URL travels with the panel, a file path is
+          machine&#8209;local and resolved asynchronously, and an icon&#8209;library reference lives in
+          app settings. <code>embed()</code> collapses the last two into the first, which nothing else
+          in the app can do.
+        </p>
+      </div>
+    </li>
     <li class="ship">
       <div class="ship-id"><b>§49</b>ce.draw</div>
       <div class="ship-body">

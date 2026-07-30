@@ -1242,6 +1242,9 @@ local WEBVIEW_ONLY = {
   "panelCreate","panelClone","panelDestroy","panelParent","panelFind","panelInfo","panelTypes",
   "panelAlign","panelDistribute","panelMatch","panelGrid","panelCircle","panelFlip","panelRect",
   "panelOrder","panelBatch","panelEntries","panelEntry","panelDefine","panelUndefine","panelPatch",
+-- @module ce.image
+  "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
+  "imageLoad",
 -- @module ce.text
   "textFonts","textFont","textStyle","textAxis","textRead","textMeasure","textFit",
 -- @module ce.components.split
@@ -2345,6 +2348,7 @@ local __CE_MODULES = {
   ["ce.draw"] = { arc = "drawArc", batch = "drawBatch", blend = "drawBlend", circle = "drawCircle", clear = "drawClear", clip = "drawClip", curve = "drawCurve", ellipse = "drawEllipse", fill = "drawFill", gradient = "drawGradient", grid = "drawGrid", image = "drawImage", line = "drawLine", lines = "drawLines", measure = "drawMeasure", opacity = "drawOpacity", path = "drawPath", pixelText = "drawPixelText", points = "drawPoints", polygon = "drawPolygon", rect = "drawRect", redraw = "drawRedraw", restore = "drawRestore", save = "drawSave", stroke = "drawStroke", text = "drawText", transform = "drawTransform" },
   ["ce.panel"] = { align = "panelAlign", batch = "panelBatch", circle = "panelCircle", clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", distribute = "panelDistribute", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", flip = "panelFlip", grid = "panelGrid", info = "panelInfo", match = "panelMatch", order = "panelOrder", parent = "panelParent", patch = "panelPatch", rect = "panelRect", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
+  ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.text"] = { axis = "textAxis", fit = "textFit", font = "textFont", fonts = "textFonts", measure = "textMeasure", read = "textRead", style = "textStyle" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", read = "splitRead", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", read = "phraseRead", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -2375,7 +2379,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { backlight = "lcdBacklight", blink = "lcdBlink", brightness = "lcdBrightness", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", fill = "lcdFill", read = "lcdRead", scroll = "lcdScroll", scrollSpeed = "lcdScrollSpeed", size = "lcdSize", text = "lcdText", value = "lcdValue" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", brightness = "pixelBrightness", contrast = "pixelContrast", gamma = "pixelGamma", glow = "pixelGlow", read = "pixelRead" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -2388,6 +2392,7 @@ local __CE_META = {
   { id = "ce.draw", version = "1.2", runtime = "webview" },
   { id = "ce.panel", version = "1.4", runtime = "any" },
   { id = "ce.storage", version = "1.2", runtime = "any" },
+  { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.text", version = "1.0", runtime = "webview" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },

@@ -1246,6 +1246,86 @@ export const COMMANDS = [
     scopes: 'any',
   },
   {
+    id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
+    summary: 'The icon library, as { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `opts` narrows with { vector = true } or { embeddable = true }. `portable` is false for every entry, and that is the honest answer rather than a bug: the payload lives in app settings, not in the panel document, so a reference to it does not survive an export. `embeddable` says whether ce.image.embed() can fix that by copying the data URL into the layer.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['vector', 'embeddable'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
+    summary: 'One library asset, by id first and then by name — the same order the renderer resolves in, so what you see is what will be picked. Nothing back when the library has no such asset, which is the guard to call before writing one. The name fallback is worth knowing about: a coincidental name match looks exactly like success.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'idOrName', type: 'string', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
+    summary: 'Point an image layer at a source and turn it on. `opts.layer` is "image" (the default), "overlay", "textImage" or "textTexture"; the rest may carry { fit, align, opacity, tint, blend, blur, offsetX, offsetY, rotation, flipH, flipV, grayscale, saturation, brightness, contrast, tileScale, clipMode, muted } — whichever of those the chosen layer actually has, since a field it lacks is refused rather than written as a dead key. Two invariants this keeps that a bare set() does not: `Src` and `Enabled` are written together, so you cannot leave a layer enabled and blank; and turning on a BACKGROUND layer adds it to `layerOrder` (they composite) while turning on a TEXT layer sets `mode` (they are exclusive, and the renderer reads mode, not Enabled). Note `fit` means different things per section — see the layer\'s own list in the refusal message. A file-path source is requested from the host automatically, because it renders blank until the read lands.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'src', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false,
+        fields: ['layer', 'fit', 'align', 'opacity', 'tint', 'blend', 'blur', 'offsetX', 'offsetY',
+          'rotation', 'flipH', 'flipV', 'grayscale', 'saturation', 'brightness', 'contrast',
+          'tileScale', 'clipMode', 'muted'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'imageClear', category: 'Images', signature: 'imageClear(target [, layer]) -> boolean',
+    summary: 'Turn a layer off and blank its source — two or three fields that have to agree, which is why it is a verb rather than a set(). An exclusive text layer also goes back to "solid", because a selected mode with no source paints nothing and looks broken.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'layer', type: 'string', required: false,
+        values: ['image', 'overlay', 'textImage', 'textTexture'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'imageRead', category: 'Images', signature: 'imageRead(target [, layer]) -> table',
+    summary: 'The layer\'s whole state, plus the three things the fields alone do not tell you: `active` is whether it will actually paint (which for a text layer depends on `mode` and not on `Enabled` at all), `source` is "data" | "file" | "none", and `portable` says whether it survives an export. Only an embedded data URL does.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'layer', type: 'string', required: false,
+        values: ['image', 'overlay', 'textImage', 'textTexture'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
+    summary: 'Point a control\'s Icon section at a library asset. `opts` may carry { size, fit, tint, opacity, rotation }. Writes the id AND the name, because the renderer resolves by id and falls back to the name — writing one leaves the fallback deciding. An asset the library does not have is refused rather than stored, which is the difference between an icon that is missing and an icon that is silently wrong.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'idOrName', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false,
+        fields: ['size', 'fit', 'tint', 'opacity', 'rotation'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'imageEmbed', category: 'Images', signature: 'imageEmbed(target [, layer]) -> boolean',
+    summary: 'Turn a layer\'s source into one that travels: copy the resolved data URL into the layer, replacing a file path that only exists on this machine. This is the verb with no equivalent anywhere else in the app — the difference between a panel that looks right here and one that looks right after an export. Already-embedded sources return true unchanged. A file the host has not read yet returns FALSE and says so rather than blocking: the read is asynchronous, it is requested, and calling again once it lands succeeds.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'layer', type: 'string', required: false,
+        values: ['image', 'overlay', 'textImage', 'textTexture'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'imageLoad', category: 'Images', signature: 'imageLoad(path) -> boolean',
+    summary: 'Ask the host to read a file into the cache, and report whether it is there yet. A path source renders blank until this has happened, and the read is asynchronous — so this returns false the first time and true once the data has arrived. A data URL needs no loading and returns true immediately.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'path', type: 'string', required: true }],
+    scopes: 'any',
+  },
+  {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
     summary: 'Every font this panel may use: { family, label, source, portable, variable, axes, features, featuresKnown }. `opts` may narrow it with { portable = true } or { variable = true }. `portable` is the one to read before styling anything: a builtin family is named in every runtime, while a font from the library is registered by the editor at edit time and is NOT part of the panel document — so it looks right while you build and falls back to a platform default once exported. `featuresKnown` separates "scanned, has none" from "nobody has scanned it", because [] otherwise reads as a fact it is not.',
     runtime: RUNTIME_WEBVIEW,
@@ -2875,6 +2955,10 @@ export const MODULES = [
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
   // measuring is done on a canvas. A player host has neither, and a typography verb that answered
   // from a guess would be worse than one that says it is not there.
+  // Panel view only, for the same reason ce.text is: the icon library and the file cache are the
+  // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
+  { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they can draw from. A Label has 102 image-related fields and a Knob 864; all were writable by path and none was named anywhere in this API. What this adds is knowing which assets exist, keeping the two activation models straight (background layers composite, text layers are exclusive), and being honest about which sources survive an export.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Typography as something a script can reason about: what fonts exist and what they support, style writes that keep weight consistent instead of half-applying it, variable axes, and measuring a control\'s own text in its own font so it can be fitted to its box. The fields were always reachable with set() — the rules around them were not.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -3007,6 +3091,12 @@ const MODULE_MEMBERS = {
   'ce.text': {
     fonts: 'textFonts', font: 'textFont', style: 'textStyle', axis: 'textAxis',
     read: 'textRead', measure: 'textMeasure', fit: 'textFit',
+  },
+  // §1 again: `set`, `read`, `clear` and `load` as bare globals would collide with ce.core's own
+  // verbs, so every flat alias keeps the image prefix.
+  'ce.image': {
+    assets: 'imageAssets', asset: 'imageAsset', set: 'imageSet', clear: 'imageClear',
+    read: 'imageRead', icon: 'imageIcon', embed: 'imageEmbed', load: 'imageLoad',
   },
   'ce.panel': {
     snapshot: 'panelSnapshot', restore: 'panelRestore', each: 'panelEach',

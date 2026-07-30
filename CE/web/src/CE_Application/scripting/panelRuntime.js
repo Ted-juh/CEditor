@@ -22,7 +22,14 @@ import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js'
 import { updateControlProperty, removeControlNode } from '../stores/controls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
-import { availableFonts } from '../stores/appSettings.js';
+import { availableFonts, storedIcons } from '../stores/appSettings.js';
+// ce.image (§50). The file cache is how a path source becomes something renderable, which is also
+// what makes embed() possible.
+import { fileCache, loadFile } from '../stores/fileCache.js';
+import {
+  IMAGE_LAYER_IDS, assetCatalogue, findAsset, imageLayer, isPortableSource, planClear, planImage,
+  sourceKind,
+} from '../utils/imageLayers.js';
 // Shared with the device profile engine, so the two cannot disagree about what "roland" means.
 import { checksumNames, computeChecksum } from '../utils/checksums.js';
 // ce.text measures through the renderer's own layout rather than a second implementation of it.
@@ -3832,6 +3839,186 @@ function textApplyWrite(name, write) {
   return typeof write.value === 'number' ? Number(now) === write.value : now === write.value;
 }
 
+/* --- ce.image: the layers, and which of them will survive an export (design doc §50) ------------
+ *
+ * The fields were always writable by path — a Label has 102 of them, a Knob 864 — and nothing in the
+ * API named one. What this adds is the same three things ce.text added for fonts: knowing what
+ * exists, keeping the invariants, and being honest about portability. See imageLayers.js for why
+ * each of those is more than a wrapper here.
+ */
+
+function imageCatalogue() {
+  return assetCatalogue(get(storedIcons));
+}
+
+/** The layer for a name, reporting rather than guessing when the name is not one. */
+function resolveImageLayer(verb, target, id) {
+  const layer = imageLayer(id);
+  if (layer) return layer;
+  addScriptTrace('error', '',
+    `ce.image.${verb}("${target}", "${id}"): no such layer. One of: ${IMAGE_LAYER_IDS.join(', ')}.`);
+  return null;
+}
+
+/** The layer's node on a control, or nothing when the control has no such section. */
+function imageNode(name, layer) {
+  const node = getValue(`${name}.${layer.node}`);
+  return node && typeof node === 'object' ? node : null;
+}
+
+function imageNeedsNode(verb, name, layer) {
+  addScriptTrace('error', '',
+    `ce.image.${verb}("${name}"): this control has no ${layer.node}, so it has no ${layer.label}. `
+    + 'ce.panel.info() reports the type.');
+  return undefined;
+}
+
+/** Apply one planned write and report whether the node now holds it. */
+function imageApplyWrite(name, layer, write) {
+  const path = write.raw
+    ? `${name}.${layer.node}.${write.raw}`
+    : `${name}.${layer.node}.${write.field}`;
+  setValue(path, write.value);
+  const now = getValue(path);
+  return typeof write.value === 'number' ? Number(now) === write.value : now === write.value;
+}
+
+/** Background layers composite in `layerOrder`, so a layer that is enabled but absent from the order
+ *  is set up and invisible. Adding it is part of turning it on. */
+function ensureLayerOrder(name, layer) {
+  if (layer.activation !== 'layer') return;
+  const path = `${name}.${layer.node}.layerOrder`;
+  const order = getValue(path);
+  if (!Array.isArray(order)) return;
+  if (order.includes(layer.prefix)) return;
+  setValue(path, [...order, layer.prefix]);
+}
+
+function imageSetImpl(target, src, opts) {
+  const name = String(target ?? '');
+  const layer = resolveImageLayer('set', name, opts?.layer);
+  if (!layer) return false;
+  if (!imageNode(name, layer)) return imageNeedsNode('set', name, layer) ?? false;
+
+  const { writes, refused } = planImage(layer, src, opts);
+  for (const problem of refused) {
+    addScriptTrace('error', '',
+      `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
+  }
+  if (!writes.length) return false;
+
+  let all = true;
+  for (const write of writes) if (!imageApplyWrite(name, layer, write)) all = false;
+  if (src) ensureLayerOrder(name, layer);
+
+  // A file path renders nothing until the host has read it, so ask — otherwise a script setting a
+  // path source sees a blank layer and no reason for it.
+  if (src && sourceKind(src) === 'file') loadFile(String(src));
+
+  return all && refused.length === 0;
+}
+
+function imageClearImpl(target, layerId) {
+  const name = String(target ?? '');
+  const layer = resolveImageLayer('clear', name, layerId);
+  if (!layer) return false;
+  if (!imageNode(name, layer)) return imageNeedsNode('clear', name, layer) ?? false;
+
+  let all = true;
+  for (const write of planClear(layer)) if (!imageApplyWrite(name, layer, write)) all = false;
+  return all;
+}
+
+function imageReadImpl(target, layerId) {
+  const name = String(target ?? '');
+  const layer = resolveImageLayer('read', name, layerId);
+  if (!layer) return undefined;
+  const node = imageNode(name, layer);
+  if (!node) return imageNeedsNode('read', name, layer);
+
+  const out = {};
+  for (const field of layer.fields) {
+    const key = `${layer.prefix}${field}`;
+    // Lower-cased first letter, so a script reads { src, fit, opacity } rather than { Src, Fit }.
+    out[field.charAt(0).toLowerCase() + field.slice(1)] = node[key];
+  }
+  const src = String(node[`${layer.prefix}Src`] ?? '');
+  return {
+    ...out,
+    layer: layer.id,
+    // The honest part, and the reason this verb reports more than the fields: `active` is whether the
+    // layer will actually paint, which for an exclusive Text layer depends on `mode` and not on
+    // `Enabled` at all.
+    active: layer.activation === 'mode'
+      ? String(node.mode ?? 'solid') === layer.mode
+      : (node[`${layer.prefix}Enabled`] === true && node[`${layer.prefix}Muted`] !== true),
+    source: sourceKind(src),
+    portable: isPortableSource(src),
+  };
+}
+
+function imageEmbedImpl(target, layerId) {
+  const name = String(target ?? '');
+  const layer = resolveImageLayer('embed', name, layerId);
+  if (!layer) return false;
+  const node = imageNode(name, layer);
+  if (!node) return imageNeedsNode('embed', name, layer) ?? false;
+
+  const src = String(node[`${layer.prefix}Src`] ?? '');
+  if (!src) {
+    addScriptTrace('error', '', `ce.image.embed("${name}"): the ${layer.label} has no source.`);
+    return false;
+  }
+  if (isPortableSource(src)) return true;      // already a data URL; embedding is a no-op, not a failure
+
+  // A file path only has a data URL once the host has read it. Nothing here can wait — the read is
+  // asynchronous — so this reports what it did rather than pretending: it asks for the file and says
+  // it is not ready yet, and the same call succeeds once the cache holds it.
+  const cached = get(fileCache)[src];
+  if (!cached || !String(cached).startsWith('data:')) {
+    loadFile(src);
+    addScriptTrace('error', '',
+      `ce.image.embed("${name}"): "${src}" is not loaded yet. The host reads files asynchronously — `
+      + 'the read has been requested, so calling this again once it lands will embed it.');
+    return false;
+  }
+  return imageApplyWrite(name, layer, { field: `${layer.prefix}Src`, value: cached });
+}
+
+/** Icon section — a different shape from the fill layers: a reference into the icon library rather
+ *  than a source, with its own size/fit/tint fields. */
+function imageIconImpl(target, idOrName, opts) {
+  const name = String(target ?? '');
+  const icon = getValue(`${name}.Icon`);
+  if (!icon || typeof icon !== 'object') {
+    addScriptTrace('error', '',
+      `ce.image.icon("${name}"): this control has no Icon section.`);
+    return false;
+  }
+  const asset = findAsset(imageCatalogue(), idOrName);
+  if (!asset) {
+    addScriptTrace('error', '',
+      `ce.image.icon("${name}", "${idOrName}"): no such asset in the icon library. `
+      + 'ce.image.assets() lists them.');
+    return false;
+  }
+
+  // Both id AND name, because the renderer resolves by id first and falls back to matching the name —
+  // writing only one leaves the fallback deciding, and a coincidental name match looks like success.
+  let all = true;
+  for (const [field, value] of [['assetId', asset.id], ['name', asset.name], ['source', 'library']]) {
+    setValue(`${name}.Icon.${field}`, value);
+    if (getValue(`${name}.Icon.${field}`) !== value) all = false;
+  }
+  for (const [key, field] of [['size', 'size'], ['fit', 'fit'], ['tint', 'tint'],
+    ['opacity', 'opacity'], ['rotation', 'rotation']]) {
+    if (opts?.[key] === undefined) continue;
+    const value = key === 'tint' ? String(opts[key]).replace(/^#/, '') : opts[key];
+    setValue(`${name}.Icon.${field}`, value);
+  }
+  return all;
+}
+
 function textStyleImpl(target, opts) {
   const name = String(target ?? '');
   const font = textFontNode(name);
@@ -5962,6 +6149,27 @@ function buildApi(ownerName, scriptId = '') {
       }
       for (const k of DRAW_STYLE_KEYS) drawState[k] = saved[k];
       return true;
+    },
+
+    /* ce.image (§50). assets/asset answer from the icon library; the rest work on one control. */
+    imageAssets: (opts) => {
+      const all = imageCatalogue();
+      if (opts?.embeddable === true) return all.filter((a) => a.embeddable);
+      if (opts?.vector === true) return all.filter((a) => a.vector);
+      return all;
+    },
+    imageAsset: (idOrName) => findAsset(imageCatalogue(), idOrName) ?? undefined,
+    imageSet: (target, src, opts) => imageSetImpl(target, src, opts),
+    imageClear: (target, layer) => imageClearImpl(target, layer),
+    imageRead: (target, layer) => imageReadImpl(target, layer),
+    imageIcon: (target, idOrName, opts) => imageIconImpl(target, idOrName, opts),
+    imageEmbed: (target, layer) => imageEmbedImpl(target, layer),
+    imageLoad: (path) => {
+      const p = String(path ?? '');
+      if (!p) return false;
+      if (sourceKind(p) !== 'file') return true;    // a data URL needs no loading
+      loadFile(p);
+      return String(get(fileCache)[p] ?? '').startsWith('data:');
     },
 
     // ce.text (§46). fonts/font answer from the catalogue; the rest work on one control's Text.

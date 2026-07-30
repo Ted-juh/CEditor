@@ -649,4 +649,34 @@ export const WRITTEN = {
     lua: `if not ce.draw.restore() then logWarn("a restore with no matching save") end`,
     js: `if (!ce.draw.restore()) logWarn("a restore with no matching save");`,
   },
+  /* ---------------------------------------------------------------- ce.image, phase §50 */
+  imageAssets: {
+    lua: `-- every entry is portable = false: the library lives in app settings, not in the panel\nfor _, a in ipairs(ce.image.assets({ embeddable = true })) do\n  log(a.name, a.width .. "x" .. a.height)\nend`,
+    js: `// every entry is portable = false: the library lives in app settings, not in the panel\nfor (const a of ce.image.assets({ embeddable: true })) {\n  log(a.name, \`\${a.width}x\${a.height}\`);\n}`,
+  },
+  imageAsset: {
+    lua: `local a = ce.image.asset("waveform")\nif a then ce.image.set("Panel", a.dataUrl) end   -- embed it straight away`,
+    js: `const a = ce.image.asset("waveform");\nif (a) ce.image.set("Panel", a.dataUrl);   // embed it straight away`,
+  },
+  imageSet: {
+    lua: `-- background layers COMPOSITE, so this also puts "image" into layerOrder\nce.image.set("Panel", logoDataUrl, {\n  fit = "tile", align = "top-left", opacity = 60,\n  tint = "#5B9BD5", blend = "multiply", blur = 2, tileScale = 1.5,\n})\n\n-- text layers are EXCLUSIVE, so this sets Text.Fill.mode instead\nce.image.set("Title", logoDataUrl, { layer = "textImage", fit = "contain" })`,
+    js: `// background layers COMPOSITE, so this also puts "image" into layerOrder\nce.image.set("Panel", logoDataUrl, {\n  fit: "tile", align: "top-left", opacity: 60,\n  tint: "#5B9BD5", blend: "multiply", blur: 2, tileScale: 1.5,\n});\n\n// text layers are EXCLUSIVE, so this sets Text.Fill.mode instead\nce.image.set("Title", logoDataUrl, { layer: "textImage", fit: "contain" });`,
+  },
+  imageClear: { code: 'ce.image.clear("Panel", "overlay")   -- blanks the source AND disables the layer' },
+  imageRead: {
+    lua: `local i = ce.image.read("Panel")\nlog(i.active, i.source, i.portable)   -- will it paint / data|file|none / survives export`,
+    js: `const i = ce.image.read("Panel");\nlog(i.active, i.source, i.portable);   // will it paint / data|file|none / survives export`,
+  },
+  imageIcon: {
+    lua: `ce.image.icon("PlayButton", "transport-play", { size = 20, tint = "#39D98A" })`,
+    js: `ce.image.icon("PlayButton", "transport-play", { size: 20, tint: "#39D98A" });`,
+  },
+  imageEmbed: {
+    lua: `-- turn a machine-local file path into a payload that survives the export\nif not ce.image.embed("Panel") then\n  logWarn("not read yet — the host loads files asynchronously; try again")\nend`,
+    js: `// turn a machine-local file path into a payload that survives the export\nif (!ce.image.embed("Panel")) {\n  logWarn("not read yet — the host loads files asynchronously; try again");\n}`,
+  },
+  imageLoad: {
+    lua: `if ce.image.load("/synths/jd800/panel.png") then ce.image.embed("Panel") end`,
+    js: `if (ce.image.load("/synths/jd800/panel.png")) ce.image.embed("Panel");`,
+  },
 };
