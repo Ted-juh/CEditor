@@ -35,6 +35,7 @@
 // that says "scene 3" should mean the third one whichever language it is written in.
 
 import { VERB_VALUES } from './componentTables.js';
+import { drumPadCount, resolveDrumPads } from '../utils/drumPadLayout.js';
 
 const NUM = 'num', INT = 'int', BOOL = 'bool', STR = 'str', ENUM = 'enum';
 const XY = 'xy', ITEM = 'item', CELL = 'cell', LINE = 'line';
@@ -57,6 +58,29 @@ const UNIT = { min: 0, max: 1 };
 const NOTE = { min: 0, max: 127 };
 const CHANNEL = { min: 1, max: 16 };
 const VELOCITY = { min: 1, max: 127 };
+
+/**
+ * The Drum Pads' per-pad override array, which is the only list here that is SPARSE.
+ *
+ * Every other `item` list is the list — six orbit nodes are six stored objects. `DrumPads.pads` is
+ * index-aligned with a grid whose size is `rows` x `cols`, and it starts EMPTY: a pad with no entry
+ * takes its note, name and choke group from the generated map. Two consequences the generic reducer
+ * cannot guess, so they are declared:
+ *
+ *   count    how many pads there are, which is the grid rather than the array's length. Without it
+ *            every per-pad verb is a silent no-op on a fresh control, because the index it is given
+ *            is out of range of an array of zero.
+ *   resolve  what a pad actually plays. Reading the raw list back would answer `undefined` sixteen
+ *            times over — true of the storage and useless as an answer.
+ *   fixed    this list does not grow from a script. Its length is decided by the `rows` and `cols`
+ *            verbs, so an insert here would fight them — the same reason `cell` and `line` lists
+ *            have never had insert/remove.
+ */
+const PADS = {
+  fixed: true,
+  count: drumPadCount,
+  resolve: resolveDrumPads,
+};
 // NO enum values are written here. Every one comes from componentTables.js, which imports the
 // table the component's own switch reads — see the note at the top of that file for the
 // twenty-four verbs that were wrong before it existed. `values` is filled in below, once, from
@@ -137,7 +161,7 @@ export const COMPONENT_FAMILIES = [
   },
   {
     id: 'drumpads', section: 'DrumPads', prefix: 'drumPads', label: 'Drum Pads',
-    summary: 'Re-map the Drum Pads: note map, base note, gate length, channel.',
+    summary: 'Re-map the Drum Pads — the grid, the kit, and each pad\'s own note, name and choke group.',
     verbs: [
       v('map', 'map', ENUM),
       v('baseNote', 'baseNote', INT, NOTE),
@@ -147,6 +171,31 @@ export const COMPONENT_FAMILIES = [
       v('channel', 'channel', INT, CHANNEL),
       v('rows', 'rows', INT, { min: 1, max: 8 }),
       v('cols', 'cols', INT, { min: 1, max: 8 }),
+      // `map` and `baseNote` were here and `origin` was not, so a script could re-map the grid and
+      // could not say which corner pad 1 sits in — the third leg of the same decision.
+      v('origin', 'origin', ENUM, { doc: 'Which corner pad 1 sits in. Hardware grids number from the bottom-left.' }),
+      v('velocityFrom', 'velocityFrom', ENUM,
+        { doc: 'Where a hit\'s velocity comes from: the fixed `velocity`, or how high up the pad it landed.' }),
+      v('editable', 'editable', BOOL, { toggle: true, doc: 'Whether the pads play when struck. Off locks the grid.' }),
+      // Echo lights the pads from INCOMING MIDI, which turns the grid into a monitor for whatever a
+      // sequencer is playing — a thing you switch on mid-set, not once in the inspector.
+      v('echo', 'echo', BOOL, { toggle: true, doc: 'Light the pads from incoming MIDI as well as from hits.' }),
+      v('echoChannel', 'echoChannel', INT, { min: 0, max: 16, doc: 'Which channel the echo listens to. 0 means omni.' }),
+      v('showNotes', 'showNotes', BOOL, { toggle: true }),
+      v('showLabels', 'showLabels', BOOL, { toggle: true }),
+      v('showHeader', 'showHeader', BOOL, { toggle: true }),
+      // The per-pad overrides. `pads` is index-aligned with the grid and SPARSE — anything omitted
+      // falls back to the generated map — so these four carry `count` (how many pads there are,
+      // whatever the stored array's length) and `resolve` (what a pad actually plays, read through
+      // the component's own resolver rather than reported as a hole).
+      v('note', 'pads', ITEM, { item: 'note', kind: INT, ...NOTE, ...PADS,
+        doc: 'Re-point one pad, 1-based. Reads back what the pad plays, generated map included.' }),
+      v('label', 'pads', ITEM, { item: 'label', kind: STR, ...PADS,
+        doc: 'Rename one pad, 1-based. Empty restores the name the map gives it.' }),
+      v('choke', 'pads', ITEM, { item: 'choke', kind: INT, min: 0, max: 8, ...PADS,
+        doc: 'Put one pad in a choke group, 1-based — pads sharing a non-zero group cut each other. 0 is none.' }),
+      v('colour', 'pads', ITEM, { item: 'colour', kind: STR, ...PADS,
+        doc: 'Tint one pad, AARRGGBB, 1-based. Empty returns it to the section accent.' }),
     ],
   },
 
@@ -495,7 +544,11 @@ for (const fam of COMPONENT_FAMILIES) {
   // objects the canvas can genuinely grow (nodes, slots, destinations, points). A `cell` or `line`
   // list is fixed-length and sized by a verb of its own — the Turing's step count is `length`, the
   // LCD's row count is the display's `rows` — so growing one from here would fight that verb.
-  const growable = lists.some((verb) => verb.k === ITEM);
+  //
+  // …and an `item` list can be in that position too, which the kind alone could not say: the Drum
+  // Pads' overrides are sized by `rows` x `cols`. `fixed` is how such a list opts out, rather than
+  // carrying two verbs that would report "cannot be grown" every time they were called.
+  const growable = lists.some((verb) => verb.k === ITEM && !verb.fixed);
   for (const spec of FAMILY_VERBS) {
     if (spec.k === READ) { fam.verbs.push({ ...spec, f: '' }); continue; }
     // A verb that could never apply is worse than no verb: it reads as a capability and answers
@@ -561,6 +614,44 @@ function coerce(kind, value, spec, current) {
   }
 }
 
+/**
+ * How many elements an `item` verb can address, and the array it writes into.
+ *
+ * For every list but one these are the same thing: the array is the list. A list declaring `count`
+ * is SPARSE — as long as the component says, however much of it happens to be stored — so the
+ * addressable length comes from the component and the array is grown on demand, only as far as the
+ * index being written.
+ */
+export function itemListLength(verb, cfg) {
+  if (verb.count) return Math.max(0, Math.round(Number(verb.count(cfg)) || 0));
+  return Array.isArray(cfg[verb.f]) ? cfg[verb.f].length : null;
+}
+
+function itemListFor(verb, cfg, at) {
+  const stored = Array.isArray(cfg[verb.f]) ? cfg[verb.f] : (verb.count ? [] : null);
+  if (!stored || stored.length > at) return stored;
+  return [...stored, ...Array.from({ length: at + 1 - stored.length }, () => ({}))];
+}
+
+/**
+ * What the component currently ANSWERS for one element — not what is stored for it.
+ *
+ * The two differ only for a sparse list, and there the difference is the whole point: pad 3 of a
+ * fresh grid plays note 38 and is stored as nothing at all. Comparing a write against the stored
+ * hole would make `note(kit, 3, 38)` write an override that pins the pad to the value it was
+ * already going to take, and a pad pinned that way stops following `baseNote`.
+ */
+export function itemCurrent(verb, cfg, at) {
+  if (!verb.resolve) {
+    const list = Array.isArray(cfg[verb.f]) ? cfg[verb.f] : [];
+    const row = list[at];
+    return row && typeof row === 'object' ? row[verb.item] : undefined;
+  }
+  const resolved = verb.resolve(cfg);
+  const row = Array.isArray(resolved) ? resolved[at] : null;
+  return row && typeof row === 'object' ? row[verb.item] : undefined;
+}
+
 /** 1-based index in, 0-based out. null when it is not a usable index. */
 function indexOf(value, length) {
   const n = Number(value);
@@ -615,13 +706,16 @@ export function componentScriptPatch(verb, cfg, args = []) {
       // One property of one element. The array is copied rather than mutated: the caller writes the
       // whole field back, and an in-place edit would make the write look like a no-op to any
       // change detection sitting between here and the store.
-      const list = Array.isArray(c[verb.f]) ? c[verb.f] : null;
-      if (!list) return {};
-      const at = indexOf(a, list.length);
+      const length = itemListLength(verb, c);
+      if (length === null) return {};
+      const at = indexOf(a, length);
       if (at === null) return {};
+      const list = itemListFor(verb, c, at);
+      if (!list) return {};
       const row = list[at] && typeof list[at] === 'object' ? list[at] : {};
-      const next = coerce(verb.kind, b, verb, row[verb.item]);
-      if (next === null || next === row[verb.item]) return {};
+      const current = itemCurrent(verb, c, at);
+      const next = coerce(verb.kind, b, verb, current);
+      if (next === null || next === current) return {};
       return { [verb.f]: list.map((x, i) => (i === at ? { ...row, [verb.item]: next } : x)) };
     }
 
@@ -720,10 +814,11 @@ export function componentRequestLegal(verb, cfg, args = []) {
     case INDEXSET:
       return Number.isFinite(Number(a)) && Math.round(Number(a)) - 1 >= 0;
     case ITEM: {
-      const list = listOf(verb.f);
-      if (!list || indexOf(a, list.length) === null) return false;
-      const row = list[indexOf(a, list.length)];
-      return coerce(verb.kind, b, verb, (row && typeof row === 'object' ? row : {})[verb.item]) !== null;
+      const length = itemListLength(verb, c);
+      if (length === null) return false;
+      const at = indexOf(a, length);
+      if (at === null) return false;
+      return coerce(verb.kind, b, verb, itemCurrent(verb, c, at)) !== null;
     }
     case LINE: {
       const list = listOf(verb.f);

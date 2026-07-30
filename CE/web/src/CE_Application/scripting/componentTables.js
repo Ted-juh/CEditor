@@ -23,7 +23,7 @@ import { DIVISION_IDS } from '../utils/transportLayout.js';
 import { ARP_PATTERNS, ARP_SOURCES } from '../utils/arpLayout.js';
 import { CHORDPAD_MODES, CHORD_TYPES, CHORDPAD_VOICINGS } from '../utils/chordPadLayout.js';
 import { RIBBON_MODES } from '../utils/noteRibbonLayout.js';
-import { PAD_MAPS, PAD_MODES } from '../utils/drumPadLayout.js';
+import { PAD_MAPS, PAD_MODES, PAD_ORIGINS, PAD_VELOCITY_SOURCES } from '../utils/drumPadLayout.js';
 import { CONSTELLATION_MODES } from '../utils/constellationLayout.js';
 import { ROUTER_INPUT_SOURCES } from '../utils/routerLayout.js';
 import { POLY_PRESSURE_MODES } from '../utils/midiNoteInput.js';
@@ -63,6 +63,8 @@ export const VERB_VALUES = {
   'noteribbon.scale': SCALE_NAMES,
   'drumpads.map': PAD_MAPS,
   'drumpads.mode': PAD_MODES,
+  'drumpads.origin': PAD_ORIGINS,
+  'drumpads.velocityFrom': PAD_VELOCITY_SOURCES,
   'turing.division': DIVISION_IDS,
   'constellation.mode': CONSTELLATION_MODES,
   'router.source': ROUTER_INPUT_SOURCES.map((s) => String(s?.id ?? s)),

@@ -53,6 +53,24 @@ export const PAD_MODES = ['momentary', 'oneShot', 'toggle'];
 export const PAD_MODE_LABELS = {
   momentary: 'Momentary (hold)', oneShot: 'One-shot', toggle: 'Toggle',
 };
+// The other two value sets this file switches on. They were spelled inline — `String(origin) ===
+// 'topLeft'` in padCell, `!== 'position'` in strikeVelocity — which is fine for a comparison and
+// useless to anything that needs to know what the legal values ARE. componentTables.js imports a
+// table per enum verb on the rule that the table must be the same object the switch reads, so
+// these are now that object and the two functions below read from them.
+export const PAD_ORIGINS = ['bottomLeft', 'topLeft'];
+export const PAD_ORIGIN_LABELS = { bottomLeft: 'Bottom-left (hardware)', topLeft: 'Top-left (reading order)' };
+export const PAD_VELOCITY_SOURCES = ['fixed', 'position'];
+export const PAD_VELOCITY_SOURCE_LABELS = { fixed: 'Fixed', position: 'From strike position' };
+
+export function drumOrigin(control) {
+  const o = String(drumConfig(control).origin ?? 'bottomLeft');
+  return PAD_ORIGINS.includes(o) ? o : 'bottomLeft';
+}
+export function drumVelocityFrom(control) {
+  const s = String(drumConfig(control).velocityFrom ?? 'fixed');
+  return PAD_VELOCITY_SOURCES.includes(s) ? s : 'fixed';
+}
 
 export function drumConfig(control) {
   return control?._children?.DrumPads ?? {};
@@ -85,9 +103,27 @@ export function drumNoteLabel(note, short = true) {
 // screen). Custom entries from the model override the generated map per pad, so
 // you can rename or re-point one pad without hand-writing all sixteen.
 export function drumPads(control) {
-  const cfg = drumConfig(control);
-  const count = drumCount(control);
-  const map = drumMap(control);
+  return resolveDrumPads(drumConfig(control));
+}
+
+/** How many pads a config describes, which is the grid and not the length of its override array. */
+export function drumPadCount(cfg) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  return clampInt(c.rows ?? 4, 1, 8) * clampInt(c.cols ?? 4, 1, 8);
+}
+
+/**
+ * The same resolution from a bare CONFIG rather than a control.
+ *
+ * Split out for the script verbs: `ce.components.drumpads.note(kit, 3)` has to answer what pad 3
+ * plays, and the stored override for it is usually absent — the honest answer comes from the same
+ * fallback chain the renderer draws from, not from the hole in the array.
+ */
+export function resolveDrumPads(config) {
+  const cfg = config && typeof config === 'object' ? config : {};
+  const count = drumPadCount(cfg);
+  const m = String(cfg.map ?? 'gm');
+  const map = PAD_MAPS.includes(m) ? m : 'gm';
   const base = clampInt(cfg.baseNote ?? 36, 0, 127);
   const overrides = Array.isArray(cfg.pads) ? cfg.pads : [];
   const out = [];
@@ -138,7 +174,8 @@ export function padCell(index, rows, cols, origin = 'bottomLeft') {
   const i = Math.max(0, Math.round(num(index, 0)));
   const row = Math.floor(i / c);
   const col = i % c;
-  return { row: String(origin) === 'topLeft' ? row : r - 1 - row, col };
+  const o = PAD_ORIGINS.includes(String(origin)) ? String(origin) : 'bottomLeft';
+  return { row: o === 'topLeft' ? row : r - 1 - row, col };
 }
 export function padRect(geom, index, origin = 'bottomLeft') {
   const { row, col } = padCell(index, geom.rows, geom.cols, origin);
@@ -166,6 +203,6 @@ export function padStrikeY(rect, py) {
 // Velocity for a hit: fixed, or softer at the bottom of the pad and harder at
 // the top, which is how hardware pads present "hit it harder" to a mouse.
 export function strikeVelocity(control, strikeY) {
-  if (String(drumConfig(control).velocityFrom ?? 'fixed') !== 'position') return drumVelocity(control);
+  if (drumVelocityFrom(control) !== 'position') return drumVelocity(control);
   return clampInt(10 + clamp01(num(strikeY, 0.5)) * 117, 1, 127);
 }

@@ -71,8 +71,9 @@ test('every family gained a read, and the list families the other four', () => {
         `${fam.id}.${name} should exist iff the family has a list`);
     }
     // insert/remove need an element TEMPLATE, so they only apply to `item` lists. A `cell` or
-    // `line` list is fixed-length and sized by a verb of its own.
-    const growable = fam.verbs.some((v) => v.k === 'item');
+    // `line` list is fixed-length and sized by a verb of its own — and an `item` list can be in
+    // that position too and say so with `fixed`: the Drum Pads' overrides are sized by rows x cols.
+    const growable = fam.verbs.some((v) => v.k === 'item' && !v.fixed);
     for (const name of ['insert', 'remove']) {
       assert.equal(Boolean(verbId(fam.id, name)), growable,
         `${fam.id}.${name} should exist iff the family has an item list`);
@@ -429,7 +430,7 @@ test('every read, size, fill, insert and remove answers on a real control', () =
     const dead = [];
     for (const fam of COMPONENT_FAMILIES) {
       const list = fam.verbs.find((v) => LIST_KINDS.includes(v.k) && !v.clear);
-      const item = fam.verbs.find((v) => v.k === 'item');
+      const item = fam.verbs.find((v) => v.k === 'item' && !v.fixed);
 
       const read = api[verbId(fam.id, 'read')](fam.id);
       if (!read || typeof read !== 'object' || !Object.keys(read).length) {

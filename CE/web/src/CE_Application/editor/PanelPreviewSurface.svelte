@@ -111,7 +111,7 @@
   } from '../utils/noteRibbonLayout.js';
   import {
     drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
-    drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy,
+    drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy, drumOrigin,
   } from '../utils/drumPadLayout.js';
   import {
     midiNoteState, midiExpressionState, midiRouteEvents, startNoteInputListener, clearNoteInput,
@@ -2837,7 +2837,6 @@
     return drumGeometry(numberOr(t.width, 0), numberOr(t.height, 0),
       drumRows(control), drumCols(control), DRUM_PAD, headerH, 5);
   }
-  function drumOrigin(control) { return String(drumConfig(control).origin ?? 'bottomLeft'); }
   function syncDrumSession(control, last) {
     const id = getControlId(control);
     const patch = { drumHits: Object.keys(drumHits[id] ?? {}) };

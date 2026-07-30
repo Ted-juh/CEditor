@@ -91,6 +91,7 @@ import {
 } from './midiFilters.js';
 import {
   COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, LIST_KINDS,
+  itemListLength,
 } from './componentVerbs.js';
 import {
   componentListWithElement, componentListWithoutElement,
@@ -2319,9 +2320,23 @@ function componentConfig(verb, path, forWhat) {
   return cfg;
 }
 
-/** The list an indexed verb addresses, in document order. */
+/**
+ * The list an indexed verb addresses, in document order.
+ *
+ * A verb declaring `count` addresses a SPARSE list — the Drum Pads' per-pad overrides are as long
+ * as the grid says and stored only where something was overridden — so it is reported at the length
+ * the component means, not the length the array happens to have. Otherwise size() would answer 0
+ * for a sixteen-pad grid and fill() would refuse every value it was given.
+ */
 function componentList(cfg, verb) {
-  return Array.isArray(cfg[verb.f]) ? cfg[verb.f] : null;
+  const stored = Array.isArray(cfg[verb.f]) ? cfg[verb.f] : null;
+  if (!verb.count) return stored;
+  const want = itemListLength(verb, cfg);
+  const list = stored ?? [];
+  if (list.length === want) return list;
+  return list.length > want
+    ? list.slice(0, want)
+    : [...list, ...Array.from({ length: want - list.length }, () => ({}))];
 }
 
 /** One scalar verb's current value, in the verb's own units. */
@@ -2344,7 +2359,13 @@ function componentScalarValue(cfg, verb) {
 function componentListValue(cfg, verb) {
   const list = componentList(cfg, verb);
   if (!list) return null;
-  if (verb.k === 'item') return list.map((row) => (row && typeof row === 'object' ? row[verb.item] : undefined));
+  if (verb.k === 'item') {
+    // A verb with a resolver reads back what the component ANSWERS rather than what is stored. For
+    // the Drum Pads that is the difference between the sixteen notes the grid plays and sixteen
+    // holes, which is the difference between an answer and a technically-correct nothing.
+    const rows = verb.resolve ? verb.resolve(cfg) : list;
+    return (Array.isArray(rows) ? rows : []).map((row) => (row && typeof row === 'object' ? row[verb.item] : undefined));
+  }
   if (verb.k === 'cell' && verb.grid) {
     // A grid reads back as rows of columns, matching how `cell(target, row, col, amount)` addresses
     // it. A flat list of sixty-four numbers would be technically the same data and unusable.

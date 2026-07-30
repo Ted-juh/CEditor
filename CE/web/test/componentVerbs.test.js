@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  moduleIdFor, verbSignature, verbArgs,
+  moduleIdFor, verbSignature, verbArgs, itemCurrent,
 } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
@@ -254,10 +254,20 @@ test('every verb either changes something or explains why it cannot', () => {
       case 'str': return ['spec-probe'];
       case 'xy': return [verb.oneBased ? 2 : 0.125, verb.oneBased ? 2 : 0.375];
       case 'item': {
-        const row = SECTION_DEFAULTS[verb.section][verb.f]?.[0] ?? {};
-        if (verb.kind === 'bool') return [1, !(row[verb.item] === true)];
-        if (verb.kind === 'enum') return [1, verb.values.find((x) => x !== row[verb.item])];
-        return [1, row[verb.item] === 0.375 ? 0.5 : 0.375];
+        // What element 1 currently ANSWERS, through the verb's own resolver where it has one —
+        // a probe that read the stored array directly would compare a sparse list's write against
+        // a hole and call a correct no-op a dead verb.
+        const current = itemCurrent(verb, cfgFor(verb.section), 0);
+        if (verb.kind === 'bool') return [1, !(current === true)];
+        if (verb.kind === 'enum') return [1, verb.values.find((x) => x !== current)];
+        if (verb.kind === 'str') return [1, current === 'spec-probe' ? 'spec-probe-2' : 'spec-probe'];
+        // A number inside the ITEM's own range rather than a fixed 0.375, which lands on the
+        // default of any integer item whose range does not happen to start near it.
+        const lo = Number.isFinite(verb.min) ? verb.min : 0;
+        const hi = Number.isFinite(verb.max) ? verb.max : 1;
+        const step = verb.kind === 'int' ? 1 : (hi - lo) / 3;
+        const pick = lo + step;
+        return [1, pick === current ? lo + step * 2 : pick];
       }
       case 'cell': return verb.clear ? [] : (verb.grid ? [1, 1, 0.375] : [1, 0.375]);
       // An index set is addressed 1-based and toggles with no second argument.
