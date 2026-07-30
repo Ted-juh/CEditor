@@ -5,6 +5,9 @@ import { get } from 'svelte/store';
 import { isJuceAvailable } from '../bridge/bridge.js';
 import { profileSources } from './deviceProfileStores.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
+// One checksum table, shared with ce.midi.checksum — the two used to be separate implementations
+// that already disagreed about which algorithms exist (design doc §48).
+import { checksumBytes } from '../utils/checksums.js';
 
 export function bytesToHex(bytes = []) {
   return (bytes ?? [])
@@ -116,13 +119,63 @@ export function localCompileParameter(profile, request = {}) {
       bytes.push(status, 38, value14.bytes[1] ?? 0);
     }
   } else if (kind === 'sysex') {
+    // This built a DIFFERENT message from DeviceProfileEngine.cpp, which is the one thing a fallback
+    // engine is not allowed to do — it runs when the JUCE bridge is absent or a draft is being
+    // edited, so the DPD preview disagreed with the export and you would "fix" a working profile to
+    // match a broken picture of it. Four divergences, all of them here:
+    //
+    //   1. $checksum CLAMPED rather than masked — clampInt(sum, 0, 127). An F0 alone is 240, so
+    //      essentially every real message produced exactly 127.
+    //   2. $checksum summed the WHOLE message so far, including F0 and the manufacturer id. A
+    //      checksum covers the address, size and data — never the header.
+    //   3. $checksum ignored the recipe's declared type and always summed, so a profile saying
+    //      "roland-7bit" got a plain sum — and this engine's own VERIFY path, which reads the type
+    //      correctly, rejected what its build path had just produced.
+    //   4. $address and $size were not handled AT ALL, and an unrecognised token fell through the
+    //      loop silently, so a template using them was quietly built short.
+    //
+    // Now it mirrors the C++ exactly: a separate accumulator fed only by the tokens a checksum
+    // covers, the declared algorithm applied to it, every token either resolved or reported, and the
+    // same F0/F7 and data-byte checks at the end.
     const template = Array.isArray(recipe.template) ? recipe.template : [];
+    const address = localPatternBytes(parameter.address ?? '', variables);
+    const size = localPatternBytes(parameter.size ?? '', variables);
+    const covered = [];
+    const checksumType = String(recipe.checksum?.type ?? 'none');
+
     for (const token of template) {
-      const text = String(token ?? '');
-      if (text === '$deviceId') bytes.push(clampInt(variables.deviceId, 0, 127));
-      else if (text === '$encodedValue') bytes.push(...encoded.bytes);
-      else if (text === '$checksum') bytes.push(clampInt(bytes.reduce((sum, byte) => sum + byte, 0), 0, 127));
-      else if (/^[0-9a-f]{1,2}$/i.test(text)) bytes.push(parseInt(text, 16));
+      const text = String(token ?? '').trim();
+      if (text === '$address') { bytes.push(...address); covered.push(...address); }
+      else if (text === '$encodedValue') { bytes.push(...encoded.bytes); covered.push(...encoded.bytes); }
+      else if (text === '$size') { bytes.push(...size); covered.push(...size); }
+      else if (text === '$checksum') {
+        if (checksumType === 'none') { bytes.push(0); continue; }
+        const value = checksumBytes(checksumType, covered);
+        if (value === undefined) {
+          return { ok: false, error: `Unsupported checksum type "${checksumType}".` };
+        }
+        bytes.push(...value);
+      } else if (text.startsWith('$')) {
+        const resolved = clampInt(variables[text.slice(1)], 0, 127);
+        if (!Number.isFinite(resolved)) {
+          return { ok: false, error: `Variable ${text} is not a MIDI data byte` };
+        }
+        bytes.push(resolved);
+      } else {
+        if (!/^[0-9a-f]{1,2}$/i.test(text)) {
+          return { ok: false, error: `Invalid hex byte in SysEx template: ${token}` };
+        }
+        bytes.push(parseInt(text, 16));
+      }
+    }
+
+    if (bytes.length === 0 || bytes[0] !== 0xf0 || bytes.at(-1) !== 0xf7) {
+      return { ok: false, error: 'SysEx transaction must start with F0 and end with F7' };
+    }
+    for (let index = 1; index < bytes.length - 1; index += 1) {
+      if (bytes[index] < 0 || bytes[index] > 127) {
+        return { ok: false, error: `SysEx data byte outside 0-127: ${bytesToHex([bytes[index]])}` };
+      }
     }
   } else {
     return { ok: false, error: `Unsupported recipe kind "${kind}".` };
@@ -431,15 +484,32 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
     if (fromOffset < 0 || toOffset >= bytes.length || fromOffset > toOffset || byteOffset < 0 || byteOffset >= bytes.length) {
       return failMatched('partial', 'Dump checksum range is outside message', 'error');
     }
-    let expected = 0;
-    for (let index = fromOffset; index <= toOffset; index += 1) expected = (expected + bytes[index]) & 0x7f;
     const type = String(checksum.type ?? '');
-    if (type === 'roland-7bit') expected = (128 - expected) & 0x7f;
-    else if (type !== 'sum-7bit') return failMatched('unsupportedChecksum', `Unsupported dump checksum type: ${type}`, 'error');
-    if (bytes[byteOffset] !== expected) {
+    // Two algorithms before this, with everything else hard-rejected — so a synth using an XOR or a
+    // Kawai-style checksum could not have a working profile at all, while a SCRIPT could compute one.
+    // The table is shared with ce.midi.checksum now, so the two vocabularies are one.
+    const expected = checksumBytes(type, bytes.slice(fromOffset, toOffset + 1),
+      { offset: checksum.offset });
+    if (expected === undefined) {
+      return failMatched('unsupportedChecksum', `Unsupported dump checksum type: ${type}`, 'error');
+    }
+    // A CRC does not fit in one byte, so a checksum field has a length. Declared explicitly when it
+    // differs from the algorithm's natural width, which keeps every existing single-byte profile
+    // reading exactly as it did.
+    const byteCount = Math.max(1, Number(checksum.byteCount ?? expected.length));
+    if (byteCount !== expected.length) {
+      return failMatched('unsupportedChecksum',
+        `Dump checksum "${type}" needs ${expected.length} byte(s) but the definition declares ${byteCount}`,
+        'error');
+    }
+    if (byteOffset + byteCount > bytes.length) {
+      return failMatched('partial', 'Dump checksum range is outside message', 'error');
+    }
+    const got = bytes.slice(byteOffset, byteOffset + byteCount);
+    if (got.join(',') !== expected.join(',')) {
       return failMatched(
         'checksumFailed',
-        `Dump checksum failed; expected ${bytesToHex([expected])} but got ${bytesToHex([bytes[byteOffset]])}`,
+        `Dump checksum failed; expected ${bytesToHex(expected)} but got ${bytesToHex(got)}`,
         'error'
       );
     }

@@ -1,4 +1,5 @@
 #include "DeviceProfileEngine.h"
+#include "ProfileChecksums.h"
 
 #include <cmath>
 #include <set>
@@ -1484,29 +1485,36 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         if (fromOffset < 0 || toOffset >= bytes.size() || fromOffset > toOffset || byteOffset < 0 || byteOffset >= bytes.size())
             return failForMatchedDump ("partial", "Dump checksum range is outside message", "error");
 
-        auto expected = 0;
-        if (type == "xor")
-        {
-            for (int index = fromOffset; index <= toOffset; ++index)
-                expected ^= bytes[index];
-            expected &= 0x7f;
-        }
-        else
-        {
-            for (int index = fromOffset; index <= toOffset; ++index)
-                expected = (expected + bytes[index]) & 0x7f;
+        // Three algorithms open-coded here before, and the build path below knew a different two —
+        // so verifying and building could disagree inside one engine. Both read the shared table now
+        // (§48), which is also the table ce.midi.checksum answers from.
+        juce::Array<int> covered;
+        for (int index = fromOffset; index <= toOffset; ++index)
+            covered.add (bytes[index]);
 
-            if (type == "roland-7bit")
-                expected = (128 - expected) & 0x7f;
-            else if (type != "sum-7bit")
-                return failForMatchedDump ("unsupportedChecksum", "Unsupported dump checksum type: " + type, "error");
-        }
+        const auto expected = ce::checksums::toBytes (type, covered, propInt (*checksum, "offset", 0xa5));
+        if (expected.isEmpty())
+            return failForMatchedDump ("unsupportedChecksum", "Unsupported dump checksum type: " + type, "error");
 
-        if (bytes[byteOffset] != expected)
-            return failForMatchedDump ("checksumFailed",
-                                       "Dump checksum failed; expected " + byteToHex (expected)
-                                           + " but got " + byteToHex (bytes[byteOffset]),
+        // A CRC does not fit in one byte, so a checksum field has a length. Defaulted from the
+        // algorithm's own width, so every existing single-byte profile reads exactly as before.
+        const auto byteCount = juce::jmax (1, propInt (*checksum, "byteCount", expected.size()));
+        if (byteCount != expected.size())
+            return failForMatchedDump ("unsupportedChecksum",
+                                       "Dump checksum \"" + type + "\" needs "
+                                           + juce::String (expected.size()) + " byte(s) but the definition declares "
+                                           + juce::String (byteCount),
                                        "error");
+
+        if (byteOffset + byteCount > bytes.size())
+            return failForMatchedDump ("partial", "Dump checksum range is outside message", "error");
+
+        for (int i = 0; i < byteCount; ++i)
+            if (bytes[byteOffset + i] != expected[i])
+                return failForMatchedDump ("checksumFailed",
+                                           "Dump checksum failed; expected " + byteToHex (expected[i])
+                                               + " but got " + byteToHex (bytes[byteOffset + i]),
+                                           "error");
 
         checksumStatus = "ok";
     }
@@ -2087,29 +2095,24 @@ CompileResult DeviceProfileEngine::compileSysex (const juce::String& deviceRole,
         {
             auto* checksum = asObject (recipe.getProperty ("checksum"));
             auto type = checksum != nullptr ? propString (*checksum, "type") : "none";
-            auto value = 0;
 
-            if (type == "sum-7bit")
+            if (type == "none")
             {
-                for (auto byte : checksumBytes)
-                    value = (value + byte) & 0x7f;
-            }
-            else if (type == "roland-7bit")
-            {
-                for (auto byte : checksumBytes)
-                    value = (value + byte) & 0x7f;
-                value = (128 - value) & 0x7f;
-            }
-            else if (type == "none")
-            {
-                value = 0;
+                bytes.add (0);
             }
             else
             {
-                return { false, "Unsupported checksum type: " + type, {} };
+                // The shared table (§48). This knew sum-7bit and roland-7bit while the verify path
+                // above also knew xor, so one engine could build a message it would then reject.
+                const auto value = ce::checksums::toBytes (type, checksumBytes,
+                                                           checksum != nullptr ? propInt (*checksum, "offset", 0xa5) : 0xa5);
+                if (value.isEmpty())
+                    return { false, "Unsupported checksum type: " + type, {} };
+
+                for (auto byte : value)
+                    bytes.add (byte);
             }
 
-            bytes.add (value);
             checksumInserted = true;
         }
         else if (token.startsWithChar ('$'))

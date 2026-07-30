@@ -2062,11 +2062,14 @@ export const COMMANDS = [
     snippet: { lua: 'sendSysex(${1:bytes})$0', javascript: 'sendSysex(${1:bytes})$0' },
   },
   {
-    id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes)',
-    summary: 'Compute a device checksum over the data bytes. "roland"/"yamaha" = two\'s-complement 7-bit (the same algorithm, both spellings accepted); "sum" = 7-bit sum; "xor" = XOR of the bytes.',
+    id: 'checksum', category: 'Device / MIDI', signature: 'checksum(type, bytes [, opts]) -> number',
+    summary: 'Compute a device checksum over the data bytes. Eleven algorithms, shared with the device profile engine so a script and a profile cannot disagree about what a name means: "sum-7bit" (Σ mod 128), "roland-7bit" — also spelled "roland" or "yamaha", the same arithmetic — "ones-complement-7bit" (one LESS than Roland\'s, and the hardest kind of wrong to spot), "xor-7bit", "offset-7bit" with `opts.offset` (the Kawai shape; the constant is yours to give, not ours to assume), "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" and "crc32". An unknown name returns NOTHING and says what it would have accepted, rather than quietly handing back a Roland checksum — which is what it used to do. Mind the width: the 7-bit algorithms fit a SysEx byte, but crc16 and crc32 do not, so split them with to7bit() before sending.',
     params: [
-      { name: 'type', type: 'string', required: true, values: ['roland', 'yamaha', 'sum', 'xor'] },
+      { name: 'type', type: 'string', required: true,
+        values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
+          'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
       { name: 'bytes', type: 'bytes', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['offset'] },
     ],
     scopes: 'any',
     snippet: { lua: 'checksum("${1:roland}", ${2:bytes})$0', javascript: 'checksum("${1:roland}", ${2:bytes})$0' },

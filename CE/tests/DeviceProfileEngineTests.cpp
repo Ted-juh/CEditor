@@ -1,6 +1,7 @@
 #include "../src/DeviceProfile/DeviceProfileEngine.h"
 #include "../src/DeviceProfile/DeviceProfileService.h"
 #include "../src/DeviceProfile/MidiCiSession.h"
+#include "../src/DeviceProfile/ProfileChecksums.h"
 
 #include <juce_midi_ci/juce_midi_ci.h>
 
@@ -9,6 +10,7 @@
 #include <iostream>
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace
@@ -839,6 +841,103 @@ struct TestCiResponder : juce::midi_ci::DeviceMessageHandler,
     }
 };
 
+// The checksum table (design doc §48). There are two implementations of this arithmetic and there
+// always will be — ProfileChecksums.h for the player, checksums.js for the editor — so they are
+// pinned to the same fixture from both sides. A checksum that differs between the editor and the
+// export means a synth accepts a dump from one and rejects it from the other, silently, and the panel
+// author has no way to tell which is wrong.
+//
+// The numbers below are CE/web/test/fixtures/checksumCases.js. The four CRC values for "123456789"
+// are additionally the published catalogue check values, which is what makes them right rather than
+// merely consistent with ourselves.
+int runChecksumTableTests()
+{
+    struct Case { const char* id; juce::uint32 ascii; juce::uint32 block; int width; };
+
+    static const Case cases[] = {
+        { "sum-7bit",             93,          76, 1 },
+        { "roland-7bit",          35,          52, 1 },
+        { "ones-complement-7bit", 34,          51, 1 },
+        { "xor-7bit",             49,          54, 1 },
+        { "offset-7bit",           2,         113, 1 },
+        { "sum-8bit",            221,         204, 2 },
+        { "twos-complement-8bit", 35,          52, 2 },
+        { "crc8",             0x00f4,         225, 2 },
+        { "crc16-ccitt",      0x29b1,          68, 3 },
+        { "crc16-modbus",     0x4b37,       57492, 3 },
+        { "crc32",        0xcbf43926u,   176437988, 5 },
+    };
+
+    juce::Array<int> ascii;
+    for (const char* p = "123456789"; *p != 0; ++p)
+        ascii.add ((int) (unsigned char) *p);
+
+    juce::Array<int> block;
+    for (auto byte : { 0x40, 0x00, 0x7f, 0x03, 0x0a })
+        block.add (byte);
+
+    auto failures = 0;
+
+    for (const auto& c : cases)
+    {
+        juce::uint32 got = 0;
+
+        if (! ce::checksums::compute (c.id, ascii, got) || got != c.ascii)
+        {
+            std::cerr << "[FAIL] checksum " << c.id << " over the check string: expected "
+                      << c.ascii << " got " << got << "\n";
+            ++failures;
+        }
+
+        if (! ce::checksums::compute (c.id, block, got) || got != c.block)
+        {
+            std::cerr << "[FAIL] checksum " << c.id << " over the address block: expected "
+                      << c.block << " got " << got << "\n";
+            ++failures;
+        }
+
+        if (ce::checksums::widthOf (ce::checksums::canonicalName (c.id)) != c.width)
+        {
+            std::cerr << "[FAIL] checksum " << c.id << " width\n";
+            ++failures;
+        }
+
+        // Every byte of a packed checksum has to be a legal SysEx data byte, which is the whole
+        // reason a CRC is split rather than truncated.
+        for (auto byte : ce::checksums::toBytes (c.id, block))
+            if (byte < 0 || byte > 0x7f)
+            {
+                std::cerr << "[FAIL] checksum " << c.id << " packed a non-data byte\n";
+                ++failures;
+            }
+    }
+
+    // Every spelling already in the wild must keep resolving: profiles say "roland-7bit", scripts
+    // say "roland", and neither may break.
+    const std::pair<const char*, const char*> aliases[] = {
+        { "sum", "sum-7bit" }, { "roland", "roland-7bit" }, { "yamaha", "roland-7bit" },
+        { "ones", "ones-complement-7bit" }, { "xor", "xor-7bit" }, { "kawai", "offset-7bit" },
+        { "crc16", "crc16-ccitt" }, { "twos-complement", "twos-complement-8bit" },
+    };
+    for (const auto& [alias, canonical] : aliases)
+        if (ce::checksums::canonicalName (alias) != juce::String (canonical))
+        {
+            std::cerr << "[FAIL] checksum alias " << alias << " no longer resolves\n";
+            ++failures;
+        }
+
+    // An unknown name must report rather than fall through to anything — the bug this phase fixed on
+    // the scripting side, where it silently returned a Roland checksum.
+    juce::uint32 ignored = 0;
+    if (ce::checksums::compute ("sha256", block, ignored))
+    {
+        std::cerr << "[FAIL] an unknown checksum name was accepted\n";
+        ++failures;
+    }
+
+    return failures;
+}
+
 // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). No hardware: two MidiCiSessions are wired output ->
 // input to each other (a software loopback, the JUCE-sanctioned way to exercise juce::midi_ci::Device).
 // The send callbacks only enqueue, so delivery is single-threaded and non-reentrant. Proves the whole
@@ -1065,6 +1164,7 @@ int main()
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runServiceRequestTests();
     failures += runMidiCiTests();
+    failures += runChecksumTableTests();
 
     if (failures == 0)
     {

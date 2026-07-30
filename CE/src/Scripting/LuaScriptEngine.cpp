@@ -1132,18 +1132,78 @@ function fromSigned(b, bits) local m = 2 ^ bits; if b >= m / 2 then return b - m
 -- checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 -- plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
 -- roland (the spelling panels shipped with before the contract was enforced).
-function checksum(kind, bytes)
+-- checksum(type, bytes [, opts]) — eleven algorithms, the same table checksums.js holds and the
+-- device profile engine reads (design doc §48). This used to know three and fall through to Roland
+-- for anything else, so a typo came back as a plausible number from a different algorithm.
+--
+-- Lua integers are 64-bit, so the CRCs need masking but not the unsigned gymnastics JavaScript does.
+__CE_CKSUM_ALIAS = {
+  ["sum"] = "sum-7bit", ["sum-7bit"] = "sum-7bit",
+  ["roland"] = "roland-7bit", ["yamaha"] = "roland-7bit", ["roland-7bit"] = "roland-7bit",
+  ["twos-complement-7bit"] = "roland-7bit",
+  ["ones"] = "ones-complement-7bit", ["ones-complement"] = "ones-complement-7bit",
+  ["ones-complement-7bit"] = "ones-complement-7bit",
+  ["xor"] = "xor-7bit", ["xor-7bit"] = "xor-7bit",
+  ["offset"] = "offset-7bit", ["kawai"] = "offset-7bit", ["offset-7bit"] = "offset-7bit",
+  ["sum-8bit"] = "sum-8bit",
+  ["twos-complement"] = "twos-complement-8bit", ["twos-complement-8bit"] = "twos-complement-8bit",
+  ["crc8"] = "crc8",
+  ["crc16"] = "crc16-ccitt", ["crc16-ccitt"] = "crc16-ccitt", ["crc16-modbus"] = "crc16-modbus",
+  ["crc32"] = "crc32",
+}
+function __ce_crc_msb(bytes, poly, init, xorOut, bits)
+  local top = 1 << (bits - 1)
+  local mask = (1 << bits) - 1
+  local crc = init
+  for i = 1, #bytes do
+    crc = crc ~ ((math.floor(bytes[i]) % 256) << (bits - 8))
+    for _ = 1, 8 do
+      if (crc & top) ~= 0 then crc = ((crc << 1) ~ poly) & mask else crc = (crc << 1) & mask end
+    end
+    crc = crc & mask
+  end
+  return (crc ~ xorOut) & mask
+end
+function __ce_crc_ref(bytes, poly, init, xorOut, bits)
+  local mask = (1 << bits) - 1
+  local crc = init
+  for i = 1, #bytes do
+    crc = crc ~ (math.floor(bytes[i]) % 256)
+    for _ = 1, 8 do
+      if (crc & 1) ~= 0 then crc = ((crc >> 1) ~ poly) & mask else crc = (crc >> 1) & mask end
+    end
+  end
+  return (crc ~ xorOut) & mask
+end
+function checksum(kind, bytes, opts)
   if bytes == nil then bytes = kind; kind = "roland" end
-  kind = string.lower(tostring(kind or "roland"))
-  local sum, x = 0, 0
+  local id = __CE_CKSUM_ALIAS[string.lower(tostring(kind or ""))]
+  if id == nil then
+    logError('ce.midi.checksum("' .. tostring(kind) .. '"): no such algorithm.')
+    return nil
+  end
+  local sum7, sum8, x = 0, 0, 0
   for i = 1, #bytes do
     local b = math.floor(bytes[i]) % 256
-    sum = (sum + b) % 128
+    sum7 = (sum7 + b) % 128
+    sum8 = (sum8 + b) % 256
     x = (x ~ b) & 0x7f
   end
-  if kind == "xor" then return x end
-  if kind == "sum" then return sum end
-  return (128 - sum) % 128
+  if id == "sum-7bit" then return sum7 end
+  if id == "roland-7bit" then return (128 - sum7) % 128 end
+  if id == "ones-complement-7bit" then return (127 - sum7) % 128 end
+  if id == "xor-7bit" then return x end
+  if id == "offset-7bit" then
+    local k = 0xa5
+    if opts ~= nil and opts.offset ~= nil then k = math.floor(opts.offset) end
+    return (sum7 + k) % 128
+  end
+  if id == "sum-8bit" then return sum8 end
+  if id == "twos-complement-8bit" then return (256 - sum8) % 256 end
+  if id == "crc8" then return __ce_crc_msb(bytes, 0x07, 0x00, 0x00, 8) end
+  if id == "crc16-ccitt" then return __ce_crc_msb(bytes, 0x1021, 0xffff, 0x0000, 16) end
+  if id == "crc16-modbus" then return __ce_crc_ref(bytes, 0xa001, 0xffff, 0x0000, 16) end
+  return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 end
 
 -- panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that

@@ -1043,13 +1043,38 @@ function onError(info) {
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>The last eleven phases, newest first</p>
+    <p>The last twelve phases, newest first</p>
   </div>
   <p class="prose">
-    The surface roughly tripled over these. Four of them were not additions at all &mdash; they were
+    The surface roughly tripled over these. Five of them were not additions at all &mdash; they were
     the API telling the truth about things it had been quietly getting wrong.
   </p>
   <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§48</b>checksums</div>
+      <div class="ship-body">
+        <p>
+          <code>ce.midi.checksum</code> knew three algorithms; the device profile engine knew a
+          <i>different</i> two, under different names, and hard&#8209;rejected the rest. So a script
+          could compute a checksum no profile could express, and a synth using anything but Roland's
+          or a plain sum could not have a working profile at all. Both read one table now &mdash;
+          eleven algorithms, including one&#8217;s complement, the Kawai&#8209;shaped constant offset
+          (the constant is yours to give), and CRC&#8209;8/16/32 with the two CRC&#8209;16 variants
+          named separately, because &ldquo;crc16&rdquo; alone is not a specification. An unknown name
+          now returns nothing instead of a Roland checksum.
+        </p>
+        <p class="note">
+          Found on the way, and worse than the gap: the editor and the export computed recipe
+          checksums <b>differently</b>. The web fallback &mdash; which runs in the browser and in the
+          DPD while you are writing a profile &mdash; clamped where it should have masked (so almost
+          every message produced exactly <code>127</code>), summed the header along with the data,
+          ignored the declared algorithm entirely, and dropped <code>$address</code> and
+          <code>$size</code> on the floor. Its own verify path would have rejected what its build
+          path produced. The preview lied and the export was correct, which is the worst direction
+          for a bug like this to run.
+        </p>
+      </div>
+    </li>
     <li class="ship">
       <div class="ship-id"><b>§47</b>this page</div>
       <div class="ship-body">

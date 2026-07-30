@@ -23,6 +23,8 @@ import { updateControlProperty, removeControlNode } from '../stores/controls.js'
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { availableFonts } from '../stores/appSettings.js';
+// Shared with the device profile engine, so the two cannot disagree about what "roland" means.
+import { checksumNames, computeChecksum } from '../utils/checksums.js';
 // ce.text measures through the renderer's own layout rather than a second implementation of it.
 import { buildBlockTextLayout } from '../editor/canvasControlTextLayout.js';
 import {
@@ -1797,18 +1799,28 @@ function toHexMessage(bytes) {
 //
 // The one-argument form checksum(bytes) defaults to roland: that is what this runtime accepted
 // when it ignored the type argument entirely, so panels written against it keep working.
-function checksumOf(kind, bytes) {
-  let sum = 0;
-  let x = 0;
-  for (const v of bytes) {
-    const b = midiInt(v, 0, 255) & 0xff;
-    sum = (sum + b) % 128;
-    x = (x ^ b) & 0x7f;
+/**
+ * One checksum, from the shared table (design doc §48).
+ *
+ * This used to hold its own three-branch implementation and fall through to Roland for anything it
+ * did not recognise — so checksum("crc16", bytes) came back as a plausible Roland checksum and a
+ * typo was indistinguishable from a working call. Every other vocabulary in this API returns nothing
+ * for a name it does not know; this one now does too, and says what it would have accepted.
+ *
+ * The table is shared with the device profile engine, which understood a DIFFERENT two algorithms
+ * under different names. Two implementations of the same arithmetic is how they drifted apart.
+ */
+function checksumOf(kind, bytes, opts) {
+  // Sanitised before the table sees them, so an out-of-range value clamps the way every other
+  // byte-taking verb in ce.midi clamps rather than wrapping.
+  const clean = bytes.map((v) => midiInt(v, 0, 255) & 0xff);
+  const value = computeChecksum(kind, clean, opts);
+  if (value === undefined) {
+    addScriptTrace('error', '',
+      `ce.midi.checksum("${kind}"): no such algorithm. One of: ${checksumNames().join(', ')}.`);
+    return undefined;
   }
-  const k = String(kind ?? 'roland').toLowerCase();
-  if (k === 'xor') return x;
-  if (k === 'sum') return sum;
-  return (128 - sum) % 128;
+  return value;
 }
 
 // routeMidi(role, fn) — the destination for sends made inside the block. A block rather than a
@@ -1983,10 +1995,10 @@ const midiApi = {
   // The parameter is `kind`, the name the contract and every other runtime use for it.
   // requestDump is bound in buildApi, not here: its optional callback belongs to a script, and a
   // throw inside it has to be reported against that script. Same reason the wire filters are.
-  checksum: (type, bytes) =>
+  checksum: (type, bytes, opts) =>
     (bytes === undefined || bytes === null
       ? checksumOf('roland', toByteArray(type))     // one-arg form: checksum(bytes)
-      : checksumOf(type, toByteArray(bytes))),
+      : checksumOf(type, toByteArray(bytes), opts)),
 
   // panic([opts]) — All Sound Off (120) FIRST, then All Notes Off (123), then Reset All
   // Controllers (121). The order matters: 120 cuts a note that is already ringing, 123 only stops

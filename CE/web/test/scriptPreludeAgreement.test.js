@@ -106,10 +106,35 @@ const CASES = [
   ['fromAscii', [[72, 105]]],
   ['toOffset', [-64, 64]], ['fromOffset', [0, 64]],
   ['toSigned', [-1, 8]], ['fromSigned', [255, 8]], ['fromSigned', [127, 8]],
+  // All eleven checksum algorithms in all four runtimes (design doc §48). This is the case that most
+  // needs to be here: a checksum that differs between the editor and the export means the synth
+  // accepts a dump from one and rejects it from the other, silently. The CRCs especially — Lua's
+  // integers are 64-bit, JavaScript's bitwise operators are 32-bit SIGNED, and Python's are
+  // arbitrary-precision, so the same three lines of shifting give three different answers unless
+  // each is masked correctly.
   ['checksum', ['roland', [0x01, 0x02, 0x03]]],
   ['checksum', ['yamaha', [0x40, 0x11, 0x00, 0x7F, 0x2A]]],
   ['checksum', ['sum', [0x01, 0x02, 0x03]]],
   ['checksum', ['xor', [0x01, 0x02, 0x03]]],
+  ['checksum', ['sum-7bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['roland-7bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['ones-complement-7bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['xor-7bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['offset-7bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['sum-8bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['twos-complement-8bit', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['crc8', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['crc16-ccitt', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['crc16-modbus', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  ['checksum', ['crc32', [0x40, 0x00, 0x7F, 0x03, 0x0A]]],
+  // The catalogue's check string, so the four runtimes are pinned to the published values and not
+  // merely to each other.
+  ['checksum', ['crc8', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
+  ['checksum', ['crc16-ccitt', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
+  ['checksum', ['crc16-modbus', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
+  ['checksum', ['crc32', [49, 50, 51, 52, 53, 54, 55, 56, 57]]],
+  // An unknown algorithm must come back as nothing in every runtime, not as a Roland checksum.
+  ['checksum', ['crc17', [0x01, 0x02, 0x03]]],
 ];
 
 // Helpers returning a table/array/object, compared structurally after normalising Lua's 1-based
@@ -181,7 +206,10 @@ test('the JS engine prelude computes what the WebView runtime computes', () => {
   const prelude = extractRawString('JsScriptEngine.cpp', 'JS');
   // The prelude wraps a native bridge that does not exist here; only the pure helpers are under
   // test, so stub the bridge and let the rest define itself.
-  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {} };
+  const sandbox = { __api: new Proxy({}, { get: () => () => undefined }),
+    // logError as well as log: checksum() calls it for an unknown algorithm, and an unstubbed host
+    // binding fails the whole prelude rather than the one helper.
+    log: () => {}, logError: () => {} };
   vm.createContext(sandbox);
   vm.runInContext(prelude, sandbox);
 
@@ -258,6 +286,7 @@ test('the Lua engine prelude computes what the WebView runtime computes', async 
     // time, to register the one listener that drives after(). Leaving it out does not fail the
     // helper being tested — it fails the whole prelude, before any of them are defined.
     lua.global.set('log', () => {});
+    lua.global.set('logError', () => {});
     lua.global.set('sendCC', () => {});
     lua.global.set('on', () => {});
     lua.global.set('startTimer', () => {});
@@ -377,7 +406,7 @@ payload = json.loads(sys.stdin.read())
 g = {"__name__": "prelude"}
 # The host binds these before the prelude runs; the prelude CALLS on() at load time to arm after(),
 # so leaving them out fails the whole prelude rather than the helper under test.
-for name in ["log", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
     g[name] = (lambda *a, **k: None)
 exec(compile(payload["prelude"], "prelude", "exec"), g)
 out = []

@@ -1091,18 +1091,79 @@ function fromSigned(b, bits) { var m = Math.pow(2, bits); return b >= m / 2 ? b 
 // checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 // plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
 // roland (the spelling panels shipped with before the contract was enforced).
-function checksum(kind, bytes) {
+// checksum(type, bytes [, opts]) — eleven algorithms, the same table checksums.js holds and the
+// device profile engine reads (design doc §48). This knew three and fell through to Roland for
+// anything else, so a typo came back as a plausible number from a different algorithm.
+var __CE_CKSUM_ALIAS = {
+  "sum": "sum-7bit", "sum-7bit": "sum-7bit",
+  "roland": "roland-7bit", "yamaha": "roland-7bit", "roland-7bit": "roland-7bit",
+  "twos-complement-7bit": "roland-7bit",
+  "ones": "ones-complement-7bit", "ones-complement": "ones-complement-7bit",
+  "ones-complement-7bit": "ones-complement-7bit",
+  "xor": "xor-7bit", "xor-7bit": "xor-7bit",
+  "offset": "offset-7bit", "kawai": "offset-7bit", "offset-7bit": "offset-7bit",
+  "sum-8bit": "sum-8bit",
+  "twos-complement": "twos-complement-8bit", "twos-complement-8bit": "twos-complement-8bit",
+  "crc8": "crc8",
+  "crc16": "crc16-ccitt", "crc16-ccitt": "crc16-ccitt", "crc16-modbus": "crc16-modbus",
+  "crc32": "crc32"
+};
+// >>> 0 after every step: JavaScript's bitwise operators are 32-bit SIGNED, so a 32-bit CRC turns
+// negative at the first shift that touches the top bit. This is the one place the four runtimes
+// genuinely need different code for the same arithmetic.
+function __ce_crc_msb(bytes, poly, init, xorOut, bits) {
+  var top = 1 << (bits - 1);
+  var mask = bits === 32 ? 0xffffffff : ((1 << bits) - 1);
+  var crc = init;
+  for (var i = 0; i < bytes.length; i++) {
+    crc = (crc ^ ((Math.floor(bytes[i]) & 0xff) << (bits - 8))) >>> 0;
+    for (var b = 0; b < 8; b++) {
+      crc = ((crc & top) !== 0 ? ((crc << 1) ^ poly) : (crc << 1)) >>> 0;
+      crc = (crc & mask) >>> 0;
+    }
+  }
+  return ((crc ^ xorOut) & mask) >>> 0;
+}
+function __ce_crc_ref(bytes, poly, init, xorOut, bits) {
+  var mask = bits === 32 ? 0xffffffff : ((1 << bits) - 1);
+  var crc = init >>> 0;
+  for (var i = 0; i < bytes.length; i++) {
+    crc = (crc ^ (Math.floor(bytes[i]) & 0xff)) >>> 0;
+    for (var b = 0; b < 8; b++) {
+      crc = ((crc & 1) !== 0 ? ((crc >>> 1) ^ poly) : (crc >>> 1)) >>> 0;
+      crc = (crc & mask) >>> 0;
+    }
+  }
+  return ((crc ^ xorOut) & mask) >>> 0;
+}
+function checksum(kind, bytes, opts) {
   if (bytes === undefined || bytes === null) { bytes = kind; kind = "roland"; }
-  kind = String(kind === undefined || kind === null ? "roland" : kind).toLowerCase();
-  var sum = 0, x = 0;
+  var id = __CE_CKSUM_ALIAS[String(kind === undefined || kind === null ? "" : kind).toLowerCase()];
+  if (id === undefined) {
+    logError('ce.midi.checksum("' + String(kind) + '"): no such algorithm.');
+    return undefined;
+  }
+  var sum7 = 0, sum8 = 0, x = 0;
   for (var i = 0; i < bytes.length; i++) {
     var b = Math.floor(bytes[i]) & 0xff;
-    sum = (sum + b) % 128;
+    sum7 = (sum7 + b) % 128;
+    sum8 = (sum8 + b) % 256;
     x = (x ^ b) & 0x7f;
   }
-  if (kind === "xor") return x;
-  if (kind === "sum") return sum;
-  return (128 - sum) % 128;
+  if (id === "sum-7bit") return sum7;
+  if (id === "roland-7bit") return (128 - sum7) % 128;
+  if (id === "ones-complement-7bit") return (127 - sum7) % 128;
+  if (id === "xor-7bit") return x;
+  if (id === "offset-7bit") {
+    var k = (opts && opts.offset !== undefined && opts.offset !== null) ? Math.floor(opts.offset) : 0xa5;
+    return (sum7 + k) % 128;
+  }
+  if (id === "sum-8bit") return sum8;
+  if (id === "twos-complement-8bit") return (256 - sum8) % 256;
+  if (id === "crc8") return __ce_crc_msb(bytes, 0x07, 0x00, 0x00, 8);
+  if (id === "crc16-ccitt") return __ce_crc_msb(bytes, 0x1021, 0xffff, 0x0000, 16);
+  if (id === "crc16-modbus") return __ce_crc_ref(bytes, 0xa001, 0xffff, 0x0000, 16);
+  return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32);
 }
 
 // panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that

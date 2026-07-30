@@ -2011,18 +2011,78 @@ def fromSigned(b, bits):
 # checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 # plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
 # roland (the spelling panels shipped with before the contract was enforced).
-def checksum(kind, bytes=None):
+# checksum(type, bytes [, opts]) — eleven algorithms, the same table checksums.js holds and the
+# device profile engine reads (design doc §48). This knew three and fell through to Roland for
+# anything else, so a typo came back as a plausible number from a different algorithm.
+__CE_CKSUM_ALIAS = {
+    "sum": "sum-7bit", "sum-7bit": "sum-7bit",
+    "roland": "roland-7bit", "yamaha": "roland-7bit", "roland-7bit": "roland-7bit",
+    "twos-complement-7bit": "roland-7bit",
+    "ones": "ones-complement-7bit", "ones-complement": "ones-complement-7bit",
+    "ones-complement-7bit": "ones-complement-7bit",
+    "xor": "xor-7bit", "xor-7bit": "xor-7bit",
+    "offset": "offset-7bit", "kawai": "offset-7bit", "offset-7bit": "offset-7bit",
+    "sum-8bit": "sum-8bit",
+    "twos-complement": "twos-complement-8bit", "twos-complement-8bit": "twos-complement-8bit",
+    "crc8": "crc8",
+    "crc16": "crc16-ccitt", "crc16-ccitt": "crc16-ccitt", "crc16-modbus": "crc16-modbus",
+    "crc32": "crc32",
+}
+
+# Python integers are arbitrary precision, so every step has to be masked explicitly or the CRC
+# register grows without bound instead of wrapping.
+def __ce_crc_msb(data, poly, init, xor_out, bits):
+    import math
+    top = 1 << (bits - 1)
+    mask = (1 << bits) - 1
+    crc = init
+    for v in data:
+        crc ^= (math.floor(v) & 0xff) << (bits - 8)
+        for _ in range(8):
+            crc = ((crc << 1) ^ poly) & mask if (crc & top) else (crc << 1) & mask
+        crc &= mask
+    return (crc ^ xor_out) & mask
+
+def __ce_crc_ref(data, poly, init, xor_out, bits):
+    import math
+    mask = (1 << bits) - 1
+    crc = init
+    for v in data:
+        crc ^= math.floor(v) & 0xff
+        for _ in range(8):
+            crc = ((crc >> 1) ^ poly) & mask if (crc & 1) else (crc >> 1) & mask
+    return (crc ^ xor_out) & mask
+
+def checksum(kind, bytes=None, opts=None):
     import math
     if bytes is None: bytes = kind; kind = "roland"
-    kind = str(kind if kind is not None else "roland").lower()
-    total = 0; x = 0
+    key = str(kind if kind is not None else "").lower()
+    cid = __CE_CKSUM_ALIAS.get(key)
+    if cid is None:
+        logError('ce.midi.checksum("' + str(kind) + '"): no such algorithm.')
+        return None
+    total = 0; total8 = 0; x = 0
     for v in bytes:
         b = math.floor(v) & 0xff
         total = (total + b) % 128
+        total8 = (total8 + b) % 256
         x = (x ^ b) & 0x7f
-    if kind == "xor": return x
-    if kind == "sum": return total
-    return (128 - total) % 128
+    if cid == "sum-7bit": return total
+    if cid == "roland-7bit": return (128 - total) % 128
+    if cid == "ones-complement-7bit": return (127 - total) % 128
+    if cid == "xor-7bit": return x
+    if cid == "offset-7bit":
+        k = 0xa5
+        if opts is not None:
+            got = opts.get("offset") if hasattr(opts, "get") else None
+            if got is not None: k = math.floor(got)
+        return (total + k) % 128
+    if cid == "sum-8bit": return total8
+    if cid == "twos-complement-8bit": return (256 - total8) % 256
+    if cid == "crc8": return __ce_crc_msb(bytes, 0x07, 0x00, 0x00, 8)
+    if cid == "crc16-ccitt": return __ce_crc_msb(bytes, 0x1021, 0xffff, 0x0000, 16)
+    if cid == "crc16-modbus": return __ce_crc_ref(bytes, 0xa001, 0xffff, 0x0000, 16)
+    return __ce_crc_ref(bytes, 0xedb88320, 0xffffffff, 0xffffffff, 32)
 
 # panic([opts]) — All Sound Off (120), All Notes Off (123), Reset All Controllers (121), in that
 # order because 120 must land before 123 for a device to cut a stuck note rather than let it ring
