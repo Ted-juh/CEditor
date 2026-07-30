@@ -25,7 +25,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
-import { MODULES } from '../src/CE_Application/scripting/panelApi.js';
+import { MODULES, moduleMemberMap } from '../src/CE_Application/scripting/panelApi.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(here, '..', '..', '..', 'docs', 'api-explorer.html'), 'utf8');
@@ -179,6 +179,22 @@ test('lesson 12 gives a roll only to the rows that asked for one', () => {
   // …and says so on its face, from the same row.
   assert.equal(pads[1].text, 'SNARE  1/16');
   assert.equal(pads[0].text, 'KICK', 'a pad with no roll must not claim one');
+});
+
+/* ---------------------------------------------------------- the counts the prose states */
+
+test('the manual states the size of the surface it documents', () => {
+  // Lesson 5 says the number out loud. The page's own script overwrites it on load, so a wrong
+  // number in the file is invisible in a browser — which is how it sat two phases stale, claiming
+  // 536 members across 40 modules. Asserted against the contract, not against a copied figure.
+  const members = MODULES.reduce((n, m) => n + Object.keys(moduleMemberMap(m.id)).length, 0);
+  const said = (id) => {
+    const m = page.match(new RegExp(`<b id="${id}">([^<]*)</b>`));
+    assert.ok(m, `the manual no longer has a <b id="${id}"> to state a count in`);
+    return Number(m[1].replace(/,/g, ''));
+  };
+  assert.equal(said('i-mem'), members, 'the stated member count is stale');
+  assert.equal(said('i-mod'), MODULES.length, 'the stated module count is stale');
 });
 
 /* ------------------------------------------------------------------- the two languages */

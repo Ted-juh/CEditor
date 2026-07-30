@@ -306,7 +306,26 @@ if (process.argv.includes('--json')) {
   } else {
     // JSON inside a <script type="application/json"> block: the only sequence that could close it
     // early is "</", so that is the one thing escaped.
-    const page = template.replace(MARK, JSON.stringify(data).replace(/<\//g, '<\\/'));
+    let page = template.replace(MARK, JSON.stringify(data).replace(/<\//g, '<\\/'));
+
+    // The prose states three counts out loud. The page's own script overwrites them on load, so a
+    // wrong number in the template is invisible in a browser and therefore rots unnoticed — it had
+    // already drifted two phases, saying 536/40 for a surface of 555/41. Fill them here so the
+    // written file agrees with the contract it ships, and fail rather than write if one goes
+    // missing: a silently unfilled count is exactly the failure this is meant to end.
+    const inline = {
+      'i-mem': data.totals.members.toLocaleString('en-US'),
+      'i-mod': String(data.totals.modules),
+      'i-derived': String(data.coverage.derived),
+    };
+    for (const [id, value] of Object.entries(inline)) {
+      const re = new RegExp(`(<b id="${id}">)[^<]*(</b>)`);
+      if (!re.test(page)) {
+        console.error(`apiExplorer.template.html has no <b id="${id}"> to fill`);
+        process.exitCode = 2;
+      }
+      page = page.replace(re, `$1${value}$2`);
+    }
     const out = join(repo, 'docs', 'api-explorer.html');
 
     if (process.argv.includes('--check')) {
