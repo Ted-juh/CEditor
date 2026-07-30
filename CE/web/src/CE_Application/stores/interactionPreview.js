@@ -9,6 +9,20 @@ import { findExclusiveSelectGroupControls, isExclusiveSelectBehavior } from '../
 import { normalizeCustomChannelValue, seedCustomValues } from '../utils/customComponentInteraction.js';
 import { syncCustomArpeggiatorValues } from '../utils/customComponentArpeggiator.js';
 import { applyPanelCustomLinkRoutes } from '../utils/panelCustomComponentLinks.js';
+import { flatControls } from '../utils/containment.js';
+
+/**
+ * Every control in the panel, containers included.
+ *
+ * The session map is rebuilt from a control LIST, and anything absent from that list is dropped —
+ * so being handed only the top-level controls silently deleted the session of everything inside a
+ * Group. It deleted them mid-gesture: pressing a nested pad wrote pressed=true, the resulting
+ * re-render synced the sessions, and the pad\'s entry vanished while the finger was still down.
+ * The runtime diffs this map to raise onPointerUp, and you cannot diff a key that is not there,
+ * so the release never fired at all. Flattening here rather than at each call site is deliberate —
+ * a caller that forgets is exactly how this happened.
+ */
+const allControls = (controls) => flatControls(Array.isArray(controls) ? controls : []);
 
 const DEFAULT_SESSION = {
   enabled: true,
@@ -177,7 +191,7 @@ function currentPreviewBoolValue(control, session = null) {
 }
 
 function createPreviewSessionsMap(controls = []) {
-  const controlList = Array.isArray(controls) ? controls : [];
+  const controlList = allControls(controls);
   const sessions = controlList.reduce((nextSessions, control) => {
     const controlId = getControlId(control);
     if (!controlId) return nextSessions;
@@ -207,7 +221,7 @@ export function updateInteractionPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions);
+    return applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions);
   });
 }
 
@@ -249,7 +263,7 @@ export function setPreviewInspectedControlId(controlId = '') {
 }
 
 export function syncPanelPreviewSessions(controls = []) {
-  const controlList = Array.isArray(controls) ? controls : [];
+  const controlList = allControls(controls);
 
   panelPreviewSessions.update((current) => {
     const next = {};
@@ -309,7 +323,7 @@ export function updatePanelPreviewSession(controlId, patch = {}) {
       ...current,
       [controlId]: nextSession,
     };
-    return applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions);
+    return applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions);
   });
 }
 
@@ -356,7 +370,7 @@ export function commitPanelPreviewSelectAction(controlId, options = {}) {
       };
     }
 
-    panelPreviewSessions.set(applyPanelSessionEffects(getActivePanel()?.controls ?? [], nextSessions));
+    panelPreviewSessions.set(applyPanelSessionEffects(allControls(getActivePanel()?.controls), nextSessions));
     return {
       checked: true,
       mixed: false,

@@ -7096,7 +7096,9 @@ function snapshotValues() {
   const panel = livePanel();
   const next = new Map();
   if (panel) {
-    for (const c of panel.controls) {
+    // flatControls, for the same reason findControlByName uses it: a control inside a Group had no
+    // baseline here, so the diff below could never see it change.
+    for (const c of flatControls(panel.controls ?? [])) {
       const id = c?._children?.Core?.id;
       if (id != null) next.set(id, controlValueState(c).sig);
     }
@@ -7155,7 +7157,9 @@ function onPanelsChanged() {
   if (!live.enabledGlobal) { snapshotValues(); return; }   // keep snapshot fresh while paused
   const events = [];
   const next = new Map();
-  for (const c of panel.controls) {
+  // flatControls: a knob inside a Group raised no onValueChange at all, because the walk that
+  // looks for changes stopped at the top level while the panel that changed did not.
+  for (const c of flatControls(panel.controls ?? [])) {
     const id = c?._children?.Core?.id;
     if (id == null) continue;
     const name = c?._children?.Core?.name ?? id;
@@ -7191,7 +7195,11 @@ function sessionValue(session) {
 }
 
 function controlNameById(id) {
-  const c = livePanel()?.controls?.find((x) => x?._children?.Core?.id === id);
+  // flatControls, or a nested control's events are addressed by RAW ID instead of by name — and a
+  // listener registered as on("pad38", "pointerDown", …) matches a name, so every press, release,
+  // click and hover on a control inside a Group went nowhere. It looked like the pad was dead;
+  // it was the envelope that was wrong.
+  const c = flatControls(livePanel()?.controls ?? []).find((x) => x?._children?.Core?.id === id);
   return c?._children?.Core?.name ?? id;
 }
 

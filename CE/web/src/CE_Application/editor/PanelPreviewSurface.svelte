@@ -21,6 +21,7 @@
     setPreviewInspectedControlId,
   } from '../stores/interactionPreview.js';
   import { sortControlsForRender } from '../utils/controlOrder.js';
+  import { flatControls } from '../utils/containment.js';
   import { resolveRadioGroupLayout, resolveRadioGroupValueAtPoint } from '../utils/radioGroupLayout.js';
   import {
     listboxRows, listboxRowStride, listboxRowIndexAtPoint, listboxMaxScroll, isSelectableRow,
@@ -240,6 +241,18 @@
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 
   let orderedControls = $derived(sortControlsForRender(panel?.controls ?? []));
+  /**
+   * Id -> control, over the WHOLE tree.
+   *
+   * `orderedControls` is RENDER order and holds top-level controls only, because a nested control
+   * is drawn by its container. Using it to answer "which control is this id?" therefore returned
+   * null for anything inside a Group — and eleven places asked exactly that. The window pointerup
+   * handler was one of them: it looked the pressed control up, got null, and skipped the release,
+   * so a nested pad could be pressed and never released. Render order stays as it is; lookups come
+   * from here.
+   */
+  let controlsById = $derived(new Map(flatControls(panel?.controls ?? []).map((c) => [getControlId(c), c])));
+  const controlById = (id) => controlsById.get(String(id ?? '')) ?? null;
   let previewRenderIdNamespace = $derived(`panel-preview-${panel?.id ?? 'panel'}`);
 
   let pointerActiveControlId = $state('');
@@ -365,7 +378,7 @@
   function lcdRangeForSource(srcId) {
     const id = String(srcId ?? '');
     if (!id) return null;
-    const src = orderedControls.find((entry) => getControlId(entry) === id);
+    const src = controlById(id);
     if (!src) return null;
     const range = lcdSourceValueRange(src);
     return range && range.value !== undefined ? range : null;
@@ -439,7 +452,7 @@
     return { type: '', section: null, name: '' };
   }
   function lcdSourceControl(sourceId) {
-    return orderedControls.find((c) => getControlId(c) === String(sourceId ?? '')) ?? null;
+    return controlById(sourceId);
   }
   // What kind of edit a zone source supports: 'text' | 'choice' | 'none'.
   function lcdEditKindOf(sourceId) {
@@ -750,7 +763,7 @@
     if (!base) return '';
     const filter = activeFilterOf(id);
     if (!filter) return base;
-    const ctrl = orderedControls.find((entry) => getControlId(entry) === base);
+    const ctrl = controlById(base);
     return ctrl && lcdControlKind(ctrl) === filter ? base : '';
   }
 
@@ -857,7 +870,7 @@
         // a fixed id resolves to that control. Keyed by the raw id so each
         // filtered "@active#kind" zone reads its own live value.
         const resolvedId = isActiveSource(id) ? lcdResolveActive(id, display) : id;
-        const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
+        const src = resolvedId ? controlById(resolvedId) : null;
         const info = src ? lcdSourceInfo(src) : null;
         if (info) live[id] = info;
       }
@@ -867,7 +880,7 @@
     // brightness (mapped 0-100 across its range), a switch for the backlight.
     const brightRange = display.brightnessSourceId ? lcdRangeForSource(display.brightnessSourceId) : null;
     const backCtrl = display.backlightSourceId
-      ? orderedControls.find((entry) => getControlId(entry) === String(display.backlightSourceId)) : null;
+      ? controlById(display.backlightSourceId) : null;
     const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
 
     // A device parameter bound directly onto this display (text/brightness/
@@ -4106,7 +4119,7 @@
     const layouts = Array.isArray(pixel?.layouts) ? pixel.layouts : [];
     if (!layouts.length) return '';
     const pages = pixel.pages ?? {};
-    const selSrc = pages.selectorSourceId ? orderedControls.find((e) => getControlId(e) === String(pages.selectorSourceId)) : null;
+    const selSrc = pages.selectorSourceId ? controlById(pages.selectorSourceId) : null;
     const selInfo = selSrc ? lcdSourceInfo(selSrc) : null;
     const selectorValue = selInfo ? selInfo.selector : undefined;
     const activeOverlayLayoutId = resolveActiveOverlayLayout(pixel);
@@ -4124,14 +4137,14 @@
     const live = {};
     for (const id of pixelSourceIds(pixel)) {
       const resolvedId = isActiveSource(id) ? lcdResolveActive(id, pixel) : id;
-      const src = resolvedId ? orderedControls.find((entry) => getControlId(entry) === resolvedId) : null;
+      const src = resolvedId ? controlById(resolvedId) : null;
       const info = src ? lcdSourceInfo(src) : null;
       if (info) live[id] = info;
     }
 
     const brightRange = pixel.brightnessSourceId ? lcdRangeForSource(pixel.brightnessSourceId) : null;
     const backCtrl = pixel.backlightSourceId
-      ? orderedControls.find((entry) => getControlId(entry) === String(pixel.backlightSourceId)) : null;
+      ? controlById(pixel.backlightSourceId) : null;
     const backInfo = backCtrl ? lcdSourceInfo(backCtrl) : null;
     const hasLayouts = Array.isArray(pixel.layouts) && pixel.layouts.length > 0;
 
@@ -4935,7 +4948,7 @@
   }
 
   function patchControlSession(controlId, patch = {}) {
-    const control = orderedControls.find((entry) => getControlId(entry) === controlId) ?? null;
+    const control = controlById(controlId);
     updatePanelPreviewSession(controlId, patch);
     if (control) emitDeviceBindingsForPatch(control, patch);
   }
@@ -5527,10 +5540,17 @@
   });
 
   $effect(() => {
-    const activeControlIds = orderedControls.map((control) => getControlId(control)).filter(Boolean);
+    // The WHOLE tree, not orderedControls: this asks "does the control I am tracking still exist?",
+    // and a control inside a Group is never in the top-level list. So the answer was always no for
+    // a nested control, and the moment this effect re-ran mid-press it concluded the pressed pad
+    // had gone, dropped the pointer state and removed the window listeners — after which the
+    // release was never handled at all. It survived because the effect only re-runs when something
+    // changes: a plain nested button held for a second was fine, while one whose own handler kept
+    // writing (a roll firing notes on a timer) tore its own listeners off mid-gesture.
+    const activeControlIds = [...controlsById.keys()];
     timedButtonPreview.syncKeys(activeControlIds);
 
-    if (pointerActiveControlId && !activeControlIds.includes(pointerActiveControlId)) {
+    if (pointerActiveControlId && !controlsById.has(pointerActiveControlId)) {
       pointerActiveControlId = '';
       pointerActiveElement = null;
       draggingRange = false;
@@ -5956,7 +5976,7 @@
     if (!pointerActiveControlId) return;
     event.preventDefault?.();
     event.stopPropagation?.();
-    const activeControl = orderedControls.find((control) => getControlId(control) === pointerActiveControlId) ?? null;
+    const activeControl = controlById(pointerActiveControlId);
     if (!activeControl || isDisabled(activeControl)) return;
 
     if (isCustomComponent(activeControl)) {
@@ -5987,7 +6007,7 @@
     event.stopPropagation?.();
 
     const activeId = pointerActiveControlId;
-    const activeControl = orderedControls.find((control) => getControlId(control) === activeId) ?? null;
+    const activeControl = controlById(activeId);
     const inside = isPointInsideActiveHitbox(event.clientX, event.clientY);
     const activeBehavior = getBehavior(activeControl);
 
