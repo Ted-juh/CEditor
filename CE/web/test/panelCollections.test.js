@@ -114,6 +114,40 @@ test('a new property on a fixed-shape section is a warning, not an error', () =>
   assert.ok(panel);
 });
 
+test('set() actually EMITS the fixed-shape warning', () => {
+  // The test above pins probeNestedWrite's flags, and they were always right — but nothing asserted
+  // that set() said anything, and it did not. The warning hung off `else if (wrote)`, while the
+  // probe reports writes:true for a resolvable fresh key and fresh:false whenever writes is false:
+  // the two conditions could never coincide, so the branch was unreachable and every typo on a
+  // fixed-shape section went through in silence. Going through set() is the only way to catch that.
+  withControl('Knob', (api) => {
+    clearScriptTrace();
+    api.set('k.Transform.wdith', 10);
+    assert.match(traced(), /is a new property on a section with a fixed shape/);
+    assert.match(traced(), /check the spelling/);
+    // Still written — the warning does not change the behaviour, it just stops it being invisible.
+    assert.equal(api.get('k.Transform.wdith'), 10);
+  });
+
+  // A correctly spelled field on the same section must stay quiet, or the warning is just noise.
+  withControl('Knob', (api) => {
+    clearScriptTrace();
+    api.set('k.Transform.width', 10);
+    assert.equal(traced(), '');
+  });
+});
+
+test('the fixed-shape warning covers Text.Font, which is where it matters most', () => {
+  // 41 hand-typed field names is exactly where a typo happens, and it was the case that found the
+  // dead branch: set("…Font.sze", 20) stored a key nothing reads and said nothing at all.
+  withControl('Label', (api) => {
+    clearScriptTrace();
+    api.set('k.Text.Font.sze', 20);
+    assert.match(traced(), /is a new property on a section with a fixed shape/);
+    assert.equal(api.get('k.Text.Font.size'), 12, 'the real field is untouched');
+  });
+});
+
 test('setNestedValue now answers whether it wrote', () => {
   const knob = createControl('Knob', { name: 'k' });
   assert.equal(setNestedValue(knob, 'Transform.x', 10), true);

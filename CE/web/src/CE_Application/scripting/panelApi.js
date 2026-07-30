@@ -1142,6 +1142,74 @@ export const COMMANDS = [
     scopes: 'any',
   },
   {
+    id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
+    summary: 'Every font this panel may use: { family, label, source, portable, variable, axes, features, featuresKnown }. `opts` may narrow it with { portable = true } or { variable = true }. `portable` is the one to read before styling anything: a builtin family is named in every runtime, while a font from the library is registered by the editor at edit time and is NOT part of the panel document — so it looks right while you build and falls back to a platform default once exported. `featuresKnown` separates "scanned, has none" from "nobody has scanned it", because [] otherwise reads as a fact it is not.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'opts', type: 'object', required: false, fields: ['portable', 'variable'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
+    summary: 'One font descriptor by family name, or nothing when no such font is available — the guard to call before writing a family, and the way to ask what variable axes a face actually has. Matched case-insensitively against the stored family and its label, the way the Properties panel matches it.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'family', type: 'string', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
+    summary: 'Set typography on a control, keeping what a bare set() breaks. `opts` may carry { family, size, weight, bold, italic, caseMode, scriptMode, justification, letterSpacing, wordSpacing, baselineShift, lineHeight, maxLines, underline, strikethrough, overline, ligatures, stylisticAlternates, oldstyleFigures, tabularFigures, fractions, slashedZero }. weight and weightValue are a PAIR — the renderer reads weightValue first, the Properties panel reads weight for a non-variable face — so writing one alone makes the editor and the render disagree, in both directions. This always writes both. A family nobody has, a feature the font lacks and an unknown option are REFUSED and reported rather than stored. Returns whether the control now holds everything asked for; a partial application is false.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: true,
+        fields: ['family', 'size', 'weight', 'bold', 'italic', 'caseMode', 'scriptMode',
+          'justification', 'letterSpacing', 'wordSpacing', 'baselineShift', 'lineHeight',
+          'maxLines', 'underline', 'strikethrough', 'overline', 'ligatures'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'textAxis', category: 'Typography', signature: 'textAxis(target, tag, value) -> boolean',
+    summary: 'Set one variable-font axis by its four-letter tag, clamped to the range the font declares. An axis the face does not have is refused rather than stored, because a stored axis nothing reads is indistinguishable from one that worked. Setting `wght` moves the weight pair with it, which is what the Properties panel\'s own axis control does — otherwise a variable face renders its old weight.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'tag', type: 'string', required: true },
+      { name: 'value', type: 'number', required: true },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'textRead', category: 'Typography', signature: 'textRead(target [, name]) -> value|table',
+    summary: 'Read one text field by name, from whichever of Font / Multiline / Position owns it — so `size` and `lineHeight` are both just names and a script need not know which node they live on. With no name, the whole state: { content, resolvedWeight, font, multiline, position }. That is what makes typography snapshot-and-restorable without naming ninety fields, and `resolvedWeight` is the weight the renderer will actually use rather than either half of the pair.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'name', type: 'string', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'textMeasure', category: 'Typography', signature: 'textMeasure(target [, text]) -> table',
+    summary: 'What a control\'s text occupies, in its own font: { width, height, lines, truncated, exact }. Measured through the same layout function CanvasControl paints with, so the answer is the layout that will be used rather than a second implementation agreeing with it until one changes. Pass `text` to measure a string the control does not hold yet — for a label about to be given a value. Unlike ce.draw.measure this needs no size or family handed to it; it resolves them from the control, honours letter spacing, wrapping and maxLines, and reports `exact: false` when there was no surface to measure on.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'text', type: 'string', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
+    summary: 'Shrink Font.size until the text fits the control\'s box, and report what it settled on: { size, fits, changed, exact }. `opts` may carry { min = 6, max = the current size, text }. Text.Multiline.fitMode = "shrink" already scales text down at PAINT time, but that is a paint-time scale — the stored size never changes, so nothing can ask what it ended up at and nothing else can be aligned to it. This writes the size. `fits` is false when even `min` overflows, which is an answer rather than a failure.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'target', type: 'string', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['min', 'max', 'text'] },
+    ],
+    scopes: 'any',
+  },
+  {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
     summary: 'Text at (x, y), which is its LEFT BASELINE. `opts` may carry { size, align, family }; align is "left" | "middle" | "right".',
     runtime: RUNTIME_WEBVIEW,
@@ -2695,6 +2763,11 @@ export const MODULES = [
     summary: 'Build the panel from a script and arrange what is there: create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each verb says so. snapshot/restore work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON, because one of the four runtimes has none.' },
+  // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
+  // measuring is done on a canvas. A player host has neither, and a typography verb that answered
+  // from a guess would be worse than one that says it is not there.
+  { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Typography as something a script can reason about: what fonts exist and what they support, style writes that keep weight consistent instead of half-applying it, variable axes, and measuring a control\'s own text in its own font so it can be fitted to its box. The fields were always reachable with set() — the rules around them were not.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -2812,6 +2885,13 @@ const MODULE_MEMBERS = {
     // author reaches for, so the flat spellings keep the draw prefix.
     gradient: 'drawGradient', opacity: 'drawOpacity', transform: 'drawTransform',
     ellipse: 'drawEllipse', pixelText: 'drawPixelText', measure: 'drawMeasure',
+  },
+  // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
+  // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and
+  // `measure` as globals would be four collisions waiting to happen.
+  'ce.text': {
+    fonts: 'textFonts', font: 'textFont', style: 'textStyle', axis: 'textAxis',
+    read: 'textRead', measure: 'textMeasure', fit: 'textFit',
   },
   'ce.panel': {
     snapshot: 'panelSnapshot', restore: 'panelRestore', each: 'panelEach',

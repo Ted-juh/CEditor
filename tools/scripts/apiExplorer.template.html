@@ -358,6 +358,7 @@ table.mem tr.mark td { background: var(--accent-2); }
     <a href="#modules">Modules</a>
     <a href="#timing">Musical time</a>
     <a href="#components">Components</a>
+    <a href="#typography">Typography</a>
     <a href="#keeping">Keeping things</a>
     <a href="#debug">When it breaks</a>
     <h2>Reference</h2>
@@ -396,7 +397,7 @@ table.mem tr.mark td { background: var(--accent-2); }
 <section id="start">
   <div class="rule-head">
     <h2>Part one &middot; the manual</h2>
-    <p>Nine things, in the order you need them</p>
+    <p>Ten things, in the order you need them</p>
     <span style="flex:1"></span>
     <div class="lang-pick" role="group" aria-label="Sample language">
       <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
@@ -583,7 +584,7 @@ watch("cutoff.background.fill.colour", (c) =&gt; {
     <div class="lesson-text prose">
       <h3>You pay for what you switch on</h3>
       <p>
-        The surface is <b id="i-mem">529</b> members across <b id="i-mod">39</b> modules. Injecting
+        The surface is <b id="i-mem">536</b> members across <b id="i-mod">40</b> modules. Injecting
         all of it into every panel would be wasteful, so a panel <b>declares</b> the modules it
         uses and the export carries only those. The weights in
         <a href="#weight">What it weighs</a> are measured from the real preludes, not estimated.
@@ -723,8 +724,94 @@ on(a, "onStep", (step) =&gt; {
     </div>
   </div>
 
+  <div class="lesson" id="typography">
+    <p class="lesson-n">08 &middot; Typography</p>
+    <div class="lesson-text prose">
+      <h3>The fields were never the problem</h3>
+      <p>
+        <code>Text.Font</code> has 41 fields, <code>Text.Multiline</code> eleven and
+        <code>Text.Position</code> around forty &mdash; and <code>set()</code> could always write
+        every one of them by path. <code>set("L.Text.Font.size", 18)</code> has worked since the
+        first release. So <code>ce.text</code> adds no reach. It adds the three things a bare path
+        write cannot do.
+      </p>
+      <p>
+        <b>It knows what exists.</b> <code>fonts()</code> is the catalogue the Properties panel
+        picks from; <code>font(family)</code> is one entry or nothing. A family nobody has is
+        <i>refused</i> rather than stored &mdash; where <code>set()</code> would keep the typo and
+        quietly fall back to a platform default. Read <code>portable</code> before you commit to a
+        face: a builtin is named in every runtime, while a font from the library belongs to this
+        editor install and is not part of the panel document, so it looks right while you build and
+        falls back once exported.
+      </p>
+      <p>
+        <b>It keeps the invariants.</b> <code>weight</code> and <code>weightValue</code> are a pair,
+        and two different consumers read different halves &mdash; the renderer takes
+        <code>weightValue</code> first, the Properties panel reads <code>weight</code> for a
+        non&#8209;variable face. Writing one alone makes the editor and the render disagree, in
+        <i>both</i> directions. <code>style()</code> always writes both, and
+        <code>axis("wght", …)</code> drags the pair along with it.
+      </p>
+      <p>
+        <b>It can measure itself.</b> <code>measure()</code> reports what a control's text occupies
+        in its own font, through the same layout function that paints it &mdash; no size or family
+        handed in, and letter spacing, wrapping and <code>maxLines</code> all honoured.
+        <code>fit()</code> then shrinks <code>Font.size</code> until it fits the box and tells you
+        what it chose. <code>fitMode = "shrink"</code> already scales text down when painting, but
+        that is a paint&#8209;time scale: the stored size never changes, so nothing can ask what it
+        settled on. <code>fit()</code> writes a number other layout can use.
+      </p>
+      <p class="note">
+        Panel view only, and deliberately: the catalogue is the editor's and the measuring wants a
+        canvas. A typography verb answering from a guess would be worse than one that says it is not
+        there.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">Check, style, fit</p>
+      <pre data-lua><code>local face = ce.text.font("Inter Tight")
+if not face or not face.portable then
+  face = ce.text.font("Arial")     -- survives the export
+end
+
+ce.text.style("Readout", {
+  family = face.family, size = 18,
+  bold = true, tabularFigures = true,
+})
+
+if face.variable then
+  ce.text.axis("Readout", "wght", 620)
+end
+
+set("Readout.Text.content", patchName)
+local fitted = ce.text.fit("Readout", { min = 9 })
+if not fitted.fits then
+  logWarn("still overflowing at " .. fitted.size)
+end</code></pre>
+      <pre data-js hidden><code>let face = ce.text.font("Inter Tight");
+if (!face || !face.portable) {
+  face = ce.text.font("Arial");    // survives the export
+}
+
+ce.text.style("Readout", {
+  family: face.family, size: 18,
+  bold: true, tabularFigures: true,
+});
+
+if (face.variable) {
+  ce.text.axis("Readout", "wght", 620);
+}
+
+set("Readout.Text.content", patchName);
+const fitted = ce.text.fit("Readout", { min: 9 });
+if (!fitted.fits) {
+  logWarn(`still overflowing at ${fitted.size}`);
+}</code></pre>
+    </div>
+  </div>
+
   <div class="lesson" id="keeping">
-    <p class="lesson-n">08 &middot; Keeping things</p>
+    <p class="lesson-n">09 &middot; Keeping things</p>
     <div class="lesson-text prose">
       <h3>Three lifespans, and you pick</h3>
       <p>
@@ -773,7 +860,7 @@ if (back === undefined) logError("bad config");</code></pre>
   </div>
 
   <div class="lesson" id="debug">
-    <p class="lesson-n">09 &middot; When it breaks</p>
+    <p class="lesson-n">10 &middot; When it breaks</p>
     <div class="lesson-text prose">
       <h3>Three levels, and a handler for the rest</h3>
       <p>
@@ -882,13 +969,34 @@ function onError(info) {
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>The last nine phases, newest first</p>
+    <p>The last ten phases, newest first</p>
   </div>
   <p class="prose">
-    The surface roughly tripled over these. Two of them were not additions at all &mdash; they were
+    The surface roughly tripled over these. Three of them were not additions at all &mdash; they were
     the API telling the truth about things it had been quietly getting wrong.
   </p>
   <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§46</b>ce.text</div>
+      <div class="ship-body">
+        <p>
+          Seven verbs for typography: <code>fonts</code>, <code>font</code>, <code>style</code>,
+          <code>axis</code>, <code>read</code>, <code>measure</code>, <code>fit</code>. The unusual
+          thing about this module is that it adds <b>no reach</b> &mdash; all ninety&#8209;odd text
+          fields were already writable by path. What was missing was knowing which fonts exist,
+          keeping <code>weight</code> and <code>weightValue</code> consistent, and being able to
+          measure a control's own text in its own font.
+        </p>
+        <p class="note">
+          Found on the way: the warning for a mistyped field on a fixed&#8209;shape section had been
+          <b>dead code</b> since it was written. It hung off the wrong branch of an
+          <code>if</code>, testing for a state that branch could never be in &mdash; so
+          <code>set("L.Text.Font.sze", 20)</code> stored a key nothing reads and said nothing at
+          all. It fires now, on both the editor and the player path, because whether a key is new on
+          a typed section is a question about the control, not about who writes it.
+        </p>
+      </div>
+    </li>
     <li class="ship">
       <div class="ship-id"><b>§45</b>ce.components events</div>
       <div class="ship-body">
@@ -1037,7 +1145,7 @@ function onError(info) {
   $("#i-mod").textContent = DATA.totals.modules;
 
   /* ------------------------------------------------------- language toggle */
-  // One preference for the whole page. A per-block toggle makes you re-pick your own language nine
+  // One preference for the whole page. A per-block toggle makes you re-pick your own language ten
   // times on the way down.
   const setLang = (lang) => {
     $$(".lang-pick button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === lang)));

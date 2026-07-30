@@ -26,8 +26,10 @@
     TEXT_FILL_LAYER_ICONS,
     TEXT_FILL_LAYER_LABELS,
     TEXT_FILL_LAYER_ORDER,
+    TEXT_CASE_OPTIONS,
     TEXT_POSITION_OPTIONS,
     TEXT_READING_OPTIONS,
+    TEXT_SCRIPT_OPTIONS,
     TYPOGRAPHY_FEATURE_OPTIONS,
   } from './textEditorOptions.js';
 
@@ -828,20 +830,17 @@
     >
       <PropertyCell label="Case" span={2} hint="Apply text case transforms including title, sentence, and small caps modes.">
         <select class="text-select" value={caseModeValue()} onchange={(event) => set('Text.Font.caseMode', event.target.value)}>
-          <option value="normal">Normal</option>
-          <option value="uppercase">Uppercase</option>
-          <option value="lowercase">Lowercase</option>
-          <option value="title">Title Case</option>
-          <option value="sentence">Sentence Case</option>
-          <option value="smallcaps">Small Caps</option>
+          {#each TEXT_CASE_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
         </select>
       </PropertyCell>
 
       <PropertyCell label="Script" span={1} hint="Shift the text into superscript or subscript styling.">
         <select class="text-select" value={scriptModeValue()} onchange={(event) => set('Text.Font.scriptMode', event.target.value)}>
-          <option value="normal">Normal</option>
-          <option value="superscript">Super</option>
-          <option value="subscript">Sub</option>
+          {#each TEXT_SCRIPT_OPTIONS as option (option.value)}
+            <option value={option.value}>{option.label}</option>
+          {/each}
         </select>
       </PropertyCell>
 

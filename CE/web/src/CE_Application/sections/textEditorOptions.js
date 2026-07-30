@@ -20,17 +20,15 @@ export const DEFAULT_TEXT_FILL_GRADIENT = {
   ],
 };
 
-export const TEXT_POSITION_OPTIONS = [
-  { value: 'topLeft', label: 'Top Left' },
-  { value: 'top', label: 'Top' },
-  { value: 'topRight', label: 'Top Right' },
-  { value: 'left', label: 'Left' },
-  { value: 'centred', label: 'Center' },
-  { value: 'right', label: 'Right' },
-  { value: 'bottomLeft', label: 'Bottom Left' },
-  { value: 'bottom', label: 'Bottom' },
-  { value: 'bottomRight', label: 'Bottom Right' },
-];
+// The pure-data vocabularies live next door so the scripting layer can read them without pulling
+// the icon components in this file along with them. Re-exported so every existing importer of
+// textEditorOptions keeps working unchanged.
+export {
+  TEXT_CASE_OPTIONS,
+  TEXT_POSITION_OPTIONS,
+  TEXT_SCRIPT_OPTIONS,
+  TYPOGRAPHY_FEATURE_OPTIONS,
+} from './textEditorVocabulary.js';
 
 export const FLOW_MODE_OPTIONS = [
   { value: 'rotate', label: 'Rotate' },
@@ -58,11 +56,3 @@ export const TEXT_FILL_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];
 export const TEXT_FILL_LAYER_LABELS = { solid: 'Solid', gradient: 'Gradient', image: 'Image', texture: 'Texture' };
 export const TEXT_FILL_LAYER_ICONS = { solid: PaintBucket, gradient: Blend, image: ImageIcon, texture: Layers };
 
-export const TYPOGRAPHY_FEATURE_OPTIONS = [
-  { key: 'ligatures', label: 'Ligatures', tags: ['liga', 'clig'] },
-  { key: 'stylisticAlternates', label: 'Alternates', tags: ['salt'] },
-  { key: 'oldstyleFigures', label: 'Oldstyle', tags: ['onum'] },
-  { key: 'tabularFigures', label: 'Tabular', tags: ['tnum'] },
-  { key: 'fractions', label: 'Fractions', tags: ['frac'] },
-  { key: 'slashedZero', label: 'Slash 0', tags: ['zero'] },
-];

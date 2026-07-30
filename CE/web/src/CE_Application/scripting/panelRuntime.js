@@ -22,6 +22,12 @@ import { panels, resolvedActivePanelId, updatePanel } from '../stores/panels.js'
 import { updateControlProperty, removeControlNode } from '../stores/controls.js';
 import { valueAtPath, probeNestedWrite } from '../stores/controlTreeUtils.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
+import { availableFonts } from '../stores/appSettings.js';
+// ce.text measures through the renderer's own layout rather than a second implementation of it.
+import { buildBlockTextLayout } from '../editor/canvasControlTextLayout.js';
+import {
+  findFont, fontCatalogue, planAxis, planStyle, resolvedWeight,
+} from './textStyle.js';
 import {
   isJuceAvailable, triggerRawMidiAction, parseDumpMessage, onDumpMessageParsed,
   listMidiInputs, listMidiDestinations,
@@ -427,21 +433,34 @@ function setValue(path, value, formOrOpts = '') {
   // live value goes through the preview session, which needs no Value section at all), so it is
   // asked rather than second-guessed; a host that returns nothing is not making a claim, and is
   // taken at its word rather than reported on.
+  // Landing but CREATING a key on a typed section node is almost always a typo: Font has a fixed
+  // shape of 41 fields, so `Text.Font.sze` writes a property nothing reads. Free-form maps (a
+  // state's `when`, a patch map) are untyped and take new keys by design, so they stay quiet.
+  //
+  // Asked BEFORE the write, and asked regardless of who performs it. Two things were wrong before:
+  //
+  //  * It was written as an `else if` beside the landing branch, which made it unreachable —
+  //    probeNestedWrite reports writes:true for any target it can resolve, a fresh key included,
+  //    and reports fresh:false whenever writes is false, so the state it tested for could never
+  //    coincide with the branch it was on. The wording already described a write that HAD happened
+  //    ("It was written, but nothing reads it"), which is the tell.
+  //  * It only ran on the no-host path. But whether a key is new on a fixed-shape section is a
+  //    question about the control tree, not about the host's write semantics — a typo is a typo in
+  //    the player too. `wrote` still comes from the host, which is the part only the host knows.
+  const shape = probeNestedWrite(control, modelPath, value);
+
   let wrote = true;
   if (host) {
     wrote = host.writeValue(control, modelPath, value) !== false;
   } else {
-    const probe = probeNestedWrite(control, modelPath, value);
-    wrote = probe.writes;
+    wrote = shape.writes;
     if (wrote) updateControlProperty(control?._children?.Core?.id, modelPath, value);
-    // Landing but CREATING a key on a typed section node is almost always a typo: Transform has a
-    // fixed shape, so `Transform.wdith` writes a property nothing reads. Free-form maps (a state's
-    // `when`, a patch map) are untyped and take new keys by design, so they stay quiet.
-    else if (probe.fresh && probe.typed) {
-      addScriptTrace('warn', '',
-        `set("${path}"): "${modelPath}" is a new property on a section with a fixed shape. `
-        + 'It was written, but nothing reads it — check the spelling.');
-    }
+  }
+
+  if (wrote && shape.fresh && shape.typed) {
+    addScriptTrace('warn', '',
+      `set("${path}"): "${modelPath}" is a new property on a section with a fixed shape. `
+      + 'It was written, but nothing reads it — check the spelling.');
   }
 
   if (!wrote) {
@@ -3575,6 +3594,255 @@ function drawMeasureImpl(text, opts) {
   return { width: ctx.measureText(str).width, height: size, exact: true };
 }
 
+/* --- ce.text: typography a script can reason about (design doc §46) ----------------------------
+ *
+ * Text.Font has 41 fields, Text.Multiline 11 and Text.Position around 40, and set() could already
+ * write every one of them by path. So this module adds no reach — it adds the three things a bare
+ * path write cannot do:
+ *
+ *  1. KNOW WHAT EXISTS. The font catalogue is a store the Properties panel reads and scripting
+ *     could not. set("…Font.family", "Helvetca") stored the typo and fell back silently.
+ *  2. KEEP THE INVARIANTS. weight/weightValue are a pair and the two halves are read by different
+ *     consumers, so writing one desynchronises the editor from the render. See textStyle.js.
+ *  3. MEASURE ITSELF. drawMeasure has to be handed a size and family; nothing could ask what a
+ *     control's own text occupies in its own font, which is what any fit-to-box needs.
+ *
+ * Every write goes back out through setValue(), so intercepts, the transmit rule and the host all
+ * apply exactly as they do to a hand-written set() — this is a better-behaved caller, not a back
+ * door. And every write verb reports by READING BACK, the §44 rule: the answer is whether the
+ * control now holds what was asked, not whether a store call was made.
+ */
+
+/** The font catalogue as descriptors, from the app's own availableFonts store. */
+function textCatalogue() {
+  return fontCatalogue(get(availableFonts));
+}
+
+/** The Font node of a control, or nothing when it has no Text section (a Knob has none). */
+function textFontNode(name) {
+  const font = getValue(`${name}.Text.Font`);
+  return font && typeof font === 'object' ? font : null;
+}
+
+/** Report the same way for every ce.text verb that needs a Text section and did not find one. */
+function textNeedsTextSection(verb, name) {
+  addScriptTrace('error', '',
+    `ce.text.${verb}("${name}"): this control has no Text section, so it has no typography. `
+    + 'ce.panel.info() reports the type; a Knob or a Meter draws its own labels.');
+  return undefined;
+}
+
+/** Apply one planned write. `variationAxes` carries { tag, value } and lands on the sub-key. */
+function textApplyWrite(name, write) {
+  const base = `${name}.Text.${write.section}`;
+  if (write.field === 'variationAxes') {
+    const path = `${base}.variationAxes.${write.value.tag}`;
+    setValue(path, write.value.value);
+    return Number(getValue(path)) === Number(write.value.value);
+  }
+  const path = `${base}.${write.field}`;
+  setValue(path, write.value);
+  const now = getValue(path);
+  // Numbers cross the boundary as numbers but may have been clamped by the model; comparing
+  // loosely would call a clamp a success. Comparing the READ-BACK is the point of doing it.
+  return typeof write.value === 'number' ? Number(now) === write.value : now === write.value;
+}
+
+function textStyleImpl(target, opts) {
+  const name = String(target ?? '');
+  const font = textFontNode(name);
+  if (!font) return textNeedsTextSection('style', name) ?? false;
+
+  const catalogue = textCatalogue();
+  const { writes, refused } = planStyle(opts, {
+    descriptor: findFont(catalogue, font.family), catalogue,
+  });
+
+  for (const problem of refused) {
+    addScriptTrace('error', '',
+      `ce.text.style("${name}"): ${problem.option} refused — ${problem.reason}.`);
+  }
+  if (!writes.length) return false;
+
+  let all = true;
+  for (const write of writes) if (!textApplyWrite(name, write)) all = false;
+  // Refusing one option and honouring another is a partial success, and partial is not true. A
+  // script that checks the return gets "the control does not hold everything you asked for".
+  return all && refused.length === 0;
+}
+
+function textAxisImpl(target, tag, value) {
+  const name = String(target ?? '');
+  const font = textFontNode(name);
+  if (!font) return textNeedsTextSection('axis', name) ?? false;
+
+  const descriptor = findFont(textCatalogue(), font.family);
+  const { writes, refused } = planAxis(descriptor, tag, value);
+  for (const problem of refused) {
+    addScriptTrace('error', '',
+      `ce.text.axis("${name}", "${problem.option}"): refused — ${problem.reason}. `
+      + `ce.text.font("${font.family}") reports the axes it has.`);
+  }
+  if (!writes.length) return false;
+  let all = true;
+  for (const write of writes) if (!textApplyWrite(name, write)) all = false;
+  return all;
+}
+
+/** Which Text child a read name belongs to, so read("L", "lineHeight") works without the script
+ *  having to know that line height is Multiline's and size is Font's. */
+const TEXT_READ_SECTIONS = ['Font', 'Multiline', 'Position'];
+
+function textReadImpl(target, field) {
+  const name = String(target ?? '');
+  const font = textFontNode(name);
+  if (!font) return textNeedsTextSection('read', name);
+
+  const clean = (node) => (node && typeof node === 'object'
+    ? Object.fromEntries(Object.entries(node).filter(([k]) => !k.startsWith('_')))
+    : {});
+
+  if (field === undefined || field === null || field === '') {
+    // The whole resolved state in one call, which is what makes typography snapshot/restore-able
+    // without naming ninety fields. `content` and the resolved weight ride along because both are
+    // things a script asks for immediately and neither is a Font field.
+    return {
+      content: String(getValue(`${name}.Text.content`) ?? ''),
+      resolvedWeight: resolvedWeight(font),
+      font: clean(font),
+      multiline: clean(getValue(`${name}.Text.Multiline`)),
+      position: clean(getValue(`${name}.Text.Position`)),
+    };
+  }
+
+  const wanted = String(field);
+  for (const section of TEXT_READ_SECTIONS) {
+    const node = section === 'Font' ? font : getValue(`${name}.Text.${section}`);
+    if (!node || typeof node !== 'object') continue;
+    const key = Object.keys(node).find((k) => k.toLowerCase() === wanted.toLowerCase());
+    if (key !== undefined && !key.startsWith('_')) return node[key];
+  }
+  if (wanted.toLowerCase() === 'content') return String(getValue(`${name}.Text.content`) ?? '');
+
+  addScriptTrace('error', '',
+    `ce.text.read("${name}", "${field}"): no such text field. ce.text.read("${name}") returns `
+    + 'everything, grouped as font / multiline / position.');
+  return undefined;
+}
+
+/**
+ * Measure a control's own text, in its own font, through the renderer's own layout.
+ *
+ * This calls buildBlockTextLayout — the same function CanvasControl lays text out with — so the
+ * answer is the layout that will actually be painted rather than a second implementation that
+ * agrees with it until one of them changes. `exact` is honest for the same reason drawMeasure's is:
+ * the layout measures on an offscreen canvas, and with no document to make one it falls back to a
+ * per-glyph estimate.
+ */
+function textMeasureImpl(target, text) {
+  const name = String(target ?? '');
+  const font = textFontNode(name);
+  if (!font) return textNeedsTextSection('measure', name);
+
+  const multiline = getValue(`${name}.Text.Multiline`) ?? {};
+  const info = getValue(`${name}.Transform`) ?? {};
+  const position = getValue(`${name}.Text.Position`) ?? {};
+  const content = text === undefined || text === null
+    ? String(getValue(`${name}.Text.content`) ?? '')
+    : String(text);
+
+  const padX = Number(position.paddingLeft ?? 0) + Number(position.paddingRight ?? 0);
+  const width = Math.max(0, Number(info.width ?? 0) - padX);
+
+  const layout = buildBlockTextLayout(content, {
+    fontSection: font,
+    family: font.family || 'Arial',
+    maxWidth: width,
+    wrapMode: String(multiline.wrapMode ?? 'word'),
+    paragraphMode: String(multiline.paragraphMode ?? 'normal'),
+    overflowMode: String(multiline.overflowMode ?? 'clip'),
+    maxLines: Number(multiline.maxLines ?? 0),
+    lineHeightMultiplier: Number(multiline.lineHeight ?? 1.2),
+  });
+
+  return {
+    width: layout.width,
+    height: layout.height,
+    lines: Array.isArray(layout.lines) ? layout.lines.length : 0,
+    truncated: layout.truncated === true,
+    exact: typeof document !== 'undefined' && typeof document.createElement === 'function',
+  };
+}
+
+/**
+ * Shrink Font.size until the text fits the control's box, and report what it settled on.
+ *
+ * Text.Multiline.fitMode = "shrink" already scales text down at PAINT time — but it is a paint-time
+ * scale: the stored size never changes, so nothing can ask what size it ended up at and nothing
+ * else can be aligned to the result. This writes the size, which is the difference between "it
+ * looks right" and "it is a number other layout can use".
+ *
+ * A descending search over integer sizes rather than a binary one: the sizes are integers, the
+ * range is small, and measuring is cheap next to being subtly off by a pixel at the boundary.
+ */
+function textFitImpl(target, opts) {
+  const name = String(target ?? '');
+  const font = textFontNode(name);
+  if (!font) return textNeedsTextSection('fit', name);
+
+  const min = Math.max(1, Number(opts?.min ?? 6));
+  const max = Math.max(min, Number(opts?.max ?? Number(font.size ?? 12)));
+  const info = getValue(`${name}.Transform`) ?? {};
+  const position = getValue(`${name}.Text.Position`) ?? {};
+  const boxW = Math.max(0, Number(info.width ?? 0)
+    - Number(position.paddingLeft ?? 0) - Number(position.paddingRight ?? 0));
+  const boxH = Math.max(0, Number(info.height ?? 0)
+    - Number(position.paddingTop ?? 0) - Number(position.paddingBottom ?? 0));
+
+  if (boxW <= 0 || boxH <= 0) {
+    addScriptTrace('error', '',
+      `ce.text.fit("${name}"): the control has no box to fit into (width ${info.width ?? 0} x `
+      + `height ${info.height ?? 0} less padding), so there is no size to choose.`);
+    return undefined;
+  }
+
+  const multiline = getValue(`${name}.Text.Multiline`) ?? {};
+  const content = opts?.text === undefined || opts?.text === null
+    ? String(getValue(`${name}.Text.content`) ?? '')
+    : String(opts.text);
+  const started = Number(font.size ?? 12);
+
+  // Measure at each candidate by handing the layout the REAL Font node with only the size swapped:
+  // letter spacing, word spacing and script mode all change the answer, and re-deriving them here
+  // would be the second implementation this verb exists to avoid.
+  const fitsAt = (size) => {
+    const probe = buildBlockTextLayout(content, {
+      fontSection: { ...font, size },
+      family: font.family || 'Arial',
+      maxWidth: boxW,
+      wrapMode: String(multiline.wrapMode ?? 'word'),
+      overflowMode: String(multiline.overflowMode ?? 'clip'),
+      maxLines: Number(multiline.maxLines ?? 0),
+      lineHeightMultiplier: Number(multiline.lineHeight ?? 1.2),
+    });
+    return probe.width <= boxW + 0.5 && probe.height <= boxH + 0.5;
+  };
+
+  let chosen = Math.round(min);
+  let fitted = false;
+  for (let size = Math.round(max); size >= Math.round(min); size -= 1) {
+    if (fitsAt(size)) { chosen = size; fitted = true; break; }
+  }
+
+  setValue(`${name}.Text.Font.size`, chosen);
+  return {
+    size: Number(getValue(`${name}.Text.Font.size`)),
+    fits: fitted,
+    changed: Number(getValue(`${name}.Text.Font.size`)) !== started,
+    exact: typeof document !== 'undefined' && typeof document.createElement === 'function',
+  };
+}
+
 function drawClearImpl(explicit, ownerName) {
   const control = drawTarget(explicit, ownerName);
   if (!control) return false;
@@ -5443,6 +5711,20 @@ function buildApi(ownerName, scriptId = '') {
       { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
         scale: Math.max(1, Math.round(Number(scale) || 1)) }),
     drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
+
+    // ce.text (§46). fonts/font answer from the catalogue; the rest work on one control's Text.
+    textFonts: (opts) => {
+      const all = textCatalogue();
+      if (opts?.portable === true) return all.filter((f) => f.portable);
+      if (opts?.variable === true) return all.filter((f) => f.variable);
+      return all;
+    },
+    textFont: (family) => findFont(textCatalogue(), family) ?? undefined,
+    textStyle: (target, opts) => textStyleImpl(target, opts),
+    textAxis: (target, tag, value) => textAxisImpl(target, tag, value),
+    textRead: (target, field) => textReadImpl(target, field),
+    textMeasure: (target, text) => textMeasureImpl(target, text),
+    textFit: (target, opts) => textFitImpl(target, opts),
     drawRect: (x, y, w, h, radius) => pushCommand(null, ownerName,
       { op: 'rect', x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
         radius: Number(radius) > 0 ? Number(radius) : 0 }),
