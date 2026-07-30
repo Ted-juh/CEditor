@@ -178,6 +178,11 @@
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
   import {
+    createMomentaryButtonPreviewController,
+    isPressToTalkBehavior,
+    isRepeatingBehavior,
+  } from '../utils/momentaryButtonPreview.js';
+  import {
     adjustRangeValue,
     adjustRangeHandleValue,
     clampRangeHandleValue,
@@ -275,6 +280,13 @@
   let openComboboxControlId = $state('');
 
   const timedButtonPreview = createTimedButtonPreviewController({
+    patchSession: (controlId, patch) => patchControlSession(controlId, patch),
+  });
+
+  // The momentary twin: `repeating` and `press_to_talk`, which the Properties panel has offered all
+  // along and nothing honoured. Same channel as the timed controller, so both are only session
+  // patches and neither needs a private path into bindings or the script runtime.
+  const momentaryButtonPreview = createMomentaryButtonPreviewController({
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
   });
 
@@ -5537,6 +5549,7 @@
   onDestroy(() => {
     removeWindowListeners();
     timedButtonPreview.destroy();
+    momentaryButtonPreview.destroy();
   });
 
   $effect(() => {
@@ -5549,8 +5562,10 @@
     // writing (a roll firing notes on a timer) tore its own listeners off mid-gesture.
     const activeControlIds = [...controlsById.keys()];
     timedButtonPreview.syncKeys(activeControlIds);
+    momentaryButtonPreview.syncKeys(activeControlIds);
 
     if (pointerActiveControlId && !controlsById.has(pointerActiveControlId)) {
+      momentaryButtonPreview.cancel(pointerActiveControlId);
       pointerActiveControlId = '';
       pointerActiveElement = null;
       draggingRange = false;
@@ -5950,6 +5965,10 @@
       });
     }
 
+    // Folded into the SAME patch, not sent after it: a second patch in this tick arrives while the
+    // script runtime is still dispatching the first and is dropped, which is how press-to-talk came
+    // to report its release and never its press.
+    const momentaryPress = momentaryButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));
     patchControlSession(pointerActiveControlId, {
       hover: true,
       pressed: true,
@@ -5959,6 +5978,7 @@
       pointerY: pointerDownLocal.y,
       pointerButton: event.button,
       pointerModifiers: (event.shiftKey ? 1 : 0) | (event.ctrlKey ? 2 : 0) | (event.altKey ? 4 : 0) | (event.metaKey ? 8 : 0),
+      ...(momentaryPress ?? {}),
     });
     if (isTimedButtonBehavior(getBehavior(control))) {
       timedButtonPreview.beginPress(pointerActiveControlId, getBehavior(control));
@@ -6173,6 +6193,8 @@
       pointerSliderHandle = '';
       pointerCustomHitZone = null;
       pointerCustomStartValues = {};
+      const abandoned = momentaryButtonPreview.releasePress(activeId, activeBehavior);
+      if (abandoned) patchControlSession(activeId, abandoned);
       removeWindowListeners();
       return;
     }
@@ -6210,11 +6232,13 @@
     } else if (isTimedButtonBehavior(activeBehavior)) {
       timedButtonPreview.releasePress(activeId, activeBehavior, { inside });
     }
+    const momentaryRelease = momentaryButtonPreview.releasePress(activeId, activeBehavior);
 
     patchControlSession(activeId, {
       hover: inside,
       pressed: false,
       dragging: false,
+      ...(momentaryRelease ?? {}),
     });
 
     pointerActiveControlId = '';

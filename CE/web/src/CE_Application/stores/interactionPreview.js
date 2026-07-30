@@ -33,6 +33,10 @@ const DEFAULT_SESSION = {
   disabled: false,
   pending: false,
   executed: false,
+  // Repeats while held (momentary/repeating). A COUNTER, not a flag: two fires 120 ms apart patch
+  // the same `executed: true` and shallowEqualSession would swallow the second, so the only way a
+  // consumer can tell one repeat from the next is a number that goes up.
+  repeatCount: 0,
   checked: false,
   mixed: false,
   valueOverrideEnabled: false,

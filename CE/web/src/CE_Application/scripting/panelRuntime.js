@@ -2903,6 +2903,16 @@ export function registeredActions() {
     has no store, so it needs the same entry point rather than a reimplementation of it. */
 export function runReactiveForTesting() { runReactive(); }
 
+/** The same door for the preview-session diff — the source of every press, release, hover and
+    repeat. Returns the dispatch, so a test can wait for the handlers rather than guess at ticks. */
+export function runPreviewSessionsForTesting(sessions = null) {
+  // initPanelRuntime normally sets these off the stores; a test that never started the runtime
+  // would otherwise diff against no active panel, and every event would be addressed by raw id.
+  live.activePanelId = get(resolvedActivePanelId);
+  live.enabledGlobal = true;
+  return onPreviewSessionsChanged(sessions ?? get(panelPreviewSessions));
+}
+
 /** Drop every loaded handler, listener, rule and timer — what a panel switch does. Exposed so a
     test can start clean: rules outlive a single `set`, which is the whole point of them, and two
     tests sharing this module would otherwise share each other's formulas and filters. */
@@ -7207,7 +7217,10 @@ function seedSessionSnapshot() {
   const sessions = get(panelPreviewSessions) ?? {};
   const next = new Map();
   for (const [id, s] of Object.entries(sessions)) {
-    next.set(id, { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true, disabled: s.disabled === true });
+    next.set(id, {
+      value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
+      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0,
+    });
   }
   live.sessionLast = next;
 }
@@ -7217,7 +7230,10 @@ function onPreviewSessionsChanged(sessions) {
   const events = [];
   const next = new Map();
   for (const [id, s] of Object.entries(sessions ?? {})) {
-    const cur = { value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true, disabled: s.disabled === true };
+    const cur = {
+      value: sessionValue(s), pressed: s.pressed === true, hover: s.hover === true,
+      disabled: s.disabled === true, repeats: Number(s.repeatCount) || 0,
+    };
     next.set(id, cur);
     const prev = live.sessionLast.get(id);
     if (!prev) continue;
@@ -7232,6 +7248,16 @@ function onPreviewSessionsChanged(sessions) {
       events.push({ event: cur.pressed ? 'onPointerDown' : 'onPointerUp', controlName: name, payload: mouse });
       if (!cur.pressed) events.push({ event: 'onClick', controlName: name, payload: mouse }); // release = click
     }
+    // A repeat is another FIRING of the button, so it raises the event a firing already raises
+    // rather than a new one nobody has heard of: `momentary/repeating` says "keeps firing while
+    // held", and onClick is what "it fired" means everywhere else in the contract. The counter is
+    // what makes two fires distinguishable — comparing a boolean pulse would merge them.
+    if (cur.repeats > prev.repeats) {
+      const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
+      for (let i = prev.repeats; i < cur.repeats; i += 1) {
+        events.push({ event: 'onClick', controlName: name, payload: mouse });
+      }
+    }
     if (prev.hover !== cur.hover) {
       events.push({ event: cur.hover ? 'onHoverStart' : 'onHoverEnd', controlName: name, payload: undefined });
     }
@@ -7244,11 +7270,12 @@ function onPreviewSessionsChanged(sessions) {
     }
   }
   live.sessionLast = next;
-  if (events.length) dispatchEvents(events);
+  const dispatched = events.length ? dispatchEvents(events) : null;
   // The reactive rules settle AFTER the declared events, and run even when there were no
   // events at all: a nested field moving (a colour, a section property) produces no
   // control event, and watching exactly those is the point of watch().
   runReactive();
+  return dispatched;
 }
 
 /* --- source 3: preview mode flag (lifecycle) --- */
