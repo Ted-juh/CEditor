@@ -3497,8 +3497,19 @@ function uiDialogImpl(scriptId, opts, onChoice) {
 // already guarded by live.dispatching — so one set of style state is enough.
 const drawState = {
   target: null, fill: null, stroke: null, strokeWidth: 1,
-  dash: null, cap: null, join: null, opacity: null, transform: null,
+  dash: null, dashOffset: null, cap: null, join: null,
+  opacity: null, transform: null, clip: null, blend: null,
 };
+
+// save()/restore() — the style was flat, so setting a stroke for one shape meant remembering what it
+// had been and putting it back by hand, and getting that wrong changes every shape after it. The
+// stack holds copies rather than references: a restore has to be unaffected by what was drawn in
+// between (§49).
+const drawStateStack = [];
+const DRAW_STYLE_KEYS = [
+  'fill', 'stroke', 'strokeWidth', 'dash', 'dashOffset', 'cap', 'join',
+  'opacity', 'transform', 'clip', 'blend',
+];
 
 // Gradients get an id because SVG paints them by reference: the overlay defines each one once in
 // <defs> and every shape using it points at that. Per panel rather than per draw pass, so a
@@ -3568,12 +3579,173 @@ function pushCommand(explicit, ownerName, command) {
   list.push({
     ...command,
     fill: drawState.fill, stroke: drawState.stroke, strokeWidth: drawState.strokeWidth,
-    dash: drawState.dash, cap: drawState.cap, join: drawState.join,
+    dash: drawState.dash, dashOffset: drawState.dashOffset,
+    cap: drawState.cap, join: drawState.join,
     opacity: drawState.opacity, transform: drawState.transform,
+    clip: drawState.clip, blend: drawState.blend,
   });
   drawCommands.set(id, list);
-  setDrawing(id, [...list]);
+  // `list`, not `[...list]` (§49). Copying on every command made an append O(n) and a drawing O(n²):
+  // 256 segments cost 21ms of array copying alone, more than a 60fps frame, before any rendering.
+  // The overlay depends on `revision` rather than the array's identity so that this is safe.
+  //
+  // The remaining per-command cost is the store notification itself, and that is what batch()
+  // removes — it cannot be removed implicitly, because dispatchEvents is async and "the end of the
+  // draw pass" is not a moment this code can hold.
+  if (drawBatchDepth > 0) drawBatchDirty.add(id);
+  else setDrawing(id, list);
   return true;
+}
+
+// batch() suspends publishing, not recording: the commands still land in drawCommands as they are
+// issued, so a script inside a batch sees exactly what a script outside one sees. Only the store
+// notification is deferred, and only to the end of the block.
+let drawBatchDepth = 0;
+const drawBatchDirty = new Set();
+
+function runDrawBatch(fn) {
+  if (typeof fn !== 'function') return false;
+  drawBatchDepth += 1;
+  try {
+    fn();
+  } catch (e) {
+    addScriptTrace('error', '', String(e?.message ?? e));
+  } finally {
+    // finally, not catch-and-continue: a throwing block must not leave publishing suspended, or
+    // every later draw in the panel silently stops appearing. Same rule noTransmit follows.
+    drawBatchDepth -= 1;
+    if (drawBatchDepth === 0) {
+      for (const id of drawBatchDirty) setDrawing(id, drawCommands.get(id) ?? []);
+      drawBatchDirty.clear();
+    }
+  }
+  return true;
+}
+
+/* --- the bulk primitives (design doc §49) ------------------------------------------------------
+ *
+ * A grid was a loop of drawLine, and a loop was the expensive thing: n commands, n store
+ * notifications, n SVG elements. These are ONE command and one element for the whole lot, which is
+ * the difference between a step grid being affordable and being the reason a panel drops frames.
+ *
+ * `segments` carries disjoint line pairs and renders as a single <path> of M/L moves — grid() is
+ * just the special case that computes a lattice, so both share one op and one renderer branch.
+ */
+
+/** A flat list of [x1, y1, x2, y2] segments from whatever shape the script passed. */
+function toSegmentList(value) {
+  const out = [];
+  if (!value) return out;
+  const list = Array.isArray(value) ? value : Object.values(value);
+  for (const item of list) {
+    const seg = Array.isArray(item) ? item : (item && typeof item === 'object'
+      ? [item.x1 ?? item[0], item.y1 ?? item[1], item.x2 ?? item[2], item.y2 ?? item[3]]
+      : null);
+    if (!seg) continue;
+    const [a, b, c, d] = seg.map((n) => Number(n));
+    if ([a, b, c, d].every((n) => Number.isFinite(n))) out.push([a, b, c, d]);
+  }
+  return out;
+}
+
+function drawGridImpl(explicit, ownerName, opts) {
+  const control = drawTarget(explicit, ownerName);
+  if (!control) {
+    addScriptTrace('error', '', 'ce.draw.grid: no control to draw on.');
+    return false;
+  }
+  const transform = control._children?.Transform ?? {};
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const x = Number(o.x ?? 0);
+  const y = Number(o.y ?? 0);
+  const w = Number(o.width ?? (Number(transform.width) || 0) - x);
+  const h = Number(o.height ?? (Number(transform.height) || 0) - y);
+
+  // Spacing OR counts, because both are the natural way to ask depending on what you know: a step
+  // sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels.
+  const cols = Number(o.columns ?? 0);
+  const rows = Number(o.rows ?? 0);
+  const stepX = cols > 0 ? w / cols : Number(o.stepX ?? o.step ?? 0);
+  const stepY = rows > 0 ? h / rows : Number(o.stepY ?? o.step ?? 0);
+
+  if (!(stepX > 0) && !(stepY > 0)) {
+    addScriptTrace('error', '',
+      'ce.draw.grid: needs a spacing or a count — { step }, { stepX, stepY } or { columns, rows }.');
+    return false;
+  }
+
+  const segments = [];
+  // <= so the closing line is drawn: a 4-column grid over 100px has lines at 0, 25, 50, 75 AND 100,
+  // and a grid missing its right edge looks like a bug in the panel rather than in the call.
+  if (stepX > 0) for (let gx = x; gx <= x + w + 0.0001; gx += stepX) segments.push([gx, y, gx, y + h]);
+  if (stepY > 0) for (let gy = y; gy <= y + h + 0.0001; gy += stepY) segments.push([x, gy, x + w, gy]);
+  return pushCommand(explicit, ownerName, { op: 'segments', segments });
+}
+
+function drawLinesImpl(explicit, ownerName, value) {
+  const segments = toSegmentList(value);
+  if (!segments.length) {
+    addScriptTrace('error', '',
+      'ce.draw.lines: no segments. Pass a list of [x1, y1, x2, y2] — one command for all of them, '
+      + 'which is the point of this over a loop of line().');
+    return false;
+  }
+  return pushCommand(explicit, ownerName, { op: 'segments', segments });
+}
+
+function drawPointsImpl(explicit, ownerName, value, radius) {
+  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
+  const points = [];
+  for (const item of list) {
+    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
+    if (!pair) continue;
+    const [px, py] = pair.map((n) => Number(n));
+    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
+  }
+  if (!points.length) {
+    addScriptTrace('error', '', 'ce.draw.points: no points. Pass a list of [x, y].');
+    return false;
+  }
+  const r = Number(radius) > 0 ? Number(radius) : 1.5;
+  return pushCommand(explicit, ownerName, { op: 'dots', points, r });
+}
+
+function drawCurveImpl(explicit, ownerName, value, opts) {
+  const list = value ? (Array.isArray(value) ? value : Object.values(value)) : [];
+  const points = [];
+  for (const item of list) {
+    const pair = Array.isArray(item) ? item : (item && typeof item === 'object' ? [item.x, item.y] : null);
+    if (!pair) continue;
+    const [px, py] = pair.map((n) => Number(n));
+    if (Number.isFinite(px) && Number.isFinite(py)) points.push([px, py]);
+  }
+  if (points.length < 2) {
+    addScriptTrace('error', '', 'ce.draw.curve: needs at least two points.');
+    return false;
+  }
+  // A curve was inexpressible before: you approximated it with straight segments, which meant a
+  // loop, which was the expensive thing. `tension` 0 is a polyline and 1 is fully round.
+  const tension = Math.max(0, Math.min(1, Number(opts?.tension ?? 0.5)));
+  return pushCommand(explicit, ownerName, {
+    op: 'curve', points, tension, closed: opts?.closed === true,
+  });
+}
+
+function drawPolygonImpl(explicit, ownerName, cx, cy, r, sides, opts) {
+  const n = Math.max(3, Math.round(Number(sides) || 3));
+  const radius = Number(r) || 0;
+  const x = Number(cx) || 0;
+  const y = Number(cy) || 0;
+  // Rotation in the panel's drawing convention: degrees, 0 at twelve o'clock, clockwise — the same
+  // one drawArc uses, so a polygon and an arc drawn at the same angle line up.
+  const from = ((Number(opts?.rotation) || 0) - 90) * (Math.PI / 180);
+  const points = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = from + (i * 2 * Math.PI) / n;
+    points.push([x + Math.cos(a) * radius, y + Math.sin(a) * radius]);
+  }
+  // Emitted as an ordinary closed path — no new renderer branch needed for a shape that IS one.
+  return pushCommand(explicit, ownerName, { op: 'path', points, closed: true });
 }
 
 /**
@@ -3895,10 +4067,17 @@ function runDrawPass(control) {
   // one happened to leave set would look different depending on what ran before it, which is the
   // whole reason this reset exists.
   drawState.dash = null;
+  drawState.dashOffset = null;
   drawState.cap = null;
   drawState.join = null;
   drawState.opacity = null;
   drawState.transform = null;
+  drawState.clip = null;
+  drawState.blend = null;
+  // …and the save() stack, which is style state too: a pass that saved and never restored would
+  // otherwise leak a growing stack into every later pass, and a stray restore() in the next frame
+  // would pop something from the last one.
+  drawStateStack.length = 0;
 
   dispatchEvents([{
     event: 'onDraw',
@@ -5684,6 +5863,9 @@ function buildApi(ownerName, scriptId = '') {
         : (typeof dash === 'string' && dash ? dash : null);
       drawState.cap = ['butt', 'round', 'square'].includes(opts?.cap) ? opts.cap : null;
       drawState.join = ['miter', 'round', 'bevel'].includes(opts?.join) ? opts.join : null;
+      // dashOffset is what makes a dash MOVE: advance it on a timer and you have marching ants,
+      // which is how a panel shows "this is recording" without redrawing the shape (§49).
+      drawState.dashOffset = Number.isFinite(Number(opts?.dashOffset)) ? Number(opts.dashOffset) : null;
     },
     drawGradient: (stops, angle) => drawGradientImpl(stops, angle),
     // Applies to everything drawn after it, like fill and stroke — not to one shape, because the
@@ -5723,6 +5905,64 @@ function buildApi(ownerName, scriptId = '') {
       { op: 'pixelText', text: String(text ?? ''), x: Number(x) || 0, y: Number(y) || 0,
         scale: Math.max(1, Math.round(Number(scale) || 1)) }),
     drawMeasure: (text, opts) => drawMeasureImpl(text, opts),
+
+    /* ce.draw, phase §49 — the bulk primitives, a style stack, clipping and images. */
+    drawBatch: (fn) => runDrawBatch(fn),
+    drawGrid: (opts) => drawGridImpl(null, ownerName, opts),
+    drawLines: (segments) => drawLinesImpl(null, ownerName, segments),
+    drawPoints: (points, r) => drawPointsImpl(null, ownerName, points, r),
+    drawCurve: (points, opts) => drawCurveImpl(null, ownerName, points, opts),
+    drawPolygon: (cx, cy, r, sides, opts) => drawPolygonImpl(null, ownerName, cx, cy, r, sides, opts),
+    // An image needs a source the renderer can actually load: a data URL, or an icon from the
+    // library resolved through ce.image. A bare name would be a string that silently draws nothing.
+    drawImage: (src, x, y, w, h, opts) => {
+      const source = String(src ?? '');
+      if (!source) {
+        addScriptTrace('error', '',
+          'ce.draw.image: no source. Pass a data URL, or ce.image.asset(name).dataUrl for a library icon.');
+        return false;
+      }
+      return pushCommand(null, ownerName, {
+        op: 'image', src: source,
+        x: Number(x) || 0, y: Number(y) || 0, w: Number(w) || 0, h: Number(h) || 0,
+        fit: ['fill', 'contain', 'cover'].includes(opts?.fit) ? opts.fit : 'fill',
+      });
+    },
+    // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
+    // fill and stroke do, and save()/restore() put them back.
+    drawClip: (x, y, w, h) => {
+      if (x === undefined || x === null) { drawState.clip = null; return true; }
+      drawState.clip = {
+        x: Number(x) || 0, y: Number(y) || 0,
+        w: Math.max(0, Number(w) || 0), h: Math.max(0, Number(h) || 0),
+      };
+      return true;
+    },
+    drawBlend: (mode) => {
+      const legal = ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
+        'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'];
+      const wanted = String(mode ?? 'normal');
+      if (!legal.includes(wanted)) {
+        addScriptTrace('error', '',
+          `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
+        return false;
+      }
+      drawState.blend = wanted === 'normal' ? null : wanted;
+      return true;
+    },
+    drawSave: () => {
+      drawStateStack.push(Object.fromEntries(DRAW_STYLE_KEYS.map((k) => [k, drawState[k]])));
+      return true;
+    },
+    drawRestore: () => {
+      const saved = drawStateStack.pop();
+      if (!saved) {
+        addScriptTrace('error', '', 'ce.draw.restore: nothing was saved. Every restore needs a save.');
+        return false;
+      }
+      for (const k of DRAW_STYLE_KEYS) drawState[k] = saved[k];
+      return true;
+    },
 
     // ce.text (§46). fonts/font answer from the catalogue; the rest work on one control's Text.
     textFonts: (opts) => {

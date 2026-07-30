@@ -19,7 +19,15 @@ export function drawingFor(controlId) {
   return get(scriptDrawings)[String(controlId)]?.commands ?? [];
 }
 
-/** Replace one control's command list. `revision` bumps so the renderer re-runs. */
+/**
+ * Replace one control's command list. `revision` bumps so the renderer re-runs.
+ *
+ * The runtime hands over its OWN array rather than a copy (design doc §49): it used to pass
+ * `[...list]` on every single command, so drawing n shapes copied the list n times and did O(n²)
+ * work for what is a sequence of appends — 21ms for a 256-segment trace, before any rendering. That
+ * means consumers must depend on `revision` and not on the array's identity, since the identity no
+ * longer changes between commands. ScriptDrawOverlay does exactly that, with a comment saying why.
+ */
 export function setDrawing(controlId, commands) {
   const key = String(controlId);
   scriptDrawings.update((all) => ({
@@ -27,6 +35,7 @@ export function setDrawing(controlId, commands) {
     [key]: { commands, revision: (all[key]?.revision ?? 0) + 1 },
   }));
 }
+
 
 /** Drop one control's drawing, or every drawing when no id is given. */
 export function clearDrawing(controlId = null) {

@@ -1043,13 +1043,35 @@ function onError(info) {
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>The last twelve phases, newest first</p>
+    <p>The last thirteen phases, newest first</p>
   </div>
   <p class="prose">
-    The surface roughly tripled over these. Five of them were not additions at all &mdash; they were
+    The surface roughly tripled over these. Six of them were not additions at all &mdash; they were
     the API telling the truth about things it had been quietly getting wrong.
   </p>
   <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§49</b>ce.draw</div>
+      <div class="ship-body">
+        <p>
+          16 &rarr; 27 members: <code>grid</code>, <code>lines</code>, <code>points</code>,
+          <code>curve</code>, <code>polygon</code>, <code>image</code>, <code>clip</code>,
+          <code>blend</code>, <code>save</code>, <code>restore</code> and <code>batch</code>, plus
+          <code>dashOffset</code> on <code>stroke</code>.
+        </p>
+        <p class="note">
+          The verb count was never the problem: the module could not afford a <b>loop</b>. Every
+          command republished the whole command list, so drawing n shapes was O(n&sup2;) work and n
+          re&#8209;renders &mdash; 256 line segments cost 21ms before any painting happened, more
+          than a 60fps frame. And every interesting drawing (a scope trace, a spectrum, a step grid,
+          tick marks) is a loop. The list is no longer copied per command; <code>grid</code>,
+          <code>lines</code> and <code>points</code> are one command for the whole lot; and
+          <code>batch</code> collapses a run into a single publish &mdash; measured at 14&times;
+          faster for 256 segments and 19&times; for a 128&times;128 grid. A test pins the ratio so
+          the quadratic cannot come back.
+        </p>
+      </div>
+    </li>
     <li class="ship">
       <div class="ship-id"><b>§48</b>checksums</div>
       <div class="ship-body">

@@ -1142,6 +1142,110 @@ export const COMMANDS = [
     scopes: 'any',
   },
   {
+    id: 'drawBatch', category: 'Drawing', signature: 'drawBatch(fn) -> boolean',
+    summary: 'Issue a run of draw calls as one publish. Every command used to republish the whole command list, so drawing n shapes was O(n²) work and n re-renders — 256 line segments cost 21ms before any painting happened, which is more than a 60fps frame. The list is no longer copied per command, and this collapses the remaining n notifications into one. Reach for it whenever you are drawing in a loop; the bulk verbs (grid, lines, points) are already one command each and need no batch.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'fn', type: 'function', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'drawGrid', category: 'Drawing', signature: 'drawGrid([opts]) -> boolean',
+    summary: 'A whole lattice as ONE command and one path. `opts` may carry { x, y, width, height } (defaulting to the control\'s box) and either a spacing — { step } or { stepX, stepY } — or a count, { columns, rows }. Both forms exist because both are how you actually know it: a step sequencer knows it has 16 columns, a ruler knows it wants a line every 10 pixels. The closing line is drawn, so a 4-column grid has five verticals rather than a missing right edge.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'opts', type: 'object', required: false,
+      fields: ['x', 'y', 'width', 'height', 'step', 'stepX', 'stepY', 'columns', 'rows'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'drawLines', category: 'Drawing', signature: 'drawLines(segments) -> boolean',
+    summary: 'Many DISJOINT line segments in one command — a list of [x1, y1, x2, y2]. drawPath already draws a connected run cheaply; this is for geometry that is not connected: tick marks, a VU ladder, a scatter of whiskers, a grid you are computing yourself. One command and one path instead of one of each per segment.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'segments', type: 'list', required: true }],
+    scopes: 'any',
+  },
+  {
+    id: 'drawPoints', category: 'Drawing', signature: 'drawPoints(points [, radius]) -> boolean',
+    summary: 'A scatter of dots as one command — a list of [x, y], with `radius` defaulting to 1.5. The radius is the dot\'s own rather than the stroke width\'s, so a thin outline and a fat dot are independent.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'points', type: 'list', required: true },
+      { name: 'radius', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawCurve', category: 'Drawing', signature: 'drawCurve(points [, opts]) -> boolean',
+    summary: 'A smooth curve THROUGH the given points, not merely near them — a Catmull-Rom spline emitted as cubic Béziers. `opts` carries { tension } (0 collapses to straight lines, 1 is fully round, default 0.5) and { closed }. Before this a curve meant approximating it with straight segments, which meant a loop, which was the expensive thing.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'points', type: 'list', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['tension', 'closed'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawPolygon', category: 'Drawing', signature: 'drawPolygon(cx, cy, radius, sides [, opts]) -> boolean',
+    summary: 'A regular polygon — hexagonal pads, a radar plot\'s frame, a triangle indicator. `opts.rotation` is in DEGREES with 0 at twelve o\'clock, clockwise, the same convention drawArc uses, so a polygon and an arc drawn at the same angle line up. Fewer than three sides is raised to three.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'cx', type: 'number', required: true },
+      { name: 'cy', type: 'number', required: true },
+      { name: 'radius', type: 'number', required: true },
+      { name: 'sides', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['rotation'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawImage', category: 'Drawing', signature: 'drawImage(src, x, y, w, h [, opts]) -> boolean',
+    summary: 'Draw an image. `src` must be something the renderer can load — a data URL, or a library icon\'s dataUrl from ce.image.asset(). A bare asset NAME is refused rather than accepted and drawn as nothing, which is the failure this verb is most likely to be handed. `opts.fit` is "fill" (stretch, the default), "contain" or "cover".',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'src', type: 'string', required: true },
+      { name: 'x', type: 'number', required: true },
+      { name: 'y', type: 'number', required: true },
+      { name: 'w', type: 'number', required: true },
+      { name: 'h', type: 'number', required: true },
+      { name: 'opts', type: 'object', required: false, fields: ['fit'] },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawClip', category: 'Drawing', signature: 'drawClip([x, y, w, h]) -> boolean',
+    summary: 'Restrict everything drawn AFTER this to a rectangle. Style, not a shape: it applies until changed, and save()/restore() put it back. No arguments clears it. This cannot be emulated — a script could previously only avoid drawing outside a region, never clip what it drew. The control\'s own bounds still clip on top, so a clip can narrow the drawing area but never widen it.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'x', type: 'number', required: false },
+      { name: 'y', type: 'number', required: false },
+      { name: 'w', type: 'number', required: false },
+      { name: 'h', type: 'number', required: false },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'drawBlend', category: 'Drawing', signature: 'drawBlend(mode) -> boolean',
+    summary: 'How what follows composites with what is under it: "normal" (the default), "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference", "exclusion". An unknown mode is refused and reported rather than silently ignored.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'mode', type: 'string', required: true,
+      values: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge',
+        'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'] }],
+    scopes: 'any',
+  },
+  {
+    id: 'drawSave', category: 'Drawing', signature: 'drawSave() -> boolean',
+    summary: 'Push the current style — fill, stroke, width, dash, dash offset, cap, join, opacity, transform, clip and blend — so restore() can put it back. The style was flat before this, so setting a colour for one shape meant remembering the old one by hand and getting it wrong changed every shape after it. The stack is cleared at the start of each draw pass, so a pass that saves without restoring cannot leak into the next one.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'drawRestore', category: 'Drawing', signature: 'drawRestore() -> boolean',
+    summary: 'Pop the style that save() pushed. Reports and returns false when nothing was saved, rather than silently resetting to defaults — an unbalanced restore is a bug in the script and worth hearing about.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
     summary: 'Every font this panel may use: { family, label, source, portable, variable, axes, features, featuresKnown }. `opts` may narrow it with { portable = true } or { variable = true }. `portable` is the one to read before styling anything: a builtin family is named in every runtime, while a font from the library is registered by the editor at edit time and is NOT part of the panel document — so it looks right while you build and falls back to a platform default once exported. `featuresKnown` separates "scanned, has none" from "nobody has scanned it", because [] otherwise reads as a fact it is not.',
     runtime: RUNTIME_WEBVIEW,
@@ -2890,6 +2994,12 @@ const MODULE_MEMBERS = {
     // author reaches for, so the flat spellings keep the draw prefix.
     gradient: 'drawGradient', opacity: 'drawOpacity', transform: 'drawTransform',
     ellipse: 'drawEllipse', pixelText: 'drawPixelText', measure: 'drawMeasure',
+    // §49. `grid`, `lines`, `points`, `curve`, `polygon`, `image`, `clip`, `blend`, `save`,
+    // `restore` and `batch` are all bare words, so every flat alias keeps the draw prefix — the
+    // same §1 rule the rest of this module follows.
+    batch: 'drawBatch', grid: 'drawGrid', lines: 'drawLines', points: 'drawPoints',
+    curve: 'drawCurve', polygon: 'drawPolygon', image: 'drawImage', clip: 'drawClip',
+    blend: 'drawBlend', save: 'drawSave', restore: 'drawRestore',
   },
   // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
   // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and

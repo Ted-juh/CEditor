@@ -607,4 +607,46 @@ export const WRITTEN = {
     lua: `ce.components.setlist.read("Setlist", "wrap")`,
     js: `ce.components.setlist.read("Setlist", "wrap");`,
   },
+  /* ---------------------------------------------------------------- ce.draw, phase §49 */
+  drawBatch: {
+    lua: `-- one publish for the whole lot instead of one per command\nce.draw.batch(function()\n  for i = 0, 63 do\n    ce.draw.line(i * 2, 32 - trace[i + 1] * 32, i * 2, 32)\n  end\nend)`,
+    js: `// one publish for the whole lot instead of one per command\nce.draw.batch(() => {\n  for (let i = 0; i < 64; i += 1) {\n    ce.draw.line(i * 2, 32 - trace[i] * 32, i * 2, 32);\n  }\n});`,
+  },
+  drawGrid: {
+    lua: `ce.draw.stroke("#2A2D3A", 1)\nce.draw.grid({ columns = 16, rows = 4 })   -- the control's whole box\nce.draw.grid({ x = 4, y = 4, width = 120, height = 40, step = 10 })`,
+    js: `ce.draw.stroke("#2A2D3A", 1);\nce.draw.grid({ columns: 16, rows: 4 });   // the control's whole box\nce.draw.grid({ x: 4, y: 4, width: 120, height: 40, step: 10 });`,
+  },
+  drawLines: {
+    lua: `-- tick marks: disjoint, so one command rather than one per tick\nlocal ticks = {}\nfor i = 0, 10 do ticks[#ticks + 1] = { i * 12, 28, i * 12, i % 5 == 0 and 20 or 24 } end\nce.draw.lines(ticks)`,
+    js: `// tick marks: disjoint, so one command rather than one per tick\nconst ticks = [];\nfor (let i = 0; i <= 10; i += 1) ticks.push([i * 12, 28, i * 12, i % 5 === 0 ? 20 : 24]);\nce.draw.lines(ticks);`,
+  },
+  drawPoints: {
+    lua: `ce.draw.fill("#39D98A")\nce.draw.points({ { 10, 20 }, { 24, 14 }, { 38, 26 } }, 2)`,
+    js: `ce.draw.fill("#39D98A");\nce.draw.points([[10, 20], [24, 14], [38, 26]], 2);`,
+  },
+  drawCurve: {
+    lua: `-- through the points, not merely near them\nce.draw.stroke("#5B9BD5", 2)\nce.draw.curve({ { 0, 40 }, { 20, 8 }, { 50, 24 }, { 90, 4 } }, { tension = 0.6 })`,
+    js: `// through the points, not merely near them\nce.draw.stroke("#5B9BD5", 2);\nce.draw.curve([[0, 40], [20, 8], [50, 24], [90, 4]], { tension: 0.6 });`,
+  },
+  drawPolygon: {
+    lua: `ce.draw.fill("#172634")\nce.draw.polygon(32, 32, 20, 6, { rotation = 30 })   -- a hexagonal pad`,
+    js: `ce.draw.fill("#172634");\nce.draw.polygon(32, 32, 20, 6, { rotation: 30 });   // a hexagonal pad`,
+  },
+  drawImage: {
+    lua: `-- the source must be LOADABLE: a data URL or an http(s) one. A bare asset name is refused\n-- rather than accepted and drawn as nothing.\nce.draw.image(logoDataUrl, 4, 4, 24, 24, { fit = "contain" })`,
+    js: `// the source must be LOADABLE: a data URL or an http(s) one. A bare asset name is refused\n// rather than accepted and drawn as nothing.\nce.draw.image(logoDataUrl, 4, 4, 24, 24, { fit: "contain" });`,
+  },
+  drawClip: {
+    lua: `ce.draw.clip(0, 0, 60, 32)   -- everything after this stays inside\nce.draw.rect(-10, -10, 200, 200)\nce.draw.clip()               -- no arguments clears it`,
+    js: `ce.draw.clip(0, 0, 60, 32);   // everything after this stays inside\nce.draw.rect(-10, -10, 200, 200);\nce.draw.clip();              // no arguments clears it`,
+  },
+  drawBlend: { code: 'ce.draw.blend("screen")   -- then "normal" to go back' },
+  drawSave: {
+    lua: `ce.draw.save()\nce.draw.stroke("#E05C5C", 3)\nce.draw.line(0, 0, 60, 0)\nce.draw.restore()   -- the stroke is whatever it was before`,
+    js: `ce.draw.save();\nce.draw.stroke("#E05C5C", 3);\nce.draw.line(0, 0, 60, 0);\nce.draw.restore();   // the stroke is whatever it was before`,
+  },
+  drawRestore: {
+    lua: `if not ce.draw.restore() then logWarn("a restore with no matching save") end`,
+    js: `if (!ce.draw.restore()) logWarn("a restore with no matching save");`,
+  },
 };
