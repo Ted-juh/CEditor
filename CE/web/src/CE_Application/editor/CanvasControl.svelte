@@ -3434,6 +3434,14 @@
     height: 100%;
     pointer-events: none;
   }
+  /* The "children re-enable interaction" half of the comment above, which was never actually
+     written: pointer-events: none INHERITS, so every nested control was transparent and a button
+     inside a Group could not be hovered, pressed or focused in preview — the parent swallowed the
+     lot. Scoped to preview-interactive on purpose. In the EDITOR the transparency is wanted:
+     clicking a child selects its container, which is how dragging a group around works. */
+  .children-origin :global(.canvas-control.preview-interactive) {
+    pointer-events: auto;
+  }
 
   /* Container highlighted as the live drop target during a canvas drag. */
   .canvas-control.drop-target {
