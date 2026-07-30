@@ -7039,6 +7039,7 @@ const live = {
   editOverride: null,      // { panelId, scripts } pushed by an open BehaviorDesigner
   last: new Map(),         // panels store: controlId -> value signature
   sessionLast: new Map(),  // preview overlay: controlId -> { value, pressed, hover }
+  sessionsDirty: false,    // a session change arrived mid-dispatch and still needs diffing
   readyFired: new Set(),   // panelIds that already saw onPanelReady (firstTime tracking)
   prevPreviewOn: false,
   dispatching: false,
@@ -7153,8 +7154,17 @@ async function dispatchEvents(events, { inbound = false } = {}) {
   } finally {
     if (inbound) origin.inboundDepth -= 1;
     snapshotValues();          // absorb panels writes our scripts just made
-    seedSessionSnapshot();     // and any preview-overlay writes
     live.dispatching = false;
+    if (live.sessionsDirty) {
+      // Something arrived while we were busy. Do NOT seed — seeding is what would swallow it.
+      // Leave the baseline alone and diff again on the next microtask, so the change is measured
+      // against the state it actually changed from. Each pass advances the baseline, so a burst
+      // drains rather than looping.
+      live.sessionsDirty = false;
+      Promise.resolve().then(() => onPreviewSessionsChanged(get(panelPreviewSessions)));
+    } else {
+      seedSessionSnapshot();   // absorb the preview-overlay writes our scripts just made
+    }
   }
 }
 
@@ -7226,7 +7236,13 @@ function seedSessionSnapshot() {
 }
 
 function onPreviewSessionsChanged(sessions) {
-  if (live.dispatching || !live.enabledGlobal) return;
+  if (!live.enabledGlobal) return;
+  // A change that lands MID-DISPATCH is remembered, not thrown away. Refusing to look at it was
+  // only half the problem: the dispatch then re-seeded the baseline from the very sessions it had
+  // declined to read, so the change became the new "nothing happened" and was lost for good. Any
+  // two patches in one tick hit this — the second one silently never existed. Press-to-talk found
+  // it by reporting its release and never its press.
+  if (live.dispatching) { live.sessionsDirty = true; return; }
   const events = [];
   const next = new Map();
   for (const [id, s] of Object.entries(sessions ?? {})) {

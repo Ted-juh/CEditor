@@ -267,3 +267,42 @@ test('every repeat reaches a script as onClick', async () => {
     assert.equal(clicks - before, 3, 'three repeats have to arrive as three onClicks, not one');
   } finally { panels.set([]); panelPreviewSessions.set({}); }
 });
+
+test('a session change that lands mid-dispatch is not lost', async () => {
+  // The wider bug press-to-talk exposed. Two patches in one tick: the first starts an async
+  // dispatch, the second arrives while `live.dispatching` is true. It used to be refused AND then
+  // absorbed by the re-seed at the end of that dispatch, so it became the new baseline and never
+  // happened. Anything patching twice in a tick hit it.
+  const { get } = await import('svelte/store');
+  const { scriptApiForTesting, runPreviewSessionsForTesting } =
+    await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { panels, activePanelId } = await import('../src/CE_Application/stores/panels.js');
+  const { panelPreviewSessions } = await import('../src/CE_Application/stores/interactionPreview.js');
+  const { MODULES } = await import('../src/CE_Application/scripting/panelApi.js');
+
+  const button = createControl('Button', { name: 'Talk' });
+  const id = button._children.Core.id;
+  panels.set([{ id: 'p', name: 'P', controls: [button], scripting: { modules: MODULES.map((m) => m.id) } }]);
+  activePanelId.set('p');
+  try {
+    const api = scriptApiForTesting('', 'talk');
+    const seen = [];
+    api.on('Talk', 'valueChanged', (v) => { seen.push(v); });
+
+    panelPreviewSessions.set({ [id]: { pressed: false, hover: true, checked: false } });
+    await runPreviewSessionsForTesting();
+
+    // press: `pressed` first, then `checked` — the two-patch shape the surface produced. Driven
+    // through the store, because the retry re-reads it exactly as the live subscription does.
+    panelPreviewSessions.set({ [id]: { pressed: true, hover: true, checked: false } });
+    const first = runPreviewSessionsForTesting();
+    panelPreviewSessions.set({ [id]: { pressed: true, hover: true, checked: true } });
+    runPreviewSessionsForTesting();          // arrives mid-dispatch
+    await first;
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+
+    assert.deepEqual(seen, [true],
+      'the value asserted during the first dispatch never arrived — it was swallowed by the re-seed');
+  } finally { panels.set([]); panelPreviewSessions.set({}); }
+});
