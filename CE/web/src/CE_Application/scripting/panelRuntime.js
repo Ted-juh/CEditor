@@ -57,7 +57,7 @@ import {
   handlerNamesForRuntime, RUNTIME_WEBVIEW, VALUE_ACCESSOR_IDS,
   PANEL_TARGET, PANEL_READONLY_PROPERTIES,
   MODULES, MODULE_BY_ID, moduleMemberMap, MEMBER_MODULE, isValueMember, MEMBER_BY_ID,
-  CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage,
+  CE_API_VERSION, RUNTIME_ANY, panelModules, moduleGateMessage, modulesUsedBy, resolveModules,
   allModules, moduleById, memberMapFor, registeredExtensions, EVENT_BY_ID,
 } from './panelApi.js';
 import { extensionSource } from './extensionModules.js';
@@ -6327,6 +6327,21 @@ function buildApi(ownerName, scriptId = '') {
 function enabledModules() {
   const panel = activePanel();
   if (!panel) return null;
+  // AUTO means "derived from what the scripts reference" — so it has to derive from the scripts
+  // that will actually RUN. activeScripts() is the Behavior Designer's live override, then the
+  // script documents, then the saved panel; panelModules() only ever saw the last of those. A
+  // script written in the designer therefore ran with every namespaced verb stubbed out, built
+  // nothing, and reported a gate that pointed at a list the panel does not even have. Gate from
+  // the same list you execute. A MANUAL list is authored intent and is still obeyed verbatim.
+  if (!Array.isArray(panel?.scripting?.modules)) {
+    const sources = scriptsForPanel(panel)
+      .map((script) => String(script?.source ?? ''))
+      .filter(Boolean);
+    if (sources.length) {
+      const used = [...new Set(sources.flatMap((src) => modulesUsedBy(src)))];
+      return new Set(resolveModules(used).enabled);
+    }
+  }
   return new Set(panelModules(panel).enabled);
 }
 
@@ -6582,6 +6597,41 @@ async function getLuaEngine() {
   return luaEnginePromise;
 }
 
+/**
+ * `null` -> `undefined` on the way back into Lua.
+ *
+ * wasmoon pushes a host function's return value through its promise extension, which reaches for
+ * `value.then` with no null check — so a verb that answers `null` raises "Cannot read properties
+ * of null" INSIDE the Lua chunk and kills the handler where it stands. Plenty of verbs answer
+ * "there is no such thing" with null (panelInfo, panelEntry, panelCreate, deviceParameter, …), and
+ * the guard the manual teaches — `local f = ce.text.font(x) ; if not f then` — is precisely what
+ * triggers it: the script asks about something absent and the engine dies instead of returning nil.
+ *
+ * `undefined` already pushes as nil, so the two spellings of "nothing" are normalised here rather
+ * than by auditing 39 existing call sites and remembering the rule for every verb added later.
+ * Only the top-level return is affected — a null NESTED in a returned table pushes fine.
+ */
+const nilSafe = (fn) => (...args) => {
+  const out = fn(...args);
+  if (out === null) return undefined;
+  if (out && typeof out.then === 'function') return out.then((v) => (v === null ? undefined : v));
+  return out;
+};
+
+/**
+ * The same treatment for the `ce.*` namespace, which is pushed as a table of tables — wrapping only
+ * the flat aliases would leave `ce.panel.info()` crashing while `panelInfo()` was fine, and the
+ * namespaced spelling is the one the manual teaches. A COPY, not a mutation: `api` is handed to the
+ * other engines unchanged, and the flat alias must stay identical to what it aliases.
+ */
+const nilSafeNamespace = (node, depth = 0) => {
+  if (typeof node === 'function') return nilSafe(node);
+  if (depth > 3 || !node || typeof node !== 'object') return node;
+  const out = {};
+  for (const [key, value] of Object.entries(node)) out[key] = nilSafeNamespace(value, depth + 1);
+  return out;
+};
+
 /** Execute a Lua script's source and return its declared handlers (async). */
 async function loadHandlersLua(script) {
   let lua;
@@ -6593,7 +6643,11 @@ async function loadHandlersLua(script) {
   }
   const api = buildApi(ownerOf(script), script.id);
   try {
-    for (const [k, v] of Object.entries(api)) lua.global.set(k, v);
+    for (const [k, v] of Object.entries(api)) {
+      if (typeof v === 'function') lua.global.set(k, nilSafe(v));
+      else if (k === 'ce') lua.global.set(k, nilSafeNamespace(v));
+      else lua.global.set(k, v);          // `state` and friends keep their identity
+    }
     // Clear any handlers left in globals by a previous run, eval the source, then collect this
     // run's handlers into a table the JS side can call.
     const names = probeNames(script);
@@ -6984,6 +7038,25 @@ const live = {
 function livePanel() {
   if (host) return host.panel ?? null;
   return get(panels).find((p) => String(p.id) === String(live.activePanelId)) ?? null;
+}
+
+/**
+ * The source scripts a GIVEN panel would run, newest authority first: the Behavior Designer's live
+ * override, then its script document, then whatever the panel document itself has saved.
+ *
+ * Taking the panel as an argument rather than reading `live.activePanelId` is what lets the module
+ * gate ask about the same panel it resolved — `activePanel()` follows the store while
+ * `live.activePanelId` is only set once initPanelRuntime has run, and gating from a panel whose
+ * scripts you could not see is what stubbed the whole API in the designer.
+ */
+function scriptsForPanel(panel) {
+  if (host) return host.scripts ?? [];
+  const pid = panel?.id;
+  if (pid == null) return [];
+  if (live.editOverride && String(live.editOverride.panelId) === String(pid)) return live.editOverride.scripts;
+  const doc = get(scriptDocuments).find((d) => String(d.panelId) === String(pid));
+  if (doc) return (doc.scripts ?? []).filter(isSourceScript);
+  return (panel.scripts ?? []).filter(isSourceScript);
 }
 
 /** The source scripts that should react for the active panel (live editor override, else the doc). */
