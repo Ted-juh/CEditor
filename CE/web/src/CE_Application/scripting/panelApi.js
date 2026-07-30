@@ -999,12 +999,12 @@ export const COMMANDS = [
   },
   {
     id: 'drawStroke', category: 'Drawing', signature: 'drawStroke([colour] [, width] [, opts])',
-    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it \u2014 the panel\u2019s own beat marks are { 3, 3 }), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }; path() used to hardcode round on both and now takes yours.',
+    summary: 'The line colour and thickness for the shapes that follow. `width` defaults to 1; nil colour means no stroke, and `colour` may be a gradient from ce.draw.gradient(). `opts` carries { dash (a list of on/off lengths, the way every drawing API since PostScript spells it \u2014 the panel\u2019s own beat marks are { 3, 3 }), dashOffset (how far into that pattern to start \u2014 advance it on a timer and the dash marches), cap ("butt" | "round" | "square"), join ("miter" | "round" | "bevel") }; path() used to hardcode round on both and now takes yours.',
     runtime: RUNTIME_WEBVIEW,
     params: [
       { name: 'colour', type: 'value', required: false },
       { name: 'width', type: 'number', required: false },
-      { name: 'opts', type: 'object', required: false, fields: ['dash', 'cap', 'join'] },
+      { name: 'opts', type: 'object', required: false, fields: ['dash', 'dashOffset', 'cap', 'join'] },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2})$0', javascript: 'ce.draw.stroke("${1:#5B9BD5}", ${2:2});$0' },
@@ -1986,7 +1986,7 @@ export const COMMANDS = [
      makes a build idempotent and what stops one half-saving into the author's document. */
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
-    signature: 'defineParameter(id, spec [, role]) -> boolean',
+    signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
     summary: 'Teach the app a parameter at runtime, for a synth it has no profile for. `spec` says how it reaches the synth — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — plus name/group/type/min/max for what parameters() reports. The declaration is refused (and says why) when there is no wire format: a descriptor that enumerates and sends nothing is worse than an error, because the panel looks built. A declared id overrides a profile one, so a script can correct one wrong parameter without redeclaring the rest. Sysex template tokens: a hex literal, $value, $deviceId, any $name from `variables`, $checksumStart and $checksum.',
     params: [
       { name: 'id', type: 'string', required: true },
@@ -2001,7 +2001,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
-    signature: 'defineDump(kind, spec [, role]) -> boolean',
+    signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
     summary: 'Describe a SysEx dump layout at runtime: `request` (the bytes that ask for it), `match` ({ prefix, suffix }), `offset`/`size` for the payload, an optional `checksum`, and `fields` — one { parameter, offset } per value the dump carries. Every field must name a parameter defineParameter already declared; an unknown one is refused rather than decoded to nothing months later. A declared layout is matched against arriving SysEx, fills the bound controls and raises onDumpReceived, exactly as a profile-defined dump does.',
     params: [
       { name: 'kind', type: 'string', required: true },
@@ -2016,7 +2016,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceBind', category: 'Device / MIDI',
-    signature: 'bind(control, parameterId [, opts]) -> boolean',
+    signature: 'deviceBind(control, parameterId [, opts]) -> boolean',
     // Panel view only for the same reason ce.panel.create is: the binding lives on the control
     // model, and there is no control model with the window shut.
     runtime: RUNTIME_WEBVIEW,
@@ -2034,7 +2034,7 @@ export const COMMANDS = [
   },
   {
     id: 'deviceUnbind', category: 'Device / MIDI',
-    signature: 'unbind(control [, port]) -> boolean',
+    signature: 'deviceUnbind(control [, port]) -> boolean',
     runtime: RUNTIME_WEBVIEW,
     summary: 'Remove a control\'s device binding. Returns whether there was one to remove, so "already clean" reads differently from "cleaned up".',
     params: [
@@ -2048,7 +2048,7 @@ export const COMMANDS = [
     },
   },
   {
-    id: 'devicePorts', category: 'Device / MIDI', signature: 'ports([opts]) -> list',
+    id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
     summary: 'What is actually plugged in: [{ id, name, direction, type, hardware, role }]. connected(role) only answers yes/no for a role somebody configured in advance; this enumerates the real ports, so a panel can offer the user a choice or notice a device that showed up. `hardware` is false for the two placeholder rows the app always lists ("No MIDI Input", "Preview Only"), and `role` is the role currently using the port, or empty. `opts.direction` narrows to "in" or "out".',
     requiresDeviceHost: true,
     params: [{ name: 'opts', type: 'object', required: false, fields: ['direction'] }],

@@ -361,9 +361,20 @@ test('drawing n shapes stays linear in the number of shapes', () => {
       api.drawBatch(() => { for (let i = 0; i < n; i += 1) api.drawLine(i, 0, i, 60); });
       return Number(process.hrtime.bigint() - t0) / 1e6;
     };
-    timeFor(256);                       // warm the JIT, so the first measurement is not the slow one
-    const small = Math.max(0.05, timeFor(256));
-    const large = timeFor(1024);
+    // MEDIAN OF MANY, not one sample each. A single pair failed on a busy machine at 15.7x while
+    // the true ratio was 4.0: at these sizes one GC pause or a descheduled slice is several times
+    // the whole measurement, so a lone sample measures the machine rather than the algorithm. The
+    // median is unmoved by a handful of stalls, which is exactly the noise being rejected.
+    const medianTimeFor = (n) => {
+      const runs = [];
+      for (let i = 0; i < 15; i += 1) runs.push(timeFor(n));
+      runs.sort((a, b) => a - b);
+      return runs[runs.length >> 1];
+    };
+    for (let i = 0; i < 5; i += 1) { timeFor(256); timeFor(1024); }   // warm the JIT
+
+    const small = Math.max(0.05, medianTimeFor(256));
+    const large = medianTimeFor(1024);
     // Four times the shapes. Linear would be ~4x; the old quadratic path was ~16x. A ceiling of 8
     // catches the regression with room for a noisy machine.
     assert.ok(large / small < 8,

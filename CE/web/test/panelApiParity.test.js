@@ -291,6 +291,24 @@ test('a member is reachable at its module path, and keeps its flat name as an al
   }
 });
 
+test('a published signature names the global that actually exists', () => {
+  // §1 says a signature is written FLAT, and it is not a cosmetic rule: the signature is the one
+  // line the manual and the editor's own hover both show, so a signature reading `bind(control,
+  // …)` for a member bound as `deviceBind` tells a reader to call something that is not there.
+  // Five ce.device members carried the namespaced spelling until an example ran into it.
+  const api = scriptApiForTesting();
+  for (const member of ALL_MEMBERS) {
+    const head = String(member.signature ?? '').split(/[( ]/)[0];
+    if (!head) continue;
+    assert.equal(head, member.id,
+      `${member.id}: the signature opens with "${head}", which is not the flat name`);
+    // A lifecycle hook is a name the SCRIPT defines, not one the runtime binds, so there is
+    // nothing on the api object to look up — only the verbs are checked for a real binding.
+    if (member.kind === 'lifecycle') continue;
+    assert.notEqual(api[head], undefined, `${head} is named by a signature but bound by nothing`);
+  }
+});
+
 test('ce.core is global and nothing else is', () => {
   const global = MODULES.filter((m) => m.global).map((m) => m.id);
   assert.deepEqual(global, ['ce.core'],
