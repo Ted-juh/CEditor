@@ -132,6 +132,7 @@ export function createMomentaryButtonPreviewController({
 
     stopTimers(state);
     state.holding = true;
+    state.count = 0;
 
     const start = () => {
       state.delayTimer = null;
@@ -145,7 +146,10 @@ export function createMomentaryButtonPreviewController({
 
     if (delay === 0) start();
     else state.delayTimer = scheduleTimeout(start, delay);
-    return null;
+    // Zero the counter IN the press patch. It is how a consumer tells "this hold produced repeats"
+    // from "it did not", which is what decides whether the release is one more fire or the end of
+    // a roll — and a hold that started at whatever the last one finished on could not say.
+    return { repeatCount: 0 };
   }
 
   /** The release half, same contract: fields for the caller's release patch, or null. */

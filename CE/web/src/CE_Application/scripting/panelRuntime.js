@@ -7262,7 +7262,13 @@ function onPreviewSessionsChanged(sessions) {
     if (prev.pressed !== cur.pressed) {
       const mouse = { x: s.pointerX ?? 0, y: s.pointerY ?? 0, button: s.pointerButton ?? 0, modifiers: s.pointerModifiers ?? 0 };
       events.push({ event: cur.pressed ? 'onPointerDown' : 'onPointerUp', controlName: name, payload: mouse });
-      if (!cur.pressed) events.push({ event: 'onClick', controlName: name, payload: mouse }); // release = click
+      // Release IS a click — except on a button that has been firing all along. A `repeating`
+      // button's contract is "keeps firing while held", so the fires happened during the hold and
+      // the release is the END of them, not one more. Without this a roll always struck once too
+      // often, on the way up.
+      if (!cur.pressed && !(prev.repeats > 0)) {
+        events.push({ event: 'onClick', controlName: name, payload: mouse });
+      }
     }
     // A repeat is another FIRING of the button, so it raises the event a firing already raises
     // rather than a new one nobody has heard of: `momentary/repeating` says "keeps firing while

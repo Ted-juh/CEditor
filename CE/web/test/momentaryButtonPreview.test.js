@@ -306,3 +306,53 @@ test('a session change that lands mid-dispatch is not lost', async () => {
       'the value asserted during the first dispatch never arrived — it was swallowed by the re-seed');
   } finally { panels.set([]); panelPreviewSessions.set({}); }
 });
+
+test('a hold that rolled does not strike once more on the way up', async () => {
+  // "Keeps firing while held" means the fires happened during the hold. Release is where they
+  // STOP. Treating it as one more click made every roll a hit too long, audibly.
+  const { scriptApiForTesting, runPreviewSessionsForTesting } =
+    await import('../src/CE_Application/scripting/panelRuntime.js');
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { panels, activePanelId } = await import('../src/CE_Application/stores/panels.js');
+  const { panelPreviewSessions } = await import('../src/CE_Application/stores/interactionPreview.js');
+  const { MODULES } = await import('../src/CE_Application/scripting/panelApi.js');
+
+  const roll = createControl('Button', { name: 'Roll' });
+  const plain = createControl('Button', { name: 'Plain' });
+  const rollId = roll._children.Core.id;
+  const plainId = plain._children.Core.id;
+  panels.set([{ id: 'p', name: 'P', controls: [roll, plain], scripting: { modules: MODULES.map((m) => m.id) } }]);
+  activePanelId.set('p');
+  try {
+    const api = scriptApiForTesting('', 'trailing');
+    const clicks = { Roll: 0, Plain: 0 };
+    api.on('Roll', 'click', () => { clicks.Roll += 1; });
+    api.on('Plain', 'click', () => { clicks.Plain += 1; });
+
+    const sessions = (patch) => { panelPreviewSessions.set(patch); return runPreviewSessionsForTesting(); };
+    const rest = { pressed: false, hover: true, repeatCount: 0 };
+    await sessions({ [rollId]: { ...rest }, [plainId]: { ...rest } });
+
+    // Both held. The roll fires twice while down; the plain one does nothing until it comes up.
+    await sessions({ [rollId]: { ...rest, pressed: true }, [plainId]: { ...rest, pressed: true } });
+    await sessions({ [rollId]: { ...rest, pressed: true, repeatCount: 1 }, [plainId]: { ...rest, pressed: true } });
+    await sessions({ [rollId]: { ...rest, pressed: true, repeatCount: 2 }, [plainId]: { ...rest, pressed: true } });
+    assert.deepEqual(clicks, { Roll: 2, Plain: 0 }, 'the repeats should have arrived, and only those');
+
+    // Both released.
+    await sessions({ [rollId]: { ...rest, repeatCount: 2 }, [plainId]: { ...rest } });
+    assert.deepEqual(clicks, { Roll: 2, Plain: 1 },
+      'the roll gained a hit on release; a plain button must still click there');
+  } finally { panels.set([]); panelPreviewSessions.set({}); }
+});
+
+test('the press zeroes the counter, so one hold cannot inherit the last one', () => {
+  const { clock, controller, fires } = harness();
+  assert.deepEqual(controller.beginPress('pad', { ...REPEATING, repeatDelay: 0 }), { repeatCount: 0 });
+  clock.advance(120 * 2);
+  controller.releasePress('pad', REPEATING);
+
+  const second = controller.beginPress('pad', { ...REPEATING, repeatDelay: 0 });
+  assert.deepEqual(second, { repeatCount: 0 }, 'a fresh hold has to start from zero');
+  assert.equal(fires().at(-1).repeatCount, 1, 'and so does the counter it patches');
+});
