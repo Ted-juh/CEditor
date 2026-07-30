@@ -258,22 +258,76 @@ pre code { font-size: inherit; }
   font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px;
 }
 
-.members { overflow-x: auto; padding: 0 0 20px; }
-table.mem { width: 100%; border-collapse: collapse; font-size: 13px; }
-table.mem th {
-  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
-  color: var(--ink-3); text-align: left; font-weight: 600;
-  padding: 7px 14px 7px 0; border-bottom: 1px solid var(--rule); white-space: nowrap;
+/* Members were a four-column table with the description in the last column. On a phone that meant
+   scrolling sideways to read what anything MEANT, and a long summary squeezed into a narrow column
+   grew a tower of vertical space to do it in. So a member is a BLOCK now: the three identifiers on
+   one line at the top, and the prose full width underneath them. Nothing scrolls sideways except
+   the code samples, which have their own overflow. */
+.members { padding: 0 0 20px; }
+.mem {
+  padding: 14px 0 16px;
+  border-bottom: 1px solid var(--rule-soft);
 }
-table.mem td { padding: 9px 14px 9px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
-table.mem tr[hidden] { display: none; }
-table.mem tr.mark td { background: var(--accent-2); }
-.m-path { font-family: var(--mono); font-size: 12.5px; color: var(--ink); white-space: nowrap; }
-.m-flat { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); white-space: nowrap; }
-.m-sig { font-family: var(--mono); font-size: 12px; color: var(--accent); white-space: nowrap; }
-/* …and the summaries carry `code spans` written in the contract itself. */
-.m-doc code { background: var(--code-bg); border: 1px solid var(--rule-soft); padding: 0 3px; font-size: 11.5px; }
-.m-doc { color: var(--ink-2); min-width: 26ch; }
+.mem[hidden] { display: none; }
+.mem.mark { background: var(--accent-2); box-shadow: -10px 0 0 var(--accent-2), 10px 0 0 var(--accent-2); }
+.mem-head {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(0, auto) minmax(0, 1fr);
+  gap: 4px 18px;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.m-path { font-family: var(--mono); font-size: 13px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.m-flat { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); overflow-wrap: anywhere; }
+/* The signature is the one thing worth its own line when it will not fit: breaking a signature
+   mid-identifier is worse than letting it scroll on its own. */
+.m-sig { font-family: var(--mono); font-size: 12px; color: var(--accent); overflow-x: auto; }
+/* …and the summaries carry `code spans` written in the contract itself. Those spans hold whole dotted
+   paths — `Text.Multiline.fitMode`, `ce.components.arp.pattern` — which a browser treats as one
+   unbreakable word, and one of them is enough to push a phone into sideways scrolling. Breaking
+   anywhere is right here: the alternative is the horizontal scroll this layout exists to remove. */
+.m-doc code {
+  background: var(--code-bg); border: 1px solid var(--rule-soft);
+  padding: 0 3px; font-size: 11.5px; overflow-wrap: anywhere;
+}
+.m-doc { color: var(--ink-2); margin: 0 0 10px; max-width: 82ch; overflow-wrap: break-word; }
+
+/* The declared arguments. `opts` in a signature says nothing about the ten fields it may carry;
+   these come straight from the contract's params. */
+.m-args { display: flex; flex-wrap: wrap; gap: 5px; margin: 0 0 10px; }
+.m-arg {
+  font-family: var(--mono); font-size: 11px;
+  border: 1px solid var(--rule); background: var(--raised);
+  padding: 2px 7px; color: var(--ink-2);
+}
+.m-arg b { color: var(--ink); font-weight: 600; }
+.m-arg i { color: var(--ink-3); font-style: normal; }
+.m-arg.opt { border-style: dashed; }
+.m-fields { margin: -4px 0 10px; }
+.m-fields summary {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); cursor: pointer; list-style: none; padding: 3px 0;
+}
+.m-fields summary::-webkit-details-marker { display: none; }
+.m-fields summary::before { content: "▸ "; }
+.m-fields[open] summary::before { content: "▾ "; }
+.m-fields .m-args { margin-top: 4px; }
+
+/* One worked example per member. Same language toggle as the tutorial. */
+.m-eg { margin: 4px 0 0; }
+.m-eg pre { margin: 0; font-size: 12px; padding: 11px 13px; }
+.m-eg .cap {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .13em; text-transform: uppercase;
+  color: var(--ink-3); margin: 0 0 5px;
+}
+.m-eg .cap b { color: var(--signal); font-weight: 600; }
+
+@media (max-width: 760px) {
+  /* One identifier per line: three columns of monospace on a phone is what caused the sideways
+     scroll in the first place. */
+  .mem-head { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .m-sig { font-size: 11.5px; }
+}
 .m-badge {
   font-family: var(--mono); font-size: 9px; letter-spacing: .1em; text-transform: uppercase;
   color: var(--amber); border: 1px solid currentColor; padding: 0 4px; white-space: nowrap;
@@ -312,7 +366,8 @@ table.mem tr.mark td { background: var(--accent-2); }
 
 /* ---------------------------------------------------------------------------- foot */
 .foot { margin-top: 70px; padding-top: 26px; border-top: 2px solid var(--ink); font-size: 13px; color: var(--ink-3); }
-.foot p { max-width: 74ch; }
+/* The footer names source paths in <code>, and a repo path is one unbreakable word to a browser. */
+.foot p { max-width: 74ch; overflow-wrap: anywhere; }
 
 @media (max-width: 1000px) {
   .lesson { grid-template-columns: 1fr; gap: 10px; }
@@ -336,6 +391,10 @@ table.mem tr.mark td { background: var(--accent-2); }
   .top { padding-top: 34px; }
   .mod > summary { grid-template-columns: 1fr; }
   .mod-sum, .mod-n { grid-column: 1; grid-row: auto; }
+  /* The changelog's two columns never collapsed. At 390px its 200px label column plus the gap left
+     the body 122px to hold a paragraph in, so every entry overflowed the page — the same sideways
+     scroll as the member table, in a section nobody thought to check that narrow. */
+  .ship { grid-template-columns: 1fr; gap: 6px; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
@@ -911,6 +970,21 @@ function onError(info) {
     <p>Every module, every member, straight out of <code>panelApi.js</code></p>
   </div>
 
+  <p class="prose">
+    Every member carries a worked example. The <b id="i-derived">90</b> that are a pure function of
+    their arguments show their <b>result</b> as well &mdash; and those numbers were not typed by hand:
+    they are what the implementation returned, and the test suite re-runs every one and fails if the
+    answer has changed. Where a signature only says <code>opts</code>, the fields it may carry are
+    listed underneath it, from the contract rather than from prose. Component examples pick their
+    values out of the same enum tables the components themselves read, so an example cannot cite a
+    pattern that does not exist.
+  </p>
+  <p class="note">
+    Search covers argument and <code>opts</code> field names too, which is the only way to find
+    something like <code>stagger</code> or <code>pingpong</code> &mdash; neither appears in any
+    signature.
+  </p>
+
   <div class="finder">
     <label class="sr" for="q">Find a verb or module</label>
     <input id="q" type="search" placeholder="Find a verb — sendNote, quantize, fill, probe…" autocomplete="off" spellcheck="false">
@@ -933,7 +1007,7 @@ function onError(info) {
     <h2>Lifecycle hooks</h2>
     <p>Define one by name; the panel calls it</p>
   </div>
-  <div class="members"><table class="mem" id="hooktable"></table></div>
+  <div class="members" id="hooktable"></div>
 </section>
 
 <section id="eventlist">
@@ -941,7 +1015,7 @@ function onError(info) {
     <h2>Events</h2>
     <p>Named handler, or <code>on(target, event, fn)</code></p>
   </div>
-  <div class="members"><table class="mem" id="evtable"></table></div>
+  <div class="members" id="evtable"></div>
 </section>
 
 <section id="weight">
@@ -969,13 +1043,32 @@ function onError(info) {
 <section id="changes">
   <div class="rule-head">
     <h2>What changed</h2>
-    <p>The last ten phases, newest first</p>
+    <p>The last eleven phases, newest first</p>
   </div>
   <p class="prose">
-    The surface roughly tripled over these. Three of them were not additions at all &mdash; they were
+    The surface roughly tripled over these. Four of them were not additions at all &mdash; they were
     the API telling the truth about things it had been quietly getting wrong.
   </p>
   <ol class="ships">
+    <li class="ship">
+      <div class="ship-id"><b>§47</b>this page</div>
+      <div class="ship-body">
+        <p>
+          A worked example for all <b>536</b> members, the declared <code>opts</code> fields shown
+          rather than described, and the member layout restacked so the description sits under the
+          identifiers instead of in a fourth column you had to scroll sideways to read.
+        </p>
+        <p class="note">
+          Found on the way, by generating the examples' results instead of typing them:
+          <code>blend</code>'s signature read <code>blend(a, b, t)</code> with no hint that both are
+          LISTS &mdash; passing two numbers returns an empty list, which is correct and baffling
+          &mdash; and <code>decodeJson</code> never documented that JSON <code>null</code> reads as
+          nothing, so encode&#8209;then&#8209;decode is not always identity. Two narrow&#8209;screen
+          layout bugs turned up too: the changelog's own two columns never collapsed, leaving each
+          entry 122px to hold a paragraph in.
+        </p>
+      </div>
+    </li>
     <li class="ship">
       <div class="ship-id"><b>§46</b>ce.text</div>
       <div class="ship-body">
@@ -1134,6 +1227,46 @@ function onError(info) {
   const doc = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>");
   const num = (n) => n.toLocaleString("en-US");
 
+  /* ------------------------------------------------- arguments and examples */
+
+  // Argument names and any object's field names go into the search haystack too: "stagger" is a
+  // thing somebody looks for, and it appears nowhere in a signature or a summary.
+  const argHay = (v) => (v.args ?? [])
+    .map((a) => `${a.name} ${(a.fields ?? []).join(" ")}`).join(" ");
+
+  const argChip = (a) => `<span class="m-arg${a.required ? "" : " opt"}">`
+    + `<b>${esc(a.name)}</b> <i>${esc(a.type)}</i>${a.required ? "" : " ?"}</span>`;
+
+  /** The declared arguments, and `opts` fields folded away — ten chips inline would bury the
+   *  description this layout exists to surface. */
+  function argBlock(v) {
+    const args = v.args ?? [];
+    if (!args.length) return "";
+    const chips = `<div class="m-args">${args.map(argChip).join("")}</div>`;
+    const objects = args.filter((a) => a.fields && a.fields.length);
+    const folded = objects.map((a) => `
+      <details class="m-fields">
+        <summary>${esc(a.name)} may carry ${a.fields.length} field${a.fields.length === 1 ? "" : "s"}</summary>
+        <div class="m-args">${a.fields.map((f) => `<span class="m-arg"><b>${esc(f)}</b></span>`).join("")}</div>
+      </details>`).join("");
+    return chips + folded;
+  }
+
+  /** One worked example. `derived` ones state a result that was produced by running the real
+   *  implementation and is pinned by the test suite, so the page says so — the reader can trust a
+   *  number that is checked differently from one somebody typed. */
+  function egBlock(v) {
+    if (!v.eg) return "";
+    const label = v.eg.derived
+      ? 'Example <b>&mdash; result verified against the implementation</b>'
+      : (v.eg.fromTable ? 'Example <b>&mdash; values from the component’s own table</b>' : "Example");
+    return `<div class="m-eg">
+      <p class="cap">${label}</p>
+      <pre data-lua><code>${esc(v.eg.lua ?? "")}</code></pre>
+      <pre data-js hidden><code>${esc(v.eg.js ?? "")}</code></pre>
+    </div>`;
+  }
+
   /* ---------------------------------------------------------------- totals */
   $("#apiver").textContent = DATA.apiVersion;
   $("#t-mod").textContent = DATA.totals.modules;
@@ -1143,6 +1276,7 @@ function onError(info) {
   $("#t-any").textContent = DATA.totals.crossRuntime;
   $("#i-mem").textContent = num(DATA.totals.members);
   $("#i-mod").textContent = DATA.totals.modules;
+  if (DATA.coverage) $("#i-derived").textContent = DATA.coverage.derived;
 
   /* ------------------------------------------------------- language toggle */
   // One preference for the whole page. A per-block toggle makes you re-pick your own language ten
@@ -1177,8 +1311,9 @@ function onError(info) {
   const plain = (s) => esc(s)
     .replace(KEY, '<span class="t-key">$1</span>')
     .replace(/\b([a-zA-Z_][\w.]*)(\s*\()/g, '<span class="t-fn">$1</span>$2');
-  $$("pre").forEach(paint);
-  setLang("lua");
+  // NOT called here: the reference now carries an example per member, and those <pre> blocks do not
+  // exist until the modules below have been rendered. Painting and choosing a language has to happen
+  // after that or every member shows both languages at once, unpainted.
 
   /* ------------------------------------------------------------- the sheet */
   const rtLabel = (rt) => (rt === "any" ? "cross-runtime" : "panel view");
@@ -1199,36 +1334,51 @@ function onError(info) {
         <span class="mod-n"><span data-count>${m.members.length}</span> members</span>
       </summary>
       <div class="members">
-        <table class="mem">
-          <thead><tr><th>Namespaced</th><th>Flat</th><th>Signature</th><th>What it does</th></tr></thead>
-          <tbody>
-            ${m.members.map((v) => `
-              <tr data-hay="${esc((v.path + " " + v.flat + " " + v.sig + " " + v.doc).toLowerCase())}">
-                <td class="m-path">${esc(v.path)}</td>
-                <td class="m-flat">${esc(v.flat)}</td>
-                <td class="m-sig">${v.value ? "&mdash;" : esc(v.sig)}
-                  ${v.rt === "webview" && m.runtime === "any" ? '<span class="m-badge">panel view</span>' : ""}</td>
-                <td class="m-doc">${doc(v.doc)}</td>
-              </tr>`).join("")}
-          </tbody>
-        </table>
+        ${m.members.map((v) => `
+          <article class="mem" data-hay="${esc((v.path + " " + v.flat + " " + v.sig + " " + v.doc
+            + " " + argHay(v)).toLowerCase())}">
+            <div class="mem-head">
+              <span class="m-path">${esc(v.path)}</span>
+              <span class="m-flat">${esc(v.flat)}</span>
+              <span class="m-sig">${v.value ? "&mdash;" : esc(v.sig)}
+                ${v.rt === "webview" && m.runtime === "any" ? '<span class="m-badge">panel view</span>' : ""}</span>
+            </div>
+            <p class="m-doc">${doc(v.doc)}</p>
+            ${argBlock(v)}
+            ${egBlock(v)}
+          </article>`).join("")}
       </div>
     </details>`).join("");
 
   /* ----------------------------------------------------- hooks and events */
-  $("#hooktable").innerHTML = `
-    <thead><tr><th>Hook</th><th>Signature</th><th>When</th></tr></thead>
-    <tbody>${DATA.hooks.map((h) => `
-      <tr><td class="m-path">${esc(h.id)}</td><td class="m-sig">${esc(h.sig)}</td>
-      <td class="m-doc">${doc(h.doc)}</td></tr>`).join("")}</tbody>`;
+  // Same shape as the members, for the same reason. Events were the worst case on a narrow screen:
+  // five columns, with the meaning in the fifth.
+  $("#hooktable").innerHTML = DATA.hooks.map((h) => `
+    <article class="mem">
+      <div class="mem-head">
+        <span class="m-path">${esc(h.id)}</span>
+        <span class="m-flat">lifecycle</span>
+        <span class="m-sig">${esc(h.sig)}</span>
+      </div>
+      <p class="m-doc">${doc(h.doc)}</p>
+    </article>`).join("");
 
-  $("#evtable").innerHTML = `
-    <thead><tr><th>Event</th><th>Handler</th><th>Group</th><th>Payload</th><th>What it means</th></tr></thead>
-    <tbody>${DATA.events.map((e) => `
-      <tr><td class="m-path">${esc(e.id)}</td><td class="m-flat">${esc(e.fn)}</td>
-      <td class="m-flat">${esc(e.group)}${e.rt === "webview" ? ' <span class="m-badge">panel view</span>' : ""}</td>
-      <td class="m-flat">${e.payload ? esc(e.payload) : "&mdash;"}</td>
-      <td class="m-doc">${doc(e.doc)}</td></tr>`).join("")}</tbody>`;
+  $("#evtable").innerHTML = DATA.events.map((e) => `
+    <article class="mem">
+      <div class="mem-head">
+        <span class="m-path">${esc(e.id)}</span>
+        <span class="m-flat">${esc(e.fn)}</span>
+        <span class="m-sig">${esc(e.group)}${e.rt === "webview"
+          ? ' <span class="m-badge">panel view</span>' : ""}</span>
+      </div>
+      <p class="m-doc">${doc(e.doc)}</p>
+      ${e.payload ? `<div class="m-args"><span class="m-arg"><b>payload</b> <i>${esc(e.payload)}</i></span></div>` : ""}
+    </article>`).join("");
+
+  // Everything is in the DOM now — the tutorial's samples and one example per member. Paint and pick
+  // a language once, here, rather than before the reference existed.
+  $$("pre").forEach(paint);
+  setLang("lua");
 
   /* ------------------------------------------------------------- find/filter */
   const q = $("#q");
@@ -1249,12 +1399,12 @@ function onError(info) {
         el.hidden = false;
         shownMods += 1;
         shownMembers += mod.members.length;
-        $$("tr", el).forEach((r) => { r.hidden = false; r.classList.remove("mark"); });
+        $$(".mem", el).forEach((r) => { r.hidden = false; r.classList.remove("mark"); });
         $("[data-count]", el).textContent = mod.members.length;
         continue;
       }
 
-      const rows = $$("tbody tr", el);
+      const rows = $$(".mem", el);
       let n = 0;
       for (const r of rows) {
         const hit = r.dataset.hay.includes(term);

@@ -2176,7 +2176,7 @@ export const COMMANDS = [
   },
   {
     id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
-    summary: 'JSON text back to a value. Nothing back for text that is not JSON, which is what tells a malformed config from an empty one — a config somebody typed into a text control is exactly where that distinction matters.',
+    summary: 'JSON text back to a value. Nothing back for text that is not JSON, which is what tells a malformed config from an empty one — a config somebody typed into a text control is exactly where that distinction matters. JSON null reads as NOTHING: {"a":1,"b":null} comes back as one key and [1,null,2] as a two-element list. That is not a preference — a Lua table cannot hold a null, so a value the four runtimes cannot all hold is not a value this API has, and one shape everywhere beats three shapes in three engines. It does mean encode-then-decode is not always identity, and null is the case where it is not.',
     params: [{ name: 'text', type: 'string', required: true }],
     scopes: 'any',
   },
@@ -2487,8 +2487,10 @@ export const HELPERS = [
   { id: 'maxOf', category: 'Value / range', signature: 'maxOf(values)', summary: 'The largest in a list, or nil for an empty one.' },
   { id: 'sumOf', category: 'Value / range', signature: 'sumOf(values)', summary: 'The total of a list. Zero for an empty one — a sum of nothing is nothing, not an absence.' },
   { id: 'meanOf', category: 'Value / range', signature: 'meanOf(values)', summary: 'The average of a list, or nil for an empty one — unlike a sum, an average of nothing does not exist.' },
-  { id: 'blend', category: 'Value / range', signature: 'blend(a, b, t)',
-    summary: 'Morph one list of values into another, element by element — which is what a snapshot morph IS, and a script could only do it one value at a time. The SHORTER list decides the length: padding with zeros would drag the missing entries to nothing, and on a patch that is a set of parameters slammed to their minimum.' },
+  // `a, b` said nothing about these being LISTS, and with no return annotation the signature read
+  // like lerp's. Passing two numbers returns an empty list, which is correct and baffling.
+  { id: 'blend', category: 'Value / range', signature: 'blend(fromList, toList, t) -> list',
+    summary: 'Morph one list of values into another, element by element — which is what a snapshot morph IS, and a script could only do it one value at a time. Both arguments are LISTS: for two single numbers you want lerp. The SHORTER list decides the length: padding with zeros would drag the missing entries to nothing, and on a patch that is a set of parameters slammed to their minimum.' },
   { id: 'randomFloat', category: 'Value / range', signature: 'randomFloat(lo, hi)',
     summary: 'A seeded random FLOAT in a range. random(lo, hi) returns whole numbers — the form a note or a step wants — so until now there was no seeded way to get a fractional one without doing the arithmetic by hand.' },
   { id: 'randomGaussian', category: 'Value / range', signature: 'randomGaussian([mean, sd])',
