@@ -147,6 +147,58 @@ test('the animation verbs agree about the timing options they share', () => {
   assert.equal(named(spring, 'duration').default, '600');
 });
 
+/* ------------------------------------------------------------------ plain words */
+// Customers said the manual read "too tech-bro… it could be less tech-savvy and more in normal
+// language". The summaries were the worst of it: ce.anim.to's ran to 955 characters, most of the
+// detail was buried mid-sentence, and emphasis was done by SHOUTING. These pin the shape of the
+// rewrite rather than any particular wording, so an edit can say anything it likes as long as it
+// says it the way the rest of the manual does.
+
+/** Acronyms and initialisms that are genuinely written in capitals. */
+const CAPITALISED = new Set([
+  'MIDI', 'CC', 'NRPN', 'RPN', 'DAW', 'JSON', 'SYSEX', 'ASCII', 'LCD', 'GM', 'CRC', 'DPD', 'GUI',
+  'VST3', 'API', 'UI', 'RGB', 'AARRGGBB', 'RRGGBB', 'LFO', 'GCD', 'XY', 'ADSR', 'OK', 'ID', 'IDS',
+  'CPU', 'HSL', 'MSB', 'LSB', 'URL', 'URLS', 'A', 'I',
+]);
+
+/** A summary with its quoted values and code spans removed — the parts prose rules apply to. */
+const proseOf = (summary) => String(summary).replace(/"[^"]*"|`[^`]*`/g, ' ');
+
+test('no summary shouts', () => {
+  const shouting = [];
+  for (const member of ALL_MEMBERS) {
+    const caps = [...proseOf(member.summary ?? '').matchAll(/\b[A-Z]{2,}\b/g)]
+      .map((m) => m[0]).filter((w) => !CAPITALISED.has(w));
+    if (caps.length) shouting.push(`${memberPath(member.id)}: ${[...new Set(caps)].join(', ')}`);
+  }
+  assert.deepEqual(shouting, [],
+    'emphasis in capitals reads as shouting — use the sentence to carry the emphasis instead');
+});
+
+test('no summary is longer than a paragraph anybody reads', () => {
+  // 955 characters was the record, and it was one comma-spliced sentence. 700 is generous — the
+  // point is that a summary which needs more than that is describing options the options table
+  // should be carrying, or history nobody using the API needs.
+  const tooLong = ALL_MEMBERS
+    .filter((m) => (m.summary ?? '').length > 700)
+    .map((m) => `${memberPath(m.id)} (${m.summary.length} chars)`);
+  assert.deepEqual(tooLong, []);
+});
+
+test('no summary explains what the API used to do', () => {
+  // "which used to fail in silence", "before this a curve meant…". Interesting to whoever changed
+  // it; noise to whoever is trying to use it. Where the history explained something real, the
+  // explanation belongs and the history does not.
+  //
+  // Only unambiguous tells. "before this" and "no longer" both have innocent uses in the same
+  // summaries — onPanelBuild clears controls "before this fires", and restore() skips "a name the
+  // panel no longer has" — so matching those flagged perfectly good sentences.
+  const historical = ALL_MEMBERS
+    .filter((m) => /\bused to\b|design doc|§\d/i.test(m.summary ?? ''))
+    .map((m) => memberPath(m.id));
+  assert.deepEqual(historical, []);
+});
+
 /* -------------------------------------------------------------------- the tree */
 
 test('every module is filed under exactly one group', () => {

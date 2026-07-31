@@ -642,7 +642,7 @@ const FAMILY_VERBS = [
     + 'rather than truncated: silently dropping half a pattern is worse than not writing it.' },
   { v: 'insert', k: INSERT, doc:
     'Add one element to a list, using the same template the canvas uses. Appends by default, or '
-    + 'inserts BEFORE a 1-based index. Returns whether it grew.' },
+    + 'inserts before the position you give, counting from 1. Returns whether it grew.' },
   { v: 'remove', k: REMOVE, doc:
     'Remove one element of a list, 1-based. Removes the last when no index is given. Refused when '
     + 'the component needs the element it was asked to drop — an envelope keeps its endpoints.' },
