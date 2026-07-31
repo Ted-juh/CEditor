@@ -428,6 +428,7 @@ pre code { font-size: inherit; }
     <a href="#debug">When it breaks</a>
     <a href="#walkthrough">A button, from nothing</a>
     <a href="#from-data">Eight, from a table</a>
+    <a href="#drumkit">Asking the instrument</a>
     <h2>Reference</h2>
     <a href="#surface">Every module</a>
     <a href="#hooks">Lifecycle hooks</a>
@@ -1406,6 +1407,149 @@ function onPanelBuild() {
         Both languages build the identical panel &mdash; same positions, same derived colours, down
         to <code>A5563B</code>&#8202;&rarr;&#8202;<code>522B1D</code>. The test suite runs both and
         compares.
+      </p>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="drumkit">
+    <p class="lesson-n">13 &middot; Asking the instrument</p>
+    <div class="lesson-text prose">
+      <h3>The control knows more than your script does</h3>
+      <p>
+        Lesson 12 built a drum kit out of eight buttons, and every line of it was honest work. This
+        is the same kit as <b>one control</b>, and the reason to reach for it is not that it is
+        shorter. It is that three of the things a drum grid does cannot be built from eight
+        independent buttons at all.
+      </p>
+      <p>
+        <b>Choke groups.</b> A closed hi&#8209;hat silences an open one. Eight buttons cannot do
+        that, because no button knows the others exist &mdash; you would have to write the
+        bookkeeping yourself and keep it right as the kit changed. <b>Strike position.</b> Where in
+        the pad you land decides how hard it sounds; a button has no inside.
+        <b>Corner zones.</b> The four corners of every pad carry a second vocabulary &mdash; a roll
+        under one thumb, a flam under the other &mdash; so sixteen triggers become something you can
+        phrase on.
+      </p>
+      <p>
+        <b>The overrides are sparse, and that is the interesting part.</b> You set what differs;
+        everything else follows the map. One <code>fill()</code> writes eight notes in a single
+        document change, and the choke groups <i>follow</i> &mdash; nothing sets them, because a
+        choke group is resolved from the note. Look at what the script actually stored: pad 1 holds
+        an empty entry, because 36 is the note it was already going to play, and pinning it there
+        would only stop it following <code>baseNote</code> later.
+      </p>
+      <p>
+        <b>So ask, rather than tell.</b> <code>read()</code> answers what the component
+        <i>resolved</i>, not what you stored &mdash; so the setup can be derived. "Give a roll to
+        every pad in a choke group" finds the hi&#8209;hats without a single typed index, names them
+        in the log from the same read, and keeps being right when the map, the rows or the columns
+        change underneath it. A stored property can hold the <i>result</i> of that question. Nothing
+        can store the question.
+      </p>
+      <p>
+        The roll is derived too: <code>rollRate</code> is a note value, not a number of
+        milliseconds, so a 1/32 roll is a 1/32 against the panel tempo and stays one when the tempo
+        moves. And <code>rollDelay</code> is what makes one pad do two jobs &mdash; tap it and it
+        strikes once, lean on it and it rolls.
+      </p>
+      <p class="note">
+        Corner zones are set for the <b>grid</b>, not per pad, on purpose: a corner is a gesture your
+        hand learns once. Four corners meaning different things on neighbouring pads is the opposite
+        of an instrument you can play without looking.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">The grid</p>
+      <pre data-lua><code>local D = ce.components.drumpads
+local KIT = "Kit"
+
+function onPanelBuild()
+  ce.panel.create("DrumPads", { name = KIT, x = 40, y = 40, width = 560, height = 300 })
+  D.rows(KIT, 2)
+  D.cols(KIT, 4)
+  D.origin(KIT, "topLeft")            -- pad 1 top-left, reading order
+
+  -- Eight notes, one document change, one undo step. The choke groups are not
+  -- set here and do not need to be: a choke group is resolved from the note.
+  D.fill(KIT, "note", { 36, 38, 42, 46, 45, 50, 39, 51 })
+
+  -- Hitting the middle is full; the rim is softer. A pad, not a button.
+  D.velocityFrom(KIT, "centre")
+  D.velocity(KIT, 110)</code></pre>
+      <pre data-js hidden><code>const D = ce.components.drumpads;
+const KIT = "Kit";
+
+function onPanelBuild() {
+  ce.panel.create("DrumPads", { name: KIT, x: 40, y: 40, width: 560, height: 300 });
+  D.rows(KIT, 2);
+  D.cols(KIT, 4);
+  D.origin(KIT, "topLeft");           // pad 1 top-left, reading order
+
+  // Eight notes, one document change, one undo step. The choke groups are not
+  // set here and do not need to be: a choke group is resolved from the note.
+  D.fill(KIT, "note", [36, 38, 42, 46, 45, 50, 39, 51]);
+
+  // Hitting the middle is full; the rim is softer. A pad, not a button.
+  D.velocityFrom(KIT, "centre");
+  D.velocity(KIT, 110);</code></pre>
+
+      <p class="cap">Ask the control what it built</p>
+      <pre data-lua><code>  -- Every pad in a choke group is a hat or a cymbal, so those are the ones worth
+  -- rolling. Not one pad index is typed: change the map, the rows or the columns
+  -- and this still finds the right pads.
+  local chokes = D.read(KIT, "choke")
+  local names  = D.read(KIT, "label")
+  local rolled = {}
+  for i = 1, D.size(KIT, "note") do
+    if chokes[i] > 0 then
+      D.roll(KIT, i, true)
+      rolled[#rolled + 1] = names[i]
+    end
+  end
+
+  D.rollRate(KIT, "1/32")             -- a note value, so it follows the tempo
+  D.rollDelay(KIT, 180)               -- tap to strike once, lean on it to roll
+  D.rollVelocity(KIT, 0.6)            -- the roll sits under its opening accent
+
+  log("rolling: " .. table.concat(rolled, ", "))</code></pre>
+      <pre data-js hidden><code>  // Every pad in a choke group is a hat or a cymbal, so those are the ones worth
+  // rolling. Not one pad index is typed: change the map, the rows or the columns
+  // and this still finds the right pads.
+  const chokes = D.read(KIT, "choke");
+  const names  = D.read(KIT, "label");
+  const rolled = [];
+  for (let i = 1; i &lt;= D.size(KIT, "note"); i += 1) {
+    if (chokes[i - 1] &gt; 0) {
+      D.roll(KIT, i, true);
+      rolled.push(names[i - 1]);
+    }
+  }
+
+  D.rollRate(KIT, "1/32");            // a note value, so it follows the tempo
+  D.rollDelay(KIT, 180);              // tap to strike once, lean on it to roll
+  D.rollVelocity(KIT, 0.6);           // the roll sits under its opening accent
+
+  log("rolling: " + rolled.join(", "));</code></pre>
+
+      <p class="cap">One gesture vocabulary, for every pad</p>
+      <pre data-lua><code>  D.zones(KIT, true)
+  D.cornerSize(KIT, 0.3)              -- how much of a pad each corner claims
+  D.cornerTopLeft(KIT, "accent")      -- full velocity, wherever it landed
+  D.cornerTopRight(KIT, "roll")       -- rolls even on a pad with no roll flag
+  D.cornerBottomLeft(KIT, "ghost")    -- a quiet grace hit
+  D.cornerBottomRight(KIT, "flam")    -- a grace note ahead of the main one
+end</code></pre>
+      <pre data-js hidden><code>  D.zones(KIT, true);
+  D.cornerSize(KIT, 0.3);             // how much of a pad each corner claims
+  D.cornerTopLeft(KIT, "accent");     // full velocity, wherever it landed
+  D.cornerTopRight(KIT, "roll");      // rolls even on a pad with no roll flag
+  D.cornerBottomLeft(KIT, "ghost");   // a quiet grace hit
+  D.cornerBottomRight(KIT, "flam");   // a grace note ahead of the main one
+}</code></pre>
+      <p class="note">
+        What it logs is <code>rolling: CH Hat, OP Hat</code> &mdash; two names the script never
+        wrote down, for two pads it never numbered. The remaining corner, <code>choke</code>, is the
+        cymbal grab: it silences the group and sounds nothing of its own.
       </p>
     </div>
   </div>

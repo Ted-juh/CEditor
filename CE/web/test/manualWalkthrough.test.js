@@ -26,6 +26,10 @@ import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { MODULES, moduleMemberMap } from '../src/CE_Application/scripting/panelApi.js';
+import {
+  drumPads, strikeVelocity, strikeAction, rollIntervalMs,
+} from '../src/CE_Application/utils/drumPadLayout.js';
+import { beatsPerStep } from '../src/CE_Application/utils/transportLayout.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const page = readFileSync(join(here, '..', '..', '..', 'docs', 'api-explorer.html'), 'utf8');
@@ -203,7 +207,7 @@ test('the Lua and the JavaScript in the manual describe the same panel', () => {
   // Hand-written twins, not a machine translation, so only a test can promise they agree. The Lua
   // is checked by TRANSLITERATION rather than by running a Lua engine here: what can drift is the
   // data and the arithmetic, and both are visible in the source.
-  for (const lesson of ['walkthrough', 'from-data']) {
+  for (const lesson of ['walkthrough', 'from-data', 'drumkit']) {
     const lua = listings(lesson, 'lua').join('\n');
     const js = listings(lesson, 'js').join('\n');
 
@@ -221,4 +225,67 @@ test('the Lua and the JavaScript in the manual describe the same panel', () => {
     assert.deepEqual(verbs.filter((v) => !lua.includes(v)), [],
       `${lesson}: the JavaScript calls verbs the Lua does not`);
   }
+});
+
+/* ------------------------------------------------------- 13 · asking the instrument */
+
+/** Run a lesson's JavaScript and hand back the Drum Pads control it built. */
+function buildKit(source) {
+  panels.set([{
+    id: 'p', name: 'P', controls: [],
+    scripting: { modules: MODULES.map((m) => m.id) },
+  }]);
+  activePanelId.set('p');
+  clearScriptTrace();
+  try {
+    const api = scriptApiForTesting('', 'manual');
+    const names = ['ce', 'set', 'get', 'log', 'logWarn', 'logError', 'on', 'sendNote', 'state'];
+    // eslint-disable-next-line no-new-func
+    const fn = new Function(...names, `${source}\nreturn onPanelBuild;`);
+    fn(...names.map((n) => api[n]))();
+    const kit = flatControls(get(panels)[0].controls)[0];
+    assert.ok(kit, 'the listing built no control');
+    return kit;
+  } finally { panels.set([]); }
+}
+
+test('lesson 13 runs, and derives the kit rather than typing it', () => {
+  const kit = buildKit(listings('drumkit', 'js').join('\n'));
+  const cfg = kit._children.DrumPads;
+  const pads = drumPads(kit);
+
+  assert.equal(pads.length, 8, 'a 2 x 4 grid');
+  assert.deepEqual(pads.map((p) => p.note), [36, 38, 42, 46, 45, 50, 39, 51]);
+
+  // The claim the lesson is built on: the choke groups are never set, and are right anyway.
+  const source = listings('drumkit', 'js').join('\n');
+  assert.ok(!/\.choke\s*\(/.test(source), 'the listing must not set a choke group');
+  assert.deepEqual(pads.filter((p) => p.choke > 0).map((p) => p.label), ['CH Hat', 'OP Hat']);
+
+  // …and the rolls landed on exactly those, from a loop that names no index.
+  assert.ok(!/roll\(KIT,\s*\d/.test(source), 'the listing must not roll a numbered pad');
+  assert.deepEqual(pads.filter((p) => p.roll).map((p) => p.label), ['CH Hat', 'OP Hat']);
+  assert.match(traced(), /rolling: CH Hat, OP Hat/, 'and says so from the same read');
+
+  // The prose points at pad 1 storing nothing, because 36 is what it already played.
+  assert.deepEqual(cfg.pads[0], {}, 'the lesson says pad 1 holds an empty entry');
+});
+
+test('lesson 13 sets up the strike the way it describes it', () => {
+  const kit = buildKit(listings('drumkit', 'js').join('\n'));
+  const cfg = kit._children.DrumPads;
+
+  // "the middle is full; the rim is softer"
+  assert.equal(strikeVelocity(kit, 0.5, 0.5), 110);
+  assert.ok(strikeVelocity(kit, 1, 0.5) < 110);
+
+  // "a 1/32 roll is a 1/32 against the panel tempo"
+  assert.equal(rollIntervalMs(cfg, 120), Math.round(beatsPerStep('1/32') * 500));
+
+  // The four corners the lesson lists, at the four corners of a pad.
+  assert.equal(strikeAction(cfg, 0.05, 0.95).action, 'accent');
+  assert.equal(strikeAction(cfg, 0.95, 0.95).action, 'roll');
+  assert.equal(strikeAction(cfg, 0.05, 0.05).action, 'ghost');
+  assert.equal(strikeAction(cfg, 0.95, 0.05).action, 'flam');
+  assert.equal(strikeAction(cfg, 0.5, 0.5).action, 'none', 'the face is still a plain hit');
 });
