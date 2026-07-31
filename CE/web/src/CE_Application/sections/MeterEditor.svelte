@@ -1,4 +1,5 @@
 <script>
+  import { componentListWithElement } from '../utils/componentElements.js';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import { activePanel } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -28,7 +29,7 @@
   let zones = $derived(Array.isArray(m?.zones) ? m.zones : []);
   function setZones(next) { set('zones', next); }
   function addZone() {
-    setZones([...zones, { from: Math.min(0.95, (zones.at(-1)?.from ?? 0) + 0.1), colour: 'FFEB5757' }]);
+    setZones(componentListWithElement('Meter', 'zones', zones, m));
   }
   function updateZone(i, key, value) {
     setZones(zones.map((z, idx) => idx === i ? { ...z, [key]: value } : z));

@@ -29,6 +29,9 @@ import { dirname, join } from 'node:path';
 import { COMPONENT_FAMILIES, COMPONENT_VERBS } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   VERB_VALUES, HAND_WRITTEN_VALUES, LCD_SCROLLS, LCD_CURSORS, PIXEL_ANIM_MODES,
+  CHORDPAD_LAYOUTS, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES, NOTERIBBON_MOD_AXES,
+  RIBBON_ORIENTATIONS, RIBBON_STYLES, CROSSFADER_ORIENTATIONS, METER_ORIENTATIONS,
+  MATRIX_CELL_STYLES, LCD_SCROLL_MODES, PIXEL_LAYOUT_TRANSITIONS,
 } from '../src/CE_Application/scripting/componentTables.js';
 import { MEMBER_BY_ID } from '../src/CE_Application/scripting/panelApi.js';
 
@@ -133,6 +136,22 @@ test('the LCD and Pixel tables match the picker the editor renders', () => {
   assert.deepEqual(LCD_SCROLLS, editorOptions('DisplayEditor.svelte', 'scroll'));
   assert.deepEqual(LCD_CURSORS, editorOptions('DisplayEditor.svelte', 'cursor'));
   assert.deepEqual(PIXEL_ANIM_MODES, editorOptions('PixelDisplayEditor.svelte', 'animMode'));
+
+  // The coverage audit's crop, held the same way. Each is consumed by a renderer conditional
+  // rather than by a table any module exports, so the editor's own picker is the source of truth.
+  assert.deepEqual(CHORDPAD_LAYOUTS, editorOptions('ChordPadEditor.svelte', 'layout'));
+  assert.deepEqual(NOTERIBBON_ORIENTATIONS, editorOptions('NoteRibbonEditor.svelte', 'orientation'));
+  assert.deepEqual(NOTERIBBON_VELOCITY_SOURCES, editorOptions('NoteRibbonEditor.svelte', 'velocityFrom'));
+  assert.deepEqual(NOTERIBBON_MOD_AXES, editorOptions('NoteRibbonEditor.svelte', 'modAxis'));
+  assert.deepEqual(RIBBON_ORIENTATIONS, editorOptions('RibbonEditor.svelte', 'orientation'));
+  assert.deepEqual(RIBBON_STYLES, editorOptions('RibbonEditor.svelte', 'style'));
+  assert.deepEqual(CROSSFADER_ORIENTATIONS, editorOptions('CrossfaderEditor.svelte', 'orientation'));
+  assert.deepEqual(METER_ORIENTATIONS, editorOptions('MeterEditor.svelte', 'orientation'));
+  assert.deepEqual(MATRIX_CELL_STYLES, editorOptions('MatrixEditor.svelte', 'cellStyle'));
+  assert.deepEqual(LCD_SCROLL_MODES, editorOptions('DisplayEditor.svelte', 'scrollMode'));
+  assert.deepEqual(PIXEL_ANIM_MODES, editorOptions('DisplayEditor.svelte', 'animMode'),
+    'the LCD and the Pixel display offer one animation vocabulary, so they share one table');
+  assert.deepEqual(PIXEL_LAYOUT_TRANSITIONS, editorOptions('PixelDisplayEditor.svelte', 'layoutTransition'));
 });
 
 /* ------------------------------------------- the five hand-written families' documentation */

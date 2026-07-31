@@ -35,6 +35,7 @@
 // that says "scene 3" should mean the third one whichever language it is written in.
 
 import { VERB_VALUES } from './componentTables.js';
+import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import {
   drumPadCount, resolveDrumPads, PAD_CORNERS, PAD_CORNER_LABELS, cornerField,
 } from '../utils/drumPadLayout.js';
@@ -144,6 +145,14 @@ export const COMPONENT_FAMILIES = [
       v('channel', 'channel', INT, CHANNEL),
       v('strum', 'strumMs', NUM, { min: 0, max: 2000, doc: 'Spread the chord over this many milliseconds.' }),
       v('latch', 'latch', BOOL, { toggle: true }),
+      // The coverage audit's crop: layout and range were inspector-only, and echo is the same
+      // monitor the Drum Pads got — light the pads from what a sequencer is playing.
+      v('layout', 'layout', ENUM, { doc: 'Wheel or grid.' }),
+      v('baseOctave', 'baseOctave', INT, { min: -1, max: 8 }),
+      v('noteSpan', 'noteSpan', INT, { min: 1, max: 8, doc: 'How many octaves the pads cover.' }),
+      v('gridCols', 'gridCols', INT, { min: 1, max: 12, doc: 'Columns, while the layout is a grid.' }),
+      v('echo', 'echo', BOOL, { toggle: true, doc: 'Light the pads from incoming MIDI as well as from taps.' }),
+      v('echoChannel', 'echoChannel', INT, { min: 0, max: 16, doc: 'Which channel the echo listens to. 0 means omni.' }),
     ],
   },
   {
@@ -159,6 +168,13 @@ export const COMPONENT_FAMILIES = [
       v('velocity', 'velocity', INT, VELOCITY),
       v('channel', 'channel', INT, CHANNEL),
       v('latch', 'latch', BOOL, { toggle: true }),
+      v('orientation', 'orientation', ENUM),
+      v('velocityFrom', 'velocityFrom', ENUM,
+        { doc: 'Fixed, or from where along the ribbon the touch landed.' }),
+      v('modAxis', 'modAxis', ENUM, { doc: 'What the cross-axis of a touch sends: nothing, or a CC.' }),
+      v('modCc', 'modCc', INT, { min: 0, max: 127, doc: 'Which CC the cross-axis sends.' }),
+      v('echo', 'echo', BOOL, { toggle: true }),
+      v('echoChannel', 'echoChannel', INT, { min: 0, max: 16, doc: '0 means omni.' }),
     ],
   },
   {
@@ -178,14 +194,10 @@ export const COMPONENT_FAMILIES = [
       v('origin', 'origin', ENUM, { doc: 'Which corner pad 1 sits in. Hardware grids number from the bottom-left.' }),
       v('velocityFrom', 'velocityFrom', ENUM,
         { doc: 'Where a hit\'s velocity comes from: the fixed `velocity`, or how high up the pad it landed.' }),
-      v('editable', 'editable', BOOL, { toggle: true, doc: 'Whether the pads play when struck. Off locks the grid.' }),
       // Echo lights the pads from INCOMING MIDI, which turns the grid into a monitor for whatever a
       // sequencer is playing — a thing you switch on mid-set, not once in the inspector.
       v('echo', 'echo', BOOL, { toggle: true, doc: 'Light the pads from incoming MIDI as well as from hits.' }),
       v('echoChannel', 'echoChannel', INT, { min: 0, max: 16, doc: 'Which channel the echo listens to. 0 means omni.' }),
-      v('showNotes', 'showNotes', BOOL, { toggle: true }),
-      v('showLabels', 'showLabels', BOOL, { toggle: true }),
-      v('showHeader', 'showHeader', BOOL, { toggle: true }),
       // The per-pad overrides. `pads` is index-aligned with the grid and SPARSE — anything omitted
       // falls back to the generated map — so these four carry `count` (how many pads there are,
       // whatever the stored array's length) and `resolve` (what a pad actually plays, read through
@@ -312,6 +324,8 @@ export const COMPONENT_FAMILIES = [
       v('power', 'power', NUM, { min: 0.1, max: 16 }),
       v('anchorX', 'anchors', ITEM, { item: 'x', kind: NUM, ...UNIT }),
       v('anchorY', 'anchors', ITEM, { item: 'y', kind: NUM, ...UNIT }),
+      v('axisX', 'axisX', STR, { doc: 'What the horizontal axis is called — it is a label, and a performer reads it.' }),
+      v('axisY', 'axisY', STR),
     ],
   },
 
@@ -329,6 +343,13 @@ export const COMPONENT_FAMILIES = [
       v('input', 'testInput', NUM, { ...UNIT, doc: 'Drive the router directly, as the test input does.' }),
       v('dest', 'destinations', ITEM, { item: 'enabled', kind: BOOL }),
       v('destDepth', 'destinations', ITEM, { item: 'depth', kind: NUM, min: -1, max: 1 }),
+      // The transfer curve. It is sampled by envValueAt — the ENVELOPE's evaluator — so these are
+      // envelope breakpoints wearing another name, and the shape vocabulary is the envelope's own
+      // table rather than a second list that could disagree with it.
+      v('curveX', 'curve', ITEM, { item: 'x', kind: NUM, ...UNIT }),
+      v('curveY', 'curve', ITEM, { item: 'y', kind: NUM, ...UNIT }),
+      v('curveShape', 'curve', ITEM, { item: 'curve', kind: ENUM,
+        doc: 'How one segment of the transfer curve bends, 1-based.' }),
     ],
   },
   {
@@ -341,6 +362,7 @@ export const COMPONENT_FAMILIES = [
       v('slotCurve', 'slots', ITEM, { item: 'curve', kind: ENUM }),
       v('slotMin', 'slots', ITEM, { item: 'min', kind: NUM, ...UNIT }),
       v('slotMax', 'slots', ITEM, { item: 'max', kind: NUM, ...UNIT }),
+      v('label', 'label', STR),
     ],
   },
   {
@@ -352,6 +374,7 @@ export const COMPONENT_FAMILIES = [
       v('clear', 'amounts', CELL, { clear: true, doc: 'Zero every crosspoint.' }),
       v('bipolar', 'bipolar', BOOL, { toggle: true }),
       v('step', 'step', INT, { min: 0, max: 64 }),
+      v('cellStyle', 'cellStyle', ENUM, { doc: 'How a crosspoint is drawn: bar, fill or dot.' }),
     ],
   },
   {
@@ -377,6 +400,11 @@ export const COMPONENT_FAMILIES = [
       v('loopEnd', 'loopEnd', INT, { min: 0, max: 64, oneBased: true }),
       v('timeMax', 'timeMax', NUM, { min: 1, max: 600000 }),
       v('phase', 'phase', NUM, UNIT),
+      v('addOnDoubleClick', 'addOnDoubleClick', BOOL, { toggle: true,
+        doc: 'Whether a double-click on the curve adds a breakpoint.' }),
+      v('snapX', 'snapX', NUM, { min: 0, max: 1, doc: 'Snap step for time, 0..1. 0 is free.' }),
+      v('snapY', 'snapY', NUM, { min: 0, max: 1, doc: 'Snap step for level. 0 is free.' }),
+      v('fillUnder', 'fillUnder', BOOL, { toggle: true }),
     ],
   },
 
@@ -391,6 +419,10 @@ export const COMPONENT_FAMILIES = [
       v('returnValue', 'returnValue', NUM, UNIT),
       v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
       v('snap', 'snap', NUM, UNIT),
+      v('orientation', 'orientation', ENUM),
+      v('style', 'style', ENUM, { doc: 'Ribbon, wheel, or the 3D wheel.' }),
+      v('label', 'label', STR),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6, doc: 'Decimal places on the readout.' }),
     ],
   },
   {
@@ -403,6 +435,9 @@ export const COMPONENT_FAMILIES = [
       v('detent', 'detent', NUM, UNIT),
       v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
       v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
+      v('orientation', 'orientation', ENUM),
+      v('labelA', 'labelA', STR),
+      v('labelB', 'labelB', STR),
     ],
   },
   {
@@ -414,6 +449,7 @@ export const COMPONENT_FAMILIES = [
       v('returnToCenter', 'returnToCenter', BOOL, { toggle: true }),
       v('returnAxes', 'returnAxes', ENUM),
       v('returnRate', 'returnRate', NUM, { min: 0, max: 100 }),
+      v('cornerLabel', 'cornerLabels', LINE, { doc: 'Name one corner, 1-based, clockwise from the top left.' }),
     ],
   },
   {
@@ -432,6 +468,14 @@ export const COMPONENT_FAMILIES = [
       v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9 }),
       v('dbFloor', 'dbFloor', NUM, { min: -200, max: 0, doc: 'The dB the bottom of the scale means.' }),
       v('dbCeil', 'dbCeil', NUM, { min: -200, max: 60, doc: 'The dB the top of the scale means.' }),
+      v('orientation', 'orientation', ENUM, { doc: 'Horizontal, vertical, or an arc.' }),
+      v('gradient', 'gradient', BOOL, { toggle: true }),
+      v('label', 'label', STR),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6 }),
+      v('valuePrefix', 'valuePrefix', STR),
+      v('valueSuffix', 'valueSuffix', STR, { doc: 'What follows the number — "dB", "%", "ms".' }),
+      v('zoneAt', 'zones', ITEM, { item: 'from', kind: NUM, ...UNIT,
+        doc: 'Where one colour zone starts, 0..1, 1-based.' }),
     ],
   },
 
@@ -452,6 +496,7 @@ export const COMPONENT_FAMILIES = [
       v('loopBars', 'loopLengthBars', INT, { min: 1, max: 9999 }),
       v('countIn', 'countInBars', INT, { min: 0, max: 16 }),
       v('clockOut', 'clockOut', BOOL, { toggle: true }),
+      v('runOnLoad', 'runOnLoad', BOOL, { toggle: true, doc: 'Start the transport as soon as the panel loads.' }),
     ],
   },
   {
@@ -463,6 +508,7 @@ export const COMPONENT_FAMILIES = [
       v('resetControllers', 'resetControllers', BOOL, { toggle: true }),
       v('centreBend', 'centreBend', BOOL, { toggle: true }),
       v('clearLocal', 'clearLocal', BOOL, { toggle: true }),
+      v('label', 'label', STR),
     ],
   },
   {
@@ -482,6 +528,20 @@ export const COMPONENT_FAMILIES = [
         args: ['col', 'row'],
         doc: 'Put the cursor at (column, row), both 1-based.' }),
       v('value', 'value', NUM, { min: -1e9, max: 1e9 }),
+      v('anim', 'animMode', ENUM),
+      v('animPreset', 'animPreset', STR),
+      v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
+      v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
+      v('animLoop', 'animLoop', BOOL, { toggle: true }),
+      v('scrollMode', 'scrollMode', ENUM, { doc: 'Whether scrolled text loops round or bounces.' }),
+      v('scrollRepeat', 'scrollRepeat', INT, { min: 0, max: 999, doc: 'How many times it scrolls. 0 is forever.' }),
+      v('blinkRate', 'blinkRate', NUM, { min: 50, max: 5000, doc: 'Blink period in ms.' }),
+      v('cursorBlink', 'cursorBlink', BOOL, { toggle: true }),
+      v('valueMin', 'valueMin', NUM, { min: -1e9, max: 1e9 }),
+      v('valueMax', 'valueMax', NUM, { min: -1e9, max: 1e9 }),
+      v('valuePrecision', 'valuePrecision', INT, { min: 0, max: 6 }),
+      v('valuePrefix', 'valuePrefix', STR),
+      v('valueSuffix', 'valueSuffix', STR),
     ],
   },
   {
@@ -497,6 +557,9 @@ export const COMPONENT_FAMILIES = [
       v('animPreset', 'animPreset', STR),
       v('animSpeed', 'animSpeed', NUM, { min: 0, max: 16 }),
       v('animLoop', 'animLoop', BOOL, { toggle: true }),
+      v('animFps', 'animFps', NUM, { min: 1, max: 120 }),
+      v('layoutTransition', 'layoutTransition', ENUM, { doc: 'How one layout gives way to the next.' }),
+      v('transitionMs', 'transitionMs', NUM, { min: 0, max: 5000 }),
     ],
   },
 ];
@@ -564,6 +627,44 @@ const FAMILY_VERBS = [
     'Remove one element of a list, 1-based. Removes the last when no index is given. Refused when '
     + 'the component needs the element it was asked to drop — an envelope keeps its endpoints.' },
 ];
+
+/* ------------------------------------------------- the two every component spells the same
+ *
+ * `editable` and the `show*` flags are not per-component ideas. Twenty-two sections carry an
+ * `editable` with one meaning — whether the control answers a finger — and every section that draws
+ * something optional spells the toggle for it `showX`. Written out per family that is sixty lines
+ * of the same line, which is how the Recorder ends up with a clamp the Harmoniser never got; and
+ * the audit that found them found the same field missing from twenty-two families at once, which is
+ * the signature of a rule rather than of twenty-two oversights.
+ *
+ * So they are DERIVED from the model. A component added later with a `showFoo` gets its verb
+ * without anybody remembering to add one, and componentCoverage.test.js holds every family to that.
+ *
+ * Only booleans: `labelPosition` is a display setting and an enum, so it belongs to whichever
+ * family declares it by hand with its own value table.
+ */
+function derivedFlagVerbs(fam) {
+  const defaults = SECTION_DEFAULTS[fam.section] ?? {};
+  const already = new Set(fam.verbs.map((verb) => verb.f).filter(Boolean));
+  const out = [];
+  const flag = (field, doc) => {
+    if (already.has(field) || typeof defaults[field] !== 'boolean') return;
+    out.push(v(field, field, BOOL, { toggle: true, doc }));
+  };
+  flag('editable', `Whether the ${fam.label} answers a touch. Off locks it — the panel still `
+    + 'drives it, a finger does not.');
+  for (const field of Object.keys(defaults)) {
+    if (!/^show[A-Z]/.test(field)) continue;
+    // "showPlayhead" -> "the playhead". Read from the field rather than written per component.
+    const what = field.slice(4).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+    flag(field, `Show or hide the ${what}. No argument toggles.`);
+  }
+  return out;
+}
+
+for (const fam of COMPONENT_FAMILIES) {
+  fam.verbs.push(...derivedFlagVerbs(fam));
+}
 
 for (const fam of COMPONENT_FAMILIES) {
   const lists = fam.verbs.filter((verb) => LIST_KINDS.includes(verb.k) && !verb.clear);

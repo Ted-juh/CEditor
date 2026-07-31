@@ -18,6 +18,17 @@
 
 import { envelopePointAdded, envelopePointRemoved } from './envelopeLayout.js';
 
+/**
+ * The two breakpoint lists, which are one idea.
+ *
+ * A Router's transfer curve is sampled by the envelope's own `envValueAt`, so its points ARE
+ * envelope points — a breakpoint goes into the widest gap and takes its neighbour's curve, and the
+ * endpoints are not removable. Giving the Router its own template would be a second, worse copy of
+ * a rule that already exists.
+ */
+const isCurve = (section, field) =>
+  `${section}.${field}` === 'Envelope.points' || `${section}.${field}` === 'Router.curve';
+
 /** The lowest `<prefix><n>` not already taken, so two adds in the same millisecond differ. */
 export function uniqueElementId(prefix, list) {
   const taken = new Set((Array.isArray(list) ? list : []).map((x) => String(x?.id ?? '')));
@@ -57,6 +68,11 @@ export const COMPONENT_ELEMENT_TEMPLATES = {
       x: 0.5, y: 0.5, values,
     };
   },
+  // The Meter's colour zones. No id — a zone is identified by where it starts. The new one lands
+  // just above the last, which is what MeterEditor's own Add button did inline before this existed.
+  'Meter.zones': (list) => ({
+    from: Math.min(0.95, (list.at(-1)?.from ?? 0) + 0.1), colour: 'FFEB5757',
+  }),
   'Looper.lanes': (list) => ({
     id: uniqueElementId('g', list), label: `Lane ${list.length + 1}`,
     points: [], rest: 0, enabled: true,
@@ -65,7 +81,7 @@ export const COMPONENT_ELEMENT_TEMPLATES = {
 
 /** Whether this list can be grown from here at all. */
 export function canGrowComponentList(section, field) {
-  return `${section}.${field}` in COMPONENT_ELEMENT_TEMPLATES || `${section}.${field}` === 'Envelope.points';
+  return `${section}.${field}` in COMPONENT_ELEMENT_TEMPLATES || isCurve(section, field);
 }
 
 /**
@@ -78,7 +94,7 @@ export function canGrowComponentList(section, field) {
  */
 export function componentListWithElement(section, field, list, cfg, at = null) {
   const current = Array.isArray(list) ? list : [];
-  if (`${section}.${field}` === 'Envelope.points') return envelopePointAdded(current, at);
+  if (isCurve(section, field)) return envelopePointAdded(current, at);
   const make = COMPONENT_ELEMENT_TEMPLATES[`${section}.${field}`];
   if (!make) return null;
   const element = make(current, cfg);
@@ -96,8 +112,8 @@ export function componentListWithElement(section, field, list, cfg, at = null) {
  */
 export function componentListWithoutElement(section, field, list, at) {
   const current = Array.isArray(list) ? list : [];
-  if (`${section}.${field}` === 'Envelope.points') return envelopePointRemoved(current, at);
-  if (!(`${section}.${field}` in COMPONENT_ELEMENT_TEMPLATES)) return null;
+  if (isCurve(section, field)) return envelopePointRemoved(current, at);
+  if (!(`${section}.${field}` in COMPONENT_ELEMENT_TEMPLATES) && !isCurve(section, field)) return null;
   if (!Number.isInteger(at) || at < 0 || at >= current.length) return null;
   return current.filter((_, i) => i !== at);
 }

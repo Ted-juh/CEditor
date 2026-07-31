@@ -48,6 +48,21 @@ import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
 export const LCD_SCROLLS = ['off', 'left', 'right'];
 export const LCD_CURSORS = ['off', 'block', 'underline'];
 export const PIXEL_ANIM_MODES = ['off', 'file', 'preset'];
+/* …and the coverage audit's crop. Same rule: each is held to the editor's own `<select>` by
+ * componentEnums.test.js, because the value is consumed by a renderer conditional rather than by a
+ * table any module exports. `orientation` is spelled by four components and they do NOT agree —
+ * the Meter has an arc and the others do not — so they are four entries, not one shared list. */
+export const CHORDPAD_LAYOUTS = ['wheel', 'grid'];
+export const RIBBON_ORIENTATIONS = ['vertical', 'horizontal'];
+export const RIBBON_STYLES = ['ribbon', 'wheel', 'wheel3d'];
+export const NOTERIBBON_ORIENTATIONS = ['horizontal', 'vertical'];
+export const NOTERIBBON_VELOCITY_SOURCES = ['fixed', 'position'];
+export const NOTERIBBON_MOD_AXES = ['none', 'cc'];
+export const CROSSFADER_ORIENTATIONS = ['horizontal', 'vertical'];
+export const METER_ORIENTATIONS = ['horizontal', 'vertical', 'arc'];
+export const MATRIX_CELL_STYLES = ['bar', 'fill', 'dot'];
+export const LCD_SCROLL_MODES = ['loop', 'bounce'];
+export const PIXEL_LAYOUT_TRANSITIONS = ['none', 'fade', 'slide'];
 
 /** The source of truth per verb, as `<family>.<verb>` — read by componentVerbs.js to build the
  *  spec, and by componentEnums.test.js to prove nothing drifted. */
@@ -68,6 +83,18 @@ export const VERB_VALUES = {
   'drumpads.origin': PAD_ORIGINS,
   'drumpads.velocityFrom': PAD_VELOCITY_SOURCES,
   'drumpads.rollRate': DIVISION_IDS,
+  'chordpad.layout': CHORDPAD_LAYOUTS,
+  'noteribbon.orientation': NOTERIBBON_ORIENTATIONS,
+  'noteribbon.velocityFrom': NOTERIBBON_VELOCITY_SOURCES,
+  'noteribbon.modAxis': NOTERIBBON_MOD_AXES,
+  'ribbon.orientation': RIBBON_ORIENTATIONS,
+  'ribbon.style': RIBBON_STYLES,
+  'crossfader.orientation': CROSSFADER_ORIENTATIONS,
+  'meter.orientation': METER_ORIENTATIONS,
+  'matrix.cellStyle': MATRIX_CELL_STYLES,
+  'lcd.anim': PIXEL_ANIM_MODES,
+  'lcd.scrollMode': LCD_SCROLL_MODES,
+  'pixel.layoutTransition': PIXEL_LAYOUT_TRANSITIONS,
   // One table for all four corners: they offer the same vocabulary, and a corner that offered a
   // different set from its neighbour would be a surprise rather than a feature.
   ...Object.fromEntries(['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight']
@@ -77,6 +104,8 @@ export const VERB_VALUES = {
   'router.source': ROUTER_INPUT_SOURCES.map((s) => String(s?.id ?? s)),
   'router.poly': POLY_PRESSURE_MODES,
   'macro.slotCurve': MACRO_CURVES,
+  // Same evaluator, same vocabulary — see the note beside the verb.
+  'router.curveShape': ENVELOPE_CURVES,
   'constraint.mode': CONSTRAINT_MODES,
   'envelope.preset': ENVELOPE_PRESETS,
   'envelope.pointCurve': ENVELOPE_CURVES,
