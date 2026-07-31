@@ -207,7 +207,7 @@ test('the Lua and the JavaScript in the manual describe the same panel', () => {
   // Hand-written twins, not a machine translation, so only a test can promise they agree. The Lua
   // is checked by TRANSLITERATION rather than by running a Lua engine here: what can drift is the
   // data and the arithmetic, and both are visible in the source.
-  for (const lesson of ['walkthrough', 'from-data', 'drumkit']) {
+  for (const lesson of ['walkthrough', 'from-data', 'drumkit', 'wiring']) {
     const lua = listings(lesson, 'lua').join('\n');
     const js = listings(lesson, 'js').join('\n');
 
@@ -288,4 +288,33 @@ test('lesson 13 sets up the strike the way it describes it', () => {
   assert.equal(strikeAction(cfg, 0.05, 0.05).action, 'ghost');
   assert.equal(strikeAction(cfg, 0.95, 0.05).action, 'flam');
   assert.equal(strikeAction(cfg, 0.5, 0.5).action, 'none', 'the face is still a plain hit');
+});
+
+/* ------------------------------------------------------------ 14 · a panel is a graph */
+
+test('lesson 14 runs, wires what it can, and refuses what it cannot', () => {
+  const kit = buildKit(listings('wiring', 'js').join('\n'));   // returns the first control
+  assert.ok(kit, 'the listing built nothing');
+  const said = traced();
+
+  // The contrast the lesson is built on: one Label, accepted by one field and refused by another.
+  assert.match(said, /could not wire Title -> Level\.source/, 'a Label cannot drive a Meter');
+  assert.match(said, /not a knob, slider or other range control/, 'and the verb says why');
+  assert.match(said, /wired 3 of 4/, 'the other three took');
+
+  // …and the same Label IS the LCD's backlight source, which is the whole point of the pairing.
+  assert.match(said, /Title {2}-> {2}Screen\.backlightSource/);
+});
+
+test('lesson 14 reads the graph back by name, not by id', () => {
+  buildKit(listings('wiring', 'js').join('\n'));
+  const said = traced();
+  for (const edge of ['Cutoff  ->  Level.source', 'Reso  ->  Screen.valueSource',
+                      'Title  ->  Screen.backlightSource']) {
+    assert.ok(said.includes(edge), `the walk did not report "${edge}"`);
+  }
+  // A raw control id must never reach a script, and the walk is where one would show up.
+  assert.ok(!/ctl[_-]?[0-9a-f]{6,}/i.test(said), 'an id leaked into what the script printed');
+  // The refused link left nothing behind: the Meter is driven by the knob and by nothing else.
+  assert.equal((said.match(/-> {2}Level\.source/g) ?? []).length, 1);
 });

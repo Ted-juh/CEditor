@@ -429,6 +429,7 @@ pre code { font-size: inherit; }
     <a href="#walkthrough">A button, from nothing</a>
     <a href="#from-data">Eight, from a table</a>
     <a href="#drumkit">Asking the instrument</a>
+    <a href="#wiring">A panel is a graph</a>
     <h2>Reference</h2>
     <a href="#surface">Every module</a>
     <a href="#hooks">Lifecycle hooks</a>
@@ -1550,6 +1551,148 @@ end</code></pre>
         What it logs is <code>rolling: CH Hat, OP Hat</code> &mdash; two names the script never
         wrote down, for two pads it never numbered. The remaining corner, <code>choke</code>, is the
         cymbal grab: it silences the group and sounds nothing of its own.
+      </p>
+    </div>
+  </div>
+
+  <div class="lesson wide" id="wiring">
+    <p class="lesson-n">14 &middot; A panel is a graph</p>
+    <div class="lesson-text prose">
+      <h3>Controls that read each other</h3>
+      <p>
+        The last three lessons built controls. This one <b>connects</b> them. A Meter can follow a
+        knob, an LCD can take its value from one control and its backlight from another, an
+        Arpeggiator can take its notes from a Chord Pad &mdash; and once any of that is true, the
+        panel has stopped being a list of controls and become a graph.
+      </p>
+      <p>
+        <b>You name the control, not its id.</b> The field underneath stores an id, because that is
+        what survives a rename; a script never sees one. It names the control the way it names
+        everything else, and <code>read()</code> hands the name back &mdash; an opaque
+        <code>ctl_&hellip;</code> is not something a script could have got hold of, and not
+        something it could do anything with.
+      </p>
+      <p>
+        <b>Not every control can drive every field, and the refusal is the interesting part.</b>
+        Look at what happens to <code>Title</code>, a plain Label, in the listing: it is
+        <i>accepted</i> as the LCD's backlight source and <i>refused</i> as the Meter's level. One
+        control, two answers, because the two fields want different things &mdash; "is this on" can
+        be answered by anything, "how far up is this" cannot. The verb says which:
+        <span class="q">refused &mdash; it is not a knob, slider or other range control</span>. A
+        wiring that failed silently would look exactly like a wiring that worked until the meter
+        sat still.
+      </p>
+      <p>
+        That is what makes the return value worth reading. The loop below builds a chain from a
+        table of intended connections and <b>counts the ones that took</b>, so a panel assembling
+        itself against a kit somebody else laid out can adapt instead of half-working.
+      </p>
+      <p>
+        <b>And then it reads the graph back.</b> The last block walks the panel with
+        <code>ce.panel.each</code>, asks <code>ce.panel.info</code> what each control IS, and asks
+        each one what drives it. Nothing in that block knows what the first two blocks did &mdash;
+        it would report a panel a script never built, wired entirely by hand in the inspector.
+        Asking a stored property what it is connected to is not a thing you can do; the connection
+        is stored, the <i>question</i> is not.
+      </p>
+      <p class="note">
+        Naming no control unlinks, which is the inspector's own
+        &ldquo;&mdash;&nbsp;Static&nbsp;/&nbsp;bound&nbsp;&mdash;&rdquo; and a real setting rather
+        than the absence of one. A link whose target has been deleted reads back as unlinked too:
+        the component is running on its static value either way, and that is the honest answer.
+      </p>
+    </div>
+    <div class="lesson-code">
+      <p class="cap">The rig</p>
+      <pre data-lua><code>local M = ce.components.meter
+local L = ce.components.lcd
+
+function onPanelBuild()
+  ce.panel.create("Knob",       { name = "Cutoff", x = 40,  y = 60,  width = 96,  height = 96 })
+  ce.panel.create("Knob",       { name = "Reso",   x = 150, y = 60,  width = 96,  height = 96 })
+  ce.panel.create("Meter",      { name = "Level",  x = 270, y = 60,  width = 240, height = 36 })
+  ce.panel.create("LcdDisplay", { name = "Screen", x = 270, y = 110, width = 240, height = 90 })
+  ce.panel.create("Label",      { name = "Title",  x = 40,  y = 180, width = 200, height = 24 })</code></pre>
+      <pre data-js hidden><code>const M = ce.components.meter;
+const L = ce.components.lcd;
+
+function onPanelBuild() {
+  ce.panel.create("Knob",       { name: "Cutoff", x: 40,  y: 60,  width: 96,  height: 96 });
+  ce.panel.create("Knob",       { name: "Reso",   x: 150, y: 60,  width: 96,  height: 96 });
+  ce.panel.create("Meter",      { name: "Level",  x: 270, y: 60,  width: 240, height: 36 });
+  ce.panel.create("LcdDisplay", { name: "Screen", x: 270, y: 110, width: 240, height: 90 });
+  ce.panel.create("Label",      { name: "Title",  x: 40,  y: 180, width: 200, height: 24 });</code></pre>
+
+      <p class="cap">Wire it, and count what took</p>
+      <pre data-lua><code>  -- The last row is deliberately impossible: a Label has no value to give a Meter.
+  -- The row above it is the same Label driving the LCD's backlight, which is fine.
+  local WIRING = {
+    { at = "Level",  verb = "source",          from = "Cutoff" },
+    { at = "Screen", verb = "valueSource",     from = "Reso"   },
+    { at = "Screen", verb = "backlightSource", from = "Title"  },
+    { at = "Level",  verb = "source",          from = "Title"  },
+  }
+  local wire = { Level = M, Screen = L }
+  local made = 0
+  for _, w in ipairs(WIRING) do
+    if wire[w.at][w.verb](w.at, w.from) then
+      made = made + 1
+    else
+      log("could not wire " .. w.from .. " -&gt; " .. w.at .. "." .. w.verb)
+    end
+  end
+  log("wired " .. made .. " of " .. #WIRING)</code></pre>
+      <pre data-js hidden><code>  // The last row is deliberately impossible: a Label has no value to give a Meter.
+  // The row above it is the same Label driving the LCD's backlight, which is fine.
+  const WIRING = [
+    { at: "Level",  verb: "source",          from: "Cutoff" },
+    { at: "Screen", verb: "valueSource",     from: "Reso"   },
+    { at: "Screen", verb: "backlightSource", from: "Title"  },
+    { at: "Level",  verb: "source",          from: "Title"  },
+  ];
+  const wire = { Level: M, Screen: L };
+  let made = 0;
+  for (const w of WIRING) {
+    if (wire[w.at][w.verb](w.at, w.from)) made += 1;
+    else log("could not wire " + w.from + " -&gt; " + w.at + "." + w.verb);
+  }
+  log("wired " + made + " of " + WIRING.length);</code></pre>
+
+      <p class="cap">Read the graph back</p>
+      <pre data-lua><code>  -- Nothing below knows what the two blocks above did. It reports the wiring of
+  -- whatever panel it is pointed at, including links made entirely by hand.
+  local SOURCES = {
+    Meter      = { { "source", M } },
+    LcdDisplay = { { "valueSource", L }, { "backlightSource", L } },
+  }
+  ce.panel.each(function(name)
+    local info = ce.panel.info(name)
+    for _, pair in ipairs(SOURCES[info.type] or {}) do
+      local verb, mod = pair[1], pair[2]
+      local from = mod.read(name, verb)
+      if from ~= "" then log(from .. "  -&gt;  " .. name .. "." .. verb) end
+    end
+  end)
+end</code></pre>
+      <pre data-js hidden><code>  // Nothing below knows what the two blocks above did. It reports the wiring of
+  // whatever panel it is pointed at, including links made entirely by hand.
+  const SOURCES = {
+    Meter:      [["source", M]],
+    LcdDisplay: [["valueSource", L], ["backlightSource", L]],
+  };
+  ce.panel.each((name) =&gt; {
+    const info = ce.panel.info(name);
+    for (const [verb, mod] of SOURCES[info.type] ?? []) {
+      const from = mod.read(name, verb);
+      if (from) log(from + "  -&gt;  " + name + "." + verb);
+    }
+  });
+}</code></pre>
+      <p class="note">
+        What it logs, in order: <code>could not wire Title &rarr; Level.source</code>,
+        <code>wired 3 of 4</code>, then the graph &mdash; <code>Cutoff &rarr; Level.source</code>,
+        <code>Reso &rarr; Screen.valueSource</code>,
+        <code>Title &rarr; Screen.backlightSource</code>.
       </p>
     </div>
   </div>
