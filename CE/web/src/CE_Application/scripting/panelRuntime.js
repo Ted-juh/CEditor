@@ -47,6 +47,9 @@ import {
   deviceProfiles, deviceRoleMappings, profileParameters, refreshProfileParameters,
   midiInputs, midiDestinations,
 } from '../stores/deviceProfiles.js';
+import { profileSources } from '../stores/deviceProfileStores.js';
+import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
+import { mapDeviceRole } from '../stores/deviceProfileSession.js';
 import {
   defineParameter as defineRuntimeParameter, defineDump as defineRuntimeDump,
   definedParameters, definedParameter, encodeParameter as encodeRuntimeParameter,
@@ -5371,12 +5374,111 @@ function roleMapping(role) {
   return mappings[role] ?? mappings[DEFAULT_ROLE] ?? null;
 }
 
+/**
+ * The profile SOURCE behind a role — the authored JSON, not the catalogue entry.
+ *
+ * profile() has always answered from the catalogue listing (id, name) and the live session, which
+ * is what a script needs to know whether it is talking to anything. Everything below needs the
+ * document: what variables the recipes interpolate, what the profile claims it can do, what
+ * messages it can build.
+ */
+function deviceProfileSource(role = DEFAULT_ROLE) {
+  const profileId = roleMapping(role)?.profileId;
+  if (!profileId) return null;
+  const text = (get(profileSources) ?? {})[profileId]?.source ?? '';
+  if (!text) return null;
+  const parsed = parseProfileSourceText(profileId, text);
+  return parsed.ok ? parsed.profile : null;
+}
+
+/**
+ * A variable's EFFECTIVE value: the profile's default, then this project's override.
+ *
+ * That precedence is the app's own — deviceProfileSession merges `mapping.variables` over
+ * `profile.variables` on the way to every recipe — and it is the reason a write goes to the
+ * MAPPING rather than to the profile. A profile is a shared document; two panels driving two units
+ * of the same synth must be able to sit on different device ids without editing it.
+ */
+function deviceVariablesRead(role = DEFAULT_ROLE) {
+  const profile = deviceProfileSource(role);
+  const mapping = roleMapping(role);
+  if (!profile && !mapping) return null;
+  return {
+    ...(profile?.variables && typeof profile.variables === 'object' ? profile.variables : {}),
+    ...(mapping?.variables && typeof mapping.variables === 'object' ? mapping.variables : {}),
+  };
+}
+
+function deviceTimingRead(role = DEFAULT_ROLE) {
+  const profile = deviceProfileSource(role);
+  const mapping = roleMapping(role);
+  if (!profile && !mapping) return null;
+  return {
+    ...(profile?.timing && typeof profile.timing === 'object' ? profile.timing : {}),
+    ...(mapping?.timingOverrides && typeof mapping.timingOverrides === 'object' ? mapping.timingOverrides : {}),
+  };
+}
+
+/** One override written onto the role mapping, through the app's own writer so it persists. */
+function deviceOverrideWrite(kind, name, value, role, { min, max, label }) {
+  const key = String(name ?? '').trim();
+  if (!key) {
+    addScriptTrace('error', '', `ce.device.${label}: a name is required.`);
+    return false;
+  }
+  const mapping = roleMapping(role);
+  if (!mapping?.profileId) {
+    addScriptTrace('error', '', `ce.device.${label}: no device profile is mapped to "${role}".`);
+    return false;
+  }
+  const n = Number(value);
+  if (!Number.isFinite(n)) {
+    addScriptTrace('error', '', `ce.device.${label}("${key}"): needs a number.`);
+    return false;
+  }
+  const next = Math.min(max, Math.max(min, Math.round(n)));
+  const current = (mapping[kind] && typeof mapping[kind] === 'object' ? mapping[kind] : {});
+  if (current[key] === next) {
+    addScriptTrace('log', '', `ce.device.${label}("${key}", ${next}) — already that way`);
+    return true;
+  }
+  mapDeviceRole(role, mapping.profileId, { [kind]: { ...current, [key]: next } });
+  addScriptTrace('log', '', `ce.device.${label} ${role}: ${key} → ${next}`);
+  return true;
+}
+
+/**
+ * What the profile says it can do, in the profile's OWN WORDS.
+ *
+ * Deliberately not a boolean. The eight shipped profiles answer with 'complete', 'partial' and
+ * 'notImplemented' — and also with 'filter-block-rq1', 'partial-block-requests' and
+ * 'broad-with-packed-text-and-requests'. Squeezing that into can()/true would be a guess presented
+ * as a fact, and the guess would be wrong for a third of them. A script tests the words it cares
+ * about; the ones that mean "no" are spelled that way.
+ */
+function deviceCoverageRead(role = DEFAULT_ROLE, feature) {
+  const coverage = deviceProfileSource(role)?.coverage;
+  if (!coverage || typeof coverage !== 'object') return feature ? undefined : null;
+  if (feature === undefined || feature === null || feature === '') return { ...coverage };
+  const wanted = String(feature);
+  const key = Object.keys(coverage).find((k) => k.toLowerCase() === wanted.toLowerCase());
+  return key === undefined ? undefined : coverage[key];
+}
+
+/** The ids of the messages a profile can build, and of the requests it can send. */
+function deviceListRead(role, field) {
+  const list = deviceProfileSource(role)?.[field];
+  if (!Array.isArray(list)) return [];
+  return list.map((entry) => String(entry?.id ?? '')).filter(Boolean);
+}
+
 function deviceProfileRead(role = DEFAULT_ROLE) {
   const mapping = roleMapping(role);
   const profileId = mapping?.profileId;
   if (!profileId) return null;
   const listed = (get(deviceProfiles) ?? []).find((p) => String(p?.id) === String(profileId)) ?? null;
   const session = (get(deviceSessionState) ?? {})[role] ?? null;
+  const source = deviceProfileSource(role);
   return {
     id: profileId,
     name: listed?.name ?? profileId,
@@ -5385,6 +5487,13 @@ function deviceProfileRead(role = DEFAULT_ROLE) {
     state: String(session?.state ?? 'unknown'),
     midiDestination: mapping?.midiDestination?.name ?? mapping?.midiDestination?.id ?? '',
     midiInput: mapping?.midiInput?.name ?? mapping?.midiInput?.id ?? '',
+    // From the authored document rather than the catalogue row: a script choosing between two
+    // dialects of the same synth needs the make and the model, and it had neither.
+    manufacturer: String(source?.manufacturer ?? ''),
+    family: String(source?.family ?? ''),
+    version: String(source?.profileVersion ?? ''),
+    status: String(source?.status ?? listed?.status ?? ''),
+    trust: String(source?.trust ?? listed?.trust ?? ''),
   };
 }
 
@@ -6357,6 +6466,17 @@ function buildApi(ownerName, scriptId = '') {
     deviceBind: (control, parameterId, opts) => deviceBindImpl(control, parameterId, opts ?? {}),
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
     devicePorts: (opts) => devicePortsRead(opts ?? {}),
+    deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
+    deviceSetVariable: (name, value, role) => deviceOverrideWrite(
+      'variables', name, value, role || DEFAULT_ROLE,
+      { min: 0, max: 127, label: 'setVariable' }),
+    deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
+    deviceSetTiming: (name, ms, role) => deviceOverrideWrite(
+      'timingOverrides', name, ms, role || DEFAULT_ROLE,
+      { min: 0, max: 60000, label: 'setTiming' }),
+    deviceCoverage: (feature, role) => deviceCoverageRead(role || DEFAULT_ROLE, feature),
+    deviceRecipes: (role) => deviceListRead(role || DEFAULT_ROLE, 'messageRecipes'),
+    deviceRequests: (role) => deviceListRead(role || DEFAULT_ROLE, 'requests'),
     // The callback belongs to the calling script, so this is bound here rather than in midiApi —
     // a throw inside it is reported against the script that scheduled it.
     requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),

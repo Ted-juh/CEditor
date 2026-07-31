@@ -834,6 +834,52 @@ private:
             return obj != nullptr && (bool) obj->getProperty ("ok");
         };
 
+        // setVariable / setTiming. The override goes onto this project's ROLE MAPPING, merged over
+        // the profile's defaults on the way to every recipe — a profile is a shared document and
+        // two panels driving two units of the same synth must not have to edit it to disagree
+        // about a device id.
+        cb.deviceSet = [this] (const juce::String& kind, const juce::String& name,
+                               const juce::var& value, const juce::String& roleIn) -> bool
+        {
+            if (name.isEmpty()) return false;
+            const auto role = roleIn.isEmpty() ? juce::String ("mainSynth") : roleIn;
+            const bool wantVars = kind == "variable";
+            if (! wantVars && kind != "timing") return false;
+
+            const auto session = deviceService.getSessionState();
+            auto* sessionObj = session.getDynamicObject();
+            const auto record = sessionObj != nullptr ? sessionObj->getProperty (role) : juce::var();
+            auto* recordObj = record.getDynamicObject();
+            const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
+                                                        : juce::String();
+            if (profileId.isEmpty()) return false;   // nothing mapped — say so rather than pretend
+
+            // Carried forward whole: setDeviceRoleMapping replaces the mapping, so dropping the
+            // ports here would silently unplug the device this call is about.
+            auto* req = new juce::DynamicObject();
+            req->setProperty ("role", role);
+            req->setProperty ("profileId", profileId);
+            if (recordObj != nullptr)
+                for (const char* key : { "midiDestination", "midiInput", "syncDirection" })
+                    req->setProperty (key, recordObj->getProperty (key));
+
+            const char* slot = wantVars ? "variables" : "timingOverrides";
+            auto* merged = new juce::DynamicObject();
+            if (recordObj != nullptr)
+                if (auto* existing = recordObj->getProperty (slot).getDynamicObject())
+                    for (const auto& e : existing->getProperties())
+                        merged->setProperty (e.name, e.value);
+            merged->setProperty (juce::Identifier (name), value);
+            req->setProperty (slot, juce::var (merged));
+            if (recordObj != nullptr)
+                req->setProperty (wantVars ? "timingOverrides" : "variables",
+                                  recordObj->getProperty (wantVars ? "timingOverrides" : "variables"));
+
+            const auto result = deviceService.setDeviceRoleMapping (juce::var (req));
+            auto* obj = result.getDynamicObject();
+            return obj == nullptr || (bool) obj->getProperty ("ok");
+        };
+
         cb.deviceQuery = [this] (const juce::String& kind, const juce::var& payload) -> juce::var
         {
             auto* p = payload.getDynamicObject();
@@ -938,6 +984,83 @@ private:
                 out->setProperty ("role", role);
                 out->setProperty ("connected", ready);
                 out->setProperty ("state", state.isNotEmpty() ? state : juce::String ("unknown"));
+                return juce::var (out);
+            }
+
+            // The profile DOCUMENT, rather than the catalogue row `profile` answers from. Every
+            // question below needs the authored JSON: what the recipes interpolate, what the
+            // profile claims it can do, what messages it can build.
+            const auto profileDocument = [&] () -> juce::var
+            {
+                const auto profileId = recordObj != nullptr ? recordObj->getProperty ("profileId").toString()
+                                                            : juce::String();
+                if (profileId.isEmpty()) return {};
+                auto* q = new juce::DynamicObject();
+                q->setProperty ("profileId", profileId);
+                const auto got = deviceService.getProfileSource (juce::var (q));
+                auto* gotObj = got.getDynamicObject();
+                if (gotObj == nullptr) return {};
+                const auto text = gotObj->getProperty ("source").toString();
+                if (text.isEmpty()) return {};
+                return juce::JSON::parse (text);
+            };
+
+            // variables / timing read as their EFFECTIVE values: the profile's defaults with this
+            // project's role-mapping overrides on top. That precedence is the send path's own —
+            // a write goes to the mapping, never to the profile, because a profile is shared.
+            if (kind == "variables" || kind == "timing")
+            {
+                const bool wantVars = kind == "variables";
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr && recordObj == nullptr) return {};
+
+                auto* out = new juce::DynamicObject();
+                const auto merge = [&] (const juce::var& src)
+                {
+                    if (auto* o = src.getDynamicObject())
+                        for (const auto& e : o->getProperties())
+                            out->setProperty (e.name, e.value);
+                };
+                if (docObj != nullptr) merge (docObj->getProperty (wantVars ? "variables" : "timing"));
+                if (recordObj != nullptr)
+                    merge (recordObj->getProperty (wantVars ? "variables" : "timingOverrides"));
+                return juce::var (out);
+            }
+
+            // What the profile says it can do, in ITS OWN WORDS. Not a boolean: real profiles
+            // answer "complete", "partial" and "notImplemented" but also "filter-block-rq1", so a
+            // yes/no would be a guess wearing the clothes of a fact.
+            if (kind == "coverage")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                const auto coverage = docObj->getProperty ("coverage");
+                auto* covObj = coverage.getDynamicObject();
+                if (covObj == nullptr) return {};
+
+                const auto feature = p != nullptr ? p->getProperty ("feature").toString() : juce::String();
+                if (feature.isEmpty()) return coverage;
+                for (const auto& e : covObj->getProperties())
+                    if (e.name.toString().equalsIgnoreCase (feature)) return e.value;
+                return {};
+            }
+
+            // The ids of what a profile can build or ask for.
+            if (kind == "recipes" || kind == "requests")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                juce::Array<juce::var> out;
+                if (docObj != nullptr)
+                    if (auto* arr = docObj->getProperty (kind == "recipes" ? "messageRecipes" : "requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject())
+                            {
+                                const auto id = o->getProperty ("id").toString();
+                                if (id.isNotEmpty()) out.add (juce::var (id));
+                            }
                 return juce::var (out);
             }
 

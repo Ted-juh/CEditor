@@ -331,6 +331,17 @@ PyObject* api_panelQuery (PyObject*, PyObject* args)
     return varToPy (g_host->panelQuery (juce::String::fromUTF8 (kind),
                                         payload != nullptr ? pyToVar (payload) : juce::var()));
 }
+PyObject* api_deviceSet (PyObject*, PyObject* args)
+{
+    const char* kind = nullptr; const char* name = nullptr; PyObject* value = nullptr; const char* role = nullptr;
+    if (! PyArg_ParseTuple (args, "ssOs", &kind, &name, &value, &role)) return nullptr;
+    if (g_host == nullptr) Py_RETURN_FALSE;
+    const bool ok = g_host->deviceSet (juce::String::fromUTF8 (kind), juce::String::fromUTF8 (name),
+                                       pyToVar (value), juce::String::fromUTF8 (role));
+    if (ok) Py_RETURN_TRUE;
+    Py_RETURN_FALSE;
+}
+
 PyObject* api_deviceWrite (PyObject*, PyObject* args)
 {
     const char* id = nullptr; PyObject* value = nullptr; const char* role = nullptr;
@@ -465,6 +476,7 @@ PyMethodDef apiMethods[] = {
     { "deviceQuery",   api_deviceQuery,   METH_VARARGS, nullptr },
     { "panelQuery",    api_panelQuery,    METH_VARARGS, nullptr },
     { "deviceWrite",   api_deviceWrite,   METH_VARARGS, nullptr },
+    { "deviceSet",     api_deviceSet,     METH_VARARGS, nullptr },
     { "transportState", api_transportState, METH_NOARGS,  nullptr },
     { "nowMs",         api_nowMs,         METH_NOARGS,  nullptr },
     { "animate",       api_animate,       METH_VARARGS, nullptr },
@@ -2433,6 +2445,9 @@ def panelRestore(snap):
 def __deviceQuery(kind, payload=None):
     return __api.deviceQuery(kind, payload)
 
+def __deviceSet(kind, name, value, role):
+    return __api.deviceSet(kind, name, value, role)
+
 def deviceProfile(role=None):
     return __deviceQuery("profile", { "role": __role(role) })
 # read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
@@ -2445,6 +2460,25 @@ def deviceWrite(id, value, role=None):
 
 def deviceConnected(role=None):
     return __deviceQuery("connected", { "role": __role(role) }) is True
+
+# The profile DOCUMENT, rather than the catalogue row deviceProfile() answers from. `variables` is
+# what every recipe interpolates ($channel, $deviceId), so it decides what every message the panel
+# sends looks like; `coverage` is what the profile claims it can do, in its own words.
+def deviceVariables(role=None):
+    return __deviceQuery("variables", { "role": __role(role) })
+def deviceTiming(role=None):
+    return __deviceQuery("timing", { "role": __role(role) })
+def deviceCoverage(feature=None, role=None):
+    return __deviceQuery("coverage", { "role": __role(role), "feature": "" if feature is None else str(feature) })
+def deviceRecipes(role=None):
+    return __deviceQuery("recipes", { "role": __role(role) }) or []
+def deviceRequests(role=None):
+    return __deviceQuery("requests", { "role": __role(role) }) or []
+# The two writes. They land on THIS PROJECT's override, never on the shared profile.
+def deviceSetVariable(name, value, role=None):
+    return __deviceSet("variable", str(name), value, __role(role)) is True
+def deviceSetTiming(name, ms, role=None):
+    return __deviceSet("timing", str(name), ms, __role(role)) is True
 
 def deviceParameters(opts=None):
     opts = opts or {}
@@ -2797,7 +2831,7 @@ import types as __ce_types
 __CE_MODULES = {
     "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-    "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
+    "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },

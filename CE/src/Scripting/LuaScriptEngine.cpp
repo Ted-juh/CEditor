@@ -1897,6 +1897,23 @@ function deviceProfile(role) return __deviceQuery("profile", { role = __role(rol
 function deviceRead(id, role) return __deviceQuery("read", { role = __role(role), id = tostring(id) }) end
 function deviceWrite(id, value, role) return __deviceWrite(tostring(id), value, __role(role)) end
 function deviceConnected(role) return __deviceQuery("connected", { role = __role(role) }) == true end
+-- The profile DOCUMENT, rather than the catalogue row profile() answers from. `variables` is what
+-- every recipe interpolates ($channel, $deviceId), so it decides what every message the panel sends
+-- looks like; `coverage` is what the profile claims it can do, in its own words.
+function deviceVariables(role) return __deviceQuery("variables", { role = __role(role) }) end
+function deviceTiming(role) return __deviceQuery("timing", { role = __role(role) }) end
+function deviceCoverage(feature, role)
+  return __deviceQuery("coverage", { role = __role(role), feature = feature and tostring(feature) or nil })
+end
+function deviceRecipes(role) return __deviceQuery("recipes", { role = __role(role) }) or {} end
+function deviceRequests(role) return __deviceQuery("requests", { role = __role(role) }) or {} end
+-- The two writes. They land on THIS PROJECT's override, never on the shared profile.
+function deviceSetVariable(name, value, role)
+  return __deviceSet("variable", tostring(name), value, __role(role)) == true
+end
+function deviceSetTiming(name, ms, role)
+  return __deviceSet("timing", tostring(name), ms, __role(role)) == true
+end
 function deviceParameters(opts)
   opts = opts or {}
   local q = { role = __role(opts.role), query = opts.query, group = opts.group,
@@ -2376,7 +2393,7 @@ end
 local __CE_MODULES = {
   ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned" },
-  ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", requestDump = "requestDump", sendDump = "sendDump", unbind = "deviceUnbind", write = "deviceWrite" },
+  ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", profile = "deviceProfile", read = "deviceRead", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromHsl = "hslToHex", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
@@ -2641,6 +2658,11 @@ public:
 
         g.set_function ("__deviceWrite", [this] (std::string id, sol::object value, std::string role)
             { return host->deviceWrite (juce::String (id), solToVar (value), juce::String (role)); });
+
+        g.set_function ("__deviceSet", [this] (std::string kind, std::string name,
+                                               sol::object value, std::string role)
+            { return host->deviceSet (juce::String (kind), juce::String (name),
+                                      solToVar (value), juce::String (role)); });
 
         g.set_function ("startTimer", [this] (std::string id, sol::optional<int> ms) { host->startTimer (juce::String (id), ms ? *ms : 0); });
         g.set_function ("stopTimer",  [this] (std::string id) { host->stopTimer (juce::String (id)); });

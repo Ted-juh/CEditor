@@ -152,6 +152,32 @@ export const WRITTEN = {
     lua: `for _, p in ipairs(ce.device.ports({ direction = "out" })) do\n  log(p.name, p.connected)\nend`,
     js: `for (const p of ce.device.ports({ direction: "out" })) {\n  log(p.name, p.connected);\n}`,
   },
+  deviceVariables: {
+    lua: `local v = ce.device.variables()\nif v then log("channel " .. tostring(v.channel) .. ", id " .. tostring(v.deviceId)) end`,
+    js: `const v = ce.device.variables();\nif (v) log(\`channel \${v.channel}, id \${v.deviceId}\`);`,
+  },
+  deviceSetVariable: {
+    code: 'ce.device.setVariable("deviceId", 17)',
+  },
+  deviceTiming: {
+    lua: `local t = ce.device.timing()\nif t then log("min gap " .. tostring(t.minDelayBetweenMessagesMs) .. " ms") end`,
+    js: `const t = ce.device.timing();\nif (t) log(\`min gap \${t.minDelayBetweenMessagesMs} ms\`);`,
+  },
+  deviceSetTiming: {
+    code: 'ce.device.setTiming("minDelayBetweenMessagesMs", 40)',
+  },
+  deviceCoverage: {
+    lua: `-- The profile answers in its own words, so test the ones that mean "no".\nif ce.device.coverage("singleParameterWrite") ~= "notImplemented" then\n  ce.device.write("filter.cutoff", 64)\nend`,
+    js: `// The profile answers in its own words, so test the ones that mean "no".\nif (ce.device.coverage("singleParameterWrite") !== "notImplemented") {\n  ce.device.write("filter.cutoff", 64);\n}`,
+  },
+  deviceRecipes: {
+    lua: `log(#ce.device.recipes() .. " message recipes")`,
+    js: `log(\`\${ce.device.recipes().length} message recipes\`);`,
+  },
+  deviceRequests: {
+    lua: `for _, id in ipairs(ce.device.requests()) do log(id) end`,
+    js: `for (const id of ce.device.requests()) log(id);`,
+  },
   deviceProfile: {
     lua: `local d = ce.device.profile()\nif d then log(d.name, d.connected) end`,
     js: `const d = ce.device.profile();\nif (d) log(d.name, d.connected);`,

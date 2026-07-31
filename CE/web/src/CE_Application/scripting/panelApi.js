@@ -2058,6 +2058,97 @@ export const COMMANDS = [
       javascript: 'for (const p of ce.device.ports({ direction: "out" })) if (p.hardware) log(p.name);$0',
     },
   },
+  {
+    id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
+    summary: 'The variables every message recipe interpolates — `channel`, `deviceId` and whatever else the profile declares — as their EFFECTIVE values: the profile\'s defaults with this project\'s overrides on top. Nothing back when no profile is mapped to the role.',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'log("device id " .. tostring(ce.device.variables().deviceId))$0',
+      javascript: 'log(`device id ${ce.device.variables().deviceId}`);$0',
+    },
+  },
+  {
+    id: 'deviceSetVariable', category: 'Device / MIDI',
+    signature: 'deviceSetVariable(name, value [, role]) -> boolean',
+    summary: 'Point this panel at a different unit: set one recipe variable, 0..127. The write lands on THIS PROJECT\'s override rather than on the profile, which is a shared document — two panels driving two units of the same synth sit on different device ids without editing it. Individual uses clamp further (a channel is 1..16).',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'value', type: 'number', required: true },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.setVariable("deviceId", 17)$0',
+      javascript: 'ce.device.setVariable("deviceId", 17);$0',
+    },
+  },
+  {
+    id: 'deviceTiming', category: 'Device / MIDI', signature: 'deviceTiming([role]) -> table',
+    summary: 'How fast the panel is allowed to talk to this device: `minDelayBetweenMessagesMs` and any other timing the profile declares, with this project\'s overrides applied.',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'log("gap " .. tostring(ce.device.timing().minDelayBetweenMessagesMs) .. " ms")$0',
+      javascript: 'log(`gap ${ce.device.timing().minDelayBetweenMessagesMs} ms`);$0',
+    },
+  },
+  {
+    id: 'deviceSetTiming', category: 'Device / MIDI',
+    signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
+    summary: 'Slow the panel down for a device that cannot keep up — an override on this project, in milliseconds, 0..60000. Same rule as setVariable: the profile is left alone.',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'name', type: 'string', required: true },
+      { name: 'ms', type: 'number', required: true },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'ce.device.setTiming("minDelayBetweenMessagesMs", 40)$0',
+      javascript: 'ce.device.setTiming("minDelayBetweenMessagesMs", 40);$0',
+    },
+  },
+  {
+    id: 'deviceCoverage', category: 'Device / MIDI',
+    signature: 'deviceCoverage([feature [, role]]) -> table|string',
+    summary: 'What the profile says it can do, in the profile\'s own words. No feature gives the whole map — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Deliberately NOT a yes/no: real profiles answer "complete", "partial" and "notImplemented" but also "filter-block-rq1" and "broad-with-packed-text-and-requests", so a boolean would be a guess wearing the clothes of a fact. Test the words you care about.',
+    requiresDeviceHost: true,
+    params: [
+      { name: 'feature', type: 'string', required: false },
+      { name: 'role', type: 'string', required: false },
+    ],
+    scopes: 'any',
+    snippet: {
+      lua: 'if ce.device.coverage("singleParameterWrite") == "complete" then log("write one at a time") end$0',
+      javascript: 'if (ce.device.coverage("singleParameterWrite") === "complete") log("write one at a time");$0',
+    },
+  },
+  {
+    id: 'deviceRecipes', category: 'Device / MIDI', signature: 'deviceRecipes([role]) -> list',
+    summary: 'The ids of the message recipes this profile can build — the templates its parameters send through. An empty list when no profile is mapped.',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, id in ipairs(ce.device.recipes()) do log(id) end$0',
+      javascript: 'for (const id of ce.device.recipes()) log(id);$0',
+    },
+  },
+  {
+    id: 'deviceRequests', category: 'Device / MIDI', signature: 'deviceRequests([role]) -> list',
+    summary: 'The ids of the named requests this profile can send — an identity enquiry, an edit-buffer request. Ask before assuming one exists.',
+    requiresDeviceHost: true,
+    params: [{ name: 'role', type: 'string', required: false }],
+    scopes: 'any',
+    snippet: {
+      lua: 'for _, id in ipairs(ce.device.requests()) do log(id) end$0',
+      javascript: 'for (const id of ce.device.requests()) log(id);$0',
+    },
+  },
 
   /* --- Device / MIDI: raw (Q9) --- */
   {
@@ -3018,6 +3109,12 @@ const MODULE_MEMBERS = {
     // is the only thing distinguishing it from a panel property.
     profile: 'deviceProfile', parameters: 'deviceParameters',
     parameter: 'deviceParameter', connected: 'deviceConnected',
+    // The profile DOCUMENT, rather than the catalogue row profile() answers from. `variables` and
+    // `timing` are §1 collisions as bare globals — both are words a panel author reaches for — so
+    // flat they keep the device prefix, the same rule every other read here follows.
+    variables: 'deviceVariables', setVariable: 'deviceSetVariable',
+    timing: 'deviceTiming', setTiming: 'deviceSetTiming',
+    coverage: 'deviceCoverage', recipes: 'deviceRecipes', requests: 'deviceRequests',
   },
   // `random` and `seed` read better namespaced; flat they keep the randomSeed spelling, because
   // a bare global called `seed` is exactly the collision §1 warned about. `map` and `choice` are

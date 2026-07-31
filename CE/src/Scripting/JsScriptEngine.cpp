@@ -1793,6 +1793,7 @@ on("*", "__animDone", function (info) {
 // the host has already said why; these hand back null / an empty list rather than pretending.
 function __role(r) { return (r === undefined || r === null || r === "") ? "mainSynth" : String(r); }
 function __deviceQuery(kind, payload) { return __api.deviceQuery(kind, payload || null); }
+function __deviceSet(kind, name, value, role) { return __api.deviceSet(kind, name, value, role); }
 // @module ce.panel
 // snapshot / restore. The only two ce.panel verbs that are NOT panel-view only: creating a control
 // needs a renderer, reading and writing a value does not — and "put the panel back how it was
@@ -1842,6 +1843,23 @@ function deviceProfile(role) { return __deviceQuery("profile", { role: __role(ro
 function deviceRead(id, role) { return __deviceQuery("read", { role: __role(role), id: String(id) }); }
 function deviceWrite(id, value, role) { return __api.deviceWrite(String(id), value, __role(role)) === true; }
 function deviceConnected(role) { return __deviceQuery("connected", { role: __role(role) }) === true; }
+// The profile DOCUMENT, rather than the catalogue row profile() answers from. `variables` is what
+// every recipe interpolates ($channel, $deviceId), so it decides what every message the panel sends
+// looks like; `coverage` is what the profile claims it can do, in its own words.
+function deviceVariables(role) { return __deviceQuery("variables", { role: __role(role) }); }
+function deviceTiming(role) { return __deviceQuery("timing", { role: __role(role) }); }
+function deviceCoverage(feature, role) {
+  return __deviceQuery("coverage", { role: __role(role), feature: feature == null ? "" : String(feature) });
+}
+function deviceRecipes(role) { return __deviceQuery("recipes", { role: __role(role) }) || []; }
+function deviceRequests(role) { return __deviceQuery("requests", { role: __role(role) }) || []; }
+// The two writes. They land on THIS PROJECT's override, never on the shared profile.
+function deviceSetVariable(name, value, role) {
+  return __deviceSet("variable", String(name), value, __role(role)) === true;
+}
+function deviceSetTiming(name, ms, role) {
+  return __deviceSet("timing", String(name), ms, __role(role)) === true;
+}
 // An undefined property must not be SENT. juce::var::undefined() stringifies to "undefined", so
 // an omitted filter reached the host as the literal filter value "undefined" and matched nothing,
 // while the Lua prelude simply has no key there. Omitting matches Lua and Python exactly.
@@ -2102,7 +2120,7 @@ function decodeJson(text) {
 var __CE_MODULES = {
   "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned" },
-  "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "requestDump": "requestDump", "sendDump": "sendDump", "unbind": "deviceUnbind", "write": "deviceWrite" },
+  "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "profile": "deviceProfile", "read": "deviceRead", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromHsl": "hslToHex", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
@@ -2289,6 +2307,9 @@ juce::DynamicObject::Ptr makeApi (ScriptHostApi* host, const juce::String& owner
         { return host->panelQuery (arg (a, 0).toString(), arg (a, 1)); });
     api->setMethod ("deviceWrite", [host, arg] (const Args& a) -> juce::var
         { return host->deviceWrite (arg (a, 0).toString(), arg (a, 1), arg (a, 2).toString()); });
+    api->setMethod ("deviceSet", [host, arg] (const Args& a) -> juce::var
+        { return host->deviceSet (arg (a, 0).toString(), arg (a, 1).toString(),
+                                  arg (a, 2), arg (a, 3).toString()); });
     api->setMethod ("startTimer", [host, arg] (const Args& a) -> juce::var { host->startTimer (arg (a, 0).toString(), (int) arg (a, 1)); return {}; });
     api->setMethod ("stopTimer", [host, arg] (const Args& a) -> juce::var { host->stopTimer (arg (a, 0).toString()); return {}; });
     api->setMethod ("saveSetting", [host, arg] (const Args& a) -> juce::var

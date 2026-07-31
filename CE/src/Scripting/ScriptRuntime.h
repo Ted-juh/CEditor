@@ -141,7 +141,8 @@ public:
         the shape a script sees is assembled in the prelude, so no engine can invent a different
         parameter descriptor.
 
-        `kind` is "profile" | "parameters" | "parameter" | "connected"; `payload` carries the role
+        `kind` is "profile" | "parameters" | "parameter" | "connected" | "ports" | "variables" |
+        "timing" | "coverage" | "recipes" | "requests"; `payload` carries the role
         and any narrowing (query/group/type/access/limit/id). Returns void when there is no device
         host, which is what makes the members report themselves as unavailable rather than lie. */
     virtual juce::var deviceQuery (const juce::String& kind, const juce::var& payload)
@@ -154,6 +155,18 @@ public:
     virtual bool deviceWrite (const juce::String& parameterId, const juce::var& value,
                               const juce::String& role)
     { juce::ignoreUnused (parameterId, value, role); return false; }
+
+    /** OVERRIDE what this project sends to a device: `kind` is "variable" or "timing", `name` the
+        key and `value` the number. Separate from deviceQuery for the same reason deviceWrite is —
+        it is not a question.
+
+        The write lands on this project's ROLE MAPPING rather than on the device profile, which is a
+        shared document: two panels driving two units of the same synth must be able to sit on
+        different device ids without either editing the other's profile. Returns whether it took;
+        false with no device host, which is what makes the verb report itself rather than lie. */
+    virtual bool deviceSet (const juce::String& kind, const juce::String& name,
+                            const juce::var& value, const juce::String& role)
+    { juce::ignoreUnused (kind, name, value, role); return false; }
 
     /** DECLARE structure the app was not shipped knowing: `what` is "parameter" or "dump", `id` is
         the parameter id or the dump kind, `spec` carries the wire format. Routes to ScriptRuntime,
