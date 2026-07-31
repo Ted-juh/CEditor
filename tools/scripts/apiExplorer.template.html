@@ -133,6 +133,34 @@ a { color: var(--accent); }
 
 .page { min-width: 0; padding: 0 var(--pad) 90px; }
 .band { max-width: 1120px; margin-inline: auto; }
+
+/* ------------------------------------------------------------------------------ views */
+/* Manual, Tutorials, Reference — one on screen at a time. */
+.view[hidden] { display: none; }
+.views {
+  display: flex; flex-wrap: wrap; gap: 0;
+  border-bottom: 1px solid var(--rule); margin-top: 26px;
+  position: sticky; top: 0; z-index: 5; background: var(--bg);
+}
+.views a {
+  padding: 15px 22px 13px 0; margin-right: 26px;
+  text-decoration: none; color: var(--ink-3);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-size: 15px; font-weight: 600; letter-spacing: -.01em;
+}
+.views a span {
+  display: block; font-size: 12px; font-weight: 400; color: var(--ink-3);
+  margin-top: 2px; letter-spacing: 0;
+}
+.views a:hover { color: var(--ink-2); }
+.views a.here { color: var(--ink); border-bottom-color: var(--accent); }
+.views a.here span { color: var(--ink-2); }
+@media (max-width: 620px) {
+  /* The three descriptions turn the tab bar into a third of the screen on a phone, which is a lot
+     of furniture to scroll past on every view. */
+  .views a span { display: none; }
+  .views a { padding: 13px 0 11px; margin-right: 22px; font-size: 14px; }
+}
 .prose { max-width: 68ch; }
 
 /* ---------------------------------------------------------------------------- masthead */
@@ -494,36 +522,55 @@ pre code { font-size: inherit; }
     <strong>CEditor Scripting</strong>
     <span>API <span id="apiver">1.0</span></span>
   </div>
+  <!-- One rail group per view; only the current view's group is shown, so the rail is a contents
+       page for what is on screen rather than for the whole document. -->
   <nav id="nav" aria-label="Sections">
-    <h2>Learn</h2>
-    <a href="#start">What a script is</a>
-    <a href="#paths">Addressing</a>
-    <a href="#transmit">Writing &amp; the synth</a>
-    <a href="#events">Reacting</a>
-    <a href="#modules">Modules</a>
-    <a href="#timing">Musical time</a>
-    <a href="#components">Components</a>
-    <a href="#typography">Typography</a>
-    <a href="#keeping">Keeping things</a>
-    <a href="#debug">When it breaks</a>
-    <a href="#walkthrough">A button, from nothing</a>
-    <a href="#from-data">Eight, from a table</a>
-    <a href="#drumkit">Asking the instrument</a>
-    <a href="#wiring">A panel is a graph</a>
-    <h2>Reference</h2>
-    <a href="#surface">Every module</a>
-    <span id="navtree"></span>
-    <a href="#hooks">Lifecycle hooks</a>
-    <a href="#eventlist">Events</a>
-    <a href="#weight">What it weighs</a>
-    <h2>Recent</h2>
-    <a href="#changes">What changed</a>
+    <div data-nav="manual">
+      <h2>The manual</h2>
+      <a href="#start">What a script is</a>
+      <a href="#paths">Addressing</a>
+      <a href="#transmit">Writing &amp; the synth</a>
+      <a href="#events">Reacting</a>
+      <a href="#modules">Modules</a>
+      <a href="#timing">Musical time</a>
+      <a href="#components">Components</a>
+      <a href="#typography">Typography</a>
+      <a href="#keeping">Keeping things</a>
+      <a href="#debug">When it breaks</a>
+    </div>
+    <div data-nav="tutorials">
+      <h2>Tutorials</h2>
+      <a href="#walkthrough">A button, from nothing</a>
+      <a href="#from-data">Eight, from a table</a>
+      <a href="#drumkit">Asking the instrument</a>
+      <a href="#wiring">A panel is a graph</a>
+    </div>
+    <div data-nav="reference">
+      <h2>Reference</h2>
+      <a href="#surface">Every module</a>
+      <span id="navtree"></span>
+      <a href="#hooks">Lifecycle hooks</a>
+      <a href="#eventlist">Events</a>
+      <a href="#weight">What it weighs</a>
+      <h2>Recent</h2>
+      <a href="#changes">What changed</a>
+    </div>
   </nav>
 </aside>
 
 <main class="page">
 <div class="band">
 
+<!-- Three views, one at a time. The page used to be a single scroll: ten concept lessons, then
+     four full tutorials, then 737 members of reference. Whichever of the three you had come for,
+     you scrolled through the others to reach it. -->
+<nav class="views" id="views" aria-label="Sections of the manual">
+  <a href="#/manual" data-view="manual">Manual<span>Ten lessons, in order</span></a>
+  <a href="#/tutorials" data-view="tutorials">Tutorials<span>Four panels, built step by step</span></a>
+  <a href="#/reference" data-view="reference">Reference<span>Every module and verb</span></a>
+</nav>
+
+<div class="view" id="view-manual">
 <header class="top">
   <p class="eyebrow">Panel scripting</p>
   <h1>Write a script once. It runs in five places.</h1>
@@ -546,7 +593,7 @@ pre code { font-size: inherit; }
 <!-- ============================================================== LEARN -->
 <section id="start">
   <div class="rule-head">
-    <h2>Part one &middot; the manual</h2>
+    <h2>The manual</h2>
     <p>Ten things, in the order you need them</p>
     <span style="flex:1"></span>
     <div class="lang-pick" role="group" aria-label="Sample language">
@@ -1053,8 +1100,34 @@ function onError(info) {
     </div>
   </div>
 
+</section>
+</div><!-- /view-manual -->
+
+<!-- ============================================================== TUTORIALS -->
+<!-- Its own view. These four are complete working scripts of 150 lines and up, and they used to
+     sit in the same run as the forty-line concept lessons — so the manual took a very long scroll
+     to get past, whichever of the two you had come for. -->
+<div class="view" id="view-tutorials" hidden>
+<section id="tutorials">
+  <div class="rule-head">
+    <h2>Tutorials</h2>
+    <p>Four panels, built from nothing, one line at a time</p>
+    <span style="flex:1"></span>
+    <div class="lang-pick" role="group" aria-label="Sample language">
+      <button type="button" data-lang="lua" aria-pressed="true">Lua</button>
+      <button type="button" data-lang="javascript" aria-pressed="false">JavaScript</button>
+    </div>
+  </div>
+
+  <p class="prose">
+    These are longer than the lessons and meant to be followed start to finish. Every line runs:
+    the numbers in the comments are what the calls actually returned, and the test suite builds
+    each of these panels again on every change, in both languages, and checks they come out the
+    same. If a tutorial here has gone stale, the build fails.
+  </p>
+
   <div class="lesson wide" id="walkthrough">
-    <p class="lesson-n">11 &middot; A button, from nothing</p>
+    <p class="lesson-n">01 &middot; A button, from nothing</p>
     <div class="lesson-text prose">
       <h3>The vocabulary, in one go</h3>
       <p>
@@ -1247,7 +1320,7 @@ on(NAME, "valueChanged", (v) =&gt; {
   </div>
 
   <div class="lesson wide" id="from-data">
-    <p class="lesson-n">12 &middot; Eight, from a table</p>
+    <p class="lesson-n">02 &middot; Eight, from a table</p>
     <div class="lesson-text prose">
       <h3>A panel is data plus a rule</h3>
       <p>
@@ -1494,7 +1567,7 @@ function onPanelBuild() {
   </div>
 
   <div class="lesson wide" id="drumkit">
-    <p class="lesson-n">13 &middot; Asking the instrument</p>
+    <p class="lesson-n">03 &middot; Asking the instrument</p>
     <div class="lesson-text prose">
       <h3>The control knows more than your script does</h3>
       <p>
@@ -1637,7 +1710,7 @@ end</code></pre>
   </div>
 
   <div class="lesson wide" id="wiring">
-    <p class="lesson-n">14 &middot; A panel is a graph</p>
+    <p class="lesson-n">04 &middot; A panel is a graph</p>
     <div class="lesson-text prose">
       <h3>Controls that read each other</h3>
       <p>
@@ -1778,8 +1851,10 @@ end</code></pre>
     </div>
   </div>
 </section>
+</div><!-- /view-tutorials -->
 
 <!-- ============================================================== REFERENCE -->
+<div class="view" id="view-reference" hidden>
 <section id="surface">
   <div class="rule-head">
     <h2>Part two &middot; the surface</h2>
@@ -2085,6 +2160,7 @@ end</code></pre>
     </li>
   </ol>
 </section>
+</div><!-- /view-reference -->
 
 <footer class="foot">
   <p>
@@ -2479,6 +2555,47 @@ end</code></pre>
     cost();
   });
   cost();
+
+  /* ------------------------------------------------------------------- views */
+  // Three views in one file, switched on the hash. `#/manual` names a view; anything else is an
+  // anchor, and an anchor decides its own view by which one contains it — so every link on the
+  // page, and every URL anybody has already saved, still lands in the right place.
+  const VIEWS = ["manual", "tutorials", "reference"];
+  const DEFAULT_VIEW = "manual";
+
+  const viewHolding = (id) => {
+    // `id && getElementById(id)` would hand back the empty STRING for an empty id, and "" is not
+    // nullish — so `?.closest` would not short-circuit and the whole route would throw on a plain
+    // hashless load. A ternary, so the miss is genuinely null.
+    const el = id ? document.getElementById(id) : null;
+    return el?.closest(".view")?.id.replace("view-", "") ?? null;
+  };
+
+  let current = null;
+  function showView(name, { scrollTo = null } = {}) {
+    const view = VIEWS.includes(name) ? name : DEFAULT_VIEW;
+    if (view !== current) {
+      current = view;
+      VIEWS.forEach((v) => { $(`#view-${v}`).hidden = v !== view; });
+      $$("#views a").forEach((a) => a.classList.toggle("here", a.dataset.view === view));
+      $$("#nav [data-nav]").forEach((g) => { g.hidden = g.dataset.nav !== view; });
+    }
+    // After the view is on screen, not before: scrolling to an element inside a hidden view puts
+    // you at the top of the page instead, which is the whole bug this ordering avoids.
+    if (scrollTo) document.getElementById(scrollTo)?.scrollIntoView({ block: "start" });
+    else window.scrollTo({ top: 0 });
+  }
+
+  function route() {
+    const hash = decodeURIComponent(location.hash.replace(/^#/, ""));
+    if (hash.startsWith("/")) return showView(hash.slice(1));
+    const holder = viewHolding(hash);
+    if (holder) return showView(holder, { scrollTo: hash });
+    return showView(DEFAULT_VIEW);
+  }
+
+  window.addEventListener("hashchange", route);
+  route();
 
   /* -------------------------------------------------------------- rail state */
   const links = $$("#nav a");
