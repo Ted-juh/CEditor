@@ -387,6 +387,26 @@ function media() {
 const data = contract();
 data.media = media();
 
+// --standalone bakes the screenshots into the page as data URIs, so the HTML is one file that can
+// be opened, mailed or hosted anywhere with nothing beside it. The normal build leaves them as
+// files in docs/media: 32 PNGs are about a megabyte, and carrying that inside every regeneration
+// of a page somebody reads from a checkout is a poor trade. The page reads `src` when it is there
+// and falls back to the relative path when it is not, so both builds render identically.
+if (process.argv.includes('--standalone')) {
+  let inlined = 0;
+  for (const [key, entry] of Object.entries(data.media)) {
+    try {
+      const png = readFileSync(join(repo, 'docs', 'media', `${key}.png`));
+      entry.src = `data:image/png;base64,${png.toString('base64')}`;
+      inlined += 1;
+    } catch {
+      // A capture that is not on disk stays a path reference; the page already copes with a
+      // missing picture by showing none.
+    }
+  }
+  console.error(`gen-api-explorer: inlined ${inlined} screenshot(s)`);
+}
+
 // Validate and report coverage. A gap is stated rather than implied: a page that shows examples for
 // most members and nothing for the rest should say which, or it reads as "these have none".
 {
@@ -442,21 +462,29 @@ if (process.argv.includes('--json')) {
       }
       page = page.replace(re, `$1${value}$2`);
     }
-    const out = join(repo, 'docs', 'api-explorer.html');
+    // A standalone build is a different artefact and must not overwrite the checked-in page —
+    // --check compares against that one, and a megabyte of base64 landing in it would make every
+    // regeneration a megabyte diff.
+    const standalone = process.argv.includes('--standalone');
+    const name = standalone ? 'api-explorer.standalone.html' : 'api-explorer.html';
+    const outArg = process.argv.indexOf('--out');
+    const out = outArg > 0 ? process.argv[outArg + 1] : join(repo, 'docs', name);
 
     if (process.argv.includes('--check')) {
       let current = '';
       try { current = readFileSync(out, 'utf8'); } catch { /* absent counts as stale */ }
       if (current === page) {
-        console.log('ok docs/api-explorer.html');
+        console.log(`ok docs/${name}`);
       } else {
-        console.error('stale docs/api-explorer.html — run: node tools/scripts/gen-api-explorer.mjs');
+        console.error(`stale docs/${name} — run: node tools/scripts/gen-api-explorer.mjs`);
         process.exitCode = 1;
       }
     } else {
       writeFileSync(out, page);
-      console.log(`wrote docs/api-explorer.html — ${data.totals.modules} modules, `
-        + `${data.totals.members} members, ${data.totals.events} events, ${data.totals.hooks} hooks`);
+      const kb = Math.round(Buffer.byteLength(page) / 1024);
+      console.log(`wrote ${out} — ${data.totals.modules} modules, `
+        + `${data.totals.members} members, ${data.totals.events} events, `
+        + `${data.totals.hooks} hooks, ${kb} KB`);
     }
   }
 }

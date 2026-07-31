@@ -535,7 +535,7 @@ pre code { font-size: inherit; }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 
-<title>CEditor Panel Scripting — the manual and the whole surface</title>
+<title>CEditor Panel Scripting — manual, tutorials and reference</title>
 
 <div class="shell">
 <aside class="rail">
@@ -2264,8 +2264,10 @@ end</code></pre>
   function shot(key, caption) {
     const entry = (DATA.media ?? {})[key];
     if (!entry) return "";
+    // A --standalone build carries the picture itself; the normal one points at docs/media.
+    const src = entry.src ?? `media/${esc(key)}.png`;
     return `<figure class="shot">
-      <img src="media/${esc(key)}.png" width="${entry.width}" height="${entry.height}"
+      <img src="${src}" width="${entry.width}" height="${entry.height}"
            loading="lazy" alt="${esc(caption)}">
       <figcaption>${esc(caption)}</figcaption>
     </figure>`;
