@@ -374,7 +374,18 @@ function contract() {
   };
 }
 
+/** What gen-manual-media captured, or nothing. Read rather than assumed: a picture that failed to
+ *  capture is simply absent, and the page falls back to prose instead of to a broken image. */
+function media() {
+  try {
+    return JSON.parse(readFileSync(join(repo, 'docs', 'media', 'manifest.json'), 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
 const data = contract();
+data.media = media();
 
 // Validate and report coverage. A gap is stated rather than implied: a page that shows examples for
 // most members and nothing for the rest should say which, or it reads as "these have none".

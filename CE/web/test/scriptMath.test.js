@@ -698,8 +698,10 @@ test('unshape says the honest thing about hold, which has no true inverse', () =
 
 test('shape() reproduces the Macro family too, at tension 1', () => {
   // The doc gap this closes: all three curve families in the app are reachable, but nothing said
-  // that a Macro slot's curve is shape(v, curve, 1).
-  assert.match(MEMBER_BY_ID.shapeCurve.summary, /MACRO FAMILY/);
+  // that a Macro slot's curve is shape(v, curve, 1). What is pinned is that FACT — the summary
+  // must still say Macro and still show the call — not the wording, which was in capitals and has
+  // since been rewritten to read like the rest of the manual.
+  assert.match(MEMBER_BY_ID.shapeCurve.summary, /Macro/i);
   assert.match(MEMBER_BY_ID.shapeCurve.summary, /shape\(v, curve, 1\)/);
 });
 

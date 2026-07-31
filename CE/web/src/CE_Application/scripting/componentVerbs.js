@@ -1047,10 +1047,16 @@ export function verbSummary(verb) {
       + 'unlinks it. Reads back as the name, never as an id.';
   }
   const label = verb.k === ITEM ? `${verb.item} of one ${verb.f.replace(/s$/, '')}` : verb.f;
+  // The range, where the verb declares one. "Set `baseNote`." told a reader nothing they did not
+  // already have from the name, and the bounds were sitting right there on the verb — which is the
+  // whole reason validation can reject an out-of-range value while the docs could not say so.
+  const lo = verb.min;
+  const hi = verb.max;
+  const range = Number.isFinite(lo) && Number.isFinite(hi) ? ` Anything from ${lo} to ${hi}.` : '';
   switch (verb.k) {
     case BOOL: return `Set \`${label}\`. Calling it with no argument toggles.`;
     case ENUM: return `Set \`${label}\` — one of ${verb.values.map((x) => `"${x}"`).join(', ')}.`;
-    case ITEM: return `Set the ${label}, 1-based.`;
-    default: return `Set \`${label}\`.`;
+    case ITEM: return `Set the ${label}, 1-based.${range}`;
+    default: return `Set \`${label}\`.${range}`;
   }
 }

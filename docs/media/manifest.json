@@ -1,0 +1,194 @@
+{
+  "component-arp": {
+    "kind": "component",
+    "id": "arp",
+    "width": 300,
+    "height": 170
+  },
+  "component-chordpad": {
+    "kind": "component",
+    "id": "chordpad",
+    "width": 320,
+    "height": 190
+  },
+  "component-constellation": {
+    "kind": "component",
+    "id": "constellation",
+    "width": 260,
+    "height": 260
+  },
+  "component-constraint": {
+    "kind": "component",
+    "id": "constraint",
+    "width": 300,
+    "height": 200
+  },
+  "component-crossfader": {
+    "kind": "component",
+    "id": "crossfader",
+    "width": 320,
+    "height": 120
+  },
+  "component-drumpads": {
+    "kind": "component",
+    "id": "drumpads",
+    "width": 260,
+    "height": 260
+  },
+  "component-envelope": {
+    "kind": "component",
+    "id": "envelope",
+    "width": 340,
+    "height": 190
+  },
+  "component-harmony": {
+    "kind": "component",
+    "id": "harmony",
+    "width": 320,
+    "height": 200
+  },
+  "component-joystick": {
+    "kind": "component",
+    "id": "joystick",
+    "width": 240,
+    "height": 240
+  },
+  "component-kinetic": {
+    "kind": "component",
+    "id": "kinetic",
+    "width": 260,
+    "height": 260
+  },
+  "component-lcd": {
+    "kind": "component",
+    "id": "lcd",
+    "width": 360,
+    "height": 160
+  },
+  "component-looper": {
+    "kind": "component",
+    "id": "looper",
+    "width": 330,
+    "height": 180
+  },
+  "component-macro": {
+    "kind": "component",
+    "id": "macro",
+    "width": 260,
+    "height": 200
+  },
+  "component-matrix": {
+    "kind": "component",
+    "id": "matrix",
+    "width": 320,
+    "height": 240
+  },
+  "component-meter": {
+    "kind": "component",
+    "id": "meter",
+    "width": 140,
+    "height": 240
+  },
+  "component-noteribbon": {
+    "kind": "component",
+    "id": "noteribbon",
+    "width": 340,
+    "height": 130
+  },
+  "component-orbit": {
+    "kind": "component",
+    "id": "orbit",
+    "width": 260,
+    "height": 260
+  },
+  "component-panic": {
+    "kind": "component",
+    "id": "panic",
+    "width": 180,
+    "height": 90
+  },
+  "component-phrase": {
+    "kind": "component",
+    "id": "phrase",
+    "width": 360,
+    "height": 200
+  },
+  "component-pixel": {
+    "kind": "component",
+    "id": "pixel",
+    "width": 300,
+    "height": 220
+  },
+  "component-recorder": {
+    "kind": "component",
+    "id": "recorder",
+    "width": 340,
+    "height": 170
+  },
+  "component-ribbon": {
+    "kind": "component",
+    "id": "ribbon",
+    "width": 340,
+    "height": 110
+  },
+  "component-router": {
+    "kind": "component",
+    "id": "router",
+    "width": 340,
+    "height": 220
+  },
+  "component-setlist": {
+    "kind": "component",
+    "id": "setlist",
+    "width": 340,
+    "height": 190
+  },
+  "component-split": {
+    "kind": "component",
+    "id": "split",
+    "width": 380,
+    "height": 150
+  },
+  "component-timbre": {
+    "kind": "component",
+    "id": "timbre",
+    "width": 260,
+    "height": 260
+  },
+  "component-transport": {
+    "kind": "component",
+    "id": "transport",
+    "width": 340,
+    "height": 110
+  },
+  "component-turing": {
+    "kind": "component",
+    "id": "turing",
+    "width": 320,
+    "height": 180
+  },
+  "tutorial-drumkit": {
+    "kind": "tutorial",
+    "id": "drumkit",
+    "width": 624,
+    "height": 364
+  },
+  "tutorial-from-data": {
+    "kind": "tutorial",
+    "id": "from-data",
+    "width": 446,
+    "height": 178
+  },
+  "tutorial-walkthrough": {
+    "kind": "tutorial",
+    "id": "walkthrough",
+    "width": 368,
+    "height": 188
+  },
+  "tutorial-wiring": {
+    "kind": "tutorial",
+    "id": "wiring",
+    "width": 534,
+    "height": 228
+  }
+}
