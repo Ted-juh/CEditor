@@ -1239,9 +1239,21 @@ export const SECTION_DEFAULTS = {
     echo: false,
     echoChannel: 0,
     echoColour: 'FF39D98A',
+    // ROLL — a pad restrikes for as long as it is on, which is the drag/buzz
+    // roll a finger does on hardware. Per-pad rather than a grid mode: a kick
+    // that rolled every time you leant on it would be unplayable. Rate is
+    // MUSICAL so a roll stays in time when the tempo moves; rollHz is the
+    // free-running fallback for a panel with no transport to follow.
+    rollRate: '1/16',
+    rollSync: true,
+    rollHz: 8,
+    rollDelay: 0,                 // ms before the first repeat; 0 starts at once
+    // Repeats at this fraction of the opening strike, so the first hit reads as
+    // an accent and the roll sits under it rather than machine-gunning flat.
+    rollVelocity: 0.75,
     // Per-pad overrides — index-aligned, sparse. Each may set label, note,
-    // colour (AARRGGBB) and choke (0 = none). Anything omitted falls back to
-    // the generated map, so renaming one pad doesn't mean writing all sixteen.
+    // colour (AARRGGBB), choke (0 = none) and roll. Anything omitted falls back
+    // to the generated map, so renaming one pad doesn't mean writing all sixteen.
     pads: [],
     // Colours.
     fieldColour: 'FF101017',

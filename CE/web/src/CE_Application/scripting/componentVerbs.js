@@ -196,6 +196,20 @@ export const COMPONENT_FAMILIES = [
         doc: 'Put one pad in a choke group, 1-based — pads sharing a non-zero group cut each other. 0 is none.' }),
       v('colour', 'pads', ITEM, { item: 'colour', kind: STR, ...PADS,
         doc: 'Tint one pad, AARRGGBB, 1-based. Empty returns it to the section accent.' }),
+      // ROLL — a pad restrikes for as long as it is on. Per-pad, because a kick that buzzed every
+      // time you leant on it would be unplayable, and because "the snare rolls and nothing else
+      // does" is the whole shape of the feature.
+      v('roll', 'pads', ITEM, { item: 'roll', kind: BOOL, ...PADS,
+        doc: 'Make one pad roll, 1-based — it restrikes for as long as it is held or latched.' }),
+      v('rollRate', 'rollRate', ENUM,
+        { doc: 'How fast a rolling pad restrikes, as a note value against the panel transport.' }),
+      v('rollSync', 'rollSync', BOOL,
+        { toggle: true, doc: 'Follow the transport. Off runs the roll at `rollHz` instead.' }),
+      v('rollHz', 'rollHz', NUM, { min: 0.5, max: 50, doc: 'Free-running roll speed, in strikes per second.' }),
+      v('rollDelay', 'rollDelay', NUM,
+        { min: 0, max: 4000, doc: 'How long a pad is held before its roll begins, in ms. 0 rolls from the first strike.' }),
+      v('rollVelocity', 'rollVelocity', NUM,
+        { ...UNIT, doc: 'Repeats strike at this fraction of the opening hit, so the first one is an accent.' }),
     ],
   },
 

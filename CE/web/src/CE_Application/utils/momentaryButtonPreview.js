@@ -27,6 +27,7 @@
  */
 
 import { numberOr } from './primitives.js';
+import { createRepeatClock } from './repeatClock.js';
 
 const DEFAULT_REPEAT_DELAY = 300;
 const DEFAULT_REPEAT_INTERVAL = 120;
@@ -63,10 +64,6 @@ export function resolveRepeatConfig(behavior) {
   };
 }
 
-function createState() {
-  return { delayTimer: null, repeatTimer: null, pulseTimer: null, count: 0, holding: false };
-}
-
 export function createMomentaryButtonPreviewController({
   patchSession,
   scheduleTimeout = setTimeout,
@@ -78,32 +75,30 @@ export function createMomentaryButtonPreviewController({
     throw new TypeError('createMomentaryButtonPreviewController requires a patchSession callback.');
   }
 
-  const states = new Map();
+  // The delay-then-interval half is repeatClock.js, shared with the drum pads' roll: released
+  // during the delay, released between fires, re-pressed while winding down and torn down
+  // mid-press are the same four edges whether the thing repeating is a button or a pad.
+  const clock = createRepeatClock({
+    onFire: (key, n) => fire(key, n),
+    scheduleTimeout, clearTimeoutFn, scheduleInterval, clearIntervalFn,
+  });
+  // One pulse timer per key, which is this file's own business rather than the clock's.
+  const pulses = new Map();
 
-  function ensureState(key) {
-    const normalizedKey = String(key ?? '');
-    if (!normalizedKey) return null;
-    let state = states.get(normalizedKey);
-    if (!state) { state = createState(); states.set(normalizedKey, state); }
-    return state;
+  function clearPulse(key) {
+    const handle = pulses.get(key);
+    if (handle != null) { clearTimeoutFn(handle); pulses.delete(key); }
   }
 
-  function stopTimers(state) {
-    if (state.delayTimer != null) { clearTimeoutFn(state.delayTimer); state.delayTimer = null; }
-    if (state.repeatTimer != null) { clearIntervalFn(state.repeatTimer); state.repeatTimer = null; }
-    if (state.pulseTimer != null) { clearTimeoutFn(state.pulseTimer); state.pulseTimer = null; }
-  }
-
-  function fire(key, state) {
-    state.count += 1;
-    patchSession(key, { executed: true, repeatCount: state.count });
+  function fire(key, n) {
+    patchSession(key, { executed: true, repeatCount: n });
     // Drop the pulse so the NEXT one is a change. Without this the second fire patches the same
     // value and shallowEqualSession swallows it, which looks exactly like the repeat having died.
-    if (state.pulseTimer != null) clearTimeoutFn(state.pulseTimer);
-    state.pulseTimer = scheduleTimeout(() => {
-      state.pulseTimer = null;
+    clearPulse(key);
+    pulses.set(key, scheduleTimeout(() => {
+      pulses.delete(key);
       patchSession(key, { executed: false });
-    }, PULSE_MS);
+    }, PULSE_MS));
   }
 
   /**
@@ -126,26 +121,8 @@ export function createMomentaryButtonPreviewController({
     if (isPressToTalkBehavior(behavior)) return { checked: true };
     if (!isRepeatingBehavior(behavior)) return null;
 
-    const state = ensureState(normalizedKey);
-    if (!state) return null;
-    const { delay, interval } = resolveRepeatConfig(behavior);
-
-    stopTimers(state);
-    state.holding = true;
-    state.count = 0;
-
-    const start = () => {
-      state.delayTimer = null;
-      if (!state.holding) return;          // released during the delay: never start
-      fire(key, state);                    // the first repeat lands AT the delay, not after it
-      state.repeatTimer = scheduleInterval(() => {
-        if (!state.holding) { stopTimers(state); return; }
-        fire(key, state);
-      }, interval);
-    };
-
-    if (delay === 0) start();
-    else state.delayTimer = scheduleTimeout(start, delay);
+    clearPulse(normalizedKey);
+    clock.start(normalizedKey, resolveRepeatConfig(behavior));
     // Zero the counter IN the press patch. It is how a consumer tells "this hold produced repeats"
     // from "it did not", which is what decides whether the release is one more fire or the end of
     // a roll — and a hold that started at whatever the last one finished on could not say.
@@ -160,36 +137,29 @@ export function createMomentaryButtonPreviewController({
     if (isPressToTalkBehavior(behavior)) return { checked: false };
     if (!isRepeatingBehavior(behavior)) return null;
 
-    const state = states.get(normalizedKey);
-    if (!state) return null;
-    state.holding = false;
-    stopTimers(state);
+    clock.stop(normalizedKey);
+    clearPulse(normalizedKey);
     return { executed: false };
   }
 
   /** Drop a press without releasing it — the control went away, or the pointer was taken over. */
   function cancel(key) {
-    const state = states.get(String(key ?? ''));
-    if (!state) return;
-    state.holding = false;
-    stopTimers(state);
+    const normalizedKey = String(key ?? '');
+    clock.stop(normalizedKey);
+    clearPulse(normalizedKey);
   }
 
   function syncKeys(activeKeys = []) {
-    const keep = new Set(
-      (Array.isArray(activeKeys) ? activeKeys : []).map((key) => String(key ?? '')).filter(Boolean),
-    );
-    for (const [key, state] of states.entries()) {
-      if (keep.has(key)) continue;
-      state.holding = false;
-      stopTimers(state);
-      states.delete(key);
-    }
+    const keep = (Array.isArray(activeKeys) ? activeKeys : [])
+      .map((key) => String(key ?? '')).filter(Boolean);
+    clock.sync(keep);
+    const alive = new Set(keep);
+    for (const key of [...pulses.keys()]) if (!alive.has(key)) clearPulse(key);
   }
 
   function destroy() {
-    for (const state of states.values()) { state.holding = false; stopTimers(state); }
-    states.clear();
+    clock.destroy();
+    for (const key of [...pulses.keys()]) clearPulse(key);
   }
 
   return { beginPress, releasePress, cancel, syncKeys, destroy };

@@ -1,9 +1,10 @@
 <script>
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import {
-    PAD_MAPS, PAD_MAP_LABELS, PAD_MODES, PAD_MODE_LABELS,
-    drumPads, drumCount, drumNoteLabel,
+    PAD_MAPS, PAD_MAP_LABELS, PAD_MODES, PAD_MODE_LABELS, ROLL_MODES,
+    drumPads, drumCount, drumNoteLabel, rollIntervalMs,
   } from '../utils/drumPadLayout.js';
+  import { DIVISION_IDS, DIVISION_LABELS } from '../utils/transportLayout.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -23,6 +24,9 @@
   let pads = $derived.by(() => { try { return drumPads(control); } catch { return []; } });
   let count = $derived(drumCount(control));
   let isOneShot = $derived(String(d?.mode ?? 'momentary') === 'oneShot');
+  let rolling = $derived(pads.filter((p) => p.roll).length);
+  // A roll only happens while a pad is ON, so a one-shot — gone by its own gate — cannot have one.
+  let rollUsable = $derived(ROLL_MODES.includes(String(d?.mode ?? 'momentary')));
 
   // Overrides are sparse and index-aligned; writing one pads the array out to it.
   function setPad(i, key, value) {
@@ -121,6 +125,7 @@
           <span role="columnheader">Label</span>
           <span role="columnheader">Note</span>
           <span role="columnheader">Choke</span>
+          <span role="columnheader">Roll</span>
           <span role="columnheader">Colour</span>
           <span role="columnheader"></span>
         </div>
@@ -133,6 +138,8 @@
                    onchange={(e) => setPad(p.index, 'note', clampInt(e.target.value, 0, 127, p.note))} />
             <input class="val" role="cell" type="number" min="0" max="8" step="1" value={p.choke} aria-label={`Pad ${p.index + 1} choke group`}
                    onchange={(e) => setPad(p.index, 'choke', clampInt(e.target.value, 0, 8, 0))} />
+            <input class="chk" role="cell" type="checkbox" checked={p.roll} aria-label={`Pad ${p.index + 1} roll`}
+                   onchange={(e) => setPad(p.index, 'roll', e.target.checked)} />
             <input class="cswatch" role="cell" type="color" value={colRgb(p.colour, d.accentColour ?? 'FF5B9BD5')} aria-label={`Pad ${p.index + 1} colour`}
                    onchange={(e) => setPad(p.index, 'colour', `FF${e.target.value.replace('#', '').toUpperCase()}`)} />
             <button class="x" type="button" title="Reset this pad" aria-label={`Reset pad ${p.index + 1}`}
@@ -141,6 +148,36 @@
         {/each}
       </div>
     </PropertyCell>
+    {#if rolling}
+      <PropertyCell label="Roll rate" span={2} hint="How fast a rolling pad restrikes, as a note value against the panel transport — so a roll stays in time when the tempo moves.">
+        <select class="val" value={d.rollRate ?? '1/16'} onchange={(e) => set('rollRate', e.target.value)}>
+          {#each DIVISION_IDS as id (id)}<option value={id}>{DIVISION_LABELS[id] ?? id}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Follow tempo" span={1} hint="Off runs the roll at a fixed speed instead, for a panel with no Transport to follow.">
+        <PropertyToggle value={d.rollSync !== false} onchange={() => set('rollSync', !(d.rollSync !== false))} />
+      </PropertyCell>
+      {#if d.rollSync === false}
+        <PropertyCell label="Strikes / sec" span={1} hint="The free-running roll speed.">
+          <input class="val" type="number" min="0.5" max="50" step="0.5" value={num(d.rollHz, 8)} onchange={(e) => set('rollHz', Math.min(50, Math.max(0.5, num(e.target.value, 8))))} />
+        </PropertyCell>
+      {:else}
+        <PropertyCell label="" span={1} hint="At the panel's current tempo.">
+          <div class="note">≈ {rollIntervalMs(d, 120)} ms at 120 bpm</div>
+        </PropertyCell>
+      {/if}
+      <PropertyCell label="Roll delay" span={1} hint="How long a pad is held before the roll begins, in milliseconds. 0 rolls from the first strike; a short delay lets you play single hits and roll only when you lean on it.">
+        <input class="val" type="number" min="0" max="4000" step="10" value={num(d.rollDelay, 0)} onchange={(e) => set('rollDelay', clampInt(e.target.value, 0, 4000, 0))} />
+      </PropertyCell>
+      <PropertyCell label="Roll velocity" span={1} hint="Repeats strike at this fraction of the opening hit, so the first one reads as an accent and the roll sits under it.">
+        <input class="val" type="number" min="0" max="1" step="0.05" value={num(d.rollVelocity, 0.75)} onchange={(e) => set('rollVelocity', Math.min(1, Math.max(0, num(e.target.value, 0.75))))} />
+      </PropertyCell>
+      {#if !rollUsable}
+        <PropertyCell label="" span={4} hint="A roll runs for as long as the pad is on. A one-shot releases itself after its gate, so there is no 'while held' for it to fill.">
+          <div class="note warn">{rolling} pad{rolling === 1 ? '' : 's'} set to roll, but the grid is a one-shot — rolls are ignored in this mode.</div>
+        </PropertyCell>
+      {/if}
+    {/if}
     {#if overridden}
       <PropertyCell label="" span={4} hint="Drop every override and go back to the generated map.">
         <button class="btn" type="button" onclick={() => set('pads', [])}>Reset all {overridden} customised pad{overridden === 1 ? '' : 's'}</button>
@@ -179,10 +216,12 @@
 <style>
   .val { width: 100%; box-sizing: border-box; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 3px 6px; font-size: 12px; outline: none; }
   .val:focus { border-color: #5B9BD5; }
+  .note.warn { color: #E0A030; }
+  .chk { justify-self: center; width: 14px; height: 14px; accent-color: var(--accent, #5B9BD5); cursor: pointer; }
   .cswatch { width: 100%; height: 22px; padding: 0; border: 1px solid #333; border-radius: 4px; background: #1A1A1A; cursor: pointer; }
   .note { font-size: 11px; color: #8a8a94; }
   .table { display: flex; flex-direction: column; gap: 3px; }
-  .thead, .trow { display: grid; grid-template-columns: 20px 1fr 52px 44px 34px 24px; gap: 4px; align-items: center; }
+  .thead, .trow { display: grid; grid-template-columns: 20px 1fr 52px 44px 30px 34px 24px; gap: 4px; align-items: center; }
   .thead span { font-size: 10px; color: #7a7a84; text-transform: uppercase; letter-spacing: 0.4px; }
   .idx { font-size: 11px; color: #7a7a84; text-align: right; }
   .btn { width: 100%; background: #1A1A1A; border: 1px solid #333; color: #DDD; border-radius: 4px; padding: 4px 6px; font-size: 12px; cursor: pointer; }

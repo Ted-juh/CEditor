@@ -109,6 +109,14 @@
       <text x={c.r.x + c.r.w / 2} y={c.r.y + c.r.h - 7} font-size="8.5"
             fill={isHit ? hitCss : labelCss} text-anchor="middle" opacity={isHit ? 1 : 0.6}>{c.p.note}</text>
     {/if}
+    <!-- roll marker: this pad restrikes for as long as it is held. Three descending ticks, on the
+         LEFT so it never fights the choke digit — a hi-hat is commonly both. -->
+    {#if c.p.roll && c.r.w >= 30}
+      {#each [0, 1, 2] as t (t)}
+        <rect x={c.r.x + 7 + t * 3.5} y={c.r.y + c.r.h - 13 + t * 1.5} width="2" height={8 - t * 1.5}
+              rx="1" fill={accent} opacity={0.9 - t * 0.2} />
+      {/each}
+    {/if}
     <!-- choke marker: pads carrying the same digit cut each other -->
     {#if c.p.choke > 0 && c.r.w >= 30}
       <circle cx={c.r.x + c.r.w - 10} cy={c.r.y + c.r.h - 10} r="6" fill="rgba(0,0,0,0.45)" stroke={accent} stroke-width="1" opacity="0.85" />

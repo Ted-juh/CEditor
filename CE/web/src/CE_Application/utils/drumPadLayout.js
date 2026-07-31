@@ -6,6 +6,7 @@
 // and CHOKE GROUPS (an open hat silenced by a closed one). Pure resolution +
 // geometry, so it's all unit-tested.
 import { noteOnBytes, noteOffBytes, bytesToHex, NOTE_SHARP } from './chordPadLayout.js';
+import { beatsPerStep, DIVISION_IDS } from './transportLayout.js';
 
 export { noteOnBytes, noteOffBytes, bytesToHex };
 
@@ -141,6 +142,7 @@ export function resolveDrumPads(config) {
       fullName: drumNoteLabel(note, false),
       choke,                                   // 0 = no group
       colour: String(ov.colour ?? '').trim(),  // '' = use the section accent
+      roll: ov.roll === true,                  // restrike while held/latched
     });
   }
   return out;
@@ -205,4 +207,50 @@ export function padStrikeY(rect, py) {
 export function strikeVelocity(control, strikeY) {
   if (drumVelocityFrom(control) !== 'position') return drumVelocity(control);
   return clampInt(10 + clamp01(num(strikeY, 0.5)) * 117, 1, 127);
+}
+
+// --- Roll ---------------------------------------------------------------------
+// A pad with `roll` set restrikes for as long as it is ON — held under 'momentary',
+// latched under 'toggle'. Not a fourth grid MODE: rolling is a property of the
+// instrument, and a kick that buzzed every time you leant on it would be unplayable.
+// One-shots are excluded because the pad is already gone by its own gate.
+export const ROLL_MODES = ['momentary', 'toggle'];
+
+export function drumRollRate(cfg) {
+  const r = String((cfg ?? {}).rollRate ?? '1/16');
+  return DIVISION_IDS.includes(r) ? r : '1/16';
+}
+
+/**
+ * How long between strikes of a roll, in milliseconds.
+ *
+ * Musical when synced and a tempo is on offer: the same beatsPerStep the Arpeggiator and the Turing
+ * Machine step by, so a roll set to 1/32 IS a 1/32 against the panel transport and stays one when
+ * the tempo moves. `bpm` of null means nothing is running to sync to, and the free-running rate
+ * takes over rather than the roll stopping — a panel with no Transport control still has pads.
+ */
+export function rollIntervalMs(cfg, bpm = null) {
+  const c = cfg && typeof cfg === 'object' ? cfg : {};
+  const tempo = Number(bpm);
+  if (c.rollSync !== false && Number.isFinite(tempo) && tempo > 0) {
+    return Math.max(10, Math.round(beatsPerStep(drumRollRate(c)) * (60000 / tempo)));
+  }
+  // Strikes per second, clamped to something a hand could ask for and a synth could follow.
+  const hz = Math.min(50, Math.max(0.5, num(c.rollHz, 8)));
+  return Math.max(10, Math.round(1000 / hz));
+}
+
+export function rollDelayMs(cfg) {
+  return Math.max(0, Math.round(num((cfg ?? {}).rollDelay, 0)));
+}
+
+/** The velocity a repeat strikes at, given what the opening strike used. */
+export function rollVelocity(cfg, openingVelocity) {
+  const scale = clamp01(num((cfg ?? {}).rollVelocity, 0.75));
+  return clampInt(clampInt(openingVelocity, 1, 127) * scale, 1, 127);
+}
+
+/** Whether this pad, on this grid, in this mode, should roll. */
+export function padRolls(cfg, pad, mode) {
+  return Boolean(pad?.roll) && ROLL_MODES.includes(String(mode ?? 'momentary'));
 }

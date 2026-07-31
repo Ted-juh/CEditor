@@ -112,7 +112,9 @@
   import {
     drumConfig, drumRows, drumCols, drumPads, drumChannel, drumMode, drumGateMs,
     drumGeometry, padHit, padRect, padStrikeY, strikeVelocity, chokedBy, drumOrigin,
+    padRolls, rollIntervalMs, rollDelayMs, rollVelocity,
   } from '../utils/drumPadLayout.js';
+  import { createRepeatClock } from '../utils/repeatClock.js';
   import {
     midiNoteState, midiExpressionState, midiRouteEvents, startNoteInputListener, clearNoteInput,
   } from '../stores/noteInput.js';
@@ -2828,6 +2830,19 @@
   const drumHits = {};        // id -> { [padId]: { note, mode } }
   const drumTimers = {};      // id -> [timeoutId...]  (one-shot gates)
   let drumPress = null;       // { id, padId } while the pointer holds a pad
+  // ROLL. A pad marked `roll` restrikes for as long as it is ON — held under 'momentary', latched
+  // under 'toggle'. The clock is the same one a repeating button holds; what differs is only what
+  // firing MEANS, which here is note-off then note-on at the roll velocity.
+  const drumRolling = {};     // "id:padId" -> { control, pad }
+  const drumRollKey = (id, padId) => `${id}:${padId}`;
+  const drumRollClock = createRepeatClock({
+    onFire: (key) => {
+      const held = drumRolling[key];
+      if (!held) return;
+      restrikeDrumPad(held.control, held.pad);
+    },
+  });
+  onDestroy(() => drumRollClock.destroy());
   function isDrumPadsControl(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'DrumPads';
   }
@@ -2845,6 +2860,10 @@
   }
   function drumNoteOff(control, padId) {
     const id = getControlId(control);
+    // Stop the roll FIRST, and unconditionally. This is the one place every way a pad can stop
+    // passes through — released, toggled off, choked by a group-mate, or cut by its one-shot gate —
+    // so a roll that outlived any of them would be a roll with no pad under it.
+    stopDrumRoll(id, padId);
     const held = (drumHits[id] ?? {})[padId];
     if (!held) return;
     sendNoteBytes(noteOffBytes(drumChannel(control), held.note), `note_off_${held.note}`);
@@ -2869,8 +2888,9 @@
     if (map[pad.id]) drumNoteOff(control, pad.id);        // restrike cleanly
     const strikeVel = strikeVelocity(control, strikeY);
     sendNoteBytes(noteOnBytes(ch, pad.note, strikeVel), `note_on_${pad.note}`);
-    map[pad.id] = { note: pad.note, mode };
+    map[pad.id] = { note: pad.note, mode, velocity: strikeVel };
     raiseComponent(control, 'onHit', { id: pad.id, note: pad.note, notes: [pad.note], velocity: strikeVel });
+    startDrumRoll(control, pad, mode);
     if (mode === 'oneShot') {
       (drumTimers[id] ??= []).push(setTimeout(() => {
         drumNoteOff(control, pad.id);
@@ -2879,6 +2899,48 @@
     }
     syncDrumSession(control, { label: pad.label, note: pad.note });
   }
+  /**
+   * One strike of a roll: off, then on again, at the roll velocity.
+   *
+   * The note-off matters. A drum sound is usually one-shot on the synth side, but a pad in
+   * 'momentary' holds its note until release, so a bare second note-on would leave the first
+   * hanging — the same reason drumHit restrikes cleanly rather than stacking.
+   *
+   * The opening strike keeps its own velocity and the repeats sit under it, which is what makes a
+   * roll read as an accent followed by a buzz rather than as a machine gun.
+   */
+  function restrikeDrumPad(control, pad) {
+    const id = getControlId(control);
+    const held = (drumHits[id] ?? {})[pad.id];
+    if (!held) { stopDrumRoll(id, pad.id); return; }
+    const cfg = drumConfig(control);
+    const ch = drumChannel(control);
+    const vel = rollVelocity(cfg, held.velocity ?? drumVelocity(control));
+    sendNoteBytes(noteOffBytes(ch, held.note), `note_off_${held.note}`);
+    sendNoteBytes(noteOnBytes(ch, held.note, vel), `note_on_${held.note}`);
+    raiseComponent(control, 'onHit',
+      { id: pad.id, note: held.note, notes: [held.note], velocity: vel, roll: true });
+  }
+
+  function startDrumRoll(control, pad, mode) {
+    const cfg = drumConfig(control);
+    if (!padRolls(cfg, pad, mode)) return;
+    const key = drumRollKey(getControlId(control), pad.id);
+    drumRolling[key] = { control, pad };
+    // Synced to the panel transport when there is one to sync to, exactly as the Arpeggiator's
+    // steps are — so a roll set to 1/32 is a 1/32 and stays one when the tempo moves.
+    drumRollClock.start(key, {
+      delay: rollDelayMs(cfg),
+      interval: rollIntervalMs(cfg, cfg.rollSync !== false ? transportBpmNow() : null),
+    });
+  }
+
+  function stopDrumRoll(id, padId) {
+    const key = drumRollKey(id, padId);
+    drumRollClock.stop(key);
+    delete drumRolling[key];
+  }
+
   // The pad under a point, plus how high up it you struck.
   function drumPadAtPoint(control, localPoint) {
     const geom = drumGeomFor(control);
@@ -4027,7 +4089,12 @@
         const id = getControlId(c);
         for (const t of drumTimers[id] ?? []) clearTimeout(t);
         drumTimers[id] = [];
+        // drumNoteOff stops each pad's roll on the way out; this catches a roll whose pad is no
+        // longer in drumHits, which a torn-down surface can leave behind.
         for (const padId of Object.keys(drumHits[id] ?? {})) drumNoteOff(c, padId);
+        for (const key of Object.keys(drumRolling)) {
+          if (key.startsWith(`${id}:`)) { drumRollClock.stop(key); delete drumRolling[key]; }
+        }
         drumPress = null;
         syncDrumSession(c, null);
       }

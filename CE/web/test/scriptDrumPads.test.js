@@ -29,7 +29,9 @@ import { VERB_VALUES } from '../src/CE_Application/scripting/componentTables.js'
 import {
   drumPads, drumPadCount, resolveDrumPads, padCell, strikeVelocity,
   PAD_ORIGINS, PAD_VELOCITY_SOURCES, GM_CHOKE,
+  ROLL_MODES, padRolls, rollIntervalMs, rollDelayMs, rollVelocity,
 } from '../src/CE_Application/utils/drumPadLayout.js';
+import { beatsPerStep, DIVISION_IDS } from '../src/CE_Application/utils/transportLayout.js';
 
 const FAMILY = COMPONENT_FAMILIES.find((f) => f.id === 'drumpads');
 
@@ -210,6 +212,88 @@ test('the pad list is sized by rows and cols, so a script cannot grow it', () =>
   withKit((d) => {
     assert.equal(typeof d.insert, 'undefined');
     assert.equal(typeof d.remove, 'undefined');
-    assert.deepEqual(Object.keys(d.size('Kit')).sort(), ['choke', 'colour', 'label', 'note']);
+    assert.deepEqual(Object.keys(d.size('Kit')).sort(), ['choke', 'colour', 'label', 'note', 'roll']);
+  });
+});
+
+/* -------------------------------------------------------------------------------- the roll */
+
+test('roll resolves per pad, and only in a mode a pad can stay on in', () => {
+  // A roll runs for as long as the pad is ON. A one-shot releases itself after its gate, so there
+  // is no "while held" for a roll to fill — and saying so here is what stops the preview surface
+  // from starting a clock nothing will ever stop.
+  const cfg = { rows: 1, cols: 2, pads: [{ roll: true }, {}] };
+  const [rolls, plain] = resolveDrumPads(cfg);
+  assert.equal(rolls.roll, true);
+  assert.equal(plain.roll, false, 'a pad with no entry does not roll');
+
+  assert.deepEqual(ROLL_MODES, ['momentary', 'toggle']);
+  for (const mode of ROLL_MODES) assert.equal(padRolls(cfg, rolls, mode), true, mode);
+  assert.equal(padRolls(cfg, rolls, 'oneShot'), false, 'a one-shot cannot roll');
+  assert.equal(padRolls(cfg, plain, 'momentary'), false);
+});
+
+test('the roll interval is musical, and follows the tempo', () => {
+  // Derived from beatsPerStep — the same table the Arpeggiator and the Turing Machine step by — so
+  // "1/16" here means what it means everywhere else in the panel.
+  const at = (rate, bpm) => rollIntervalMs({ rollRate: rate, rollSync: true }, bpm);
+  assert.equal(at('1/16', 120), Math.round(beatsPerStep('1/16') * (60000 / 120)));
+  assert.equal(at('1/16', 120), 125);
+  assert.equal(at('1/32', 120), 63);
+  assert.equal(at('1/16', 60), 250, 'half the tempo is twice the interval');
+  assert.equal(at('1/8T', 120), Math.round(beatsPerStep('1/8T') * 500), 'triplets too');
+
+  // Unsynced, or synced with nothing to sync to: the free rate takes over rather than the roll
+  // dying. A panel with no Transport control still has pads.
+  assert.equal(rollIntervalMs({ rollSync: false, rollHz: 8 }, 120), 125);
+  assert.equal(rollIntervalMs({ rollSync: false, rollHz: 20 }, 120), 50);
+  assert.equal(rollIntervalMs({ rollSync: true, rollRate: '1/16' }, null), 125, 'falls back to rollHz');
+  assert.equal(rollIntervalMs({ rollSync: false, rollHz: 9999 }, null), 20, 'and is clamped to something playable');
+});
+
+test('repeats sit under the strike that opened them', () => {
+  // What makes a roll read as an accent followed by a buzz rather than as a machine gun.
+  assert.equal(rollVelocity({ rollVelocity: 0.75 }, 100), 75);
+  assert.equal(rollVelocity({ rollVelocity: 1 }, 100), 100, 'a scale of 1 is a flat roll');
+  assert.equal(rollVelocity({ rollVelocity: 0 }, 100), 1, 'never silent — a note-on of 0 is a note-off');
+  assert.equal(rollVelocity({}, 120), 90, 'the default leaves the roll clearly below the accent');
+});
+
+test('a script can give one pad a roll and set the grid up to play it', () => {
+  withKit((d, live) => {
+    assert.equal(d.roll('Kit', 2, true), true);
+    assert.equal(d.rollRate('Kit', '1/32'), true);
+    assert.equal(d.rollDelay('Kit', 120), true);
+    assert.equal(d.rollVelocity('Kit', 0.6), true);
+
+    const pads = drumPads(live());
+    assert.deepEqual(pads.map((p) => p.roll).filter(Boolean), [true], 'exactly one rolling pad');
+    assert.equal(pads[1].roll, true);
+
+    const cfg = live()._children.DrumPads;
+    assert.equal(rollIntervalMs(cfg, 120), 63, '1/32 at 120');
+    assert.equal(rollDelayMs(cfg), 120);
+    assert.equal(rollVelocity(cfg, 100), 60);
+
+    // …and it reads back by the same names it was written by.
+    assert.deepEqual(d.read('Kit', 'roll'), pads.map((p) => p.roll));
+    assert.equal(d.read('Kit').rollRate, '1/32');
+  });
+});
+
+test('a rate the transport does not have is a no-op', () => {
+  withKit((d, live) => {
+    assert.equal(d.rollRate('Kit', '1/7'), false);
+    assert.equal(live()._children.DrumPads.rollRate, '1/16');
+    assert.equal(VERB_VALUES['drumpads.rollRate'], DIVISION_IDS, 'offered from the transport\'s own table');
+  });
+});
+
+test('fill can set which pads roll in one call', () => {
+  withKit((d) => {
+    const which = [false, true, true, false, false, false, false, false,
+                   false, false, false, false, false, false, false, false];
+    assert.equal(d.fill('Kit', 'roll', which), true);
+    assert.deepEqual(d.read('Kit', 'roll'), which);
   });
 });

@@ -65,6 +65,7 @@ export const VERB_VALUES = {
   'drumpads.mode': PAD_MODES,
   'drumpads.origin': PAD_ORIGINS,
   'drumpads.velocityFrom': PAD_VELOCITY_SOURCES,
+  'drumpads.rollRate': DIVISION_IDS,
   'turing.division': DIVISION_IDS,
   'constellation.mode': CONSTELLATION_MODES,
   'router.source': ROUTER_INPUT_SOURCES.map((s) => String(s?.id ?? s)),
