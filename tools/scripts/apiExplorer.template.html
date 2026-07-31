@@ -125,6 +125,11 @@ a { color: var(--accent); }
 .rail a:hover { color: var(--ink); background: var(--rule-soft); }
 .rail a.here { color: var(--accent); border-left-color: var(--accent); background: var(--accent-2); }
 .rail a code { font-size: 12px; }
+/* The reference branches, mirrored into the rail. There used to be one link called "Every module"
+   for all 41 of them, so the only way to reach ce.components.drumpads was to scroll past twenty
+   others looking for it. */
+.rail a.sub { padding-left: 32px; font-size: 12.5px; color: var(--ink-3); }
+.rail a.sub:hover { color: var(--ink-2); }
 
 .page { min-width: 0; padding: 0 var(--pad) 90px; }
 .band { max-width: 1120px; margin-inline: auto; }
@@ -240,8 +245,40 @@ pre code { font-size: inherit; }
 .seg { display: flex; border: 1px solid var(--rule); background: var(--raised); }
 .hits { font-family: var(--mono); font-size: 11px; color: var(--ink-3); flex-basis: 100%; margin: 0; }
 
+/* ------------------------------------------------------------------------------ tree */
+/* The reference was 41 sibling panels in one run — 28 of them a component — and one nav link
+   pointing at the whole thing. It is a tree now: six groups, with the components subdivided again
+   underneath. Indentation is a left rule per level rather than padding, so a member's text stays
+   where the eye expects it however deep the branch is. */
+.grp { border-bottom: 1px solid var(--rule); }
+.grp[hidden] { display: none; }
+.grp > summary {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  padding: 17px 0; cursor: pointer; list-style: none;
+}
+.grp > summary::-webkit-details-marker { display: none; }
+.grp > summary::before {
+  content: "▸"; color: var(--ink-3); font-size: 11px; width: 10px; flex: none;
+}
+.grp[open] > summary::before { content: "▾"; }
+.grp > summary:hover .grp-name { text-decoration: underline; text-underline-offset: 3px; }
+.grp-name { font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+.grp-blurb { font-size: 13.5px; color: var(--ink-2); flex: 1 1 30ch; margin: 0; }
+.grp-n {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-3);
+  font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: auto;
+}
+.grp-body { padding-left: 17px; border-left: 1px solid var(--rule); margin-left: 4px; }
+/* A subgroup is the same shape one size down — it is a level of the same tree, not a new idea. */
+.grp.sub { border-bottom: 0; }
+.grp.sub > summary { padding: 11px 0; }
+.grp.sub .grp-name { font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.grp.sub .grp-blurb { font-size: 12.5px; color: var(--ink-3); }
+.grp.sub + .grp.sub { border-top: 1px solid var(--rule-soft); }
+
 /* ---------------------------------------------------------------------------- modules */
 .mod { border-bottom: 1px solid var(--rule-soft); }
+.mod:last-child { border-bottom: 0; }
 .mod[hidden] { display: none; }
 .mod > summary {
   display: grid; grid-template-columns: minmax(190px, 260px) minmax(0, 1fr) auto;
@@ -475,6 +512,7 @@ pre code { font-size: inherit; }
     <a href="#wiring">A panel is a graph</a>
     <h2>Reference</h2>
     <a href="#surface">Every module</a>
+    <span id="navtree"></span>
     <a href="#hooks">Lifecycle hooks</a>
     <a href="#eventlist">Events</a>
     <a href="#weight">What it weighs</a>
@@ -2217,8 +2255,9 @@ end</code></pre>
 
   /* ------------------------------------------------------------- the sheet */
   const rtLabel = (rt) => (rt === "any" ? "cross-runtime" : "panel view");
-  const modsEl = $("#mods");
-  modsEl.innerHTML = DATA.modules.map((m) => `
+  const MODULE_BY_ID = new Map(DATA.modules.map((m) => [m.id, m]));
+
+  const moduleBlock = (m) => `
     <details class="mod" data-id="${esc(m.id)}" data-rt="${esc(m.runtime)}">
       <summary>
         <span>
@@ -2248,7 +2287,44 @@ end</code></pre>
             ${egBlock(v)}
           </article>`).join("")}
       </div>
-    </details>`).join("");
+    </details>`;
+
+  /** One branch of the tree. Groups start closed: the point of the tree is that you choose what to
+   *  open, and six headings you can take in at a glance beat 41 panels you cannot. */
+  const groupBlock = (g, sub = false) => `
+    <details class="grp${sub ? " sub" : ""}" data-group="${esc(g.id)}">
+      <summary>
+        <span class="grp-name">${esc(g.label)}</span>
+        <p class="grp-blurb">${doc(g.blurb)}</p>
+        <span class="grp-n"><span data-gcount>${num(g.members)}</span> members</span>
+      </summary>
+      <div class="grp-body">
+        ${(g.subgroups ?? []).map((s) => groupBlock(s, true)).join("")}
+        ${g.modules.map((id) => MODULE_BY_ID.get(id)).filter(Boolean).map(moduleBlock).join("")}
+      </div>
+    </details>`;
+
+  $("#mods").innerHTML = DATA.tree.map((g) => groupBlock(g)).join("");
+
+  // The same branches in the rail. Clicking one opens it and scrolls to it, rather than dropping
+  // you at the top of the reference to hunt.
+  $("#navtree").innerHTML = DATA.tree.flatMap((g) => [
+    `<a class="sub" href="#grp-${esc(g.id)}" data-goto="${esc(g.id)}">${esc(g.label)}</a>`,
+    ...(g.subgroups ?? []).map((s) =>
+      `<a class="sub" style="padding-left:44px" href="#grp-${esc(s.id)}" data-goto="${esc(s.id)}">${esc(s.label)}</a>`),
+  ]).join("");
+
+  $("#navtree").addEventListener("click", (e) => {
+    const link = e.target.closest("[data-goto]");
+    if (!link) return;
+    e.preventDefault();
+    const el = $(`.grp[data-group="${link.dataset.goto}"]`);
+    if (!el) return;
+    // Open it AND every branch above it — opening a subgroup inside a closed group scrolls to
+    // nothing.
+    for (let node = el; node; node = node.parentElement?.closest(".grp")) node.open = true;
+    el.scrollIntoView({ block: "start", behavior: "smooth" });
+  });
 
   /* ----------------------------------------------------- hooks and events */
   // Same shape as the members, for the same reason. Events were the worst case on a narrow screen:
@@ -2294,12 +2370,16 @@ end</code></pre>
     for (const el of $$(".mod")) {
       const mod = DATA.modules.find((m) => m.id === el.dataset.id);
       const rtOk = runtime === "all" || el.dataset.rt === runtime;
-      if (!rtOk) { el.hidden = true; continue; }
+      // `shown` is what the branches above add up. It has to be set on every path, including the
+      // ones that hide the module — a stale count from the previous keystroke would otherwise be
+      // rolled up as though those members were still on screen.
+      if (!rtOk) { el.hidden = true; el.dataset.shown = 0; continue; }
 
       if (!term) {
         el.hidden = false;
         shownMods += 1;
         shownMembers += mod.members.length;
+        el.dataset.shown = mod.members.length;
         $$(".mem", el).forEach((r) => { r.hidden = false; r.classList.remove("mark"); });
         $("[data-count]", el).textContent = mod.members.length;
         continue;
@@ -2318,11 +2398,30 @@ end</code></pre>
       const idHit = mod.id.toLowerCase().includes(term);
       if (idHit && !n) { rows.forEach((r) => { r.hidden = false; }); n = rows.length; }
       el.hidden = !(n || idHit);
+      el.dataset.shown = el.hidden ? 0 : n;
       if (!el.hidden) {
         el.open = true;
         shownMods += 1;
         shownMembers += n;
         $("[data-count]", el).textContent = n;
+      }
+    }
+
+    // Roll the surviving modules up the tree. A branch whose modules have all been filtered out
+    // hides rather than sitting there claiming members you cannot see, and a branch with a hit
+    // opens itself — a search that leaves its own result one click away is a search that failed.
+    // Innermost first, so a subgroup has settled before the group above it counts it.
+    for (const el of [...$$(".grp")].reverse()) {
+      const live = $$(":scope > .grp-body > .mod, :scope > .grp-body > .grp", el)
+        .filter((child) => !child.hidden);
+      const n = live.reduce((sum, child) => sum + Number(child.dataset.shown ?? 0), 0);
+      el.dataset.shown = n;
+      el.hidden = !live.length;
+      if (!el.hidden) {
+        $("[data-gcount]", el).textContent = num(n);
+        // Only force a branch open while filtering; with no filter, leave the reader's own
+        // choices alone rather than re-collapsing what they opened.
+        if (term || runtime !== "all") el.open = true;
       }
     }
 
@@ -2341,7 +2440,9 @@ end</code></pre>
     const open = e.currentTarget.getAttribute("aria-pressed") !== "true";
     e.currentTarget.setAttribute("aria-pressed", String(open));
     e.currentTarget.textContent = open ? "Collapse all" : "Expand all";
-    $$(".mod").forEach((d) => { d.open = open; });
+    // Every level, not just the modules: opening the modules inside a closed group would look
+    // like the button had done nothing at all.
+    $$(".grp, .mod").forEach((d) => { d.open = open; });
   });
   apply();
 

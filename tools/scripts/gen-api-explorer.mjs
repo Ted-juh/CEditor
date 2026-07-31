@@ -29,7 +29,7 @@ const { PURE, WRITTEN } = await import(join(here, 'apiExamples.mjs'));
 const {
   MODULES, ALL_MEMBERS, ALL_EVENTS, LIFECYCLE_HOOKS, MODULE_COST, MODULE_COST_LANGUAGES,
   CE_API_VERSION, RUNTIME_ANY, COST_SHARED_KEY,
-  moduleMemberMap, memberRuntime, memberPath, isValueMember, MEMBER_BY_ID,
+  moduleMemberMap, memberRuntime, memberPath, isValueMember, MEMBER_BY_ID, moduleTree,
 } = api;
 
 /* ------------------------------------------------------------------ examples ------------------ */
@@ -294,6 +294,11 @@ function describeArg(p, given = false) {
   };
 }
 
+/** How many members a group holds, so a collapsed branch can say what is inside it. */
+function countMembers(ids, modules) {
+  return ids.reduce((n, id) => n + (modules.find((m) => m.id === id)?.members.length ?? 0), 0);
+}
+
 /** The shape the page renders. Everything here comes from the contract; nothing is retyped. */
 function contract() {
   const modules = MODULES.map((mod) => {
@@ -347,6 +352,15 @@ function contract() {
       crossRuntime: modules.filter((m) => m.runtime === RUNTIME_ANY).length,
     },
     modules,
+    // How they are filed. The page renders the reference from this rather than from `modules`
+    // order, so a module moves between groups by moving in the contract and nowhere else.
+    tree: moduleTree().map((group) => ({
+      ...group,
+      members: countMembers(group.modules, modules),
+      subgroups: group.subgroups.map((sub) => ({
+        ...sub, members: countMembers(sub.modules, modules),
+      })),
+    })),
     hooks: LIFECYCLE_HOOKS.map((h) => ({
       id: h.id, sig: h.signature, doc: h.summary, rt: memberRuntime(h),
       // What the hook is handed. onPanelReady(info) told a reader `info` existed and left

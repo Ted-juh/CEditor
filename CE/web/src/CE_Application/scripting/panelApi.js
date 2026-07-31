@@ -323,7 +323,7 @@ const SHARED_OPTION_FIELDS = {
     name: 'kind', type: 'text', default: '"info"', values: ['info', 'warn', 'error'],
     summary: 'How serious it is, which sets the colour and the icon.',
   },
-  uiTitle: { name: 'title', type: 'text', sample: '"Overwrite the patch?"', summary: 'The heading line.' },
+  uiTitle: { name: 'title', type: 'text', sample: '"Overwrite the patch?"', summary: 'The bold line at the top.' },
   uiMessage: { name: 'message', type: 'text', sample: '"This cannot be undone."', summary: 'The body text under the heading.' },
   uiAccept: {
     name: 'accept', type: 'text', default: '"OK"',
@@ -408,7 +408,7 @@ export const LIFECYCLE_HOOKS = [
       { name: 'event', type: 'text', summary: 'The handler that was running, such as "onValueChanged".' },
       { name: 'phase', type: 'text', values: ['load', 'dispatch'],
         summary: 'Whether it failed while being loaded or while handling an event.' },
-      { name: 'message', type: 'text', summary: 'What went wrong.' },
+      { name: 'message', type: 'text', summary: 'What went wrong, in words.' },
     ]) }],
     snippet: {
       lua: 'function onError(info)\n  set("status.text", info.script .. ": " .. info.message)\n  $0\nend',
@@ -1251,7 +1251,7 @@ export const COMMANDS = [
           summary: 'How far into the dash pattern to start. Advance it on a timer and the dashes '
             + 'march along the line.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'How a line ends.' },
+          summary: 'The shape a line ends in.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
           summary: 'How two line segments meet at a corner.' },
       ]) },
@@ -1361,8 +1361,8 @@ export const COMMANDS = [
           + 'knob pointer orbits somewhere it should not.' },
       { name: 'cy', type: 'number', default: 'the middle of the control', unit: 'pixels', sample: '40',
         summary: 'The vertical point to rotate about.' },
-      { name: 'x', type: 'number', default: '0', unit: 'pixels', summary: 'Shift sideways.' },
-      { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Shift up or down.' },
+      { name: 'x', type: 'number', default: '0', unit: 'pixels', summary: 'Move everything sideways.' },
+      { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Move everything up or down.' },
       { name: 'scale', type: 'number', default: '1',
         summary: 'Grow or shrink. 2 is double size, 0.5 is half.' },
     ]) }],
@@ -1431,7 +1431,7 @@ export const COMMANDS = [
         { name: 'width', type: 'number', default: 'the control\'s width', unit: 'pixels', sample: '120',
           summary: 'How wide the grid is.' },
         { name: 'height', type: 'number', default: 'the control\'s height', unit: 'pixels', sample: '60',
-          summary: 'How tall it is.' },
+          summary: 'How tall the grid is.' },
         { name: 'step', type: 'number', unit: 'pixels', sample: '10',
           summary: 'Spacing both ways — a line every this many pixels. Use this or `columns`, not '
             + 'both: a ruler knows its spacing, a step sequencer knows its count.' },
@@ -1723,13 +1723,14 @@ export const COMMANDS = [
           { name: 'family', type: 'text', sample: '"Inter Tight"',
             summary: 'The font family. One nobody has is refused rather than stored, where a bare '
               + 'set() would keep the typo and quietly fall back to a system font.' },
-          { name: 'size', type: 'number', unit: 'pixels', sample: '18', summary: 'Text size.' },
+          { name: 'size', type: 'number', unit: 'pixels', sample: '18',
+            summary: 'How big the text is drawn.' },
           { name: 'weight', type: 'number or text', sample: '600',
             summary: 'How heavy the text is, either as a number from 100 to 900 or as a name such '
               + 'as "Bold". The panel stores this as a pair of fields that must agree, and this '
               + 'always writes both.' },
           { name: 'bold', type: 'true or false', summary: 'A shorthand for a heavy weight.' },
-          { name: 'italic', type: 'true or false', summary: 'Slant the text.' },
+          { name: 'italic', type: 'true or false', summary: 'Slant the text over.' },
           { name: 'caseMode', type: 'text', default: '"normal"', values: CASE_MODES,
             summary: 'Re-case the text as it is drawn, without changing what it says.' },
           { name: 'scriptMode', type: 'text', default: '"normal"', values: SCRIPT_MODES,
@@ -1754,10 +1755,10 @@ export const COMMANDS = [
             summary: 'Inset it from the top edge.' },
           { name: 'paddingBottom', type: 'number', default: '0', unit: 'pixels',
             summary: 'Inset it from the bottom edge.' },
-          { name: 'underline', type: 'true or false', default: 'false', summary: 'Rule under it.' },
+          { name: 'underline', type: 'true or false', default: 'false', summary: 'Draw a rule under it.' },
           { name: 'strikethrough', type: 'true or false', default: 'false',
-            summary: 'Rule through it.' },
-          { name: 'overline', type: 'true or false', default: 'false', summary: 'Rule above it.' },
+            summary: 'Draw a rule through it.' },
+          { name: 'overline', type: 'true or false', default: 'false', summary: 'Draw a rule above it.' },
           ...FEATURE_KEYS.map((key) => ({
             name: key, type: 'true or false', default: 'false', group: 'typographic feature',
             summary: `${TYPOGRAPHIC_FEATURES[key]} A font that does not offer it refuses the `
@@ -1825,7 +1826,7 @@ export const COMMANDS = [
       { name: 'x', type: 'number', required: true }, { name: 'y', type: 'number', required: true },
       { name: 'text', type: 'string', required: true },
       { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'The text size.' },
+        { name: 'size', type: 'number', unit: 'pixels', sample: '12', summary: 'How big the text is.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
           summary: 'Which part of the text sits at the x you gave.' },
         { name: 'family', type: 'text', sample: '"Inter Tight"', summary: 'The font family to draw in.' },
@@ -2491,7 +2492,8 @@ export const COMMANDS = [
         { name: 'type', type: 'text', default: '"number"',
           summary: 'What kind of value it holds — a number, or a choice from `choices`.' },
         { name: 'min', type: 'number', default: '0', summary: 'The lowest value it accepts.' },
-        { name: 'max', type: 'number', default: '127', summary: 'The highest.' },
+        { name: 'max', type: 'number', default: '127',
+          summary: 'The highest value it accepts.' },
         { name: 'access', type: 'text', default: '"readwrite"',
           summary: 'Whether the synth lets you read this parameter, write it, or both.' },
         { name: 'choices', type: 'list of text',
@@ -3561,6 +3563,61 @@ export const MODULE_EXT_ROOT = 'ce.ext';   // reserved for installed third-party
 // rather than in a runtime so every runtime reports the same number.
 export const CE_API_VERSION = '1.0';
 
+/* ------------------------------------------------------------------ module groups */
+// The reference used to be 41 modules in one flat run, 28 of them ce.components.*, with a single
+// nav-rail link called "Every module" pointing at the lot. Customers said what that is like to
+// use: "all components are in one long list while it would be easier to have them under a
+// collapsible tree, even subcategorised."
+//
+// So the modules are filed. `MODULE_GROUPS` is the top level and `COMPONENT_GROUPS` sorts the
+// component families underneath it — the same division the COMPONENT_FAMILIES source already made
+// in its section comments, written down as data so the page and the nav rail can both read it.
+// Both are checked below: a module in no group, or a group naming a module that does not exist,
+// fails at load rather than quietly vanishing from the page.
+
+export const MODULE_GROUPS = [
+  { id: 'core', label: 'The basics',
+    blurb: 'Always available, in every script.',
+    modules: ['ce.core'] },
+  { id: 'sound', label: 'Notes, MIDI and time',
+    blurb: 'Talking to the instrument, and doing it in time with the music.',
+    modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
+  { id: 'numbers', label: 'Working out values',
+    blurb: 'Arithmetic on values and ranges, and moving a value over time instead of jumping it.',
+    modules: ['ce.math', 'ce.anim'] },
+  { id: 'panel', label: 'The panel itself',
+    blurb: 'Building and arranging controls, and remembering things between sessions.',
+    modules: ['ce.panel', 'ce.storage'] },
+  { id: 'appearance', label: 'How it looks',
+    blurb: 'Drawing, images, type, and talking to whoever is using the panel.',
+    modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
+  { id: 'components', label: 'Components',
+    blurb: 'One module per interactive component. Each takes the control\'s name first, and every '
+      + 'verb reports whether the component now holds what you asked for.',
+    componentGroups: true },
+];
+
+export const COMPONENT_GROUPS = [
+  { id: 'notes', label: 'Note sources',
+    blurb: 'Components that produce notes.',
+    modules: ['arp', 'chordpad', 'noteribbon', 'drumpads', 'phrase', 'recorder', 'harmony'] },
+  { id: 'movement', label: 'Movement and randomness',
+    blurb: 'Components that keep changing on their own.',
+    modules: ['turing', 'looper', 'orbit', 'kinetic', 'constellation', 'timbre'] },
+  { id: 'routing', label: 'Routing and modulation',
+    blurb: 'Components that send one value somewhere else, or shape it on the way.',
+    modules: ['router', 'macro', 'matrix', 'constraint', 'envelope', 'split'] },
+  { id: 'handson', label: 'Hands-on controls',
+    blurb: 'Components you play with directly.',
+    modules: ['ribbon', 'crossfader', 'joystick', 'meter'] },
+  { id: 'displays', label: 'Displays',
+    blurb: 'Components that show something rather than set it.',
+    modules: ['lcd', 'pixel'] },
+  { id: 'panelwide', label: 'Panel-wide',
+    blurb: 'Components that act on the whole panel rather than one value.',
+    modules: ['transport', 'panic', 'setlist'] },
+];
+
 export const MODULES = [
   { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
     summary: 'Values, flow and logging — the verbs every script uses. Never namespaced.' },
@@ -3636,6 +3693,47 @@ export const MODULES = [
     summary: `${fam.summary} Panel view only — the component is modelled there.`,
   })),
 ];
+
+/* ------------------------------------------------- the grouping, checked and indexed */
+// A module that no group claims would simply not appear on the page, and a group naming one that
+// does not exist would render an empty row. Both are silent failures of the kind the whole
+// generate-rather-than-write approach exists to prevent, so both are errors at load.
+
+/** Every module id a group claims, component short names expanded to full module ids. */
+const GROUPED_MODULE_IDS = MODULE_GROUPS.flatMap((group) => (group.componentGroups
+  ? COMPONENT_GROUPS.flatMap((sub) => sub.modules.map((id) => `ce.components.${id}`))
+  : group.modules));
+
+{
+  const known = new Set(MODULES.map((m) => m.id));
+  const unfiled = [...known].filter((id) => !GROUPED_MODULE_IDS.includes(id));
+  const phantom = GROUPED_MODULE_IDS.filter((id) => !known.has(id));
+  const twice = GROUPED_MODULE_IDS.filter((id, i) => GROUPED_MODULE_IDS.indexOf(id) !== i);
+  if (unfiled.length) throw new Error(`panelApi: module(s) in no group: ${unfiled.join(', ')}`);
+  if (phantom.length) throw new Error(`panelApi: group names unknown module(s): ${phantom.join(', ')}`);
+  if (twice.length) throw new Error(`panelApi: module(s) in two groups: ${twice.join(', ')}`);
+}
+
+/**
+ * The modules as a two-level tree: top-level groups, and for Components a level of families
+ * underneath. Each node carries the module ids it holds, in the order the group declares them.
+ */
+export function moduleTree() {
+  return MODULE_GROUPS.map((group) => ({
+    id: group.id,
+    label: group.label,
+    blurb: group.blurb,
+    modules: group.componentGroups ? [] : [...group.modules],
+    subgroups: group.componentGroups
+      ? COMPONENT_GROUPS.map((sub) => ({
+        id: sub.id,
+        label: sub.label,
+        blurb: sub.blurb,
+        modules: sub.modules.map((id) => `ce.components.${id}`),
+      }))
+      : [],
+  }));
+}
 
 // module id -> the members it owns. A plain array means "keep the member's own name"; an object
 // maps shortName -> memberId, which is how ce.components.setlist.next reaches `setlistNext`.
